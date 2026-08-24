@@ -54,6 +54,12 @@ vi.mock(
     }),
     identityEmail: () => ({ resolveEmail: async () => null }),
     identityService: () => ({}),
+    identityGuards: () => ({}),
+    identityProjectionStore: () => ({}),
+    identityBridgeCeremonies: () => ({
+      beforeAccountCreate: async () => undefined,
+      beforeAccountDelete: async () => undefined,
+    }),
     identityBackfill: () => ({}),
     identifierBackfillMigration: () => ({}),
     identityBirth: () => ({}),
@@ -61,6 +67,10 @@ vi.mock(
     identitySecretCarry: () => ({}),
     identitySecretHealMigration: () => ({}),
     isLatched: async () => false,
+    isAnyoneLatched: async () => false,
+    // A value, not a factory: the runtime exports the birth-aware gate itself
+    // so the adapter and the databaseHooks bridge fork on one closure.
+    routesToIdentityBranch: async () => false,
     // `betterAuth()` builds its adapter EAGERLY at module load, so this one
     // has to be real enough to initialise. better-auth's own memory engine
     // over an empty store is exactly that, and it holds nothing this suite

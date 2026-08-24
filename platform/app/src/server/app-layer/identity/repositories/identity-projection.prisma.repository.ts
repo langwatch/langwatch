@@ -30,6 +30,17 @@ export const FOLD_OWNED_ACCOUNT_COLUMNS = [
 
 const logger = createLogger("langwatch:identity:projection");
 
+/** An identifier that projects to an `Account` row at all. One with no
+ *  `accountId` projects to none — the email adopted from `User.email` never
+ *  had an `Account` behind it. */
+type LinkedIdentifier = IdentifierFact & { accountId: string };
+
+function linkedIdentifiers(state: IdentityFoldState): LinkedIdentifier[] {
+  return Object.values(state.identifiers).filter(
+    (fact): fact is LinkedIdentifier => typeof fact.accountId === "string",
+  );
+}
+
 /**
  * The identity pipeline's projection store (ADR-101 §3, ADR-116): the
  * Postgres `Identifier` head, the linkage columns of `Account`, and the
@@ -184,70 +195,85 @@ export class PrismaIdentityProjectionRepository
     userId: string;
     state: IdentityFoldState;
   }): Promise<void> {
-    // An identifier with no `accountId` projects to no row at all — the
-    // email adopted from `User.email` never had an `Account` behind it.
-    const linked = Object.values(state.identifiers).filter(
-      (fact): fact is IdentifierFact & { accountId: string } =>
-        typeof fact.accountId === "string",
-    );
+    const linked = linkedIdentifiers(state);
     if (linked.length === 0) return;
+    await this.reportWhenUserIsMissing({ userId, linked });
+    await this.removeTombstonedAccounts(linked);
+    for (const fact of linked) {
+      await this.upsertLiveAccount(fact);
+    }
+  }
 
-    // A `User` row that is not there is an ANOMALY, not a branch: the fold is
-    // projecting a user's linkage while nothing in `User` carries them. It is
-    // surfaced and the projection stays total — the row is written anyway,
-    // because `Account` carries no database foreign key (the schema's
-    // `relationMode = "prisma"` makes the cascade the client's) and a fold
-    // that silently declined would leave the projection quietly incomplete
-    // with nothing to read about it.
+  /**
+   * A `User` row that is not there is an ANOMALY, not a branch: the fold is
+   * projecting a user's linkage while nothing in `User` carries them.
+   *
+   * Surfaced, and the projection stays total — the rows are written anyway,
+   * because `Account` carries no database foreign key (the schema's
+   * `relationMode = "prisma"` makes the cascade the client's) and a fold that
+   * silently declined would leave the projection quietly incomplete with
+   * nothing to read about it.
+   */
+  private async reportWhenUserIsMissing({
+    userId,
+    linked,
+  }: {
+    userId: string;
+    linked: readonly LinkedIdentifier[];
+  }): Promise<void> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { id: true },
     });
-    if (!user) {
-      logger.warn(
-        { userId, identifiers: linked.length },
-        "the identity fold is projecting Account rows for a user with no User row; the rows are written and the anomaly is reported",
-      );
-    }
+    if (user) return;
+    logger.warn(
+      { userId, identifiers: linked.length },
+      "the identity fold is projecting Account rows for a user with no User row; the rows are written and the anomaly is reported",
+    );
+  }
 
+  /** A tombstoned identifier projects to no row. `deleteMany`, not `delete`:
+   *  the unlink that stated the detach has usually removed the row already,
+   *  and that is the expected case rather than an error. */
+  private async removeTombstonedAccounts(
+    linked: readonly LinkedIdentifier[],
+  ): Promise<void> {
     const tombstoned = linked
       .filter((fact) => !isLiveIdentifierState(fact.state))
       .map((fact) => fact.accountId);
-    if (tombstoned.length > 0) {
-      // `deleteMany`, not `delete`: the unlink that stated the detach has
-      // usually removed the row already, and that is the expected case
-      // rather than an error.
-      await this.prisma.account.deleteMany({
-        where: { id: { in: tombstoned } },
-      });
-    }
+    if (tombstoned.length === 0) return;
+    await this.prisma.account.deleteMany({
+      where: { id: { in: tombstoned } },
+    });
+  }
 
-    for (const fact of linked) {
-      if (!isLiveIdentifierState(fact.state)) continue;
-      // Without a subject there is nothing to key the row by. Facts stated
-      // before ADR-116 carry none, and are left to better-auth's own row.
-      if (fact.providerAccountId === null) continue;
-      // better-auth's own provider id, never the folded vocabulary. The
-      // identifier's `provider` collapses auth0, okta and every custom OIDC
-      // connection into `oidc`; `Account`'s uniqueness and the genericOAuth
-      // callback's lookup are both keyed by the unfolded name, so writing the
-      // folded one here makes a held user's account unfindable by the library
-      // that wrote it. A fact stated before ADR-116 carries none, and its row
-      // keeps whatever it already had.
-      const columns = {
-        userId: fact.userId,
-        ...(fact.providerId === null ? {} : { provider: fact.providerId }),
-        providerAccountId: fact.providerAccountId,
-      };
-      await this.prisma.account.upsert({
-        where: { id: fact.accountId },
-        create: {
-          id: fact.accountId,
-          ...columns,
-          provider: fact.providerId ?? fact.provider,
-        },
-        update: columns,
-      });
-    }
+  /**
+   * One live identifier's `Account` row.
+   *
+   * The provider written here is better-auth's OWN id, never the folded
+   * vocabulary: the identifier's `provider` collapses auth0, okta and every
+   * custom OIDC connection into `oidc`, while `Account`'s uniqueness and the
+   * genericOAuth callback's lookup are both keyed by the unfolded name — so
+   * writing the folded one makes a held user's account unfindable by the
+   * library that wrote it. A fact stated before ADR-116 carries neither a
+   * subject nor an unfolded id, and its row is left as better-auth's own.
+   */
+  private async upsertLiveAccount(fact: LinkedIdentifier): Promise<void> {
+    if (!isLiveIdentifierState(fact.state)) return;
+    if (fact.providerAccountId === null) return;
+    const columns = {
+      userId: fact.userId,
+      ...(fact.providerId === null ? {} : { provider: fact.providerId }),
+      providerAccountId: fact.providerAccountId,
+    };
+    await this.prisma.account.upsert({
+      where: { id: fact.accountId },
+      create: {
+        id: fact.accountId,
+        ...columns,
+        provider: fact.providerId ?? fact.provider,
+      },
+      update: columns,
+    });
   }
 }
