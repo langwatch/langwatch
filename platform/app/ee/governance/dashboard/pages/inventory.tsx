@@ -1166,6 +1166,32 @@ export function isBackfillStartLocked({
 }
 
 /**
+ * Which adapter fields the form shows but refuses to change.
+ *
+ * `startingAt` locks because the usage cursor never rewinds, so an edited
+ * start would be accepted and then ignored. `report` locks for a harder
+ * reason: the two Anthropic reports price the same spend twice, the adapter
+ * says "never both", and switching one that has already run leaves the old
+ * report's events in place while the new one replays the same period beside
+ * them. The service refuses that change too — this is the form declining to
+ * offer what the server would reject, not the guarantee itself.
+ */
+export function lockedParserKeys({
+  hasPulled,
+  report,
+}: {
+  hasPulled: boolean;
+  report: string | undefined;
+}): string[] {
+  const keys: string[] = [];
+  if (isBackfillStartLocked({ hasPulled, report })) keys.push("startingAt");
+  if (hasPulled && typeof report === "string" && report.length > 0) {
+    keys.push("report");
+  }
+  return keys;
+}
+
+/**
  * The adapter half of the edit form: the pull config fields plus the cadence,
  * rendered only for a source type the form knows how to rebuild.
  */
@@ -1189,6 +1215,11 @@ function PullConfigEditFields({
     hasPulled,
     report: parserConfig.report,
   });
+  const lockedKeys = lockedParserKeys({
+    hasPulled,
+    report: parserConfig.report,
+  });
+  const isReportLocked = lockedKeys.includes("report");
   return (
     <>
       <ParserConfigFields
@@ -1196,8 +1227,15 @@ function PullConfigEditFields({
         values={parserConfig}
         onChange={onParserConfigChange}
         mode="edit"
-        readOnlyKeys={isStartLocked ? ["startingAt"] : undefined}
+        readOnlyKeys={lockedKeys.length > 0 ? lockedKeys : undefined}
       />
+      {isReportLocked && (
+        <Text fontSize="xs" color="fg.muted">
+          The report is fixed once a source has pulled: usage and cost describe
+          the same spend, so recording both for one source would count it twice.
+          To switch, archive this source and create a new one.
+        </Text>
+      )}
       {isStartLocked && (
         <Text fontSize="xs" color="fg.muted">
           The backfill start is fixed once a source has pulled: the cursor has
@@ -1350,7 +1388,19 @@ export function SourceEditDrawer({
               colorPalette="blue"
               onClick={handleSubmit}
               loading={isPending}
-              disabled={!form.name.trim()}
+              // The same gate the create drawer uses. The server already
+              // refuses an invalid cron, so this is not what keeps a bad
+              // schedule out of the column — it is what stops the two drawers
+              // disagreeing about whether a cron the field has already marked
+              // invalid is worth submitting.
+              disabled={
+                !form.name.trim() ||
+                (isEditablePullSource(sourceType) &&
+                  composerCadenceError({
+                    sourceType,
+                    pullSchedule: form.pullSchedule,
+                  }) !== null)
+              }
             >
               Save changes
             </Button>
@@ -2031,8 +2081,11 @@ function ParserConfigField({
           value={value}
           onChange={(e) => handleChange(e.target.value)}
           placeholder={placeholder}
+          // readOnly, never disabled: a locked field is shown precisely so the
+          // admin can read what it holds, and `disabled` drops it out of the
+          // tab order where a keyboard or screen-reader user cannot reach it.
+          // The Textarea branch above says the same thing.
           readOnly={readOnly}
-          disabled={readOnly}
         />
       )}
       {hint && (

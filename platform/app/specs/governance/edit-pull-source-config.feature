@@ -70,17 +70,24 @@ Feature: Edit the configuration of a pull-mode ingestion source
       Then the backfill start is shown but cannot be changed
       And the form explains that the cursor has already moved past it
 
-  Rule: Controls that do not apply to pull sources are not offered
+  Rule: Copy that does not apply to a pull source is not shown
 
-    Scenario: Rotate secret is hidden for a pull-mode source
-      When the admin views the source
-      Then no control to rotate an ingest secret is offered
-      And the form does not describe the ingest secret as immutable
+    # Hiding the rotate control itself for pull sources is an access decision,
+    # not a form-editing one, and is deliberately not made here: the control
+    # stays where it is for every source type. What this rule covers is the
+    # drawer no longer telling a pull-source admin about an ingest secret
+    # their source does not have.
 
-    Scenario: Rotate secret remains available for a push-mode source
+    Scenario: A pull-mode source is not told its ingest secret is immutable
+      When the admin opens the edit form for a pull-mode source
+      Then the form does not describe the ingest secret as immutable
+      And the form still explains that the source type is immutable
+
+    Scenario: A push-mode source is told both are immutable
       Given a push-mode ingestion source
-      When the admin views that source
-      Then a control to rotate its ingest secret is offered
+      When the admin opens the edit form for that source
+      Then the form describes the ingest secret as immutable
+      And the form points at the rotate control for changing it
 
   Rule: The source detail page can edit, not only the source list
 
