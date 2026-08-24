@@ -362,6 +362,10 @@ function mergeSummaries(
     alreadyFinalized: a.alreadyFinalized + b.alreadyFinalized,
     alreadyRolledBack: a.alreadyRolledBack + b.alreadyRolledBack,
     claimed: a.claimed + b.claimed,
+    // Summed like any other count: the convergence loop stops when a whole
+    // pass - both legs - moved nothing, so one leg still advancing has to
+    // keep the merged answer non-zero.
+    advanced: a.advanced + b.advanced,
   };
 }
 

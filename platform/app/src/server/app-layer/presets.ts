@@ -1057,8 +1057,9 @@ export function initializeDefaultApp(options?: {
   scheduler?.start();
 
   // ADR-092 stage B: the in-place system migrations. Worker-only and
-  // fire-and-forget - one pass per boot, level-triggered, so held and parked
-  // organizations retry on the restart cadence with nobody running anything.
+  // fire-and-forget - passes run until the fleet stops moving and then stop,
+  // so held and parked organizations converge here rather than on the
+  // restart cadence with nobody running anything.
   // Redis is handed in rather than read back off the App: this composes the
   // App, so `tryGetApp()` is still null here, and a null handle would make
   // the lease unacquirable and every pass a silent no-op.

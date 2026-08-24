@@ -96,6 +96,7 @@ function targetedPassStub() {
       alreadyFinalized: 0,
       alreadyRolledBack: 0,
       claimed: 0,
+      advanced: 0,
     });
 }
 
@@ -877,6 +878,7 @@ describe("SystemMigrationsService.runForOrganization", () => {
           alreadyFinalized: 0,
           alreadyRolledBack: 0,
           claimed: 1,
+          advanced: 0,
         }),
       });
 
@@ -905,6 +907,7 @@ describe("SystemMigrationsService.runForOrganization", () => {
           alreadyFinalized: 0,
           alreadyRolledBack: 0,
           claimed: 1,
+          advanced: 0,
         }),
       });
 
@@ -934,6 +937,7 @@ describe("SystemMigrationsService.runForOrganization", () => {
           alreadyFinalized: 0,
           alreadyRolledBack: 0,
           claimed: 2,
+          advanced: 0,
         }),
       });
 
@@ -961,6 +965,7 @@ describe("SystemMigrationsService.runForOrganization", () => {
           alreadyFinalized: 3,
           alreadyRolledBack: 0,
           claimed: 0,
+          advanced: 0,
         }),
       });
 
@@ -986,6 +991,7 @@ describe("SystemMigrationsService.runForOrganization", () => {
           alreadyFinalized: 0,
           alreadyRolledBack: 3,
           claimed: 0,
+          advanced: 0,
         }),
       });
 
@@ -1011,6 +1017,7 @@ describe("SystemMigrationsService.runForOrganization", () => {
           alreadyFinalized: 0,
           alreadyRolledBack: 0,
           claimed: 0,
+          advanced: 0,
         }),
       });
 

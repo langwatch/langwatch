@@ -53,16 +53,20 @@ export type SystemMigrationRunnerDeps = {
 };
 
 /**
- * Drives every registered migration over every cohort tenant, once per
- * boot, several tenants at a time. Coordination is per ORGANIZATION, not
- * per process: each tenant is claimed under its own lease before any work,
- * so any number of processes (booting workers, an operator's targeted run)
- * share the fleet instead of standing down behind one fleet-wide driver -
- * a tenant already claimed elsewhere is simply left to its claim holder.
- * Level-triggered on the restart cadence: each pass re-attempts held and
- * parked tenants, so a tenant whose blocker was fixed heals itself with no
- * manual state change, and a pass that dies anywhere simply happens again
- * next boot.
+ * Drives every registered migration over every cohort tenant, several
+ * tenants at a time. Coordination is per ORGANIZATION, not per process:
+ * each tenant is claimed under its own lease before any work, so any number
+ * of processes (booting workers, an operator's targeted run) share the fleet
+ * instead of standing down behind one fleet-wide driver - a tenant already
+ * claimed elsewhere is simply left to its claim holder.
+ *
+ * Level-triggered: every pass re-attempts held and parked tenants, so a
+ * tenant whose blocker was fixed heals itself with no manual state change,
+ * and a pass that dies anywhere simply happens again. One `runPass` is one
+ * sweep and nothing more - a tenant generally needs several, because a pass
+ * cannot observe its own events. Driving passes until the fleet stops moving
+ * is the CALLER's job, and `MigrationPassSummary.advanced` is the field that
+ * tells it when to stop.
  */
 export class SystemMigrationRunnerService {
   constructor(private readonly deps: SystemMigrationRunnerDeps) {}
@@ -81,6 +85,7 @@ export class SystemMigrationRunnerService {
       alreadyFinalized: 0,
       alreadyRolledBack: 0,
       claimed: 0,
+      advanced: 0,
     };
     if (this.deps.migrations.length === 0) return summary;
 
@@ -294,6 +299,11 @@ export class SystemMigrationRunnerService {
         );
         return;
       }
+      // The transition, not the outcome: a held tenant re-proved and
+      // re-written `migrated` moved nowhere, and a caller looping until the
+      // fleet stops moving has to be able to tell that apart. An absent
+      // previous record is a transition - pending is a state.
+      if (existing?.status !== outcome.status) summary.advanced += 1;
       if (outcome.status === "finalized") summary.finalized += 1;
       else if (outcome.status === "migrated") summary.held += 1;
       else summary.parked += 1;
@@ -312,7 +322,7 @@ export class SystemMigrationRunnerService {
         // next pass and re-finalized, undoing the rollback. A refused park
         // costs nothing - the pin already keeps the tenant off every later
         // pass.
-        await state.upsertRecordUnlessRolledBack({
+        const parkWritten = await state.upsertRecordUnlessRolledBack({
           migrationName: migration.name,
           tenantId,
           status: "parked",
@@ -321,6 +331,12 @@ export class SystemMigrationRunnerService {
             message: error instanceof Error ? error.message : String(error),
           },
         });
+        // Newly parked is a transition; a tenant parked again for the same
+        // reason is not, or a permanently broken tenant would keep a
+        // convergence loop running forever.
+        if (parkWritten && existing?.status !== "parked") {
+          summary.advanced += 1;
+        }
       } catch (parkError) {
         // Recording the park is itself a write, so the very failure most
         // likely to park a tenant - the state store being unreachable - is

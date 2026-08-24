@@ -50,6 +50,51 @@ Feature: Running system migrations across organizations
     When a later pass runs
     Then it is skipped
 
+  # ═══ Converging ═══════════════════════════════════════════════════════
+  # One pass is never enough on its own: a pass cannot observe its own
+  # events, so an organization it adopts reads as held and only a LATER pass
+  # finalizes it. Starting the app therefore drives passes rather than one
+  # pass — nobody should have to restart the app, or click "run a pass",
+  # until the counts settle.
+  #
+  # It stops on NO PROGRESS, never on "everything is terminal": a held
+  # organization is re-proved on every pass and may legitimately never reach
+  # a terminal state, so waiting for terminal would never stop.
+
+  @unit
+  Scenario: The runner drives passes until nothing advances
+    When the app starts
+    Then passes run one after another while each one advances an organization
+    And the first pass that advances nothing ends the run
+
+  @unit
+  Scenario: A held tenant that never advances does not loop forever
+    Given an organization held with a disagreement nothing resolves
+    When the app starts
+    Then it is re-proved once and the run ends
+    And being re-proved into the same state does not count as progress
+
+  @unit
+  Scenario: Shutting down stops the loop between passes
+    Given a run waiting between two passes
+    When the app shuts down
+    Then no further pass starts
+    And the shutdown does not wait out the interval
+
+  @unit
+  Scenario: A loop that never converges stops at its cap and says so
+    Given passes that report progress every time
+    When the maximum number of passes is reached
+    Then the run stops
+    And it says how many passes it gave up after
+
+  @unit
+  Scenario: A failed pass ends the loop rather than retrying it
+    Given a pass that fails outright
+    When the run reaches it
+    Then the run stops rather than retrying immediately
+    And the failure is recorded for the next start to retry
+
   # ═══ Automatic enrollment ═════════════════════════════════════════════
   # Enrollment paces a rollout while it is happening. A finished rollout has
   # the opposite problem: every organization created since must migrate too,

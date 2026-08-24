@@ -80,4 +80,19 @@ export type MigrationPassSummary = {
   alreadyRolledBack: number;
   /** Claimed by another process's pass, so left to that process. */
   claimed: number;
+  /**
+   * State TRANSITIONS this pass made: a (tenant, migration) whose stored
+   * status is not the one it carried when the pass read it, first record
+   * included. The ONLY field that means the fleet moved.
+   *
+   * None of the others can carry that meaning, which is why this exists.
+   * `held` counts a `migrated` write, and a held tenant is re-proved and
+   * re-written `migrated` on every pass forever - so a caller that read
+   * `held > 0` as progress would drive passes until something else stopped
+   * it. `parked` has the same shape for a tenant that keeps failing the
+   * same way. `tenantsSeen` counts visits, not outcomes. Zero here is the
+   * honest "this pass changed nothing, and running another identical one
+   * will change nothing either".
+   */
+  advanced: number;
 };
