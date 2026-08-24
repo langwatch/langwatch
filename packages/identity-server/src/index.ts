@@ -73,6 +73,8 @@ export type {
   IdentityVerificationRepository,
 } from "./identity-verification.repository";
 export { IdentityService } from "./identity.service";
+export type { MfaEnrollmentRepository } from "./mfa-enrollment.repository";
+export { MfaGuards } from "./mfa-guards";
 export {
   type SignInBreakGlassLimiter,
   type SignInDomainRoutingPort,
@@ -146,6 +148,7 @@ export type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
+  SsoPlatformOperatorRepository,
 } from "./sso-connection.repository";
 export { SsoConnectionService } from "./sso-connection.service";
 export {

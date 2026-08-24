@@ -458,12 +458,9 @@ const LEGACY_INERT: string[] = [
   // Wave 3's specs, every scenario @unimplemented on purpose: each deliverable's
   // specs ship ahead of the code, and the PR that builds each surface binds its
   // file as it lands. Remove each entry with its first binding.
-  "specs/identity/mfa-and-session-shape.feature",
   "specs/identity/org-admin-identity-surface.feature",
-  "specs/identity/passkeys.feature",
   "specs/identity/platform-ops-identity-lookup.feature",
   "specs/identity/scim-connection-sync.feature",
-  "specs/identity/sso-onboarding-tiers.feature",
   "specs/langy/langy-agent-service-conventions.feature",
   "specs/langy/langy-baseline.feature",
   "specs/langy/langy-card-taxonomy.feature",

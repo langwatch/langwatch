@@ -104,6 +104,16 @@ round-trip that buys nothing.
   shown to somebody; an attestation publishes nothing, so the fact carries the
   attesting operator instead. Whether that is a separate event or a nullable
   field on the existing one is an implementation choice the spec leaves open.
+  **Decided (D05 tier 1): a separate fact, `lw.identity.domain_attested`.**
+  Three reasons. A nullable `tokenHash` would make a `dns-txt` request with no
+  proof structurally representable, moving an invariant the schema enforces
+  today onto a runtime check for every existing method in order to accommodate
+  one new one. The lifecycles differ — DNS is two steps (request, then verify)
+  and an attestation is one, APPROVED straight to VERIFIED, because there is
+  nothing to wait for in between; reusing `verification_requested` would put
+  the connection into VERIFICATION_PENDING with nothing pending. And the
+  payload lists above already named the event, so the separate fact is what
+  this document was written against.
 - **Every other guard is unchanged.** First-verifier-owns still refuses a
   domain another ACTIVE connection holds; activation still needs a verified
   domain, a recorded test login and a live break-glass binding.

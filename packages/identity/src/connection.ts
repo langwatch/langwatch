@@ -63,6 +63,12 @@ export type SsoConnectionLifecycleState = z.infer<
  * How a domain claim is proved. Self-hosted installations that cannot
  * publish a TXT record prove ownership with their license token instead.
  *
+ * `operator-attested` is the D05 amendment: a LangWatch operator states out
+ * of band that the domain is that organization's, which replaces the PROOF
+ * and never the approval. It publishes nothing, so it carries no token and
+ * is not a two-step ceremony — which is why it is absent from
+ * `SSO_VERIFICATION_CEREMONY_METHODS` below and has a verb of its own.
+ *
  * `legacy-configuration` is not a ceremony and cannot be requested: it is
  * what the grandfather migration states for a domain that was already
  * serving production sign-ins through `Organization.ssoDomain` before
@@ -73,6 +79,7 @@ export type SsoConnectionLifecycleState = z.infer<
 export const SSO_VERIFICATION_METHODS = [
   "dns-txt",
   "license-token",
+  "operator-attested",
   "legacy-configuration",
 ] as const;
 export const ssoVerificationMethodSchema = z.enum(SSO_VERIFICATION_METHODS);
@@ -130,6 +137,8 @@ export const CONNECTION_DISCARDED_EVENT_TYPE =
   "lw.identity.connection_discarded" as const;
 export const VERIFICATION_REQUESTED_EVENT_TYPE =
   "lw.identity.verification_requested" as const;
+export const DOMAIN_ATTESTED_EVENT_TYPE =
+  "lw.identity.domain_attested" as const;
 export const DOMAIN_VERIFIED_EVENT_TYPE =
   "lw.identity.domain_verified" as const;
 export const CONNECTION_ACTIVATED_EVENT_TYPE =
@@ -150,6 +159,7 @@ export const SSO_CONNECTION_EVENT_TYPES = [
   DOMAIN_CLAIM_REJECTED_EVENT_TYPE,
   CONNECTION_DISCARDED_EVENT_TYPE,
   VERIFICATION_REQUESTED_EVENT_TYPE,
+  DOMAIN_ATTESTED_EVENT_TYPE,
   DOMAIN_VERIFIED_EVENT_TYPE,
   CONNECTION_ACTIVATED_EVENT_TYPE,
   CONNECTION_SUSPENDED_EVENT_TYPE,
@@ -216,6 +226,28 @@ export const verificationRequestedPayloadSchema = z.object({
    *  shown once and never recorded — a log that carried it would let anyone
    *  with read access to history satisfy someone else's ceremony. */
   tokenHash: z.string().min(1),
+  actor: identityActorSchema,
+  ...sourced,
+});
+
+/**
+ * A LangWatch operator stating out of band that a domain is that
+ * organization's (D05 amendment). Its OWN fact rather than a
+ * `verification_requested` carrying a nullable `tokenHash`, because there is
+ * no token: an attestation publishes nothing, so nothing was ever shown to
+ * anybody to hash. A nullable hash would also make a `dns-txt` request
+ * without a proof structurally representable, moving an invariant the schema
+ * enforces today onto a runtime check.
+ *
+ * It is also one step rather than two — APPROVED straight to VERIFIED —
+ * because there is nothing to wait for between them.
+ */
+export const domainAttestedPayloadSchema = z.object({
+  connectionId: z.string().min(1),
+  domain: z.string().min(1),
+  /** The platform operator who attested. Recorded because an attested domain
+   *  is exactly as trustworthy as the operator behind it, and a dispute is
+   *  answered from this fact. */
   actor: identityActorSchema,
   ...sourced,
 });
@@ -299,6 +331,10 @@ export const ssoConnectionFactInputSchema = z.discriminatedUnion("type", [
     data: verificationRequestedPayloadSchema,
   }),
   z.object({
+    type: z.literal(DOMAIN_ATTESTED_EVENT_TYPE),
+    data: domainAttestedPayloadSchema,
+  }),
+  z.object({
     type: z.literal(DOMAIN_VERIFIED_EVENT_TYPE),
     data: domainVerifiedPayloadSchema,
   }),
@@ -333,6 +369,23 @@ export type SsoConnectionFact = SsoConnectionFactInput & { occurredAt: number };
 // ---- folded state --------------------------------------------------------
 
 /**
+ * What proved one domain, kept per domain and forever (D05 amendment). The
+ * price of an attestation standing indefinitely is that the weaker evidence
+ * must never become invisible, so the method rides on the connection itself
+ * rather than only in the log: every surface that reads a connection reads
+ * this too, and an attested domain cannot be presented as one the customer
+ * proved.
+ */
+export interface SsoDomainVerification {
+  domain: string;
+  method: SsoVerificationMethod;
+  /** Who proved it — the attesting operator, or whoever ran the ceremony.
+   *  Null for a system actor, which is what the grandfather migration is. */
+  actorId: string | null;
+  verifiedAtMs: number;
+}
+
+/**
  * One connection as the projection knows it — one row of `SsoConnection`,
  * and the state every guard is evaluated against.
  */
@@ -347,6 +400,8 @@ export interface SsoConnectionState {
   approvedDomains: string[];
   /** Proved, and the only ones that ever route. */
   verifiedDomains: string[];
+  /** What proved each of them, and who. One entry per verified domain. */
+  domainVerifications: SsoDomainVerification[];
   /** The ceremony in flight, if any. The token's hash, never the token. */
   pendingVerification: {
     domain: string;
@@ -388,6 +443,7 @@ export function emptySsoConnection({
     claimedDomains: [],
     approvedDomains: [],
     verifiedDomains: [],
+    domainVerifications: [],
     pendingVerification: null,
     idpMetadata: EMPTY_IDP,
     allowsJit: false,
@@ -406,6 +462,17 @@ const without = (domains: string[], domain: string): string[] =>
 
 const withDomain = (domains: string[], domain: string): string[] =>
   domains.includes(domain) ? domains : [...domains, domain];
+
+/** One proof per domain, last one wins — a domain re-proved by a later
+ *  ceremony is described by what proved it most recently, and the earlier
+ *  proof stays in the event log where a dispute reads it. */
+const withVerification = (
+  held: SsoDomainVerification[],
+  verification: SsoDomainVerification,
+): SsoDomainVerification[] => [
+  ...held.filter((entry) => entry.domain !== verification.domain),
+  verification,
+];
 
 /**
  * The reducer. Pure and total: every fact answers a next state, and the
@@ -469,12 +536,35 @@ export function reduceSsoConnection({
           tokenHash: fact.data.tokenHash,
         },
       };
+    // Attestation is one step, not two: there is nothing to wait for between
+    // the operator deciding and the domain being proved, so it folds exactly
+    // as a verification does — and records its own method, permanently.
+    case DOMAIN_ATTESTED_EVENT_TYPE:
+      return {
+        ...touched,
+        state: "VERIFIED",
+        approvedDomains: without(state.approvedDomains, fact.data.domain),
+        verifiedDomains: withDomain(state.verifiedDomains, fact.data.domain),
+        domainVerifications: withVerification(state.domainVerifications, {
+          domain: fact.data.domain,
+          method: "operator-attested",
+          actorId: fact.data.actor.id,
+          verifiedAtMs: fact.occurredAt,
+        }),
+        pendingVerification: null,
+      };
     case DOMAIN_VERIFIED_EVENT_TYPE:
       return {
         ...touched,
         state: "VERIFIED",
         approvedDomains: without(state.approvedDomains, fact.data.domain),
         verifiedDomains: withDomain(state.verifiedDomains, fact.data.domain),
+        domainVerifications: withVerification(state.domainVerifications, {
+          domain: fact.data.domain,
+          method: fact.data.method,
+          actorId: fact.data.actor.id,
+          verifiedAtMs: fact.occurredAt,
+        }),
         pendingVerification: null,
       };
     case CONNECTION_ACTIVATED_EVENT_TYPE:

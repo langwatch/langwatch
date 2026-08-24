@@ -1,6 +1,7 @@
 import {
   IDENTIFIER_ATTACHED_EVENT_TYPE,
   IDENTIFIER_DEAD_ENDED_EVENT_TYPE,
+  IDENTIFIER_DETACHED_EVENT_TYPE,
   IDENTIFIER_VERIFIED_EVENT_TYPE,
   IdentityCommandRefusedError,
 } from "@langwatch/identity";
@@ -278,6 +279,20 @@ describe("detachIdentifier guard", () => {
       const attached = await guards.attachIdentifier(attachData());
       const identifierId = (attached[0]!.data as { identifierId: string }).identifierId;
       heads.fold(USER, attached);
+      // A second way in, so this exercises tombstone semantics rather than
+      // the strands guard — detaching somebody's last verified identifier is
+      // refused outright (D07).
+      heads.fold(
+        USER,
+        await guards.attachIdentifier(
+          attachData({
+            commandId: "idcmd_keep",
+            accountId: "acc_keep",
+            providerAccountId: "gid_keep",
+            value: "sam.keep@acme.com",
+          }),
+        ),
+      );
 
       const detached = await detach(heads, identifierId);
       expect(detached).toHaveLength(1);
@@ -311,6 +326,115 @@ describe("eraseUser guard", () => {
       expect(
         (facts[0]!.data as { erasedIdentifierIds: string[] }).erasedIdentifierIds.sort(),
       ).toEqual(["idf_a", "idf_b"]);
+    });
+  });
+});
+
+describe("detachIdentifier strands guard", () => {
+  const detach = (heads: InMemoryHeads, identifierId: string) =>
+    new IdentityGuards(heads).detachIdentifier({
+      tenantId: USER,
+      userId: USER,
+      commandId: "idcmd_d2",
+      identifierId,
+      occurredAtMs: T0 + 5000,
+      actor: ACTOR,
+    });
+
+  describe("when the passkey is the only verified way in", () => {
+    /** @scenario "Removing the last way in is refused" */
+    it("refuses with identity_detach_strands_user and leaves the passkey working", async () => {
+      const heads = new InMemoryHeads();
+      const passkey = fact({
+        identifierId: "idf_passkey",
+        provider: "passkey",
+        value: "cred_abc",
+        domain: null,
+        state: "VERIFIED",
+      });
+      heads.heads.set(USER, headsWith(passkey));
+
+      const attempt = detach(heads, "idf_passkey");
+      await expect(attempt).rejects.toMatchObject({
+        code: "identity_detach_strands_user",
+      });
+      // Refused before any fact exists, so the passkey still signs them in.
+      expect(heads.heads.get(USER)?.identifiers.idf_passkey?.state).toBe(
+        "VERIFIED",
+      );
+    });
+  });
+
+  describe("when only passkeys would be left", () => {
+    /** @scenario "Removing is refused when nothing is left to recover with" */
+    it("refuses because losing the other would leave no way back", async () => {
+      const heads = new InMemoryHeads();
+      heads.heads.set(
+        USER,
+        headsWith(
+          fact({
+            identifierId: "idf_passkey_a",
+            provider: "passkey",
+            value: "cred_a",
+            domain: null,
+          }),
+          fact({
+            identifierId: "idf_passkey_b",
+            provider: "passkey",
+            value: "cred_b",
+            domain: null,
+          }),
+        ),
+      );
+
+      // Two passkeys and no verified email: removing one leaves a way IN but
+      // no address anybody could be recovered through.
+      await expect(detach(heads, "idf_passkey_a")).rejects.toMatchObject({
+        code: "identity_detach_strands_user",
+      });
+    });
+
+    /** @scenario "Removal follows the same guards as every other identifier" */
+    it("allows the removal once a verified email is there to recover through", async () => {
+      const heads = new InMemoryHeads();
+      heads.heads.set(
+        USER,
+        headsWith(
+          fact({
+            identifierId: "idf_passkey_a",
+            provider: "passkey",
+            value: "cred_a",
+            domain: null,
+          }),
+          fact({ identifierId: "idf_email", provider: "email" }),
+        ),
+      );
+
+      expect(await detach(heads, "idf_passkey_a")).toEqual([
+        {
+          type: IDENTIFIER_DETACHED_EVENT_TYPE,
+          data: { identifierId: "idf_passkey_a", actor: ACTOR },
+        },
+      ]);
+    });
+
+    it("does not refuse an unverified identifier, which strands nobody", async () => {
+      const heads = new InMemoryHeads();
+      heads.heads.set(
+        USER,
+        headsWith(
+          fact({
+            identifierId: "idf_unverified",
+            provider: "email",
+            state: "ATTACHED",
+            verifiedAtMs: null,
+          }),
+        ),
+      );
+
+      // Nobody could have signed in with it, so removing it takes nothing
+      // away — the guard is about ways IN, not about rows.
+      expect(await detach(heads, "idf_unverified")).toHaveLength(1);
     });
   });
 });

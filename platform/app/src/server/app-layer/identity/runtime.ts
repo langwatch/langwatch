@@ -48,6 +48,7 @@ import {
 import { JoinRequestLedgerWriter } from "./join-request-ledger";
 import { JoinRequestsService } from "./join-requests.service";
 import { IdentityLedgerWriter } from "./ledger";
+import { AdminEmailPlatformOperators } from "./platform-operators";
 import { PrismaIdentityBackfillRepository } from "./repositories/identity-backfill.prisma.repository";
 import { PrismaIdentityHeadsRepository } from "./repositories/identity-heads.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./repositories/identity-projection.prisma.repository";
@@ -228,6 +229,7 @@ export function ssoConnections(): SsoConnectionService {
       connections: new PrismaSsoConnectionReadRepository(prisma),
       breakGlass: new LocalDoorBreakGlassBinding(),
       stranding: new PrismaSsoConnectionStrandingRepository(prisma),
+      platformOperators: new AdminEmailPlatformOperators(prisma),
     }),
     new SsoConnectionLedgerWriter({
       projectionStore: new PrismaSsoConnectionProjectionRepository(prisma),

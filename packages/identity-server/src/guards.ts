@@ -8,6 +8,7 @@ import {
   IDENTIFIER_DETACHED_EVENT_TYPE,
   IDENTIFIER_VERIFIED_EVENT_TYPE,
   type IdentifierArrivalState,
+  IdentityDetachStrandsUserError,
   IdentityIdentifierNotFoundError,
   IdentityIdentifierNotVerifiableError,
   IdentityPrimaryMustDemoteFirstError,
@@ -205,6 +206,30 @@ export class IdentityGuards {
       );
     }
     if (head.state === "DETACHED") return [];
+    // Removing a way IN is refused when it is the last one, or the last one
+    // anybody could be recovered through (D07). Scoped to identifiers that
+    // are actually usable: detaching an unverified address strands nobody,
+    // because nobody could have signed in with it.
+    if (head.state === "VERIFIED") {
+      const remaining = Object.values(heads.identifiers).filter(
+        (candidate) =>
+          candidate.identifierId !== identifierId &&
+          (candidate.state === "VERIFIED" || candidate.state === "PRIMARY"),
+      );
+      if (remaining.length === 0) {
+        throw new IdentityDetachStrandsUserError(
+          `detach_identifier: ${identifierId} is the last verified identifier for this user`,
+        );
+      }
+      // A passkey is a way in and not a way back: it has no address, so a
+      // person holding only passkeys has nowhere a recovery message could
+      // reach them. The remedy the screen offers is a verified email.
+      if (remaining.every((candidate) => candidate.provider === "passkey")) {
+        throw new IdentityDetachStrandsUserError(
+          `detach_identifier: removing ${identifierId} would leave this user with passkeys only and no recovery address`,
+        );
+      }
+    }
     return [
       { type: IDENTIFIER_DETACHED_EVENT_TYPE, data: { identifierId, actor } },
     ];

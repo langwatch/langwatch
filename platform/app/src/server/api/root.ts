@@ -78,6 +78,7 @@ import { setupSkillsRouter } from "./routers/setupSkills";
 import { shareRouter } from "./routers/share";
 import { sharedTraceRouter } from "./routers/sharedTrace";
 import { spansRouter } from "./routers/spans";
+import { ssoConnectionsRouter } from "./routers/ssoConnections";
 import { storedObjectsRouter } from "./routers/stored-objects.router";
 import { subscriptionRouter } from "./routers/subscription";
 import { suiteRouter } from "./routers/suites";
@@ -131,6 +132,7 @@ const coreRouters = {
   llmModelCost: llmModelCostsRouter,
   user: userRouter,
   bugReports: bugReportsRouter,
+  ssoConnections: ssoConnectionsRouter,
   annotationScore: annotationScoreRouter,
   publicEnv: publicEnvRouter,
   setupSkills: setupSkillsRouter,

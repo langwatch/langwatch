@@ -9,6 +9,7 @@ import type { StateProjectionStore } from "../../projections/stateProjection.typ
 import {
   ActivateConnectionCommand,
   ApproveDomainClaimCommand,
+  AttestDomainCommand,
   ClaimDomainCommand,
   CompleteTeardownCommand,
   DiscardConnectionCommand,
@@ -47,7 +48,7 @@ import type { SsoConnectionEvent } from "./schemas/events";
  * Every verb the aggregate has, and the name its queue sender is resolved by
  * (the ledger writer maps a command type to one of these strings).
  *
- * A table rather than thirteen near-identical `.withCommandInstance(...)`
+ * A table rather than fourteen near-identical `.withCommandInstance(...)`
  * blocks: every one takes the same guards and differs only in its name and
  * class, so a list says that, and adding a verb is one line in one place
  * instead of five in two.
@@ -59,6 +60,7 @@ const CONNECTION_COMMANDS = [
   ["rejectDomainClaim", RejectDomainClaimCommand],
   ["discardConnection", DiscardConnectionCommand],
   ["requestVerification", RequestVerificationCommand],
+  ["attestDomain", AttestDomainCommand],
   ["verifyDomain", VerifyDomainCommand],
   ["activateConnection", ActivateConnectionCommand],
   ["suspendConnection", SuspendConnectionCommand],

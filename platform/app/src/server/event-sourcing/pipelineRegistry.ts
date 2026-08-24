@@ -20,13 +20,16 @@ import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/we
 import type {
   IdentityHeadsRepository,
   JoinRequestReadRepository,
+  MfaEnrollmentRepository,
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
+  SsoPlatformOperatorRepository,
 } from "@langwatch/identity-server";
 import {
   IdentityGuards,
   JoinRequestGuards,
+  MfaGuards,
   SsoConnectionGuards,
 } from "@langwatch/identity-server";
 import type {
@@ -162,6 +165,7 @@ import { createGithubMaintenancePipeline } from "./pipelines/github-maintenance/
 import { createGovernanceEventsPipeline } from "./pipelines/governance-events/pipeline";
 import { createIdentityPipeline } from "./pipelines/identity/pipeline";
 import type { IdentityFoldState } from "./pipelines/identity/projections/identityState.foldProjection";
+import type { MfaFoldState } from "./pipelines/identity/projections/mfaEnrollmentState.foldProjection";
 import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
 import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
 import { createLangyMaintenancePipeline } from "./pipelines/langy-maintenance/pipeline";
@@ -376,6 +380,10 @@ export interface PipelineRepositories {
   identityProjection: StateProjectionStore<IdentityFoldState>;
   /** Postgres reads the identity guards run against (ADR-101 §2). */
   identityHeads: IdentityHeadsRepository;
+  /** The two-step verification pipeline's `MfaEnrollment` head + cursor (D06). */
+  mfaProjection: StateProjectionStore<MfaFoldState>;
+  /** Postgres reads the two-step verification guards run against (D06). */
+  mfaEnrollments: MfaEnrollmentRepository;
   /** The connection pipeline's `SsoConnection` head + cursor (D04). */
   ssoConnectionProjection: StateProjectionStore<SsoConnectionFoldState>;
   /** Postgres reads the connection guards run against (ADR-117 §5). */
@@ -384,6 +392,9 @@ export interface PipelineRepositories {
   ssoConnectionStranding: SsoConnectionStrandingRepository;
   /** Activation's break-glass precondition (D05 hardens it). */
   ssoBreakGlassBindings: SsoBreakGlassBindingRepository;
+  /** Whether an actor is a LangWatch platform operator — what makes deciding
+   *  a domain claim and attesting a domain operator acts (D05 tier 1). */
+  ssoPlatformOperators: SsoPlatformOperatorRepository;
   /** How the teardown grace wake dispatches its completion command. */
   ssoConnectionTeardown: ConnectionTeardownPort;
   /** The join-request pipeline's `JoinRequest` head + cursor (D12). */
@@ -697,6 +708,12 @@ export class PipelineRegistry {
         identityGuards: new IdentityGuards(
           this.deps.repositories.identityHeads,
         ),
+        // Two-step verification rides this same aggregate (D06), so its
+        // commands share the per-person lane rather than racing it. Ships
+        // dark: `MFA_ENROLLMENT_OPEN` defaults to `off`, so the two-factor
+        // plugin is not registered and nothing dispatches these.
+        mfaProjectionStore: this.deps.repositories.mfaProjection,
+        mfaGuards: new MfaGuards(this.deps.repositories.mfaEnrollments),
       }),
     );
     // The SSO connection pipeline (ADR-117 §5, D04). Ships dark:
@@ -713,6 +730,7 @@ export class PipelineRegistry {
           connections: this.deps.repositories.ssoConnectionReads,
           breakGlass: this.deps.repositories.ssoBreakGlassBindings,
           stranding: this.deps.repositories.ssoConnectionStranding,
+          platformOperators: this.deps.repositories.ssoPlatformOperators,
         }),
         teardown: this.deps.repositories.ssoConnectionTeardown,
       }),

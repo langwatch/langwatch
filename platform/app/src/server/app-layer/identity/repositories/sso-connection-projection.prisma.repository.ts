@@ -3,10 +3,15 @@ import type {
   SsoConnectionSource,
   SsoConnectionState,
   SsoConnectionType,
+  SsoDomainVerification,
   SsoIdpMetadata,
   SsoVerificationMethod,
 } from "@langwatch/identity";
-import type { PrismaClient, SsoConnection } from "~/generated/prisma/client";
+import type {
+  Prisma,
+  PrismaClient,
+  SsoConnection,
+} from "~/generated/prisma/client";
 import type { SsoConnectionFoldState } from "~/server/event-sourcing/pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type {
@@ -72,6 +77,13 @@ export class PrismaSsoConnectionProjectionRepository
       claimedDomains: state.claimedDomains,
       approvedDomains: state.approvedDomains,
       verifiedDomains: state.verifiedDomains,
+      // Prisma's `InputJsonValue` does not accept a typed array directly (it
+      // wants an index signature), so the shape is asserted at the column
+      // boundary. `rowToConnection` asserts it back on the way out, and both
+      // sides name `SsoDomainVerification` — the reducer is what actually
+      // decides the shape.
+      domainVerifications:
+        state.domainVerifications as unknown as Prisma.InputJsonValue,
       pendingVerification: state.pendingVerification ?? undefined,
       idpMetadata: state.idpMetadata,
       allowsJit: state.allowsJit,
@@ -113,6 +125,9 @@ export function rowToConnection(row: SsoConnection): SsoConnectionState {
     claimedDomains: row.claimedDomains,
     approvedDomains: row.approvedDomains,
     verifiedDomains: row.verifiedDomains,
+    domainVerifications: Array.isArray(row.domainVerifications)
+      ? (row.domainVerifications as unknown as SsoDomainVerification[])
+      : [],
     pendingVerification: row.pendingVerification
       ? (row.pendingVerification as unknown as {
           domain: string;

@@ -15,6 +15,7 @@ import { SsoConnectionGuards } from "../sso-connection-guards";
 import {
   InMemoryConnections,
   StubBreakGlassBindings,
+  StubPlatformOperators,
   StubStranding,
 } from "./support/in-memory-connections";
 
@@ -91,7 +92,12 @@ beforeEach(() => {
   connections = new InMemoryConnections();
   breakGlass = new StubBreakGlassBindings(true);
   stranding = new StubStranding([]);
-  guards = new SsoConnectionGuards({ connections, breakGlass, stranding });
+  guards = new SsoConnectionGuards({
+    connections,
+    breakGlass,
+    stranding,
+    platformOperators: new StubPlatformOperators([OPS.id]),
+  });
 });
 
 describe("sso connection guards", () => {

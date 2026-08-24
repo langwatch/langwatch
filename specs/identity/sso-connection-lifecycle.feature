@@ -120,28 +120,28 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
 
   # ── Operator attestation (D05 amendment) ───────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: An operator attests a domain instead of waiting for a record
     Given an APPROVED connection for "acme.com"
     When a platform operator attests that "acme.com" belongs to "acme"
     Then the connection is VERIFIED with nothing published anywhere
     And the fact records the attesting operator, the domain and when they attested it
 
-  @unit @unimplemented
+  @unit
   Scenario: Attestation replaces the proof and never the approval
     Given a CLAIMED connection for "acme.com" that nobody has approved
     When a platform operator attests the domain
     Then the command is refused and no event is emitted
     And attesting becomes available only once the claim is approved
 
-  @unit @unimplemented
+  @unit
   Scenario: How a domain was proved is its own recorded method, permanently
     Given one domain proved by a published record and another attested by an operator
     When each connection's history is read
     Then each domain names the method that proved it
     And nothing anywhere can present an attested domain as one the customer proved
 
-  @unit @unimplemented
+  @unit
   Scenario: An organization administrator can never attest their own domain
     Given an APPROVED connection for "acme.com"
     And an administrator of "acme" holding every permission the organization can grant
@@ -149,28 +149,28 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     Then the command is refused and no event is emitted
     And publishing the record stays the way their domain is proved
 
-  @unit @unimplemented
+  @unit
   Scenario: Attestation is a platform operator's act on any deployment
     Given a self-hosted installation whose platform operator attests a domain
     When the attestation is handled
     Then it succeeds and is recorded against that operator
     And whoever administers the organization still cannot attest it themselves
 
-  @unit @unimplemented
+  @unit
   Scenario: An attested domain cannot take one another ACTIVE connection holds
     Given "acme.com" is verified on another organization's ACTIVE connection
     When a platform operator attests "acme.com" for a second organization
     Then the command is refused exactly as any other method is refused
     And the first verifier keeps the domain
 
-  @unit @unimplemented
+  @unit
   Scenario: An attestation stands until somebody decides otherwise
     Given a domain verified by operator attestation a year ago
     When the connection is read
     Then the domain is still verified and still routing
     And nothing has asked for it to be proved again
 
-  @unit @unimplemented
+  @unit
   Scenario: A disputed attested domain is answered by suspending, not by expiring
     Given a domain verified by operator attestation is disputed
     When an operator suspends the connection

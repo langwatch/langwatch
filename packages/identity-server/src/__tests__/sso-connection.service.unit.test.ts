@@ -9,6 +9,7 @@ import { SsoConnectionService } from "../sso-connection.service";
 import {
   InMemoryConnections,
   StubBreakGlassBindings,
+  StubPlatformOperators,
   StubStranding,
 } from "./support/in-memory-connections";
 
@@ -64,6 +65,7 @@ beforeEach(() => {
       connections,
       breakGlass: new StubBreakGlassBindings(true),
       stranding: new StubStranding([]),
+      platformOperators: new StubPlatformOperators([OPS.id]),
     }),
     ledger,
   );

@@ -299,6 +299,22 @@ export function createEnvConfig() {
         .enum(["off", "shadow", "enforce"])
         .optional()
         .default("off"),
+      // D06: whether two-step verification exists at all. Reached SIGNED
+      // OUT — a challenge stands between a password and a session — so it is
+      // an env flag rather than a feature flag, which is read per project
+      // and needs somebody already signed in to have a project.
+      //
+      // Off is byte-for-byte the old behaviour: the plugin is not registered,
+      // so none of its routes are mounted and nothing about two-step
+      // verification is reachable. Turning it back off leaves everybody who
+      // set one up signed in and their enrollment rows intact — it stops
+      // being ASKED for, and nothing is deleted.
+      MFA_ENROLLMENT_OPEN: z.enum(["off", "on"]).optional().default("off"),
+      // D07: whether passkeys exist. Same reasoning — registering a passkey
+      // is reached signed out, on the sign-in screen. Off unmounts the
+      // ceremony routes and hides the option; passkeys already registered
+      // are left alone, so turning it on again finds them still there.
+      PASSKEYS_ENABLED: z.enum(["off", "on"]).optional().default("off"),
       // ADR-117 §5: where the router's DOMAIN LOOKUP reads from. Three-valued
       // and shipped `off` for the same reason the router's own flag is: the
       // front door is the highest-risk flip in the identity program.
@@ -637,6 +653,8 @@ export function createEnvConfig() {
         process.env.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
       LANGWATCH_LICENSE_KEY: process.env.LANGWATCH_LICENSE_KEY,
       IDENTITY_ROUTER_V2: process.env.IDENTITY_ROUTER_V2,
+      MFA_ENROLLMENT_OPEN: process.env.MFA_ENROLLMENT_OPEN,
+      PASSKEYS_ENABLED: process.env.PASSKEYS_ENABLED,
       SSOCONN_ROUTING: process.env.SSOCONN_ROUTING,
       TRIGGER_EMAIL_HOURLY_CAP: process.env.TRIGGER_EMAIL_HOURLY_CAP,
       TRIGGER_EMAIL_TENANT_DAILY_CAP:

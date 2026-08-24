@@ -1,4 +1,5 @@
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { CannotImpersonateWithoutSecondFactorError } from "@langwatch/identity";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { isAdmin } from "./isAdmin";
 
@@ -110,11 +111,57 @@ export class ImpersonationService {
    *   - The target user does not exist → {@link UserToImpersonateNotFoundError}
    *   - The target is deactivated       → {@link CannotImpersonateDeactivatedUserError}
    *   - The target is an admin          → {@link CannotImpersonateAdminError}
+   *   - The target belongs to an organization requiring a second factor and
+   *     the OPERATOR has not set one up
+   *     → {@link CannotImpersonateWithoutSecondFactorError}
    *
    * The audit log is written before the session mutation so a DB failure
    * during the update still leaves a trail of the *attempt* — matching the
    * behaviour of the previous inline handler.
    */
+  /**
+   * Borrowing somebody's access inside an organization that requires a second
+   * factor requires one on the OPERATOR'S own account (D06).
+   *
+   * The requirement is about the operator, not the target, and that is the
+   * whole point: impersonation would otherwise be a way to reach an
+   * organization's data while holding less than its own members must hold.
+   * A person who has set one up is challenged at every sign-in, so
+   * `twoFactorEnabled` is the durable answer and no session evidence can add
+   * to it.
+   *
+   * Reads the TARGET's organizations, because those are the ones whose data
+   * the operator is about to see.
+   */
+  private async assertOperatorCanProveSecondFactor({
+    operatorUserId,
+    targetUserId,
+  }: {
+    operatorUserId: string;
+    targetUserId: string;
+  }): Promise<void> {
+    const requiring = await this.prisma.organizationUser.findMany({
+      where: {
+        userId: targetUserId,
+        organization: { mfaRequired: true },
+      },
+      select: { organization: { select: { slug: true } } },
+    });
+    if (requiring.length === 0) return;
+
+    const operator = await this.prisma.user.findUnique({
+      where: { id: operatorUserId },
+      select: { twoFactorEnabled: true },
+    });
+    if (operator?.twoFactorEnabled) return;
+
+    throw new CannotImpersonateWithoutSecondFactorError(
+      `impersonate: operator ${operatorUserId} has no second factor; target ${targetUserId} belongs to ${requiring
+        .map((membership) => membership.organization.slug)
+        .join(", ")}`,
+    );
+  }
+
   async start(input: StartImpersonationInput): Promise<void> {
     const target = await this.prisma.user.findUnique({
       where: { id: input.userIdToImpersonate },
@@ -136,6 +183,10 @@ export class ImpersonationService {
     if (isAdmin(target)) {
       throw new CannotImpersonateAdminError(target.id);
     }
+    await this.assertOperatorCanProveSecondFactor({
+      operatorUserId: input.impersonatorUserId,
+      targetUserId: target.id,
+    });
 
     await this.auditLog({
       userId: input.impersonatorUserId,
