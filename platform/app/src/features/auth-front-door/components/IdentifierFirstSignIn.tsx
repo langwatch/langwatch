@@ -11,7 +11,8 @@ import { useSearchParams } from "~/utils/compat/next-navigation";
 import { useSignInRouting } from "../hooks/useSignInRouting";
 import {
   readLastUsedMethodId,
-  rememberLastUsedMethod,
+  promotePendingMethod,
+  rememberPendingMethod,
 } from "../logic/lastUsedMethod";
 import {
   signInMethodActionLabel,
@@ -67,7 +68,11 @@ export function IdentifierFirstSignIn() {
   const [signingUp, setSigningUp] = useState<string | null>(null);
 
   useEffect(() => {
-    if (session) replaceLocation(safeRedirectTarget(callbackUrl));
+    if (!session) return;
+    // A session is the only proof a federated hand-off worked, and this is
+    // where the browser lands holding one.
+    promotePendingMethod();
+    replaceLocation(safeRedirectTarget(callbackUrl));
   }, [session, callbackUrl]);
 
   // Asked once, with no address: the answer is what tells this screen whether
@@ -85,7 +90,7 @@ export function IdentifierFirstSignIn() {
   }, [decide, breakGlass, session]);
 
   const dialFederated = (method: SignInMethod) => {
-    rememberLastUsedMethod(method);
+    rememberPendingMethod(method);
     void signIn(method.id, { callbackUrl });
   };
 
@@ -106,7 +111,14 @@ export function IdentifierFirstSignIn() {
   if (session) return null;
 
   const decision = routing.decision;
-  const submittedIdentifier = routing.identifier;
+  // An address that is present but blank is the same as no address: the
+  // password step it would render cannot sign anybody in — it posts an empty
+  // username and the server answers "Invalid email", which reads as a
+  // refusal of something the person never typed. Treated as absent, so they
+  // land back on the address step and can simply type it.
+  const submittedIdentifier = routing.identifier?.trim()
+    ? routing.identifier
+    : null;
 
   if (decision?.outcome === "redirect_to_connection") {
     return (

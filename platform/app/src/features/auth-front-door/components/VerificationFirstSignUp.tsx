@@ -11,7 +11,7 @@ import { hardRedirect } from "~/utils/hardRedirect";
 import { useSignInRouting } from "../hooks/useSignInRouting";
 import {
   readLastUsedMethodId,
-  rememberLastUsedMethod,
+  rememberPendingMethod,
 } from "../logic/lastUsedMethod";
 import { CredentialSignInForm } from "./CredentialSignInForm";
 import { FrontDoorFinePrint } from "./FrontDoorFinePrint";
@@ -99,7 +99,7 @@ export function VerificationFirstSignUp() {
   }, [decide, verifyToken]);
 
   const dialFederated = (method: SignInMethod) => {
-    rememberLastUsedMethod(method);
+    rememberPendingMethod(method);
     void signIn(method.id, {
       callbackUrl: callbackUrl ?? JOIN_BEFORE_CREATE_PATH,
     });

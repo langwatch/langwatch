@@ -63,7 +63,31 @@ export function CredentialSignInForm({
 }) {
   const form = useForm<CredentialValues>({
     resolver: zodResolver(credentialSchema),
-    mode: "onBlur",
+    // Nothing validates automatically; the handlers below decide when a
+    // judgement is welcome — the same line the address step takes.
+    mode: "onSubmit",
+    reValidateMode: "onSubmit",
+  });
+
+  // A password you have typed something into can be judged when you leave it;
+  // an empty one cannot, because you have not tried yet. Clicking past it to
+  // reach the reveal toggle, "Forgot password?" or a password manager is not
+  // a mistake, and answering it with "required" is the screen telling somebody
+  // off for looking around.
+  const passwordRegistration = form.register("password", {
+    onBlur: () => {
+      const value = form.getValues("password");
+      if (value) void form.trigger("password");
+      else form.clearErrors("password");
+    },
+    onChange: () => {
+      // Clearing only: typing can lift a rejection, never earn one.
+      if (!form.formState.errors.password) return;
+      const parsed = credentialSchema.safeParse({
+        password: form.getValues("password"),
+      });
+      if (parsed.success) form.clearErrors("password");
+    },
   });
   const startPasswordSignUp = api.frontDoor.startPasswordSignUp.useMutation();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -106,7 +130,14 @@ export function CredentialSignInForm({
     <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
       <VStack width="full" align="stretch" gap="13px">
         {/* The address the password is for, held in a quiet pill the way the
-            board draws it: settled, not editable here, one link out. */}
+            board draws it: settled, not editable here, one link out.
+
+            Only when there IS one. The local door can be asked for by name
+            (`?local=1`) and renders this form without an address having been
+            typed, and an empty pill is a row of furniture holding nothing —
+            it reads as a field that failed to load rather than one that was
+            never asked for. */}
+        {email ? (
         <HStack
           width="full"
           justify="space-between"
@@ -136,6 +167,7 @@ export function CredentialSignInForm({
             Use a different email
           </Button>
         </HStack>
+        ) : null}
         {/* The address the password belongs to, kept in the form so a password
             manager can save and fill the pair. Read-only above, carried here. */}
         <input
@@ -174,9 +206,9 @@ export function CredentialSignInForm({
                 autoComplete="current-password"
                 {...FIELD_SURFACE}
                 _focusVisible={FIELD_FOCUS}
-                {...form.register("password")}
+                {...passwordRegistration}
                 ref={(node) => {
-                  form.register("password").ref(node);
+                  passwordRegistration.ref(node);
                   passwordField.current = node;
                 }}
               />

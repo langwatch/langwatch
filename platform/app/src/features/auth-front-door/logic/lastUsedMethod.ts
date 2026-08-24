@@ -24,6 +24,18 @@ import type { SignInMethod } from "@langwatch/identity";
  */
 const STORAGE_KEY = "langwatch.auth.last-used-method";
 
+/**
+ * A federated method that has been dialled but has not got anybody in yet.
+ *
+ * The browser leaves for the provider and may never come back signed in — a
+ * cancelled consent screen, a wrong directory, a closed tab. Writing the
+ * badge at the moment of the hand-off made "last used" mean "last clicked",
+ * so a provider somebody tried once and abandoned wore the badge forever.
+ * The dial parks the method here instead, and it is promoted only when a
+ * session actually exists.
+ */
+const PENDING_KEY = "langwatch.auth.pending-method";
+
 export function readLastUsedMethodId(): string | null {
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
@@ -34,15 +46,39 @@ export function readLastUsedMethodId(): string | null {
 }
 
 /**
- * Remembers a method at the last point this screen can see it being used: a
- * password sign-in that came back without a failure, or a federated method at
- * the moment the browser is handed to the provider.
+ * Remembers a method that actually got somebody in — a password sign-in that
+ * came back without a failure, or a federated one promoted from the pending
+ * slot once a session exists.
  */
 export function rememberLastUsedMethod(method: Pick<SignInMethod, "id">): void {
   try {
     window.localStorage.setItem(STORAGE_KEY, method.id);
   } catch {
     // A browser that will not store it simply does not get the badge.
+  }
+}
+
+/** Parks a federated method while the browser is away at the provider. */
+export function rememberPendingMethod(method: Pick<SignInMethod, "id">): void {
+  try {
+    window.localStorage.setItem(PENDING_KEY, method.id);
+  } catch {
+    // No badge, rather than a wrong one.
+  }
+}
+
+/**
+ * Turns a parked method into the badge, now that a session proves it worked.
+ * A no-op when nothing is parked, so it is safe to call on every arrival.
+ */
+export function promotePendingMethod(): void {
+  try {
+    const pending = window.localStorage.getItem(PENDING_KEY);
+    if (!pending) return;
+    window.localStorage.removeItem(PENDING_KEY);
+    window.localStorage.setItem(STORAGE_KEY, pending);
+  } catch {
+    // Nothing to promote if the store will not answer.
   }
 }
 

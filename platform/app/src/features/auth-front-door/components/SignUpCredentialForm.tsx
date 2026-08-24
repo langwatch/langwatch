@@ -80,7 +80,23 @@ export function SignUpCredentialForm({
 }) {
   const form = useForm<SignUpValues>({
     resolver: zodResolver(signUpSchema),
-    mode: "onBlur",
+    // Nothing validates automatically; `blurJudged` below decides when a
+    // judgement is welcome — the same line the address and sign-in steps take.
+    mode: "onSubmit",
+    reValidateMode: "onSubmit",
+  });
+
+  /**
+   * Judge a field on the way out of it, but only once there is something to
+   * judge. A sign-up form has three fields to tab through, and answering an
+   * empty one with "required" tells somebody off for looking around before
+   * they have tried anything.
+   */
+  const blurJudged = (field: keyof SignUpValues) => ({
+    onBlur: () => {
+      if (form.getValues(field)) void form.trigger(field);
+      else form.clearErrors(field);
+    },
   });
   const register = api.user.register.useMutation();
   const [isSigningIn, setIsSigningIn] = useState(false);
@@ -153,7 +169,7 @@ export function SignUpCredentialForm({
               minHeight="44px"
               {...FIELD_SURFACE}
               _focusVisible={FIELD_FOCUS}
-              {...form.register("name")}
+              {...form.register("name", blurJudged("name"))}
             />
           )}
         </FrontDoorField>
@@ -177,7 +193,7 @@ export function SignUpCredentialForm({
                 autoComplete="new-password"
                 {...FIELD_SURFACE}
                 _focusVisible={FIELD_FOCUS}
-                {...form.register("password")}
+                {...form.register("password", blurJudged("password"))}
               />
               <IconButton
                 variant="ghost"
@@ -204,7 +220,7 @@ export function SignUpCredentialForm({
               autoComplete="new-password"
               {...FIELD_SURFACE}
               _focusVisible={FIELD_FOCUS}
-              {...form.register("confirmPassword")}
+              {...form.register("confirmPassword", blurJudged("confirmPassword"))}
             />
           )}
         </FrontDoorField>
