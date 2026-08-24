@@ -20,6 +20,7 @@ import {
   lockedParserKeys,
   parserFieldPresentation,
   seedComposerParserConfig,
+  seedPullSchedule,
 } from "../inventory";
 import { composer } from "./editPullSourceConfig.fixture";
 
@@ -328,5 +329,62 @@ describe("seedComposerParserConfig", () => {
 
     expect(config).not.toHaveProperty("credentials");
     expect(anthropicAdminPullConfigSchema.parse(config).report).toBe("usage");
+  });
+});
+
+describe("seedPullSchedule", () => {
+  it("shows the column the scheduler runs on, not the parser config's copy", () => {
+    // The two can disagree: `parserConfig.schedule` is the adapter's own copy,
+    // written by the composer on create, while `pullSchedule` is the column
+    // the lifecycle actually reads. Any write that touches one and not the
+    // other — the update mutation takes `pullSchedule` on its own, and seeds
+    // and migrations bypass both — leaves a row where seeding from the parser
+    // config would show a cadence the source is not running on, and saving
+    // would then write that stale value over the live one.
+    expect(
+      seedPullSchedule({
+        pullSchedule: "0 */6 * * *",
+        storedParserConfig: { schedule: "0 * * * *" },
+      }),
+    ).toBe("0 */6 * * *");
+  });
+
+  it("falls back to the parser config for a row whose column is empty", () => {
+    // Not hypothetical: the column is nullable, and a null one reads as
+    // `disable` to the lifecycle. Showing the adapter's copy is the better
+    // answer than a blank box, which an admin reads as "no schedule set".
+    expect(
+      seedPullSchedule({
+        pullSchedule: null,
+        storedParserConfig: { schedule: "*/15 * * * *" },
+      }),
+    ).toBe("*/15 * * * *");
+  });
+
+  it("treats a whitespace-only column as absent", () => {
+    expect(
+      seedPullSchedule({
+        pullSchedule: "   ",
+        storedParserConfig: { schedule: "*/15 * * * *" },
+      }),
+    ).toBe("*/15 * * * *");
+  });
+
+  it("reports no schedule at all rather than inventing one", () => {
+    // Blank is the cadence field's way of saying "use the recommended
+    // schedule". Seeding a default here would make the field lie about what
+    // is stored, and `buildEditSubmission` already resolves blank on save.
+    expect(
+      seedPullSchedule({ pullSchedule: null, storedParserConfig: {} }),
+    ).toBe("");
+  });
+
+  it("ignores a non-string schedule in the parser config", () => {
+    expect(
+      seedPullSchedule({
+        pullSchedule: null,
+        storedParserConfig: { schedule: 42 },
+      }),
+    ).toBe("");
   });
 });

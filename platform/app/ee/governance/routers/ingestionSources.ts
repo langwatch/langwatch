@@ -72,6 +72,11 @@ export function toIngestionSourceDto({
     // edit form would offer a backfill start that cannot take effect. Better a
     // compile error than a setting that quietly does nothing.
     pollerCursor: unknown;
+    // Required for the same reason as `pollerCursor` above: the edit form
+    // seeds its cadence field from this column, and a `select` clause that
+    // stopped fetching it would send the form back to the stale duplicate
+    // inside parserConfig — which is the bug this field was added to close.
+    pullSchedule: string | null;
     status: string;
     traceProjectId: string | null;
     lastEventAt: Date | null;
@@ -114,6 +119,21 @@ export function toIngestionSourceDto({
      * cursor, and one disabled before its first run never held one.
      */
     hasPollerCursor: hasPollerCursor(row.pollerCursor),
+    /**
+     * The cron the lifecycle actually runs this source on.
+     *
+     * `parserConfig` carries an adapter-owned copy under `schedule`, written
+     * by the composer on create, and the two drift the moment anything writes
+     * one without the other — `update` accepts this column on its own, and
+     * seeds and migrations touch neither. The edit form used to seed from the
+     * copy because this column never reached the client; it does now, so the
+     * form shows the cadence that is running rather than the one that was
+     * last written through the composer.
+     *
+     * Not a secret: a cron expression says how often we poll, nothing about
+     * the credentials we poll with.
+     */
+    pullSchedule: row.pullSchedule,
     status: row.status,
     traceProjectId: row.traceProjectId,
     traceProjectArchived: row.traceProjectId
