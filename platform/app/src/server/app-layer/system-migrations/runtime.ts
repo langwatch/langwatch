@@ -24,7 +24,10 @@ import {
 } from "../authz/authz-engine.migration";
 import { authzGrantsCommands } from "../authz/ledger";
 import { PrismaAuthzMigrationRepository } from "../authz/repositories/authz-migration.prisma.repository";
-import { identifierBackfillMigration } from "../identity/runtime";
+import {
+  identifierBackfillMigration,
+  identitySecretHealMigration,
+} from "../identity/runtime";
 import {
   migrationRunsOnThisInstallation,
   organizationMigrates,
@@ -138,7 +141,11 @@ export function registeredMigrations(): SystemMigration[] {
  * the tenant axis differs.
  */
 export function registeredUserMigrations(): SystemMigration[] {
-  return [identifierBackfillMigration()];
+  // The heal pass rides beside the backfill rather than inside it: the user
+  // it repairs is FINALIZED, and the runner skips a terminal record, so a
+  // step inside the backfill would never run for exactly the population that
+  // needs it (ADR-116 §4).
+  return [identifierBackfillMigration(), identitySecretHealMigration()];
 }
 
 const senders = async () => (await authzGrantsCommands()).commands;

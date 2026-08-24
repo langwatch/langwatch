@@ -59,6 +59,12 @@ export {
 } from "./identity-backfill.service";
 export { IdentityEmailService } from "./identity-email.service";
 export {
+  type AccountSecretPair,
+  IdentitySecretCarryService,
+  type IdentitySecretCarryOutcome,
+  type IdentitySecretCarryRepository,
+} from "./identity-secret-carry.service";
+export {
   adoptAccountCommandId,
   adoptUserEmailCommandId,
   detachOrphanCommandId,

@@ -13,6 +13,7 @@ import {
   IdentityBackfillService,
   IdentityEmailService,
   IdentityGuards,
+  IdentitySecretCarryService,
   IdentityService,
   newIdentityCommandId,
   VerificationCeremonyService,
@@ -37,8 +38,10 @@ import { PrismaIdentityHeadsRepository } from "./repositories/identity-heads.pri
 import { PrismaIdentityNewbornRepository } from "./repositories/identity-newborn.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./repositories/identity-projection.prisma.repository";
 import { PrismaIdentityResolutionRepository } from "./repositories/identity-resolution.prisma.repository";
+import { PrismaIdentitySecretCarryRepository } from "./repositories/identity-secret-carry.prisma.repository";
 import { PrismaIdentityUsersRepository } from "./repositories/identity-users.prisma.repository";
 import { PrismaIdentityVerificationRepository } from "./repositories/identity-verification.prisma.repository";
+import { IdentitySecretHealMigration } from "./secret-heal.migration";
 import { forgetIdentityWriteGate, isUserOnIdentityWrites } from "./write-gate";
 
 const identityHeads = new PrismaIdentityHeadsRepository(prisma);
@@ -91,17 +94,34 @@ export function verificationCeremony(): VerificationCeremonyService {
   );
 }
 
+/** Both pass-time directions of the bridge mirror's row half (ADR-116 §4):
+ *  the latch's one-time carry, and the reverse heal. */
+const identitySecretCarryService = new IdentitySecretCarryService(
+  new PrismaIdentitySecretCarryRepository(prisma),
+);
+
+export function identitySecretCarry(): IdentitySecretCarryService {
+  return identitySecretCarryService;
+}
+
 export function identityBackfill(): IdentityBackfillService {
   return new IdentityBackfillService(
     new PrismaIdentityBackfillRepository(prisma),
     identityUsers,
     identityService(),
+    identitySecretCarryService,
   );
 }
 
 /** The D01 backfill as the migrations runtime registers it (tenant = user). */
 export function identifierBackfillMigration(): IdentityIdentifierBackfillMigration {
   return new IdentityIdentifierBackfillMigration(identityBackfill());
+}
+
+/** The reverse mirror's heal leg, as its own never-terminal pass — see the
+ *  migration's own docblock for why it cannot be a step in the backfill. */
+export function identitySecretHealMigration(): IdentitySecretHealMigration {
+  return new IdentitySecretHealMigration(identitySecretCarryService);
 }
 
 /**

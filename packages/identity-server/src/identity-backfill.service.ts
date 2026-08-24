@@ -17,6 +17,7 @@ import {
   detachOrphanCommandId,
   establishUserEmailCommandId,
 } from "./identity-command-id";
+import type { IdentitySecretCarryService } from "./identity-secret-carry.service";
 import type { IdentityUsersRepository } from "./identity-users.repository";
 import type { IdentityAdoptionWrites } from "./identity-writes";
 
@@ -75,6 +76,7 @@ export class IdentityBackfillService {
     private readonly reads: IdentityBackfillRepository,
     private readonly users: IdentityUsersRepository,
     private readonly identity: IdentityAdoptionWrites,
+    private readonly secrets: IdentitySecretCarryService,
     deps: IdentityBackfillServiceDeps = {},
   ) {
     this.now = deps.now ?? Date.now;
@@ -122,7 +124,21 @@ export class IdentityBackfillService {
     });
     await this.detachOrphanedIdentifiers({ userId, accounts });
 
-    return this.prove({ userId, planned });
+    const outcome = await this.prove({ userId, planned });
+    if (outcome.status === "finalized") {
+      // The latch carries this user's secrets across ONCE (ADR-116 §4).
+      // Before it, everything they can sign in with lives only in `Account`;
+      // after the gate opens their reads come from `AccountCredential`, so a
+      // finalization without this step latches a user whose very next
+      // sign-in verifies against an empty credential row.
+      //
+      // After `prove`, never before: a user the proof holds is one whose
+      // `Account` rows are still authoritative, and copying their secrets
+      // early would be writing the identity branch's half of a split the
+      // parity check has not agreed to yet.
+      await this.secrets.carryForUser({ userId });
+    }
+    return outcome;
   }
 
   private async adoptPlanned({
