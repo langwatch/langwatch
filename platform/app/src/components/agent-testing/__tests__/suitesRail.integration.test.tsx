@@ -422,7 +422,6 @@ function casesPanelProps(
     allLabels: [],
     activeLabels: [],
     onToggleLabel: vi.fn(),
-    targetOf: () => null,
     onRunSet: vi.fn(),
     onNewTestCase: vi.fn(),
     onSelectSuite: vi.fn(),

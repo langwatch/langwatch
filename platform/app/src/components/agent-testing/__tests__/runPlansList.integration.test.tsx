@@ -158,8 +158,20 @@ describe("the Test Runs list", () => {
       suites: [makeSuite()],
       suiteSummaries: {},
       externalSets: [
-        { scenarioSetId: "ci-regression", lastRunTimestamp: NOW },
-        { scenarioSetId: "smoke-tests", lastRunTimestamp: NOW - 1000 },
+        {
+          scenarioSetId: "ci-regression",
+          lastRunTimestamp: NOW,
+          passedCount: 2,
+          failedCount: 0,
+          totalCount: 2,
+        },
+        {
+          scenarioSetId: "smoke-tests",
+          lastRunTimestamp: NOW - 1000,
+          passedCount: 1,
+          failedCount: 1,
+          totalCount: 2,
+        },
       ],
       oneOffLastRun: {
         passedCount: 1,
