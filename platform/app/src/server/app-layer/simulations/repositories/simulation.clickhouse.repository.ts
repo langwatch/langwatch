@@ -1279,7 +1279,13 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       LastRunAt: string;
       LastBatchRunId: string;
       LastScenarioSetId: string;
+      LastDurationMs: string;
+      LastTotalCost: string;
     }>(
+      // Duration and cost ride the same argMax as the verdict, stringified
+      // with '' for NULL first: an aggregate over the raw Nullable column
+      // would skip NULL rows and serve an older run's value for a latest run
+      // that has none yet.
       `SELECT
         ScenarioId,
         argMax(Status, UpdatedAt)                                   AS LastStatus,
@@ -1287,10 +1293,13 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         toString(argMax(length(UnmetCriteria), UpdatedAt))          AS UnmetCriteriaCount,
         toString(toUnixTimestamp64Milli(max(ifNull(StartedAt, CreatedAt)))) AS LastRunAt,
         argMax(BatchRunId, UpdatedAt)                               AS LastBatchRunId,
-        argMax(ScenarioSetId, UpdatedAt)                            AS LastScenarioSetId
+        argMax(ScenarioSetId, UpdatedAt)                            AS LastScenarioSetId,
+        argMax(ifNull(toString(DurationMs), ''), UpdatedAt)         AS LastDurationMs,
+        argMax(ifNull(toString(TotalCost), ''), UpdatedAt)          AS LastTotalCost
        FROM (
          SELECT ScenarioId, Status, MetCriteria, UnmetCriteria, BatchRunId,
-                ScenarioSetId, StartedAt, CreatedAt, UpdatedAt, ArchivedAt
+                ScenarioSetId, DurationMs, TotalCost,
+                StartedAt, CreatedAt, UpdatedAt, ArchivedAt
          FROM ${TABLE_NAME}
          WHERE ${whereFilters}
            ${simulationRunDedupPredicate(whereFilters)}
@@ -1312,6 +1321,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       lastRunAt: Number(row.LastRunAt),
       batchRunId: row.LastBatchRunId,
       scenarioSetId: row.LastScenarioSetId,
+      durationInMs: row.LastDurationMs === "" ? null : Number(row.LastDurationMs),
+      totalCost: row.LastTotalCost === "" ? null : Number(row.LastTotalCost),
     }));
   }
 

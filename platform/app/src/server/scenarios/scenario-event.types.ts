@@ -142,4 +142,8 @@ export type ScenarioLastResultSummary = {
   lastRunAt: number;
   batchRunId: string;
   scenarioSetId: string;
+  /** The latest run's execution time. Null while it has not finished. */
+  durationInMs: number | null;
+  /** The latest run's cost in USD. Null when no cost was recorded. */
+  totalCost: number | null;
 };

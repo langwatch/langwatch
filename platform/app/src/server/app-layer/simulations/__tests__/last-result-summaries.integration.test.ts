@@ -30,6 +30,8 @@ function makeRunRow({
   startedAt = new Date(now - 60_000),
   updatedAt,
   tenant = tenantId,
+  durationMs = "1500",
+  totalCost = null,
 }: {
   scenarioId: string;
   batchRunId: string;
@@ -40,6 +42,8 @@ function makeRunRow({
   startedAt?: Date;
   updatedAt?: Date;
   tenant?: string;
+  durationMs?: string | null;
+  totalCost?: number | null;
 }) {
   return {
     ProjectionId: `proj-${nanoid()}`,
@@ -64,7 +68,8 @@ function makeRunRow({
     MetCriteria: metCriteria,
     UnmetCriteria: unmetCriteria,
     Error: null,
-    DurationMs: "1500",
+    DurationMs: durationMs,
+    TotalCost: totalCost,
     StartedAt: startedAt,
     CreatedAt: startedAt,
     UpdatedAt: updatedAt ?? new Date(startedAt.getTime() + 1000),
@@ -118,6 +123,8 @@ describe("getLastResultSummaries", () => {
           batchRunId: olderBatch,
           status: "SUCCESS",
           startedAt: new Date(now - 120_000),
+          durationMs: "900",
+          totalCost: 0.01,
         }),
         makeRunRow({
           scenarioId,
@@ -127,6 +134,8 @@ describe("getLastResultSummaries", () => {
           metCriteria: ["c1"],
           unmetCriteria: ["c2", "c3"],
           startedAt: new Date(now - 30_000),
+          durationMs: "2500",
+          totalCost: 0.042,
         }),
       ]);
 
@@ -144,6 +153,40 @@ describe("getLastResultSummaries", () => {
       expect(summary.batchRunId).toBe(latestBatch);
       expect(summary.scenarioSetId).toBe(latestSet);
       expect(summary.lastRunAt).toBe(now - 30_000);
+      expect(summary.durationInMs).toBe(2500);
+      expect(summary.totalCost).toBeCloseTo(0.042);
+    });
+  });
+
+  describe("when the latest run carries no duration or cost yet", () => {
+    it("reports null rather than an older run's values", async () => {
+      const scenarioId = `scen-metrics-${nanoid(6)}`;
+      await insertRows([
+        makeRunRow({
+          scenarioId,
+          batchRunId: `batch-finished-${nanoid(6)}`,
+          startedAt: new Date(now - 120_000),
+          durationMs: "900",
+          totalCost: 0.01,
+        }),
+        makeRunRow({
+          scenarioId,
+          batchRunId: `batch-fresh-${nanoid(6)}`,
+          status: "IN_PROGRESS",
+          startedAt: new Date(now - 30_000),
+          durationMs: null,
+          totalCost: null,
+        }),
+      ]);
+
+      const summaries = await repo.getLastResultSummaries({
+        projectId: tenantId,
+        scenarioIds: [scenarioId],
+      });
+
+      expect(summaries).toHaveLength(1);
+      expect(summaries[0]!.durationInMs).toBeNull();
+      expect(summaries[0]!.totalCost).toBeNull();
     });
   });
 
