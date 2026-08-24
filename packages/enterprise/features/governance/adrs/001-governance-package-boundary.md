@@ -59,6 +59,8 @@ port; ClickHouse query syntax remains inside the application adapter.
 Departments are Governance accounting dimensions, not access grants. Their
 CRUD and assignment invariants live in the feature server; tRPC only applies
 authentication and permission checks.
+Governance owns the OCSF export cursor and tenant-resolution policy; the
+application injects the ClickHouse event reader.
 
 ## Persistence
 

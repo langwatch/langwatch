@@ -81,6 +81,13 @@ Feature: Enterprise governance package boundary
     And a missing target is not reported as a successful assignment
     And the department remains an accounting dimension rather than an access grant
 
+  Scenario: OCSF export uses a stable compound cursor
+    Given Governance has OCSF events ordered by event time and event identifier
+    When a security consumer requests an export page
+    Then Governance returns the final event time and identifier as the next cursor
+    And an organization without a Governance tenant receives an empty page
+    And ClickHouse remains behind the injected event reader
+
   Scenario: Contracts are transport independent
     Given a browser imports the governance contract root
     Then no server, Eventing, application, environment, or generated database module loads

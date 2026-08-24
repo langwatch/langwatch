@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { createLogger } from "@langwatch/observability";
+import type { GovernanceOcsfExportRow } from "@langwatch/enterprise-governance-contract";
+import { GovernanceOcsfEventsReaderPort } from "@langwatch/enterprise-governance-server";
 /**
  * GovernanceOcsfEventsClickHouseRepository — write side of the
  * `governance_ocsf_events` fold projection. Each call inserts ONE
@@ -105,33 +107,6 @@ export interface FindOcsfEventsInput {
   limit: number;
 }
 
-export interface GovernanceOcsfExportRow {
-  eventId: string;
-  /**
-   * Forward-compat marker stamped at write time by
-   * {@link OCSF_SCHEMA_VERSION}. Pre-this-column rows decode as "1.1.0" via
-   * the CH DEFAULT (migration 00028). SIEM consumers can filter or
-   * version-gate downstream parsing on this value.
-   */
-  ocsfSchemaVersion: string;
-  traceId: string;
-  sourceId: string;
-  sourceType: string;
-  classUid: number;
-  categoryUid: number;
-  activityId: number;
-  typeUid: number;
-  severityId: number;
-  eventTimeMs: number;
-  actorUserId: string;
-  actorEmail: string;
-  actorEnduserId: string;
-  actionName: string;
-  targetName: string;
-  anomalyAlertId: string;
-  rawOcsfJson: string;
-}
-
 interface OcsfExportCHRow {
   EventId: string;
   OcsfSchemaVersion: string;
@@ -153,8 +128,10 @@ interface OcsfExportCHRow {
   RawOcsfJson: string;
 }
 
-export class GovernanceOcsfEventsClickHouseRepository {
-  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+export class GovernanceOcsfEventsClickHouseRepository extends GovernanceOcsfEventsReaderPort {
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {
+    super();
+  }
 
   async insertEvent(row: GovernanceOcsfEventInput): Promise<void> {
     if (!row.tenantId || !row.eventId) {

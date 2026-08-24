@@ -36,7 +36,7 @@ import {
   OCSF_SCHEMA_VERSION,
   OCSF_SEVERITY,
 } from "../governanceOcsfEvents.clickhouse.repository";
-import { GovernanceOcsfExportService } from "../governanceOcsfExport.service";
+import { PostgresGovernanceOcsfExportAdapter } from "@langwatch/enterprise-governance-server";
 import { PROJECT_KIND } from "../governanceProject.service";
 
 const ns = `ocsf-ver-${nanoid(8)}`;
@@ -170,10 +170,10 @@ describe("OCSF schema-version forward-compat", () => {
       // constructor argument (ADR: repositories reached from the App, not
       // resolved ad hoc), so it can be pointed at the test client directly
       // instead of driving the SELECT by hand.
-      const service = GovernanceOcsfExportService.create({
-        prisma,
-        ocsfRepository: repo,
-      });
+      const service = PostgresGovernanceOcsfExportAdapter.create({
+        database: prisma,
+        events: repo,
+      }).build();
       const page = await service.list({
         organizationId,
         sinceMs: 0,
