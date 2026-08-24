@@ -187,7 +187,15 @@ Feature: SCIM Group Mapping
   # under a cloud, so the postcondition is the deliverable: not "these
   # records were deleted" but "nothing resolves for this person here any
   # more", checked before the removal is allowed to stand. A removal that
-  # cannot prove it changes nothing at all.
+  # cannot prove it fails loudly rather than passing quietly.
+  #
+  # Calibration, so nobody reads the deactivate scenario as a live breach:
+  # today a deprovision leaves grants in place and deactivation does block
+  # sign-in and API-key verification, so the retained authority is LATENT.
+  # What it costs is a decision - reactivating somebody restores everything
+  # they held on the day they left, with nobody choosing that. Reactivation
+  # is therefore re-entry, not undo; specs/identity/scim-connection-sync.feature
+  # carries what a return does and does not restore.
 
   @integration @unimplemented
   Scenario: Deprovisioned user's org membership and role bindings are cleaned up
@@ -207,11 +215,19 @@ Feature: SCIM Group Mapping
     And "user-1"'s next permission check answers no
 
   @unit @unimplemented
-  Scenario: A deprovision that cannot prove itself empty changes nothing
+  Scenario: A deprovision that cannot prove itself empty fails loudly
     Given a deprovision of "user-1" whose proof still finds access resolving for them
     When the deprovision is applied
     Then it is refused with code offboard_incomplete and status 500
     And "user-1"'s access is exactly what it was before the push
+    And the failure is surfaced rather than retried into silence
+
+  @integration @unimplemented
+  Scenario: Reactivating a deprovisioned user restores no access on its own
+    Given user "user-1" was pushed inactive and their access was removed
+    When Entra pushes user "user-1" as active again
+    Then "user-1" can sign in
+    And "user-1" holds no access until a push asserts it again
 
   # --- SCIM Settings UI ---
 
