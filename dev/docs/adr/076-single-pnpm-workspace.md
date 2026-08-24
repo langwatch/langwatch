@@ -2,7 +2,16 @@
 
 **Date:** 2026-07-28
 
-**Status:** Accepted
+**Status:** Accepted; physical application and npm staging source details
+amended by [ADR-111](./111-physical-application-workspaces.md)
+
+ADR-111 preserves this ADR's single workspace, root lockfile, frozen first-boot
+install and nested staging tree. It replaces the physical application package,
+publishable-manifest location, workspace filter and version source:
+`apps/server` owns `@langwatch/server`, and staged installation selects the
+`@langwatch/server...` closure. References below to `@langwatch/web`,
+`platform/app`, `packages/server` and its filter describe the implementation
+this ADR originally introduced, not the post-ADR-111 target layout.
 
 ## Context
 

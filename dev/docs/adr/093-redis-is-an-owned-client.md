@@ -2,9 +2,15 @@
 
 **Date:** 2026-08-10
 
-**Status:** Accepted
+**Status:** Accepted; physical composition ownership amended by
+[ADR-111](./111-physical-application-workspaces.md)
 
 **Related:** ADR-070 (modular package architecture — this is one bounded-context package cut from it), ADR-076 (single pnpm workspace), ADR-004 (dev environment — `REDIS_DB_INDEX` worktree isolation). Redis follows the ownership rule `@langwatch/clickhouse-client` already applies to ClickHouse.
+
+ADR-111 preserves explicit client ownership while replacing the global App
+composition: standalone API and worker processes each own one connection, and
+the contributor-only combined runtime may deliberately share one connection
+through its parent `ResourceScope`.
 
 ---
 

@@ -19,6 +19,23 @@ Feature: Feature package boundary lint
     When architecture lint checks the workspace
     Then it fails with the expected package name and manifest path
 
+  @unit @architecture @enterprise
+  Scenario: Enterprise aggregate packages have fixed roles and names
+    Given the portable enterprise root and API, worker and web composition packages
+    When architecture lint checks their paths, manifests and exports
+    Then each has the package name and dependency role fixed by ADR-111
+    And packages/enterprise/LICENSE.md exists above every enterprise source package
+    And the root manifest identifies that Enterprise license
+    And no descendant manifest claims that enterprise source is Apache-2.0
+    And no aggregate manifest is accepted outside the fixed root, composition and feature-surface paths
+
+  @unit @architecture @enterprise
+  Scenario: Enterprise composition packages preserve runtime graphs
+    Given an enterprise composition package imports another composition role or an incompatible feature surface
+    When architecture lint checks the package
+    Then it reports the cross-runtime dependency
+    And it identifies the compatible enterprise surface for that composition role
+
   @unit @architecture
   Scenario: Contract production code cannot acquire runtime implementations
     Given contract source imports React, Node, Prisma, server or web code
@@ -58,10 +75,10 @@ Feature: Feature package boundary lint
 
   @unit @architecture
   Scenario: Only composition roots import feature server installers
-    Given app code outside a designated runtime composition imports a feature server package
+    Given code outside an application or enterprise composition root imports a feature server package
     When architecture lint checks the importer
     Then the server dependency is rejected
-    And the diagnostic names the app or worker composition directory as the allowed location
+    And the diagnostic names the compatible application or enterprise composition directory as the allowed location
 
   @unit @architecture
   Scenario: A relative import cannot escape its physical package

@@ -4,6 +4,14 @@
 **Owners:** @langwatch_npx_smith (CLI/predeps/UX) · @langwatch_npx_julia (services/.env/QA/CI)
 **Purpose:** Single source of truth for `npx @langwatch/server`. Every BDD spec in `specs/npx-installer/` agrees with this file. Disagreements get resolved here first, code changes second.
 
+**Planned physical relocation:**
+[ADR-111](../../../dev/docs/adr/111-physical-application-workspaces.md) moves the
+publishable manifest to `apps/server`, stages the four application artifacts and
+installs the `@langwatch/server...` workspace closure. The nested workspace,
+root lockfile, frozen first-boot install, public package and binary remain
+unchanged. Paths and filters below describe the current implementation until
+that migration stage updates this contract and its code together.
+
 ---
 
 ## 1. Goal

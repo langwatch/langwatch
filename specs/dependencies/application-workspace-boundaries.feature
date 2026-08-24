@@ -1,6 +1,18 @@
 # See ../../dev/docs/adr/111-physical-application-workspaces.md
-# Complements ../../platform/app/specs/runtime-composition.feature, which owns
+# Complements runtime-composition.feature, which owns
 # capability-graph construction, lifecycle and combined-development behaviour.
+# Detailed compatibility remains owned by ../server/prisma-driver-adapter.feature,
+# ../server/redis-client-ownership.feature, ../server/spa-fallback.feature,
+# ../server/cdn-asset-base.feature, ../setup/single-pnpm-workspace.feature and
+# ../npx-installer/05-publish.feature.
+# Enterprise package shape remains owned by
+# ../../packages/architecture-lint/specs/feature-package-boundaries.feature and
+# ../../packages/architecture-lint/specs/strict-feature-layout.feature.
+# License and plan behaviour remains owned by
+# ../../packages/features/entitlements/specs/entitlement-resolution.feature and
+# ../licensing/license-validation.feature. Locked capability discovery remains
+# owned by ../licensing/self-hosted-enterprise-discovery.feature.
+# Repository lint and format migration is owned by oxc-toolchain.feature.
 
 @unimplemented
 Feature: Physical application workspace boundaries
@@ -37,6 +49,16 @@ Feature: Physical application workspace boundaries
       And shared product behaviour comes from its owning feature contract or implementation package
       And shared infrastructure comes from a deliberately named package
 
+    @architecture @development @typecheck
+    Scenario: Combined development is a contributor composition rather than an application dependency
+      Given local development hosts API and worker in one process
+      When the combined runtime dependency graph is inspected
+      Then tools/dev-runtime is a private contributor workspace package
+      And it imports the intentional API and worker runtime construction entry points
+      And API and worker do not depend on one another
+      And no other tool or application may import both runtime entry points
+      And tools/dev-runtime contains no product service, repository, route, consumer or job implementation
+
   Rule: Browser and interactive server graphs are physically separate
 
     @architecture @web @typecheck
@@ -51,6 +73,8 @@ Feature: Physical application workspace boundaries
       Given the UI calls an existing application tRPC procedure
       When its client input and output types are resolved
       Then those types come from a portable browser-safe contract
+      And a feature-owned procedure gets those types from its feature contract
+      And a not-yet-extracted procedure gets them from the temporary @langwatch/platform-api-contract package
       And the UI does not import AppRouter or another declaration from the API implementation
       And a type-only import is not accepted as an application boundary
 
@@ -77,6 +101,84 @@ Feature: Physical application workspace boundaries
       And it invokes built API, worker and task entry points
       And it implements no product API, product job, repository, projection or database migration
 
+  Rule: Enterprise code follows the same strict feature ownership
+
+    @architecture @enterprise @typecheck
+    Scenario: Enterprise has one portable root package and one legal license boundary
+      Given enterprise packages are installed
+      When the packages/enterprise ownership root is inspected
+      Then its LICENSE.md is the LangWatch Enterprise License
+      And that notice governs every file and package below the root
+      And its README explains the open-core split and catalogues the features
+      And its root manifest is the @langwatch/enterprise package
+      And the root package owns only the portable enterprise catalogue
+      And the root package imports no enterprise feature implementation, React, Node runtime, transport or persistence adapter
+      And source archives and staged distributions retain the root notice
+
+    @architecture @enterprise @typecheck
+    Scenario: Each runtime has one convenient enterprise composition package
+      Given UI, API and worker each install enterprise capabilities
+      When their application composition dependencies are inspected
+      Then UI imports @langwatch/enterprise-web
+      And API imports @langwatch/enterprise-api
+      And worker imports @langwatch/enterprise-worker
+      And each composition package exports a class with static create
+      And no application maintains a second list of individual enterprise feature implementations
+
+    @architecture @enterprise @typecheck
+    Scenario: Enterprise grouping does not merge runtime dependency graphs
+      Given the three enterprise composition packages
+      When architecture lint checks their manifests, imports and declarations
+      Then the web composition imports only portable contracts and enterprise web surfaces
+      And the API composition imports only portable contracts and enterprise API or server installers
+      And the worker composition imports only portable contracts and enterprise worker or server installers
+      And no composition package imports either of the other two composition packages
+
+    @architecture @enterprise @typecheck
+    Scenario: Enterprise features use the strict version-zero package layout
+      Given reusable enterprise product behaviour is extracted from platform/app/ee
+      When its ownership root is inspected
+      Then it lives under packages/enterprise/features/<feature>
+      And its contract, server and optional web surfaces are separate workspace packages
+      And its package names use the @langwatch/enterprise-<feature>-<surface> form
+      And it obeys the same class, filename, repository and public-export rules as a core feature
+      And product licensing lives at packages/enterprise/features/licensing rather than in an aggregate package
+
+    @architecture @enterprise @licensing
+    Scenario: Signed licenses feed rather than replace provider-neutral entitlements
+      Given enterprise availability may come from SaaS plan state or a signed self-host license
+      When an enterprise operation evaluates whether a capability may be used
+      Then signed-license validation is provided by the strict enterprise licensing feature
+      And the final availability decision uses the provider-neutral Entitlements contract
+      And no enterprise feature assumes every Enterprise customer has a signed license
+
+    @integration @enterprise @licensing
+    Scenario: Unlicensed self-hosted deployments retain enterprise discovery
+      Given the distribution contains the enterprise composition and feature packages
+      And the deployment has no Enterprise entitlement
+      When enterprise surfaces are registered
+      Then locked capability discovery remains available as specified by the licensing feature
+      And protected enterprise operations remain unavailable
+      And entitlement affects use rather than whether the source package was installed
+
+    @architecture @enterprise @typecheck
+    Scenario: The application no longer contains an unstructured EE source tree
+      Given the physical application split is complete
+      When enterprise-owned source and import aliases are inspected
+      Then platform/app/ee does not exist
+      And no @ee import alias exists
+      And no apps/ui/ee, apps/api/ee, apps/worker/ee or apps/server/ee directory exists
+      And no catch-all enterprise implementation or legacy package replaces them
+      And no core package imports an enterprise implementation
+
+    @integration @enterprise @deployment
+    Scenario: Moving EE source does not change enterprise availability
+      Given the current image and self-host distribution include enterprise behaviour
+      When that behaviour moves into strict enterprise feature packages
+      Then the same selected packages are staged into the existing distribution
+      And packages/enterprise/LICENSE.md and README.md are staged above them
+      And licensing and deployment topology remain unchanged
+
   Rule: UI hosting remains compatible while source ownership separates
 
     @integration @web @packaging
@@ -84,8 +186,8 @@ Feature: Physical application workspace boundaries
       Given the production image contains the UI and API build artifacts
       When a browser requests a product route from the API origin
       Then the API serves the UI shell and existing single-page fallback
-      And static assets retain their content types, cache policy and security headers
       And the API consumes an artifact location rather than importing UI source
+      And the detailed static, cache, CDN and security behaviour remains owned by the existing server specifications
 
     @integration @development
     Scenario: Development keeps the UI and API processes separate
@@ -94,6 +196,25 @@ Feature: Physical application workspace boundaries
       Then the Vite development server proxies that request to the API process
       And browser navigation remains on the UI origin
       And the API does not start a second browser build
+
+  Rule: Process configuration remains explicit while the UI stays environment-free
+
+    @architecture @configuration @typecheck
+    Scenario: Process applications validate only their own environment
+      Given API, worker and server are composed independently
+      When each process validates its environment
+      Then each uses its own runtime environment schema
+      And none imports another application's environment schema
+      And UI owns no deployment environment schema or secret
+      And UI receives allow-listed public runtime configuration from the API
+
+    @integration @development
+    Scenario: Contributor environment files survive removal of the monolithic package
+      Given a contributor uses quickstart, Haven or a root development command
+      When platform/app is removed
+      Then the repository-root .env is the contributor source of truth
+      And generated development overrides are written to repository-root .env.dev-up
+      And each selected process validates only its subset of the loaded source
 
   Rule: Prisma is an explicitly owned infrastructure client
 
@@ -112,15 +233,17 @@ Feature: Physical application workspace boundaries
       When it imports @langwatch/prisma-client
       Then no database connection is created
       And no environment variable is read
+      And no ready-made client, lazy proxy or module singleton is exported
 
     @architecture @prisma @typecheck
     Scenario: Product behaviour does not move into the Prisma client package
       Given a feature persists relational state
       When its dependency graph is inspected
-      Then only its concrete repositories/prisma adapter may use the generated Prisma surface
+      Then only its concrete server/src/repositories/prisma adapter may import @langwatch/prisma-client/generated
       And the feature service depends on its narrow repository capability
       And @langwatch/prisma-client contains no product query, repository or business rule
       And contract and web packages do not import @langwatch/prisma-client
+      And no product package re-exports the generated Prisma surface
 
     @integration @prisma @runtime
     Scenario: Standalone processes own separate Prisma clients
@@ -133,7 +256,7 @@ Feature: Physical application workspace boundaries
     @integration @prisma @runtime
     Scenario: Combined development shares Prisma explicitly
       Given local development hosts API and worker in one process
-      When the combined runtime composes shared infrastructure
+      When tools/dev-runtime composes shared infrastructure
       Then API and worker receive the same Prisma client intentionally
       And the parent resource scope closes that client exactly once
 
@@ -146,7 +269,7 @@ Feature: Physical application workspace boundaries
       Then it contains the built UI, API and worker artifacts
       And its default command starts the API
       And its worker command starts the worker
-      And existing probes, ports, environment contracts and shutdown budgets remain compatible
+      And no additional image is required by the source split
 
     @integration @deployment
     Scenario: No new network service is required
@@ -161,6 +284,8 @@ Feature: Physical application workspace boundaries
       When the split release is installed and started
       Then the same public package and binary launch the self-host stack
       And the launcher resolves the built API, worker and task artifacts from the staged distribution
+      And the nested staged workspace retains its frozen lockfile install
+      And first boot installs the @langwatch/server workspace closure
       And the operator is not required to install a renamed package
 
     @architecture @build
@@ -186,5 +311,8 @@ Feature: Physical application workspace boundaries
       Given the last supported caller has moved out of platform/app
       When platform/app is removed
       Then no forwarding package, source alias or duplicate runtime composition preserves it
+      And no platform/app/ee directory or @ee import alias remains
       And no UI-to-server AppRouter import remains
-      And root scripts, CI, Docker, Helm, generated-file checks and npm staging name the owning application packages
+      And the temporary @langwatch/platform-api-contract package is removed after its last legacy procedure moves
+      And root scripts, environment files, CI, Docker, Helm, generated-file checks and npm staging name the owning application packages
+      And the detailed runtime, Prisma, Oxc, static-delivery and npx contracts name their replacement paths

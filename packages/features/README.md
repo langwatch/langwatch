@@ -46,9 +46,38 @@ Each code directory is a separate workspace package:
 The feature root is an ownership directory, not a package. Do not put a
 `package.json` there.
 
-Enterprise features mirror the same structure under
-`packages/enterprise/features/<feature>` and use package names such as
-`@langwatch/enterprise-<feature>-contract`.
+Enterprise code is grouped beneath one deliberate root:
+
+```text
+packages/enterprise/
+├── LICENSE.md                # governs every enterprise descendant
+├── README.md                 # enterprise catalogue + open-core explanation
+├── package.json              # @langwatch/enterprise: portable catalogue
+├── src/
+├── composition/api/          # @langwatch/enterprise-api
+├── composition/worker/       # @langwatch/enterprise-worker
+├── composition/web/          # @langwatch/enterprise-web
+└── features/<feature>/       # strict contract/server/web packages
+```
+
+Enterprise feature packages use names such as
+`@langwatch/enterprise-<feature>-contract`. Each application imports its one
+runtime-compatible enterprise composition package; those aggregate packages
+contain only composition classes and never product implementation. The root
+legal license and README move before any enterprise source so their
+directory-and-descendants scope remains intact. Product licensing uses the same
+strict `features/licensing/{contract,server,web}` layout as other features.
+Signed-license state feeds the provider-neutral
+[Entitlements capability](./entitlements/adrs/001-provider-neutral-plan-resolution.md)
+rather than replacing it.
+
+During the physical application split in
+[ADR-111](../../dev/docs/adr/111-physical-application-workspaces.md), reusable
+source from `platform/app/ee` moves feature by feature into those ownership
+roots. Do not rename the old tree wholesale or create an enterprise legacy
+package: move reusable code into a strict enterprise feature, register it once
+in the matching composition package and remove the `@ee/*` alias with its last
+caller.
 
 ## Version-0 source layout
 

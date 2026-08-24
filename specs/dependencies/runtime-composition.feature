@@ -1,8 +1,9 @@
-# See ../../../dev/docs/adr/102-runtime-composition-roots.md
+# See ../../dev/docs/adr/102-runtime-composition-roots.md
+# See ../../dev/docs/adr/111-physical-application-workspaces.md
 
 Feature: App and worker runtime encapsulation
   As a platform maintainer
-  I want separate app and worker compositions inside one workspace package
+  I want separate API and worker compositions with an explicit development parent
   So that each process loads and owns only the services it runs
 
   @architecture @typecheck
@@ -57,7 +58,7 @@ Feature: App and worker runtime encapsulation
   @integration @runtime
   Scenario: Combined development mode shares infrastructure explicitly
     Given development hosts app and worker in one process
-    When createCombined builds both runtimes
+    When tools/dev-runtime builds both runtimes
     Then app and worker are distinct child compositions
     And their shared infrastructure is owned by the combined parent
 

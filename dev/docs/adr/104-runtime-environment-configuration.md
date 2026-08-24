@@ -5,11 +5,13 @@
 **Status:** Accepted
 
 **Behavioural contract:**
-[Runtime composition](../../../platform/app/specs/runtime-composition.feature)
+[Runtime composition](../../../specs/dependencies/runtime-composition.feature)
 
 **Related:** [ADR-101: feature package surfaces](./101-feature-package-surfaces.md),
 [ADR-102: runtime composition roots](./102-runtime-composition-roots.md), and
-[ADR-070: modular package architecture](./070-modular-package-architecture.md).
+[ADR-070: modular package architecture](./070-modular-package-architecture.md),
+as amended physically by
+[ADR-111: application workspaces](./111-physical-application-workspaces.md).
 
 ## Context
 
@@ -56,13 +58,15 @@ as the JavaScript analogue of Go's `pkg/config`. It owns the reusable parsing
 and safety conventions: Zod-first validation, strict booleans, ports, bounded
 whole-second durations, sanitized errors, and explicit source injection.
 
-Each deployable runtime still owns its concrete schema, defaults, required
-values, and cross-field validation. There is deliberately no repository-wide
-`Config` type and no shared object containing all environment values. The app,
-worker, standalone services, and CLIs can therefore boot and test independently
-while using the same mechanics. The existing T3 Env app schema migrates onto
-these primitives incrementally; T3 remains an app adapter rather than a module
-that feature packages import.
+Each deployable process runtime still owns its concrete schema, defaults,
+required values, and cross-field validation. There is deliberately no
+repository-wide `Config` type and no shared object containing all environment
+values. The API, worker, standalone services, and CLIs can therefore boot and
+test independently while using the same mechanics. The static UI is not a
+process runtime and owns no deployment environment schema; it receives the
+allow-listed contract described below. The existing T3 Env app schema migrates
+onto these primitives incrementally; T3 remains an application adapter rather
+than a module that feature packages import.
 
 An environment-dependent service class declares configuration in the nested
 semantic shape it consumes, including safe inline defaults. The shared config

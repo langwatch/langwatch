@@ -1,3 +1,10 @@
+# ADR-111 preserves the single-process experience but moves its parent from the
+# application process to tools/dev-runtime. This feature characterizes the
+# pre-extraction physical implementation and is retired when that migration
+# stage lands; specs/dependencies/runtime-composition.feature owns the enduring
+# combined-runtime behaviour.
+
+@deprecated
 Feature: In-process workers for local development
   As a developer running LangWatch locally
   I want the background worker stack hosted inside the app process by default

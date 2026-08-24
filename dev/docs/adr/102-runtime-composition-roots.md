@@ -6,7 +6,7 @@
 [ADR-111](./111-physical-application-workspaces.md)
 
 **Behavioural contract:**
-[App and worker runtime encapsulation](../../../platform/app/specs/runtime-composition.feature)
+[App and worker runtime encapsulation](../../../specs/dependencies/runtime-composition.feature)
 
 **Related:** [ADR-070: modular package architecture](./070-modular-package-architecture.md),
 [ADR-101: feature package surfaces](./101-feature-package-surfaces.md),

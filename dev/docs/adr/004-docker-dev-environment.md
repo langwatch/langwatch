@@ -232,3 +232,19 @@ reserving the worker-metrics port in that mode.
   which does the same import, no longer runs under the single-process default.
   Worker spans are real, not no-ops. (This was a known limitation when the mode
   was opt-in; making it the default is what closed it.)
+
+## Amendment: Physical application workspaces (2026-08)
+
+[ADR-111](./111-physical-application-workspaces.md) preserves single-process
+development but changes its physical owner. The contributor-only
+`tools/dev-runtime` composition imports the API and worker runtime construction
+entry points, owns their shared infrastructure scope and closes it once. The API
+application no longer imports or starts the worker application itself. The
+separate `dev:app`, `dev:worker` and `dev:concurrent` modes remain available.
+
+When `platform/app` is retired, the contributor source of truth moves from
+`platform/app/.env` to repository-root `.env`; quickstart and Haven write the
+generated overlay to repository-root `.env.dev-up`. Root tooling loads the
+source, while API and worker validate their own subsets independently. Existing
+path assertions remain truthful until that migration stage lands and must move
+atomically with the scripts that consume them.

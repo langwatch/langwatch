@@ -4,6 +4,12 @@
 
 **Status:** Accepted
 
+**Physical ownership:**
+[ADR-111](./111-physical-application-workspaces.md) moves the Vite build to
+`apps/ui` and production static serving to `apps/api`. This ADR's runtime asset
+base, same-image, CSP and immutable-CDN decisions remain unchanged; its source
+paths move with those owners.
+
 ## Context
 
 The web app is a Vite SPA whose JS/CSS chunks carry content-hash filenames

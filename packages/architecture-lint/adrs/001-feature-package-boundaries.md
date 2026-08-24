@@ -8,8 +8,10 @@
 [Feature package boundary lint](../specs/feature-package-boundaries.feature)
 
 **Related:**
-[ADR-101: feature package surfaces](../../../dev/docs/adr/101-feature-package-surfaces.md)
-and [ADR-102: runtime composition roots](../../../dev/docs/adr/102-runtime-composition-roots.md).
+[ADR-101: feature package surfaces](../../../dev/docs/adr/101-feature-package-surfaces.md),
+[ADR-102: runtime composition roots](../../../dev/docs/adr/102-runtime-composition-roots.md),
+[ADR-111: physical application workspaces](../../../dev/docs/adr/111-physical-application-workspaces.md),
+and [ADR-003: unified Oxc toolchain](./003-unified-oxc-toolchain.md).
 
 ## Context
 
@@ -77,6 +79,26 @@ Missing optional roles are valid. Unexpected directories containing a
 `package.json`, duplicate package names and a feature directory containing its
 own package manifest are errors.
 
+ADR-111 adds four non-feature enterprise packages at fixed paths beneath one
+legal ownership root:
+
+```text
+packages/enterprise/LICENSE.md                    # governs the entire tree
+packages/enterprise/package.json                 # @langwatch/enterprise
+packages/enterprise/composition/api/             # @langwatch/enterprise-api
+packages/enterprise/composition/worker/          # @langwatch/enterprise-worker
+packages/enterprise/composition/web/             # @langwatch/enterprise-web
+```
+
+The root package follows portable contract rules and owns catalogue vocabulary.
+The legal notice must exist before any enterprise package is accepted, and
+package metadata must not claim that a descendant is Apache-only. Each
+composition package may import enterprise implementation packages only for its
+named runtime and must not contain implementation itself. The three composition
+packages cannot depend on one another. No other package manifest is allowed
+directly beneath the enterprise ownership root; product licensing is an
+ordinary strict enterprise feature rather than another aggregate role.
+
 ### Package roles determine allowed dependencies
 
 Production source and runtime dependencies follow these rules:
@@ -93,12 +115,12 @@ Production source and runtime dependencies follow these rules:
 - a core package may not depend on an enterprise package; and
 - the complete package graph must be acyclic.
 
-Only designated composition modules under `platform/app/src/runtime/app` and
-`platform/app/src/runtime/worker` may import feature server installation entry
-points. Ordinary app handlers, services and browser code use feature contracts
-or capabilities supplied by their runtime. The rule prevents the composition
-root exception from turning into permission for the whole legacy app to reach
-server implementations.
+Only designated application composition modules and the three enterprise
+composition packages may import compatible feature installation entry points.
+Ordinary app handlers, services and browser code use feature contracts or
+capabilities supplied by their runtime. The rule prevents the composition-root
+exception from turning into permission for the whole application or enterprise
+tree to reach server implementations.
 
 Development-only test dependencies may include test runners and Node tooling,
 but production `src` imports remain subject to the role rules. Tests may reach

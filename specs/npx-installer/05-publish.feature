@@ -4,6 +4,10 @@ Feature: CI smoke + publish for `@langwatch/server`
   So that `npx @langwatch/server` always points at the same version as helm/docker
 
   See _shared/contract.md §9 (CI matrix), §10 (publish), §11 (rip-out).
+  See ../../dev/docs/adr/111-physical-application-workspaces.md for the planned
+  source relocation. Physical paths below characterize the current artifact
+  until that migration stage moves the manifest and staging inputs atomically;
+  the public command and nested frozen-workspace behaviour remain authoritative.
 
   # =========================================================================
   # Smoke matrix

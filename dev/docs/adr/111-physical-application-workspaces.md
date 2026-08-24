@@ -2,16 +2,23 @@
 
 **Date:** 2026-08-24
 
-**Status:** Proposed
+**Status:** Accepted
 
 **Behavioural contract:**
 [Application workspace boundaries](../../../specs/dependencies/application-workspace-boundaries.feature)
 
-**Related:** [ADR-070: modular package architecture](./070-modular-package-architecture.md),
+**Related:** [ADR-004: development environment](./004-docker-dev-environment.md),
+[ADR-070: modular package architecture](./070-modular-package-architecture.md),
 [ADR-076: single pnpm workspace](./076-single-pnpm-workspace.md),
+[ADR-086: runtime-configurable CDN assets](./086-cdn-asset-base.md),
+[ADR-093: Redis client ownership](./093-redis-is-an-owned-client.md),
 [ADR-101: feature package surfaces](./101-feature-package-surfaces.md),
 [ADR-102: runtime composition roots](./102-runtime-composition-roots.md), and
 [ADR-104: runtime environment configuration](./104-runtime-environment-configuration.md).
+The physical move of SSO also preserves the licensing boundary fixed by
+[ADR-027](./027-license-gated-sso.md), while repository-wide lint and format
+cutover is owned by
+[architecture-lint ADR-003](../../../packages/architecture-lint/adrs/003-unified-oxc-toolchain.md).
 
 ## Context
 
@@ -40,9 +47,22 @@ must continue to ship in the same image with separate commands, and
 `npx @langwatch/server` must remain compatible. This decision separates source
 and dependency graphs without changing that deployment topology.
 
-This ADR supersedes only ADR-102's decision to defer physical application
+This ADR supersedes ADR-102's decision to defer physical application
 extraction. ADR-102's closed runtime graphs, explicit lifecycle ownership,
-feature installation, and combined-development rules remain in force.
+feature installation, and combined-development rules remain in force. It also
+partially supersedes the physical details fixed by ADR-076: the application is
+no longer one `@langwatch/web` package, the publishable manifest moves from the
+repository root to `apps/server`, and npm staging installs the
+`@langwatch/server...` workspace closure rather than `@langwatch/web...`.
+ADR-076's single workspace, one lockfile, frozen install and nested staging
+decisions remain in force.
+
+This ADR narrows two earlier containment rules without weakening them. It gives
+ADR-101 one explicit infrastructure-only exception for the generated Prisma
+surface, while keeping Prisma out of product package exports and service
+interfaces. It also clarifies ADR-104: the three Node applications validate
+process environments, while the static UI receives the existing allow-listed
+public runtime contract and owns no deployment environment schema.
 
 ## Decision
 
@@ -95,6 +115,90 @@ happens through injected feature contracts within a process or through an
 existing network boundary between processes. Packaging one app's artifact
 beside another does not create a source dependency.
 
+Combined local development is the sole composition exception and does not live
+in an application package. `tools/dev-runtime` is a private contributor
+workspace package. It may import intentional `./runtime` construction entry
+points exported by `@langwatch/platform-api` and `@langwatch/worker`, construct
+one shared `ResourceScope`, and return the two closed child runtimes. Neither
+application depends on the other, and architecture lint permits only this
+contributor tool to import both runtime entry points. It is not shipped or
+deployed and contains no product service, repository, route, consumer or job
+implementation.
+
+### Enterprise source moves out of the application tree
+
+The unstructured `platform/app/ee` tree is removed as part of the application
+extraction. Enterprise code gains one deliberate ownership and composition
+root, while product behaviour moves feature by feature into the strict layout
+already defined by ADR-101 and the
+[feature-package boundary](../../../packages/architecture-lint/adrs/001-feature-package-boundaries.md):
+
+```text
+packages/enterprise/
+├── LICENSE.md                # governs this tree and every descendant
+├── README.md                 # catalogue and licensing explanation
+├── package.json              # @langwatch/enterprise
+├── src/                      # portable enterprise catalogue
+├── composition/
+│   ├── api/                  # @langwatch/enterprise-api
+│   ├── worker/               # @langwatch/enterprise-worker
+│   └── web/                  # @langwatch/enterprise-web
+└── features/<feature>/
+    ├── feature.json
+    ├── contract/
+    ├── server/
+    ├── web/                  # optional
+    ├── adrs/
+    └── specs/
+```
+
+The existing Enterprise `LICENSE.md` moves to this root before any enterprise
+source moves. Its directory-and-descendants scope therefore continues to cover
+every enterprise contract, implementation, composition package and test. The
+root README explains the open-core split and catalogues the feature packages.
+Package metadata, repository documentation, source archives and the staged
+self-host distribution retain the notice; no enterprise source may live beside
+or above it under an Apache-only path.
+
+The root `@langwatch/enterprise` package is portable. It owns enterprise feature
+identity and catalogue declarations. It imports no feature implementation,
+React, Node built-in, transport or persistence adapter. Product licensing is
+not confused with the legal source license: signed-license schemas, validation,
+issuance, activation, persistence and UI move into the ordinary strict
+`packages/enterprise/features/licensing/{contract,server,web}` surfaces.
+Licensing remains a source of entitlement information as decided by the
+[Entitlements feature](../../../packages/features/entitlements/adrs/001-provider-neutral-plan-resolution.md);
+it does not replace the provider-neutral plan decision or make SaaS depend on a
+signed self-host license.
+
+Each application gets one convenient enterprise composition import without
+collapsing runtime graphs. `@langwatch/enterprise-api` composes enterprise API
+installers, `@langwatch/enterprise-worker` composes background installers, and
+`@langwatch/enterprise-web` composes browser installers. Each is a physical
+workspace package, exports a composition class with static `create`, and may
+depend only on enterprise feature surfaces valid for that runtime. The API
+composition package cannot import enterprise web or worker implementations;
+the corresponding restrictions apply to the other two. Applications import
+their one matching composition package rather than maintaining independent
+lists of every enterprise feature.
+
+Enterprise feature packages use names such as
+`@langwatch/enterprise-<feature>-contract` and obey the same version-0
+contract/server/web, class, filename, public-export and repository rules as core
+feature packages. Enterprise status changes optional composition and
+distribution, not package quality or dependency direction. Core packages may
+define extension contracts but never import enterprise implementations.
+
+There is no replacement `ee` alias, `apps/*/ee` tree, catch-all enterprise
+implementation package or permanent enterprise legacy root. The portable root
+and three composition packages contain no product services, repositories,
+routes, jobs or UI components. Every reusable implementation, including product
+licensing, moves to its enterprise feature. Tests, ADRs and specifications move
+with the owning feature, while cross-feature behavioural specifications remain
+in the top-level `specs` corpus. The existing image and self-host staging
+continue to include the selected enterprise packages and the root Enterprise
+license, so this source move does not change licensing or deployment topology.
+
 ### The API serves the UI artifact without owning UI source
 
 `apps/ui` produces a static build artifact. Development continues to run Vite
@@ -110,7 +214,12 @@ future CDN or independently deployed UI as an artifact-routing change.
 The UI also stops importing the server router to infer the complete tRPC
 surface. Browser-facing inputs, outputs and client capabilities must be
 portable contracts rather than declarations that pull the API implementation
-graph into the UI. Existing whole-router inference is a migration seam, not an
+graph into the UI. Feature-owned procedures expose these schemas and types from
+their feature contract. Legacy application procedures that have not yet moved
+to a feature use a temporary `@langwatch/platform-api-contract` package. The
+tRPC router implementation remains in `apps/api`; the temporary contract
+package owns no router or handler and is deleted after its last legacy
+procedure moves. Existing whole-router inference is a migration seam, not an
 accepted cross-app boundary, and must be removed before `platform/app` is
 deleted.
 
@@ -125,17 +234,40 @@ Create `packages/prisma-client`, named `@langwatch/prisma-client`, alongside
 - database migration and seed mechanics; and
 - the generated Prisma errors and types required by concrete repositories.
 
-The package reads no ambient environment and creates no client on import. A
-composition root supplies validated configuration and owns the returned
-client's lifecycle. Standalone API and worker processes each construct and
-close their own client. Combined development may deliberately share one client
-through the shared `ResourceScope`, which closes it exactly once.
+The package exposes service classes for configuration, connection construction,
+readiness, migrations and seeds. It exports no ready-made client, lazy proxy or
+module singleton. The package reads no ambient environment and creates no
+client on import. A composition root supplies validated configuration, calls
+the connection service explicitly and owns the returned client's lifecycle.
+Standalone API and worker processes each construct and close their own client.
+`tools/dev-runtime` may deliberately share one client through its parent
+`ResourceScope`, which closes it exactly once.
 
 `@langwatch/prisma-client` is infrastructure, not a home for product queries,
 repositories or business rules. In strict feature packages, only concrete
 `repositories/prisma` adapters may depend on its generated surface. Services
 continue to depend on narrow repository capabilities, and contract and web
 packages never import it.
+
+The package has two deliberate public surfaces. Its root exports construction
+and lifecycle services. `@langwatch/prisma-client/generated` exports generated
+Prisma types, enums, errors and query utilities, and architecture lint permits
+that subpath only from concrete `server/src/repositories/prisma` adapters and
+the Prisma client package itself. No product package re-exports those values.
+
+### Environment files remain contributor inputs, not application ownership
+
+The repository-root `.env` is the contributor source of truth after
+`platform/app` is removed. Quickstart and Haven write the generated development
+overlay to root `.env.dev-up`. Root contributor commands load those files and
+pass the resulting source into the selected composition roots; API, worker and
+server independently validate only the subset they own. Neither application
+imports another application's environment schema.
+
+`apps/ui` owns no process environment schema and reads no deployment secrets.
+It obtains deployment-time public configuration through ADR-104's browser-safe
+RPC contract. Deliberate non-secret Vite build inputs, if any remain, are build
+tool configuration rather than a second runtime configuration source.
 
 ### Physical packages do not imply new deployments
 
@@ -145,9 +277,11 @@ networking, environment, probes, scaling controls and shutdown budgets. Helm,
 Docker Compose and the self-host launcher continue to select a command from the
 same image.
 
-Each physical app owns a separate manifest, typecheck, tests, build and runtime
-environment schema. A filtered install or build can select the UI, API, worker
-or server graph independently. Combined local development remains an explicit
+Each physical app owns a separate manifest, typecheck, tests and build. The API,
+worker and server process applications each own a runtime environment schema;
+the UI consumes the allow-listed browser runtime contract described above. A
+filtered install or build can select the UI, API, worker or server graph
+independently. Combined local development remains an explicit contributor-tool
 parent composition and may share infrastructure; it is not a reason to restore
 one universal package or service locator.
 
@@ -155,17 +289,30 @@ one universal package or service locator.
 
 The repository migrates in dependency order:
 
-1. establish the app workspace and dependency-direction lint rules;
-2. extract `@langwatch/prisma-client` so API and worker have a neutral owner for
+1. establish the app workspace, dependency-direction lint rules and the
+   contributor-only `tools/dev-runtime` composition exception;
+2. move the Enterprise `LICENSE.md` and README first; establish
+   `@langwatch/enterprise` and its separate API, worker and web composition
+   packages; update workspace discovery and staging for those paths in the same
+   stage; then extract `platform/app/ee` feature by feature into
+   `packages/enterprise/features`, replacing `@ee/*` imports with package
+   exports;
+3. move the runtime-composition contract out of `platform/app`, then extract
+   `@langwatch/prisma-client` so API and worker have a neutral owner for
    their shared PostgreSQL client;
-3. extract the browser build to `apps/ui` and make static assets an explicit
+4. move contributor environment files to the repository root, then extract the
+   browser build to `apps/ui` and make static assets an explicit
    build artifact;
-4. extract HTTP and interactive runtime composition to `apps/api`;
-5. extract background composition and task execution to `apps/worker`;
-6. move the self-host CLI from `packages/server` to `apps/server`;
-7. update workspace filters, root scripts, generated-file checks, Docker,
-   Helm, CI and npm staging; and
-8. remove `platform/app` after no compatibility source edge remains.
+5. extract HTTP and interactive runtime composition to `apps/api`, replace
+   whole-router browser inference with feature contracts and the temporary
+   legacy API contract;
+6. extract background composition and task execution to `apps/worker`;
+7. move the self-host CLI from `packages/server` to `apps/server`;
+8. complete remaining workspace filters, root scripts, generated-file checks,
+   Docker, Helm, CI, npm staging, Oxc lint/format migration and the detailed
+   runtime, Prisma, static-delivery and self-host contracts; and
+9. remove `platform/app`, its `ee` directory and the `@ee/*` alias after no
+   compatibility source edge remains.
 
 Every stage keeps the current application, worker and self-host commands
 runnable. Transitional aliases or forwarding entry points are removed with the
@@ -187,6 +334,20 @@ Making `apps/server` a shared backend library was rejected because applications
 are composition roots, not dependency containers. Shared product behavior
 belongs to feature packages and shared infrastructure belongs to specifically
 named packages.
+
+Renaming `platform/app/ee` wholesale to another legacy directory was rejected.
+It would preserve the same mixed browser, transport, service and persistence
+graph under a longer name and create a second architecture beside strict
+features. Moving enterprise implementation beneath each `apps/*` directory was
+also rejected because it would duplicate feature ownership across composition
+roots.
+
+One aggregate package importing API, worker and web implementations was
+rejected even though it would offer one identical import everywhere. A package
+has one dependency manifest, so that shape would put React in backend closures
+and Node, queues and transports in the UI closure. The portable root plus three
+runtime-specific composition packages keeps the grouping convenience while
+retaining independently checkable graphs.
 
 Creating a generic `packages/database` was rejected in favor of
 `@langwatch/prisma-client`, which states the technology and responsibility as
@@ -221,6 +382,17 @@ split.
 - Legacy whole-router tRPC inference and other browser-to-server source edges
   must be converted to portable client contracts; moving directories alone is
   insufficient.
+- Enterprise implementation gains the same enforceable feature surfaces as
+  core code, and the ambiguous `ee` directory and alias disappear.
+- Each application has one enterprise composition import, while the portable
+  root makes catalogue vocabulary discoverable without leaking a different
+  runtime's dependencies.
+- The Enterprise license once again governs one physical tree, and packaging
+  must preserve that notice wherever the tree is copied or staged.
+- The convenience costs four aggregate manifests: the portable root and three
+  runtime-specific composition packages. Architecture lint must keep those
+  exceptional roles narrow so `@langwatch/enterprise` does not become another
+  universal service bag.
 - API and worker processes each hold their own Prisma pool in production, so
   pool sizing remains fleet-aware and must account for both process classes.
 - `@langwatch/server` remains a semantically imperfect public name. Its

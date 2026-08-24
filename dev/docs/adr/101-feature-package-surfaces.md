@@ -6,7 +6,9 @@
 
 **Related:** [ADR-070: modular package architecture](./070-modular-package-architecture.md),
 [ADR-102: runtime composition roots](./102-runtime-composition-roots.md), and
-[ADR-104: runtime environment configuration](./104-runtime-environment-configuration.md).
+[ADR-104: runtime environment configuration](./104-runtime-environment-configuration.md),
+with physical composition and the Prisma infrastructure export exception
+defined by [ADR-111](./111-physical-application-workspaces.md).
 
 **Concrete boundaries:**
 [Agents](../../../packages/features/agents/adrs/001-package-boundary.md),
@@ -308,7 +310,10 @@ LangWatch keeps one Prisma schema and generated client. Only concrete Prisma
 repository adapters import generated Prisma code. Repository interfaces use
 feature-contract types, and adapters translate database records and enums
 before returning. Prisma types never appear in a contract package, web package,
-service interface or package export.
+service interface or product package export. ADR-111 defines the sole package
+export exception: the infrastructure-owned
+`@langwatch/prisma-client/generated` subpath, importable only by concrete
+`server/src/repositories/prisma` adapters and never re-exported by them.
 
 This is type-graph isolation, not a claim that each feature owns an independent
 database. Features may share the same physical database while being unable to
@@ -335,12 +340,24 @@ packages/enterprise/features/<feature>/
 
 Each surface remains optional and is a separate workspace package when it
 exists. Core packages may define extension contracts, but do not import
-enterprise implementations. Application composition roots are the only place
-where an enterprise implementation is selected and connected to a core
-extension point.
+enterprise implementations. Runtime-compatible enterprise composition packages
+own the static catalogue of available installers. Application composition roots
+remain the only place where the selected catalogue is constructed and connected
+to core extension points.
 
 The exact grouping of enterprise features can evolve independently; enterprise
 status does not weaken the browser/server, contract or repository boundaries.
+
+ADR-111 adds the deliberate aggregate root around those features. The portable
+`@langwatch/enterprise` package owns catalogue vocabulary; separate
+`@langwatch/enterprise-api`, `@langwatch/enterprise-worker` and
+`@langwatch/enterprise-web` packages compose the compatible feature surfaces
+for one application each. These are composition packages, not feature packages,
+and may import enterprise implementations only for their declared runtime. The
+legal Enterprise `LICENSE.md` sits at the ownership root and governs the entire
+tree. Product licensing follows the same strict feature layout as other
+enterprise behavior and contributes to the provider-neutral Entitlements
+decision.
 
 ### Tooling enforces the shape
 

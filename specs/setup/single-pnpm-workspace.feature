@@ -5,6 +5,8 @@ Feature: One workspace for every JavaScript project in the repo
     between two projects can actually be shared
 
   See dev/docs/adr/076-single-pnpm-workspace.md.
+  See dev/docs/adr/111-physical-application-workspaces.md for the planned
+  physical application packages and amended npm staging workspace closure.
 
   # These scenarios describe how the repository installs, resolves and packages
   # itself. The @unit ones bind to packages/server/test/workspace-invariants.test.ts
