@@ -2,7 +2,6 @@ import {
   buildGenericOAuthConfigs,
   buildSocialProviders,
 } from "@ee/sso/providers";
-import { platformSSOAllowed, resolveAuthProvider } from "@ee/sso/sso-gate";
 import {
   isCredentialMutationPath,
   isEmailAuthPath,
@@ -12,6 +11,7 @@ import {
   normalizedRequestPathname,
   requestPathname,
 } from "@ee/sso/ssoPathGate";
+import type { SignInMethodPolicy } from "@langwatch/identity";
 import { createLogger } from "@langwatch/observability";
 import { RedisConfigService } from "@langwatch/redis-client";
 import { compare, hash } from "bcrypt";
@@ -22,6 +22,10 @@ import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { env } from "~/env.mjs";
 import { tryGetApp } from "~/server/app-layer/app";
 import { identityCeremonies } from "~/server/app-layer/identity/runtime";
+import {
+  deploymentIsFederationCapable,
+  resolveSignInMethodPolicy,
+} from "~/server/app-layer/identity/signin-method-policy";
 import { prisma } from "~/server/db";
 import { fireActivityTrackingNurturing } from "../../../ee/billing/nurturing/hooks/activityTracking";
 import { ensureUserSyncedToCio } from "../../../ee/billing/nurturing/hooks/userSync";
@@ -184,22 +188,29 @@ const isBuildTime = !!process.env.BUILD_TIME;
  * Two conditions, and the second is the one that is easy to leave out. The
  * route has to be one that mints or recovers a password account, and this
  * deployment has to actually federate — a stronger claim than the license gate
- * allowing it. `resolveAuthProvider` reports "email" when NEXTAUTH_PROVIDER
- * names a provider this build cannot mount, and the sign-in page renders the
- * credential form on exactly that answer. Refusing the form the page just
- * offered would tell a licensed operator their account is managed by an
- * identity provider that does not exist, and leave them no way in at all.
+ * allowing it. The resolved method policy carries no federated method when
+ * NEXTAUTH_PROVIDER names a provider this build cannot mount, and the sign-in
+ * page renders the credential form on exactly that answer. Refusing the form
+ * the page just offered would tell a licensed operator their account is
+ * managed by an identity provider that does not exist, and leave them no way
+ * in at all.
+ *
+ * ADR-117 §4 is what changed here, and only in mechanism: the question used to
+ * be asked of `resolveAuthProvider()` directly and is now asked of the method
+ * policy that resolver feeds. Same answer, one source.
  */
-async function refusesCredentialRoute({
+function refusesCredentialRoute({
   pathname,
   isResetPath,
+  policy,
 }: {
   pathname: string;
   isResetPath: boolean;
-}): Promise<boolean> {
+  policy: SignInMethodPolicy;
+}): boolean {
   if (!isResetPath && !isEmailAuthPath(pathname)) return false;
 
-  return (await resolveAuthProvider()) !== "email";
+  return policy.defaultMethods.some((method) => method.kind === "federated");
 }
 
 export const auth = betterAuth({
@@ -583,9 +594,12 @@ export const auth = betterAuth({
       // nothing, computed nothing and logged nothing.
       await runSignInRouterShadow({ pathname, url, body: ctx.body });
 
-      // Email-mode deployments never register an IdP, so the gate is moot —
-      // leave every route untouched (zero behavior change from `main`).
-      if (env.NEXTAUTH_PROVIDER === "email") return;
+      // Deployments that name no federated method never register an IdP, so
+      // there is no policy to enforce — leave every route untouched (zero
+      // behavior change from `main`). Synchronous by contract (ADR-117 §4):
+      // an email-mode deployment must not wait on the licensing store to be
+      // told it has nothing to wait for.
+      if (!deploymentIsFederationCapable()) return;
 
       // Credential-mutation block: keyed off the CONFIGURED mode, blocked in
       // every gate state (ADR-027 Constants table). The password-reset pair
@@ -604,10 +618,20 @@ export const auth = betterAuth({
       // route table, so it never waits on the gate (see `isGateDependentPath`).
       if (!isGateDependentPath(url)) return;
 
-      if (await platformSSOAllowed()) {
+      // ADR-117 §4: the hook is the ENFORCEMENT BACKSTOP now, and it asks the
+      // router's method policy rather than raw env. The decision moved to
+      // where the data is; enforcement stayed here, because absence from a
+      // picker is not enforcement — a pinned legacy callback URL never renders
+      // one, and this is still the only interception point that sees the
+      // `/callback/auth0|okta` rewrite. Every ADR-027 semantic is unchanged:
+      // the gate inside the policy is the same per-process memo, so a license
+      // still takes effect on restart and never mid-flight.
+      const policy = await resolveSignInMethodPolicy();
+
+      if (policy.federationLicensed) {
         // Gate ALLOW (site #3): refuse the routes that would otherwise mint a
         // password account on a licensed SSO-capable deployment (v5 BLOCKER).
-        if (await refusesCredentialRoute({ pathname, isResetPath })) {
+        if (refusesCredentialRoute({ pathname, isResetPath, policy })) {
           throw APIError.from("BAD_REQUEST", {
             code: "EMAIL_PASSWORD_DISABLED",
             message:

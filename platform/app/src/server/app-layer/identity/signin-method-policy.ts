@@ -1,8 +1,4 @@
-import {
-  authProviderIsMounted,
-  platformSSOAllowed,
-  resolveAuthProvider,
-} from "@ee/sso/sso-gate";
+import { platformSSOAllowed, resolveAuthProvider } from "@ee/sso/sso-gate";
 import type { SignInMethod, SignInMethodPolicy } from "@langwatch/identity";
 import type { SignInMethodPolicyPort } from "@langwatch/identity-server";
 import { env } from "~/env.mjs";
@@ -78,11 +74,6 @@ export async function resolveSignInMethodPolicy(): Promise<SignInMethodPolicy> {
     // Only a self-hosted deployment auto-redirects on its sole connection.
     selfHosted: !env.IS_SAAS,
   };
-}
-
-/** Whether the deployment's own method is wired into better-auth at all. */
-export function federatedMethodIsMounted(): boolean {
-  return authProviderIsMounted();
 }
 
 export const signInMethodPolicyPort: SignInMethodPolicyPort = {
