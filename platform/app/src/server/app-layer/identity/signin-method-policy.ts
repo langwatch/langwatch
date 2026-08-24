@@ -35,8 +35,30 @@ export const PASSWORD_METHOD: SignInMethod = {
   connectionId: null,
 };
 
+/**
+ * A passkey. Local in the same sense the password is — this deployment
+ * authenticates — but it is a way IN rather than a fallback, which is why it
+ * is not in the break-glass set: the door that must stay open when the
+ * identity provider cannot be reached is the one anybody can use from any
+ * machine, and a passkey is bound to a device.
+ */
+export const PASSKEY_METHOD: SignInMethod = {
+  id: "passkey",
+  kind: "passkey",
+  connectionId: null,
+};
+
 /** The instance's local method set — the break-glass and fallback door. */
 export const LOCAL_METHOD_SET: readonly SignInMethod[] = [PASSWORD_METHOD];
+
+/**
+ * Whether this deployment mounted the passkey plugin at boot. The server half
+ * is registered off the same value, so the set can never name a method the
+ * endpoint behind it does not have.
+ */
+export function deploymentOffersPasskeys(): boolean {
+  return env.PASSKEYS_ENABLED === "on";
+}
 
 /**
  * Whether this deployment names a federated method AT ALL — a pure env read,
@@ -67,9 +89,16 @@ export async function resolveFederatedMethod(): Promise<SignInMethod | null> {
 export async function resolveSignInMethodPolicy(): Promise<SignInMethodPolicy> {
   const federationLicensed = await platformSSOAllowed();
   const federated = await resolveFederatedMethod();
+  // Offered alongside whatever else answers, never instead of it: somebody
+  // without a passkey on THIS device must still find the way they used last
+  // time. It is appended, so the order the screen renders does not move.
+  const passkeys = deploymentOffersPasskeys() ? [PASSKEY_METHOD] : [];
   return {
-    defaultMethods: federated ? [federated] : LOCAL_METHOD_SET,
-    localMethods: LOCAL_METHOD_SET,
+    defaultMethods: [
+      ...(federated ? [federated] : LOCAL_METHOD_SET),
+      ...passkeys,
+    ],
+    localMethods: [...LOCAL_METHOD_SET, ...passkeys],
     federationLicensed,
     // Only a self-hosted deployment auto-redirects on its sole connection.
     selfHosted: !env.IS_SAAS,

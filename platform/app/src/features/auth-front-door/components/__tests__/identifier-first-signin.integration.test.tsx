@@ -217,15 +217,11 @@ describe("given the identifier-first sign-in screen", () => {
       renderScreen();
       await enterEmail("sam@example.com");
 
-      expect(
-        await screen.findByText(/could not start log-in/i),
-      ).toBeTruthy();
+      expect(await screen.findByText(/could not start log-in/i)).toBeTruthy();
       // The retry IS the field. An alert that replaces it leaves somebody
       // holding an apology with nothing to act on.
       expect(await screen.findByLabelText(/email/i)).toBeTruthy();
-      expect(
-        screen.getByRole("button", { name: /^continue$/i }),
-      ).toBeTruthy();
+      expect(screen.getByRole("button", { name: /^continue$/i })).toBeTruthy();
     });
 
     it("offers the address form rather than a picker built from a failed decision", async () => {

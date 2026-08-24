@@ -10,8 +10,8 @@ import Link from "~/utils/compat/next-link";
 import { useSearchParams } from "~/utils/compat/next-navigation";
 import { useSignInRouting } from "../hooks/useSignInRouting";
 import {
-  readLastUsedMethodId,
   promotePendingMethod,
+  readLastUsedMethodId,
   rememberPendingMethod,
 } from "../logic/lastUsedMethod";
 import {
@@ -22,6 +22,7 @@ import { CheckYourEmail } from "./CheckYourEmail";
 import { CredentialSignInForm } from "./CredentialSignInForm";
 import { FrontDoorFinePrint } from "./FrontDoorFinePrint";
 import { IdentifierStepForm } from "./IdentifierStepForm";
+import { PasskeySignInButton } from "./PasskeySignInButton";
 import {
   AlternativeMethods,
   hasAlternativeMethods,
@@ -144,8 +145,17 @@ export function IdentifierFirstSignIn() {
           reasonCode={decision.reasonCode}
           lastUsedMethodId={lastUsedMethodId}
           onFederatedMethodChosen={dialFederated}
-          renderLocalMethod={(method) =>
-            method.kind === "password" ? (
+          renderLocalMethod={(method) => {
+            if (method.kind === "passkey") {
+              return (
+                <PasskeySignInButton
+                  key={method.id}
+                  callbackUrl={callbackUrl}
+                />
+              );
+            }
+            if (method.kind !== "password") return null;
+            return (
               <CredentialSignInForm
                 key={method.id}
                 email={submittedIdentifier ?? ""}
@@ -153,8 +163,8 @@ export function IdentifierFirstSignIn() {
                 onUseDifferentEmail={routing.clear}
                 onSignUpStarted={setSigningUp}
               />
-            ) : null
-          }
+            );
+          }}
         />
         {/* The switch link is always here, carrying the address already
             typed: somebody who meant to sign up gets there in one click, and

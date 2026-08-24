@@ -220,7 +220,10 @@ export function SignUpCredentialForm({
               autoComplete="new-password"
               {...FIELD_SURFACE}
               _focusVisible={FIELD_FOCUS}
-              {...form.register("confirmPassword", blurJudged("confirmPassword"))}
+              {...form.register(
+                "confirmPassword",
+                blurJudged("confirmPassword"),
+              )}
             />
           )}
         </FrontDoorField>

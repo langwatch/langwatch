@@ -1,5 +1,6 @@
 "use client";
 
+import { passkeyClient } from "@better-auth/passkey/client";
 import { createAuthClient } from "better-auth/react";
 import {
   type ReactElement,
@@ -17,7 +18,15 @@ import {
  * The adapter normalizes BetterAuth's `{ session, user }` response shape into
  * the flat Session type that the rest of the app expects.
  */
-const client = createAuthClient();
+/**
+ * The passkey plugin is declared unconditionally, and the METHOD SET decides
+ * whether anyone is offered one: the server registers its half only when
+ * `PASSKEYS_ENABLED` is on, and the sign-in router never names a passkey
+ * unless the same env says so. Gating the client half too would mean a second
+ * place for the two to disagree, and the failure would be a button that
+ * exists calling an endpoint that does not.
+ */
+const client = createAuthClient({ plugins: [passkeyClient()] });
 
 export const authClient = client;
 

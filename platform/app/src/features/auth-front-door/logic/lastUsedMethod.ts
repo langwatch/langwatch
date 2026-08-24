@@ -22,7 +22,17 @@ import type { SignInMethod } from "@langwatch/identity";
  * that cannot render because a badge could not be looked up is a far worse
  * failure than a missing badge.
  */
-const STORAGE_KEY = "langwatch.auth.last-used-method";
+/**
+ * Versioned, and the version is load-bearing.
+ *
+ * The first key was written the moment a federated button was CLICKED, so
+ * every browser that ever tried a provider and backed out is still holding a
+ * badge that was never true. Fixing the write does nothing for those: the
+ * wrong value is already stored. A new key abandons them, and the old one is
+ * cleared on the way past so it does not sit there forever.
+ */
+const STORAGE_KEY = "langwatch.auth.last-used-method.v2";
+const LEGACY_STORAGE_KEY = "langwatch.auth.last-used-method";
 
 /**
  * A federated method that has been dialled but has not got anybody in yet.
@@ -38,6 +48,9 @@ const PENDING_KEY = "langwatch.auth.pending-method";
 
 export function readLastUsedMethodId(): string | null {
   try {
+    // Swept here rather than in its own effect: this runs on every render of
+    // the sign-in screen, which is exactly and only when the badge matters.
+    window.localStorage.removeItem(LEGACY_STORAGE_KEY);
     const stored = window.localStorage.getItem(STORAGE_KEY);
     return stored && stored.length > 0 ? stored : null;
   } catch {

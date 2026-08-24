@@ -138,35 +138,35 @@ export function CredentialSignInForm({
             it reads as a field that failed to load rather than one that was
             never asked for. */}
         {email ? (
-        <HStack
-          width="full"
-          justify="space-between"
-          backgroundColor="bg.subtle"
-          borderWidth="1px"
-          borderRadius="full"
-          paddingX="14px"
-          paddingY="7px"
-        >
-          <Text
-            fontSize="13px"
-            color="fg.muted"
-            truncate
-            data-testid="routed-identifier"
+          <HStack
+            width="full"
+            justify="space-between"
+            backgroundColor="bg.subtle"
+            borderWidth="1px"
+            borderRadius="full"
+            paddingX="14px"
+            paddingY="7px"
           >
-            {email}
-          </Text>
-          <Button
-            variant="plain"
-            size="xs"
-            fontSize="12px"
-            textDecoration="underline"
-            textUnderlineOffset="2px"
-            flexShrink={0}
-            onClick={onUseDifferentEmail}
-          >
-            Use a different email
-          </Button>
-        </HStack>
+            <Text
+              fontSize="13px"
+              color="fg.muted"
+              truncate
+              data-testid="routed-identifier"
+            >
+              {email}
+            </Text>
+            <Button
+              variant="plain"
+              size="xs"
+              fontSize="12px"
+              textDecoration="underline"
+              textUnderlineOffset="2px"
+              flexShrink={0}
+              onClick={onUseDifferentEmail}
+            >
+              Use a different email
+            </Button>
+          </HStack>
         ) : null}
         {/* The address the password belongs to, kept in the form so a password
             manager can save and fill the pair. Read-only above, carried here. */}
