@@ -1117,8 +1117,8 @@ function useSourceEditForm(source: Source | null) {
     undefined,
   );
 
-  // Sync local state when the drawer opens for a new source - drives
-  // the form fields off whatever the row carries on the wire.
+  // Keyed on `source?.id`, not `source`: a re-render that hands back an equal
+  // row must not discard what the admin has typed since the drawer opened.
   useEffect(() => {
     if (!source) return;
     setName(source.name);

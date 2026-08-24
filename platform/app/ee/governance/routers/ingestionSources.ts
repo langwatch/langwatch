@@ -147,7 +147,6 @@ export function toIngestionSourceDto({
   };
 }
 
-/** {@link toIngestionSourceDto} for a single row, resolving its destination. */
 async function dtoForRow(
   service: IngestionSourceService,
   row: Parameters<typeof toIngestionSourceDto>[0]["row"],
