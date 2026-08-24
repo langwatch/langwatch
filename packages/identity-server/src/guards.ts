@@ -3,6 +3,7 @@ import {
   arrivalStateForProvider,
   type DetachIdentifierCommandData,
   type EraseUserCommandData,
+  IdentityEmailInUseError,
   IDENTIFIER_ATTACHED_EVENT_TYPE,
   IDENTIFIER_DEAD_ENDED_EVENT_TYPE,
   IDENTIFIER_DETACHED_EVENT_TYPE,
@@ -25,6 +26,7 @@ import {
   deriveIdentifierId,
 } from "./crypto/identifier-identity";
 import type { IdentityHeadsRepository } from "./identity-heads.repository";
+import type { IdentityUsersRepository } from "./identity-users.repository";
 
 /**
  * The identity guards (ADR-101 §2): what runs BEFORE any fact exists — the
@@ -38,9 +40,52 @@ import type { IdentityHeadsRepository } from "./identity-heads.repository";
  * guard that vetoes a live ceremony is the one the queue's re-run applies.
  * Facts come back without their envelope; the ledger stamps business time,
  * tenancy and idempotency from the command that produced them.
+ *
+ * Two repositories, because uniqueness spans two populations (ADR-116 §6).
+ * The heads answer for latched users; `User.email` answers for everyone the
+ * identity branch has not adopted yet. A guard that consulted only the
+ * projection would call an address free while a legacy user held it, and the
+ * collision would surface as a unique-constraint failure inside the fold
+ * rather than a refusal the caller can act on.
  */
 export class IdentityGuards {
-  constructor(private readonly heads: IdentityHeadsRepository) {}
+  constructor(
+    private readonly heads: IdentityHeadsRepository,
+    private readonly users: IdentityUsersRepository,
+  ) {}
+
+  /**
+   * The cross-population uniqueness check (ADR-116 §6), asked at the two
+   * moments a value becomes a CLAIM on a mailbox: verify, and primary.
+   *
+   * Two reads because there are two populations and one address space. The
+   * projection answers for latched users; `User.email` answers for everyone
+   * else. Attach never asks — an `ATTACHED` identifier blocks nobody, which
+   * is what stops the guard from becoming a squatting mechanism.
+   *
+   * The identity half stays a DEAD-END rather than a refusal, and that is
+   * deliberate: it resolves a concurrent race between two users who both
+   * reached verify, where there is no caller to hand a refusal to on the
+   * losing side (D01, `uniqueness_race_lost`). The legacy half is a genuine
+   * refusal, because the holder was already sitting there before this
+   * ceremony began and the customer can act on being told so.
+   */
+  private async refuseIfLegacyHolderExists({
+    userId,
+    normalizedValue,
+    verb,
+  }: {
+    userId: string;
+    normalizedValue: string | null;
+    verb: string;
+  }): Promise<void> {
+    if (normalizedValue === null) return;
+    const holder = await this.users.findUserIdByEmail({ normalizedValue });
+    if (holder === null || holder === userId) return;
+    throw new IdentityEmailInUseError(
+      `${verb}: a user outside the identity population already holds this address as their User.email`,
+    );
+  }
 
   async attachIdentifier(
     data: AttachIdentifierCommandData,
@@ -128,6 +173,15 @@ export class IdentityGuards {
         `verify_identifier: identifier is ${head.state}, only ATTACHED verifies`,
       );
     }
+    // The legacy population first, and BEFORE any fact is stated — which is
+    // also before the ceremony consumes its verification proof, since the
+    // ceremony dispatches the command and only then consumes. A refusal
+    // therefore never burns the token (ADR-116 §6).
+    await this.refuseIfLegacyHolderExists({
+      userId,
+      normalizedValue: head.value,
+      verb: "verify_identifier",
+    });
     // Uniqueness of VERIFIED values is re-checked here — concurrent verifies
     // of the same value are serialized by the per-user queue only within one
     // user, so the loser of a cross-user race dead-ends rather than verifying
@@ -170,6 +224,15 @@ export class IdentityGuards {
         `mark_primary: identifier is ${head.state}, only VERIFIED takes PRIMARY`,
       );
     }
+    // PRIMARY is what the fold writes into `User.email`, so this is the
+    // moment the value has to be free in the legacy population too. Refusing
+    // here is what turns a `User.email @unique` write failure deep inside
+    // the projection into a named refusal the caller can act on (ADR-116 §6).
+    await this.refuseIfLegacyHolderExists({
+      userId,
+      normalizedValue: head.value,
+      verb: "mark_primary",
+    });
     const previous = Object.values(heads.identifiers).find(
       (candidate) => candidate.state === "PRIMARY",
     );

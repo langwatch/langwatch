@@ -48,6 +48,34 @@ export class IdentityPrimaryMustDemoteFirstError extends IdentityCommandRefusedE
   }
 }
 
+/**
+ * The cross-population uniqueness refusal (ADR-116 §6): the normalized
+ * address is already somebody else's.
+ *
+ * Refused at VERIFY and at PRIMARY, never at attach — an unverified
+ * (`ATTACHED`) identifier blocks nobody, so there is no squatting, and
+ * verify is the choke point in both directions. "Somebody else" spans both
+ * populations, which is the point: a latched user's verified identifier and
+ * a legacy user's `User.email` are the same claim on the same mailbox, and
+ * only one of them can hold it. Without this, a PRIMARY switch onto a taken
+ * address reaches the fold and dies on `User.email @unique` — a write
+ * failure with no name, in a projection, long after the user could have
+ * been told.
+ */
+export class IdentityEmailInUseError extends IdentityCommandRefusedError {
+  constructor(detail: string) {
+    super("identity_email_in_use", "identity_email_in_use", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+      tips: [
+        "Sign in with the account that already holds this address, or use a different one.",
+      ],
+    });
+    this.name = "IdentityEmailInUseError";
+  }
+}
+
 export class IdentityPrimaryRequiresVerifiedError extends IdentityCommandRefusedError {
   constructor(detail: string) {
     super(

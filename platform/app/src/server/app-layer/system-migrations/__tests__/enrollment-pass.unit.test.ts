@@ -61,7 +61,8 @@ class InMemoryStateRepository implements SystemMigrationStateRepository {
     migrationName: string;
   }): Promise<boolean> {
     return [...this.rows.values()].some(
-      (row) => row.migrationName === migrationName && row.status === "finalized",
+      (row) =>
+        row.migrationName === migrationName && row.status === "finalized",
     );
   }
 

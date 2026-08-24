@@ -8,6 +8,7 @@ import {
   type IdentityHeadsRepository,
 } from "@langwatch/identity-server";
 import { describe, expect, it } from "vitest";
+import { inMemoryIdentityUsers } from "~/server/app-layer/identity/__tests__/support/identity-test-doubles";
 import { createTenantId } from "../../..";
 import type { Command } from "../../../commands/command";
 import { validateEventAggregateType } from "../../../stores/eventStoreUtils";
@@ -98,7 +99,10 @@ describe("identity event aggregate type", () => {
       {
         label: "attach",
         handler: new AttachIdentifierCommand(
-          new IdentityGuards(new HeadsOf(emptyIdentityHeads({ userId: USER }))),
+          new IdentityGuards(
+            new HeadsOf(emptyIdentityHeads({ userId: USER })),
+            inMemoryIdentityUsers(),
+          ),
         ),
         data: {
           ...base,
@@ -120,6 +124,7 @@ describe("identity event aggregate type", () => {
                 idf_1: fact({ state: "ATTACHED", verifiedAtMs: null }),
               },
             }),
+            inMemoryIdentityUsers(),
           ),
         ),
         data: {
@@ -132,19 +137,23 @@ describe("identity event aggregate type", () => {
       },
       {
         label: "mark primary",
-        handler: new MarkPrimaryCommand(new IdentityGuards(new HeadsOf(held))),
+        handler: new MarkPrimaryCommand(
+          new IdentityGuards(new HeadsOf(held), inMemoryIdentityUsers()),
+        ),
         data: { ...base, commandId: "idcmd_3", identifierId: "idf_1" },
       },
       {
         label: "detach",
         handler: new DetachIdentifierCommand(
-          new IdentityGuards(new HeadsOf(held)),
+          new IdentityGuards(new HeadsOf(held), inMemoryIdentityUsers()),
         ),
         data: { ...base, commandId: "idcmd_4", identifierId: "idf_2" },
       },
       {
         label: "erase",
-        handler: new EraseUserCommand(new IdentityGuards(new HeadsOf(held))),
+        handler: new EraseUserCommand(
+          new IdentityGuards(new HeadsOf(held), inMemoryIdentityUsers()),
+        ),
         data: { ...base, commandId: "idcmd_5" },
       },
     ])("the store accepts every event $label emits", async ({
@@ -170,7 +179,10 @@ describe("identity event aggregate type", () => {
     /** @scenario "A retried command dedupes at the event store" */
     it("keys idempotency as commandId:index so a retry dedupes", async () => {
       const handler = new AttachIdentifierCommand(
-        new IdentityGuards(new HeadsOf(emptyIdentityHeads({ userId: USER }))),
+        new IdentityGuards(
+          new HeadsOf(emptyIdentityHeads({ userId: USER })),
+          inMemoryIdentityUsers(),
+        ),
       );
       const data = {
         ...base,

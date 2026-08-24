@@ -224,6 +224,7 @@ import { PrismaGithubPullRequestsRepository } from "./github/repositories/github
 import { NullGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
 import { PrismaIdentityHeadsRepository } from "./identity/repositories/identity-heads.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./identity/repositories/identity-projection.prisma.repository";
+import { PrismaIdentityUsersRepository } from "./identity/repositories/identity-users.prisma.repository";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import {
   createLangyTrustedMessageReader,
@@ -891,6 +892,7 @@ export function initializeDefaultApp(options?: {
     authzAuditTrail: new PrismaAuthzAuditTrailRepository(prisma),
     identityProjection: new PrismaIdentityProjectionRepository(prisma),
     identityHeads: new PrismaIdentityHeadsRepository(prisma),
+    identityUsers: new PrismaIdentityUsersRepository(prisma),
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,
     ),

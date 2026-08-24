@@ -19,6 +19,7 @@ export {
 } from "./backfill";
 export {
   IdentityCommandRefusedError,
+  IdentityEmailInUseError,
   IdentityIdentifierNotFoundError,
   IdentityIdentifierNotVerifiableError,
   IdentityPrimaryMustDemoteFirstError,

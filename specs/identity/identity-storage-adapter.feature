@@ -76,7 +76,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And "olga" misses the Identifier read and resolves via the legacy branch
     And each lookup returns exactly one user
 
-  @unit @unimplemented
+  @unit
   Scenario: A held user is served wholly by the legacy branch
     Given a user "ines" whose backfill state is migrated but not finalized
     And "ines" has Identifier rows the parity proof found disagreeing
@@ -84,7 +84,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     Then every operation takes the legacy branch
     And the next backfill pass heals her projection, not the adapter
 
-  @unit @unimplemented
+  @unit
   Scenario: Admin user searches are never routed
     Given "sam" is finalized and "olga" is not
     When the admin plugin searches users by a name fragment across both populations
@@ -151,7 +151,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     Then the newer Account secret columns are copied onto "olga"'s AccountCredential row
     And her next sign-in verifies the new password
 
-  @unit @unimplemented
+  @unit
   Scenario: An unreadable gate cache degrades writes to the legacy branch, never to an error
     Given the gate cache cannot be read
     When a user's account rows are written
@@ -223,7 +223,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     Then the update is dispatched as an identity command the guard evaluates
     And User.email is written only by the fold, from the PRIMARY identifier
 
-  @unit @unimplemented
+  @unit
   Scenario: A primary switch that collides is refused by the guard, not the database
     Given "sam@home.net" is already another user's User.email
     When "sam" promotes "sam@home.net" to PRIMARY
@@ -232,7 +232,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
 
   # ── Collisions across both populations ─────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: Verification is refused when a legacy user holds the address
     Given a legacy user "bob" whose User.email is "bob@acme.com"
     And a finalized user "sam" has attached "bob@acme.com"
@@ -241,14 +241,14 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And no event is appended
     And "bob" still resolves by that address
 
-  @unit @unimplemented
+  @unit
   Scenario: A legacy sign-up cannot claim a latched user's verified address
     Given a finalized user "sam" with the verified secondary identifier "sam@home.net"
     When someone signs up on the legacy branch with "sam@home.net"
     Then the sign-up is refused as a duplicate address
     And no user is created
 
-  @unit @unimplemented
+  @unit
   Scenario: A guard refusal reaches the customer as named copy
     Given a finalized user "sam" verifying an address another user holds
     When the guard refuses the verification

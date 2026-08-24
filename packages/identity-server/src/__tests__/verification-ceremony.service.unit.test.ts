@@ -1,5 +1,6 @@
 import {
   emptyIdentityHeads,
+  IdentityEmailInUseError,
   IdentityVerificationInvalidError,
   type VerifyIdentifierCommandData,
 } from "@langwatch/identity";
@@ -128,6 +129,54 @@ describe("the email verification ceremony", () => {
         }),
       ).rejects.toMatchObject({ code: "identity_verification_invalid" });
       expect(verifyIdentifier).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the guard refuses the address as already held", () => {
+    /**
+     * ADR-116 §6. Two claims, and the second is the one that is easy to
+     * lose: the code survives the ceremony — so the client registry can turn
+     * `identity_email_in_use` into copy rather than showing the raw string —
+     * AND the single-use proof is still there afterwards. What buys the
+     * second one is the ceremony's own ordering: dispatch, THEN consume. A
+     * refusal must not burn a link the customer will need again once they
+     * have freed the address.
+     */
+    /** @scenario "A guard refusal reaches the customer as named copy" */
+    it("keeps the handled code and leaves the verification proof unconsumed", async () => {
+      const { store, service, verifyIdentifier } = harness();
+      verifyIdentifier.mockRejectedValue(
+        new IdentityEmailInUseError(
+          "verify_identifier: a user outside the identity population already holds this address",
+        ),
+      );
+      const codeVerifier = "the-initiating-context-secret";
+      const minted = await service.mintEmailVerification({
+        userId: USER,
+        identifierId: WORK,
+        codeChallenge: s256Challenge(codeVerifier),
+      });
+      const complete = () =>
+        service.completeEmailVerification({
+          userId: USER,
+          identifierId: WORK,
+          verificationId: minted.verificationId,
+          token: minted.token,
+          codeVerifier,
+        });
+
+      await expect(complete()).rejects.toMatchObject({
+        code: "identity_email_in_use",
+      });
+      expect(store.records.get(WORK)?.verificationId).toBe(
+        minted.verificationId,
+      );
+
+      // The proof outlived the refusal, so the very same link completes once
+      // the collision is gone.
+      verifyIdentifier.mockResolvedValue([]);
+      await expect(complete()).resolves.toBeUndefined();
+      expect(store.records.has(WORK)).toBe(false);
     });
   });
 

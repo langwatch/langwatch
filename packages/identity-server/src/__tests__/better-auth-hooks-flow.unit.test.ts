@@ -74,9 +74,17 @@ function harness() {
       const row = db.user?.find((candidate) => candidate.id === userId);
       return typeof row?.email === "string" ? row.email : null;
     },
+    async findUserIdByEmail({ normalizedValue }) {
+      const row = db.user?.find(
+        (candidate) =>
+          typeof candidate.email === "string" &&
+          candidate.email.toLowerCase() === normalizedValue.toLowerCase(),
+      );
+      return typeof row?.id === "string" ? row.id : null;
+    },
   };
 
-  const identity = new IdentityService(new IdentityGuards(heads), ledger);
+  const identity = new IdentityService(new IdentityGuards(heads, users), ledger);
   const ceremonies = new IdentityCeremonies(
     heads,
     users,

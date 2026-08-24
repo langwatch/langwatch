@@ -17,7 +17,10 @@ import {
 } from "@ee/governance/subscribers/governanceOcsfEventsSync.subscriber";
 import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
 import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/webhookDelivery.process";
-import type { IdentityHeadsRepository } from "@langwatch/identity-server";
+import type {
+  IdentityHeadsRepository,
+  IdentityUsersRepository,
+} from "@langwatch/identity-server";
 import { IdentityGuards } from "@langwatch/identity-server";
 import type {
   LangyConversationStateData,
@@ -360,6 +363,13 @@ export interface PipelineRepositories {
   identityProjection: StateProjectionStore<IdentityFoldState>;
   /** Postgres reads the identity guards run against (ADR-101 §2). */
   identityHeads: IdentityHeadsRepository;
+  /**
+   * The `User` reads the same guards run against. The staged re-run has to
+   * ask the cross-population collision question the calling path asked
+   * (ADR-116 §6) — a guard that could only see the projection here would let
+   * the queue state a fact the caller was refused.
+   */
+  identityUsers: IdentityUsersRepository;
 }
 
 export interface PipelineRegistryDeps {
@@ -664,6 +674,7 @@ export class PipelineRegistry {
         identityProjectionStore: this.deps.repositories.identityProjection,
         identityGuards: new IdentityGuards(
           this.deps.repositories.identityHeads,
+          this.deps.repositories.identityUsers,
         ),
       }),
     );

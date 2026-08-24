@@ -15,6 +15,7 @@ import type {
 import type { EventStore } from "~/server/event-sourcing/stores/eventStore.types";
 import { IdentityLedgerWriter } from "../ledger";
 import { identityProjectionConvergenceTimeoutsTotal } from "../metrics";
+import { inMemoryIdentityUsers } from "./support/identity-test-doubles";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };
@@ -150,7 +151,7 @@ function harness(overrides?: {
     convergence: { timeoutMs: 40, pollMs: 5 },
   });
   const identity = new IdentityService(
-    new IdentityGuards(new ProjectionHeads(store)),
+    new IdentityGuards(new ProjectionHeads(store), inMemoryIdentityUsers()),
     ledger,
   );
 

@@ -1644,6 +1644,11 @@ const presentations = {
     describe: () =>
       "Nothing was changed, and we've been alerted. Try again in a moment, and contact support if it keeps happening.",
   },
+  identity_email_in_use: {
+    title: "That email address is already in use",
+    describe: () =>
+      "Another account already holds it. Sign in with that account, or use a different address here.",
+  },
 
   // ---- governance ----
   anomaly_rule_not_found: {

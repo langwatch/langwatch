@@ -109,6 +109,7 @@ export const APP_ERROR_CODES = [
   "group_not_in_organization",
   "guardrail_attach_forbidden",
   "idempotency_error",
+  "identity_email_in_use",
   "identity_identifier_not_found",
   "identity_identifier_not_verifiable",
   "identity_primary_must_demote_first",

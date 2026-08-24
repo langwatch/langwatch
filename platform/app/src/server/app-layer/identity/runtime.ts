@@ -70,7 +70,7 @@ export function identityEmail(): IdentityEmailService {
  */
 export function identityService(): IdentityService {
   return new IdentityService(
-    new IdentityGuards(identityHeads),
+    new IdentityGuards(identityHeads, identityUsers),
     new IdentityLedgerWriter({
       projectionStore: new PrismaIdentityProjectionRepository(prisma),
     }),

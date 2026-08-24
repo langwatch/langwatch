@@ -113,11 +113,22 @@ export function identityStack({
     },
   };
 
+  /** `User` as identity reads it: the memory engine's own rows, so the
+   *  legacy population the collision guard consults is the same one
+   *  better-auth is writing. */
   const users: IdentityUsersRepository = {
     async storeUserHashKeyIfMissing() {},
     async findEmail({ userId }) {
       const row = db.user?.find((candidate) => candidate.id === userId);
       return typeof row?.email === "string" ? row.email : null;
+    },
+    async findUserIdByEmail({ normalizedValue }) {
+      const row = db.user?.find(
+        (candidate) =>
+          typeof candidate.email === "string" &&
+          candidate.email.toLowerCase() === normalizedValue.toLowerCase(),
+      );
+      return typeof row?.id === "string" ? row.id : null;
     },
   };
 
@@ -132,7 +143,7 @@ export function identityStack({
   const ceremonies = new IdentityCeremonies(
     heads,
     users,
-    new IdentityService(new IdentityGuards(heads), ledger),
+    new IdentityService(new IdentityGuards(heads, users), ledger),
     isUserOnIdentityWrites,
     { now: () => T0, newCommandId: newIdentityCommandId },
   );

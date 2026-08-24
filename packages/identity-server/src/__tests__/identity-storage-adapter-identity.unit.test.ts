@@ -438,11 +438,191 @@ describe("better-auth over the identity storage adapter", () => {
     });
   });
 
+  describe("given a finalized user holding a verified secondary address", () => {
+    let stack: Stack;
+
+    beforeEach(async () => {
+      stack = identityStack();
+      stack.gate.open = () => true;
+      await signUp(stack.auth, EMAIL);
+      attachVerifiedAlias(stack, {
+        userId: userIdOf(stack),
+        value: "sam@home.net",
+      });
+    });
+
+    describe("when someone else signs up with that address", () => {
+      /**
+       * The other direction of ADR-116 §6's collision rule, and it needs no
+       * guard at all: better-auth's own duplicate check is a
+       * `findUserByEmail`, and on this adapter that read resolves through the
+       * identifiers. A secondary address exists nowhere in `User.email`, so
+       * without the routed read the sign-up would sail past it.
+       */
+      /** @scenario "A legacy sign-up cannot claim a latched user's verified address" */
+      it("is refused as a duplicate address, and no user is created", async () => {
+        const before = stack.db.user?.length ?? 0;
+
+        await expect(
+          stack.auth.api.signUpEmail({
+            body: {
+              email: "sam@home.net",
+              password: PASSWORD,
+              name: "Impostor",
+            },
+          }),
+        ).rejects.toMatchObject({ status: "UNPROCESSABLE_ENTITY" });
+
+        expect(stack.db.user).toHaveLength(before);
+      });
+    });
+  });
+
+  describe("given a user whose backfill is migrated but not finalized", () => {
+    let stack: Stack;
+
+    beforeEach(async () => {
+      stack = identityStack();
+      // A HELD user, built the way one actually arises: her `Account` rows
+      // came from the legacy branch and are still authoritative, a backfill
+      // pass adopted her identifiers into the projection, and the parity
+      // proof then found the two disagreeing — so her state row says
+      // `migrated`, and the gate stays shut.
+      await signUp(stack.auth, EMAIL);
+      attachVerifiedAlias(stack, { userId: userIdOf(stack), value: EMAIL });
+      stack.gate.open = () => false;
+      stack.finalized.is = () => false;
+    });
+
+    describe("when better-auth reads and writes her account data", () => {
+      /** @scenario "A held user is served wholly by the legacy branch" */
+      it("takes the legacy branch for every operation, projection rows and all", async () => {
+        const context = await stack.auth.$context;
+        const userId = userIdOf(stack);
+        const statedBefore = stack.commands.length;
+        const projectionBefore = statedIdentifiers(stack);
+        // The identity tables still hold her — that is what makes this a
+        // HELD user rather than an unlatched one, and what would make a
+        // resolution-first read answer for her if the gate were not asked.
+        expect(projectionBefore.length).toBeGreaterThan(0);
+
+        const listed = await context.internalAdapter.findAccounts(userId);
+        expect(listed.map((row) => row.providerId)).toEqual(["credential"]);
+        expect(listed.map((row) => row.id)).toEqual(
+          (stack.db.account ?? []).map((row) => row.id),
+        );
+
+        const resolved =
+          await context.internalAdapter.findUserByEmail(EMAIL);
+        expect(resolved?.user.id).toBe(userId);
+
+        await context.internalAdapter.linkAccount({
+          userId,
+          providerId: "google",
+          accountId: "sub-google-1",
+        });
+
+        // Nothing was stated and nothing entered identity storage: the next
+        // backfill pass heals her projection, not the adapter.
+        expect(stack.commands).toHaveLength(statedBefore);
+        expect(statedIdentifiers(stack)).toEqual(projectionBefore);
+        expect(stack.storage.credentials.size).toBe(0);
+        expect(stack.db.account).toHaveLength(2);
+      });
+    });
+  });
+
+  describe("given a finalized user whose gate cache cannot be read", () => {
+    let stack: Stack;
+
+    beforeEach(async () => {
+      stack = identityStack();
+      stack.gate.open = () => true;
+      await signUp(stack.auth, EMAIL);
+      const [identifier] = statedIdentifiers(stack);
+      seedBridgeRow(stack, identifier?.accountId as string);
+      // The state row still says finalized — she IS latched. Only the cache
+      // in front of the write gate is unreadable, and it fails CLOSED.
+      stack.finalized.is = () => true;
+      stack.gate.open = () => false;
+    });
+
+    describe("when her account rows are written", () => {
+      /** @scenario "An unreadable gate cache degrades writes to the legacy branch, never to an error" */
+      it("serves every routed write from the legacy branch instead of failing", async () => {
+        const context = await stack.auth.$context;
+        const userId = userIdOf(stack);
+        const statedBefore = stack.commands.length;
+        const credentialsBefore = stack.storage.credentials.size;
+
+        await context.internalAdapter.linkAccount({
+          userId,
+          providerId: "google",
+          accountId: "sub-google-1",
+        });
+        const google = (stack.db.account ?? []).find(
+          (row) => row.providerId === "google",
+        );
+        await context.internalAdapter.updateAccount(google?.id as string, {
+          accessToken: "at-2",
+        });
+
+        // Degraded, not errored: the writes landed, on the branch that is
+        // always able to serve them.
+        expect(google).toBeDefined();
+        expect(
+          (stack.db.account ?? []).find((row) => row.id === google?.id)
+            ?.accessToken,
+        ).toBe("at-2");
+        expect(stack.commands).toHaveLength(statedBefore);
+        expect(stack.storage.credentials.size).toBe(credentialsBefore);
+      });
+    });
+  });
+
   describe("given one finalized user and one who is not", () => {
     let stack: Stack;
 
     beforeEach(() => {
       stack = identityStack();
+    });
+
+    /**
+     * The admin plugin's population-wide reads. They are not per-user
+     * routable in the first place — one query, both populations — which is
+     * exactly why the `user` model's READS are never routed at all: the
+     * `User` table is complete for everyone, because the fold polyfills
+     * `email` from the PRIMARY identifier for the users it owns.
+     */
+    /** @scenario "Admin user searches are never routed" */
+    it("serves a name search from the User table, with latched users' primary emails on it", async () => {
+      stack.gate.open = () => true;
+      await signUp(stack.auth, "sam@acme.com");
+      const samId = userIdOf(stack);
+      stack.gate.open = (userId) => userId === samId;
+      await signUp(stack.auth, "olga@acme.com");
+      const context = await stack.auth.$context;
+
+      const found = await context.adapter.findMany<{
+        id: string;
+        email: string;
+      }>({
+        model: "user",
+        where: [{ field: "name", value: "Sa", operator: "starts_with" }],
+      });
+
+      // No `identity_unsupported_storage_query`: that failure is scoped to
+      // the `account` model, where per-record routing has to be decidable.
+      expect(found.map((row) => row.email).sort()).toEqual([
+        "olga@acme.com",
+        "sam@acme.com",
+      ]);
+      expect(
+        await context.adapter.count({
+          model: "user",
+          where: [{ field: "name", value: "Sa", operator: "starts_with" }],
+        }),
+      ).toBe(2);
     });
 
     /** @scenario "A read that names no user routes by resolution, then by gate" */
