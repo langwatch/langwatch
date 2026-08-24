@@ -38,6 +38,12 @@ Feature: Enterprise governance package boundary
     Then governance chooses between the governance and project homes
     And the application remains responsible for authentication and redirect transport
 
+  Scenario: Governance evaluates quarantine fill without owning trace storage
+    Given the application supplies a governance tenant and trace-activity reader
+    When governance evaluates the current quarantine fill window
+    Then governance computes the per-source rate and warning threshold
+    And ClickHouse access remains behind the injected trace-activity capability
+
   Scenario: Contracts are transport independent
     Given a browser imports the governance contract root
     Then no server, Eventing, application, environment, or generated database module loads

@@ -20,13 +20,13 @@ import { AdminWorkspaceViewAuditService } from "@ee/governance/services/adminWor
 import { GovernanceOcsfExportService } from "@ee/governance/services/governanceOcsfExport.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import {
+  QUARANTINE_DEFAULT_THRESHOLD,
+  QUARANTINE_DEFAULT_WINDOW_SECONDS,
   PersonaHomeResolverService,
   type PersonaResolution,
 } from "@langwatch/enterprise-governance-contract";
 import {
-  QUARANTINE_DEFAULT_THRESHOLD,
-  QUARANTINE_DEFAULT_WINDOW_SECONDS,
-  QuarantineFillEvaluator,
+  AppQuarantineFillEvaluatorService,
 } from "@ee/governance/services/quarantineFillEvaluator.service";
 import { GovernanceSetupStateService } from "@ee/governance/services/setupState.service";
 import { z } from "zod";
@@ -388,7 +388,7 @@ export const governanceRouter = createTRPCRouter({
     )
     .permission("governance:view")
     .query(async ({ ctx, input }) => {
-      const evaluator = QuarantineFillEvaluator.create({
+      const evaluator = AppQuarantineFillEvaluatorService.create({
         prisma: ctx.prisma,
         traceActivity: getApp().governance.traceActivity,
       });

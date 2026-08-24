@@ -16,6 +16,7 @@ import {
   normalizedPullEventSchema,
   pulledUsageHintSchema,
 } from "../src/puller";
+import { quarantineFillInputSchema } from "../src/quarantine-fill";
 
 describe("governance backend contract", () => {
   it("accepts HTTPS destinations and quarantines malformed legacy rows", () => {
@@ -68,6 +69,16 @@ describe("governance backend contract", () => {
         dimensions: { workspaceId: "workspace" },
       }).success,
     ).toBe(true);
+  });
+
+  it("applies the portable quarantine-fill defaults", () => {
+    expect(
+      quarantineFillInputSchema.parse({ organizationId: "organization" }),
+    ).toEqual({
+      organizationId: "organization",
+      windowSeconds: 60,
+      threshold: 100,
+    });
   });
 
   it("recognizes governance traces by the canonical origin attribute", () => {

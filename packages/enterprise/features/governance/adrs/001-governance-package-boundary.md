@@ -23,7 +23,9 @@ persona-home policy that chooses between Governance and project homes from
 organisation intent and Governance setup state; the application still owns
 authentication, signal loading and the redirect transport. The ingestion-pull and
 pulled-usage workflows therefore belong to governance rather than to a generic
-Enterprise event-sourcing directory.
+Enterprise event-sourcing directory. Governance also owns quarantine-fill rate
+and warning policy; project resolution and trace-activity storage remain
+injected capabilities.
 
 Gateway, Billing, Webhooks, Automations and the generic Audit Log retain their
 technical capabilities. Governance consumes gateway spend facts, delegates

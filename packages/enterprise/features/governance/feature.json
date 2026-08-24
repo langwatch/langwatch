@@ -15,6 +15,7 @@
     "platform-tool-policy",
     "pull-destination",
     "pulled-usage",
-    "puller"
+    "puller",
+    "quarantine-fill"
   ]
 }

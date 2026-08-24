@@ -16,3 +16,4 @@ export * from "./platform-tool-policy";
 export * from "./puller";
 export * from "./pulled-usage.commands";
 export * from "./pulled-usage.events";
+export * from "./quarantine-fill";
