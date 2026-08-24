@@ -193,15 +193,30 @@ an **idempotent sequence with retries**, not an atomic ceremony.
 Ids are minted once per sign-up and reused by every retry: the `commandId`
 is the event store's idempotency key (D01 — a retried command dedupes rather
 than appending twice), the identifier id is deterministic (D01), and the
-newborn's user id is pinned to the flow. The legs, in order:
+newborn's user id is pinned to the flow.
+
+Before any leg runs, the entrance **claims** the newborn's tenant: its
+migration-state row is written at `migrated`, carrying a born report. Only
+`finalized` opens the write gate, so the claim grants nothing; what it
+leaves behind is a handle, and the residual below is what needs one. The
+legs, in order:
 
 1. the **waited idempotent append** of the attach facts;
-2. **one Postgres transaction** over the row writes — the user row, the
-   `AccountCredential` row and the `finalized` migration-state row. These
+2. **one Postgres transaction** over the row writes the entrance itself
+   performs — the user row and the `finalized` migration-state row. These
    *can* share a transaction: they are one store;
 3. the **fold staged onto the queue**, with the ceremonies' bounded wait.
    The fold skips harmlessly and retries while the user row is not yet
    visible.
+
+The `AccountCredential` row sits outside that transaction, and better-auth
+is what puts it there. `signUpEmail` runs `createUser` and then
+`linkAccount`, with `databaseHooks.user.create.after` firing between them —
+and this application's after-create hook writes rows that FK the user. The
+user row therefore cannot be deferred past its own create to join a later
+transaction, so the credential row is written by the account create that
+follows, on the identity branch, routed there by the marker. Both rows
+exist when sign-up returns, which is what the spec pins.
 
 If any leg fails, the sign-up fails and the retry re-executes **every** leg.
 Already-done legs are no-ops — the append dedupes on the command id, the row
@@ -213,7 +228,10 @@ row commit leaves facts under a tenant that never gained a user row. Nothing
 serves them — the fold declines to project a user that does not exist, and
 resolution reads resolve nothing — and a **reconciliation sweep removes
 orphaned newborn streams**. That sweep is a required companion to this
-entrance, not optional hygiene.
+entrance, not optional hygiene, and the claim is what it hunts by: the event
+store exposes no aggregate enumeration, and an entrance that dies before the
+row commit staged no fold either — so without the claim the orphan would
+leave nothing anything could find it by.
 
 This deliberately re-couples flagged sign-up to engine availability — the
 coupling the authz programme removed ("born-on-engine"). It is accepted
@@ -257,11 +275,20 @@ against a stale `Account` row and wrongly reject their sign-in.
 
 *Reverse:* a finalized user's secret write can land on the legacy branch
 anyway — deterministically for up to `IDENTITY_WRITE_GATE_TTL_MS` per pod
-immediately after their latch, and during any gate-cache failure. So the
-heal pass gains a **secrets leg**: where an `Account` row's secret columns
-are newer than the matching `AccountCredential` row (`updatedAt`
-comparison), they are copied back. Without the reverse leg, a password
-changed in that window is rejected forever.
+immediately after their latch, and during any gate-cache failure. So a
+**secrets leg** runs: where an `Account` row's secret columns are newer than
+the matching `AccountCredential` row (`updatedAt` comparison), they are
+copied back. Without the reverse leg, a password changed in that window is
+rejected forever.
+
+It runs as its own identity migration pass rather than as a step of the
+backfill, and the runner is why. `finalized` is terminal and the runner
+skips terminal tenants, so a step inside the backfill would visit held users
+and never the latched population this leg exists for — which is precisely
+the population whose secrets can still land on the legacy branch. The heal
+therefore carries its own state row and never finalizes it: it reports
+`migrated` on every pass, the runner's existing shape for work that is never
+done.
 
 With both legs, either branch authenticates a user correctly at any moment,
 and "fail closed toward legacy" keeps meaning "sign-in never breaks". The
