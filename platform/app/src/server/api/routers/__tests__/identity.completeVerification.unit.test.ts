@@ -58,7 +58,10 @@ describe("identity.completeVerification", () => {
       });
 
       await expect(
-        caller.completeVerification({ ...input, userId: "user_mallory" } as never),
+        caller.completeVerification({
+          ...input,
+          userId: "user_mallory",
+        } as never),
       ).resolves.toEqual({ verified: true });
 
       expect(mockComplete).toHaveBeenCalledWith({
@@ -102,9 +105,7 @@ describe("identity.completeVerification", () => {
         user: { id: "user_sam", email: "sam@acme.com" },
       });
 
-      await expect(
-        caller.completeVerification(input),
-      ).rejects.toMatchObject({
+      await expect(caller.completeVerification(input)).rejects.toMatchObject({
         message: "identity_verification_invalid",
       });
     });

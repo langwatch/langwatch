@@ -231,7 +231,10 @@ export class IdentityLedgerWriter implements IdentityLedger {
     last,
   }: {
     userId: string;
-    context: { aggregateId: string; tenantId: ReturnType<typeof createTenantId> };
+    context: {
+      aggregateId: string;
+      tenantId: ReturnType<typeof createTenantId>;
+    };
     last: IdentityEvent;
   }): Promise<boolean> {
     try {
