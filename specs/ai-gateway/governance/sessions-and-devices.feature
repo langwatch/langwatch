@@ -20,8 +20,9 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
 
   Per ingestion-templates-catalog.feature + ingestion-key-lifecycle.feature:
     Ingestion keys are TODAY surfaced ONLY at /me Trace Ingest tile-grid
-    (per-template). They MUST also appear in the unified /me/devices
-    inventory so users can revoke + admins can apply max-session-duration.
+    (per-template). They MUST also appear in the unified devices inventory
+    on /me/configure so users can revoke + admins can apply
+    max-session-duration.
 
   Background:
     Given organization "acme" exists
@@ -35,12 +36,12 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
       | ingestion key    | "cursor template"            | 12 days ago |
 
   # ---------------------------------------------------------------------------
-  # User-facing inventory at /me/devices
+  # User-facing inventory on the /me/configure devices tab
   # ---------------------------------------------------------------------------
 
   @bdd @sessions-and-devices @inventory @user-visibility
-  Scenario: User sees ALL credential classes in one list at /me/devices
-    When jane navigates to "/me/devices"
+  Scenario: User sees ALL credential classes in one list on the devices tab
+    When jane opens the devices tab on "/me/configure"
     Then she sees a card-grid with exactly 4 cards:
       | label                       | class            | revoke affordance |
       | "MacBook Pro — Chrome"      | web              | "Revoke session"  |
@@ -52,13 +53,13 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
     And there is a "Revoke all sessions" button at the top of the page
 
   @bdd @sessions-and-devices @inventory @binding-tokens-included
-  Scenario: Ingestion keys appear in /me/devices alongside CLI sessions
+  Scenario: Ingestion keys appear on the devices tab alongside CLI sessions
     Given jane has only one credential — an ingestion key for claude_code
-    When jane navigates to "/me/devices"
+    When jane opens the devices tab on "/me/configure"
     Then she sees ONE card for the claude_code ingestion key
     And the card class label is "Ingestion key · claude_code"
     And the card last-used reflects the ingestion key's `lastUsedAt`
-    # The /me/devices inventory is the authoritative single-pane-of-glass
+    # The devices inventory is the authoritative single-pane-of-glass
     # for every active credential. No credential type is invisible from this
     # page (defense against losing track of long-lived keys).
 
@@ -100,7 +101,7 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
   @bdd @sessions-and-devices @max-duration @policy
   Scenario: Admin sets org-level maxSessionDurationDays
     Given the org's current `maxSessionDurationDays` is NULL (unlimited)
-    When carol navigates to /settings/governance and sets `maxSessionDurationDays` to 30
+    When carol navigates to /governance and sets `maxSessionDurationDays` to 30
     Then `Organization.maxSessionDurationDays` is updated to 30
     And an audit row `gateway.organization.max_session_duration_changed`
         with payload { previousDays: null, newDays: 30, actorUserId: carol.id } is emitted
@@ -143,7 +144,7 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
     When carol navigates to "/governance" and selects the "Sessions" widget
     Then she sees an aggregate view: total active credentials by class +
         a top-N list of users with the most active credentials
-    And clicking a user row drills into that user's /me/devices view
+    And clicking a user row drills into that user's devices tab
         (via the existing admin-trace-access drill-in pattern, with the
         same persistent banner indicating impersonation)
 
@@ -164,11 +165,11 @@ Feature: AI Gateway Governance — Sessions and Devices Inventory
   # ---------------------------------------------------------------------------
 
   @bdd @sessions-and-devices @inventory @no-leak
-  Scenario: User sees only their own credentials at /me/devices (never other users')
+  Scenario: User sees only their own credentials on the devices tab (never other users')
     Given jane has 4 credentials (per Background)
     And user "ben@acme.com" has 2 credentials of his own
-    When jane visits /me/devices
+    When jane opens the devices tab on /me/configure
     Then she sees exactly 4 cards
     And ben's 2 credentials are NOT listed
-    # /me/devices is per-user; admin oversight is at /governance per the
+    # The devices tab is per-user; admin oversight is at /governance per the
     # admin-bird-eye scenario. Cross-user leakage would be a P0.

@@ -47,6 +47,7 @@ function rawSpanEvent({
   endMs = 2_000,
   statusCode = 0,
   traceId = TRACE_ID,
+  scopeName = "com.anthropic.claude_code.tracing",
 }: {
   name: string;
   spanId: string;
@@ -54,6 +55,8 @@ function rawSpanEvent({
   eventId?: string;
   resourceAttributes?: Record<string, string>;
   attributes?: Record<string, string | number>;
+  /** The instrumentation scope, which backs the gate for bare span names. */
+  scopeName?: string;
   startMs?: number;
   endMs?: number;
   /** OTLP status: 0 UNSET, 1 OK, 2 ERROR. */
@@ -94,7 +97,7 @@ function rawSpanEvent({
           value: { stringValue: value },
         })),
       },
-      instrumentationScope: { name: "com.anthropic.claude_code.tracing" },
+      instrumentationScope: { name: scopeName },
     },
   } as unknown as TraceProcessingEvent;
 }
@@ -385,6 +388,54 @@ describe("codingAgentSpanFactsDispatch", () => {
         expect(
           subscriber.options?.enqueue?.filter?.(
             rawSpanEvent({ name: "openai.chat", spanId: "s-1" }),
+          ),
+        ).toBe(false);
+      });
+    });
+
+    describe("when the raw span is codex's bare-named turn span", () => {
+      it("passes the filter on the codex scope", () => {
+        const { subscriber } = makeSubscriber();
+
+        expect(
+          subscriber.options?.enqueue?.filter?.(
+            rawSpanEvent({
+              name: "session_task.turn",
+              spanId: "turn-1",
+              scopeName: "codex_exec",
+            }),
+          ),
+        ).toBe(true);
+      });
+
+      /** @scenario "a foreign span reusing codex's bare turn name is declined at the gate" */
+      it("fails the filter when the scope names no coding agent", () => {
+        const { subscriber } = makeSubscriber();
+
+        expect(
+          subscriber.options?.enqueue?.filter?.(
+            rawSpanEvent({
+              name: "session_task.turn",
+              spanId: "turn-2",
+              scopeName: "com.acme.pipeline",
+            }),
+          ),
+        ).toBe(false);
+      });
+
+      // handle_responses repeats the turn's token counts and stamps a tokio
+      // thread.id the session-key resolution would read as the session, so
+      // it is not a gated name at all.
+      it("fails the filter for handle_responses even on the codex scope", () => {
+        const { subscriber } = makeSubscriber();
+
+        expect(
+          subscriber.options?.enqueue?.filter?.(
+            rawSpanEvent({
+              name: "handle_responses",
+              spanId: "hr-1",
+              scopeName: "codex_exec",
+            }),
           ),
         ).toBe(false);
       });

@@ -63,7 +63,7 @@ export function createGithubMaintenancePipeline(
           .onWake(githubBranchRecheckWake)
           // A pass is bounded at 50 branches and each one is a sequential GitHub
           // call, so the lease has to cover fifty round trips plus their retries.
-          // The prune shares it: two DELETEs, each a single statement.
+          // The prune shares it: one DELETE, a single statement.
           .outbox({ leaseDurationMs: 10 * 60 * 1000, maxAttempts: 3 }),
       )
       .build()

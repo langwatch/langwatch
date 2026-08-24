@@ -97,19 +97,30 @@ const { mocks } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("~/server/app-layer/app", () => ({
-  getApp: () => ({
-    traces: {
-      spans: {
-        getSpanById: mocks.getSpanById,
-        getSpanEvents: mocks.getSpanEvents,
-        getSpanSummaryByTraceId: mocks.getSpanSummaryByTraceId,
-        getSpansByTraceId: vi.fn().mockResolvedValue([]),
+// `.permission()` procedures decide through getApp().permissions (ADR-092),
+// so the fake carries the real composition over the real test database.
+vi.mock("~/server/app-layer/app", async () => {
+  const { permissionsServiceFor } = await import(
+    "~/server/app-layer/permissions/runtime"
+  );
+  const { prisma: dbForPermissions } = await import("~/server/db");
+  return {
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    getApp: () => ({
+      permissions: permissionsServiceFor(dbForPermissions),
+      traces: {
+        spans: {
+          getSpanById: mocks.getSpanById,
+          getSpanEvents: mocks.getSpanEvents,
+          getSpanSummaryByTraceId: mocks.getSpanSummaryByTraceId,
+          getSpansByTraceId: vi.fn().mockResolvedValue([]),
+        },
+        logRecords: { getLogsByTraceId: mocks.getLogsByTraceId },
       },
-      logRecords: { getLogsByTraceId: mocks.getLogsByTraceId },
-    },
-  }),
-}));
+    }),
+  };
+});
 
 // Protections resolve per test case; RBAC/session still run for real.
 const { protectionsMock } = vi.hoisted(() => ({

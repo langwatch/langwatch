@@ -23,6 +23,7 @@ export const evaluationResultSchema = z.object({
 export const evaluationResultSkippedSchema = z.object({
   status: z.literal("skipped"),
   details: z.string().optional(),
+  cost: moneySchema.optional(),
 });
 
 export const evaluationResultErrorSchema = z.object({

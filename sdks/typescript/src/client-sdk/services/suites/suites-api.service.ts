@@ -32,6 +32,22 @@ export interface SuiteTarget {
   referenceId: string;
 }
 
+/** Options for `POST /api/suites/{id}/run`. */
+export interface SuiteRunOptions {
+  /**
+   * Key that makes the request safe to retry. Generated per call when omitted,
+   * so two retries of the same command schedule two runs unless the caller
+   * pins one.
+   */
+  idempotencyKey?: string;
+  /**
+   * Constant values applied to every scenario in the run, e.g. a fixture id or
+   * a tenant. A value supplied here overrides the scenario's own default for
+   * that name.
+   */
+  parameters?: Record<string, string | number | boolean>;
+}
+
 export class SuitesApiError extends Error {
   constructor(
     message: string,
@@ -96,12 +112,34 @@ export class SuitesApiService {
     return data;
   }
 
-  async run(id: string, idempotencyKey?: string): Promise<SuiteRunResult> {
+  async run(id: string, options?: SuiteRunOptions): Promise<SuiteRunResult>;
+  /**
+   * @deprecated Pass `{ idempotencyKey }` instead. The options object is what
+   * carries run parameters, and a positional key cannot reach them.
+   */
+  async run(id: string, idempotencyKey: string): Promise<SuiteRunResult>;
+  async run(
+    id: string,
+    optionsOrIdempotencyKey?: SuiteRunOptions | string,
+  ): Promise<SuiteRunResult> {
+    const options: SuiteRunOptions =
+      typeof optionsOrIdempotencyKey === "string"
+        ? { idempotencyKey: optionsOrIdempotencyKey }
+        : optionsOrIdempotencyKey ?? {};
+
+    const body: {
+      idempotencyKey: string;
+      parameters?: Record<string, string | number | boolean>;
+    } = {
+      idempotencyKey:
+        options.idempotencyKey ??
+        `cli-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    };
+    if (options.parameters !== undefined) body.parameters = options.parameters;
+
     const { data, error } = await this.apiClient.POST("/api/suites/{id}/run", {
       params: { path: { id } },
-      body: {
-        idempotencyKey: idempotencyKey ?? `cli-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      },
+      body,
     });
     if (error) this.handleApiError(`run suite "${id}"`, error);
     return data;

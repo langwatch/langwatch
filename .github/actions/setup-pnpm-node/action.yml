@@ -31,9 +31,10 @@ inputs:
   install:
     description: >
       What to install. Omit to skip the install step. `all` installs every
-      workspace project. Anything else is passed straight to `pnpm --filter`,
-      so a trailing `...` selects a project together with its workspace
-      dependencies (e.g. `@langwatch/web...`).
+      workspace project. Anything else is split on whitespace and each word
+      becomes one `pnpm --filter`, so a trailing `...` selects a project
+      together with its workspace dependencies (e.g. `@langwatch/web...`,
+      or `@langwatch/web... @langwatch/langyworker...` for two roots).
     required: false
     default: ""
 
@@ -98,5 +99,18 @@ runs:
         if [ "$INSTALL" = "all" ]; then
           CI=true pnpm install --frozen-lockfile
         else
-          CI=true pnpm install --frozen-lockfile --filter "$INSTALL"
+          # read -ra splits on whitespace WITHOUT pathname expansion. An
+          # unquoted `for target in $INSTALL` would glob, and a filter carrying
+          # a `*` would become however many paths happen to match in the
+          # checkout, which is not what the caller asked to install.
+          # read stops at the first newline, and a YAML block scalar (`install: >`
+          # or `install: |`) is the natural way to write several targets, so
+          # fold newlines into spaces first or every target after the first is
+          # dropped without a word of warning.
+          read -ra targets <<< "${INSTALL//[$'\n\r']/ }"
+          filters=()
+          for target in "${targets[@]}"; do
+            filters+=(--filter "$target")
+          done
+          CI=true pnpm install --frozen-lockfile "${filters[@]}"
         fi

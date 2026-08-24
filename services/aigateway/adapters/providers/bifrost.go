@@ -69,6 +69,17 @@ type BifrostRouter struct {
 	// the session as expired instead of retrying.
 	codexRefresher  domain.CodexTokenRefresher
 	codexBackendURL string
+	// realtimeClient makes the one bounded REST call a voice session mint
+	// needs. Its own client because the mint must not follow redirects and
+	// re-checks every dialed address against the endpoint policy: it carries
+	// the customer's provider key in a header Go does not strip across
+	// hosts.
+	realtimeClient *http.Client
+	// elevenLabsClient serves the two ElevenLabs-native audio routes, which
+	// Bifrost cannot forward. Its own client for the same reasons as the mint
+	// above, with the gateway-wide provider timeout because synthesis and
+	// transcription are real work rather than a mint.
+	elevenLabsClient *http.Client
 }
 
 // BifrostOptions configures the bifrost router.
@@ -129,19 +140,23 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 	if codexURL == "" {
 		codexURL = codexBackendDefaultURL
 	}
+	endpointPolicy := newCustomerEndpointPolicy(
+		opts.BlockLocalHTTPCalls,
+		opts.RequireHTTPSCustomerEndpoints,
+		opts.AllowedEndpointHosts,
+	)
 	return &BifrostRouter{
-		bf:           bf,
-		logger:       opts.Logger,
-		voyageClient: newVoyageClient(),
-		endpointPolicy: newCustomerEndpointPolicy(
-			opts.BlockLocalHTTPCalls,
-			opts.RequireHTTPSCustomerEndpoints,
-			opts.AllowedEndpointHosts,
-		),
+		bf:              bf,
+		logger:          opts.Logger,
+		voyageClient:    newVoyageClient(),
+		endpointPolicy:  endpointPolicy,
 		anthropicCompat: compatEndpoints,
 		codexClient:     newCodexClient(),
 		codexRefresher:  opts.CodexRefresher,
 		codexBackendURL: codexURL,
+		realtimeClient:  newRealtimeClient(endpointPolicy),
+
+		elevenLabsClient: newElevenLabsAudioClient(endpointPolicy),
 	}, nil
 }
 
@@ -193,6 +208,25 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	if err := r.validateCredentialEndpoints(ctx, cred); err != nil {
 		return nil, err
 	}
+	// A realtime session mint is a bounded REST call to the vendor's own
+	// mint endpoint, not an inference request: no Bifrost translation, no
+	// model dispatch, no usage on the answer. It branches before the
+	// provider mapping because the route already named the vendor.
+	if req.Type == domain.RequestTypeRealtimeSession {
+		return r.dispatchRealtimeSession(ctx, req, cred)
+	}
+
+	// ElevenLabs' own audio paths carry that vendor's wire, which Bifrost's
+	// ElevenLabs provider answers with an unsupported-operation error, so the
+	// gateway calls the vendor itself. The route pinned the provider, so the
+	// credential here is already an ElevenLabs one.
+	if elevenLabsNativeRoute(req) {
+		if req.Type == domain.RequestTypeTranscription {
+			return r.dispatchElevenLabsTranscription(ctx, req, cred)
+		}
+		return r.dispatchElevenLabsSpeech(ctx, req, cred)
+	}
+
 	model := req.Model
 	if req.Resolved != nil {
 		model = req.Resolved.ModelID
@@ -1025,6 +1059,16 @@ const ProviderRequestTimeoutSeconds = 14 * 60
 
 func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfschemas.ProviderConfig, error) {
 	cfg := &bfschemas.ProviderConfig{}
+	// Every provider is sized explicitly, standard ones included. A zero here
+	// is not "no opinion": CheckAndSetDefaults at the bottom of this function
+	// replaces it with bifrost's own 1000 workers and 5000-slot queue, and
+	// GetConfiguredProviders registers the whole standard list up front, so
+	// leaving it zero bought a worker pool per provider whether or not this
+	// install ever dispatches to it. See standardProviderConcurrency.
+	cfg.ConcurrencyAndBufferSize = bfschemas.ConcurrencyAndBufferSize{
+		Concurrency: standardProviderConcurrency,
+		BufferSize:  standardProviderBufferSize,
+	}
 	if strings.HasPrefix(string(provider), anthropicCompatPrefix) ||
 		strings.HasPrefix(string(provider), geminiCompatPrefix) {
 		endpoint, ok := a.anthropicCompat.lookup(string(provider))
@@ -1288,6 +1332,30 @@ const anthropicCompatMaxEndpoints = 32
 const (
 	anthropicCompatConcurrency = 128
 	anthropicCompatBufferSize  = 1024
+)
+
+// standardProviderConcurrency and standardProviderBufferSize size the worker
+// pool bifrost creates for each entry in bfschemas.StandardProviders.
+//
+// GetConfiguredProviders returns that whole list, because a virtual key may
+// name any provider and bifrost resolves config by provider key alone. Left
+// unset, each of the 23 entries took bifrost's own defaults — 1000 workers
+// and a 5000-slot queue, sized for a deployment where one provider fronts the
+// entire gateway. Paid 23 times over, that was ~21,000 permanently parked
+// goroutines per pod in production (99.85% of the process's goroutines), for
+// providers most installs never dispatch to. Their only measurable effect was
+// making the GC rescan 21,000 stacks on every mark cycle and the profiler
+// serialize them every 15 seconds.
+//
+// 128 is the figure the compat path above already arrived at, for the same
+// reason: the pool bounds in-flight upstream requests, and a burst past it
+// queues rather than fails — bifrost drops queued requests only under
+// DropExcessRequests, which the gateway leaves off. Across the production
+// pods that is several hundred concurrent upstream requests per provider,
+// far above what the gateway's own request ceiling makes reachable.
+const (
+	standardProviderConcurrency = 128
+	standardProviderBufferSize  = 1024
 )
 
 // anthropicCompatRegistry maps derived provider keys to their endpoints.
@@ -1655,11 +1723,19 @@ func extractUsage(resp *bfschemas.BifrostChatResponse) domain.Usage {
 		CompletionTokens: resp.Usage.CompletionTokens,
 		TotalTokens:      resp.Usage.TotalTokens,
 	}
+	var split domain.AudioTokenSplit
 	if d := resp.Usage.PromptTokensDetails; d != nil {
 		u.CacheReadTokens = d.CachedReadTokens
 		u.CacheCreationTokens = d.CachedWriteTokens
+		split.InputAudio = d.AudioTokens
+		split.InputText = d.TextTokens
 	}
-	return u
+	if d := resp.Usage.CompletionTokensDetails; d != nil {
+		u.ReasoningTokens = d.ReasoningTokens
+		split.OutputAudio = d.AudioTokens
+		split.OutputText = d.TextTokens
+	}
+	return u.SplitAudioTokens(split)
 }
 
 // extractResponsesUsage maps the Responses-API usage block onto the
@@ -1675,11 +1751,19 @@ func extractResponsesUsage(resp *bfschemas.BifrostResponsesResponse) domain.Usag
 		CompletionTokens: resp.Usage.OutputTokens,
 		TotalTokens:      resp.Usage.TotalTokens,
 	}
+	var split domain.AudioTokenSplit
 	if d := resp.Usage.InputTokensDetails; d != nil {
 		u.CacheReadTokens = d.CachedReadTokens
 		u.CacheCreationTokens = d.CachedWriteTokens
+		split.InputAudio = d.AudioTokens
+		split.InputText = d.TextTokens
 	}
-	return u
+	if d := resp.Usage.OutputTokensDetails; d != nil {
+		u.ReasoningTokens = d.ReasoningTokens
+		split.OutputAudio = d.AudioTokens
+		split.OutputText = d.TextTokens
+	}
+	return u.SplitAudioTokens(split)
 }
 
 // extractEmbeddingUsage maps Bifrost's embedding usage block. Embedding
@@ -1726,6 +1810,14 @@ type bifrostStreamIterator struct {
 	// carry the same extra_fields.params_dropped signal as sync ones.
 	// Never set on raw-framing passthrough streams.
 	paramsDropped []string
+	// usageTail carries the unterminated remainder of the previous
+	// passthrough chunk. Bifrost's passthrough adapter forwards raw
+	// socket reads, not whole SSE events, so a usage-bearing frame can
+	// straddle two chunks; the tail is prepended to the next chunk
+	// before usage parsing so a split frame still counts. Capped at
+	// maxUsageTailBytes so a stream that never closes a frame cannot
+	// grow it without bound.
+	usageTail []byte
 }
 
 func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
@@ -1789,8 +1881,20 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 			if parser == nil {
 				parser = parseGeminiPassthroughUsage
 			}
+			// The chunk boundary is a socket-read boundary, not an SSE
+			// frame boundary, so a usage-bearing frame can arrive split
+			// across two chunks and a per-chunk parse would silently
+			// lose it (Anthropic's message_start, the only frame with
+			// input and cache counts, is the largest and most exposed).
+			// Prepend the unterminated remainder of the previous chunk
+			// so the frame parses whole once its closing bytes arrive.
 			//nolint:staticcheck // explicit embedded-field reference matches the parallel branches above for readability.
-			if u, ok := parser(chunk.BifrostPassthroughResponse.Body); ok {
+			scan := chunk.BifrostPassthroughResponse.Body
+			if len(it.usageTail) > 0 {
+				scan = append(it.usageTail, scan...)
+			}
+			it.usageTail = passthroughUsageTail(scan)
+			if u, ok := parser(scan); ok {
 				// Merge — Anthropic streams emit prompt+cache tokens
 				// once on `message_start` and a stream of output token
 				// counters on `message_delta`, so a chunk-by-chunk
@@ -1812,6 +1916,19 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 				if u.CacheCreation1hTokens > 0 {
 					it.usage.CacheCreation1hTokens = u.CacheCreation1hTokens
 				}
+				// Audio tokens merge on the same rule. A chunk that
+				// reports none must not clear a count an earlier chunk
+				// already carried, or a streamed audio turn prices at the
+				// text rate.
+				if u.InputAudioTokens > 0 {
+					it.usage.InputAudioTokens = u.InputAudioTokens
+				}
+				if u.OutputAudioTokens > 0 {
+					it.usage.OutputAudioTokens = u.OutputAudioTokens
+				}
+				if u.ReasoningTokens > 0 {
+					it.usage.ReasoningTokens = u.ReasoningTokens
+				}
 				// Prefer the parser's reported total when non-zero —
 				// Gemini's `totalTokenCount` can exceed prompt+completion
 				// (reasoning / thinking tokens). Anthropic doesn't report
@@ -1830,6 +1947,33 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 		}
 		return true
 	}
+}
+
+// maxUsageTailBytes caps the carry-over buffer between passthrough
+// chunks. A well-formed SSE frame closes within a few socket reads; a
+// pathological stream that never closes one must not grow the tail
+// without bound, so past the cap the tail is dropped, losing at worst
+// that one frame's usage.
+const maxUsageTailBytes = 64 * 1024
+
+// passthroughUsageTail returns the bytes after the last complete SSE
+// frame in scan: everything past the final blank-line terminator
+// ("\n\n", or "\r\n\r\n" on CRLF wires). Frames before that point were
+// already handed to the usage parser, so only the unterminated
+// remainder carries over to the next chunk.
+func passthroughUsageTail(scan []byte) []byte {
+	start := 0
+	if i := bytes.LastIndex(scan, []byte("\n\n")); i >= 0 {
+		start = i + 2
+	}
+	if i := bytes.LastIndex(scan, []byte("\r\n\r\n")); i >= 0 && i+4 > start {
+		start = i + 4
+	}
+	tail := scan[start:]
+	if len(tail) == 0 || len(tail) > maxUsageTailBytes {
+		return nil
+	}
+	return append([]byte(nil), tail...)
 }
 
 // parseGeminiPassthroughUsage extracts Gemini's `usageMetadata` block from a
@@ -1856,7 +2000,14 @@ func parseGeminiPassthroughUsage(body []byte) (domain.Usage, bool) {
 		return domain.Usage{}, false
 	}
 	prompt := int(usage.Get("promptTokenCount").Int())
-	completion := int(usage.Get("candidatesTokenCount").Int())
+	// Gemini reports its thinking tokens OUTSIDE candidatesTokenCount
+	// (totalTokenCount = promptTokenCount + candidatesTokenCount +
+	// thoughtsTokenCount), unlike OpenAI, whose completion total already
+	// contains them. Google bills thoughts at the output rate, so the
+	// completion total has to carry them or every thinking call under-bills:
+	// a 47-token answer with 196 thinking tokens billed for 47.
+	thoughts := int(usage.Get("thoughtsTokenCount").Int())
+	completion := int(usage.Get("candidatesTokenCount").Int()) + thoughts
 	total := int(usage.Get("totalTokenCount").Int())
 	if prompt == 0 && completion == 0 && total == 0 {
 		return domain.Usage{}, false
@@ -1872,6 +2023,8 @@ func parseGeminiPassthroughUsage(body []byte) (domain.Usage, bool) {
 		CompletionTokens: completion,
 		TotalTokens:      total,
 		CacheReadTokens:  int(usage.Get("cachedContentTokenCount").Int()),
+		// The reported subset of the completion total, never priced on its own.
+		ReasoningTokens: thoughts,
 	}, true
 }
 

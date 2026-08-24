@@ -49,10 +49,6 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-vi.mock("~/components/messages/HeaderButtons", () => ({
-  useTableView: () => ({ isTableView: false }),
-}));
-
 vi.mock("~/components/sidebar/CollapsibleMenuGroup", () => ({
   CollapsibleMenuGroup: ({ label }: { label: string }) => (
     <a href="/demo/simulations" aria-label={label} />

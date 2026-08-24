@@ -1,6 +1,8 @@
+import type { LedgerActor } from "@langwatch/actor";
+import { ledgerActorFor } from "@langwatch/actor";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
-import type { User } from "@prisma/client";
+import type { User } from "~/generated/prisma/client";
 import {
   type Currency,
   type OrganizationIntent,
@@ -10,28 +12,37 @@ import {
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
-import { TRPCError } from "@trpc/server";
+} from "~/generated/prisma/client";
+import {
+  type GrantsLedgerWriter,
+  grantsLedgerWriter,
+  type LedgerBindingAttach,
+} from "~/server/app-layer/authz/ledger";
 import { findSharedTeamIds } from "~/server/role-bindings/personal-team-scope";
 import { projectAdminUserIdsWithoutDirectRole } from "~/server/teams/effective-team-admins";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import {
   isTeamRoleAllowedForOrganizationRole,
+  ORGANIZATION_TO_TEAM_ROLE_MAP,
   type TeamRoleValue,
 } from "~/utils/memberRoleConstraints";
 import { GROWTH_SEAT_PLAN_TYPES } from "../../../../../ee/billing/utils/growthSeatEvent";
 import { isCustomRole } from "../../../api/enterprise";
 import { revokeAllSessionsForUser } from "../../../better-auth/revokeSessions";
+import { CustomRoleNotAssignableError } from "../../../role-bindings/errors";
 import {
   CannotRemoveSelfAsLastAdminError,
   LiteMemberViewerOnlyError,
   TeamLastAdminRequiredError,
+  TeamMembershipNotFoundError,
+  TeamNotFoundError,
 } from "../../teams/team.service";
 import {
   CannotDemoteLastAdminError,
   CannotDisableLastAdminError,
   CannotRemoveLastAdminError,
+  MemberNotFoundError,
   OrganizationSlugTakenError,
 } from "../errors";
 import type {
@@ -212,18 +223,17 @@ function namesSlug(target: unknown): boolean {
 }
 
 /**
- * Point a member's binding on one scope at a role without replacing the row.
- *
- * Role syncs used to delete and recreate the row, which changed its id in the
- * middle of a save: the member dialog stages removals by id, the seat change
- * applies first and used to churn every id, and the binding batch then carried
- * ids that no longer existed. Updating in place keeps the id, so what the
- * admin staged stays addressable through the whole save, and rows keep their
- * creation order instead of jumping to the bottom of the access list on every
- * correction. Several rows on one scope still collapse to the one this sync
- * sets, exactly as the delete and recreate always did.
+ * Point a member's binding on one scope at a role without replacing the row
+ * — an UPDATE, never a delete-then-recreate, which would change its id
+ * mid-save: the member dialog stages removals by id, and a binding batch
+ * built against ids a churned recreate had already replaced would carry
+ * ids that no longer exist. Keeping the id stable keeps what the admin
+ * staged addressable through the whole save, and rows keep their creation
+ * order instead of jumping to the bottom of the access list on every
+ * correction. Several rows on one scope still collapse to the one this
+ * sync sets.
  */
-async function setUserScopeBinding({
+async function planUserScopeBinding({
   tx,
   organizationId,
   userId,
@@ -239,7 +249,7 @@ async function setUserScopeBinding({
   scopeId: string;
   role: TeamUserRole;
   customRoleId: string | null;
-}): Promise<void> {
+}): Promise<ScopeBindingPlan> {
   const rows = await tx.roleBinding.findMany({
     where: { organizationId, userId, scopeType, scopeId },
     // id breaks createdAt ties so the same row is kept on every execution
@@ -247,33 +257,94 @@ async function setUserScopeBinding({
     select: { id: true },
   });
   const [keep, ...extras] = rows;
-  if (extras.length > 0) {
-    await tx.roleBinding.deleteMany({
-      where: { id: { in: extras.map((row) => row.id) } },
-    });
-  }
+  const revokeIds = extras.map((row) => row.id);
   if (keep) {
-    await tx.roleBinding.update({
-      where: { id: keep.id },
-      data: { role, customRoleId },
-    });
-    return;
+    return {
+      revokeIds,
+      change: { bindingId: keep.id, role, customRoleId },
+    };
   }
-  await tx.roleBinding.create({
-    data: {
-      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-      organizationId,
-      userId,
+  return {
+    revokeIds,
+    attach: {
+      bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      principal: { userId },
       role,
       customRoleId,
       scopeType,
       scopeId,
     },
-  });
+  };
+}
+
+/**
+ * What a scope-binding correction resolves to once the transaction has read
+ * the rows: the ids that collapse away, and either the role change on the row
+ * that stays or a fresh attach. Planned inside the transaction and emitted
+ * after it commits — bindings are ledger facts, and the ledger is their only
+ * writer (ADR-092 §13).
+ */
+type ScopeBindingPlan = {
+  revokeIds: string[];
+  change?: {
+    bindingId: string;
+    role: TeamUserRole;
+    customRoleId: string | null;
+  };
+  attach?: LedgerBindingAttach;
+};
+
+/**
+ * Emit a batch of plans, revocations first: a crash mid-batch leaves the
+ * member with less access than the correction asked for, never more, and the
+ * retry converges. Revoking the collapsed siblings before the role change
+ * also keeps the surviving row's target role free of a duplicate.
+ */
+async function emitScopeBindingPlans({
+  writer,
+  organizationId,
+  plans,
+  actor,
+}: {
+  writer: GrantsLedgerWriter;
+  organizationId: string;
+  plans: ScopeBindingPlan[];
+  actor: LedgerActor;
+}): Promise<void> {
+  const revokeIds = plans.flatMap((plan) => plan.revokeIds);
+  if (revokeIds.length > 0) {
+    await writer.revokeBindings({
+      organizationId,
+      bindingIds: revokeIds,
+      actor,
+    });
+  }
+  for (const plan of plans) {
+    if (!plan.change) continue;
+    await writer.changeBindingRole({
+      organizationId,
+      bindingId: plan.change.bindingId,
+      role: plan.change.role,
+      customRoleId: plan.change.customRoleId,
+      actor,
+    });
+  }
+  const attaches = plans.flatMap((plan) => (plan.attach ? [plan.attach] : []));
+  if (attaches.length > 0) {
+    await writer.attachBindings({
+      organizationId,
+      bindings: attaches,
+      actor,
+      onDuplicate: "skip",
+    });
+  }
 }
 
 export class PrismaOrganizationRepository implements OrganizationRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
+  ) {}
 
   getClient(): PrismaClient {
     return this.prisma;
@@ -466,7 +537,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   async createAndAssign(
     input: CreateAndAssignInput,
   ): Promise<CreateAndAssignResult> {
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       const organization = await tx.organization.create({
         data: {
           id: input.orgId,
@@ -496,33 +567,43 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         },
       });
 
-      await tx.roleBinding.create({
-        data: {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId: organization.id,
-          userId: input.userId,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: organization.id,
-        },
-      });
-
-      await tx.roleBinding.create({
-        data: {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId: organization.id,
-          userId: input.userId,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: team.id,
-        },
-      });
-
       return {
         organization: { id: organization.id, name: organization.name },
         team: { id: team.id, slug: team.slug, name: team.name },
       };
     });
+
+    // The organization, its membership row and its first team are not grant
+    // facts; the founder's two ADMIN grants are, so they are emitted once the
+    // scopes they point at exist.
+    await this.writer.attachBindings({
+      organizationId: created.organization.id,
+      bindings: [
+        {
+          bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          principal: { userId: input.userId },
+          role: TeamUserRole.ADMIN,
+          customRoleId: null,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: created.organization.id,
+        },
+        {
+          bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          principal: { userId: input.userId },
+          role: TeamUserRole.ADMIN,
+          customRoleId: null,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: created.team.id,
+        },
+      ],
+      actor: ledgerActorFor({
+        userId: input.userId,
+        fallback: "organizationService",
+      }),
+      onDuplicate: "skip",
+    });
+
+    return created;
   }
 
   async createForProvisioning(
@@ -568,9 +649,34 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   }
 
   async deleteProvisionedOrganization(organizationId: string): Promise<void> {
+    // Deliberately imperative, and it stays that way: this is a tenant purge,
+    // not a grant write. The organization itself is going away, so there is no
+    // access left to describe and no stream left to append to — emitting
+    // revocations for rows whose aggregate is being deleted would only leave
+    // the ledger holding facts about a tenant that no longer exists.
+    //
     // Role bindings first: RoleBinding.apiKeyId restricts api-key deletion.
     await this.prisma.$transaction([
       this.prisma.roleBinding.deleteMany({ where: { organizationId } }),
+      // The authorization read model. It carries organizationId as a plain
+      // column and never a relation - facts derived from the log must not
+      // presume the row they describe still exists - so nothing cascades
+      // them, and a purge that skipped them would leave a deleted tenant's
+      // access rows behind as the only surviving head. Usage before its
+      // Grant.
+      this.prisma.grantUsage.deleteMany({ where: { organizationId } }),
+      this.prisma.grant.deleteMany({ where: { organizationId } }),
+      this.prisma.role.deleteMany({ where: { organizationId } }),
+      // The migration machinery's own per-tenant rows follow the same rule:
+      // plain organizationId columns, no relation, nothing cascades them. A
+      // purge that left them behind would keep a deleted tenant enrolled and
+      // its migration state answering the next pass.
+      this.prisma.systemMigrationTenantState.deleteMany({
+        where: { tenantId: organizationId },
+      }),
+      this.prisma.systemMigrationEnrollment.deleteMany({
+        where: { organizationId },
+      }),
       this.prisma.apiKey.deleteMany({ where: { organizationId } }),
       this.prisma.promptTag.deleteMany({ where: { organizationId } }),
       this.prisma.team.deleteMany({ where: { organizationId } }),
@@ -914,75 +1020,210 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
    * from bricking that slot.
    */
   async deleteMember(input: DeleteMemberInput): Promise<void> {
-    const { organizationId, userId } = input;
-
-    await this.prisma.$transaction(async (tx) => {
-      const member = await tx.organizationUser.findUnique({
-        where: { userId_organizationId: { userId, organizationId } },
-        select: { role: true, disabledAt: true },
+    const { organizationId, userId, actingUserId } = input;
+    const actor = ledgerActorFor({
+      userId: actingUserId,
+      fallback: "organizationService",
+    });
+    const revokeTheirGrants = () =>
+      this.writer.revokeBindingsWhere({
+        organizationId,
+        where: { userId },
+        actor,
+        reason: "organization membership removed",
       });
 
-      if (!member) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
-      }
+    const member = await this.prisma.organizationUser.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      select: { role: true, disabledAt: true },
+    });
 
-      // Same guard as disabling or demoting the last admin, and the only
-      // irreversible one of the three: an organization with no admin who can
-      // sign in cannot be recovered from inside the product.
-      if (
-        member.role === OrganizationUserRole.ADMIN &&
-        member.disabledAt === null
-      ) {
-        const activeAdmins = await lockActiveAdmins({ tx, organizationId });
+    if (!member) {
+      // The membership is already gone, which is also what a retry of a
+      // removal that died between the two writes below sees. Revoking again
+      // is a no-op when the first attempt finished and the repair when it did
+      // not, so the retry can still reach grants the seat no longer names —
+      // refusing outright left them orphaned, and a re-invite reactivated
+      // them.
+      await revokeTheirGrants();
+      throw new MemberNotFoundError(userId);
+    }
 
-        if (activeAdmins.length <= 1) {
-          throw new CannotRemoveLastAdminError();
-        }
-      }
+    await this.assertRemovalKeepsAnActiveAdmin({ organizationId, member });
 
-      await tx.organizationUser.delete({
-        where: {
-          userId_organizationId: {
-            userId,
-            organizationId,
-          },
-        },
+    // Snapshotted before the revoke below so a refusal inside the
+    // transaction — the locked re-check is the one two concurrent removals
+    // of the last two admins can actually trip, the advisory check above
+    // passes for both — can put back exactly what this call is about to take
+    // away, rather than leaving a member who keeps their seat and loses
+    // every grant it should carry.
+    const grantsBeforeRevoke = await this.prisma.roleBinding.findMany({
+      where: { organizationId, userId },
+      select: {
+        id: true,
+        role: true,
+        customRoleId: true,
+        scopeType: true,
+        scopeId: true,
+      },
+    });
+
+    // Grants go before the membership, not after. A ledger append cannot join
+    // the Prisma transaction, so one of the two writes is always exposed to a
+    // crash: this order leaves a member who still holds their seat and none of
+    // their grants (less access, and the retry converges), where the other
+    // order left grants nobody could reach any more.
+    await revokeTheirGrants();
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await this.deleteMembershipRow({ tx, organizationId, userId });
+        await this.archivePersonalWorkspaces({ tx, organizationId, userId });
       });
-      await tx.roleBinding.deleteMany({
-        where: { organizationId, userId },
-      });
-
-      const archivedAt = new Date();
-      const personalTeams = await tx.team.findMany({
-        where: {
+    } catch (error) {
+      // The locked re-check inside `deleteMembershipRow` refused this
+      // removal — a concurrent removal of the organization's other admin
+      // committed first. The grants above are already gone by then, so
+      // without this the survivor keeps their seat and holds nothing. Put
+      // back exactly the rows just revoked.
+      if (grantsBeforeRevoke.length > 0) {
+        await this.writer.attachBindings({
           organizationId,
-          ownerUserId: userId,
-          isPersonal: true,
-          archivedAt: null,
-        },
-        select: { id: true },
-      });
-      if (personalTeams.length === 0) return;
+          bindings: grantsBeforeRevoke.map((binding) => ({
+            bindingId: binding.id,
+            principal: { userId },
+            role: binding.role,
+            customRoleId: binding.customRoleId,
+            scopeType: binding.scopeType,
+            scopeId: binding.scopeId,
+          })),
+          actor,
+          onDuplicate: "skip",
+        });
+      }
+      throw error;
+    }
+  }
 
-      const personalTeamIds = personalTeams.map((team) => team.id);
-      // `isPersonal` on the same terms the reactivation reads it, so the two
-      // sides move the same rows. A personal team holds nothing else today
-      // (creating a project in one, or moving one into it, is refused), and the
-      // flag mirrors the team's, so this narrows nothing away; it keeps the pair
-      // symmetric if that ever slips, since archiving what the revival would
-      // not return is the failure with no way back.
-      await tx.project.updateMany({
-        where: {
-          teamId: { in: personalTeamIds },
-          isPersonal: true,
-          archivedAt: null,
+  /**
+   * Same guard as disabling or demoting the last admin, and the only
+   * irreversible one of the three: an organization with no admin who can
+   * sign in cannot be recovered from inside the product. Read ahead of the
+   * revocation as well as inside the removal transaction, so a refusal never
+   * strips the last admin's grants on its way to saying no; the locked read
+   * inside the transaction is still the authority.
+   */
+  private async assertRemovalKeepsAnActiveAdmin({
+    organizationId,
+    member,
+  }: {
+    organizationId: string;
+    member: { role: OrganizationUserRole; disabledAt: Date | null };
+  }): Promise<void> {
+    if (
+      member.role !== OrganizationUserRole.ADMIN ||
+      member.disabledAt !== null
+    ) {
+      return;
+    }
+    const activeAdmins = await this.prisma.organizationUser.count({
+      where: {
+        organizationId,
+        role: OrganizationUserRole.ADMIN,
+        disabledAt: null,
+      },
+    });
+    if (activeAdmins <= 1) {
+      throw new CannotRemoveLastAdminError();
+    }
+  }
+
+  /**
+   * The membership delete itself, re-guarded under the transaction: the
+   * pre-transaction reads are advisory, this locked read is the authority.
+   */
+  private async deleteMembershipRow({
+    tx,
+    organizationId,
+    userId,
+  }: {
+    tx: Prisma.TransactionClient;
+    organizationId: string;
+    userId: string;
+  }): Promise<void> {
+    const stillAMember = await tx.organizationUser.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      select: { role: true, disabledAt: true },
+    });
+
+    if (!stillAMember) {
+      throw new MemberNotFoundError(userId);
+    }
+
+    if (
+      stillAMember.role === OrganizationUserRole.ADMIN &&
+      stillAMember.disabledAt === null
+    ) {
+      const activeAdmins = await lockActiveAdmins({ tx, organizationId });
+
+      if (activeAdmins.length <= 1) {
+        throw new CannotRemoveLastAdminError();
+      }
+    }
+
+    await tx.organizationUser.delete({
+      where: {
+        userId_organizationId: {
+          userId,
+          organizationId,
         },
-        data: { archivedAt },
-      });
-      await tx.team.updateMany({
-        where: { id: { in: personalTeamIds } },
-        data: { archivedAt },
-      });
+      },
+    });
+  }
+
+  /**
+   * Archives the removed member's personal team and project, on the same
+   * terms `PersonalWorkspaceService.ensure()` reactivates them.
+   */
+  private async archivePersonalWorkspaces({
+    tx,
+    organizationId,
+    userId,
+  }: {
+    tx: Prisma.TransactionClient;
+    organizationId: string;
+    userId: string;
+  }): Promise<void> {
+    const archivedAt = new Date();
+    const personalTeams = await tx.team.findMany({
+      where: {
+        organizationId,
+        ownerUserId: userId,
+        isPersonal: true,
+        archivedAt: null,
+      },
+      select: { id: true },
+    });
+    if (personalTeams.length === 0) return;
+
+    const personalTeamIds = personalTeams.map((team) => team.id);
+    // `isPersonal` on the same terms the reactivation reads it, so the two
+    // sides move the same rows. A personal team holds nothing else today
+    // (creating a project in one, or moving one into it, is refused), and the
+    // flag mirrors the team's, so this narrows nothing away; it keeps the pair
+    // symmetric if that ever slips, since archiving what the revival would
+    // not return is the failure with no way back.
+    await tx.project.updateMany({
+      where: {
+        teamId: { in: personalTeamIds },
+        isPersonal: true,
+        archivedAt: null,
+      },
+      data: { archivedAt },
+    });
+    await tx.team.updateMany({
+      where: { id: { in: personalTeamIds } },
+      data: { archivedAt },
     });
   }
 
@@ -996,7 +1237,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       });
 
       if (!member) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
+        throw new MemberNotFoundError(userId);
       }
 
       // Same guard as demoting the last admin: an organization with no admin
@@ -1037,8 +1278,14 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     // failure, and not silent either: the caller reports them to whoever made
     // the decision.
     const teamsLeftWithoutAdmin: Array<{ id: string; name: string }> = [];
+    // The seat change reads and corrects every scope the seat caps; the
+    // corrections are collected here and emitted as commands once the
+    // membership transaction has committed.
+    const plans: ScopeBindingPlan[] = [];
 
-    await this.prisma.$transaction(async (tx) => {
+    // The transaction answers the seat the member held before it, kept so a
+    // failed correction can put it back (see the compensation below).
+    const previousRole = await this.prisma.$transaction(async (tx) => {
       const currentMember = await tx.organizationUser.findUnique({
         where: {
           userId_organizationId: {
@@ -1049,10 +1296,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       });
 
       if (!currentMember) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Member not found",
-        });
+        throw new MemberNotFoundError(userId);
       }
 
       if (
@@ -1084,27 +1328,31 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         data: { role },
       });
 
-      // Keep ORGANIZATION-scoped RoleBinding in sync (skip EXTERNAL)
+      // Keep the ORGANIZATION-scoped grant in sync (skip EXTERNAL)
       if (role !== OrganizationUserRole.EXTERNAL) {
-        await setUserScopeBinding({
-          tx,
-          organizationId,
-          userId,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: organizationId,
-          role: role as unknown as TeamUserRole,
-          customRoleId: null,
-        });
+        plans.push(
+          await planUserScopeBinding({
+            tx,
+            organizationId,
+            userId,
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+            scopeId: organizationId,
+            role: ORGANIZATION_TO_TEAM_ROLE_MAP[role],
+            customRoleId: null,
+          }),
+        );
       } else {
-        // EXTERNAL (Lite Member) users have no org-level binding
-        await tx.roleBinding.deleteMany({
+        // EXTERNAL (Lite Member) users have no org-level grant
+        const orgRows = await tx.roleBinding.findMany({
           where: {
             organizationId,
             userId,
             scopeType: RoleBindingScopeType.ORGANIZATION,
             scopeId: organizationId,
           },
+          select: { id: true },
         });
+        plans.push({ revokeIds: orgRows.map((row) => row.id) });
       }
 
       // Shared teams only, matching what the router resolved before it computed
@@ -1209,12 +1457,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           if (adminsAfter.size === 0) {
             // A caller who named this team asked for a team-local change, and a
             // team needs an admin. A seat correction did not name it: the
-            // decision was about one person's seat, every shared team is still
-            // administered through any ORGANIZATION-scoped ADMIN binding, and
-            // refusing here used to roll back the organization role change too,
-            // so the seat could not be changed at all while the member was
-            // somebody's only team admin. It goes through, and the team is
-            // reported so the admin who did it is not left to discover this.
+            // decision was about one person's seat, and every shared team is
+            // still administered through any ORGANIZATION-scoped ADMIN binding
+            // — so it goes through, and the team is reported so the admin who
+            // did it is not left to discover this.
             if (teamRoleUpdate.origin === "requested") {
               throw new TeamLastAdminRequiredError(
                 await teamNameFor({ tx, teamId }),
@@ -1234,17 +1480,19 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             : currentMembership.customRoleId === teamRoleUpdate.customRoleId);
         if (roleUnchanged) continue;
 
-        await setUserScopeBinding({
-          tx,
-          organizationId,
-          userId,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: teamId,
-          role: nextRole,
-          customRoleId: shouldClearCustomRole
-            ? null
-            : (teamRoleUpdate.customRoleId ?? null),
-        });
+        plans.push(
+          await planUserScopeBinding({
+            tx,
+            organizationId,
+            userId,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: teamId,
+            role: nextRole,
+            customRoleId: shouldClearCustomRole
+              ? null
+              : (teamRoleUpdate.customRoleId ?? null),
+          }),
+        );
       }
 
       // The seat correction reaches everything the seat caps, and a member
@@ -1252,7 +1500,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       // projects only: the member's own personal workspace keeps its stored
       // rows and is capped at resolution, which is what makes re-promoting
       // them a no-op (personal-workspace-integrity.feature). Corrected
-      // through setUserScopeBinding so ids survive, several rows on one
+      // through planUserScopeBinding so ids survive, several rows on one
       // project collapse to one, and a pre-existing Viewer row cannot collide
       // with the correction on the partial unique index. Left alone on the
       // way back up: an upgrade grants nothing on its own.
@@ -1279,15 +1527,17 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             select: { id: true },
           });
           for (const project of sharedProjects) {
-            await setUserScopeBinding({
-              tx,
-              organizationId,
-              userId,
-              scopeType: RoleBindingScopeType.PROJECT,
-              scopeId: project.id,
-              role: TeamUserRole.VIEWER,
-              customRoleId: null,
-            });
+            plans.push(
+              await planUserScopeBinding({
+                tx,
+                organizationId,
+                userId,
+                scopeType: RoleBindingScopeType.PROJECT,
+                scopeId: project.id,
+                role: TeamUserRole.VIEWER,
+                customRoleId: null,
+              }),
+            );
           }
         }
       }
@@ -1300,12 +1550,36 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       });
 
       if (finalAdminCount === 0) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Operation would result in no admins for this organization",
+        throw new CannotDemoteLastAdminError();
+      }
+
+      return currentMember.role;
+    });
+
+    // The seat has committed and the grants it caps have not. A ledger append
+    // cannot join the transaction above, so the correction is compensated
+    // instead of shared with it: if it fails the seat goes back to the role it
+    // held, and the caller sees the whole change refused with the member's old
+    // access standing rather than an ADMIN binding under a MEMBER seat.
+    try {
+      await emitScopeBindingPlans({
+        writer: this.writer,
+        organizationId,
+        plans,
+        actor: ledgerActorFor({
+          userId: input.currentUserId,
+          fallback: "organizationService",
+        }),
+      });
+    } catch (error) {
+      if (previousRole !== role) {
+        await this.prisma.organizationUser.updateMany({
+          where: { organizationId, userId, role },
+          data: { role: previousRole },
         });
       }
-    });
+      throw error;
+    }
 
     return { teamsLeftWithoutAdmin };
   }
@@ -1313,20 +1587,18 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   async updateTeamMemberRole(input: UpdateTeamMemberRoleInput): Promise<void> {
     const { teamId, userId, role, customRoleId, currentUserId } = input;
     const inputIsCustomRole = customRoleId !== undefined;
+    let planned: { organizationId: string; plan: ScopeBindingPlan };
 
     if (inputIsCustomRole && customRoleId) {
       const storedCustomRoleId = customRoleId;
 
-      await this.prisma.$transaction(async (tx) => {
+      planned = await this.prisma.$transaction(async (tx) => {
         const team = await tx.team.findUnique({
           where: { id: teamId },
           select: { organizationId: true, name: true },
         });
         if (!team) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Team not found",
-          });
+          throw new TeamNotFoundError(teamId);
         }
         const customRole = await tx.customRole.findUnique({
           where: { id: storedCustomRoleId },
@@ -1336,10 +1608,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           customRole?.kind !== "custom" ||
           customRole.organizationId !== team.organizationId
         ) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "Role does not belong to team's organization",
-          });
+          throw new CustomRoleNotAssignableError(storedCustomRoleId);
         }
 
         const orgMembership = await tx.organizationUser.findUnique({
@@ -1366,10 +1635,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         });
 
         if (!targetUserBinding) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "User is not a member of this team",
-          });
+          throw new TeamMembershipNotFoundError(userId);
         }
 
         const isTargetUserAdmin = targetUserBinding.role === TeamUserRole.ADMIN;
@@ -1396,27 +1662,27 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           }
         }
 
-        await setUserScopeBinding({
-          tx,
+        return {
           organizationId: team.organizationId,
-          userId,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: teamId,
-          role: TeamUserRole.CUSTOM,
-          customRoleId: storedCustomRoleId,
-        });
+          plan: await planUserScopeBinding({
+            tx,
+            organizationId: team.organizationId,
+            userId,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: teamId,
+            role: TeamUserRole.CUSTOM,
+            customRoleId: storedCustomRoleId,
+          }),
+        };
       });
     } else {
-      await this.prisma.$transaction(async (tx) => {
+      planned = await this.prisma.$transaction(async (tx) => {
         const team = await tx.team.findUnique({
           where: { id: teamId },
           select: { organizationId: true, name: true },
         });
         if (!team) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Team not found",
-          });
+          throw new TeamNotFoundError(teamId);
         }
 
         const orgMembership = await tx.organizationUser.findUnique({
@@ -1450,10 +1716,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         });
 
         if (!targetUserBinding) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "User is not a member of this team",
-          });
+          throw new TeamMembershipNotFoundError(userId);
         }
 
         const isTargetUserAdmin = targetUserBinding.role === TeamUserRole.ADMIN;
@@ -1479,17 +1742,30 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           }
         }
 
-        await setUserScopeBinding({
-          tx,
+        return {
           organizationId: team.organizationId,
-          userId,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: teamId,
-          role: role as TeamUserRole,
-          customRoleId: null,
-        });
+          plan: await planUserScopeBinding({
+            tx,
+            organizationId: team.organizationId,
+            userId,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: teamId,
+            role: role as TeamUserRole,
+            customRoleId: null,
+          }),
+        };
       });
     }
+
+    await emitScopeBindingPlans({
+      writer: this.writer,
+      organizationId: planned.organizationId,
+      plans: [planned.plan],
+      actor: ledgerActorFor({
+        userId: currentUserId,
+        fallback: "organizationService",
+      }),
+    });
   }
 
   async getAuditLogs(

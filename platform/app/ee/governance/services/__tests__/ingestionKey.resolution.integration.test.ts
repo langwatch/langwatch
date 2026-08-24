@@ -23,6 +23,10 @@
  *      two-or-more-project keys stay ambiguous and require an explicit
  *      projectId.
  *
+ * It also pins the create-only sibling, issueForProject: two machines each
+ * hold a live key for one (project, sourceType), where ensureForProject would
+ * have revoked the first.
+ *
  * Spec: specs/ai-gateway/governance/ingest-api-key-lifecycle.feature
  */
 import { nanoid } from "nanoid";
@@ -226,6 +230,95 @@ describe("IngestionKey issuance + self-scoping resolution", () => {
       if (resolved?.type === "apiKey") {
         expect(resolved.project.id).toBe(OTHER_PROJECT_ID);
       }
+    });
+  });
+
+  describe("when ingest keys are issued create-only for one project", () => {
+    /** @scenario "Two machines each keep a live key for the same project and tool" */
+    it("leaves every token live so two machines can both write", async () => {
+      const first = await ingestKeys.issueForProject({
+        callerUserId: USER_ID,
+        ownerUserId: null,
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+        sourceType: "opencode",
+        createdByDeviceLabel: "laptop-a",
+      });
+      const second = await ingestKeys.issueForProject({
+        callerUserId: USER_ID,
+        ownerUserId: null,
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+        sourceType: "opencode",
+        createdByDeviceLabel: "laptop-b",
+      });
+      expect(second.token).not.toBe(first.token);
+      expect(first.token).toMatch(/^ik-lw-/);
+
+      for (const token of [first.token, second.token]) {
+        const resolved = await resolver.resolve({ token, projectId: null });
+        expect(resolved?.type).toBe("apiKey");
+        if (resolved?.type === "apiKey") {
+          expect(resolved.project.id).toBe(PROJECT_ID);
+          expect(resolved.ingestSourceType).toBe("opencode");
+        }
+      }
+    });
+
+    it("names each key after its source type and minting device", async () => {
+      const issued = await ingestKeys.issueForProject({
+        callerUserId: USER_ID,
+        ownerUserId: null,
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+        sourceType: "gemini",
+        createdByDeviceLabel: "build-box",
+      });
+      const row = await prisma.apiKey.findUniqueOrThrow({
+        where: { id: issued.apiKeyId },
+        select: { name: true, createdByDeviceLabel: true, userId: true },
+      });
+      expect(row.name).toBe("Ingestion key (gemini, build-box)");
+      expect(row.createdByDeviceLabel).toBe("build-box");
+      expect(row.userId).toBeNull();
+    });
+
+    it("falls back to the source type alone when no device is named", async () => {
+      const issued = await ingestKeys.issueForProject({
+        callerUserId: USER_ID,
+        ownerUserId: null,
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+        sourceType: "claude_cowork",
+      });
+      const row = await prisma.apiKey.findUniqueOrThrow({
+        where: { id: issued.apiKeyId },
+        select: { name: true },
+      });
+      expect(row.name).toBe("Ingestion key (claude_cowork)");
+    });
+
+    it("does not revoke a key the rotating path issued for the same pair", async () => {
+      const rotating = await ingestKeys.ensureForProject({
+        callerUserId: USER_ID,
+        ownerUserId: USER_ID,
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+        sourceType: "claude_desktop",
+      });
+      await ingestKeys.issueForProject({
+        callerUserId: USER_ID,
+        ownerUserId: null,
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+        sourceType: "claude_desktop",
+      });
+
+      const stillLive = await resolver.resolve({
+        token: rotating.token,
+        projectId: null,
+      });
+      expect(stillLive?.type).toBe("apiKey");
     });
   });
 

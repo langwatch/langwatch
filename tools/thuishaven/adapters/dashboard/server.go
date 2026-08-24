@@ -23,27 +23,32 @@ import (
 // Server renders live state pulled through the callbacks it is built with, so it
 // never imports the app core.
 type Server struct {
-	stacks    func() []domain.Stack
-	sharedURL func(service string) string // builds langwatch/observability/telemetry URLs
-	probes    Probes
+	config Config
 }
 
-// Probes are the optional OS checks the page uses to show live health and
-// resource numbers. A nil PortInUse leaves every service dot in its default
-// "down" state (the page can't confirm the port is listening); a nil GroupRSS or
-// TotalMemory simply blanks the stat it feeds, and a nil ProcessAlive falls back
-// to treating a stack with a launcher PID as live.
+// Probes are the optional OS checks the page uses to show live health. A nil
+// PortInUse leaves every service dot in its default "down" state (the page
+// can't confirm the port is listening); a nil ProcessAlive falls back to
+// treating a stack with a launcher PID as live.
 type Probes struct {
 	PortInUse    func(port int) bool
 	ProcessAlive func(pid int) bool
-	GroupRSS     func(pid int) uint64
-	TotalMemory  func() uint64
 }
 
-// New builds a Server. stacks yields the live registry; sharedURL builds the
-// shared-surface URLs (dashboard root, observability, telemetry).
-func New(stacks func() []domain.Stack, sharedURL func(string) string, probes Probes) *Server {
-	return &Server{stacks: stacks, sharedURL: sharedURL, probes: probes}
+// Config wires the Server to the world. Stacks yields the live registry;
+// SharedURL builds the shared-surface URLs (dashboard root, observability,
+// telemetry); Extras yields the machine picture (may be nil — the page
+// degrades to registry-only).
+type Config struct {
+	Stacks    func() []domain.Stack
+	SharedURL func(service string) string
+	Probes    Probes
+	Extras    func() Extras
+}
+
+// New builds a Server.
+func New(config Config) *Server {
+	return &Server{config: config}
 }
 
 // Serve runs the HTTP surface until the context is cancelled.
@@ -98,7 +103,7 @@ func (s *Server) hostAllowed(host string) bool {
 	// shared-surface URL so it honours a custom LANGWATCH_LOCAL_TLD. The bare
 	// domain is the dashboard root; every stack host and the observability /
 	// telemetry surfaces are subdomains of it.
-	u, err := url.Parse(s.sharedURL("langwatch"))
+	u, err := url.Parse(s.config.SharedURL("langwatch"))
 	if err != nil {
 		return false
 	}
@@ -115,7 +120,13 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_, _ = io.WriteString(w, renderHTML(s.stacks(), s.sharedURL, s.probes))
+	var extras Extras
+	if s.config.Extras != nil {
+		extras = s.config.Extras()
+	}
+	_, _ = io.WriteString(w, renderHTML(s.config.Stacks(), renderInputs{
+		sharedURL: s.config.SharedURL, probes: s.config.Probes, extras: extras,
+	}))
 }
 
 // registryStack mirrors domain.Stack for the unauthenticated /api/registry
@@ -154,7 +165,7 @@ func toRegistryStack(st domain.Stack) registryStack {
 }
 
 func (s *Server) handleRegistry(w http.ResponseWriter, _ *http.Request) {
-	stacks := s.stacks()
+	stacks := s.config.Stacks()
 	out := make([]registryStack, len(stacks))
 	for i, st := range stacks {
 		out[i] = toRegistryStack(st)
@@ -162,9 +173,9 @@ func (s *Server) handleRegistry(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"stacks":        out,
-		"dashboard":     s.sharedURL("langwatch"),
-		"observability": s.sharedURL("observability"),
-		"telemetry":     s.sharedURL("telemetry"),
+		"dashboard":     s.config.SharedURL("langwatch"),
+		"observability": s.config.SharedURL("observability"),
+		"telemetry":     s.config.SharedURL("telemetry"),
 	})
 }
 
@@ -198,8 +209,9 @@ func (s *Server) handleTelemetry(w http.ResponseWriter, r *http.Request) {
 	}
 	ct := r.Header.Get("Content-Type")
 	fanned := 0
-	for _, st := range s.stacks() {
-		for _, svc := range st.Services {
+	stacks := s.config.Stacks()
+	for i := range stacks {
+		for _, svc := range stacks[i].Services {
 			if svc.Name != "app" {
 				continue
 			}

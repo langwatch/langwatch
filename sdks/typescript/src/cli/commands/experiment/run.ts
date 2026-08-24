@@ -4,18 +4,21 @@ import { ExperimentsApiService } from "@/client-sdk/services/experiments/experim
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { parseRunParameterFlags } from "../../utils/keyValueFlags";
 
 export const runExperimentCommand = async (
   slug: string,
-  options: { wait?: boolean },
+  options: { wait?: boolean; param?: string[] },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
+
+  const parameters = parseRunParameterFlags({ pairs: options.param });
 
   const service = new ExperimentsApiService();
   const spinner = createSpinner(`Starting experiment "${slug}"...`).start();
 
   try {
-    const runResult = await service.startRun(slug);
+    const runResult = await service.startRun(slug, { parameters });
 
     spinner.succeed(
       `Experiment started! Run ID: ${chalk.cyan(runResult.runId)} (${runResult.total} cells)`,

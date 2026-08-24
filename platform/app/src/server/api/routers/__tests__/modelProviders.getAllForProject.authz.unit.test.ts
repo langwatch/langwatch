@@ -1,7 +1,7 @@
-import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
+import type { PrismaClient } from "~/generated/prisma/client";
+import { permissionsServiceFor } from "~/server/app-layer/permissions/runtime";
 import { MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
 import { createInnerTRPCContext } from "../../trpc";
 import { modelProviderRouter } from "../modelProviders";
@@ -44,11 +44,13 @@ const organizationUsers = [
     userId: "user_member_of_project_a",
     organizationId: "org_a",
     role: "MEMBER",
+    disabledAt: null,
   },
   {
     userId: "user_other_project_admin",
     organizationId: "org_a",
     role: "MEMBER",
+    disabledAt: null,
   },
   { userId: "user_other_org_admin", organizationId: "org_b", role: "ADMIN" },
 ];
@@ -146,6 +148,7 @@ function callerForUser(userId: string) {
     res: undefined,
   });
   ctx.prisma = fixturePrisma();
+  ctx.app = { permissions: permissionsServiceFor(fixturePrisma()) } as never;
   return modelProviderRouter.createCaller(ctx);
 }
 

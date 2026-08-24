@@ -26,7 +26,9 @@ const jsonResponse = (body: unknown, status = 200): Response =>
 
 const endpoint = (id: string): WebhookEndpointSummary => ({
   id,
+  destination_kind: "http",
   url: "https://acme.example/hooks",
+  sqs: null,
   max_batch_size: 100,
   max_batch_delay_ms: 1_000,
   max_in_flight: 4,

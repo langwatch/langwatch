@@ -27,15 +27,11 @@ const { mockRedisStore, mockRedis } = vi.hoisted(() => {
   return { mockRedisStore, mockRedis };
 });
 
-let mockIsBuildOrNoRedis = false;
+/** Drives whether the App this cache reads from carries a connection. */
+let mockRedisConfigured = true;
 
-vi.mock("~/server/redis", () => ({
-  get isBuildOrNoRedis() {
-    return mockIsBuildOrNoRedis;
-  },
-  get connection() {
-    return mockRedis;
-  },
+vi.mock("~/server/app-layer/app", () => ({
+  tryGetApp: () => (mockRedisConfigured ? { redis: mockRedis } : null),
 }));
 
 import { TtlCache } from "../ttlCache";
@@ -44,7 +40,7 @@ describe("TtlCache", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRedisStore.clear();
-    mockIsBuildOrNoRedis = false;
+    mockRedisConfigured = true;
   });
 
   describe("when Redis is available", () => {
@@ -200,7 +196,7 @@ describe("TtlCache", () => {
 
   describe("when Redis is not configured", () => {
     beforeEach(() => {
-      mockIsBuildOrNoRedis = true;
+      mockRedisConfigured = false;
     });
 
     it("uses in-memory cache only", async () => {

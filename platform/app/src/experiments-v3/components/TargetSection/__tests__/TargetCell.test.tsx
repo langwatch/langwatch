@@ -181,7 +181,7 @@ describe("TargetCellContent", () => {
       const traceButton = screen.getByTestId("trace-link-target-1");
       await user.click(traceButton);
 
-      expect(mockOpenDrawer).toHaveBeenCalledWith("traceDetails", {
+      expect(mockOpenDrawer).toHaveBeenCalledWith("traceV2Details", {
         traceId: "trace_abc123",
       });
     });
@@ -480,6 +480,40 @@ describe("TargetCellContent", () => {
           `add-evaluator-button-${target.id}`,
         );
         expect(addButtons.length).toBe(1);
+      });
+    });
+
+    // The backdrop covers the viewport and swallows every pointer event, so an
+    // expanded cell that ignores Escape leaves the rest of the workbench dead
+    // until the reader happens to click the backdrop.
+    it("closes expanded view when pressing Escape", async () => {
+      const user = userEvent.setup();
+      const target = createTarget();
+      mockScrollHeight(200);
+
+      render(
+        <TargetCellContent
+          target={target}
+          output="This is some content that would overflow"
+          evaluatorResults={{}}
+          row={0}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const outputText = screen.getByText(/This is some content/);
+      await user.click(outputText);
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("expanded-cell-backdrop"),
+        ).toBeInTheDocument();
+      });
+
+      await user.keyboard("{Escape}");
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("expanded-cell-backdrop")).toBeNull();
       });
     });
 

@@ -1,10 +1,10 @@
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { dashboardBelongsToProject } from "~/server/analytics/dashboardBelongsToProject";
 import { redactActionParamsFor } from "~/server/app-layer/automations/providers/registry";
 import { type FilterField, filterFieldsEnum } from "../../filters/types";
-import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -34,7 +34,7 @@ export const graphsRouter = createTRPCRouter({
         rowSpan: z.number().min(1).max(2).optional(),
       }),
     )
-    .use(checkProjectPermission("analytics:create"))
+    .permission("analytics:create")
     .mutation(async ({ ctx, input }) => {
       const graph = JSON.parse(input.graph);
 
@@ -52,7 +52,12 @@ export const graphsRouter = createTRPCRouter({
         });
       }
 
-      // If no gridRow provided, find the next available row
+      // If no gridRow provided, find the next available row.
+      //
+      // Deliberately not filtered by `kind`: the grid is one shared space, so
+      // the next free row has to account for every chart occupying it. Scoping
+      // this to builder rows would place a new chart on top of a saved
+      // workbench chart the moment those gain dashboard placement.
       let gridRow = input.gridRow;
       if (gridRow === undefined && input.dashboardId) {
         const lastGraph = await ctx.prisma.customGraph.findFirst({
@@ -91,7 +96,7 @@ export const graphsRouter = createTRPCRouter({
         dashboardId: z.string().optional(),
       }),
     )
-    .use(checkProjectPermission("analytics:view"))
+    .permission("analytics:view")
     .query(async ({ input, ctx }) => {
       const { projectId, dashboardId } = input;
       const prisma = ctx.prisma;
@@ -99,6 +104,7 @@ export const graphsRouter = createTRPCRouter({
       const graphs = await prisma.customGraph.findMany({
         where: {
           projectId,
+          kind: BUILDER_CHART_KIND,
           ...(dashboardId ? { dashboardId } : {}),
         },
         orderBy: dashboardId
@@ -131,33 +137,33 @@ export const graphsRouter = createTRPCRouter({
     }),
   delete: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
-    .use(checkProjectPermission("analytics:delete"))
+    .permission("analytics:delete")
     .mutation(async ({ ctx, input }) => {
       const { id } = input;
       const prisma = ctx.prisma;
 
       const graph = await prisma.customGraph.findUnique({
-        where: { id, projectId: input.projectId },
+        where: { id, projectId: input.projectId, kind: BUILDER_CHART_KIND },
       });
       if (!graph) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Graph not found" });
       }
 
       await prisma.customGraph.delete({
-        where: { id, projectId: input.projectId },
+        where: { id, projectId: input.projectId, kind: BUILDER_CHART_KIND },
       });
 
       return graph;
     }),
   getById: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
-    .use(checkProjectPermission("analytics:view"))
+    .permission("analytics:view")
     .query(async ({ ctx, input }) => {
       const { id } = input;
       const prisma = ctx.prisma;
 
       const graph = await prisma.customGraph.findUnique({
-        where: { id, projectId: input.projectId },
+        where: { id, projectId: input.projectId, kind: BUILDER_CHART_KIND },
       });
 
       if (!graph) {
@@ -241,12 +247,16 @@ export const graphsRouter = createTRPCRouter({
         filterParams: z.any().optional(),
       }),
     )
-    .use(checkProjectPermission("analytics:update"))
+    .permission("analytics:update")
     .mutation(async ({ ctx, input }) => {
       const prisma = ctx.prisma;
 
       const customGraph = await prisma.customGraph.update({
-        where: { id: input.graphId, projectId: input.projectId },
+        where: {
+          id: input.graphId,
+          projectId: input.projectId,
+          kind: BUILDER_CHART_KIND,
+        },
         data: {
           name: input.name,
           graph: JSON.parse(input.graph),
@@ -273,10 +283,14 @@ export const graphsRouter = createTRPCRouter({
         rowSpan: z.number().min(1).max(2),
       }),
     )
-    .use(checkProjectPermission("analytics:update"))
+    .permission("analytics:update")
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.customGraph.update({
-        where: { id: input.graphId, projectId: input.projectId },
+        where: {
+          id: input.graphId,
+          projectId: input.projectId,
+          kind: BUILDER_CHART_KIND,
+        },
         data: {
           gridColumn: input.gridColumn,
           gridRow: input.gridRow,
@@ -301,11 +315,15 @@ export const graphsRouter = createTRPCRouter({
         ),
       }),
     )
-    .use(checkProjectPermission("analytics:update"))
+    .permission("analytics:update")
     .mutation(async ({ ctx, input }) => {
       const updates = input.layouts.map((layout) =>
         ctx.prisma.customGraph.update({
-          where: { id: layout.graphId, projectId: input.projectId },
+          where: {
+            id: layout.graphId,
+            projectId: input.projectId,
+            kind: BUILDER_CHART_KIND,
+          },
           data: {
             gridColumn: layout.gridColumn,
             gridRow: layout.gridRow,

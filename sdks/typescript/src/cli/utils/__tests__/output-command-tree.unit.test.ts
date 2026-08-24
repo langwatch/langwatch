@@ -132,6 +132,10 @@ describe("the real command tree", () => {
       ["suite run", "human-interactive --wait poll"],
       ["scenario run", "human-interactive --wait poll"],
 
+      // A live session that runs until Ctrl-C: it produces status prose and
+      // exits via process.exit, never a result document.
+      ["agent dev", "live tunnel session until Ctrl-C, no result document"],
+
       // Launchers and passthroughs: they exec another tool and own its stdio.
       ...(
         ["claude", "codex", "cursor", "gemini", "opencode", "copilot", "code", "open"] as const
@@ -144,13 +148,15 @@ describe("the real command tree", () => {
       ["navigate open", "signal command: prints the resource id, no data payload"],
       ["docs", "prints fetched markdown verbatim"],
       ["scenario-docs", "prints fetched markdown verbatim"],
-      ["init-shell", "emits shell script for eval"],
 
       // Interactive / credential flows: prompts, not documents.
       ["login", "interactive credential flow"],
       ["logout", "interactive credential flow"],
       ["whoami", "interactive credential flow"],
-      ["request-increase", "interactive support flow"],
+      // The output contract covers commands that return a platform document.
+      // This one reports what it wrote to the local machine, so there is no
+      // document for `--json` to carry.
+      ["instrument", "local setup flow: writes telemetry wiring files"],
       ["help", "renders help text"],
 
       // Own their key/value or `--json` output, predating the contract.

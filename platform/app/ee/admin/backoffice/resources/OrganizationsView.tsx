@@ -13,7 +13,6 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { Currency, PricingModel } from "@prisma/client";
 import { MoreVertical, Pencil } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
@@ -22,6 +21,7 @@ import { Menu } from "~/components/ui/menu";
 import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
+import { Currency, PricingModel } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import {
   BackofficeTable,
@@ -301,7 +301,6 @@ function OrganizationEditDrawer({
             title: "Organization updated",
             type: "success",
             duration: 3000,
-            meta: { closable: true },
           });
           onClose();
         },

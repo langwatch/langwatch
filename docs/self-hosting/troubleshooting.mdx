@@ -204,7 +204,7 @@ Ensure the service account has S3 access (IRSA) or static credentials are config
 
 ### Migration failures on startup
 
-If Prisma migrations fail, the app pod will crash. Check logs:
+If Prisma migrations fail, the app pod crashes. Check logs:
 
 ```bash
 kubectl -n langwatch logs deploy/langwatch-app --tail=100 | grep -i prisma

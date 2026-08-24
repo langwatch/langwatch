@@ -11,20 +11,18 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { ExperimentType } from "@prisma/client";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import {
   createInitialUIState,
   type EvaluationsV3State,
 } from "~/experiments-v3/types";
 import { persistedEvaluationsV3StateSchema } from "~/experiments-v3/types/persistence";
+import { ExperimentType } from "~/generated/prisma/client";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import type { Permission } from "~/server/api/rbac";
-import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import {
@@ -33,6 +31,7 @@ import {
   extractCredentials,
 } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import {
@@ -165,7 +164,7 @@ const authenticateRequest = async (
   }
 
   try {
-    await enforceApiKeyCeiling({ prisma, resolved, permission });
+    await enforceApiKeyCeiling({ resolved, permission });
   } catch (error) {
     const denial = apiKeyCeilingDenialResponse(error);
     // `body` carries the full handled payload (code, permission, tips) for
@@ -239,8 +238,8 @@ secured.access(sessionAuth).post(
       );
     }
 
-    const hasPermission = await hasProjectPermission(
-      { prisma, session },
+    const hasPermission = await probeProjectPermission(
+      { session },
       projectId,
       "evaluations:manage",
     );
@@ -388,8 +387,8 @@ secured.access(sessionAuth).post("/abort", async (c) => {
     );
   }
 
-  const hasPermission = await hasProjectPermission(
-    { prisma, session },
+  const hasPermission = await probeProjectPermission(
+    { session },
     projectId,
     "evaluations:manage",
   );

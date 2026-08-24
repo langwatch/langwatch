@@ -17,7 +17,7 @@
  * Spec: specs/ai-gateway/governance/feature-flag-gating.feature
  *       (persona detection sub-scenario, added next iter as we wire)
  */
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { PROJECT_KIND } from "./governanceProject.service";
 import type { GovernanceTraceActivityClickHouseRepository } from "./governanceTraceActivity.clickhouse.repository";
 
@@ -92,7 +92,7 @@ export class GovernanceSetupStateService {
       }),
       // Persona-3 detection: any application-kind project that has ever
       // received its first message (firstMessage flag is set by the
-      // collectorWorker + projectMetadata reactor on the first ingested
+      // collectorWorker + projectMetadata subscriber on the first ingested
       // span). Excludes internal_governance projects so a freshly-minted
       // Gov Project alone does not flip persona-3 to true.
       this.prisma.project.count({

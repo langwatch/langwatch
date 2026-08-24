@@ -122,7 +122,7 @@ const _mockSavedPromptData = {
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       prompts: {
         getByIdOrHandle: { invalidate: vi.fn() },
         getAllPromptsForProject: { invalidate: vi.fn() },

@@ -73,6 +73,15 @@ func SeedPresetNames() []string {
 	return names
 }
 
+// ValidateSeedPreset reports whether a preset name is one this registry knows
+// ("" is the plain identity seed). It exists for the surfaces that must reject
+// a bad preset before they start doing expensive or destructive work — `haven
+// play --seed` checks it before it resolves the PR, so a typo costs nothing.
+func ValidateSeedPreset(name string) error {
+	_, err := resolveSeedPreset(name)
+	return err
+}
+
 // resolveSeedPreset validates a preset name ("" is the plain identity seed).
 func resolveSeedPreset(name string) (seedPreset, error) {
 	if name == "" {
@@ -156,7 +165,7 @@ func (o *Orchestrator) runSeedIngest(ctx context.Context, p UpParams, pre seedPr
 // ensures, an unavailable managed server is a hard error here: there is no
 // .env fallback that could make "reset the managed database" mean anything.
 func (o *Orchestrator) managedStackEnv(ctx context.Context, slug string) ([]string, error) {
-	st := domain.Stack{Slug: slug, RedisDB: domain.RedisDBForSlug(slug), LocalAPIKey: o.cfg.LocalAPIKey}
+	st := domain.Stack{Slug: slug, RedisDB: o.redisDBFor(slug), LocalAPIKey: o.cfg.LocalAPIKey}
 	o.ensureClickHouse(ctx, &st)
 	o.ensurePostgres(ctx, &st)
 	o.ensureRedis(ctx, &st)
@@ -292,7 +301,7 @@ func (o *Orchestrator) DBURL(ctx context.Context, p UpParams, engine string) err
 		if err != nil {
 			return err
 		}
-		fmt.Printf("%sredis://127.0.0.1:%d/%d\n", label("redis"), port, domain.RedisDBForSlug(slug))
+		fmt.Printf("%sredis://127.0.0.1:%d/%d\n", label("redis"), port, o.redisDBFor(slug))
 		return nil
 	}
 	switch engine {

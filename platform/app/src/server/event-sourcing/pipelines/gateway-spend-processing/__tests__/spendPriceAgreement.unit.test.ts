@@ -75,6 +75,11 @@ const USAGE = {
   cache_read_input_tokens: 0,
   cache_creation_input_tokens: 0,
   reasoning_tokens: 0,
+  cache_creation_1h_tokens: 0,
+  input_audio_tokens: 0,
+  output_audio_tokens: 0,
+  input_chars: 0,
+  audio_ms: 0,
 };
 
 const ADMITTED = {
@@ -128,6 +133,9 @@ function captureHandlers(apply: (builder: unknown) => unknown): {
       return builder;
     },
     outbox() {
+      return builder;
+    },
+    transient() {
       return builder;
     },
   };
@@ -209,6 +217,19 @@ describe("one price per gateway request", () => {
       cost_nano_usd: priced.costNanoUsd,
       rate_version: priced.rateVersion,
       duration_ms: 3878,
+      // Attribution the outcome now states about itself. This case is about
+      // the PRICE agreeing across surfaces, so it carries the emitter's
+      // values rather than the empty ones an older build would send.
+      organization_id: "org_1",
+      virtual_key_id: "vk_1",
+      end_user_id: "",
+      trace_id: "",
+      request_type: "chat",
+      labels: [],
+      metadata: "",
+      admitted_at: T0,
+      principal_user_id: "",
+      team_id: "",
     };
 
     // The ledger folds it first.

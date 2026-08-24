@@ -4,7 +4,7 @@ description: A new-developer walkthrough, install the LangWatch CLI, sign in via
 sidebarTitle: First 5 minutes (dev)
 ---
 
-You've just been added to a LangWatch organization and you want to use Claude Code (or Codex, Gemini, Cursor, opencode) without your IT team writing a wiki page. This page is the 5-minute version of that wiki page.
+You've just been added to a LangWatch organization and you want to use Claude Code (or Codex, Gemini, Cursor, opencode) without your IT team writing a wiki page.
 
 When you finish you will have:
 
@@ -21,8 +21,8 @@ If you are an admin trying to make the org *ready* for developers to do this, ju
 Before you start, your IT admin should already have:
 
 1. Provisioned your account in LangWatch (you should have an invite email or be able to sign in via your company SSO).
-2. Published at least one default [Routing Policy](/ai-gateway/governance/routing-policies). If they haven't, the CLI will fail with a friendly `409 no_default_routing_policy` error, see the [CLI error catalog](/ai-governance/cli-debug#error-catalog) and ping your admin.
-3. Optionally: published an [AI Tools Portal](/ai-governance/personal-portal/overview) catalog (the card grid you'll see on `/me`). If they haven't, your `/me` page will show a "your IT team is still setting things up" empty state, you can still use the CLI directly.
+2. Published at least one default [Routing Policy](/ai-gateway/governance/routing-policies). If they haven't, the CLI fails with a `409 no_default_routing_policy` error, see the [CLI error catalog](/ai-governance/cli-debug#error-catalog) and ping your admin.
+3. Optionally: published an [AI Tools Portal](/ai-governance/personal-portal/overview) catalog (the card grid you'll see on `/me`). If they haven't, your `/me` page shows a "your IT team is still setting things up" empty state, you can still use the CLI directly.
 
 If any of those are missing your admin's first stop is [From zero to first detected anomaly](/ai-governance/getting-started-admin).
 
@@ -77,24 +77,24 @@ Find the tile for your preferred CLI (Claude Code in this example). Click it. Th
 langwatch claude
 ```
 
-Run it. The wrapper will:
+Run it. The wrapper:
 
-1. Read your Personal VK from `~/.langwatch/config.json`.
-2. Set the `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` env vars to point at your org's gateway.
-3. `exec` the underlying `claude` binary with everything pre-injected.
+1. Reads your Personal VK from `~/.langwatch/config.json`.
+2. Sets the `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` env vars to point at your org's gateway.
+3. `exec`s the underlying `claude` binary with everything pre-injected.
 
 You should see Claude Code's normal startup banner. Make a request. The gateway proxies it transparently to Anthropic (or to whatever provider your admin's [Routing Policy](/ai-gateway/governance/routing-policies) sends it to, the CLI doesn't care).
 
 The same pattern works for [Codex](/ai-gateway/cli/codex) (`langwatch codex`), [Gemini CLI](/ai-gateway/cli/gemini-cli) (`langwatch gemini`), [Cursor](/ai-gateway/cli/cursor), and [opencode](/ai-gateway/cli/opencode). The full matrix lives in [Coding CLI Integrations](/ai-gateway/cli/overview).
 
 <Tip>
-**Always-on shell setup.** If you'd rather not type `langwatch claude` every time, paste this in your `~/.zshrc` (or `~/.bashrc`):
+**Capture without the wrapper.** If you'd rather not type `langwatch claude` every time, write the telemetry wiring once:
 
 ```bash
-eval "$(langwatch init-shell zsh)"
+langwatch instrument claude
 ```
 
-After a shell restart, plain `claude` (or `codex`, `gemini`, etc.) will pick up the gateway automatically.
+A plain `claude` run then reports to LangWatch. Add `--project <id-or-slug>` to send it to a team project, or `--key <ingest-key>` on a machine that never logs in. Model calls keep going wherever the tool points them, so start the tool with the wrapper when you want the gateway. See the [Claude Code integration guide](/integration/tools/integrations/claude-code).
 </Tip>
 
 ## Step 5: Read your spend back

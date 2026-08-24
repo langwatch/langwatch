@@ -148,4 +148,50 @@ describe("ChildProcessJobDataSchema", () => {
       expect(roleModelParams.judge.model).toBe("openai/judge-model");
     });
   });
+
+  describe("given a payload queued before parameters existed", () => {
+    it("parses with an empty record, so the child can read its keys", () => {
+      const { parameters: _omitted, ...withoutParameters } = {
+        ...basePayload,
+        modelParams: litellmParams,
+        parameters: undefined,
+      };
+
+      const result = ChildProcessJobDataSchema.safeParse(withoutParameters);
+
+      expect(result.success).toBe(true);
+      if (!result.success) {
+        expect.fail("expected a payload without parameters to parse");
+        return;
+      }
+      // The child reads Object.keys(parameters) to decide whether to record
+      // them, so an absent field has to arrive as a record rather than as
+      // undefined; otherwise a job queued across the deploy takes the process
+      // down before the run reports anything.
+      expect(result.data.parameters).toEqual({});
+    });
+  });
+
+  describe("given a payload carrying a trace wait budget", () => {
+    // Zod strips undeclared keys at parse, so the budget surviving the parse
+    // is what lets the child pass it to the SDK.
+    it("keeps the budget through the parse, and tolerates its absence", () => {
+      const withBudget = ChildProcessJobDataSchema.safeParse({
+        ...basePayload,
+        modelParams: litellmParams,
+        traceWaitTimeoutMs: 45_000,
+      });
+      expect(withBudget.success).toBe(true);
+      if (!withBudget.success) return;
+      expect(withBudget.data.traceWaitTimeoutMs).toBe(45_000);
+
+      const withoutBudget = ChildProcessJobDataSchema.safeParse({
+        ...basePayload,
+        modelParams: litellmParams,
+      });
+      expect(withoutBudget.success).toBe(true);
+      if (!withoutBudget.success) return;
+      expect(withoutBudget.data.traceWaitTimeoutMs).toBeUndefined();
+    });
+  });
 });

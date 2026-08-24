@@ -43,7 +43,7 @@ helm search repo langwatch/langwatch --versions
 # Install a specific chart version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.0.0 \
+  --version 3.16.0 \
   -f values-production.yaml
 ```
 
@@ -64,7 +64,7 @@ app:
 
 ### ClickHouse
 
-Schema migrations are handled by the application on startup. No manual intervention is required.
+The application runs schema migrations on startup. No manual intervention is required.
 
 ## Rollback
 
@@ -85,7 +85,7 @@ Pin image tags to a specific version instead of `latest`:
 ```yaml
 services:
   app:
-    image: langwatch/langwatch:2.6.0  # Pin to previous version
+    image: langwatch/langwatch:<previous-version>  # the release you are rolling back to
 ```
 
 Then restart:

@@ -32,13 +32,14 @@ import {
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
+import type { AgentWithFields } from "~/server/agents/agent-fields";
 import { api } from "~/utils/api";
 
 export type AgentListDrawerProps = {
   open?: boolean;
   onClose?: () => void;
-  onSelect?: (agent: TypedAgent) => void;
-  onEdit?: (agent: TypedAgent) => void;
+  onSelect?: (agent: AgentWithFields) => void;
+  onEdit?: (agent: AgentWithFields) => void;
   onCreateNew?: () => void;
 };
 
@@ -54,7 +55,7 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const { closeDrawer, openDrawer } = useDrawer();
   const complexProps = getComplexProps();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   // Get flow callbacks for this drawer (set by parent flows like useAgentPickerFlow)
   const flowCallbacks = getFlowCallbacks("agentList");
@@ -103,7 +104,6 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
           ? "Also deleted: 1 workflow"
           : undefined,
         type: "success",
-        meta: { closable: true },
       });
     },
     onError: () => {
@@ -115,12 +115,12 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
     },
   });
 
-  const handleSelectAgent = (agent: TypedAgent) => {
+  const handleSelectAgent = (agent: AgentWithFields) => {
     onSelect?.(agent);
     onClose();
   };
 
-  const handleEditAgent = (agent: TypedAgent) => {
+  const handleEditAgent = (agent: AgentWithFields) => {
     if (onEdit) {
       onEdit(agent);
       return;
@@ -163,7 +163,6 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
             toaster.create({
               title: "Agent deleted",
               type: "success",
-              meta: { closable: true },
             });
           },
           onError: () => {

@@ -26,14 +26,12 @@
 import { auditLog } from "@ee/audit-log/auditLog";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import {
-  checkOrganizationPermission,
-  checkProjectPermission,
-  type PermissionMiddleware,
-} from "~/server/api/rbac";
+import type { PermissionMiddleware } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer";
 import { GithubNotConnectedError } from "~/server/app-layer/github/errors";
 import { MAX_STATUS_REFS } from "~/server/app-layer/github/github-pull-request-status.service";
+import { getGithubAppConfig } from "~/server/app-layer/github/githubAppConfig";
+import { getGithubWebBase } from "~/server/app-layer/github/githubHost";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -67,29 +65,39 @@ const enforceOrganizationMembership: PermissionMiddleware<{
   return next();
 };
 
-// GitHub can only be uninstalled by a human on github.com. Deep-link to the
-// right settings page for the account type.
+// GitHub can only be uninstalled by a human on GitHub itself. Deep-link to the
+// right account settings page on the host this instance is bound to.
 function uninstallUrl(installation: {
   accountLogin: string;
   accountType: string;
   installationId: string;
 }): string {
+  const webBase = getGithubWebBase();
   if (installation.accountType === "Organization") {
-    return `https://github.com/organizations/${installation.accountLogin}/settings/installations/${installation.installationId}`;
+    return `${webBase}/organizations/${installation.accountLogin}/settings/installations/${installation.installationId}`;
   }
-  return `https://github.com/settings/installations/${installation.installationId}`;
+  return `${webBase}/settings/installations/${installation.installationId}`;
 }
 
-// Where an install starts. Built here so no client needs to know the App slug,
-// or that the flow begins with a REST redirect at all.
-function installUrl(organizationId: string): string {
+/**
+ * Where an install starts, or null on an instance that cannot start one. Built
+ * here so no client needs to know the App slug, or that the flow begins with a
+ * REST redirect at all.
+ *
+ * Null takes the same reading of "configured" the install route itself takes,
+ * which includes the App slug the deep link is built from. Reading it any other
+ * way hands the customer a button whose only possible outcome is the route's
+ * 503.
+ */
+function installUrl(organizationId: string): string | null {
+  if (!getGithubAppConfig().configured) return null;
   return `/api/github/install?organizationId=${encodeURIComponent(organizationId)}`;
 }
 
 export const githubRouter = createTRPCRouter({
   getConnectionStatus: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .use(enforceOrganizationMembership)
     .query(async ({ input }) => {
       const service = getApp().github.installations;
@@ -97,7 +105,12 @@ export const githubRouter = createTRPCRouter({
         input.organizationId,
       );
       return {
-        configured: service.configured,
+        // The same reading `installUrl` takes, which includes the App slug the
+        // deep link needs. Reporting token readiness here instead said GitHub
+        // was available on an instance with no slug, while both install
+        // actions were disabled, which is the state this contradiction
+        // produced on the settings page.
+        configured: getGithubAppConfig().configured,
         connected: installations.length > 0,
         installations: installations.map((i) => ({
           installationId: i.installationId,
@@ -118,7 +131,7 @@ export const githubRouter = createTRPCRouter({
 
   listRepos: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .use(enforceOrganizationMembership)
     .query(async ({ input }) => {
       return getApp().github.installations.listRepositoriesForOrganization(
@@ -151,7 +164,7 @@ export const githubRouter = createTRPCRouter({
           .max(MAX_STATUS_REFS),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input }) => {
       const organizationId = await resolveOrganizationId(input.projectId);
       if (!organizationId) return { statuses: [] };
@@ -165,7 +178,7 @@ export const githubRouter = createTRPCRouter({
 
   disconnect: protectedProcedure
     .input(z.object({ organizationId: z.string(), installationId: z.string() }))
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .use(enforceOrganizationMembership)
     .mutation(async ({ ctx, input }) => {
       const installation =

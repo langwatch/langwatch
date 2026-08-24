@@ -33,7 +33,7 @@ const abortPendingUpload = vi.fn();
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       dataset: {
         findNextName: { fetch: vi.fn().mockResolvedValue("New Dataset") },
       },

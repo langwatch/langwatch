@@ -1,6 +1,5 @@
-import { Currency } from "@prisma/client";
 import { z } from "zod";
-import { checkOrganizationPermission } from "../../src/server/api/rbac";
+import { Currency } from "~/generated/prisma/client";
 import {
   createTRPCRouter,
   protectedProcedure,
@@ -35,9 +34,13 @@ export const createSubscriptionRouterFactory = ({
           upgradeTraces: z.boolean(),
           totalMembers: z.number(),
           totalTraces: z.number(),
+          // Echoed back from `previewProration` so the charge prices the same
+          // instant the customer was quoted. Optional: callers that never
+          // showed a quote are priced at the moment they run.
+          quotedAt: z.number().int().positive().optional(),
         }),
       )
-      .use(checkOrganizationPermission("organization:manage"))
+      .permission("organization:manage")
       .mutation(async ({ input }) => {
         return await subscriptionService.updateSubscriptionItems({
           organizationId: input.organizationId,
@@ -46,6 +49,7 @@ export const createSubscriptionRouterFactory = ({
           upgradeTraces: input.upgradeTraces,
           totalMembers: input.totalMembers,
           totalTraces: input.totalTraces,
+          quotedAt: input.quotedAt,
         });
       }),
 
@@ -61,7 +65,7 @@ export const createSubscriptionRouterFactory = ({
           billingInterval: z.enum(["monthly", "annual"]).optional(),
         }),
       )
-      .use(checkOrganizationPermission("organization:manage"))
+      .permission("organization:manage")
       .mutation(async ({ input, ctx }) => {
         const customerId = await customerService.getOrCreateCustomerId({
           user: ctx.session.user,
@@ -82,7 +86,7 @@ export const createSubscriptionRouterFactory = ({
 
     manage: protectedProcedure
       .input(z.object({ organizationId: z.string(), baseUrl: z.string() }))
-      .use(checkOrganizationPermission("organization:manage"))
+      .permission("organization:manage")
       .mutation(async ({ input, ctx }) => {
         const customerId = await customerService.getOrCreateCustomerId({
           user: ctx.session.user,
@@ -103,7 +107,7 @@ export const createSubscriptionRouterFactory = ({
           newTotalSeats: z.number().min(1),
         }),
       )
-      .use(checkOrganizationPermission("organization:manage"))
+      .permission("organization:manage")
       .query(async ({ input }) => {
         return await subscriptionService.previewProration({
           organizationId: input.organizationId,
@@ -113,7 +117,7 @@ export const createSubscriptionRouterFactory = ({
 
     getLastSubscription: protectedProcedure
       .input(z.object({ organizationId: z.string() }))
-      .use(checkOrganizationPermission("organization:view"))
+      .permission("organization:view")
       .query(async ({ input }) => {
         return await subscriptionService.getLastNonCancelledSubscription(
           input.organizationId,
@@ -136,7 +140,7 @@ export const createSubscriptionRouterFactory = ({
           ),
         }),
       )
-      .use(checkOrganizationPermission("organization:manage"))
+      .permission("organization:manage")
       .mutation(async ({ input, ctx }) => {
         const customerId = await customerService.getOrCreateCustomerId({
           user: ctx.session.user,
@@ -164,7 +168,7 @@ export const createSubscriptionRouterFactory = ({
           note: z.string().optional(),
         }),
       )
-      .use(checkOrganizationPermission("organization:manage"))
+      .permission("organization:manage")
       .mutation(async ({ input, ctx }) => {
         const actorEmail = ctx.session.user.email;
         if (!actorEmail) {
@@ -183,7 +187,7 @@ export const createSubscriptionRouterFactory = ({
 
     listInvoices: protectedProcedure
       .input(z.object({ organizationId: z.string() }))
-      .use(checkOrganizationPermission("organization:view"))
+      .permission("organization:view")
       .query(async ({ input }) => {
         return await subscriptionService.listInvoices({
           organizationId: input.organizationId,

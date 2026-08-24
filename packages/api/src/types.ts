@@ -1,3 +1,7 @@
+import type {
+  AccessDeclaration,
+  AuthzPermission,
+} from "@langwatch/authz";
 import type { Context, MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { DescribeRouteOptions } from "hono-openapi";
@@ -34,6 +38,22 @@ export function isDateVersion(value: string): value is DateVersion {
 // ---------------------------------------------------------------------------
 
 export type HttpMethod = "get" | "post" | "put" | "delete" | "patch";
+
+/**
+ * Context key holding the endpoint a request matched, as `METHOD /path`.
+ *
+ * The REGISTERED path, not the URL that arrived: `GET /things/:id` rather than
+ * `GET /things/th_01J9Z...`. That is the difference between a field you can
+ * group by and one with a distinct value per request — the request log already
+ * carries the concrete `url`, and what it lacked was the endpoint identity to
+ * aggregate on.
+ *
+ * Set by the version-context middleware, which is first in every endpoint's
+ * stack, so it is present for anything downstream of routing: the request log,
+ * and the output-validation failure in `response.ts`, which could otherwise say
+ * only that *an* endpoint returned the wrong shape.
+ */
+export const ENDPOINT_ROUTE = "endpointRoute" as const;
 
 // ---------------------------------------------------------------------------
 // Base app context
@@ -93,9 +113,18 @@ export interface EndpointDocs {
  * `v.get(path, config, handler)`.
  *
  * Merges schema declarations (input, output, params, query) with per-endpoint
- * options (auth, resourceLimit, middleware, etc.).
+ * options (auth, resourceLimit, middleware, etc.) and the mandatory
+ * {@link AccessDeclaration}.
  */
-export interface EndpointConfig<
+export type EndpointConfig<
+  TInput extends ZodType = ZodType,
+  TOutput extends ZodType = ZodType,
+  TParams extends ZodType = ZodType,
+  TQuery extends ZodType = ZodType,
+> = BaseEndpointConfig<TInput, TOutput, TParams, TQuery> & AccessDeclaration;
+
+/** The access-independent half of {@link EndpointConfig}. */
+export interface BaseEndpointConfig<
   TInput extends ZodType = ZodType,
   TOutput extends ZodType = ZodType,
   TParams extends ZodType = ZodType,
@@ -131,6 +160,11 @@ export interface EndpointConfig<
    * - A `MiddlewareHandler` -- use a custom auth middleware for this endpoint.
    */
   auth?: "default" | "none" | MiddlewareHandler;
+  // The permission itself lives on {@link AccessDeclaration}, intersected into
+  // EndpointConfig: it is enforced by the FRAMEWORK (the service's
+  // `permissionEnforcer` middleware mounts between auth and the endpoint's
+  // own `middleware`, so a custom middleware array can never displace the
+  // check), and declaring one without an enforcer fails `build()`.
   /** Resource limit type — requires `_legacy.resourceLimitMiddleware` on the service. */
   resourceLimit?: string;
   /** Additional middleware to run for this endpoint (after auth, before handler). */
@@ -186,6 +220,14 @@ export interface ServiceConfig {
   basePath?: string;
   /** Default auth middleware applied to every endpoint (unless overridden). */
   auth?: MiddlewareHandler;
+  /**
+   * Builds the enforcement middleware for an endpoint's declared
+   * `permission`. Injected by the host — the platform passes one backed by
+   * its app-composed permissions service — and mounted by the framework
+   * right after auth for every endpoint that declares a permission, so the
+   * declaration and its enforcement cannot be torn apart.
+   */
+  permissionEnforcer?: (permission: AuthzPermission) => MiddlewareHandler;
   /** Disable the built-in tracer middleware. Set to `false` to opt out. */
   tracer?: false;
   /** Disable the built-in logger middleware. Set to `false` to opt out. */

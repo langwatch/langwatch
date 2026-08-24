@@ -6,7 +6,7 @@ import { TraceV2DrawerShell } from "./TraceDrawer";
 
 /**
  * Mounts the v2 trace drawer at the global dashboard layout so it
- * works on any page — `/simulations`, `/messages`, evaluation results,
+ * works on any page — `/simulations`, evaluation results,
  * anywhere the operator can trigger `openDrawer("traceV2Details", …)`.
  *
  * Skipped on the `/[project]/traces` route because `TracesPage` already

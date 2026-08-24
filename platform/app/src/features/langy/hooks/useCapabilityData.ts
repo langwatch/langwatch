@@ -25,7 +25,7 @@
  */
 
 import { CLI_SUBRESOURCE_VERBS, type CliResultDigest } from "@langwatch/langy";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import {
@@ -75,7 +75,7 @@ export function useCapabilityData({
   digest,
   maxRows = DEFAULT_MAX_ROWS,
 }: CapabilityDataInput): CapabilityData {
-  const utils = api.useContext();
+  const utils = api.useUtils();
   // The viewer's CURRENT project, from the one authoritative context — never a
   // prop, so a card can't be handed some other project's id and quietly break
   // isolation. (The procedures re-check permissions server-side regardless.)
@@ -139,7 +139,7 @@ export function useCapabilityData({
     // Reconcile, don't blink: when the digest lands and the key flips from the
     // query fetch to the ids fetch, the query rows stay on screen until the
     // refined rows arrive.
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
 
   if (!enabled) return IDLE;

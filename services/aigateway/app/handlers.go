@@ -3,8 +3,8 @@ package app
 import (
 	"context"
 	"io"
-	"strconv"
 
+	"github.com/bytedance/sonic"
 	"github.com/tidwall/gjson"
 
 	"github.com/langwatch/langwatch/services/aigateway/app/pipeline"
@@ -73,13 +73,74 @@ func (a *App) HandleSpeech(ctx context.Context, bundle *domain.Bundle, body io.R
 // body-reading pipeline stages see well-formed bytes instead of multipart
 // framing.
 func (a *App) HandleTranscription(ctx context.Context, bundle *domain.Bundle, upload *domain.TranscriptionUpload, model string) (*CompletionResult, error) {
-	body := []byte(`{"model":` + strconv.Quote(model) + `}`)
 	return a.pipeline.Sync(ctx, bundle, &domain.Request{
 		Type:          domain.RequestTypeTranscription,
 		Model:         model,
-		Body:          body,
+		Body:          modelOnlyBody("model", model),
 		Transcription: upload,
 	})
+}
+
+// HandleElevenLabsSpeech dispatches POST /v1/text-to-speech/{voice_id},
+// ElevenLabs' own synthesis path. Same request type, pipeline and metering as
+// the OpenAI-wire TTS route: only the wire differs, and the vendor reads that
+// wire directly. The response body is binary audio.
+func (a *App) HandleElevenLabsSpeech(ctx context.Context, bundle *domain.Bundle, in ElevenLabsAudioDispatch) (*CompletionResult, error) {
+	route := in.Route
+	return a.pipeline.Sync(ctx, bundle, &domain.Request{
+		Type:       domain.RequestTypeSpeech,
+		Model:      in.Model,
+		Body:       in.Body,
+		ElevenLabs: &route,
+		Surface:    domain.ElevenLabsSpeechSurface(),
+	})
+}
+
+// HandleElevenLabsTranscription dispatches POST /v1/speech-to-text,
+// ElevenLabs' own transcription path. The router parsed the multipart form,
+// so the upload rides on req.Transcription and Body carries the synthesized
+// JSON summary the body-reading pipeline stages need, exactly as the
+// OpenAI-wire transcription route does.
+func (a *App) HandleElevenLabsTranscription(ctx context.Context, bundle *domain.Bundle, in ElevenLabsAudioDispatch) (*CompletionResult, error) {
+	route := in.Route
+	return a.pipeline.Sync(ctx, bundle, &domain.Request{
+		Type:          domain.RequestTypeTranscription,
+		Model:         in.Model,
+		Body:          modelOnlyBody(domain.ElevenLabsModelField, in.Model),
+		Transcription: in.Upload,
+		ElevenLabs:    &route,
+		Surface:       domain.ElevenLabsTranscriptionSurface(),
+	})
+}
+
+// modelOnlyBody is the synthesized JSON a multipart route hands the pipeline,
+// so the body-reading stages see a well-formed object instead of multipart
+// framing.
+//
+// Marshaled rather than concatenated, the same rule the realtime mint states:
+// the model is a caller-supplied form part, and strconv.Quote emits Go escapes
+// such as \x01 for a control byte, which is not JSON. Every stage downstream
+// parses this body, including the sjson rewrite that puts the resolved model
+// back into it, so one control byte would break resolution rather than the
+// request that carried it. A marshal failure cannot happen for a map of two
+// strings; an empty object is still valid JSON and the resolver refuses the
+// missing model with its own message.
+func modelOnlyBody(field, model string) []byte {
+	body, err := sonic.Marshal(map[string]string{field: model})
+	if err != nil {
+		return []byte(`{}`)
+	}
+	return body
+}
+
+// ElevenLabsAudioDispatch is one ElevenLabs-native audio call: the model it
+// bills under, the vendor-shaped body or upload, and the URL-level parameters
+// the vendor's own path carries.
+type ElevenLabsAudioDispatch struct {
+	Model  string
+	Body   []byte
+	Upload *domain.TranscriptionUpload
+	Route  domain.ElevenLabsAudioRequest
 }
 
 // HandlePassthrough dispatches a provider-native request whose wire shape
@@ -87,26 +148,73 @@ func (a *App) HandleTranscription(ctx context.Context, bundle *domain.Bundle, up
 // Body, path, method, query, and forwarded headers ride on req.Passthrough;
 // the provider router's raw-forward dispatch hands them to Bifrost's
 // Passthrough endpoint verbatim.
-func (a *App) HandlePassthrough(ctx context.Context, bundle *domain.Bundle, body io.Reader, model string, meta domain.PassthroughRequest) (*CompletionResult, error) {
-	return a.pipeline.Sync(ctx, bundle, &domain.Request{
-		Type:        domain.RequestTypePassthrough,
-		Model:       model,
-		BodyReader:  body,
-		Passthrough: meta,
-	})
+func (a *App) HandlePassthrough(ctx context.Context, bundle *domain.Bundle, in PassthroughDispatch) (*CompletionResult, error) {
+	return a.pipeline.Sync(ctx, bundle, in.request())
 }
 
 // HandlePassthroughStream is the streaming sibling of HandlePassthrough.
 // Upstream emits pre-framed SSE (Gemini streamGenerateContent); the
 // iterator's RawFraming() returns true so the writer forwards chunks
 // unchanged rather than re-wrapping them.
-func (a *App) HandlePassthroughStream(ctx context.Context, bundle *domain.Bundle, body io.Reader, model string, meta domain.PassthroughRequest) (*StreamResult, error) {
-	return a.pipeline.Stream(ctx, bundle, &domain.Request{
+func (a *App) HandlePassthroughStream(ctx context.Context, bundle *domain.Bundle, in PassthroughDispatch) (*StreamResult, error) {
+	return a.pipeline.Stream(ctx, bundle, in.request())
+}
+
+// PassthroughDispatch is one raw-forward request: the body, the model the
+// route named, the HTTP context the vendor call is rebuilt from, and the
+// providers that route may reach.
+type PassthroughDispatch struct {
+	Body    io.Reader
+	Model   string
+	Meta    domain.PassthroughRequest
+	Surface domain.Surface
+}
+
+func (in PassthroughDispatch) request() *domain.Request {
+	return &domain.Request{
 		Type:        domain.RequestTypePassthrough,
-		Model:       model,
-		BodyReader:  body,
-		Passthrough: meta,
+		Model:       in.Model,
+		BodyReader:  in.Body,
+		Passthrough: in.Meta,
+		Surface:     in.Surface,
+	}
+}
+
+// HandleRealtimeSession dispatches a realtime voice session mint (ADR-097).
+// The gateway checks the budget, mints the vendor's own short-lived session
+// credential and hands it back; the media socket runs client to vendor and
+// never touches this process.
+//
+// Both mint routes come through here. The OpenAI one forwards the caller's
+// session body with the resolved model written back into it; the ElevenLabs
+// one carries a synthesized body, the same way HandleTranscription does, so
+// the body-reading stages of the pipeline see well-formed JSON instead of a
+// bare query string.
+func (a *App) HandleRealtimeSession(ctx context.Context, bundle *domain.Bundle, in RealtimeMintDispatch) (*CompletionResult, error) {
+	session := in.Session
+	return a.pipeline.Sync(ctx, bundle, &domain.Request{
+		Type:            domain.RequestTypeRealtimeSession,
+		Model:           in.Model,
+		Body:            in.Body,
+		RealtimeSession: &session,
+		Surface:         in.Surface,
 	})
+}
+
+// RealtimeMintDispatch is one session mint: the body the vendor receives,
+// the model it bills under, which family to mint for, and the providers the
+// route may reach.
+type RealtimeMintDispatch struct {
+	Body    []byte
+	Model   string
+	Session domain.RealtimeSessionRequest
+	Surface domain.Surface
+}
+
+// RealtimeUsagePost is a usage report a client read off its own socket.
+type RealtimeUsagePost struct {
+	SessionID string
+	Body      []byte
 }
 
 func PeekStream(body []byte) bool {

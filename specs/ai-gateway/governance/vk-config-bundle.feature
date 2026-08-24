@@ -45,7 +45,6 @@ Feature: AI Gateway — Virtual Key /config bundle materialisation
     "routing_policy": {
       "id": "rp_default_acme",
       "scope": { "scope_type": "ORGANIZATION", "scope_id": "org_abc" },
-      "strategy": "ordered",
       "model_provider_ids": ["mp_openai_org", "mp_anthropic_team_platform"],
       "credential_overrides": null
     },
@@ -71,7 +70,7 @@ Feature: AI Gateway — Virtual Key /config bundle materialisation
   # ============================================================================
 
   Scenario: VK with a RoutingPolicy uses the policy's model_provider_ids order verbatim
-    Given a RoutingPolicy "rp_strict" with strategy="ordered" and model_provider_ids=["mp_anthropic_org", "mp_openai_org"]
+    Given a RoutingPolicy "rp_strict" with model_provider_ids=["mp_anthropic_org", "mp_openai_org"] in that order
     And a VirtualKey "vk_with_policy" scoped to ORGANIZATION "acme" with routingPolicyId="rp_strict"
     When the materialiser assembles the bundle for "vk_with_policy"
     Then `model_providers[0].id` equals "mp_anthropic_org"

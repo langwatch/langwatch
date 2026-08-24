@@ -6,8 +6,9 @@
  * already refuses. Reserved rows read as not-found so a response never
  * confirms they exist.
  */
-import type { PrismaClient } from "@prisma/client";
+
 import { describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 import { LANGY_VK_SECRET_NAME } from "~/server/projects/reserved-secret-names";
 

@@ -1,11 +1,10 @@
 import { createLogger } from "@langwatch/observability";
-import type { Prisma } from "@prisma/client";
 import { HTTPException } from "hono/http-exception";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
+import type { Prisma } from "~/generated/prisma/client";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { prisma } from "~/server/db";

@@ -141,3 +141,65 @@ Feature: Coding-agent sessions
     When a session's telemetry names the session that spawned it as a fork
     Then the session records its parent and that it forked the parent's context
     And later telemetry does not change who the parent was
+
+  # Codex sessions. Codex reports the turn on a span and everything else on
+  # events: there is no tool span, tokens arrive as turn totals whose input
+  # includes the cache buckets, and the turn span's name carries no vendor
+  # namespace. The scenarios below pin the codex-specific reading.
+
+  Scenario: a codex turn span folds the turn's model call and tokens
+    When a codex session's turn span reports the turn's model and token totals
+    Then the session counts one model call for the turn
+    And the token buckets stay disjoint, with the cached input counted once
+
+  Scenario: a codex session is priced from the tokens it reported
+    Given a codex session, whose telemetry states no price of its own
+    When its turn span reports the model and the token totals
+    Then the session's cost is worked out from those tokens at that model's price
+    And a second turn adds its own price to the session's total
+    # Without this a codex session reads as free, while the same turn's trace
+    # states a figure: the trace pipeline prices the identical span.
+
+  Scenario: a turn priced at an unknown model costs nothing rather than guessing
+    Given a codex turn whose model is in no price list
+    When the turn is folded
+    Then the session's tokens are counted and its cost stays at zero
+
+  Scenario: an agent that states its own price keeps it beside the computed one
+    Given a session whose telemetry reports what it was billed
+    When its model calls are folded
+    Then the session's cost is worked out from the call tokens
+    And the reported figure is kept apart from it, as a drift signal
+    # One session, two figures with two homes. The computed one is the same
+    # formula the trace pipeline applies to the same spans, so a session and
+    # its traces cannot disagree; the reported one tells us when either our
+    # price registry or the agent's own pricing went stale.
+
+  Scenario: a codex shell command counts once despite its sandbox outcome event
+    When a codex session runs one shell command that reports a tool result and a sandbox outcome
+    Then the session counts one tool run
+
+  Scenario: a codex denial and a codex abort are the human's decisions, not failures
+    When a codex session's tool prompts are denied, aborted and left to time out
+    Then the denials and the walk-aways are counted apart
+    And none of them counts as a failed tool
+
+  Scenario: codex time to first token folds from its own event
+    When a codex session reports time to first token on its own event
+    Then the session's mean time to first token reflects it
+
+  Scenario: a foreign span reusing codex's bare turn name is declined at the gate
+    Given a span named like codex's turn span from an unrelated instrumentation
+    When the span dispatcher considers it
+    Then it never reaches the session fold
+
+  Scenario: the codex script wrapper is plumbing, its commands are the tool runs
+    Given a codex session where the model sends one script that runs one command
+    When the script wrapper and the command each report a tool result
+    Then the session counts one tool run, named after the command
+
+  Scenario: a codex record outside any session does not mint a session
+    Given a codex log record that carries no session id
+    When the log dispatcher considers it
+    Then no session contribution is made for it
+    And the record itself is still stored

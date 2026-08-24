@@ -59,6 +59,7 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config, pl
 func buildServices(deps *Deps, srv *http.Server) []lifecycle.Service {
 	return []lifecycle.Service{
 		lifecycle.Closer("otel", deps.OTel.Shutdown),
+		lifecycle.Closer("profiling", deps.Profiler.Shutdown),
 		lifecycle.ListenServer("http", srv),
 	}
 }

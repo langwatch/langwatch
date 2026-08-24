@@ -48,6 +48,15 @@ func TestResolve_ExplicitFormat_NormalizedProviders(t *testing.T) {
 		{"google_vertex", "google_vertex/m", domain.ProviderVertex, "m"},
 		{"aws_bedrock", "aws_bedrock/m", domain.ProviderBedrock, "m"},
 		{"google_gemini", "google_gemini/m", domain.ProviderGemini, "m"},
+		// LiteLLM's spelling, and the one most SDKs emit. The credential
+		// side has always normalized it; this side had not, so a caller
+		// with a working Vertex credential resolved to a provider that
+		// matched none of their credentials.
+		{"vertex_ai", "vertex_ai/gemini-2.5-flash", domain.ProviderVertex, "gemini-2.5-flash"},
+		{"azure", "azure/m", domain.ProviderAzure, "m"},
+		{"bedrock", "bedrock/m", domain.ProviderBedrock, "m"},
+		{"vertex", "vertex/m", domain.ProviderVertex, "m"},
+		{"openai_codex", "openai_codex/m", domain.ProviderOpenAICodex, "m"},
 	}
 
 	r := New()
@@ -250,4 +259,142 @@ func TestResolve_EmptyAllowlist_AllowsAll(t *testing.T) {
 	got, err := r.Resolve(context.Background(), chatRequest("anything-goes"), cfg)
 	require.NoError(t, err)
 	assert.Equal(t, "anything-goes", got.ModelID)
+}
+
+// The alias branch used to return before any allowlist check, so an alias was
+// a second door into models_allowed while the documentation promised the
+// opposite.
+//
+// @scenario "An alias resolving outside models_allowed is refused"
+func TestResolve_AliasOutsideAllowlistIsRefused(t *testing.T) {
+	r := New()
+	cfg := domain.BundleConfig{
+		AllowedModels: []string{"claude-*"},
+		ModelAliases: map[string]domain.ModelAlias{
+			"coding": {ProviderID: domain.ProviderOpenAI, Model: "gpt-5-mini"},
+		},
+	}
+
+	_, err := r.Resolve(context.Background(), chatRequest("coding"), cfg)
+	require.Error(t, err)
+	assert.True(t, herr.IsCode(err, domain.ErrModelNotAllowed))
+	// The caller typed "coding" and has no other way to learn what it points
+	// at, so the rejection names the model that was actually refused.
+	var e herr.E
+	require.ErrorAs(t, err, &e)
+	assert.Contains(t, e.Meta["message"], "gpt-5-mini")
+}
+
+// @scenario "An alias resolving inside models_allowed is served"
+func TestResolve_AliasInsideAllowlistIsServed(t *testing.T) {
+	r := New()
+	cfg := domain.BundleConfig{
+		AllowedModels: []string{"claude-*"},
+		ModelAliases: map[string]domain.ModelAlias{
+			"coding": {ProviderID: domain.ProviderAnthropic, Model: "claude-haiku-4-5"},
+		},
+	}
+
+	got, err := r.Resolve(context.Background(), chatRequest("coding"), cfg)
+	require.NoError(t, err)
+	assert.Equal(t, "claude-haiku-4-5", got.ModelID)
+	assert.Equal(t, domain.ProviderAnthropic, got.ProviderID)
+	assert.Equal(t, domain.ModelSourceAlias, got.Source)
+}
+
+// @scenario "The allowlist accepts either spelling of the same model"
+func TestResolve_AllowlistAcceptsEitherSpelling(t *testing.T) {
+	aliases := map[string]domain.ModelAlias{
+		"coding": {ProviderID: domain.ProviderOpenAI, Model: "gpt-5-mini"},
+	}
+
+	for name, allowed := range map[string][]string{
+		"provider-qualified allowance": {"openai/gpt-5-mini"},
+		"bare allowance":               {"gpt-5-mini"},
+		"provider-qualified wildcard":  {"openai/*"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := New()
+			got, err := r.Resolve(context.Background(), chatRequest("coding"), domain.BundleConfig{
+				AllowedModels: allowed,
+				ModelAliases:  aliases,
+			})
+			require.NoError(t, err)
+			assert.Equal(t, "gpt-5-mini", got.ModelID)
+			assert.Equal(t, domain.ProviderOpenAI, got.ProviderID)
+		})
+	}
+}
+
+// @scenario "A key with no allowlist keeps serving every alias it defines"
+func TestResolve_NoAllowlistServesEveryAlias(t *testing.T) {
+	r := New()
+	cfg := domain.BundleConfig{
+		ModelAliases: map[string]domain.ModelAlias{
+			"coding": {ProviderID: domain.ProviderOpenAI, Model: "gpt-5-mini"},
+		},
+	}
+
+	got, err := r.Resolve(context.Background(), chatRequest("coding"), cfg)
+	require.NoError(t, err)
+	assert.Equal(t, "gpt-5-mini", got.ModelID)
+}
+
+// An explicit provider/model request was judged on the bare model id alone,
+// so an operator who wrote the allowlist the provider-qualified way had one
+// that matched nothing.
+func TestResolve_ExplicitFormatAcceptsQualifiedAllowance(t *testing.T) {
+	r := New()
+	cfg := domain.BundleConfig{AllowedModels: []string{"openai/gpt-4"}}
+
+	got, err := r.Resolve(context.Background(), chatRequest("openai/gpt-4"), cfg)
+	require.NoError(t, err)
+	assert.Equal(t, "gpt-4", got.ModelID)
+
+	// Still narrow: the same model behind a provider the key did not allow
+	// is refused rather than matching on the model half alone.
+	_, err = r.Resolve(context.Background(), chatRequest("anthropic/gpt-4"), cfg)
+	require.Error(t, err)
+	assert.True(t, herr.IsCode(err, domain.ErrModelNotAllowed))
+}
+
+// Every refusal the resolver authors is the caller's to fix, and the wire body
+// only carries a fault when the meta does. Two of the three branches were
+// silent, so the same code reached one customer annotated and another not.
+//
+// @scenario "Every model refusal names the caller as the fault"
+func TestResolve_RefusalsAreAttributedToTheCaller(t *testing.T) {
+	r := New()
+	cfg := domain.BundleConfig{
+		AllowedModels: []string{"openai/gpt-5.6-sol"},
+		ModelAliases: map[string]domain.ModelAlias{
+			"coding": {ProviderID: domain.ProviderOpenAI, Model: "gpt-5-mini"},
+		},
+	}
+
+	for _, model := range []string{"coding", "openai/gpt-5-mini", "gpt-5-mini"} {
+		_, err := r.Resolve(context.Background(), chatRequest(model), cfg)
+		require.Error(t, err, model)
+		assert.True(t, herr.IsCode(err, domain.ErrModelNotAllowed), model)
+
+		var e herr.E
+		require.ErrorAs(t, err, &e, model)
+		assert.Equal(t, "customer", e.Meta["fault"], model)
+	}
+}
+
+// A key can allow a model under one provider and not another, so a refusal
+// that drops the provider half describes a rule the caller did not hit.
+//
+// @scenario "A refused provider-qualified model is named the way it was sent"
+func TestResolve_RefusalEchoesTheSpellingTheCallerSent(t *testing.T) {
+	r := New()
+	cfg := domain.BundleConfig{AllowedModels: []string{"openai/gpt-4"}}
+
+	_, err := r.Resolve(context.Background(), chatRequest("anthropic/gpt-4"), cfg)
+	require.Error(t, err)
+
+	var e herr.E
+	require.ErrorAs(t, err, &e)
+	assert.Contains(t, e.Meta["message"], "anthropic/gpt-4")
 }

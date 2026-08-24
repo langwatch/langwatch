@@ -1,4 +1,4 @@
-import type { Currency } from "@prisma/client";
+import type { Currency } from "~/generated/prisma/client";
 import { InvalidSeatCountError } from "../errors";
 import { PlanTypes } from "../planTypes";
 import { prices } from "../stripe/stripePriceCatalog";

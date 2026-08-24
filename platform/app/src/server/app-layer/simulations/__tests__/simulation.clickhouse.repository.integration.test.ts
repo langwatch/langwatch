@@ -1,11 +1,17 @@
+/**
+ * Batch aggregates over the simulation_runs table.
+ *
+ * @see specs/features/simulation-runs-batch-completion.feature
+ */
+
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createResilientClickHouseClient } from "~/server/clickhouse/managedClient";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
-import { createResilientClickHouseClient } from "../../clients/clickhouse";
 import { SimulationClickHouseRepository } from "../repositories/simulation.clickhouse.repository";
 
 const tenantId = `test-sim-repo-${nanoid()}`;
@@ -269,6 +275,79 @@ describe("SimulationClickHouseRepository (integration)", () => {
         if (!result.changed) throw new Error("expected changed");
         expect(result.runs).toHaveLength(1);
         expect(result.runs[0]!.metadata).toEqual(metadata);
+      });
+    });
+
+    describe("when no scenario set id is given", () => {
+      /** @scenario "A batch id alone filters the list" */
+      it("returns the batch's runs and no others", async () => {
+        const batchRunId = `batch-only-${nanoid()}`;
+        const wantedRunId = `run-only-${nanoid()}`;
+
+        await insertRow(
+          ch,
+          makeInsertRow({ ScenarioRunId: wantedRunId, BatchRunId: batchRunId }),
+        );
+        await insertRow(ch, makeInsertRow({ Status: "IN_PROGRESS" }));
+
+        const result = await repo.getRunDataForBatchRun({
+          projectId: tenantId,
+          batchRunId,
+        });
+
+        expect(result.changed).toBe(true);
+        if (!result.changed) throw new Error("expected changed");
+        expect(result.runs.map((r) => r.scenarioRunId)).toEqual([wantedRunId]);
+      });
+    });
+
+    describe("when the scenario set id is the empty string", () => {
+      /** @scenario "An empty scenario set id still selects the default set" */
+      it("keeps the default set filter instead of dropping it", async () => {
+        const batchRunId = `batch-default-${nanoid()}`;
+        // The default set holds both storage values: "" from rows written
+        // before the set id got its name, and "default" from rows after.
+        const legacyDefaultRunId = `run-legacy-default-${nanoid()}`;
+        const namedDefaultRunId = `run-named-default-${nanoid()}`;
+
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: legacyDefaultRunId,
+            BatchRunId: batchRunId,
+            ScenarioSetId: "",
+          }),
+        );
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: namedDefaultRunId,
+            BatchRunId: batchRunId,
+            ScenarioSetId: "default",
+          }),
+        );
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioRunId: `run-other-set-${nanoid()}`,
+            BatchRunId: batchRunId,
+            ScenarioSetId: `set-named-${nanoid()}`,
+          }),
+        );
+
+        const result = await repo.getRunDataForBatchRun({
+          projectId: tenantId,
+          scenarioSetId: "",
+          batchRunId,
+        });
+
+        expect(result.changed).toBe(true);
+        if (!result.changed) throw new Error("expected changed");
+        // The two default rows share a CreatedAt, so their order is not
+        // decided; only membership is.
+        expect(result.runs.map((r) => r.scenarioRunId).sort()).toEqual(
+          [legacyDefaultRunId, namedDefaultRunId].sort(),
+        );
       });
     });
   });
@@ -1216,6 +1295,127 @@ describe("SimulationClickHouseRepository (integration)", () => {
         expect(previewQuery!.query_params?.minStartedAtMs).toBe(
           String(oldStartedAtMs),
         );
+      });
+    });
+
+    /**
+     * Seeds one batch and returns the ids the assertions need. A queued run
+     * carries no FinishedAt: the queue writes the row before the worker picks
+     * it up.
+     */
+    async function seedBatch(statuses: string[]) {
+      const setId = `set-completion-${nanoid()}`;
+      const batchRunId = `batch-completion-${nanoid()}`;
+
+      for (const status of statuses) {
+        const settled = status !== "QUEUED";
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioSetId: setId,
+            BatchRunId: batchRunId,
+            Status: status,
+            FinishedAt: settled ? new Date(now) : null,
+          }),
+        );
+      }
+
+      return { setId, batchRunId };
+    }
+
+    async function readBatch({
+      setId,
+      batchRunId,
+    }: {
+      setId: string;
+      batchRunId: string;
+    }) {
+      const result = await repo.getBatchHistoryForScenarioSet({
+        projectId: tenantId,
+        scenarioSetId: setId,
+        limit: 10,
+      });
+      const batch = result.batches.find((b) => b.batchRunId === batchRunId);
+      if (!batch) throw new Error("expected the seeded batch");
+      return batch;
+    }
+
+    describe("when the batch still holds a queued run", () => {
+      /** @scenario "A batch with queued runs is not complete" */
+      it("counts the queued run as running and the finished one as settled", async () => {
+        const { setId, batchRunId } = await seedBatch(["SUCCESS", "QUEUED"]);
+
+        const batch = await readBatch({ setId, batchRunId });
+
+        expect(batch.totalCount).toBe(2);
+        expect(batch.runningCount).toBe(1);
+        expect(batch.settledCount).toBe(1);
+      });
+
+      /** @scenario "allCompletedAt stays null until the last run settles" */
+      it("leaves allCompletedAt null while the queued run waits", async () => {
+        const { setId, batchRunId } = await seedBatch(["SUCCESS", "QUEUED"]);
+
+        const batch = await readBatch({ setId, batchRunId });
+
+        expect(batch.allCompletedAt).toBeNull();
+      });
+    });
+
+    describe("when every run of the batch reached a terminal status", () => {
+      /** @scenario "A batch is complete when every run is terminal" */
+      it("settles every run and carries a completion timestamp", async () => {
+        const { setId, batchRunId } = await seedBatch(["SUCCESS", "FAILURE"]);
+
+        const batch = await readBatch({ setId, batchRunId });
+
+        expect(batch.totalCount).toBe(2);
+        expect(batch.runningCount).toBe(0);
+        expect(batch.settledCount).toBe(batch.totalCount);
+        expect(batch.allCompletedAt).not.toBeNull();
+      });
+    });
+
+    describe("when one batch is read by its batch run id", () => {
+      it("returns the same counts as the history page, without items", async () => {
+        const { batchRunId } = await seedBatch(["SUCCESS", "QUEUED"]);
+
+        const summary = await repo.getBatchSummary({
+          projectId: tenantId,
+          batchRunId,
+        });
+
+        expect(summary).not.toBeNull();
+        expect(summary!.batchRunId).toBe(batchRunId);
+        expect(summary!.totalCount).toBe(2);
+        expect(summary!.runningCount).toBe(1);
+        expect(summary!.settledCount).toBe(1);
+        expect(summary!.allCompletedAt).toBeNull();
+      });
+
+      it("carries a completion timestamp once every run is terminal", async () => {
+        const { batchRunId } = await seedBatch(["SUCCESS", "FAILURE"]);
+
+        const summary = await repo.getBatchSummary({
+          projectId: tenantId,
+          batchRunId,
+        });
+
+        expect(summary).not.toBeNull();
+        expect(summary!.settledCount).toBe(2);
+        expect(summary!.runningCount).toBe(0);
+        expect(summary!.allCompletedAt).not.toBeNull();
+      });
+    });
+
+    describe("when the batch run id belongs to no run of the project", () => {
+      it("returns null", async () => {
+        const summary = await repo.getBatchSummary({
+          projectId: tenantId,
+          batchRunId: `batch-unknown-${nanoid()}`,
+        });
+
+        expect(summary).toBeNull();
       });
     });
   });

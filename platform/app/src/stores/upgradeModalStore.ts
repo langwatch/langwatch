@@ -15,7 +15,12 @@ type SeatsVariant = {
   organizationId: string;
   currentSeats: number;
   newSeats: number;
-  onConfirm: () => Promise<void>;
+  /**
+   * @param quotedAt the instant the quote on screen was priced, so the charge
+   *   can reproduce it rather than re-price at confirm time. Undefined when no
+   *   quote was loaded, which leaves the confirm priced at the moment it runs.
+   */
+  onConfirm: (quotedAt?: number) => Promise<void>;
 };
 
 /** Modal shown when a lite member tries to access a restricted feature. */
@@ -33,7 +38,12 @@ interface OpenSeatsParams {
   organizationId: string;
   currentSeats: number;
   newSeats: number;
-  onConfirm: () => Promise<void>;
+  /**
+   * @param quotedAt the instant the quote on screen was priced, so the charge
+   *   can reproduce it rather than re-price at confirm time. Undefined when no
+   *   quote was loaded, which leaves the confirm priced at the moment it runs.
+   */
+  onConfirm: (quotedAt?: number) => Promise<void>;
 }
 
 interface UpgradeModalState {

@@ -29,10 +29,22 @@ export const notifyDigestIntentSchema = z.object({
 });
 export type NotifyDigestIntent = z.infer<typeof notifyDigestIntentSchema>;
 
-export const persistMatchIntentSchema = z.object({
-  triggerId: z.string().min(1),
-  traceId: z.string().min(1),
-});
+/**
+ * Union of the paged shape and the legacy single-trace shape. The union is
+ * the rolling-deploy contract: outbox rows are durable, so during a deploy
+ * the fleet holds rows written by both pod versions and every pod must parse
+ * both. The emitter side moves to pages only after every pod can read them.
+ */
+export const persistMatchIntentSchema = z.union([
+  z.object({
+    triggerId: z.string().min(1),
+    traceIds: z.array(z.string().min(1)).min(1),
+  }),
+  z.object({
+    triggerId: z.string().min(1),
+    traceId: z.string().min(1),
+  }),
+]);
 export type PersistMatchIntent = z.infer<typeof persistMatchIntentSchema>;
 
 export const logOverflowIntentSchema = z.object({

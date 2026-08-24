@@ -1,11 +1,12 @@
 Feature: Governance home — route, nav promotion, persona detection
   The governance product surface lives at top-level `/governance` (a
-  daily-use org-scoped home) — NOT under Settings. The legacy URL
-  `/settings/governance` continues to render the same dashboard as a
-  back-compat alias during the transition. Admin-authoring sub-routes
-  (`/settings/governance/ingestion-sources*`, `/anomaly-rules`,
-  `/settings/routing-policies`) stay under Settings since they are
-  configuration surfaces, not daily-use dashboards.
+  daily-use org-scoped home), NOT under Settings. The whole family
+  lives there: `/governance/ingestion-sources*`, `/governance/anomaly-rules`,
+  `/governance/tool-catalog`, `/governance/departments`. Routing policies
+  are gateway behavior and live at `/gateway/routing-policies` instead. The
+  legacy `/settings/governance*` and `/settings/routing-policies` addresses
+  redirect permanently to the new ones
+  (specs/navigation/gateway-url-move.feature).
 
   A `Governance` entry surfaces in the MainMenu sidebar ONLY for org
   admins whose org has actual governance state. Vast-majority current
@@ -27,28 +28,24 @@ Feature: Governance home — route, nav promotion, persona detection
     When the admin navigates to "/governance"
     Then the page renders with the heading "Governance"
     And the URL stays at "/governance"
-    And the same setup-checklist OR live-metrics view shown at
-      "/settings/governance" is rendered
+    And the setup-checklist OR live-metrics view is rendered
 
   @bdd @ui @governance-home @route @alias
-  Scenario: Legacy /settings/governance keeps working as alias
+  Scenario: Legacy /settings/governance keeps working as a redirect
     When the admin navigates to "/settings/governance"
-    Then the page renders the same dashboard component
+    Then the browser lands on "/governance" with the same dashboard
     And no 404 is shown
-    And admins who bookmarked the legacy URL during the preview can
-      keep using it during the transition
+    And admins who bookmarked the legacy URL keep landing on the
+      dashboard through the permanent redirect
 
   @bdd @ui @governance-home @route @sub-routes
-  Scenario: Admin-authoring sub-routes stay under /settings/governance
-    Then "/settings/governance/ingestion-sources" remains the list page
-    And "/settings/governance/ingestion-sources/<id>" remains the
-      per-source detail page
-    And "/settings/governance/anomaly-rules" remains the rule
-      authoring surface
-    And "/settings/routing-policies" remains the routing-policy
-      authoring surface
-    # These are admin-config surfaces by design; the daily-use dashboard
-    # at /governance links into them.
+  Scenario: Admin-authoring sub-routes live under /governance
+    Then "/governance/ingestion-sources" is the list page
+    And "/governance/ingestion-sources/<id>" is the per-source
+      detail page
+    And "/governance/anomaly-rules" is the rule authoring surface
+    # The daily-use dashboard at /governance links into them, and into the
+    # routing-policy surface the gateway owns at /gateway/routing-policies.
 
   # ---------------------------------------------------------------------------
   # Persona / nav promotion via api.governance.setupState
@@ -62,8 +59,8 @@ Feature: Governance home — route, nav promotion, persona detection
     Then the MainMenu sidebar shows a "Govern · Preview" section header
     And below it a "Governance" entry with an Eye icon
     And the entry links to "/governance"
-    And the entry highlights as active when the URL is "/governance" OR
-      "/settings/governance" OR any "/settings/governance/*" sub-route
+    And the entry highlights as active when the URL is "/governance"
+      OR any "/governance/*" sub-route
 
   @bdd @ui @governance-home @nav-promotion @no-state
   Scenario: Org admin with NO governance state sees no nav change
@@ -144,23 +141,16 @@ Feature: Governance home — route, nav promotion, persona detection
       sub-routes:
       | label             | href                                          |
       | Overview          | /governance                                   |
-      | Ingestion Sources | /settings/governance/ingestion-sources        |
-      | Anomaly Rules     | /settings/governance/anomaly-rules            |
-      | Routing Policies  | /settings/routing-policies                    |
-    And a footer note explains that sub-pages are admin-config surfaces
-      under Settings, while Overview is the daily-use home
+      | Catalog           | /governance/ingestion-sources                 |
+      | Anomaly Rules     | /governance/anomaly-rules                     |
 
   @bdd @ui @governance-home @layout @sub-routes
-  Scenario: Admin-authoring sub-routes keep SettingsLayout chrome
-    When the admin clicks "Ingestion Sources" in the GovernanceLayout
-      left rail and lands on "/settings/governance/ingestion-sources"
-    Then the page renders inside SettingsLayout (same chrome as every
-      other Settings page) — NOT GovernanceLayout
-    And the same applies to "/settings/governance/anomaly-rules" and
-      "/settings/routing-policies"
-    # GovernanceLayout owns the daily-use home only. Admin-config
-    # surfaces stay under Settings because they're configuration
-    # entities, not dashboards.
+  Scenario: Admin-authoring sub-routes share the GovernanceLayout chrome
+    When the admin clicks "Catalog" in the GovernanceLayout
+      left rail and lands on "/governance/ingestion-sources"
+    Then the page renders inside GovernanceLayout, the same chrome as
+      the daily-use home
+    And the same applies to "/governance/anomaly-rules"
 
   @bdd @ui @governance-home @layout @bypass-project-redirect
   Scenario: /governance bypasses the no-project onboarding redirect

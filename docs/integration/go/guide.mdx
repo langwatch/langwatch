@@ -24,7 +24,7 @@ import LLMsTxtProtip from "/snippets/llms-txt-protip.mdx";
   </div>
 </div>
 
-Integrate LangWatch into your Go application to start observing your LLM interactions. This guide covers the setup and basic usage of the LangWatch Go SDK, which is built on top of OpenTelemetry to provide powerful, vendor-neutral tracing.
+Integrate LangWatch into your Go application to start observing your LLM interactions. This guide covers the setup and basic usage of the LangWatch Go SDK, which is built on top of OpenTelemetry to keep the tracing vendor-neutral.
 
 <LLMsTxtProtip />
 
@@ -38,7 +38,7 @@ Before you begin, ensure you have:
 - Basic familiarity with Go and OpenTelemetry concepts
 
 <Tip>
-If you're new to OpenTelemetry, don't worry! The LangWatch SDK handles most of the complexity for you. You only need to understand the basic concepts of traces and spans.
+If you're new to OpenTelemetry, the LangWatch SDK handles the setup for you. You only need to understand the basic concepts of traces and spans.
 </Tip>
 
 ## Setup
@@ -334,7 +334,7 @@ The SDK respects these environment variables for configuration:
 
 ## Filtering Spans
 
-The LangWatch SDK provides powerful filtering capabilities to control which spans are exported. This is useful for reducing noise, excluding sensitive data, or focusing on specific instrumentation.
+The LangWatch SDK filters which spans are exported. Use filtering to reduce noise, exclude sensitive data, or focus on specific instrumentation.
 
 ### Using Preset Filters
 
@@ -400,7 +400,7 @@ For detailed filter API documentation and more examples, see the [Filtering sect
 
 ## Features
 
-* 🔗 **Seamless OpenTelemetry integration** - Works with your existing OTel setup
+* 🔗 **OpenTelemetry integration** - Works with your existing OTel setup
 * 🚀 **OpenAI instrumentation** - Automatic tracing for OpenAI API calls
 * 🌐 **Multi-provider support** - OpenAI, Anthropic, Azure, local models, and more
 * 📊 **Rich LLM telemetry** - Capture inputs, outputs, token usage, and model information

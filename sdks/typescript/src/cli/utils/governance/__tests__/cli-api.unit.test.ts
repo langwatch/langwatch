@@ -4,6 +4,7 @@ import {
   GovernanceCliError,
   SESSION_EXPIRED_MESSAGE,
   cloneIngestionTemplateFromPlatform,
+  getBudgetOverview,
   getCliBootstrap,
   getEventsForSource,
   getGovernanceStatus,
@@ -135,8 +136,7 @@ describe("cli-api — auth contract", () => {
       const authHeaders: (string | undefined)[] = [];
       const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
         authHeaders.push(
-          (init?.headers as Record<string, string> | undefined)
-            ?.Authorization,
+          (init?.headers as Record<string, string> | undefined)?.Authorization,
         );
         return responses.shift()!;
       }) as unknown as typeof fetch;
@@ -160,8 +160,8 @@ describe("cli-api — auth contract", () => {
 
     it("surfaces the 401 when the refresh token is refused too", async () => {
       const cfg = { ...baseCfg("at_old"), refresh_token: "rt_dead" };
-      const fetchImpl = vi.fn(
-        async () => status(401, { error: "unauthorized" }),
+      const fetchImpl = vi.fn(async () =>
+        status(401, { error: "unauthorized" }),
       ) as unknown as typeof fetch;
 
       await expect(
@@ -318,9 +318,7 @@ describe("cli-api — request shape", () => {
         beforeIso: "2026-04-27T00:00:00.000Z",
       });
       expect(seen[0]!.url).toContain("limit=25");
-      expect(seen[0]!.url).toContain(
-        "before_iso=2026-04-27T00%3A00%3A00.000Z",
-      );
+      expect(seen[0]!.url).toContain("before_iso=2026-04-27T00%3A00%3A00.000Z");
     });
 
     it("omits the query string entirely when neither flag is set", async () => {
@@ -348,7 +346,9 @@ describe("cli-api — request shape", () => {
         },
       ];
       const { fetchImpl } = spyFetch(ok({ events: fixture }));
-      const events = await getEventsForSource(baseCfg(), "src-1", { fetchImpl });
+      const events = await getEventsForSource(baseCfg(), "src-1", {
+        fetchImpl,
+      });
       expect(events).toEqual(fixture);
     });
   });
@@ -413,15 +413,15 @@ describe("cli-api — request shape", () => {
       };
       const { fetchImpl, seen } = spyFetch(ok(fixture));
       const out = await getCliBootstrap(baseCfg(), { fetchImpl });
-      expect(seen[0]!.url).toBe(
-        "http://app.example/api/auth/cli/bootstrap",
-      );
+      expect(seen[0]!.url).toBe("http://app.example/api/auth/cli/bootstrap");
       expect(seen[0]!.authHeader).toBe("Bearer at_x");
       expect(out).toEqual(fixture);
     });
 
     it("returns null on 404 — graceful degrade for older self-hosters without the REST adapter", async () => {
-      const { fetchImpl } = spyFetch(status(404, { error_description: "Not found" }));
+      const { fetchImpl } = spyFetch(
+        status(404, { error_description: "Not found" }),
+      );
       const out = await getCliBootstrap(baseCfg(), { fetchImpl });
       expect(out).toBeNull();
     });
@@ -438,6 +438,34 @@ describe("cli-api — request shape", () => {
       await expect(getCliBootstrap(baseCfg(), { fetchImpl })).rejects.toThrow(
         /500/,
       );
+    });
+  });
+  describe("when the caller sets a request timeout", () => {
+    it("aborts a request the server never answers", async () => {
+      // A control plane that accepts the connection and then goes quiet:
+      // fetch has no deadline of its own, so without the signal this
+      // never settles and the login ceremony never prints.
+      const fetchImpl: typeof fetch = (_url, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () =>
+            reject(new DOMException("aborted", "TimeoutError")),
+          );
+        });
+
+      await expect(
+        getBudgetOverview(baseCfg(), { fetchImpl, timeoutMs: 20 }),
+      ).rejects.toThrow(/abort/i);
+    });
+
+    it("passes no signal when the caller sets no timeout", async () => {
+      let sawSignal: AbortSignal | null | undefined;
+      const fetchImpl: typeof fetch = async (_url, init) => {
+        sawSignal = init?.signal;
+        return ok({ gatewayAccess: true, budgets: [] });
+      };
+
+      await getBudgetOverview(baseCfg(), { fetchImpl });
+      expect(sawSignal).toBeUndefined();
     });
   });
   describe("ingestion-templates clone-from-platform", () => {

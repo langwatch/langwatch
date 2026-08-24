@@ -20,7 +20,7 @@ import {
   Sparkles,
   Zap,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { useModelSelectionOptions } from "~/components/ModelSelector";
 import {
   modelProviderIcons,
@@ -100,8 +100,13 @@ const MODEL_GROUPS: Array<{
  * `triggerRef` exposes the pill's button so `/model` in the composer palette can
  * open THIS picker rather than the palette growing a second, divergent copy of
  * the model list.
+ *
+ * Memoized: the pill drags the whole Ark combobox (portal, positioner, every
+ * row) through a render even while closed, and its props are stable strings,
+ * arrays and panel-level callbacks — so a composer render for a palette or
+ * turn-phase change stops here.
  */
-export function LangyModelPill({
+export const LangyModelPill = memo(function LangyModelPill({
   ref: triggerRef,
   model,
   options,
@@ -519,7 +524,7 @@ export function LangyModelPill({
       </Portal>
     </Combobox.Root>
   );
-}
+});
 
 function ModelRow({ item }: { item: ModelItem }) {
   const hasProviderIcon = item.provider in modelProviderIcons;

@@ -185,9 +185,8 @@ vi.mock("@paper-design/shaders-react", () => ({
 
 vi.mock("~/utils/api", async () => {
   const React = await import("react");
-  const { createTrpcUtils, idleQuery, withFallback } = await import(
-    "./support/langyApiMock"
-  );
+  const { createTrpcUtils, idleQuery, modelProviderRouter, withFallback } =
+    await import("./support/langyApiMock");
 
   /** A minimal, `enabled`-honouring stand-in for a tRPC query. */
   const useSnapshotQuery = <TData,>(resolve: () => TData, enabled: boolean) => {
@@ -219,9 +218,8 @@ vi.mock("~/utils/api", async () => {
     return {
       data: state.data,
       isLoading: enabled && state.status === "loading",
-      isInitialLoading: enabled && state.status === "loading",
       isFetching: enabled && state.status === "loading",
-      isPreviousData: false,
+      isPlaceholderData: false,
       isFetched: state.status === "success",
       isSuccess: state.status === "success",
       isError: false,
@@ -283,17 +281,7 @@ vi.mock("~/utils/api", async () => {
     }),
     useUtils: () => trpcUtils,
     useContext: () => trpcUtils,
-    modelProvider: {
-      getResolvedDefault: {
-        useQuery: () => ({
-          data: { model: "openai/gpt-5-mini" },
-          isLoading: false,
-        }),
-      },
-      listAllForProjectForFrontend: {
-        useQuery: () => ({ data: { providers: [] }, isLoading: false }),
-      },
-    },
+    modelProvider: modelProviderRouter(),
     virtualKeys: {
       list: { useQuery: () => ({ data: undefined, isLoading: false }) },
     },

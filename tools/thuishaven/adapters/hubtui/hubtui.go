@@ -1,14 +1,17 @@
-// Package hubtui is the interactive hub: one screen showing every stack with
-// its health and footprint, and actions on the selected one — open its git
-// view, shut it down, or destroy the worktree entirely. Like the dashboard
-// adapter it never imports the app core: it reads state and performs actions
-// through the callbacks it is constructed with, so the composition root stays
-// the only place that knows both sides.
+// Package hubtui is the interactive hub: one screen showing the whole machine
+// — every stack with its health and footprint, every worktree (running or
+// not), the shared servers, agents and tooling beside them, and the daemon's
+// recent reaping — with actions on the selected row and one-key handoffs to
+// cleanup and the web dashboard. Like the dashboard adapter it never imports
+// the app core: it reads state and performs actions through the callbacks it
+// is constructed with, so the composition root stays the only place that knows
+// both sides.
 package hubtui
 
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -36,32 +39,103 @@ type Row struct {
 	Services          []ServiceRow
 }
 
-// Actions wires the hub to the world. Rows is re-read on every refresh tick;
-// Down and Destroy run against the selected row when the user confirms.
-// Restart bounces the selected stack's supervised services in place; OpenURL
-// opens the stack's app URL in the browser. Either may be nil (action hidden).
+// WorktreeRow is a worktree with nothing running from it — visible so the hub
+// answers "what is on this machine", not just "what is up".
+type WorktreeRow struct {
+	Slug, Branch, Dir    string
+	IsPrimary, IsCurrent bool
+}
+
+// Name is what the worktree is called on screen and what a destroy
+// confirmation must type: the haven slug when one is known, the directory's
+// base name otherwise.
+func (w WorktreeRow) Name() string {
+	if w.Slug != "" {
+		return w.Slug
+	}
+	return filepath.Base(w.Dir)
+}
+
+// Protected reports whether the row may never be destroyed (the primary
+// checkout and the worktree haven runs from — the same guards the app layer
+// enforces again).
+func (w WorktreeRow) Protected() bool { return w.IsPrimary || w.IsCurrent }
+
+// Summary is the machine header: the RAM picture with every process attributed
+// once — the dev buckets by name, everything else as Other — plus the daemon's
+// pressure reading.
+type Summary struct {
+	TotalRAM   uint64
+	StacksRSS  uint64
+	ServerRSS  map[string]uint64
+	AgentRSS   uint64
+	AgentCount int
+	ToolingRSS uint64
+	OtherRSS   uint64 // not dev work — its own color in the chart
+	Pressure   string // the daemon's pressure level ("green" hidden, others shown)
+}
+
+// DevRSS is everything attributed to dev work, summed.
+func (s Summary) DevRSS() uint64 {
+	total := s.StacksRSS + s.AgentRSS + s.ToolingRSS
+	for _, rss := range s.ServerRSS {
+		total += rss
+	}
+	return total
+}
+
+// Event is one daemon reclamation, newest first, as the monitor panel shows it.
+type Event struct {
+	At                   time.Time
+	Kind, Target, Reason string
+}
+
+// View is everything one refresh shows.
+type View struct {
+	Stacks    []Row
+	Worktrees []WorktreeRow
+	Summary   Summary
+	Events    []Event
+}
+
+// Actions wires the hub to the world. Refresh is re-read on every tick; Down
+// and Destroy run against the selected row when the user confirms. Restart
+// bounces the selected stack's supervised services in place; OpenURL opens a
+// URL in the browser (the stack's app, or WebURL for the machine dashboard).
+// Any action may be nil (hidden).
 type Actions struct {
-	Rows    func() []Row
+	Refresh func() View
 	Down    func(ctx context.Context, slug string) error
 	Destroy func(ctx context.Context, dir string) error
 	Restart func(ctx context.Context, slug string) error
 	OpenURL func(url string) error
+	// WebURL is the machine dashboard ("w" opens it via OpenURL).
+	WebURL string
+	// HasCleanup advertises the cleanup handoff ("c"): the hub quits with
+	// Outcome.RunCleanup set and the caller runs the picker in the terminal.
+	HasCleanup bool
 }
 
-// Run blocks in the hub TUI. It returns a non-empty directory when the user
-// chose to open the git view for a stack — the caller runs that and re-enters
-// the hub — and "" when the user quit.
-func Run(ctx context.Context, a Actions) (openDir string, err error) {
+// Outcome is what the hub wants the caller to do after it closed: open a git
+// view, hand the terminal to cleanup, or nothing (a plain quit). The caller
+// re-enters the hub after either handoff.
+type Outcome struct {
+	OpenGitDir string
+	RunCleanup bool
+}
+
+// Run blocks in the hub TUI and returns what to do next.
+func Run(ctx context.Context, a Actions) (Outcome, error) {
 	p := tea.NewProgram(newModel(ctx, a), tea.WithAltScreen(), tea.WithContext(ctx))
 	out, err := p.Run()
 	if err != nil {
-		if ctx.Err() != nil { // Ctrl-C via signal context is a clean quit
-			return "", nil
+		if ctx.Err() != nil {
+			return Outcome{}, nil //nolint:nilerr // Ctrl-C via signal context is a clean quit, not an error
 		}
-		return "", err
+		return Outcome{}, err
 	}
 	m := out.(model)
-	return m.openDir, nil
+	return m.outcome, nil
 }
 
 type mode int
@@ -72,9 +146,29 @@ const (
 	modeConfirmDestroy
 )
 
+// item is one selectable line: a stack or a worktree.
+type item struct {
+	stack *Row
+	wt    *WorktreeRow
+}
+
+func (it item) dir() string {
+	if it.stack != nil {
+		return it.stack.Dir
+	}
+	return it.wt.Dir
+}
+
+func (it item) name() string {
+	if it.stack != nil {
+		return it.stack.Slug
+	}
+	return it.wt.Name()
+}
+
 type tickMsg struct{}
 
-// actionDoneMsg reports a Down/Destroy result back to the update loop.
+// actionDoneMsg reports a Down/Destroy/Restart result back to the update loop.
 type actionDoneMsg struct {
 	verb string
 	slug string
@@ -84,21 +178,52 @@ type actionDoneMsg struct {
 type model struct {
 	ctx     context.Context
 	actions Actions
-	rows    []Row
+	view    View
+	items   []item
 	cursor  int
 	mode    mode
-	pending *Row   // the row a confirmation prompt is acting on, frozen at open time
+	pending *item  // the row a confirmation prompt is acting on, frozen at open time
 	typed   string // the name typed to confirm a destroy
 	flash   string // last action's outcome, shown until the next keypress
 	// isQuitting means quit was requested while an action was in flight: the hub
 	// exits when the action completes (a second ctrl+c force-quits).
-	isQuitting bool
-	openDir    string
-	busy       bool
+	isQuitting  bool
+	outcome     Outcome
+	busy        bool
+	showMonitor bool
+	// wtOverride is the user's explicit worktree-section toggle ("t"); nil means
+	// automatic — visible only while no stacks are running, so the running work
+	// owns the screen and the idle trees stay out of the way.
+	wtOverride *bool
 }
 
 func newModel(ctx context.Context, a Actions) model {
-	return model{ctx: ctx, actions: a, rows: a.Rows()}
+	m := model{ctx: ctx, actions: a}
+	m.refresh()
+	return m
+}
+
+func (m *model) refresh() {
+	m.view = m.actions.Refresh()
+	m.items = m.items[:0]
+	for i := range m.view.Stacks {
+		m.items = append(m.items, item{stack: &m.view.Stacks[i]})
+	}
+	if m.worktreesVisible() {
+		for i := range m.view.Worktrees {
+			m.items = append(m.items, item{wt: &m.view.Worktrees[i]})
+		}
+	}
+	if m.cursor >= len(m.items) {
+		m.cursor = max(0, len(m.items)-1)
+	}
+}
+
+func (m model) worktreesVisible() bool {
+	if m.wtOverride != nil {
+		return *m.wtOverride
+	}
+	return len(m.view.Stacks) == 0
 }
 
 func (m model) Init() tea.Cmd { return tick() }
@@ -110,10 +235,7 @@ func tick() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tickMsg:
-		m.rows = m.actions.Rows()
-		if m.cursor >= len(m.rows) {
-			m.cursor = max(0, len(m.rows)-1)
-		}
+		m.refresh()
 		return m, tick()
 	case actionDoneMsg:
 		m.busy = false
@@ -122,10 +244,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.flash = fmt.Sprintf("%s %s — done", msg.verb, msg.slug)
 		}
-		m.rows = m.actions.Rows()
-		if m.cursor >= len(m.rows) {
-			m.cursor = max(0, len(m.rows)-1)
-		}
+		m.refresh()
 		if m.isQuitting {
 			return m, tea.Quit
 		}
@@ -170,71 +289,94 @@ func (m model) updateBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.cursor--
 		}
 	case "down", "j":
-		if m.cursor < len(m.rows)-1 {
+		if m.cursor < len(m.items)-1 {
 			m.cursor++
 		}
 	case "enter", "g":
-		if r, ok := m.selected(); ok {
-			m.openDir = r.Dir
+		if it, ok := m.selected(); ok {
+			m.outcome.OpenGitDir = it.dir()
 			return m, tea.Quit
 		}
 	case "d":
-		if r, ok := m.selected(); ok {
+		if it, ok := m.selected(); ok && it.stack != nil {
 			m.mode = modeConfirmDown
-			m.pending = &r
+			m.pending = &it
 		}
 	case "r":
-		if r, ok := m.selected(); ok && m.actions.Restart != nil && r.IsLive {
+		if it, ok := m.selected(); ok && it.stack != nil && m.actions.Restart != nil && it.stack.IsLive {
 			m.busy = true
-			slug := r.Slug
+			slug := it.stack.Slug
 			return m, func() tea.Msg {
 				return actionDoneMsg{verb: "restart", slug: slug, err: m.actions.Restart(m.ctx, slug)}
 			}
 		}
 	case "o":
-		if r, ok := m.selected(); ok && m.actions.OpenURL != nil && r.AppURL != "" {
-			if err := m.actions.OpenURL(r.AppURL); err != nil {
-				m.flash = fmt.Sprintf("open %s failed: %v", r.AppURL, err)
-			} else {
-				m.flash = "opened " + r.AppURL
-			}
+		if it, ok := m.selected(); ok && it.stack != nil && m.actions.OpenURL != nil && it.stack.AppURL != "" {
+			m.open(it.stack.AppURL)
 		}
+	case "w":
+		if m.actions.OpenURL != nil && m.actions.WebURL != "" {
+			m.open(m.actions.WebURL)
+		}
+	case "c":
+		if m.actions.HasCleanup {
+			m.outcome.RunCleanup = true
+			return m, tea.Quit
+		}
+	case "m":
+		m.showMonitor = !m.showMonitor
+	case "t":
+		visible := !m.worktreesVisible()
+		m.wtOverride = &visible
+		m.refresh()
 	case "x":
-		if r, ok := m.selected(); ok {
+		if it, ok := m.selected(); ok {
+			if it.wt != nil && it.wt.Protected() {
+				m.flash = fmt.Sprintf("%s is protected — the primary checkout and the current worktree are never destroyed", it.name())
+				return m, nil
+			}
 			m.mode = modeConfirmDestroy
-			m.pending = &r
+			m.pending = &it
 			m.typed = ""
 		}
 	}
 	return m, nil
 }
 
+func (m *model) open(url string) {
+	if err := m.actions.OpenURL(url); err != nil {
+		m.flash = fmt.Sprintf("open %s failed: %v", url, err)
+	} else {
+		m.flash = "opened " + url
+	}
+}
+
 func (m model) updateConfirmDown(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "y", "Y":
-		r := m.pending
+		it := m.pending
 		m.mode = modeBrowse
 		m.pending = nil
-		if r == nil || !m.rowStillPresent(*r) {
-			m.flash = "down cancelled — stack changed"
+		if it == nil || it.stack == nil || !m.itemStillPresent(*it) {
+			m.flash = "down canceled — stack changed"
 			return m, nil
 		}
 		m.busy = true
-		slug := r.Slug
+		slug := it.stack.Slug
 		return m, func() tea.Msg {
 			return actionDoneMsg{verb: "down", slug: slug, err: m.actions.Down(m.ctx, slug)}
 		}
 	default:
 		m.mode = modeBrowse
 		m.pending = nil
-		m.flash = "down cancelled"
+		m.flash = "down canceled"
 	}
 	return m, nil
 }
 
 func (m model) updateConfirmDestroy(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	r := m.pending
-	if r == nil {
+	it := m.pending
+	if it == nil {
 		m.mode = modeBrowse
 		return m, nil
 	}
@@ -242,7 +384,7 @@ func (m model) updateConfirmDestroy(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc", "ctrl+c":
 		m.mode = modeBrowse
 		m.pending = nil
-		m.flash = "destroy cancelled"
+		m.flash = "destroy canceled"
 	case "backspace":
 		if len(m.typed) > 0 {
 			m.typed = m.typed[:len(m.typed)-1]
@@ -250,20 +392,20 @@ func (m model) updateConfirmDestroy(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		m.mode = modeBrowse
 		m.pending = nil
-		if m.typed != r.Slug {
+		if m.typed != it.name() {
 			m.flash = "name did not match — nothing destroyed"
 			m.typed = ""
 			return m, nil
 		}
 		m.typed = ""
-		if !m.rowStillPresent(*r) {
-			m.flash = "destroy cancelled — stack changed"
+		if !m.itemStillPresent(*it) {
+			m.flash = "destroy canceled — the row changed"
 			return m, nil
 		}
 		m.busy = true
-		dir, slug := r.Dir, r.Slug
+		dir, name := it.dir(), it.name()
 		return m, func() tea.Msg {
-			return actionDoneMsg{verb: "destroy", slug: slug, err: m.actions.Destroy(m.ctx, dir)}
+			return actionDoneMsg{verb: "destroy", slug: name, err: m.actions.Destroy(m.ctx, dir)}
 		}
 	default:
 		if msg.Type == tea.KeyRunes {
@@ -273,92 +415,214 @@ func (m model) updateConfirmDestroy(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// rowStillPresent reports whether the frozen confirmation row is still in the
-// freshly-read row set — a refresh tick may have removed it while the prompt
-// was open, in which case the destructive action must not fire.
-func (m model) rowStillPresent(r Row) bool {
-	for _, x := range m.rows {
-		if x.Slug == r.Slug && x.Dir == r.Dir {
+// itemStillPresent reports whether the frozen confirmation row is still in the
+// freshly-read view — a refresh tick may have removed it while the prompt was
+// open, in which case the destructive action must not fire.
+func (m model) itemStillPresent(it item) bool {
+	for _, x := range m.items {
+		if x.dir() == it.dir() && x.name() == it.name() && (x.stack != nil) == (it.stack != nil) {
 			return true
 		}
 	}
 	return false
 }
 
-func (m model) selected() (Row, bool) {
-	if m.cursor < 0 || m.cursor >= len(m.rows) {
-		return Row{}, false
+func (m model) selected() (item, bool) {
+	if m.cursor < 0 || m.cursor >= len(m.items) {
+		return item{}, false
 	}
-	return m.rows[m.cursor], true
+	return m.items[m.cursor], true
 }
 
 // --- view --------------------------------------------------------------------
 
 var (
-	accent     = lipgloss.AdaptiveColor{Light: "#ed8926", Dark: "#f59e3f"}
-	styleTitle = lipgloss.NewStyle().Bold(true).Foreground(accent)
-	styleDim   = lipgloss.NewStyle().Faint(true)
-	styleSel   = lipgloss.NewStyle().Foreground(accent).Bold(true)
-	styleLive  = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-	styleStale = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
-	styleWarn  = lipgloss.NewStyle().Foreground(lipgloss.Color("203")).Bold(true)
+	accent       = lipgloss.AdaptiveColor{Light: "#ed8926", Dark: "#f59e3f"}
+	styleTitle   = lipgloss.NewStyle().Bold(true).Foreground(accent)
+	styleDim     = lipgloss.NewStyle().Faint(true)
+	styleSel     = lipgloss.NewStyle().Foreground(accent).Bold(true)
+	styleLive    = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	styleStale   = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
+	styleWarn    = lipgloss.NewStyle().Foreground(lipgloss.Color("203")).Bold(true)
+	styleSection = lipgloss.NewStyle().Bold(true).Faint(true)
+	styleBarOn   = lipgloss.NewStyle().Foreground(accent)
+	// styleBarOther colors the non-dev slice of the RAM bar: a muted violet so
+	// it reads as "occupied, not ours" next to the accent's "ours".
+	styleBarOther = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#7c3aed", Dark: "#a78bfa"})
 )
+
+const hubWidth = 72
 
 func (m model) View() string {
 	var b strings.Builder
+	m.viewHeader(&b)
+	m.viewStacks(&b)
+	m.viewWorktrees(&b)
+	if m.showMonitor {
+		m.viewMonitor(&b)
+	}
+	m.viewFooter(&b)
+	return b.String()
+}
 
+func (m model) viewHeader(b *strings.Builder) {
 	live := 0
-	var totalRSS uint64
-	for _, r := range m.rows {
-		if r.IsLive {
+	for i := range m.view.Stacks {
+		if m.view.Stacks[i].IsLive {
 			live++
 		}
-		totalRSS += r.RSS
 	}
-	summary := fmt.Sprintf("%d stack(s) · %d live", len(m.rows), live)
-	if totalRSS > 0 {
-		summary += " · " + humanBytes(totalRSS)
+	title := " ⌂ haven "
+	right := fmt.Sprintf("%d stack(s) · %d live", len(m.view.Stacks), live)
+	if p := m.view.Summary.Pressure; p != "" && p != "green" {
+		right += " · pressure " + styleWarn.Render(p)
 	}
-	b.WriteString(styleTitle.Render(" ⌂ thuishaven hub "))
-	b.WriteString(styleDim.Render("  " + summary))
-	b.WriteString("\n" + styleDim.Render(" "+strings.Repeat("─", 66)) + "\n\n")
+	pad := max(1, hubWidth-lipgloss.Width(title)-lipgloss.Width(right))
+	b.WriteString(styleTitle.Render(title) + strings.Repeat(" ", pad) + styleDim.Render(right) + "\n")
+	b.WriteString(styleDim.Render(" "+strings.Repeat("─", hubWidth)) + "\n")
 
-	if len(m.rows) == 0 {
-		b.WriteString(styleDim.Render("  no stacks running — run `haven up` in a worktree\n"))
+	s := m.view.Summary
+	if s.TotalRAM > 0 && s.DevRSS() > 0 {
+		bar := s.memBar(24)
+		fmt.Fprintf(b, " %s %s  dev ~%s · other ~%s · %s RAM\n",
+			styleSection.Render("machine"), bar, humanBytes(s.DevRSS()), humanBytes(s.OtherRSS), humanBytes(s.TotalRAM))
+		b.WriteString(styleDim.Render("         "+strings.Join(summaryParts(s), " · ")) + "\n")
 	}
-	for i, r := range m.rows {
-		isSelected := i == m.cursor
-		marker, style := "  ", lipgloss.NewStyle()
-		if isSelected {
-			marker, style = "▸ ", styleSel
-		}
-		dot := styleLive.Render("●")
-		if !r.IsLive {
-			dot = styleStale.Render("○")
-		}
-		facts := fmt.Sprintf("%-28s %d/%d up", truncate(r.Branch, 28), r.ServicesUp, r.ServicesTotal)
-		if r.RSS > 0 {
-			facts += fmt.Sprintf("  %7s", humanBytes(r.RSS))
-		}
-		b.WriteString(fmt.Sprintf("%s%s %s  %s\n", marker, dot, style.Render(fmt.Sprintf("%-20s", truncate(r.Slug, 20))), styleDim.Render(facts)))
+	b.WriteString("\n")
+}
+
+// summaryParts is the machine breakdown: only the buckets that hold anything.
+func summaryParts(s Summary) []string {
+	var parts []string
+	if s.StacksRSS > 0 {
+		parts = append(parts, "stacks ~"+humanBytes(s.StacksRSS))
+	}
+	if servers := sumValues(s.ServerRSS); servers > 0 {
+		parts = append(parts, "servers ~"+humanBytes(servers))
+	}
+	if s.AgentRSS > 0 {
+		parts = append(parts, fmt.Sprintf("agents ~%s (%d)", humanBytes(s.AgentRSS), s.AgentCount))
+	}
+	if s.ToolingRSS > 0 {
+		parts = append(parts, "tooling ~"+humanBytes(s.ToolingRSS))
+	}
+	return parts
+}
+
+func (m model) viewStacks(b *strings.Builder) {
+	b.WriteString(styleSection.Render(" stacks") + "\n")
+	if len(m.view.Stacks) == 0 {
+		b.WriteString(styleDim.Render("   none running — `haven up` in a worktree starts one") + "\n")
+	}
+	for i := range m.view.Stacks {
+		r := &m.view.Stacks[i]
+		isSelected := m.itemSelected(item{stack: r})
+		renderStackRow(b, r, isSelected)
 		// The selected stack unfolds: where it lives, and each service's health +
 		// hostname — the detail you'd otherwise dig out of `haven list`.
 		if isSelected {
-			b.WriteString(styleDim.Render("       "+r.Dir) + "\n")
-			for _, svc := range r.Services {
-				sdot := styleLive.Render("●")
-				if !svc.IsUp {
-					sdot = styleStale.Render("○")
-				}
-				note := svc.URL
-				if svc.IsFallback {
-					note += styleDim.Render("  (baseline)")
-				}
-				b.WriteString(fmt.Sprintf("       %s %-12s %s\n", sdot, svc.Name, styleDim.Render(note)))
-			}
+			renderStackDetail(b, r)
 		}
 	}
+}
 
+func renderStackRow(b *strings.Builder, r *Row, isSelected bool) {
+	marker, style := "  ", lipgloss.NewStyle()
+	if isSelected {
+		marker, style = " ▸", styleSel
+	}
+	dot := styleLive.Render("●")
+	if !r.IsLive {
+		dot = styleStale.Render("○")
+	}
+	facts := fmt.Sprintf("%-26s %d/%d up", truncate(r.Branch, 26), r.ServicesUp, r.ServicesTotal)
+	if r.RSS > 0 {
+		facts += fmt.Sprintf("  %7s", humanBytes(r.RSS))
+	}
+	fmt.Fprintf(b, "%s %s %s  %s\n", marker, dot, style.Render(fmt.Sprintf("%-18s", truncate(r.Slug, 18))), styleDim.Render(facts))
+}
+
+func renderStackDetail(b *strings.Builder, r *Row) {
+	b.WriteString(styleDim.Render("       "+r.Dir) + "\n")
+	for _, svc := range r.Services {
+		sdot := styleLive.Render("●")
+		if !svc.IsUp {
+			sdot = styleStale.Render("○")
+		}
+		note := svc.URL
+		if svc.IsFallback {
+			note += styleDim.Render("  (baseline)")
+		}
+		fmt.Fprintf(b, "       %s %-12s %s\n", sdot, svc.Name, styleDim.Render(note))
+	}
+}
+
+func (m model) viewWorktrees(b *strings.Builder) {
+	if len(m.view.Worktrees) == 0 {
+		return
+	}
+	if !m.worktreesVisible() {
+		b.WriteString("\n" + styleDim.Render(fmt.Sprintf(" %d idle worktree(s) hidden — t shows them", len(m.view.Worktrees))) + "\n")
+		return
+	}
+	b.WriteString("\n" + styleSection.Render(" worktrees — nothing running") + "\n")
+	for i := range m.view.Worktrees {
+		w := &m.view.Worktrees[i]
+		isSelected := m.itemSelected(item{wt: w})
+		marker, style := "  ", styleDim
+		if isSelected {
+			marker, style = " ▸", styleSel
+		}
+		note := truncate(w.Branch, 30)
+		switch {
+		case w.IsPrimary:
+			note += "  (primary — protected)"
+		case w.IsCurrent:
+			note += "  (current — protected)"
+		}
+		fmt.Fprintf(b, "%s ○ %s  %s\n", marker, style.Render(fmt.Sprintf("%-18s", truncate(w.Name(), 18))), styleDim.Render(note))
+		if isSelected {
+			b.WriteString(styleDim.Render("       "+w.Dir) + "\n")
+		}
+	}
+}
+
+func (m model) viewMonitor(b *strings.Builder) {
+	b.WriteString("\n" + styleSection.Render(" monitor — the daemon's recent reaping") + "\n")
+	if parts := serverParts(m.view.Summary.ServerRSS); len(parts) > 0 {
+		b.WriteString(styleDim.Render("   shared servers: "+strings.Join(parts, " · ")) + "\n")
+	}
+	if len(m.view.Events) == 0 {
+		b.WriteString(styleDim.Render("   nothing reaped yet") + "\n")
+		return
+	}
+	shown := m.view.Events
+	const maxEvents = 8
+	if len(shown) > maxEvents {
+		shown = shown[:maxEvents]
+	}
+	for _, ev := range shown {
+		age := "now"
+		if !ev.At.IsZero() {
+			age = humanAge(time.Since(ev.At))
+		}
+		fmt.Fprintf(b, "   %s  %-13s %-22s %s\n",
+			styleDim.Render(fmt.Sprintf("%6s", age)), ev.Kind, truncate(ev.Target, 22), styleDim.Render(ev.Reason))
+	}
+}
+
+// serverParts names each shared server that holds memory, in a stable order.
+func serverParts(servers map[string]uint64) []string {
+	var parts []string
+	for _, name := range []string{"clickhouse", "postgres", "redis", "containers"} {
+		if rss := servers[name]; rss > 0 {
+			parts = append(parts, fmt.Sprintf("%s ~%s", name, humanBytes(rss)))
+		}
+	}
+	return parts
+}
+
+func (m model) viewFooter(b *strings.Builder) {
 	b.WriteString("\n")
 	switch {
 	case m.busy && m.isQuitting:
@@ -366,26 +630,81 @@ func (m model) View() string {
 	case m.busy:
 		b.WriteString(styleWarn.Render("  working…") + "\n")
 	case m.mode == modeConfirmDown && m.pending != nil:
-		b.WriteString(styleWarn.Render(fmt.Sprintf("  shut %q down? Its databases are kept. y/n", m.pending.Slug)) + "\n")
+		b.WriteString(styleWarn.Render(fmt.Sprintf("  shut %q down? Its databases are kept. y/n", m.pending.name())) + "\n")
 	case m.mode == modeConfirmDestroy && m.pending != nil:
-		b.WriteString(styleWarn.Render(fmt.Sprintf("  DESTROY %q — stops the stack, drops its databases, deletes the worktree.", m.pending.Slug)) + "\n")
+		b.WriteString(styleWarn.Render(fmt.Sprintf("  DESTROY %q — stops anything running, drops its databases, deletes the worktree.", m.pending.name())) + "\n")
 		b.WriteString(styleWarn.Render(fmt.Sprintf("  type the name to confirm: %s▏", m.typed)) + "\n")
 	case m.flash != "":
 		b.WriteString("  " + m.flash + "\n")
 	default:
-		keys := "  ↑↓ select · enter/g git"
-		if r, ok := m.selected(); ok {
-			if m.actions.OpenURL != nil && r.AppURL != "" {
-				keys += " · o open"
-			}
-			if m.actions.Restart != nil && r.IsLive {
-				keys += " · r restart"
-			}
-		}
-		keys += " · d down · x destroy · q quit"
-		b.WriteString(styleDim.Render(keys) + "\n")
+		b.WriteString(styleDim.Render("  "+strings.Join(m.keyHints(), " · ")) + "\n")
 	}
-	return b.String()
+}
+
+func (m model) keyHints() []string {
+	keys := append([]string{"↑↓ select", "enter git"}, m.stackKeys()...)
+	keys = append(keys, "x destroy")
+	if len(m.view.Worktrees) > 0 {
+		keys = append(keys, "t worktrees")
+	}
+	if m.actions.HasCleanup {
+		keys = append(keys, "c cleanup")
+	}
+	if m.actions.OpenURL != nil && m.actions.WebURL != "" {
+		keys = append(keys, "w web")
+	}
+	return append(keys, "m monitor", "q quit")
+}
+
+// stackKeys are the hints that only apply with a stack row selected.
+func (m model) stackKeys() []string {
+	it, ok := m.selected()
+	if !ok || it.stack == nil {
+		return nil
+	}
+	var keys []string
+	if m.actions.OpenURL != nil && it.stack.AppURL != "" {
+		keys = append(keys, "o open")
+	}
+	if m.actions.Restart != nil && it.stack.IsLive {
+		keys = append(keys, "r restart")
+	}
+	return append(keys, "d down")
+}
+
+func (m model) itemSelected(it item) bool {
+	sel, ok := m.selected()
+	if !ok {
+		return false
+	}
+	if it.stack != nil {
+		return sel.stack == it.stack
+	}
+	return sel.wt == it.wt
+}
+
+// memBar renders the machine's RAM as a fixed-width bar: dev work in the
+// accent color, everything else in its own color, free space dim. Summed RSS
+// double-counts shared pages, so the segments are clamped to the bar.
+func (s Summary) memBar(width int) string {
+	if s.TotalRAM == 0 {
+		return ""
+	}
+	w := uint64(width)
+	devW := min(w, s.DevRSS()*w/s.TotalRAM)
+	otherW := min(w-devW, s.OtherRSS*w/s.TotalRAM)
+	free := width - int(devW) - int(otherW)
+	return styleBarOn.Render(strings.Repeat("█", int(devW))) +
+		styleBarOther.Render(strings.Repeat("█", int(otherW))) +
+		styleDim.Render(strings.Repeat("░", free))
+}
+
+func sumValues(m map[string]uint64) uint64 {
+	var total uint64
+	for _, v := range m {
+		total += v
+	}
+	return total
 }
 
 // truncate bounds a cell to n runes so one long branch name can't shear the
@@ -409,4 +728,18 @@ func humanBytes(b uint64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f%cB", float64(b)/float64(div), "KMGTPE"[exp])
+}
+
+// humanAge is a compact "how long ago" for the monitor panel.
+func humanAge(d time.Duration) string {
+	switch {
+	case d < time.Minute:
+		return "now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh", int(d.Hours()))
+	default:
+		return fmt.Sprintf("%dd", int(d.Hours()/24))
+	}
 }

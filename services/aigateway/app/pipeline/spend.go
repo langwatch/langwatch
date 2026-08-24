@@ -38,6 +38,28 @@ type SpendError struct {
 	HTTPStatus int
 }
 
+// SpendAttribution is who a request is billed against, as the gateway
+// knows it.
+//
+// It rides the outcome as well as the admission. Repeating it is what lets
+// the control plane's consumers act on a single event: without it they have
+// to remember every admission until its outcome arrives, which cost one
+// durable row per request in a table with no retention. The two can never
+// disagree, because the outcome copies the value the admission was built
+// from rather than re-deriving it.
+type SpendAttribution struct {
+	OrganizationID string
+	VirtualKeyID   string
+	EndUserID      string
+	TraceID        string
+	RequestType    string
+	Labels         []string
+	MetadataJSON   string
+	// AdmittedAt is the admission instant, so a consumer can state how long
+	// the request was open without holding the admission.
+	AdmittedAt time.Time
+}
+
 // SpendOutcome closes an admitted request: confirmed when Err is nil,
 // failed otherwise. Model and provider identity are the post-dispatch
 // resolution, which admission could not know.
@@ -52,6 +74,7 @@ type SpendOutcome struct {
 	Model           string
 	ModelProviderID string
 	Duration        time.Duration
+	Attribution     SpendAttribution
 }
 
 // SpendEmitter receives spend lifecycle records. Implementations must
@@ -75,39 +98,72 @@ func Spend(emit SpendEmitter) Interceptor {
 		Sync: func(next DispatchFunc) DispatchFunc {
 			return func(ctx context.Context, call *Call) (*domain.Response, error) {
 				start := time.Now()
-				emit.AdmitSpend(admissionFor(ctx, call, start))
+				admission := admissionFor(ctx, call, start)
+				emit.AdmitSpend(admission)
 				resp, err := next(ctx, call)
 				if err != nil {
-					emit.FailSpend(outcomeFor(outcomeInput{call: call, start: start, err: classifySpendError(err)}))
+					emit.FailSpend(outcomeFor(outcomeInput{call: call, start: start, err: classifySpendError(err), admission: admission}))
 					return nil, err
 				}
-				emit.ConfirmSpend(outcomeFor(outcomeInput{call: call, start: start, usage: resp.Usage}))
+				if deferredOutcome(call.Request.Type) {
+					return resp, nil
+				}
+				emit.ConfirmSpend(outcomeFor(outcomeInput{call: call, start: start, usage: resp.Usage, admission: admission}))
 				return resp, nil
 			}
 		},
 		Stream: func(next StreamFunc) StreamFunc {
 			return func(ctx context.Context, call *Call) (domain.StreamIterator, error) {
 				start := time.Now()
-				emit.AdmitSpend(admissionFor(ctx, call, start))
+				admission := admissionFor(ctx, call, start)
+				emit.AdmitSpend(admission)
 				iter, err := next(ctx, call)
 				if err != nil {
-					emit.FailSpend(outcomeFor(outcomeInput{call: call, start: start, err: classifySpendError(err)}))
+					emit.FailSpend(outcomeFor(outcomeInput{call: call, start: start, err: classifySpendError(err), admission: admission}))
 					return nil, err
 				}
 				return &spendStreamWrapper{
-					inner: iter,
-					emit:  emit,
-					call:  call,
-					start: start,
+					inner:     iter,
+					emit:      emit,
+					call:      call,
+					start:     start,
+					admission: admission,
 				}, nil
 			}
 		},
 	}
 }
 
-// traceIDFrom returns the active trace id, or empty when no span is
-// recording: an all-zeros id must never masquerade as a join key.
+// deferredOutcome reports the request types whose spend record this dispatch
+// must NOT close.
+//
+// Every other type measures its own usage and confirms the moment the
+// provider answers. A realtime session mint answers in milliseconds and the
+// call it opened has not started, so confirming here would close the record
+// at zero dollars and leave the settlement sweeper nothing to settle. The
+// record stays admitted until the vendor reports the call, or until the
+// grace expires and it settles as cost-unknown.
+//
+// Only the success path defers. A mint the gateway refused or that the
+// vendor rejected still emits a failure, because a session that never opened
+// has no later report coming and an invisible record is a lost one.
+func deferredOutcome(t domain.RequestType) bool {
+	return t == domain.RequestTypeRealtimeSession
+}
+
+// traceIDFrom returns the trace this spend record joins to, or empty when
+// there is none: an all-zeros id must never masquerade as a join key.
+//
+// The customer-facing trace comes first. That is the trace the request lands
+// in for the project, so it is the one that matches the trace surface; the
+// ambient span belongs to the gateway's internal instrumentation and names a
+// different trace whenever the caller sent no traceparent of its own. The
+// ambient span is still the fallback, so a request outside the bridge keeps
+// the join it had.
 func traceIDFrom(ctx context.Context) string {
+	if id := customertracebridge.CustomerTraceID(ctx); id != "" {
+		return id
+	}
 	sc := trace.SpanFromContext(ctx).SpanContext()
 	if !sc.HasTraceID() {
 		return ""
@@ -149,11 +205,13 @@ func ResolveEndUser(ctx context.Context, call *Call) string {
 			return ""
 		}
 		return customertracebridge.EndUserIDFromBody(call.Request.Body)
-	case domain.RequestTypePassthrough, domain.RequestTypeTranscription:
-		// Passthrough carries a provider-native body shape, and
-		// transcription is multipart form, not JSON: neither exposes the
-		// OpenAI `user` field this reads, so header-only attribution
-		// (resolved above) is all these types get.
+	case domain.RequestTypePassthrough, domain.RequestTypeTranscription,
+		domain.RequestTypeRealtimeSession:
+		// Passthrough carries a provider-native body shape, transcription is
+		// multipart form, not JSON, and a session mint declares a socket
+		// rather than a completion: none exposes the OpenAI `user` field
+		// this reads, so header-only attribution (resolved above) is all
+		// these types get.
 		return ""
 	}
 	return ""
@@ -166,6 +224,11 @@ type outcomeInput struct {
 	start time.Time
 	usage domain.Usage
 	err   *SpendError
+	// admission is this request's own admission record. The outcome copies
+	// its attribution rather than re-deriving it, so end-user resolution
+	// runs once per request and both records state the same answer even if
+	// the body was materialized in between.
+	admission SpendAdmission
 }
 
 func outcomeFor(in outcomeInput) SpendOutcome {
@@ -182,6 +245,22 @@ func outcomeFor(in outcomeInput) SpendOutcome {
 		Model:            model,
 		ModelProviderID:  in.call.Meta.DispatchedProviderID(),
 		Duration:         time.Since(in.start),
+		Attribution:      attributionOf(in.admission),
+	}
+}
+
+// attributionOf lifts the billing attribution out of an admission, so the
+// outcome states exactly what the admission stated.
+func attributionOf(a SpendAdmission) SpendAttribution {
+	return SpendAttribution{
+		OrganizationID: a.OrganizationID,
+		VirtualKeyID:   a.VirtualKeyID,
+		EndUserID:      a.EndUserID,
+		TraceID:        a.TraceID,
+		RequestType:    a.RequestType,
+		Labels:         a.Labels,
+		MetadataJSON:   a.MetadataJSON,
+		AdmittedAt:     a.OccurredAt,
 	}
 }
 
@@ -207,7 +286,11 @@ type spendStreamWrapper struct {
 	emit  SpendEmitter
 	call  *Call
 	start time.Time
-	once  sync.Once
+	// admission is carried so the outcome states the attribution resolved
+	// when the stream opened, not whatever the call looks like when it
+	// closes, which can be many minutes later.
+	admission SpendAdmission
+	once      sync.Once
 }
 
 func (w *spendStreamWrapper) Next(ctx context.Context) bool {
@@ -237,9 +320,9 @@ func (w *spendStreamWrapper) Close() error {
 func (w *spendStreamWrapper) finish() {
 	w.once.Do(func() {
 		if err := w.inner.Err(); err != nil {
-			w.emit.FailSpend(outcomeFor(outcomeInput{call: w.call, start: w.start, usage: w.inner.Usage(), err: classifySpendError(err)}))
+			w.emit.FailSpend(outcomeFor(outcomeInput{call: w.call, start: w.start, usage: w.inner.Usage(), err: classifySpendError(err), admission: w.admission}))
 			return
 		}
-		w.emit.ConfirmSpend(outcomeFor(outcomeInput{call: w.call, start: w.start, usage: w.inner.Usage()}))
+		w.emit.ConfirmSpend(outcomeFor(outcomeInput{call: w.call, start: w.start, usage: w.inner.Usage(), admission: w.admission}))
 	})
 }

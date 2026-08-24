@@ -50,8 +50,8 @@ import type {
   IExportTraceServiceRequest,
   IKeyValue,
 } from "@opentelemetry/otlp-transformer";
-import type { IngestionSource } from "@prisma/client";
 import type { Context } from "hono";
+import type { IngestionSource } from "~/generated/prisma/client";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
@@ -781,10 +781,22 @@ secured
                 ).filter((b) => b.scopeType !== "ATTRIBUTED_USER");
                 if (budgets.length === 0) continue;
 
-                // The reported cost is a float the caller sent, so it is
-                // pinned to an integer once, here, and every total downstream
-                // adds those integers rather than re-deriving from decimals.
-                const nano = usdToNanoUsd(event.costUsd.toFixed(10));
+                // The reported cost is a decimal string, so it is pinned to
+                // an integer once, here, and every total downstream adds
+                // those integers rather than re-deriving from decimals.
+                const nano = usdToNanoUsd(event.costUsd);
+                const nanoNum = Number(nano);
+                if (!Number.isSafeInteger(nanoNum)) {
+                  logger.error(
+                    {
+                      costUsd: event.costUsd,
+                      nanoUsd: nano.toString(),
+                      requestId: event.requestId,
+                    },
+                    "budget: amountNanoUsd exceeds Number.MAX_SAFE_INTEGER, skipping debit row to avoid silent rounding",
+                  );
+                  continue;
+                }
                 const rows = budgets.map((b) => ({
                   tenantId: govProject.id,
                   budgetId: b.id,
@@ -793,7 +805,7 @@ secured
                   window: b.window,
                   virtualKeyId: sentinelVK,
                   gatewayRequestId: event.requestId,
-                  amountNanoUsd: Number(nano),
+                  amountNanoUsd: nanoNum,
                   tokensInput: event.inputTokens,
                   tokensOutput: event.outputTokens,
                   tokensCacheRead: event.cacheReadTokens,

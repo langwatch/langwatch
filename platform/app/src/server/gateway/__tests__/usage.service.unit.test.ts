@@ -1,5 +1,5 @@
-import { Prisma, type PrismaClient } from "@prisma/client";
 import { describe, expect, it } from "vitest";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 
 import { GatewayUsageService } from "../usage.service";
 import type {

@@ -134,6 +134,62 @@ export function grafanaLinksForTrace(
   return { traceUrl, logsUrl };
 }
 
+/** Escape a value for interpolation into a double-quoted TraceQL/LogQL string. */
+function escapeQueryString(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+/**
+ * A Grafana Explore link to every span the queue executed for one group.
+ * GroupQueue stamps `queue.group_id` on each consumer span, so the TraceQL
+ * attribute match is exact — no substring false positives across groups that
+ * share a prefix. Returns null when the base URL is malformed.
+ */
+export function grafanaGroupTracesUrl(
+  groupId: string,
+  config: GrafanaDeepLinkConfig,
+): string | null {
+  const uid = config.tempoDatasourceUid ?? DEFAULT_TEMPO_DATASOURCE_UID;
+  return buildExploreUrl(config.baseUrl, {
+    datasource: uid,
+    queries: [
+      {
+        refId: "A",
+        datasource: { type: "tempo", uid },
+        queryType: "traceql",
+        query: `{span.queue.group_id="${escapeQueryString(groupId)}"}`,
+      },
+    ],
+    range: { from: config.from ?? DEFAULT_FROM, to: config.to ?? DEFAULT_TO },
+  });
+}
+
+/**
+ * A Grafana Explore link to the log lines mentioning one group. A line-contains
+ * filter rather than a label matcher: the group id is logged as an ordinary
+ * field by whichever worker touches the group, not indexed as a stream label.
+ * Returns null when the base URL is malformed.
+ */
+export function grafanaGroupLogsUrl(
+  groupId: string,
+  config: GrafanaDeepLinkConfig,
+): string | null {
+  const uid = config.lokiDatasourceUid ?? DEFAULT_LOKI_DATASOURCE_UID;
+  return buildExploreUrl(config.baseUrl, {
+    datasource: uid,
+    queries: [
+      {
+        refId: "A",
+        datasource: { type: "loki", uid },
+        editorMode: "code",
+        queryType: "range",
+        expr: `{service_name=~".+"} |= "${escapeQueryString(groupId)}"`,
+      },
+    ],
+    range: { from: config.from ?? DEFAULT_FROM, to: config.to ?? DEFAULT_TO },
+  });
+}
+
 /**
  * Resolve the deep-link config from the environment (server-side). GRAFANA_BASE_URL
  * is set by haven when the local observability stack is up, or by ops in

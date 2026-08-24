@@ -68,7 +68,7 @@ langwatch.setup()
   - Different types of [Spans](/concepts#spans-the-building-blocks) capture different parameters.
   - [Spans](/concepts#spans-the-building-blocks) can be nested to capture the pipeline structure.
 - [Traces](/concepts#traces-one-task-end-to-end) can be grouped together on LangWatch Dashboard by having the same [`thread_id`](/concepts#threads-the-whole-conversation) in their metadata, making the individual messages become part of a conversation.
-  - It is also recommended to provide the [`user_id`](/concepts#user-id) metadata to track user analytics.
+  - It is also recommended to provide the [`user_id`](/concepts#user-id-whos-using-the-app) metadata to track user analytics.
 
 ### Creating a Trace
 
@@ -260,7 +260,7 @@ langwatch.setup(
 
 ## Integrations
 
-LangWatch offers seamless integrations with a variety of popular Python libraries and frameworks. These integrations provide automatic instrumentation, capturing relevant data from your LLM applications with minimal setup.
+LangWatch integrates with a range of Python libraries and frameworks. These integrations instrument your code automatically and capture data from your LLM applications.
 
 Below is a list of currently supported integrations. Click on each to learn more about specific setup instructions and available features:
 
@@ -285,7 +285,7 @@ If you are using a library that is not listed here, you can still instrument you
 
 <AccordionGroup>
   <Accordion title="How do I track LLM costs and token usage?">
-    LangWatch automatically captures cost and token data for most LLM providers. If you're missing costs or token counts, our [cost tracking tutorial](/integration/python/tutorials/tracking-llm-costs) covers troubleshooting steps, model cost configuration, and manual token tracking setup.
+    LangWatch captures token counts from the span and prices them against the model registry in **Settings > Model Costs**, so a model that is in the registry gets its cost automatically. If you're missing costs or token counts, our [cost tracking tutorial](/integration/python/tutorials/tracking-llm-costs) covers troubleshooting steps, model cost configuration, and manual token tracking setup.
   </Accordion>
 
   <Accordion title="How do I capture RAG (Retrieval Augmented Generation) contexts?">
@@ -313,6 +313,6 @@ If you are using a library that is not listed here, you can still instrument you
   </Accordion>
 
   <Accordion title="How do I integrate with existing OpenTelemetry setups?">
-    LangWatch is OpenTelemetry-based, so it can be integrated seamlessly with any OpenTelemetry-compatible application. If you already use OpenTelemetry in your application, our [OpenTelemetry integration tutorial](/integration/python/tutorials/open-telemetry) explains how to configure LangWatch alongside existing telemetry infrastructure, including custom collectors and exporters.
+    LangWatch is OpenTelemetry-based, so it works with any OpenTelemetry-compatible application. If you already use OpenTelemetry in your application, our [OpenTelemetry integration tutorial](/integration/python/tutorials/open-telemetry) explains how to configure LangWatch alongside existing telemetry infrastructure, including custom collectors and exporters.
   </Accordion>
 </AccordionGroup>

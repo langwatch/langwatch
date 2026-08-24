@@ -6,9 +6,9 @@ from litellm.files.main import ModelResponse
 from litellm.utils import trim_messages
 from pydantic import Field
 from typing import List, Optional, Literal, cast
-import os
 import json
 
+from langevals_core.litellm_patch import azure_api_version
 from langevals_core.base_evaluator import (
     BaseEvaluator,
     EvaluatorEntry,
@@ -56,10 +56,6 @@ class QueryResolutionEvaluator(
         self, entry: QueryResolutionEntry
     ) -> SingleEvaluationResult:
         vendor, model = self.settings.model.split("/")
-        if vendor == "azure":
-            os.environ["AZURE_API_KEY"] = self.get_env("AZURE_API_KEY")
-            os.environ["AZURE_API_BASE"] = self.get_env("AZURE_API_BASE")
-            os.environ["AZURE_API_VERSION"] = "2023-12-01-preview"
 
         content = entry.conversation or []
         conversation = ""
@@ -99,6 +95,7 @@ class QueryResolutionEvaluator(
         )
 
         response = litellm.completion(
+            **azure_api_version(self.settings.model, "2023-12-01-preview"),
             model=litellm_model,
             messages=messages,
             tools=[

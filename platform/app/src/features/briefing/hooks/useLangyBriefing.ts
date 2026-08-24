@@ -1,3 +1,4 @@
+import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { SeriesInputType } from "~/server/analytics/registry";
@@ -177,11 +178,11 @@ export function useLangyBriefing(): LangyBriefingResult {
     {
       enabled: !!project?.id && !mockKey,
       staleTime: BRIEFING_STALE_MS,
-      cacheTime: BRIEFING_CACHE_MS,
+      gcTime: BRIEFING_CACHE_MS,
       refetchInterval: BRIEFING_POLL_MS,
       // Keep the last roll-up on screen through a refetch so the card never
       // blanks and re-fills (see specs/home/langy-briefing.feature).
-      keepPreviousData: true,
+      placeholderData: keepPreviousData,
     },
   );
 
@@ -190,8 +191,8 @@ export function useLangyBriefing(): LangyBriefingResult {
     {
       enabled: !!project?.id && !mockKey,
       staleTime: BRIEFING_STALE_MS,
-      cacheTime: BRIEFING_CACHE_MS,
-      keepPreviousData: true,
+      gcTime: BRIEFING_CACHE_MS,
+      placeholderData: keepPreviousData,
     },
   );
 
@@ -242,9 +243,9 @@ export function useLangyBriefing(): LangyBriefingResult {
       // A dev mock must still win — don't fetch while one is pinned.
       enabled: !!project?.id && !mockKey && canViewAnalytics,
       staleTime: BRIEFING_STALE_MS,
-      cacheTime: BRIEFING_CACHE_MS,
+      gcTime: BRIEFING_CACHE_MS,
       refetchInterval: BRIEFING_POLL_MS,
-      keepPreviousData: true,
+      placeholderData: keepPreviousData,
     },
   );
 
@@ -270,9 +271,9 @@ export function useLangyBriefing(): LangyBriefingResult {
     {
       enabled: !!project?.id && !mockKey && canViewAnalytics,
       staleTime: BRIEFING_STALE_MS,
-      cacheTime: BRIEFING_CACHE_MS,
+      gcTime: BRIEFING_CACHE_MS,
       refetchInterval: BRIEFING_POLL_MS,
-      keepPreviousData: true,
+      placeholderData: keepPreviousData,
     },
   );
 
@@ -293,9 +294,9 @@ export function useLangyBriefing(): LangyBriefingResult {
     {
       enabled: !!project?.id && !mockKey && canViewTraces,
       staleTime: BRIEFING_STALE_MS,
-      cacheTime: BRIEFING_CACHE_MS,
+      gcTime: BRIEFING_CACHE_MS,
       refetchInterval: BRIEFING_POLL_MS,
-      keepPreviousData: true,
+      placeholderData: keepPreviousData,
     },
   );
 
@@ -315,8 +316,8 @@ export function useLangyBriefing(): LangyBriefingResult {
     {
       enabled: !!project?.id && !mockKey && canViewTraces,
       staleTime: BRIEFING_STALE_MS,
-      cacheTime: BRIEFING_CACHE_MS,
-      keepPreviousData: true,
+      gcTime: BRIEFING_CACHE_MS,
+      placeholderData: keepPreviousData,
     },
   );
 

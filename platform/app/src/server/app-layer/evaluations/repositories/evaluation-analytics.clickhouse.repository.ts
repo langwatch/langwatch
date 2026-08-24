@@ -142,11 +142,14 @@ export class EvaluationAnalyticsClickHouseRepository
         clickhouse_settings: READ_BACK_FOLD_INSERT_SETTINGS,
       });
     } catch (error) {
-      logger.error(
+      // Warning, not error: this rethrows, so the caller owns the outcome and
+      // the queue above it retries. See
+      // specs/observability/retryable-failure-log-level.feature.
+      logger.warn(
         {
           tenantId: row.tenantId,
           evaluationId: row.evaluationId,
-          error: error instanceof Error ? error.message : String(error),
+          error,
         },
         "Failed to upsert evaluation_analytics row into ClickHouse",
       );
@@ -194,11 +197,13 @@ export class EvaluationAnalyticsClickHouseRepository
         clickhouse_settings: READ_BACK_FOLD_INSERT_SETTINGS,
       });
     } catch (error) {
-      logger.error(
+      // Warning, not error: rethrown, so the caller owns the outcome. See
+      // specs/observability/retryable-failure-log-level.feature.
+      logger.warn(
         {
           tenantId,
           count: entries.length,
-          error: error instanceof Error ? error.message : String(error),
+          error,
         },
         "Failed to batch upsert evaluation_analytics rows into ClickHouse",
       );
@@ -276,7 +281,11 @@ export class EvaluationAnalyticsClickHouseRepository
       // the row, so without this the deploy window ADR-066 documents — workers
       // rolling ahead of migration 00056, every read throwing
       // UNKNOWN_IDENTIFIER — surfaces as an untraceable line.
-      logger.error(
+      //
+      // Warning, not error: the identifiers are the point, not the severity.
+      // This rethrows, and the fold executor above it retries the miss. See
+      // specs/observability/retryable-failure-log-level.feature.
+      logger.warn(
         { tenantId, evaluationId, error },
         "Failed to read back evaluation analytics row",
       );

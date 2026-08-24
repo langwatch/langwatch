@@ -119,7 +119,7 @@ export class TraceSummaryClickHouseRepository
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
+      logger.warn(
         { tenantId, traceId: data.traceId, error: errorMessage },
         "Failed to store trace summary in ClickHouse",
       );
@@ -170,7 +170,7 @@ export class TraceSummaryClickHouseRepository
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
+      logger.warn(
         { tenantId, count: entries.length, error: errorMessage },
         "Failed to batch store trace summaries in ClickHouse",
       );
@@ -218,7 +218,7 @@ export class TraceSummaryClickHouseRepository
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
-        logger.error(
+        logger.warn(
           { tenantId, traceId, error: errorMessage },
           "Failed to get trace summary from ClickHouse",
         );
@@ -299,7 +299,7 @@ export class TraceSummaryClickHouseRepository
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
+      logger.warn(
         { tenantId, traceId, error: errorMessage },
         "Failed to get trace summary from ClickHouse",
       );

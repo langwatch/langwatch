@@ -2,7 +2,7 @@ import {
   type Prisma,
   RoleBindingScopeType,
   TeamUserRole,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 
 /**
  * Who effectively administers a team.
@@ -18,7 +18,14 @@ import {
 
 type TxClient = Prisma.TransactionClient;
 
-export async function computeEffectiveAdminUserIds({
+/**
+ * The principals holding a team's ADMIN bindings, split by kind.
+ *
+ * The one read every admin question in this module asks — a single
+ * definition of "administers this team" that the last-admin invariant rests
+ * on every caller agreeing with.
+ */
+async function readTeamAdminPrincipals({
   tx,
   organizationId,
   teamId,
@@ -26,7 +33,7 @@ export async function computeEffectiveAdminUserIds({
   tx: TxClient;
   organizationId: string;
   teamId: string;
-}): Promise<Set<string>> {
+}): Promise<{ userIds: string[]; groupIds: string[] }> {
   const adminBindings = await tx.roleBinding.findMany({
     where: {
       organizationId,
@@ -37,21 +44,88 @@ export async function computeEffectiveAdminUserIds({
     select: { userId: true, groupId: true },
   });
 
-  const userIds = new Set<string>();
+  const userIds: string[] = [];
   const groupIds: string[] = [];
-  for (const b of adminBindings) {
-    if (b.userId) userIds.add(b.userId);
-    if (b.groupId) groupIds.push(b.groupId);
+  for (const binding of adminBindings) {
+    if (binding.userId) userIds.push(binding.userId);
+    if (binding.groupId) groupIds.push(binding.groupId);
   }
+  return { userIds, groupIds };
+}
 
-  if (groupIds.length > 0) {
-    const memberships = await tx.groupMembership.findMany({
-      where: { groupId: { in: groupIds } },
-      select: { userId: true },
-    });
-    for (const m of memberships) userIds.add(m.userId);
+/**
+ * Every user the given admin-holding groups expand to — the one membership
+ * fan-out all the group-derived admin answers share, so the expansion cannot
+ * drift between them.
+ */
+async function groupMemberUserIds({
+  tx,
+  groupIds,
+}: {
+  tx: TxClient;
+  groupIds: string[];
+}): Promise<string[]> {
+  if (groupIds.length === 0) return [];
+  const memberships = await tx.groupMembership.findMany({
+    where: { groupId: { in: groupIds } },
+    select: { userId: true },
+  });
+  return memberships.map((m) => m.userId);
+}
+
+export async function computeEffectiveAdminUserIds({
+  tx,
+  organizationId,
+  teamId,
+}: {
+  tx: TxClient;
+  organizationId: string;
+  teamId: string;
+}): Promise<Set<string>> {
+  const { userIds: directUserIds, groupIds } = await readTeamAdminPrincipals({
+    tx,
+    organizationId,
+    teamId,
+  });
+
+  const userIds = new Set<string>(directUserIds);
+  for (const id of await groupMemberUserIds({ tx, groupIds })) {
+    userIds.add(id);
   }
+  return userIds;
+}
 
+/**
+ * The effective admin set a planned edit to a team's DIRECT user bindings
+ * would leave behind.
+ *
+ * Bindings are ledger facts (ADR-092 §13), so the plan is decided before
+ * anything is emitted rather than read back post-write inside a
+ * transaction: the caller supplies the direct-admin users its plan leaves,
+ * and the group-derived admins — which this form cannot edit — still come
+ * from the projection.
+ */
+export async function projectAdminUserIdsAfterDirectEdit({
+  tx,
+  organizationId,
+  teamId,
+  directAdminUserIdsAfter,
+}: {
+  tx: TxClient;
+  organizationId: string;
+  teamId: string;
+  directAdminUserIdsAfter: Iterable<string>;
+}): Promise<Set<string>> {
+  const userIds = new Set<string>(directAdminUserIdsAfter);
+
+  const { groupIds } = await readTeamAdminPrincipals({
+    tx,
+    organizationId,
+    teamId,
+  });
+  for (const id of await groupMemberUserIds({ tx, groupIds })) {
+    userIds.add(id);
+  }
   return userIds;
 }
 
@@ -66,23 +140,15 @@ export async function isUserAdminViaGroup({
   teamId: string;
   userId: string;
 }): Promise<boolean> {
-  const adminGroupBindings = await tx.roleBinding.findMany({
-    where: {
-      organizationId,
-      scopeType: RoleBindingScopeType.TEAM,
-      scopeId: teamId,
-      role: TeamUserRole.ADMIN,
-      groupId: { not: null },
-    },
-    select: { groupId: true },
+  const { groupIds } = await readTeamAdminPrincipals({
+    tx,
+    organizationId,
+    teamId,
   });
-  if (adminGroupBindings.length === 0) return false;
+  if (groupIds.length === 0) return false;
 
   const count = await tx.groupMembership.count({
-    where: {
-      userId,
-      groupId: { in: adminGroupBindings.map((b) => b.groupId!) },
-    },
+    where: { userId, groupId: { in: groupIds } },
   });
   return count > 0;
 }

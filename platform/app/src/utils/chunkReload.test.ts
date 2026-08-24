@@ -5,6 +5,7 @@ import {
   isChunkLoadError,
   registerChunkReloadListener,
   reloadOnChunkError,
+  warmChunk,
 } from "./chunkReload";
 
 // jsdom locks down window.location (non-configurable, can't be deleted, redefined
@@ -13,6 +14,22 @@ import {
 // writes to sessionStorage — which is where the branching logic actually lives.
 const RELOAD_AT = "chunk-reload-at";
 const reloaded = () => sessionStorage.getItem(RELOAD_AT) !== null;
+
+/**
+ * The event Vite dispatches from its preload helper. `payload` is the error it
+ * is about to throw, and it is the only field that says which import failed.
+ */
+const preloadErrorEvent = (payload: Error) =>
+  Object.assign(new Event("vite:preloadError", { cancelable: true }), {
+    payload,
+  });
+
+const staleChunkError = () =>
+  new Error("Failed to fetch dynamically imported module");
+
+/** Let the listener's deferred reload decision run. */
+const settleDeferredReload = () =>
+  new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("isChunkLoadError", () => {
   describe("when the message is a Vite dynamic-import failure", () => {
@@ -120,10 +137,11 @@ describe("registerChunkReloadListener", () => {
   });
 
   describe("when Vite dispatches vite:preloadError for a stale chunk", () => {
+    /** @scenario "A stale file outside a warm-up still reloads the page" */
     it("reloads the page once to fetch the new chunk hashes", () => {
       registerChunkReloadListener();
 
-      const event = new Event("vite:preloadError", { cancelable: true });
+      const event = preloadErrorEvent(staleChunkError());
       window.dispatchEvent(event);
 
       expect(event.defaultPrevented).toBe(true);
@@ -137,11 +155,75 @@ describe("registerChunkReloadListener", () => {
       sessionStorage.setItem(RELOAD_AT, "9999999999999");
       registerChunkReloadListener();
 
-      const event = new Event("vite:preloadError", { cancelable: true });
+      const event = preloadErrorEvent(staleChunkError());
       window.dispatchEvent(event);
 
       // No reload scheduled → Vite's error must NOT be preventDefault()'d.
       expect(event.defaultPrevented).toBe(false);
+    });
+  });
+});
+
+describe("warmChunk", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  describe("when a warm-up asks for a file that is gone", () => {
+    /** @scenario "A stale file during a warm-up does not reload the page" */
+    it("does not reload the page", async () => {
+      registerChunkReloadListener();
+
+      const loaded = await warmChunk(() => {
+        // Vite fires the event from its preload helper, then rejects the
+        // import with the same error, so the warm-up is still in flight when
+        // the listener runs.
+        const failure = staleChunkError();
+        window.dispatchEvent(preloadErrorEvent(failure));
+        return Promise.reject(failure);
+      });
+      await settleDeferredReload();
+
+      expect(loaded).toBe(false);
+      expect(reloaded()).toBe(false);
+    });
+  });
+
+  describe("given a warm-up is in flight", () => {
+    describe("when another import fails because the file is gone", () => {
+      /** @scenario "A stale file for a waiting screen reloads during a warm-up" */
+      it("reloads the page for the import somebody is waiting for", async () => {
+        registerChunkReloadListener();
+
+        let finishWarmup = () => {};
+        const warmup = warmChunk(
+          () =>
+            new Promise<void>((resolve) => {
+              finishWarmup = resolve;
+            }),
+        );
+
+        // A drawer the person just opened asks for a stale file. This error is
+        // not the warm-up's, so recovery must still run.
+        window.dispatchEvent(preloadErrorEvent(staleChunkError()));
+
+        finishWarmup();
+        await warmup;
+        await settleDeferredReload();
+
+        expect(reloaded()).toBe(true);
+      });
+    });
+  });
+
+  describe("when the warm-up has finished", () => {
+    it("leaves a later stale chunk to reload the page", async () => {
+      registerChunkReloadListener();
+      await warmChunk(() => Promise.resolve());
+
+      window.dispatchEvent(preloadErrorEvent(staleChunkError()));
+
+      expect(reloaded()).toBe(true);
     });
   });
 });

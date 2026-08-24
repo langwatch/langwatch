@@ -10,7 +10,7 @@ import type {
 import { useRequiredCredentialKeys } from "../../hooks/useRequiredCredentialKeys";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
 import { api } from "../../utils/api";
-import { isApiKeyField } from "../../utils/modelProviderHelpers";
+import { isSecretCredentialField } from "../../utils/modelProviderHelpers";
 import { SmallLabel } from "../SmallLabel";
 
 /**
@@ -102,7 +102,7 @@ export const CredentialsSection = ({
           // optional loses its marker the moment that URL is typed.
           const description = fieldMetadata?.[key]?.description;
           const isOptional = !requiredKeys.has(key);
-          const isPassword = isApiKeyField(key);
+          const isPassword = isSecretCredentialField(key);
           const isInvalid = Boolean(fieldErrors[key]);
 
           return (

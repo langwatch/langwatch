@@ -41,6 +41,8 @@ const metricNames = [
   "gq_foreign_siblings_restaged_total",
   "gq_jobs_unroutable_total",
   "gq_batch_bisections_total",
+  // Work-conserving override visibility
+  "gq_jobs_dispatched_override_total",
 ] as const;
 
 for (const name of metricNames) {
@@ -86,6 +88,24 @@ export const gqJobsStagedTotal = new Counter({
 export const gqJobsDispatchedTotal = new Counter({
   name: "gq_jobs_dispatched_total",
   help: "Total number of jobs dispatched from staging to the processing queue",
+  labelNames: ["queue_name"] as const,
+});
+
+/**
+ * The subset of `gq_jobs_dispatched_total` admitted by the work-conserving
+ * override — jobs let past a tenant's fair share because slots would otherwise
+ * have sat idle.
+ *
+ * It exists to make `gq_parked_groups` readable. A high parked count has two
+ * opposite causes that look identical on their own: the cap is holding work
+ * back while capacity is free (bad — the override should have fired), or the
+ * fleet is saturated and there is no slot to give (expected). A non-zero rate
+ * here says the override is doing its job; a flat zero alongside a full fleet
+ * says the parked work is waiting on capacity, not on fairness.
+ */
+export const gqJobsDispatchedOverrideTotal = new Counter({
+  name: "gq_jobs_dispatched_override_total",
+  help: "Jobs dispatched by the work-conserving override, past a tenant's fair share, into slots that would otherwise be idle",
   labelNames: ["queue_name"] as const,
 });
 
@@ -272,7 +292,7 @@ export const gqGroupsPoisonParkedTotal = new Counter({
  */
 export const gqRetryEncodeFailuresTotal = new Counter({
   name: "gq_retry_encode_failures_total",
-  help: "Retry re-encode failed — dispatched job completed via fail-safe and the job was DISCARDED (replay does not recover reactor jobs; see gq_jobs_dropped_total)",
+  help: "Retry re-encode failed — dispatched job completed via fail-safe and the job was DISCARDED (replay does not recover subscriber jobs; see gq_jobs_dropped_total)",
   labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
 });
 
@@ -307,14 +327,14 @@ export const gqRetryEncodeFailuresTotal = new Counter({
  * - `unknown` — an unclassified throw. Non-zero here means a decode failure mode
  *   exists that we have not named; that is a bug in the enum, not a shrug.
  *
- * ⚠️ A non-zero rate on a reactor pipeline is PERMANENT DATA LOSS, not a blip.
- * Replay rebuilds fold projections and never invokes reactors
+ * ⚠️ A non-zero rate on a subscriber pipeline is PERMANENT DATA LOSS, not a blip.
+ * Replay rebuilds fold projections and never invokes subscribers
  * (`projections/projectionRouter.ts:61-71`), so nothing re-fires a dropped
- * reactor job. This counter is the ONLY signal that it happened.
+ * subscriber job. This counter is the ONLY signal that it happened.
  */
 export const gqJobsDroppedTotal = new Counter({
   name: "gq_jobs_dropped_total",
-  help: "Staged jobs discarded because they could not be decoded — for reactor pipelines this is permanent data loss (replay does not re-invoke reactors)",
+  help: "Staged jobs discarded because they could not be decoded — for subscriber pipelines this is permanent data loss (replay does not re-invoke subscribers)",
   labelNames: [
     "queue_name",
     "pipeline_name",

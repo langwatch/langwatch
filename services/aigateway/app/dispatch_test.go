@@ -84,12 +84,20 @@ func (m *mockGuardrails) EvaluateChunk(_ context.Context, _ *domain.Bundle, _ *d
 }
 
 type mockPolicy struct {
-	checkFn func(ctx context.Context, rules []domain.PolicyRule, body []byte) error
+	checkFn      func(ctx context.Context, rules []domain.PolicyRule, body []byte) error
+	checkModelFn func(ctx context.Context, rules []domain.PolicyRule, resolved domain.ResolvedModel) error
 }
 
 func (m *mockPolicy) Check(ctx context.Context, rules []domain.PolicyRule, body []byte) error {
 	if m.checkFn != nil {
 		return m.checkFn(ctx, rules, body)
+	}
+	return nil
+}
+
+func (m *mockPolicy) CheckModel(ctx context.Context, rules []domain.PolicyRule, resolved domain.ResolvedModel) error {
+	if m.checkModelFn != nil {
+		return m.checkModelFn(ctx, rules, resolved)
 	}
 	return nil
 }

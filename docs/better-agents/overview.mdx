@@ -3,11 +3,11 @@ title: "Better Agents"
 description: "Build reliable, testable, production-grade AI agents with Better Agents CLI - the reliability layer for agent development"
 ---
 
-# Better Agents
+## The Reliability Layer
 
-Better Agents is a CLI tool and a set of standards for building **reliable, testable, production-grade agents**, independent of which framework you use. It supercharges your coding assistant (Kilocode, Claude Code, Cursor, etc.), making it an expert in any agent framework you choose (Agno, Mastra, LangGraph, etc.) and all their best practices.
+Better Agents is a CLI tool and a set of standards for building **reliable, testable, production-grade agents**, independent of which framework you use. It gives your coding assistant (Kilocode, Claude Code, Cursor, etc.) knowledge of any agent framework you choose (Agno, Mastra, LangGraph, etc.) and all their best practices.
 
-Use your preferred stack—Agno, Mastra, Vercel AI, Google ADK, or anything else. Better Agents doesn't replace your stack, it stabilizes it.
+Use your preferred stack: Agno, Mastra, Vercel AI, Google ADK, or anything else. Better Agents adds project structure, tests, and prompt versioning on top of it.
 
 <Note>
   **Already have an agent?** You don't need Better Agents -- go to [LangWatch Skills](/skills/directory) to add tracing, evaluations, scenarios, and prompt versioning to your existing project.
@@ -105,9 +105,9 @@ Your actual agent code, written using your chosen framework. This is where you i
 
 ### `tests/scenarios/`
 
-**The core of real agent reliability.** These aren't unit tests—they're conversational test cases that simulate real tasks and validate agent behavior across iterations, updates, or model swaps.
+**The core of real agent reliability.** These are conversational test cases that simulate real tasks and validate agent behavior across iterations, updates, or model swaps.
 
-Scenarios answer the most important question in AI engineering: *Does the agent still behave the way we expect?*
+Scenarios answer one question: *Does the agent still behave the way we expect?*
 
 Example scenario structure:
 
@@ -163,7 +163,7 @@ describe("Customer Support Agent", () => {
       description: "Customer requests refund for defective product",
       agents: [
         customerSupportAgent,
-        scenario.userSimulatorAgent({ model: openai("gpt-4o") }),
+        scenario.userSimulatorAgent({ model: openai("gpt-5-mini") }),
       ],
       script: [
         scenario.user("I want a refund for my order"),
@@ -209,14 +209,14 @@ print(f"RAG F1 Score: {results.f1_score}")
 
 ### `prompts/`
 
-Versioned prompt files in YAML format for team collaboration. Prompts are tracked, shared, and collaboratively improved—like real software.
+Versioned prompt files in YAML format for team collaboration. Prompts are tracked, shared, and collaboratively improved, like real software.
 
 Example prompt structure:
 
 ```yaml prompts/customer-support.yaml
 handle: customer-support-bot
 scope: PROJECT
-model: openai/gpt-4o-mini
+model: openai/gpt-5-mini
 prompt: |
   You are a helpful customer support agent.
   
@@ -273,17 +273,15 @@ Evaluations provide structured benchmarking for specific components of your agen
 
 LangWatch offers an extensive library of evaluators covering answer correctness, LLM-as-judge metrics, RAG quality, safety checks, format validation, and more. See the [complete evaluators list](/evaluations/evaluators/list) for all available options.
 
-Evaluations make AI development feel less like experimentation and more like engineering.
-
 <Note>
 Learn more about evaluations in [LLM Evaluation](/evaluations/overview).
 </Note>
 
 ### Prompt Versioning
 
-Prompts are no longer ad-hoc artifacts. With Better Agents, they become:
+With Better Agents, prompts become:
 
-- **Tracked** - Full version history with easy rollback
+- **Tracked** - Full version history with rollback
 - **Reviewable** - Team collaboration on prompt improvements
 - **Documented** - Clear structure and purpose
 - **Synced** - Controlled by `prompts-lock.json`, versioned with codebase, synced to platform

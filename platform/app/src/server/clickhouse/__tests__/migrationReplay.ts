@@ -17,6 +17,7 @@ import { link, open, readFile, rename, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { acquireClickHouseSchemaLock } from "./schemaLock";
 
 const MIGRATIONS_DIR = join(__dirname, "..", "migrations");
 
@@ -29,12 +30,18 @@ const MIGRATIONS_DIR = join(__dirname, "..", "migrations");
  * when they were written: each restates part of the rollup's shape, and
  * restoring only some of it hands later suites a rollup the reader cannot
  * read. 00069 re-derives the rows and declares the sorting key; 00070 adds
- * the nano-USD aggregate every spend read now sums. Append to this list
- * whenever another lands.
+ * the nano-USD aggregate every spend read now sums; 00082 stops the view
+ * folding pulled provider cost into those totals (ADR-088). Append to this
+ * list whenever another lands.
+ *
+ * 00082 alters the view 00070 creates rather than creating its own, so it
+ * only replays correctly after 00070 — which is the order this list is read
+ * in, and the reason it is a list rather than a set.
  */
 export const CURRENT_ROLLUP_REBUILD_MIGRATIONS = [
   "00069_gateway_budget_scope_totals_budget_grain.sql",
   "00070_gateway_budget_ledger_nano_usd.sql",
+  "00082_gateway_budget_scope_totals_exclude_pulled.sql",
 ] as const;
 
 /** Replays `CURRENT_ROLLUP_REBUILD_MIGRATIONS` in order. */
@@ -47,6 +54,21 @@ export async function replayRollupRebuild(
 }
 
 export async function replayGooseMigrationUp({
+  client,
+  fileName,
+}: {
+  client: ClickHouseClient;
+  fileName: string;
+}): Promise<void> {
+  const release = await acquireClickHouseSchemaLock();
+  try {
+    await runMigrationStatements({ client, fileName });
+  } finally {
+    release();
+  }
+}
+
+async function runMigrationStatements({
   client,
   fileName,
 }: {

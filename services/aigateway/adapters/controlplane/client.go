@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -123,12 +122,28 @@ func (c *Client) ResolveKey(ctx context.Context, rawKey string) (*domain.Bundle,
 	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusUnauthorized:
 		return nil, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
 	case resp.StatusCode == http.StatusForbidden:
-		// The control plane distinguishes the reversible disable from the
-		// one-way revoke in its error code; forward the distinction so a
-		// disabled tenant is not told its credential is gone for good.
-		if strings.Contains(string(respBody), "virtual_key_disabled") {
+		// The control plane distinguishes the reversible disable and the
+		// self-serve expiry from the one-way revoke in its error code;
+		// forward the distinction so neither tenant is told its credential
+		// is gone for good. The decoded code decides it, never a substring
+		// of the body: the human-readable message travels in the same
+		// payload and may name a code this is not. An unrecognized or
+		// undecodable 403 still reads as revoked, which is the safe answer
+		// for a gateway older than the code.
+		var rejection struct {
+			Error struct {
+				Code string `json:"code"`
+			} `json:"error"`
+		}
+		_ = json.Unmarshal(respBody, &rejection)
+		switch rejection.Error.Code {
+		case "virtual_key_disabled":
 			return nil, herr.New(ctx, domain.ErrKeyDisabled, herr.M{
 				"message": "This key is disabled. An administrator can re-enable it; the key material is unchanged.",
+			})
+		case "virtual_key_expired":
+			return nil, herr.New(ctx, domain.ErrKeyExpired, herr.M{
+				"message": domain.KeyExpiredMessage,
 			})
 		}
 		return nil, herr.New(ctx, domain.ErrKeyRevoked, nil)
@@ -260,10 +275,13 @@ func (c *Client) PollChanges(ctx context.Context, organizationID, since string) 
 //
 // Conditional when ifNoneMatch is non-empty: the ETag goes back as
 // If-None-Match and a 304 is reported as NotModified rather than a config.
-// The control plane keys that ETag off the virtual key's revision, which every
-// mutation bumps (contract §4.2), so revalidating a key nobody touched costs a
-// revision lookup instead of materializing the whole bundle again. An empty
-// ifNoneMatch asks for the config outright.
+// The control plane derives that ETag from the virtual key's revision and
+// from the provider rows its config is built from (contract §4.2), so
+// revalidating a key nobody touched costs two indexed lookups instead of
+// materializing the whole bundle again. Both halves are needed: a credential
+// rotation writes the provider row and leaves the key's revision alone, and a
+// token that cannot see it would confirm a bundle carrying the replaced key.
+// An empty ifNoneMatch asks for the config outright.
 //
 // Anything other than a well-formed 200 or a 304 answering our own
 // If-None-Match is an error: a caller must never take a surprising response
@@ -312,9 +330,23 @@ func (c *Client) FetchConfig(ctx context.Context, vkID, ifNoneMatch string) (dom
 	if err := json.Unmarshal(body, &wire); err != nil {
 		return domain.ConfigFetchResult{}, err
 	}
+	// An expires_at that is neither a unix timestamp nor null fails the whole
+	// fetch, the same way an unparseable body does: the caller then keeps the
+	// bundle it holds, with the expiry cap it already had, and the refusal is
+	// logged. Taking the rest of the config and dropping the date would move the
+	// key's own end date on a guess.
+	keyExpiry, keyExpiryKnown, err := wire.keyExpiry()
+	if err != nil {
+		return domain.ConfigFetchResult{}, fmt.Errorf("config fetch expires_at: %w", err)
+	}
 	// A response with no ETag header stores none, so the next fetch goes out
 	// unconditional and gets the config outright.
-	return domain.ConfigFetchResult{Config: wire.toDomain(), ETag: resp.Header.Get("ETag")}, nil
+	return domain.ConfigFetchResult{
+		Config:                wire.toDomain(),
+		ETag:                  resp.Header.Get("ETag"),
+		VirtualKeyExpiresAt:   keyExpiry,
+		VirtualKeyExpiryKnown: keyExpiryKnown,
+	}, nil
 }
 
 // BudgetBucketSpend reads the current-period spend for one attributed-user
@@ -390,6 +422,12 @@ type Claims struct {
 	TeamID         string
 	OrganizationID string
 	ExpiresAt      int64
+	// VirtualKeyExpiresAt is the vk_expires_at claim in unix seconds: the
+	// instant the key itself runs out. The control plane sends null for a key
+	// with no expiration date, and a gateway talking to a control plane older
+	// than the claim sees nothing at all; both decode to 0, which means the
+	// key never expires.
+	VirtualKeyExpiresAt int64
 }
 
 func extractClaims(m map[string]any) *Claims {
@@ -409,17 +447,26 @@ func extractClaims(m map[string]any) *Claims {
 	if v, ok := m["exp"].(float64); ok {
 		c.ExpiresAt = int64(v)
 	}
+	if v, ok := m["vk_expires_at"].(float64); ok {
+		c.VirtualKeyExpiresAt = int64(v)
+	}
 	return c
 }
 
 func claimsToBundle(c *Claims) *domain.Bundle {
-	return &domain.Bundle{
+	b := &domain.Bundle{
 		VirtualKeyID:   c.VirtualKeyID,
 		ProjectID:      c.ProjectID,
 		TeamID:         c.TeamID,
 		OrganizationID: c.OrganizationID,
 		ExpiresAt:      time.Unix(c.ExpiresAt, 0),
 	}
+	// A zero claim stays the zero time rather than becoming 1970, which every
+	// clock comparison would read as an expired key.
+	if c.VirtualKeyExpiresAt > 0 {
+		b.VirtualKeyExpiresAt = time.Unix(c.VirtualKeyExpiresAt, 0)
+	}
+	return b
 }
 
 // setCommonHeaders stamps headers shared by every outbound control-plane request.

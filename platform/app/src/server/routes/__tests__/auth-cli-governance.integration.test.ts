@@ -21,6 +21,7 @@
 
 import { IngestionKeyService } from "@ee/governance/services/ingestionKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
+import type { Redis } from "ioredis";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
@@ -31,7 +32,6 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { connection as redisConnection } from "~/server/redis";
 import { FREE_PLAN } from "../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 import { app } from "../auth-cli";
@@ -75,14 +75,18 @@ const USER_C = `usr-cli-gov-c-${suffix}`;
 const TOKEN_C = `lw_at_${"c".repeat(43)}-${suffix}`;
 const SOURCE_C_ID = `src-cli-gov-c-${suffix}`;
 
+/** The container's connection, handed to the test App so the routes share it. */
+let redisConnection: Redis | null = null;
+
 describe("GET /api/auth/cli/governance/*", () => {
   beforeAll(async () => {
-    await startTestContainers();
+    ({ redisConnection } = await startTestContainers());
 
     // Override plan provider so org A + B get ENTERPRISE (existing tests
     // pin RBAC + tenancy, not license) and org C gets FREE (402 subdescribe).
     await resetApp();
     globalForApp.__langwatch_app = createTestApp({
+      redis: redisConnection,
       planProvider: PlanProviderService.create({
         getActivePlan: async ({ organizationId }) =>
           organizationId === ORG_C ? freePlan : enterprisePlan,

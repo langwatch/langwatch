@@ -125,7 +125,7 @@ interface QueuedEventConsumerDefinition<E extends Event> {
 }
 
 /**
- * Manages queue facades for event handlers, projections, commands, and reactors.
+ * Manages queue facades for event handlers, projections, commands, and subscribers.
  *
  * Creates per-job-type facades that inject routing metadata (__pipelineName, __jobType, __jobName)
  * into a global shared queue. The global queue and job registry are owned by EventSourcing
@@ -147,7 +147,7 @@ export class QueueManager<EventType extends Event = Event> {
   private subscriberCount = 0;
   private stateProjectionCount = 0;
   private projectionCount = 0;
-  private reactorCount = 0;
+  private projectionSubscriberCount = 0;
 
   constructor({
     aggregateType,
@@ -755,8 +755,8 @@ export class QueueManager<EventType extends Event = Event> {
     }
   }
 
-  initializeReactorQueues(
-    reactors: Record<
+  initializeProjectionSubscriberQueues(
+    subscribers: Record<
       string,
       {
         name: string;
@@ -784,7 +784,7 @@ export class QueueManager<EventType extends Event = Event> {
       }
     >,
     onEvent: (
-      reactorName: string,
+      subscriberName: string,
       payload: { event: EventType; foldState: unknown },
       context: EventStoreReadContext<EventType>,
     ) => Promise<void>,
@@ -793,10 +793,10 @@ export class QueueManager<EventType extends Event = Event> {
       return;
     }
 
-    for (const [reactorName, reactorDef] of Object.entries(reactors)) {
-      const customGroupKeyFn = reactorDef.groupKeyFn;
-      const reactorGroupKeyFn = this.buildGroupKey({
-        jobPath: `${reactorDef.parentType}/${reactorDef.parentProjection}/reactor/${reactorName}`,
+    for (const [subscriberName, subscriberDef] of Object.entries(subscribers)) {
+      const customGroupKeyFn = subscriberDef.groupKeyFn;
+      const subscriberGroupKeyFn = this.buildGroupKey({
+        jobPath: `${subscriberDef.parentType}/${subscriberDef.parentProjection}/reactor/${subscriberName}`,
         getTenantId: (payload: any) => String(payload.event.tenantId),
         domainKeyFn: customGroupKeyFn
           ? (payload: any) => customGroupKeyFn(payload)
@@ -804,34 +804,40 @@ export class QueueManager<EventType extends Event = Event> {
               `${payload.event.aggregateType}:${String(payload.event.aggregateId)}`,
       });
       const entry: JobRegistryEntry = {
-        groupKeyFn: reactorGroupKeyFn,
+        groupKeyFn: subscriberGroupKeyFn,
         scoreFn: (payload: any) => payload.event.createdAt,
         process: async (payload: any) => {
-          await onEvent(reactorName, payload, {
+          await onEvent(subscriberName, payload, {
             tenantId: payload.event.tenantId,
           });
         },
-        delay: reactorDef.options?.delay,
-        deduplication: reactorDef.options?.deduplication
+        delay: subscriberDef.options?.delay,
+        deduplication: subscriberDef.options?.deduplication
           ? resolveDeduplicationStrategy(
-              reactorDef.options.deduplication,
+              subscriberDef.options.deduplication,
               (payload) => this.createDefaultDeduplicationId(payload.event),
             )
           : undefined,
         spanAttributes: (payload: any) => ({
-          "reactor.name": reactorName,
+          "reactor.name": subscriberName,
           "event.type": payload.event.type,
           "event.id": payload.event.id,
           "event.aggregate_id": String(payload.event.aggregateId),
         }),
       };
 
+      // The "reactor" jobType is a KEPT name, not a missed rename (ADR-098).
+      // It is the queue's routing key: it spells the `<tenantId>/<fold|map>/
+      // <projection>/reactor/<name>` job path and the pause keys ops sets
+      // against it. Renaming it strands every job a pod staged under the old
+      // spelling for the length of a rolling deploy, so it outlives the
+      // vocabulary it came from. Change it only behind a dual-read migration.
       const facade = this.createFacade<{
         event: EventType;
         foldState: unknown;
-      }>("reactor", reactorName, entry);
-      this.queues.set(this.key("reactor", reactorName), facade);
-      this.reactorCount++;
+      }>("reactor", subscriberName, entry);
+      this.queues.set(this.key("reactor", subscriberName), facade);
+      this.projectionSubscriberCount++;
     }
   }
 
@@ -851,8 +857,8 @@ export class QueueManager<EventType extends Event = Event> {
     return this.stateProjectionCount > 0;
   }
 
-  hasReactorQueues(): boolean {
-    return this.reactorCount > 0;
+  hasProjectionSubscriberQueues(): boolean {
+    return this.projectionSubscriberCount > 0;
   }
 
   getHandlerQueue(
@@ -887,12 +893,12 @@ export class QueueManager<EventType extends Event = Event> {
       | undefined;
   }
 
-  getReactorQueue(
-    reactorName: string,
+  getProjectionSubscriberQueue(
+    subscriberName: string,
   ):
     | EventSourcedQueueProcessor<{ event: EventType; foldState: unknown }>
     | undefined {
-    return this.queues.get(this.key("reactor", reactorName)) as
+    return this.queues.get(this.key("reactor", subscriberName)) as
       | EventSourcedQueueProcessor<{ event: EventType; foldState: unknown }>
       | undefined;
   }
@@ -933,7 +939,7 @@ export class QueueManager<EventType extends Event = Event> {
   /**
    * Registers a standalone job in the global queue.
    *
-   * Unlike handler/projection/reactor queues that are tied to event processing,
+   * Unlike handler/projection/subscriber queues that are tied to event processing,
    * standalone jobs are independent work items (e.g. deferred evaluation checks).
    *
    * Returns `null` when the global queue is not available (event sourcing disabled).

@@ -1,6 +1,7 @@
 import type {
   BatchHistoryResult,
   BatchRunDataResult,
+  BatchSummary,
   ExternalSetSummary,
   ScenarioRunData,
   ScenarioSetData,
@@ -58,9 +59,18 @@ export interface SimulationRepository {
     endDate?: number;
   }): Promise<BatchHistoryResult>;
 
+  /**
+   * Counts for one batch, addressed by its batch run id alone. Returns null
+   * when the project holds no run for that batch.
+   */
+  getBatchSummary(params: {
+    projectId: string;
+    batchRunId: string;
+  }): Promise<BatchSummary | null>;
+
   getRunDataForBatchRun(params: {
     projectId: string;
-    scenarioSetId: string;
+    scenarioSetId?: string;
     batchRunId: string;
     sinceTimestamp?: number;
   }): Promise<BatchRunDataResult>;
@@ -185,6 +195,10 @@ export class NullSimulationRepository implements SimulationRepository {
 
   async getBatchHistoryForScenarioSet(): Promise<BatchHistoryResult> {
     return { batches: [], hasMore: false, lastUpdatedAt: 0, totalCount: 0 };
+  }
+
+  async getBatchSummary(): Promise<BatchSummary | null> {
+    return null;
   }
 
   async getRunDataForBatchRun(): Promise<BatchRunDataResult> {

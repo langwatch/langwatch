@@ -16,6 +16,7 @@
 
 import { spawn } from "node:child_process";
 import { normalizeEndpoint } from "../../../internal/endpoint";
+import { createSpinner } from "../spinner";
 import { lwTag } from "./brand";
 import { checkBudget, renderBudgetExceeded } from "./budget";
 import { updateLangwatchClaudePlugin } from "./claude-plugin";
@@ -28,13 +29,18 @@ import {
 	copilotPrespawnWarnings,
 } from "./copilot-prespawn";
 import { runDeviceFlowLogin } from "./login-flow";
+import { clearToolProjectPin, pinToolToProject } from "./project-scope";
 import {
 	maybeOfferIngestionShellRcPersist,
 	SHELL_FUNCTION_TOOLS,
 } from "./shell-rc";
 import { envForTool } from "./tool-env";
 import { resolveWrapperMode } from "./wrapper-mode";
-import { parseToolModeFlag, resolveWrapperPath } from "./wrapper-path-choice";
+import {
+	parseProjectScopeFlags,
+	parseToolModeFlag,
+	resolveWrapperPath,
+} from "./wrapper-path-choice";
 import {
 	classifyIngestionSetupError,
 	recoverExpiredSession,
@@ -220,7 +226,7 @@ export async function preflightWrapper(
 					`The gateway isn't enabled for \`${tool}\` in your organization.\n` +
 					`An admin needs to publish a ${tool} coding-assistant tile in the\n` +
 					`AI Tools catalog (with the gateway path enabled):\n` +
-					`  ${cp}/settings/governance/tool-catalog\n` +
+					`  ${cp}/governance/tool-catalog\n` +
 					renderContactFooter(adminEmail),
 			};
 		}
@@ -305,6 +311,36 @@ export function buildShellReapply(args: {
 }
 
 /**
+ * Run one telemetry setup step behind a spinner. Setting a tool up can
+ * reach the control plane (confirming the cached ingest key is live, minting
+ * a fresh one after a logout), and that used to happen in silence long
+ * enough to read as a hang. The spinner is stopped before the result, or the
+ * error, reaches the caller, so everything printed after it lands on a clean
+ * line.
+ *
+ * discardStdin:false for the same reason login-flow sets it: ora's default
+ * flips stdin to raw mode and swallows Ctrl+C, making the wait unkillable.
+ */
+export async function withTelemetrySetupSpinner<T>({
+	tool,
+	run,
+}: {
+	tool: string;
+	run: () => Promise<T>;
+}): Promise<T> {
+	const spinner = createSpinner({
+		text: `Setting up telemetry for ${tool}...`,
+		discardStdin: false,
+	});
+	spinner.start();
+	try {
+		return await run();
+	} finally {
+		spinner.stop();
+	}
+}
+
+/**
  * Run the named tool routed through the gateway. Inherits stdio so
  * the user gets the same interactive UX they'd have invoking the
  * tool directly. Exits the parent process with the child's exit
@@ -334,27 +370,54 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 		}
 	}
 
-	// Budget pre-check - render Screen-8 box + exit 2 BEFORE exec.
-	const exceeded = await checkBudget(cfg);
-	if (exceeded) {
-		process.stderr.write(renderBudgetExceeded(exceeded));
-		if (exceeded.request_increase_url) {
-			cfg.last_request_increase_url = exceeded.request_increase_url;
-			try {
-				saveConfig(cfg);
-			} catch {
-				// Config write failure shouldn't change the spec'd exit
-				// code - the next `langwatch request-increase` falls back
-				// to the static page.
-			}
-		}
+	// Wrapper-only telemetry-scope flags, stripped before anything reaches
+	// the child. `--project` pins this tool's telemetry to a team project
+	// (minting a project ingest key); `--personal` clears the pin.
+	const scopeFlags = parseProjectScopeFlags(args);
+	if (scopeFlags.personal && scopeFlags.project) {
+		process.stderr.write(
+			`${lwTag()} pass either --project or --personal, not both.\n`,
+		);
 		process.exit(2);
+	}
+	if (scopeFlags.personal) {
+		const cleared = clearToolProjectPin({ cfg, tool });
+		process.stderr.write(
+			cleared
+				? `${lwTag()} cleared the project pin for ${tool}; telemetry goes to your personal workspace again.\n`
+				: `${lwTag()} ${tool} has no project pin; telemetry already goes to your personal workspace.\n`,
+		);
+	}
+	if (scopeFlags.project) {
+		try {
+			const pinned = await pinToolToProject({
+				cfg,
+				tool,
+				project: scopeFlags.project,
+			});
+			process.stderr.write(
+				`${lwTag()} pinned ${tool} telemetry to project ${pinned.label}.\n`,
+			);
+		} catch (err) {
+			process.stderr.write(
+				`${lwTag()} could not pin ${tool} to project ${scopeFlags.project}: ` +
+					`${(err as Error).message}\n`,
+			);
+			process.exit(2);
+		}
 	}
 
 	// Strip the wrapper-only `--tool-mode` flag from the args BEFORE anything
 	// forwards them to the real tool, and resolve any explicit override.
 	// Everything else stays verbatim + in order for the child invocation.
-	const { args: toolArgs, override: pathOverride } = parseToolModeFlag(args);
+	const parsedMode = parseToolModeFlag(scopeFlags.args);
+	const toolArgs = parsedMode.args;
+	// A project pin means telemetry-only by definition, so it behaves like
+	// an explicit direct-OTLP override: no gateway-vs-subscription prompt,
+	// no tool_mode persistence. A literal --tool-mode flag still wins.
+	const pathOverride =
+		parsedMode.override ??
+		(cfg.tool_project_keys?.[tool]?.secret ? "ingestion" : undefined);
 
 	// Decide Path A (gateway) vs Path B (ingestion) for this run. Prompts
 	// (and remembers the answer) only when the org policy allows BOTH paths,
@@ -387,13 +450,17 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 	const gatewayClears = toolEnv.clears ?? [];
 	let modeResult;
 	try {
-		modeResult = await resolveWrapperMode(
-			cfg,
+		modeResult = await withTelemetrySetupSpinner({
 			tool,
-			gatewayVars,
-			gatewayClears,
-			pathChoice.mode,
-		);
+			run: () =>
+				resolveWrapperMode(
+					cfg,
+					tool,
+					gatewayVars,
+					gatewayClears,
+					pathChoice.mode,
+				),
+		});
 	} catch (err) {
 		// Direct-OTLP setup can fail at mint time: an expired device session,
 		// no personal workspace yet, an unreachable control plane. None of
@@ -416,13 +483,17 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 			// derived from the expired session.
 			const refreshedEnv = envForTool(cfg, tool);
 			try {
-				modeResult = await resolveWrapperMode(
-					cfg,
+				modeResult = await withTelemetrySetupSpinner({
 					tool,
-					refreshedEnv.vars,
-					refreshedEnv.clears ?? [],
-					"ingestion",
-				);
+					run: () =>
+						resolveWrapperMode(
+							cfg,
+							tool,
+							refreshedEnv.vars,
+							refreshedEnv.clears ?? [],
+							"ingestion",
+						),
+				});
 			} catch (err2) {
 				process.stderr.write(
 					`${lwTag()} still could not set up direct OTLP telemetry for ` +
@@ -432,7 +503,8 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 			}
 		} else {
 			process.stderr.write(
-				`mode resolution failed: ${(err as Error).message}\n`,
+				`${lwTag()} could not set up telemetry for ${tool}: ` +
+					`${(err as Error).message}\n`,
 			);
 			process.exit(2);
 		}
@@ -504,6 +576,18 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 	}
 
 	if (modeResult.mode === "gateway") {
+		// Budget pre-check - render Screen-8 box + exit 2 BEFORE exec. Gateway
+		// runs only: the budget gates gateway spend, and an ingestion run
+		// spends nothing through us, so subscription users skip the call.
+		const exceeded = await checkBudget(cfg);
+		if (exceeded) {
+			process.stderr.write(
+				renderBudgetExceeded(exceeded, {
+					fallbackUrl: `${cfg.control_plane_url}/me/budget/request`,
+				}),
+			);
+			process.exit(2);
+		}
 		const probe = await preflightWrapper(cfg, tool);
 		if (!probe.ok) {
 			process.stderr.write(probe.message ?? "preflight failed\n");
@@ -545,6 +629,12 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 	} else {
 		// ingestion mode side-effect feedback so the user sees what
 		// the wrapper just did on their behalf.
+		if (modeResult.projectScope) {
+			process.stderr.write(
+				`${lwTag()} telemetry goes to project ` +
+					`${modeResult.projectScope.label ?? "(pinned ingest key)"}.\n`,
+			);
+		}
 		if (modeResult.newKeyMinted) {
 			process.stderr.write(
 				`${lwTag()} minted a personal ingestion key for ${tool}.\n`,
@@ -650,6 +740,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 			? createCodexIOStreamer({
 					sinceMs: sessionStartMs,
 					endpoint: `${normalizeEndpoint(modeResult.endpoint)}/v1/traces`,
+					logsEndpoint: `${normalizeEndpoint(modeResult.endpoint)}/v1/logs`,
 					token: modeResult.ingestionToken,
 				})
 			: null;

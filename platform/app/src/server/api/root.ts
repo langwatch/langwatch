@@ -14,6 +14,7 @@ import { analyticsRouter } from "./routers/analytics";
 import { annotationRouter } from "./routers/annotation";
 import { annotationScoreRouter } from "./routers/annotationScore";
 import { apiKeyRouter } from "./routers/apiKey";
+import { authzRouter } from "./routers/authz";
 import { automationRouter } from "./routers/automations";
 import { batchRecordRouter } from "./routers/batchRecord";
 import { bugReportsRouter } from "./routers/bugReports";
@@ -70,6 +71,7 @@ import { savedViewsRouter } from "./routers/savedViews";
 import { scenarioRouter } from "./routers/scenarios";
 import { scimTokenRouter } from "./routers/scimToken";
 import { secretsRouter } from "./routers/secrets";
+import { setupSkillsRouter } from "./routers/setupSkills";
 import { shareRouter } from "./routers/share";
 import { sharedTraceRouter } from "./routers/sharedTrace";
 import { spansRouter } from "./routers/spans";
@@ -115,6 +117,7 @@ const coreRouters = {
   batchRecord: batchRecordRouter,
   limits: limitsRouter,
   automation: automationRouter,
+  authz: authzRouter,
   experiments: experimentsRouter,
   featureFlag: featureFlagRouter,
   annotation: annotationRouter,
@@ -124,6 +127,7 @@ const coreRouters = {
   bugReports: bugReportsRouter,
   annotationScore: annotationScoreRouter,
   publicEnv: publicEnvRouter,
+  setupSkills: setupSkillsRouter,
   share: shareRouter,
   sharedTrace: sharedTraceRouter,
   pinnedTrace: pinnedTraceRouter,

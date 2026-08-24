@@ -13,14 +13,15 @@ import {
   requestPathname,
 } from "@ee/sso/ssoPathGate";
 import { createLogger } from "@langwatch/observability";
+import { RedisConfigService } from "@langwatch/redis-client";
 import { compare, hash } from "bcrypt";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError } from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { env } from "~/env.mjs";
+import { tryGetApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
-import { connection as redisConnection } from "~/server/redis";
 import { fireActivityTrackingNurturing } from "../../../ee/billing/nurturing/hooks/activityTracking";
 import { ensureUserSyncedToCio } from "../../../ee/billing/nurturing/hooks/userSync";
 import { sendResetPasswordEmail } from "../mailer/resetPasswordEmail";
@@ -72,28 +73,105 @@ const plugins =
     : [];
 
 /**
- * Wire BetterAuth's secondary storage to the shared Redis connection.
- * Used by rate limiting (below) so limits are enforced across pods.
- * Falls back to in-memory when Redis isn't configured (build time, tests).
+ * Wire BetterAuth's secondary storage to the App's Redis connection. Used by
+ * rate limiting (below) so limits are enforced across pods.
+ *
+ * WHETHER to configure it is decided here, at module load, because
+ * `betterAuth()` below is itself constructed at module load and the choice
+ * changes its session strategy — a deployment with no Redis must get `undefined`
+ * and keep its sessions in the database. That decision is a pure question about
+ * *configuration*, so it is answered from env rather than from a live client
+ * (ADR-093); the client itself is resolved lazily, inside each callback.
+ *
+ * `BUILD_TIME` joins `SKIP_REDIS` in the skip signal: a build or a test run has
+ * env pointing at a Redis it must not adopt as a session store.
  */
-const secondaryStorage: BetterAuthOptions["secondaryStorage"] = redisConnection
-  ? {
-      get: async (key) => {
-        const value = await redisConnection!.get(`better-auth:${key}`);
-        return value;
-      },
-      set: async (key, value, ttl) => {
-        if (ttl) {
-          await redisConnection!.set(`better-auth:${key}`, value, "EX", ttl);
-        } else {
-          await redisConnection!.set(`better-auth:${key}`, value);
-        }
-      },
-      delete: async (key) => {
-        await redisConnection!.del(`better-auth:${key}`);
-      },
-    }
-  : undefined;
+const redisEnv = {
+  url: env.REDIS_URL,
+  clusterEndpoints: env.REDIS_CLUSTER_ENDPOINTS,
+  skip: env.SKIP_REDIS || !!process.env.BUILD_TIME,
+};
+
+/**
+ * The App's connection at the moment a storage callback runs.
+ *
+ * Null wherever env advertises Redis but the App has none, which is three
+ * states, not one: a test app, a callback firing before boot completes, and —
+ * for the whole life of the process — anything that never builds an App at all
+ * (a task, a bare `tsx scripts/*.ts`). `start.ts` boots before it listens, so
+ * the web entrypoint only ever sees the first two.
+ *
+ * Resolving per call rather than once at import is what makes this possible,
+ * and it is deliberate: the alternative needs a live client at module load.
+ * See the ADR's note on where the old singleton's behaviour is and is not
+ * reproduced.
+ */
+const secondaryStorageConnection = () => tryGetApp()?.redis ?? null;
+
+/**
+ * How many writes this process has dropped for want of a connection.
+ *
+ * Carried in the log line because the *first* drop and the ten-thousandth mean
+ * different things: one is a request that raced boot, a climbing count is a
+ * process serving auth with no secondary storage at all.
+ */
+let droppedSecondaryWrites = 0;
+
+/**
+ * Reports a write that went nowhere.
+ *
+ * A dropped read is a cache miss and better-auth recovers it from the database.
+ * A dropped WRITE has no such recovery, and one of its tenants is the
+ * credential sign-in rate-limit counter, which lives only in secondary storage:
+ * dropping the `set` is a rate limit that fails OPEN. That is a security-
+ * relevant degradation, so it does not get to be silent (#6950).
+ *
+ * The key is deliberately not logged. Better-auth keys secondary storage by
+ * session token, so the key IS a credential.
+ */
+const reportDroppedSecondaryWrite = (operation: "set" | "delete"): void => {
+  droppedSecondaryWrites += 1;
+  logger.warn(
+    { operation, droppedSecondaryWrites },
+    "better-auth secondary storage write dropped: Redis is configured but the application has no connection. Rate limiting and session revocation degrade to fail-open until it does.",
+  );
+};
+
+/**
+ * The storage better-auth is configured with — `undefined` when this deployment
+ * has no Redis, in which case sessions stay in the database.
+ *
+ * Exported for unit testing, the same way `isEmailPasswordEnabled` is: ADR-093
+ * moved this from "decided once against a live singleton" to "resolved per
+ * call", which opened a window where the callbacks run with no connection.
+ * That window is the contract now, so it is asserted rather than merely
+ * commented (#6950).
+ */
+export const secondaryStorage: BetterAuthOptions["secondaryStorage"] =
+  new RedisConfigService().isConfigured(redisEnv)
+    ? {
+        get: async (key) => {
+          const redis = secondaryStorageConnection();
+          // A miss, not a failure: better-auth falls through to the database.
+          if (!redis) return null;
+          return await redis.get(`better-auth:${key}`);
+        },
+        set: async (key, value, ttl) => {
+          const redis = secondaryStorageConnection();
+          if (!redis) return reportDroppedSecondaryWrite("set");
+          if (ttl) {
+            await redis.set(`better-auth:${key}`, value, "EX", ttl);
+          } else {
+            await redis.set(`better-auth:${key}`, value);
+          }
+        },
+        delete: async (key) => {
+          const redis = secondaryStorageConnection();
+          if (!redis) return reportDroppedSecondaryWrite("delete");
+          await redis.del(`better-auth:${key}`);
+        },
+      }
+    : undefined;
 
 const isBuildTime = !!process.env.BUILD_TIME;
 

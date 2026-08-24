@@ -70,8 +70,10 @@ interface ClickHouseWriteRecord {
   RepositoryOwner: string;
   RepositoryName: string;
   GitBranch: string;
+  GitBranches: string[];
   GitWorktree: string;
   Title: string;
+  TitleSource: string;
 
   ModelCalls: number;
   ToolCalls: number;
@@ -96,6 +98,7 @@ interface ClickHouseWriteRecord {
   CacheReadTokens: string;
   CacheCreationTokens: string;
   CostUsd: number;
+  AgentReportedCostUsd: number;
 
   ModelCallMs: string;
   ToolMs: string;
@@ -187,6 +190,8 @@ function toBranchSessionRow(
     models: asStringArray(record.Models),
     userId: String(record.UserId ?? ""),
     gitBranch: String(record.GitBranch ?? ""),
+    gitBranches: asStringArray(record.GitBranches),
+    title: String(record.Title ?? ""),
   };
 }
 
@@ -227,8 +232,10 @@ function toRecord({
     RepositoryOwner: row.repositoryOwner,
     RepositoryName: row.repositoryName,
     GitBranch: row.gitBranch,
+    GitBranches: row.gitBranches,
     GitWorktree: row.gitWorktree,
     Title: row.title,
+    TitleSource: row.titleSource,
 
     ModelCalls: row.modelCalls,
     ToolCalls: row.toolCalls,
@@ -255,6 +262,7 @@ function toRecord({
     CacheReadTokens: big(row.cacheReadTokens),
     CacheCreationTokens: big(row.cacheCreationTokens),
     CostUsd: row.costUsd,
+    AgentReportedCostUsd: row.agentReportedCostUsd,
 
     ModelCallMs: big(row.modelCallMs),
     ToolMs: big(row.toolMs),
@@ -379,7 +387,7 @@ export class CodingAgentSessionClickHouseRepository
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         { error, tenantId: row.tenantId, sessionId: row.sessionId },
         "failed to upsert coding agent session",
       );
@@ -706,8 +714,17 @@ export class CodingAgentSessionClickHouseRepository
    * `findManyRecent` documents at length: `StartedAt` moves, so bounding the
    * dedup scope can resolve a session to a superseded version.
    *
-   * Only the columns the rollup adds up are selected, plus the scalar keys the
-   * shared tie-break ranks on. The two array-length keys it also knows about
+   * A session matches on the branch it ENDED on or on any branch it drove
+   * (`GitBranches`, migration 00077). Matching the scalar alone would charge a
+   * session that landed one change and moved on entirely to its last pull
+   * request, leaving the one it opened first reading as free. The set is
+   * selected as well as matched on, because attribution runs the tenure rule
+   * over it again on the way out: a row fetched on a branch it no longer sits
+   * on is only useful if the caller can still see which branch that was.
+   *
+   * Only the columns the rollup adds up are selected, plus the session's title
+   * and the scalar keys the shared tie-break ranks on. The two array-length
+   * keys it also knows about
    * are deliberately absent, because they would mean reading `MetricSeries` and
    * `AppliedEventIds` for every session of a busy repository to break a tie
    * that `nextVersionStamp` already makes unreachable. `preferredOf` treats an
@@ -790,6 +807,8 @@ export class CodingAgentSessionClickHouseRepository
           Models,
           UserId,
           GitBranch,
+          GitBranches,
+          Title,
           LastEventOccurredAt,
           ModelCalls,
           ToolCalls,
@@ -799,7 +818,10 @@ export class CodingAgentSessionClickHouseRepository
           AND lower(RepositoryHost) = {repositoryHost:String}
           AND lower(RepositoryOwner) = {repositoryOwner:String}
           AND lower(RepositoryName) = {repositoryName:String}
-          AND GitBranch IN {branches:Array(String)}
+          AND (
+            GitBranch IN {branches:Array(String)}
+            OR hasAny(GitBranches, {branches:Array(String)})
+          )
           AND StartedAt >= fromUnixTimestamp64Milli({from:Int64})
           AND (TenantId, SessionId, UpdatedAt) IN (
             SELECT TenantId, SessionId, max(UpdatedAt)
@@ -888,7 +910,7 @@ export class CodingAgentSessionClickHouseRepository
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
     } catch (error) {
-      logger.error(
+      logger.warn(
         { error, tenantId, count: entries.length },
         "failed to upsert coding agent session batch",
       );
@@ -1053,8 +1075,10 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     repositoryOwner: String(record.RepositoryOwner ?? ""),
     repositoryName: String(record.RepositoryName ?? ""),
     gitBranch: String(record.GitBranch ?? ""),
+    gitBranches: asStringArray(record.GitBranches),
     gitWorktree: String(record.GitWorktree ?? ""),
     title: String(record.Title ?? ""),
+    titleSource: String(record.TitleSource ?? ""),
 
     modelCalls: asNumber(record.ModelCalls),
     toolCalls: asNumber(record.ToolCalls),
@@ -1086,6 +1110,7 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     cacheReadTokens: asNumber(record.CacheReadTokens),
     cacheCreationTokens: asNumber(record.CacheCreationTokens),
     costUsd: asNumber(record.CostUsd),
+    agentReportedCostUsd: asNumber(record.AgentReportedCostUsd),
 
     modelCallMs: asNumber(record.ModelCallMs),
     toolMs: asNumber(record.ToolMs),

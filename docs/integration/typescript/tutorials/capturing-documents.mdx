@@ -1,0 +1,136 @@
+---
+title: Capturing Documents
+sidebarTitle: TypeScript/JS
+description: LangWatch captures the PDF files and other documents your TypeScript application sends to a model and shows them on the trace.
+icon: square-js
+keywords: langwatch, typescript, javascript, documents, pdf, files, attachments, multimodal, tracing
+---
+
+Send the file the way your model provider expects and keep the call inside a trace. There is no upload step and no extra API call: LangWatch reads the document out of the messages at ingestion, stores it, and leaves a reference in its place.
+
+## Send the document with the model call
+
+The examples below use `setupObservability()`. Read [Integration Guide](/integration/typescript/guide) first if you have not set that up yet.
+
+### Vercel AI SDK
+
+Put the document in a `file` part inside the user message. `mediaType` is what tells LangWatch and the provider what the bytes are.
+
+```typescript
+import { readFileSync } from "node:fs";
+import { openai } from "@ai-sdk/openai";
+import { generateText } from "ai";
+import { setupObservability } from "langwatch/observability/node";
+
+setupObservability({ serviceName: "invoice-service" });
+
+const data = readFileSync("invoice.pdf").toString("base64");
+
+const { text } = await generateText({
+  model: openai.chat("gpt-5-mini"),
+  messages: [
+    {
+      role: "user",
+      content: [
+        { type: "text", text: "What is the invoice number and the total due?" },
+        {
+          type: "file",
+          data,
+          mediaType: "application/pdf",
+          filename: "invoice.pdf",
+        },
+      ],
+    },
+  ],
+  experimental_telemetry: { isEnabled: true },
+});
+
+console.log(text);
+```
+
+### OpenAI SDK
+
+Put the document in a `file` part, as `file_data`. That is the shape Chat Completions accepts for PDF files.
+
+```typescript
+import { readFileSync } from "node:fs";
+import OpenAI from "openai";
+import { getLangWatchTracer } from "langwatch";
+import { setupObservability } from "langwatch/observability/node";
+
+setupObservability({ serviceName: "invoice-service" });
+
+const tracer = getLangWatchTracer("invoice-service");
+const client = new OpenAI();
+
+const readInvoice = async (prompt: string, path: string): Promise<string> => {
+  return await tracer.withActiveSpan("ReadInvoice", async (span) => {
+    span.setType("llm");
+
+    const encoded = readFileSync(path).toString("base64");
+    const completion = await client.chat.completions.create({
+      model: "gpt-5-mini",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: prompt },
+            {
+              type: "file",
+              file: {
+                filename: "invoice.pdf",
+                file_data: `data:application/pdf;base64,${encoded}`,
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    return completion.choices[0]?.message.content ?? "";
+  });
+};
+
+await readInvoice("What is the invoice number and the total due?", "invoice.pdf");
+```
+
+`file_data` accepts a base64 data URL, as above, or raw base64. With raw base64 the media type comes from the `filename` extension, so always send a filename.
+
+## Document shapes LangWatch understands
+
+Send any of these and the attachment is captured.
+
+| Source | Shape |
+|---|---|
+| Vercel AI SDK | `{ type: "file", mediaType: "application/pdf", data: "<base64>" }` |
+| OpenAI | `{ type: "file", file: { filename: "x.pdf", file_data: "data:application/pdf;base64,..." } }` |
+| Anthropic | `{ type: "document", source: { type: "base64", media_type: "application/pdf", data: "..." } }` |
+| Anthropic | `{ type: "document", source: { type: "url", url: "https://..." } }` |
+| Google Gemini and Vertex | `{ inlineData: { mimeType: "application/pdf", data: "..." } }` |
+| AG-UI | `{ type: "document", source: { type: "data", value: "...", mimeType: "application/pdf" } }` |
+
+A part that names only a provider-hosted file, such as an OpenAI `file_id` with no `file_data`, holds no bytes. LangWatch passes it through unchanged and stores no attachment.
+
+## What happens to the bytes
+
+LangWatch moves the document out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
+
+Storage is addressed by SHA-256, so identical bytes are stored once. For example, the same contract sent on ten traces costs one stored object.
+
+On read, LangWatch serves PDF files with their original media type, along with images, audio and video. Every other document type, such as CSV, JSON, Markdown and plain text, is served as a download.
+
+## Where the document appears
+
+The trace list draws a paperclip next to the input preview, so you can spot a run with a file without opening it.
+
+Open the trace and the Summary tab shows an attachment chip, named after the file, or after its media type when the message sends no filename. Click it to open the file. The Conversation tab shows the same chip in the message it belongs to, and the Trace tab shows the full message payload.
+
+<Frame caption="The trace drawer Summary tab, with an application/pdf attachment chip below the input text and the model answer reading the invoice number and total from the file">
+  <img src="/images/integration/multimodal/trace-drawer-pdf.png" alt="LangWatch trace drawer showing a PDF attachment chip below the input question" />
+</Frame>
+
+## Related
+
+- [Capturing Images](/integration/typescript/tutorials/capturing-images), for pictures and screenshots
+- [Capturing Audio and Voice](/integration/typescript/tutorials/capturing-audio), for recordings and voice agents
+- [Multimodal Evaluation](/evaluations/experiments/multimodal-evaluation), to score document parsing with a vision model

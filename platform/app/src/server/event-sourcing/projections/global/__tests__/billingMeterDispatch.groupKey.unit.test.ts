@@ -11,8 +11,8 @@ vi.mock("@langwatch/observability", () => ({
 
 import {
   billingMeterDispatchGroupKey,
-  createBillingMeterDispatchReactor,
-} from "../billingMeterDispatch.reactor";
+  createBillingMeterDispatchSubscriber,
+} from "../billingMeterDispatch.subscriber";
 
 /**
  * The lane and the dedup id must describe the same unit of work. The queue
@@ -47,8 +47,8 @@ describe("billingMeterDispatchGroupKey", () => {
   });
 });
 
-describe("createBillingMeterDispatchReactor lane wiring", () => {
-  const reactor = createBillingMeterDispatchReactor({
+describe("billingMeterDispatch lane wiring", () => {
+  const subscriber = createBillingMeterDispatchSubscriber({
     getDispatch: () => async () => {},
   });
 
@@ -63,14 +63,14 @@ describe("createBillingMeterDispatchReactor lane wiring", () => {
       event: { tenantId, aggregateId, aggregateType: "trace" },
       foldState: {},
     } as unknown as Parameters<
-      NonNullable<NonNullable<typeof reactor.options>["groupKeyFn"]>
+      NonNullable<NonNullable<typeof subscriber.options>["groupKeyFn"]>
     >[0];
   }
 
   describe("given a project ingesting several traces at once", () => {
-    describe("when each trace dispatches the reactor", () => {
+    describe("when each trace dispatches the subscriber", () => {
       it("assigns every dispatch the same lane", () => {
-        const groupKeyFn = reactor.options?.groupKeyFn;
+        const groupKeyFn = subscriber.options?.groupKeyFn;
         expect(groupKeyFn).toBeDefined();
 
         const lanes = ["trace_1", "trace_2", "trace_3"].map((aggregateId) =>
@@ -81,7 +81,7 @@ describe("createBillingMeterDispatchReactor lane wiring", () => {
       });
 
       it("assigns every dispatch the same dedup id", () => {
-        const makeJobId = reactor.options?.makeJobId;
+        const makeJobId = subscriber.options?.makeJobId;
         expect(makeJobId).toBeDefined();
 
         const jobIds = ["trace_1", "trace_2", "trace_3"].map((aggregateId) =>
@@ -95,7 +95,7 @@ describe("createBillingMeterDispatchReactor lane wiring", () => {
 
   describe("given two projects ingesting concurrently", () => {
     it("keeps their lanes separate so one project cannot serialize behind another", () => {
-      const groupKeyFn = reactor.options!.groupKeyFn!;
+      const groupKeyFn = subscriber.options!.groupKeyFn!;
 
       expect(
         groupKeyFn(payloadFor({ tenantId: "project_x", aggregateId: "t1" })),
@@ -107,8 +107,8 @@ describe("createBillingMeterDispatchReactor lane wiring", () => {
 
   describe("given the lane and the dedup id are both derived from a payload", () => {
     it("varies them over exactly the same inputs", () => {
-      const groupKeyFn = reactor.options!.groupKeyFn!;
-      const makeJobId = reactor.options!.makeJobId!;
+      const groupKeyFn = subscriber.options!.groupKeyFn!;
+      const makeJobId = subscriber.options!.makeJobId!;
 
       const sameProjectDifferentTrace = [
         payloadFor({ tenantId: "project_x", aggregateId: "trace_1" }),

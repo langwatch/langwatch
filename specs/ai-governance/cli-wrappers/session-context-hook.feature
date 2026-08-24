@@ -158,16 +158,79 @@ Rule: The hook reports the git identity of the session
     Then a new record is posted with the new branch
 
   @unit
+  Scenario: A native worktree switch changes the reported checkout
+    Given a Claude Code session launched in one checkout
+    When a Stop invocation's payload cwd names a different worktree of the repository
+    Then the record reports the worktree the payload names, not the launch directory
+
+  @unit
+  Scenario: A payload with no cwd falls back to the launch directory
+    Given a Claude Code invocation whose payload carries only the session id
+    When the hook runs with CLAUDE_PROJECT_DIR set
+    Then the record reports the git identity of that directory
+
+  @unit
   Scenario: Two agents reporting the same session id keep separate fingerprints
     Given a session id already reported for one agent
     When another agent reports the same session id
     Then the second agent posts rather than reading the first one's fingerprint
 
+Rule: The session's own name travels with its context
+
+  Claude names every session: --name at launch, /rename mid-session, or its
+  own derived default. The hook MIRRORS that name rather than inventing one.
+  At session start the hook payload carries it (session_title); no hook
+  fires on a mid-session /rename, so the hook reads claude's live session
+  registry instead, and the Stop hook runs after every turn, which is what
+  makes a rename reach the platform within one turn.
+
+  @unit
+  Scenario: The session's name rides the context record
+    Given a hook payload whose session_title names the session
+    And a hook invocation inside a git worktree
+    When the hook runs
+    Then the record carries the name alongside the git identity
+
+  @unit
+  Scenario: A mid-session rename reaches the next hook through the registry
+    Given a hook payload with no session_title
+    And claude's live session registry names the session
+    When the hook runs
+    Then the record carries the newest name the registry holds
+
+  @unit
+  Scenario: A named session posts even outside a git repository
+    Given a hook payload whose session_title names the session
+    And a hook invocation in a directory that is not a git repository
+    When the hook runs
+    Then one record is posted carrying the session id and the name
+    And it carries no repository attributes
+
+  @unit
+  Scenario: A renamed session re-posts its context
+    Given a session whose context was already posted with one name
+    When the hook runs again with a different name
+    Then a new record is posted carrying the new name
+
+  @unit
+  Scenario: A blank name is no name
+    Given a hook payload whose session_title is whitespace
+    And a hook invocation in a directory that is not a git repository
+    When the hook runs
+    Then nothing is posted and the exit code is zero
+
+  @unit
+  Scenario: Only claude's seam reads claude's registry
+    Given claude's live session registry names the session
+    When the hook runs for the codex seam
+    Then the record carries no session name
+
 Rule: The hook never disturbs the session
 
   @unit
-  Scenario: Outside a git repository the hook sends nothing and exits zero
+  Scenario: Outside a git repository with nothing to declare the hook sends nothing and exits zero
     Given a hook invocation in a directory that is not a git repository
+    And nothing names the session
     When the hook runs
     Then nothing is posted and the exit code is zero
 

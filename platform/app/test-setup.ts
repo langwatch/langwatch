@@ -134,14 +134,18 @@ import {
   TransformStream as NodeTransformStream,
   WritableStream as NodeWritableStream,
 } from "node:stream/web";
+
 if (typeof globalThis.TransformStream === "undefined") {
-  globalThis.TransformStream = NodeTransformStream as unknown as typeof TransformStream;
+  globalThis.TransformStream =
+    NodeTransformStream as unknown as typeof TransformStream;
 }
 if (typeof globalThis.ReadableStream === "undefined") {
-  globalThis.ReadableStream = NodeReadableStream as unknown as typeof ReadableStream;
+  globalThis.ReadableStream =
+    NodeReadableStream as unknown as typeof ReadableStream;
 }
 if (typeof globalThis.WritableStream === "undefined") {
-  globalThis.WritableStream = NodeWritableStream as unknown as typeof WritableStream;
+  globalThis.WritableStream =
+    NodeWritableStream as unknown as typeof WritableStream;
 }
 
 // Mock recharts to avoid ESM/CJS compatibility issues with @reduxjs/toolkit in vmThreads pool.
@@ -362,9 +366,17 @@ if (
 // Polyfill window.matchMedia for Vitest/JSDOM (not implemented by default).
 // Prevents "TypeError: window.matchMedia is not a function" when components
 // or hooks call matchMedia at module or render time.
+//
+// `configurable: true` matters as much as `writable`. Without it the property
+// can be ASSIGNED but never REDEFINED, so a test that swaps matchMedia the
+// normal way — Object.defineProperty, to simulate `prefers-reduced-motion` —
+// dies on "Cannot redefine property: matchMedia" instead. A polyfill standing
+// in for a missing browser API has no business being less replaceable than the
+// API it imitates; jsdom's own property is configurable.
 if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
   Object.defineProperty(window, "matchMedia", {
     writable: true,
+    configurable: true,
     value: (query: string): MediaQueryList =>
       ({
         matches: false,

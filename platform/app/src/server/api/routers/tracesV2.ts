@@ -28,6 +28,7 @@ import {
   type CodingAgentTranscript,
 } from "~/server/app-layer/traces/coding-agent-transcript.derivation";
 import { deriveTraceStatus } from "~/server/app-layer/traces/derive-trace-status";
+import { deriveTraceTimestamp } from "~/server/app-layer/traces/derive-trace-timestamp";
 import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import {
   extractFreeTextTerms,
@@ -43,6 +44,7 @@ import type {
   SpanSummaryRow,
   TraceEventRollup,
 } from "~/server/app-layer/traces/repositories/span-storage.repository";
+import type { TraceListItem } from "~/server/app-layer/traces/trace-list.service";
 import {
   traceMetadataUpdateSchema,
   updateTraceMetadata,
@@ -94,7 +96,6 @@ import {
   RESERVED_INPUT_MEDIA_REFS,
   RESERVED_OUTPUT_MEDIA_REFS,
 } from "~/shared/traces/media-refs";
-import { checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 import {
   gateHeaderCost,
@@ -184,7 +185,10 @@ export function mapTraceSummaryToHeader(
 
   return {
     traceId: summary.traceId,
-    timestamp: summary.occurredAt,
+    timestamp: deriveTraceTimestamp({
+      occurredAt: summary.occurredAt,
+      storageAnchorMs: summary.storageAnchorMs,
+    }),
     name:
       summary.attributes["langwatch.span.name"] ?? summary.traceId.slice(0, 8),
     serviceName: summary.attributes["service.name"] ?? "",
@@ -502,6 +506,7 @@ type V2RedactionFlags = {
 
 /** Protection facts the V2 read mappers consume to enforce restrict at read. */
 type V2Protections = {
+  canSeeCosts?: boolean | null;
   canSeeCapturedInput?: boolean | null;
   canSeeCapturedOutput?: boolean | null;
   capturedInputVisibleTo?: string | null;
@@ -765,6 +770,61 @@ export function redactV2Content<
     }
   }
   return redacted;
+}
+
+/**
+ * One turn of a session, as `conversationContext` lists it. Carries the
+ * permission-nulled input/output AND the redaction flags so a hidden turn
+ * renders the "Redacted" marker in the conversation strip / view instead of an
+ * empty "(no message)" placeholder that would read as a genuinely-absent turn.
+ * Carries the turn's totals so the terminal's bottom bar can count the
+ * session's turns above its loaded window without reading their transcripts.
+ */
+export function toConversationContextTurn({
+  trace: t,
+  protections,
+}: {
+  trace: TraceListItem;
+  protections: V2Protections;
+}) {
+  const {
+    input,
+    output,
+    inputRedacted,
+    outputRedacted,
+    inputVisibleTo,
+    outputVisibleTo,
+  } = redactV2Content(
+    {
+      traceId: t.traceId,
+      timestamp: t.timestamp,
+      name: t.traceName || t.name,
+      rootSpanType: t.rootSpanType ?? null,
+      status: t.status,
+      input: t.input ?? null,
+      output: t.output ?? null,
+    },
+    protections,
+  );
+  return {
+    traceId: t.traceId,
+    timestamp: t.timestamp,
+    name: t.traceName || t.name,
+    rootSpanType: t.rootSpanType ?? null,
+    status: t.status,
+    input,
+    output,
+    inputRedacted,
+    outputRedacted,
+    inputVisibleTo,
+    outputVisibleTo,
+    totalTokens: t.totalTokens,
+    // Spend follows the viewer's own `cost:view` (ADR-057), the same rule the
+    // session rows and the trace header apply through `gateSessionCost` /
+    // `gateHeaderCost`. Without it a viewer who may not read the session
+    // rollup could add the same total up one turn at a time.
+    totalCost: protections.canSeeCosts === true ? t.totalCost : null,
+  };
 }
 
 /**
@@ -1096,7 +1156,7 @@ export const tracesV2Router = createTRPCRouter({
         query: z.string().nullish(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const app = getApp();
       const protections = await getUserProtectionsForProject(ctx, {
@@ -1140,7 +1200,7 @@ export const tracesV2Router = createTRPCRouter({
         query: z.string().nullish(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const app = getApp();
       const protections = await getUserProtectionsForProject(ctx, {
@@ -1194,7 +1254,7 @@ export const tracesV2Router = createTRPCRouter({
         timeRange: timeRangeSchema,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(
       async ({ input }): Promise<Record<string, TraceEventRollup>> =>
         getApp().traces.spans.getTraceEventRollupsByTraceIds({
@@ -1212,7 +1272,7 @@ export const tracesV2Router = createTRPCRouter({
         query: z.string().nullish(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input }) => {
       const app = getApp();
       return app.traces.list.getFacets({
@@ -1231,7 +1291,7 @@ export const tracesV2Router = createTRPCRouter({
         query: z.string().nullish(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input }) => {
       const app = getApp();
       const count = await app.traces.list.getNewCount({
@@ -1252,7 +1312,7 @@ export const tracesV2Router = createTRPCRouter({
         limit: z.number().int().min(1).max(100).default(20),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input }) => {
       const app = getApp();
       const values = await app.traces.list.getSuggestions({
@@ -1276,7 +1336,7 @@ export const tracesV2Router = createTRPCRouter({
         conversationId: z.string().min(1),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const app = getApp();
       const protections = await getUserProtectionsForProject(ctx, {
@@ -1301,44 +1361,9 @@ export const tracesV2Router = createTRPCRouter({
           input.projectId,
         ),
       });
-      const turns = page.items.map((t) => {
-        // Carry the permission-nulled input/output AND the redaction flags so a
-        // hidden turn renders the "Redacted" marker in the conversation strip /
-        // view instead of an empty "(no message)" placeholder that would read
-        // as a genuinely-absent turn.
-        const {
-          input,
-          output,
-          inputRedacted,
-          outputRedacted,
-          inputVisibleTo,
-          outputVisibleTo,
-        } = redactV2Content(
-          {
-            traceId: t.traceId,
-            timestamp: t.timestamp,
-            name: t.traceName || t.name,
-            rootSpanType: t.rootSpanType ?? null,
-            status: t.status,
-            input: t.input ?? null,
-            output: t.output ?? null,
-          },
-          protections,
-        );
-        return {
-          traceId: t.traceId,
-          timestamp: t.timestamp,
-          name: t.traceName || t.name,
-          rootSpanType: t.rootSpanType ?? null,
-          status: t.status,
-          input,
-          output,
-          inputRedacted,
-          outputRedacted,
-          inputVisibleTo,
-          outputVisibleTo,
-        };
-      });
+      const turns = page.items.map((t) =>
+        toConversationContextTurn({ trace: t, protections }),
+      );
       // Position/previous/next are derived client-side from the active
       // traceId so the cache key doesn't churn on J/K navigation.
       return {
@@ -1355,7 +1380,7 @@ export const tracesV2Router = createTRPCRouter({
         timeRange: timeRangeSchema,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input }) => {
       const app = getApp();
       return app.traces.list.getDiscover({
@@ -1376,13 +1401,12 @@ export const tracesV2Router = createTRPCRouter({
    */
   onDiscoverUpdate: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .subscription(async function* (opts) {
       const { projectId } = opts.input;
       const emitter = getApp().broadcast.getTenantEmitter(projectId);
       try {
         for await (const eventArgs of on(emitter, "discover_updated", {
-          // @ts-expect-error - signal is not typed
           signal: opts.signal,
         })) {
           yield eventArgs[0];
@@ -1403,7 +1427,7 @@ export const tracesV2Router = createTRPCRouter({
         offset: z.number().int().min(0).default(0),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input }) => {
       const app = getApp();
       return app.traces.list.getFacetValues({
@@ -1424,7 +1448,7 @@ export const tracesV2Router = createTRPCRouter({
         timeRange: timeRangeSchema,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .mutation(async ({ input }) => {
       return generateTraceQueryFromPrompt({
         projectId: input.projectId,
@@ -1445,7 +1469,7 @@ export const tracesV2Router = createTRPCRouter({
         timeRange: timeRangeSchema,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .mutation(async ({ input }) => {
       return generateTraceAction({
         projectId: input.projectId,
@@ -1487,7 +1511,7 @@ export const tracesV2Router = createTRPCRouter({
         full: z.boolean().default(true),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }): Promise<TraceHeader> => {
       const app = getApp();
       const protections = await getUserProtectionsForProject(ctx, {
@@ -1539,7 +1563,7 @@ export const tracesV2Router = createTRPCRouter({
         newName: z.string(),
       }),
     )
-    .use(checkProjectPermission("traces:update"))
+    .permission("traces:update")
     .mutation(async ({ input, ctx }) => {
       const trimmed = input.newName.trim();
       const parsed = changeTraceNameInputSchema.safeParse({ newName: trimmed });
@@ -1577,7 +1601,7 @@ export const tracesV2Router = createTRPCRouter({
         metadata: traceMetadataUpdateSchema,
       }),
     )
-    .use(checkProjectPermission("traces:update"))
+    .permission("traces:update")
     .mutation(async ({ input }) => {
       await updateTraceMetadata(input);
       return { traceId: input.traceId };
@@ -1593,7 +1617,7 @@ export const tracesV2Router = createTRPCRouter({
         ...spanReadHintShape,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const app = getApp();
       const protections = await getUserProtectionsForProject(ctx, {
@@ -1631,7 +1655,7 @@ export const tracesV2Router = createTRPCRouter({
         ...spanReadHintShape,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const app = getApp();
       const protections = await getUserProtectionsForProject(ctx, {
@@ -1669,7 +1693,7 @@ export const tracesV2Router = createTRPCRouter({
         ...spanReadHintShape,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(
       async ({
         input,
@@ -1710,7 +1734,7 @@ export const tracesV2Router = createTRPCRouter({
         ...spanReadHintShape,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }): Promise<SpanTreeNode[]> => {
       const app = getApp();
       const protections = await getUserProtectionsForProject(ctx, {
@@ -1744,7 +1768,7 @@ export const tracesV2Router = createTRPCRouter({
         ...spanReadHintShape,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }): Promise<SpanTreeNode[]> => {
       const app = getApp();
       const protections = await getUserProtectionsForProject(ctx, {
@@ -1775,7 +1799,7 @@ export const tracesV2Router = createTRPCRouter({
         ...spanReadHintShape,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input }): Promise<SpanLangwatchSignals[]> => {
       const app = getApp();
       const rows = await app.traces.spans.getLangwatchSignalsByTraceId({
@@ -1799,7 +1823,7 @@ export const tracesV2Router = createTRPCRouter({
         ...spanReadHintShape,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }): Promise<SpanDetail[]> => {
       return loadProtectedSpansFull({ input, ctx });
     }),
@@ -1825,7 +1849,7 @@ export const tracesV2Router = createTRPCRouter({
         ...spanReadHintShape,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }): Promise<CodingAgentTranscript> => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
@@ -1845,7 +1869,7 @@ export const tracesV2Router = createTRPCRouter({
         ...spanReadHintShape,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }): Promise<SpanDetail> => {
       const app = getApp();
       const protections = await getUserProtectionsForProject(ctx, {
@@ -1985,7 +2009,7 @@ export const tracesV2Router = createTRPCRouter({
         ...spanReadHintShape,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }): Promise<TraceResourceInfoDto> => {
       const app = getApp();
       const protections = await getUserProtectionsForProject(ctx, {
@@ -2040,7 +2064,7 @@ export const tracesV2Router = createTRPCRouter({
         ...spanReadHintShape,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }): Promise<DerivedTraceEvent[]> => {
       const app = getApp();
       const protections = await getUserProtectionsForProject(ctx, {
@@ -2063,7 +2087,7 @@ export const tracesV2Router = createTRPCRouter({
         traceId: z.string(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input }) => {
       const app = getApp();
       return app.evaluations.runs.findByTraceId(input.projectId, input.traceId);
@@ -2089,7 +2113,7 @@ export const tracesV2Router = createTRPCRouter({
         traceId: z.string(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input }) => {
       const app = getApp();
       // Two keyed seeks (ADR-056 §4): the (trace → session) map, then the
@@ -2123,7 +2147,7 @@ export const tracesV2Router = createTRPCRouter({
         ...spanReadHintShape,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .query(async ({ input, ctx }): Promise<TraceLogRecordDto[]> => {
       // The free-plan teaser window and the viewer's captured-content
       // permissions are both applied inside the loader, which the transcript

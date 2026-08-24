@@ -16,6 +16,14 @@ import { trpcClient } from "~/utils/api";
 export interface LangyTurnRequestContext {
   projectId: string;
   conversationId: string | null;
+  /**
+   * The conversation id a panel-open warm minted ahead of the first message
+   * (specs/langy/langy-worker-prewarm.feature). Only consulted when there is
+   * no active conversation: the create call adopts it so the first turn lands
+   * on the worker the warm already booted, instead of spawning under a fresh
+   * server-minted id.
+   */
+  pendingConversationId?: string | null;
   modelOverride?: string;
   pageContext?: LangyResourceContext[];
   skills?: LangySkillContext[];
@@ -27,10 +35,21 @@ export interface LangyTurnRequestContext {
  * manager's typed plan snapshot into the store, which the plan card prefers over
  * parsing the raw `todowrite` tool part.
  */
-export type LangyTurnSignalEntry = Extract<
-  LangyStreamEntry,
-  { type: "status" | "progress" | "milestone" | "reasoning" | "plan" }
->;
+export type LangyTurnSignalEntry =
+  | (Extract<LangyStreamEntry, { type: "status" }> & {
+      /**
+       * The status arrived BEFORE this stream produced any output — the
+       * manager's readiness placeholder for silence ("Starting Langy…",
+       * "Thinking…"). The panel suppresses a readiness status once the answer
+       * is visible: a replayed stream re-delivers it after text is already on
+       * screen, and a placeholder under the reply reads as a contradiction.
+       */
+      readiness?: boolean;
+    })
+  | Extract<
+      LangyStreamEntry,
+      { type: "progress" | "milestone" | "reasoning" | "plan" }
+    >;
 
 /**
  * How a turn stream terminated. "end" is the genuine end-of-turn frame — the
@@ -97,6 +116,15 @@ export function createLangyChatTransport(
   return {
     async sendMessages(options) {
       const ctx = deps.getContext();
+      // A create carries THIS send and nothing else. The useChat state can still
+      // hold the previous conversation when the user starts a new chat
+      // mid-stream, and anything else in it seeds the new conversation, and the
+      // title generated from it, with the old exchange. Every user message was
+      // the same failure with the answers stripped out: the old questions still
+      // went through.
+      const lastUserMessage = options.messages.findLast(
+        (message) => message.role === "user",
+      );
       const turnInput = {
         // One logical send, one identity: minted fresh on every sendMessages
         // call (each composer submit / regenerate re-arms with a new key), so
@@ -112,33 +140,20 @@ export function createLangyChatTransport(
         ...(ctx.skills?.length ? { skills: ctx.skills } : {}),
       };
 
-      // The vanilla client's proxy inference collapses on this router (see
-      // api.tsx / the onTurnStream call below), so invoke the mutation by dotted
-      // path and cast — the same escape hatch the subscription path uses.
-      //
-      // The call MUST stay attached to `trpcClient`. `TRPCUntypedClient.mutation`
-      // runs `this.requestAsPromise(...)`, so a detached `const mutate =
-      // trpcClient.mutation` drops `this` and throws "Cannot read properties of
-      // undefined (reading 'requestAsPromise')" synchronously — before any
-      // request leaves the browser. The arrow keeps the property access inline
-      // (like the api.tsx sibling and the onTurnStream call below), so `this` is
-      // bound to the client.
-      const mutate = (
-        path: string,
-        input: unknown,
-      ): Promise<StartTurnResponse> =>
-        (
-          trpcClient.mutation as (
-            path: string,
-            input: unknown,
-          ) => Promise<StartTurnResponse>
-        )(path, input);
-      const { conversationId, turnId } = ctx.conversationId
-        ? await mutate("langy.continueConversation", {
+      const { conversationId, turnId }: StartTurnResponse = ctx.conversationId
+        ? await trpcClient.langy.continueConversation.mutate({
             ...turnInput,
             conversationId: ctx.conversationId,
           })
-        : await mutate("langy.createConversation", turnInput);
+        : await trpcClient.langy.createConversation.mutate({
+            ...turnInput,
+            messages: lastUserMessage ? [lastUserMessage] : [],
+            // Adopt the warmed conversation when the panel holds one, so the
+            // first turn reuses the worker the panel open already booted.
+            ...(ctx.pendingConversationId
+              ? { conversationId: ctx.pendingConversationId }
+              : {}),
+          });
       deps.onIds({ conversationId, turnId });
 
       return subscribeTurnStream({
@@ -205,7 +220,7 @@ function subscribeTurnStream({
       controller.enqueue({ type: "start" });
       controller.enqueue({ type: "text-start", id: textId });
 
-      // The manager emits a readiness status ("Waking Langy up…") into the cold window
+      // The manager emits a readiness status ("Starting Langy…") into the cold window
       // (worker tool prep produces no frames for many seconds). It is a
       // placeholder for SILENCE, so the first real output — text, a tool, the
       // model's reasoning — retires it; without this the status line would
@@ -248,6 +263,8 @@ function subscribeTurnStream({
             onSignal(entry);
             return;
           case "status":
+            onSignal({ ...entry, readiness: !sawOutput });
+            return;
           case "progress":
           case "milestone":
             onSignal(entry);
@@ -267,24 +284,10 @@ function subscribeTurnStream({
         }
       };
 
-      // The vanilla client's proxy inference collapses on this router (see
-      // api.tsx), so call the subscription by dotted path and cast — the same
-      // escape hatch the mutation path uses.
-      sub = (
-        trpcClient.subscription as (
-          path: string,
-          input: unknown,
-          opts: {
-            onData: (entry: LangyStreamEntry) => void;
-            onError: (err: unknown) => void;
-            onComplete: () => void;
-          },
-        ) => Unsubscribable
-      )(
-        "langy.onTurnStream",
+      sub = trpcClient.langy.onTurnStream.subscribe(
         { projectId, conversationId, turnId },
         {
-          onData: onEntry,
+          onData: (entry) => onEntry(entry as LangyStreamEntry),
           onError: (err) => {
             if (closed) return;
             controller.enqueue({
