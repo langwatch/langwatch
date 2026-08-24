@@ -276,6 +276,41 @@ self-serve OIDC connections are the whole surface. The choice
 genericOAuth-with-SAML) moves to D05's onboarding, where the first customer
 who needs it arrives. It remains this ADR's named debt.
 
+### Revision (2026-08-24) — a fourth verification method, from D05
+
+§5 names the DNS ceremony and the self-hosted licence token; the D04 revision
+above adds `legacy-configuration`. D05's onboarding adds a fourth,
+**`operator-attested`**, and the full set is now `dns-txt` · `license-token` ·
+`operator-attested` · `legacy-configuration` (the last requestable by nobody).
+
+D05's first and highest-value tier is a LangWatch operator onboarding a hosted
+customer from the back office. That operator already approves the customer's
+domain claim, and **the approval is the trust decision** — §5's abuse boundary
+was always the manual approval, never the record. Making the same operator
+then wait on a TXT record the customer publishes buys a round-trip and no
+security. So attestation replaces the *proof* and never the *approval*: the
+claim is claimed, approved and audited exactly as before, and an attested
+domain is precisely as trustworthy as the approval already in the flow.
+
+It is requestable **only by a platform operator**. An organization
+administrator can never attest their own domain, which keeps `dns-txt` as the
+proof for hosted self-serve — the case where a stranger claims a domain we
+have no other reason to believe is theirs, and the one this ADR's
+first-verifier-owns rule is defending. Every other guard is unchanged:
+first-verifier-owns still refuses a domain another ACTIVE connection holds,
+and activation still needs a verified domain, a recorded test login and a live
+break-glass binding.
+
+**An attestation does not expire, and there is no DNS upgrade path.** No other
+method's verification expires — DNS TXT expires the *token* before it is
+found, never the verification — so an expiry unique to attestation would make
+it the only method able to stop routing with nobody having decided anything,
+which is the lockout class the break-glass binding exists to prevent. Suspend
+already does what an expiry would do, and does it better: always available,
+immediate, reversible, and taken by a human when it matters, with the dispute
+answered from event history. The reasoning in full is in
+`../identity-platform/D04-sso-connection-aggregate.md`'s amendment section.
+
 ### Revision (2026-08-24) — the screen-level no-oracle is retired
 
 D13's implementation converts both dead ends into the other journey, at the

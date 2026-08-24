@@ -35,7 +35,7 @@ Feature: The platform operator identity lookup - the end of database surgery
   #   actions, each one a guarded command with the operator on it:
   #     confirm a proposed sign-in · reject one · detach a method ·
   #     resend an invitation · extend one · end somebody's sessions ·
-  #     approve a domain claim · reject a domain claim
+  #     approve a domain claim · reject a domain claim · attest a domain
   #
   # THE READ IS ITSELF THE ACT. Resolving an address here crosses every
   # organization on the installation, so it is authorized and recorded
@@ -235,6 +235,13 @@ Feature: The platform operator identity lookup - the end of database surgery
     When "olive" approves the claim
     Then "acme" can ask for its domain proof without anybody else acting
     And the approval is recorded with "olive" on it
+
+  @integration @unimplemented
+  Scenario: Approving a claim for a customer being onboarded leads straight into attesting it
+    Given "olive" has just approved "acme"'s claim on "acme.com" while onboarding it
+    When she attests the domain in the same sitting
+    Then "acme" is asked to publish nothing and to wait for nobody
+    And the approval and the attestation are two facts, each recorded against "olive"
 
   @integration @unimplemented
   Scenario: Rejecting a domain claim needs a note, and the customer reads that note
