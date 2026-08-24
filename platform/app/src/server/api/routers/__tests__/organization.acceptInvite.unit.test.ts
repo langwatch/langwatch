@@ -52,6 +52,17 @@ vi.mock("@ee/governance/services/personalWorkspace.service", () => ({
   },
 }));
 
+// Identifier-aware acceptance (D11): the router asks the identity runtime
+// for the user's verified addresses. `null` = not on identifiers, keep the
+// legacy session-email comparison — the default here so the pre-identifier
+// tests exercise exactly the legacy branch.
+const verifiedEmailsOfMock = vi.hoisted(() =>
+  vi.fn().mockResolvedValue(null),
+);
+vi.mock("~/server/app-layer/identity/runtime", () => ({
+  identityEmail: () => ({ verifiedEmailsOf: verifiedEmailsOfMock }),
+}));
+
 // The invite's grants are ledger commands (ADR-092 delivery-plan PR 2).
 const ledger = vi.hoisted(() => ({
   attachBindings: vi.fn(),
@@ -193,6 +204,52 @@ describe("organization.acceptInvite", () => {
       expect(inviteUpdateMock.mock.invocationCallOrder[0]!).toBeLessThan(
         ledger.attachBindings.mock.invocationCallOrder[0]!,
       );
+    });
+  });
+
+  describe("when the signed-in user is on identifiers", () => {
+    /** @scenario "Acceptance requires verification and an exact normalized match" */
+    it("accepts through any verified identifier matching the invite's normalized address", async () => {
+      // The invite targets the work address with the admin's casing and a
+      // plus tag; the user is signed in as their personal email, but a
+      // VERIFIED Google identifier holds the work address.
+      findUniqueMock.mockResolvedValue(
+        makeInvite({ status: "PENDING", email: "Sam.J+team@Acme.com" }),
+      );
+      verifiedEmailsOfMock.mockResolvedValueOnce([
+        { identifierId: "idf_g", value: "sam.j@acme.com", provider: "google" },
+      ]);
+
+      const caller = createCaller("sam@personal.net");
+      const result = await caller.acceptInvite({ inviteCode: "test-code" });
+
+      expect(result.success).toBe(true);
+      // The claim records which identifier vouched for the acceptance.
+      expect(inviteUpdateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            acceptedViaIdentifierId: "idf_g",
+          }),
+        }),
+      );
+    });
+
+    it("refuses when no verified identifier holds the invited address", async () => {
+      // The session email HAPPENS to equal the invite's address, but for a
+      // user on identifiers the proven set is the authority — an address
+      // nothing verified never opens an invitation.
+      findUniqueMock.mockResolvedValue(
+        makeInvite({ status: "PENDING", email: "user@example.com" }),
+      );
+      verifiedEmailsOfMock.mockResolvedValueOnce([
+        { identifierId: "idf_o", value: "other@acme.com", provider: "email" },
+      ]);
+
+      const caller = createCaller();
+      await expect(
+        caller.acceptInvite({ inviteCode: "test-code" }),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(createManyMock).not.toHaveBeenCalled();
     });
   });
 

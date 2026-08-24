@@ -69,6 +69,10 @@ export {
   verifyIdentifierCommandDataSchema,
 } from "./facts";
 export { identifierDomain, normalizeIdentifierValue } from "./identifier";
+export {
+  type MatchableEmail,
+  matchableEmailsOf,
+} from "./matchable-emails";
 export { primaryEmailOf } from "./primary-email";
 export { reduceIdentity } from "./reduce";
 export {

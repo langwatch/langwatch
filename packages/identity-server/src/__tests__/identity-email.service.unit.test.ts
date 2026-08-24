@@ -67,3 +67,64 @@ describe("the identity email read fork", () => {
     });
   });
 });
+
+describe("the verified emails a user can accept an invitation through", () => {
+  describe("given a user whose backfill is finalized", () => {
+    it("answers every proven address with the identifier that vouches for it", async () => {
+      const { service, heads } = harness();
+      heads.heads.set(USER, {
+        userId: USER,
+        identifiers: {
+          idf_primary: fact({
+            identifierId: "idf_primary",
+            value: "chosen@acme.com",
+            state: "PRIMARY",
+          }),
+          idf_google: fact({
+            identifierId: "idf_google",
+            provider: "google",
+            value: "sam@home.net",
+            state: "VERIFIED",
+          }),
+          idf_attached: fact({
+            identifierId: "idf_attached",
+            value: "unproven@acme.com",
+            state: "ATTACHED",
+          }),
+        },
+      });
+
+      expect(await service.verifiedEmailsOf({ userId: USER })).toEqual([
+        {
+          identifierId: "idf_google",
+          value: "sam@home.net",
+          provider: "google",
+        },
+        {
+          identifierId: "idf_primary",
+          value: "chosen@acme.com",
+          provider: "email",
+        },
+      ]);
+    });
+  });
+
+  describe("given a user whose backfill is not finalized", () => {
+    it("answers null so the caller keeps the legacy comparison", async () => {
+      const { service } = harness({ onIdentity: false });
+
+      expect(await service.verifiedEmailsOf({ userId: USER })).toBeNull();
+    });
+  });
+
+  describe("when the projection cannot be read", () => {
+    it("answers null rather than failing the acceptance path", async () => {
+      const { service, heads } = harness();
+      vi.spyOn(heads, "findHeads").mockRejectedValue(
+        new Error("postgres unavailable"),
+      );
+
+      expect(await service.verifiedEmailsOf({ userId: USER })).toBeNull();
+    });
+  });
+});

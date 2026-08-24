@@ -1,10 +1,12 @@
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { declareAuthzMiddleware } from "@langwatch/authz";
+import { normalizeIdentifierValue } from "@langwatch/identity";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { fireTeamMemberInvitedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
 import { fireInviteAcceptedNurturingCalls } from "~/../ee/billing/nurturing/hooks/inviteAcceptance";
 import { env } from "~/env.mjs";
+import { identityEmail } from "~/server/app-layer/identity/runtime";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
@@ -1043,17 +1045,35 @@ export const organizationRouter = createTRPCRouter({
         });
       }
 
-      // Case-insensitive email comparison: BetterAuth lowercases emails
-      // during signup/signin (see `findUserByEmail` in
-      // node_modules/better-auth/dist/db/internal-adapter.mjs) so
-      // `session.user.email` is always lowercase, but `invite.email`
-      // preserves the admin's original casing. A strict `!==` would
-      // reject an "Alice@Acme.com" invite for an "alice@acme.com" user.
-      // The old NextAuth flow worked accidentally because it didn't
-      // lowercase emails either — this is now a real mismatch post-migration.
-      if (
-        session.user.email.toLowerCase() !== invite.email.trim().toLowerCase()
-      ) {
+      // Identifier-aware acceptance (D11): an invitation targets an address,
+      // and ANY of the signed-in user's VERIFIED identifiers holding that
+      // address vouches for them — password, Google, or the org's SSO. The
+      // person invited by email who signed in with their Google account is
+      // no longer a support ticket.
+      //
+      // A user not yet on identifiers answers `null` and keeps the legacy
+      // comparison byte-for-byte: BetterAuth lowercases emails during
+      // signup/signin so `session.user.email` is always lowercase, while
+      // `invite.email` preserves the admin's original casing — hence the
+      // case-insensitive compare.
+      const matchable = await identityEmail().verifiedEmailsOf({
+        userId: session.user.id,
+      });
+      let viaIdentifierId: string | null = null;
+      let inviteEmailMatches: boolean;
+      if (matchable === null) {
+        inviteEmailMatches =
+          session.user.email.toLowerCase() ===
+          invite.email.trim().toLowerCase();
+      } else {
+        const normalizedInviteEmail = normalizeIdentifierValue(invite.email);
+        const hit = matchable.find(
+          (candidate) => candidate.value === normalizedInviteEmail,
+        );
+        inviteEmailMatches = hit !== undefined;
+        viaIdentifierId = hit?.identifierId ?? null;
+      }
+      if (!inviteEmailMatches) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: `The invite was sent to ${invite.email}, but you are signed in as ${session.user.email}`,
@@ -1067,6 +1087,7 @@ export const organizationRouter = createTRPCRouter({
       await InviteService.create(prisma).applyInvite({
         userId: session.user.id,
         invite,
+        viaIdentifierId,
       });
 
       // Provision the user's Personal Workspace (Team.isPersonal +
