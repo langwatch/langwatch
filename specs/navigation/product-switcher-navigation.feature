@@ -138,6 +138,14 @@ Feature: Product switcher navigation
     Then the highlighted project opens
 
   @integration
+  Scenario: Typing highlights the top result
+    Given my organization holds more than eight projects
+    And the project menu is open
+    When I type enough of a project's name to narrow the list
+    Then the first result is already highlighted, with no arrow key pressed
+    And Enter opens it, by the scenario above
+
+  @integration
   Scenario: Creating a project stays available while the list is unfiltered
     Given my organization holds more than eight projects
     When I open the project menu without typing
