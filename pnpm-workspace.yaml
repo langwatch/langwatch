@@ -189,7 +189,7 @@ overrides:
   tmp: ">=0.2.6"
   # @hono/node-server request smuggling. Per-major: the 2.x line is a separate
   # advisory and an unconditional floor would force 1.x dependents onto 2.
-  "@hono/node-server@<1.19.13": ">=1.19.13"
+  "@hono/node-server@<1.19.13": ">=1.19.13 <2"
   "@hono/node-server@>=2.0.0 <2.0.10": ">=2.0.10"
   # ...and path-scoped for the MCP SDK specifically. With two range selectors
   # already present for this name, pnpm matched only the first and left the
@@ -233,8 +233,9 @@ overrides:
   # fast-xml-builder attribute value quote bypass (#1028)
   "fast-xml-builder@<1.1.7": ">=1.1.7"
   # fast-uri path traversal + host confusion (#1031-#1042), with two further
-  # advisories fixed in 3.1.4 and 3.1.5.
-  "fast-uri@<3.1.5": ">=3.1.5"
+  # advisories fixed in 3.1.4 and 3.1.5. Capped: uncapped this resolves 4.1.2,
+  # while its only dependent, ajv 8, declares ^3.0.1.
+  "fast-uri@<3.1.5": ">=3.1.5 <4"
   # systeminformation command injection / privilege issues across five
   # advisories; 5.31.7 is the first release above all of them.
   "systeminformation@<5.31.7": ">=5.31.7"
@@ -244,8 +245,12 @@ overrides:
   # minimumReleaseAgeExclude below can resolve. Widen to a range and drop the
   # exclude once 8.0.x ages past the gate.
   "deepmerge-ts@<8.0.0": "8.0.0"
-  # body-parser DoS on malformed urlencoded input.
-  "body-parser@<1.20.6": ">=1.20.6"
+  # body-parser DoS on malformed urlencoded input. Capped to the 1.x line:
+  # uncapped this resolves 2.3.0 under express 4, which declares ~1.20.5. On 2.x
+  # req.body is undefined rather than {} for a request with no body or an
+  # unmatched content-type, so a handler reading req.body throws. 1.20.6 carries
+  # the same fix with no behaviour change.
+  "body-parser@<1.20.6": ">=1.20.6 <2"
   # @langchain/community SSRF / path traversal in loaders is deliberately NOT
   # pinned. The advisory range is `<=1.1.17`, which covers the 0.3.59 this tree
   # actually resolves, and the first patched release is 1.1.18 — i.e. the only
