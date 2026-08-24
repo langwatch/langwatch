@@ -29,6 +29,7 @@ import {
   isOttlEnabledSourceType,
   OTTL_ENABLED_SOURCE_TYPES,
 } from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
+import { hasPollerCursor } from "@ee/governance/services/pullers/pollerCursor";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
@@ -62,6 +63,11 @@ function toDto(row: {
   name: string;
   description: string | null;
   parserConfig: unknown;
+  // Required, not optional: if a future `select` clause stops fetching this,
+  // `hasPollerCursor` would silently answer false for every source and the
+  // edit form would offer a backfill start that cannot take effect. Better a
+  // compile error than a setting that quietly does nothing.
+  pollerCursor: unknown;
   status: string;
   traceProjectId: string | null;
   lastEventAt: Date | null;
@@ -84,6 +90,18 @@ function toDto(row: {
     name: row.name,
     description: row.description,
     parserConfig: safeParser,
+    /**
+     * Whether a pull has already minted a cursor — NOT the cursor itself,
+     * which is adapter-internal and of no use to a client.
+     *
+     * The edit form needs this to know whether the backfill start is still in
+     * play: the usage cursor deliberately never rewinds, so once one exists
+     * the setting is accepted and then ignored. `status` is not a usable proxy
+     * for it in either direction — a source that pulled successfully but
+     * recorded zero events is still `awaiting_first_event` while holding a
+     * cursor, and one disabled before its first run never held one.
+     */
+    hasPollerCursor: hasPollerCursor(row.pollerCursor),
     status: row.status,
     traceProjectId: row.traceProjectId,
     lastEventAt: row.lastEventAt,

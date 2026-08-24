@@ -24,6 +24,7 @@
 import { pullScheduleSchema } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/events";
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
 import { syncIngestionPullSource } from "@ee/governance/services/pullers/ingestionPullLifecycle";
+import { hasPollerCursor } from "@ee/governance/services/pullers/pollerCursor";
 import {
   HandledError,
   NotFoundError,
@@ -32,10 +33,10 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { createHash, randomBytes } from "crypto";
 import { env } from "~/env.mjs";
-import type {
-  IngestionSource,
+import {
+  type IngestionSource,
   Prisma,
-  PrismaClient,
+  type PrismaClient,
 } from "~/generated/prisma/client";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { getApp } from "~/server/app-layer/app";
@@ -186,6 +187,106 @@ function assertPullSchedule(pullSchedule: string): void {
     complaints.join(" ") || "Pull schedule is not a valid cron expression",
     { meta: { formErrors: complaints } },
   );
+}
+
+/**
+ * What `assertReportUnchangedOncePulled` permitted, and on what basis.
+ *
+ * The guard answers a question about a row it read a moment ago, and the write
+ * it clears happens later. For most of its answers that gap is harmless — a
+ * config that names no report has no report to protect, and an edit that
+ * leaves the report alone stays correct however the row moves underneath.
+ *
+ * One answer is not like the others: a report change is allowed only while the
+ * source has no cursor, and a pull run can give it one at any moment. Read at
+ * a moment when the column was empty, that permission is already stale by the
+ * time it is acted on, and acting on it produces exactly the double-counted
+ * spend the guard exists to prevent. So the verdict says which kind of yes it
+ * was, and the caller is obliged to hold the row still for the one that needs
+ * it. A boolean rather than a re-derivation because the two would drift: the
+ * caller would have to ask "was this a report change?" a second time, in its
+ * own words, and be wrong about it independently.
+ */
+export type ReportImmutabilityVerdict = {
+  cursorMustNotMove: boolean;
+};
+
+/** The row may move freely; nothing this guard allowed depended on it. */
+const REPORT_UNAFFECTED: ReportImmutabilityVerdict = {
+  cursorMustNotMove: false,
+};
+
+/** A report change, allowed only because the cursor was absent when asked. */
+const CURSOR_MUST_NOT_MOVE: ReportImmutabilityVerdict = {
+  cursorMustNotMove: true,
+};
+
+/**
+ * Refuse a change of report kind on a source that has already pulled.
+ *
+ * The Anthropic adapter's two reports price the same spend twice over — its
+ * header states the invariant as "Never both", because usage is priced by us
+ * and cost is the provider's own figure for the identical consumption. A
+ * source obeys that invariant by picking one at create time, and its events
+ * carry that choice in their ids: `usage:*` or `cost:*`, never a mix.
+ *
+ * Editing the report kind is what breaks it. The adapter derives a query
+ * identity from the report, so a changed report no longer matches the stored
+ * cursor; the cursor is discarded, the new report replays from the backfill
+ * start, and its events land in a namespace the old ones never occupied. No
+ * row is overwritten because nothing collides — the two sets simply coexist,
+ * both counting the same money, which is the outcome the adapter says must
+ * never happen.
+ *
+ * This lives in the service rather than in the form because the invariant is
+ * a property of the stored events, not of the drawer: the form declining to
+ * offer the edit is a courtesy, and a caller that skips the form would
+ * otherwise walk straight past it. The cursor is the test for "has pulled"
+ * because it is the same thing the adapter consults, and it is read through
+ * the shared predicate so the two cannot drift apart.
+ */
+export function assertReportUnchangedOncePulled({
+  existing,
+  incoming,
+}: {
+  existing: Pick<IngestionSource, "parserConfig" | "pollerCursor">;
+  incoming: Record<string, unknown>;
+}): ReportImmutabilityVerdict {
+  const stored = (existing.parserConfig as Record<string, unknown>) ?? {};
+  const storedReport = stored.report;
+  if (typeof storedReport !== "string") return REPORT_UNAFFECTED;
+  if (incoming.report === storedReport) return REPORT_UNAFFECTED;
+
+  // The one permission this guard grants on the strength of something that
+  // can change while it is being granted. Everything above holds whatever the
+  // puller does next: a stored config with no report has none to protect, and
+  // an unchanged report is not the edit that breaks the invariant. This branch
+  // is different — it says yes *because* the column was empty a moment ago,
+  // and the caller has to keep it empty all the way to the write.
+  if (!hasPollerCursor(existing.pollerCursor)) return CURSOR_MUST_NOT_MOVE;
+
+  // An omitted report is still refused — `data.parserConfig` replaces the
+  // stored JSON wholesale, so letting it through would delete the report
+  // rather than preserve it, and the source would come back up configured for
+  // neither. But it is not the same mistake as asking for the other report,
+  // and telling a caller they changed something they never sent is how a
+  // serialization bug gets read as a deliberate edit.
+  if (incoming.report === undefined) {
+    const missing =
+      `This source is configured for its ${storedReport} report, and has ` +
+      "already pulled it. An update that replaces the configuration has to " +
+      "carry the same report value rather than omit it.";
+    throw new ValidationError(missing, { meta: { formErrors: [missing] } });
+  }
+
+  const complaint =
+    `This source has already pulled its ${storedReport} report. ` +
+    "Changing the report would record the same spend a second time under " +
+    "the other report, so it is fixed once a source has run. Archive this " +
+    "source and create a new one to switch reports.";
+  throw new ValidationError(complaint, {
+    meta: { formErrors: [complaint] },
+  });
 }
 
 async function syncPullProcessBestEffort({
@@ -448,6 +549,10 @@ export class IngestionSourceService {
       assertPullSchedule(input.pullSchedule);
     }
     const data: Prisma.IngestionSourceUpdateInput = {};
+    // Set by the report-immutability guard below, and read at the write. It
+    // lives out here because the guard only runs on the parserConfig path
+    // while the write is shared by every path.
+    let cursorMustNotMove = false;
     if (input.name !== undefined) data.name = input.name;
     if (input.description !== undefined) data.description = input.description;
     if (input.parserConfig !== undefined) {
@@ -480,6 +585,10 @@ export class IngestionSourceService {
           incoming[key] = stored[key];
         }
       }
+      ({ cursorMustNotMove } = assertReportUnchangedOncePulled({
+        existing,
+        incoming,
+      }));
       assertPullDestinationAllowed(incoming);
       data.parserConfig = encryptParserConfigCredentials(
         incoming,
@@ -504,14 +613,82 @@ export class IngestionSourceService {
         ? { connect: { id: input.teamId } }
         : { disconnect: true };
     }
-    const source = await this.prisma.ingestionSource.update({
-      where: { id: existing.id },
-      data,
-    });
+    const source = cursorMustNotMove
+      ? await this.updateHoldingTheCursorStill({ existing, data })
+      : await this.prisma.ingestionSource.update({
+          where: { id: existing.id },
+          data,
+        });
     if (existing.pullSchedule !== null || source.pullSchedule !== null) {
       await syncPullProcessBestEffort({ prisma: this.prisma, source });
     }
     return source;
+  }
+
+  /**
+   * The same update, refused rather than applied if the poller cursor moved
+   * since the guard read it.
+   *
+   * `assertReportUnchangedOncePulled` clears a report change by observing that
+   * the source has no cursor yet. Between that read and this write a pull run
+   * can complete and record one, and the update then lands on a source that
+   * has pulled — the state the guard refuses when it can see it, reached by
+   * arriving a few milliseconds late. Nothing about the result looks wrong
+   * afterwards: no row collides, no constraint fires, and the same spend is
+   * simply counted twice, once under each report.
+   *
+   * Two things close it, and both are needed. The `updateMany` carries the
+   * cursor the decision was made on in its `where`, so a cursor written in the
+   * gap makes it match nothing and the transaction is abandoned with the row
+   * untouched. And because it is a write rather than a read, Postgres holds a
+   * row lock from that point until commit, so a pull run arriving after the
+   * check waits instead of interleaving with the update that follows. A plain
+   * `SELECT` inside the transaction would give neither: under READ COMMITTED
+   * it takes no lock, and the puller would write straight past it.
+   *
+   * The cost is one extra statement, paid only on this path — a report change
+   * on a source that has never pulled, which happens while an admin is fixing
+   * a source they just created. Every other edit takes the unpinned write,
+   * because pinning them would fail a routine rename for the sole reason that
+   * a scheduled pull happened to land in the same second.
+   *
+   * `Prisma.AnyNull` rather than `null`: the column is `Json?` and the two
+   * writers disagree about which null they store — the projection repository
+   * writes `Prisma.JsonNull` (a JSON null) while a never-written column holds
+   * SQL NULL. Both read back as JS `null`, so a pin derived from the read has
+   * to match either, or the guard's most common case — a source that has never
+   * pulled at all — would conflict with itself.
+   */
+  private async updateHoldingTheCursorStill({
+    existing,
+    data,
+  }: {
+    existing: IngestionSource;
+    data: Prisma.IngestionSourceUpdateInput;
+  }): Promise<IngestionSource> {
+    return await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.ingestionSource.updateMany({
+        where: {
+          id: existing.id,
+          pollerCursor:
+            existing.pollerCursor === null
+              ? { equals: Prisma.AnyNull }
+              : { equals: existing.pollerCursor as Prisma.InputJsonValue },
+        },
+        data: { updatedAt: new Date() },
+      });
+      if (count === 0) {
+        const raced =
+          "This source started pulling while the change was being saved, " +
+          "and the report can no longer be changed. Reload the source to " +
+          "see its current configuration.";
+        throw new ValidationError(raced, { meta: { formErrors: [raced] } });
+      }
+      return await tx.ingestionSource.update({
+        where: { id: existing.id },
+        data,
+      });
+    });
   }
 
   /**
