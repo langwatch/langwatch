@@ -247,30 +247,6 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
   // which calls it `network_error` and means it.
   if (isSystemError(record)) return null;
 
-  // Dialect 4: the canonical envelope, nested under `error`. Read first because
-  // it is unambiguous — dialects 1 and 3 both need `error` to be a STRING, so an
-  // object there naming a code can only be this one.
-  const canonical = asRecord(record.error);
-  if (
-    canonical &&
-    (typeof canonical.code === "string" || typeof canonical.type === "string")
-  ) {
-    const code =
-      typeof canonical.code === "string"
-        ? canonical.code
-        : (canonical.type as string);
-    return {
-      code,
-      message:
-        typeof canonical.message === "string" ? canonical.message : undefined,
-      meta: asRecord(canonical.meta) ?? {},
-      traceId:
-        typeof canonical.trace_id === "string" ? canonical.trace_id : undefined,
-      reasons: asReasons(asRecord(canonical.meta)?.reasons),
-      suggestions: asSuggestions(asRecord(canonical.meta)?.suggestions),
-    };
-  }
-
   // Dialect 2: the serialised HandledError, carried whole under `domainError`.
   const serialized = asRecord(record.domainError);
   if (

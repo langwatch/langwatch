@@ -97,6 +97,13 @@
 		"userPrompt": "Take my agent to the next level"
 	},
 	{
+		"id": "lwql-charts",
+		"label": "Lwql charts",
+		"description": "Author a saved analytics chart from a plain question and place it on a dashboard. Discovers the LangWatchQL analytics schema, writes and test-runs the SQL, saves it as a chart with a Vega-Lite specification, and places it where the team already looks. Use when asked to build, save, run, or dashboard a metric or chart.",
+		"category": "recipe",
+		"userPrompt": "Build a chart from a question and put it on my dashboard"
+	},
+	{
 		"id": "online-evaluations",
 		"label": "Online evaluations",
 		"description": "Configure LangWatch online evaluations and guardrails for production traffic. Use when the user wants to score live traces or threads, monitor production quality, sample incoming traffic, or synchronously block unsafe requests and responses. Do not use for batch experiments.",
