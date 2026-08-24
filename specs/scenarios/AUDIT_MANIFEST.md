@@ -4,6 +4,21 @@ Phase 0 audit of every unimplemented-tagged scenario under `specs/scenarios/` (2
 
 Tracking: https://github.com/langwatch/langwatch/issues/3458
 
+## Agent Testing v2 additions
+
+Three spec files were added for Agent Testing v2. They are outside the #3458
+audit: they describe behavior being built now, not legacy debt.
+
+| File | Tagging | Note |
+|------|---------|------|
+| scenario-folder-assignment.feature | all bound tags | Bound as WS1 and WS2 land. |
+| scenario-versioning.feature | all bound tags | Bound as WS1 phase 3 lands. |
+| scenario-version-on-runs.feature | all bound tags | Bound as WS1 phase 3 lands. |
+| scenario-version-restore.feature | all `@unimplemented` | Restore ships in phase 4. Rows below. |
+
+The `@unimplemented` rows of `scenario-version-restore.feature` are listed in
+the manifest table at the end of this file, class KEEP.
+
 ## TL;DR
 
 | Class | Count | % | Phase 1 action |
@@ -270,3 +285,12 @@ Concentrations:
 | specs/scenarios/scenario-drawer-close-on-save.feature | "Drawer stays open when save fails" | DUPLICATE | ScenarioFormDrawer.integration.test "when save fails keeps drawer open" + error toast assertions. |
 | specs/scenarios/scenario-drawer-close-on-save.feature | "Drawer stays open after save-and-run" | UPDATE | ScenarioFormDrawer.integration.test asserts save-and-run CLOSES drawer + navigates; behavior contradicts scenario. |
 | specs/scenarios/scenario-event-repository-tracing.feature | "<method> emits an OTel span with correct attributes" | DUPLICATE | scenario-event-repository-tracing.unit.test.ts covers all 6 listed methods with span name/kind/attrs. |
+| specs/scenarios/scenario-version-restore.feature | "Restoring an older version writes a new version at the top" | KEEP | Agent Testing v2 phase 4. Model and list/get land in phase 3; restore is the append-only write on top. |
+| specs/scenarios/scenario-version-restore.feature | "The restore entry says which version it came from" | KEEP | Agent Testing v2 phase 4. Needs the restore write path before a test can bind. |
+| specs/scenarios/scenario-version-restore.feature | "A restore can be undone by restoring the version before it" | KEEP | Agent Testing v2 phase 4. Append-only history makes this fall out of the write path. |
+| specs/scenarios/scenario-version-restore.feature | "Restoring the newest version still writes an entry" | KEEP | Agent Testing v2 phase 4. Pins that restore never becomes a no-op. |
+| specs/scenarios/scenario-version-restore.feature | "A restore brings back the editable content and nothing else" | KEEP | Agent Testing v2 phase 4. Folder membership and run history stay untouched by a restore. |
+| specs/scenarios/scenario-version-restore.feature | "Restoring a version that does not exist is refused with scenario_version_not_found" | KEEP | Agent Testing v2 phase 4. Error code follows the experiment_version_not_found precedent. |
+| specs/scenarios/scenario-version-restore.feature | "Restoring a version of a case in another project is refused with not_found" | KEEP | Agent Testing v2 phase 4. Tenancy guard on the restore path. |
+| specs/scenarios/scenario-version-restore.feature | "A viewer cannot restore a version" | KEEP | Agent Testing v2 phase 4. Restore is a scenarios:manage action. |
+| specs/scenarios/scenario-version-restore.feature | "Restoring an archived test case is refused" | KEEP | Agent Testing v2 phase 4. Archived cases take no writes. |

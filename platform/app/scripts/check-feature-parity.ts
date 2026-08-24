@@ -428,10 +428,7 @@ const LEGACY_INERT: string[] = [
   "specs/features/monitor-cli.feature",
   "specs/features/onboarding/primary-use-setting.feature",
   "specs/features/prompt-versions-cli.feature",
-  "specs/features/scenario-cli.feature",
   "specs/features/secret-cli.feature",
-  "specs/features/simulation-runs-cli.feature",
-  "specs/features/suite-cli.feature",
   "specs/features/suites/collapsible-suite-sidebar.feature",
   "specs/features/suites/footer-to-header-migration.feature",
   "specs/features/suites/inline-add-target-and-scenario-buttons.feature",
@@ -550,6 +547,13 @@ const LEGACY_INERT: string[] = [
   "specs/scenarios/scenario-drawer-close-on-save.feature",
   "specs/scenarios/scenario-editor-new-agent-flow.feature",
   "specs/scenarios/scenario-library.feature",
+  // Agent Testing v2: restoring an older test case version. Written in phase
+  // 0 with the rest of the v2 specs so the append-only rule is agreed before
+  // the write path exists, and parked whole because restore ships in the last
+  // phase. Every scenario is @unimplemented on purpose, which is why the file
+  // enforces none. Remove this entry when the restore path lands and the
+  // scenarios take their @unit / @integration tags.
+  "specs/scenarios/scenario-version-restore.feature",
   "specs/secrets/secrets-manager.feature",
   // Helm chart behaviour, verified by charts/langwatch/tests/e2e-overlays.sh.
   // The checker now scans that directory (DEFAULT_SHELL_TEST_ROOTS), so these
