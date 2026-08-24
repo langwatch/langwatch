@@ -78,14 +78,14 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
     Then the same states were recorded in the same order
     And no tier skipped a guard, and no tier recorded a state another cannot
 
-  @integration @unimplemented
+  @integration
   Scenario: A tier that has not shipped never blocks one that has
     Given this installation offers no way for a customer to claim a domain themselves
     When an operator onboards a customer from the back office
     Then the connection reaches live traffic
     And nothing in the journey waited on a queue
 
-  @unit @unimplemented
+  @unit
   Scenario: Which tier a connection came through stays readable afterwards
     Given connections set up by an operator, by a licensed self-hosted administrator, and through a reviewed claim
     When each connection's history is read
@@ -94,72 +94,72 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
 
   # ── Tier 1: an operator sets a customer up ─────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: An operator takes a customer from nothing to a connection ready to go live
     When "olive" registers "acme"'s identity provider, claims "acme.com", approves the claim and attests the domain
     Then the connection is ready to activate before "olive" leaves the page
     And every step is recorded as a separate fact with "olive" named on it
 
-  @integration @unimplemented
+  @integration
   Scenario: Setting a customer up asks the customer for nothing until they sign in
     Given "olive" has attested "acme.com" for "acme"
     When the setup is read back
     Then the only thing still wanted from "acme" is somebody completing a test sign-in
     And "acme" was never asked to publish a record or to wait for anybody
 
-  @integration @unimplemented
+  @integration
   Scenario: What proved the domain is on the connection wherever it is read
     Given "olive" attested "acme.com"
     When the connection is opened, in the back office or from the operator lookup
     Then it says the domain was attested, by whom, and when
     And it never reads as a domain the customer proved
 
-  @unit @unimplemented
+  @unit
   Scenario: The operator approving the claim they just made is recorded as exactly that
     When "olive" claims a domain and approves it
     Then both facts are recorded, each naming "olive"
     And nothing on the connection implies a second person reviewed it
 
-  @integration @unimplemented
+  @integration
   Scenario: Activation from the back office needs everything activation ever needs
     Given "acme"'s domain is proved but nobody has completed a test sign-in
     When "olive" activates the connection
     Then the activation is refused with the code "sso_connection_activation_blocked"
     And the words name the proved domain, the test sign-in, and a way back in without the identity provider
 
-  @integration @unimplemented
+  @integration
   Scenario: The connection list behaves like every other back-office list
     When "olive" opens the single sign-on connections list
     Then it searches, pages and shows its loading and empty states the way the other back-office lists do
     And each row's actions are in that row's overflow menu, with removal set apart as destructive
 
-  @integration @unimplemented
+  @integration
   Scenario: A connection's detail opens beside the list, not on a page of its own
     When "olive" opens a connection from the list
     Then its state, its domains, its identity provider reference and its history open in a drawer
     And closing the drawer returns to the list where it was
 
-  @unit @unimplemented
+  @unit
   Scenario: The connections page is reachable from the operator menu
     Given the operator menu offers the single sign-on connections page
     When each menu link is resolved against the application's route table
     Then the connections entry resolves to a route registered for that exact path
     And no entry falls through to the catch-all route
 
-  @unit @unimplemented
+  @unit
   Scenario: An operator cannot change a connection except by commanding it
     When "olive" changes anything about a connection
     Then the change is a guarded command carrying "olive" as the actor
     And no field on the surface writes straight to storage
 
-  @integration @unimplemented
+  @integration
   Scenario: The old single sign-on fields stop being where single sign-on is set up
     Given connection routing decides sign-ins on this installation
     When "olive" edits the organization's older single sign-on domain or provider fields
     Then the edit is refused with the code "sso_connection_string_edit_retired"
     And the words point at the organization's connection instead
 
-  @integration @unimplemented
+  @integration
   Scenario: Removing a live connection states its own risk before it happens
     Given "acme"'s connection is routing sign-ins
     When "olive" starts removing it
@@ -290,7 +290,7 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
 
   # ── Only OIDC, and it says so ──────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: Setting up a SAML connection is not something anybody does themselves yet
     When a SAML connection is registered through the back office or through Settings
     Then it is refused with the code "sso_saml_not_self_serve"
@@ -397,7 +397,7 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
     Then no single sign-on setup entry is offered
     And opening the address directly is refused
 
-  @unit @unimplemented
+  @unit
   Scenario: Approving somebody else's domain claim is an operator's act, not an administrator's
     Given "ana" holds every permission her organization can grant
     When she tries to approve her own organization's domain claim
@@ -406,13 +406,13 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
 
   # ── Failures are named, never generic ──────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: Every refusal on these surfaces carries a code and words written for a customer
     When any onboarding step is refused for a reason we can name
     Then the answer carries a stable code
     And the words the reader sees are the ones registered for that code, never the code and never "unknown"
 
-  @unit @unimplemented
+  @unit
   Scenario: A failure we cannot name degrades honestly and stays traceable
     Given a step fails for a reason nobody anticipated
     When the reader is told

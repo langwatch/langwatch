@@ -328,6 +328,10 @@ model SsoConnection {
   approvedDomains     String[]
   /// The only domains that ever route, and only while state is ACTIVE.
   verifiedDomains     String[]
+  /// [{ domain, method, actorId, verifiedAtMs }] - what proved each verified
+  /// domain, and who. Kept on the row rather than only in the log so that an
+  /// operator-attested domain can never be read as one the customer proved.
+  domainVerifications Json      @default("[]")
   /// { domain, method, tokenHash } while a ceremony is in flight.
   pendingVerification Json?
   idpMetadata         Json

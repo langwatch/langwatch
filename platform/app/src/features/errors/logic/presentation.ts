@@ -1752,6 +1752,21 @@ const presentations = {
     describe: () =>
       "Some people can only sign in through it. Give them another verified sign-in method first, then remove it.",
   },
+  sso_connection_operator_act_required: {
+    // Read by two very different people: a LangWatch operator whose session
+    // is no longer on the staff list, and an organization administrator who
+    // found the command another way. The words serve the second, because the
+    // first can read the trace id — and they point at the thing that IS
+    // available to an administrator rather than stopping at "no".
+    title: "Only LangWatch can decide this",
+    describe: () =>
+      "Approving a domain claim and vouching for a domain are LangWatch's to do. Prove the domain by publishing the record we give you, or contact support.",
+  },
+  sso_saml_not_self_serve: {
+    title: "SAML connections are set up with us",
+    describe: () =>
+      "Single sign-on you can set up yourself is OpenID Connect for now. Contact support to set up SAML and we will do it with you.",
+  },
   identity_link_proposed: {
     title: "An administrator needs to confirm this sign-in",
     // Deliberately says nothing about whether an account exists, who holds the

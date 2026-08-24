@@ -30,6 +30,7 @@ import { getServerAuthSession } from "~/server/auth";
 import { auth as betterAuth } from "~/server/better-auth";
 import { prisma } from "~/server/db";
 import { UserService } from "~/server/users/user.service";
+import { adminSurfaceHidden } from "../adminSurfaceHidden";
 import {
   mapUserToBackofficeRow,
   USER_BACKOFFICE_INCLUDE,
@@ -46,36 +47,6 @@ const adminAuth = handlerManagedAuth({
   permissions: [],
   credential: "session",
 });
-
-/**
- * The answer to "you are not an admin", which deliberately says nothing more.
- *
- * A 404 rather than a 403 so the admin surface doesn't confirm its own
- * existence to whoever is probing it, and the generic `not_found` code rather
- * than something naming the backoffice, for the same reason. It goes through
- * the handled channel anyway so the response carries a trace id — an operator
- * whose session quietly stopped being an admin has something to quote.
- *
- * The identifying fields are the part that has to stay out. `NotFoundError`
- * builds `"<resource> not found: <id>"` and puts the id in `meta`, so the
- * earlier spelling answered `{ error: "not_found", message: "Route not found:
- * /api/admin", id: "/api/admin" }` — byte-for-byte distinguishable from the
- * framework's own 404 for a path that was never registered, which told a
- * prober the route exists and they merely lack the session for it. Only the
- * code and the trace id are carried now.
- */
-function adminSurfaceHidden(): HandledError {
-  return new AdminSurfaceHiddenError();
-}
-
-class AdminSurfaceHiddenError extends HandledError {
-  declare readonly code: "not_found";
-
-  constructor() {
-    super("not_found", "Not found", { httpStatus: 404, fault: "customer" });
-    this.name = "AdminSurfaceHiddenError";
-  }
-}
 
 /**
  * The caller has an app session but no live auth session behind it.

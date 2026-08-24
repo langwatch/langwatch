@@ -1,0 +1,23 @@
+-- What proved each verified domain, on the connection itself (D05 tier 1,
+-- amending D04 - see specs/identity/sso-onboarding-tiers.feature and the
+-- amendment section of specs/identity/sso-connection-lifecycle.feature).
+--
+-- `operator-attested` joins `dns-txt`, `license-token` and
+-- `legacy-configuration` as a way a domain can be proved, and it is the
+-- weakest of them: a LangWatch operator stating out of band that the domain
+-- is that organization's. An attestation does not expire, so the price of it
+-- standing indefinitely is that the weaker evidence must never become
+-- invisible. `verifiedDomains` is a bare string array and cannot carry that,
+-- so the method - and who proved it, and when - rides here, on every read of
+-- the connection rather than only in the event log.
+--
+-- Additive and fold-written like every other column on this row: a replay
+-- rebuilds it, and the `[]` default is what an existing row folded before
+-- this column existed reads as until its next event or its next replay.
+--
+-- To roll back, uncomment and run manually. Dropping the column loses only
+-- fold-written projection state, which replay rebuilds from the event log.
+-- ALTER TABLE "SsoConnection" DROP COLUMN "domainVerifications";
+
+-- AlterTable
+ALTER TABLE "SsoConnection" ADD COLUMN     "domainVerifications" JSONB NOT NULL DEFAULT '[]';

@@ -23,6 +23,7 @@ import type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
+  SsoPlatformOperatorRepository,
 } from "@langwatch/identity-server";
 import {
   IdentityGuards,
@@ -386,6 +387,9 @@ export interface PipelineRepositories {
   ssoConnectionStranding: SsoConnectionStrandingRepository;
   /** Activation's break-glass precondition (D05 hardens it). */
   ssoBreakGlassBindings: SsoBreakGlassBindingRepository;
+  /** Whether an actor is a LangWatch platform operator — what makes deciding
+   *  a domain claim and attesting a domain operator acts (D05 tier 1). */
+  ssoPlatformOperators: SsoPlatformOperatorRepository;
   /** How the teardown grace wake dispatches its completion command. */
   ssoConnectionTeardown: ConnectionTeardownPort;
 }
@@ -715,6 +719,7 @@ export class PipelineRegistry {
           connections: this.deps.repositories.ssoConnectionReads,
           breakGlass: this.deps.repositories.ssoBreakGlassBindings,
           stranding: this.deps.repositories.ssoConnectionStranding,
+          platformOperators: this.deps.repositories.ssoPlatformOperators,
         }),
         teardown: this.deps.repositories.ssoConnectionTeardown,
       }),

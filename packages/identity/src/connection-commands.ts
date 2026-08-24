@@ -35,6 +35,8 @@ export const DISCARD_CONNECTION_COMMAND_TYPE =
   "lw.identity.discard_connection" as const;
 export const REQUEST_VERIFICATION_COMMAND_TYPE =
   "lw.identity.request_verification" as const;
+export const ATTEST_DOMAIN_COMMAND_TYPE =
+  "lw.identity.attest_domain" as const;
 export const VERIFY_DOMAIN_COMMAND_TYPE = "lw.identity.verify_domain" as const;
 export const ACTIVATE_CONNECTION_COMMAND_TYPE =
   "lw.identity.activate_connection" as const;
@@ -64,6 +66,7 @@ export const SSO_CONNECTION_COMMAND_TYPES = [
   REJECT_DOMAIN_CLAIM_COMMAND_TYPE,
   DISCARD_CONNECTION_COMMAND_TYPE,
   REQUEST_VERIFICATION_COMMAND_TYPE,
+  ATTEST_DOMAIN_COMMAND_TYPE,
   VERIFY_DOMAIN_COMMAND_TYPE,
   ACTIVATE_CONNECTION_COMMAND_TYPE,
   SUSPEND_CONNECTION_COMMAND_TYPE,
@@ -155,6 +158,20 @@ export type RequestVerificationCommandData = z.infer<
   typeof requestVerificationCommandDataSchema
 >;
 
+/**
+ * A platform operator attesting a domain (D05 tier 1). Carries the domain and
+ * nothing else: no method, because there is only one way to attest, and no
+ * token hash, because nothing was published.
+ *
+ * Who may command it is not a field here — a boolean on the wire saying "I am
+ * an operator" would be the caller asserting its own authorization. The guard
+ * asks a platform-operator port about `actor` instead.
+ */
+export const attestDomainCommandDataSchema = commandDataSchema(domainShape);
+export type AttestDomainCommandData = z.infer<
+  typeof attestDomainCommandDataSchema
+>;
+
 export const verifyDomainCommandDataSchema = commandDataSchema(domainShape);
 export type VerifyDomainCommandData = z.infer<
   typeof verifyDomainCommandDataSchema
@@ -242,6 +259,7 @@ export type SsoConnectionCommand =
       type: typeof REQUEST_VERIFICATION_COMMAND_TYPE;
       data: RequestVerificationCommandData;
     }
+  | { type: typeof ATTEST_DOMAIN_COMMAND_TYPE; data: AttestDomainCommandData }
   | { type: typeof VERIFY_DOMAIN_COMMAND_TYPE; data: VerifyDomainCommandData }
   | {
       type: typeof ACTIVATE_CONNECTION_COMMAND_TYPE;

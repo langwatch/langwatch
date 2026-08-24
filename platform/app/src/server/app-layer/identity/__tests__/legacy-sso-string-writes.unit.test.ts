@@ -4,6 +4,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { env } from "~/env.mjs";
+import { explainHandledError } from "~/features/errors/logic/presentation";
 import {
   assertLegacySsoStringWriteAllowed,
   legacySsoStringColumnsIn,
@@ -60,6 +61,40 @@ describe("the legacy sso string columns", () => {
           ssoProvider: "okta",
         }),
       ).toEqual(["ssoDomain", "ssoProvider"]);
+    });
+
+    /** @scenario "The old single sign-on fields stop being where single sign-on is set up" */
+    it("points the reader at the organization's connection instead", () => {
+      envMock.SSOCONN_ROUTING = "enforce";
+
+      const refusal = (() => {
+        try {
+          assertLegacySsoStringWriteAllowed({
+            data: { ssoProvider: "okta" },
+          });
+          return null;
+        } catch (error) {
+          return error as { code: string };
+        }
+      })();
+      expect(refusal?.code).toBe("sso_connection_string_edit_retired");
+
+      // The words a reader actually sees come from the registry keyed by the
+      // code, never from the error's own message — which for a handled error
+      // on the wire IS the code. They have to send the reader somewhere.
+      const copy = explainHandledError({
+        code: "sso_connection_string_edit_retired",
+        meta: {},
+        httpStatus: 409,
+        fault: "customer",
+        tips: [],
+        docsUrl: undefined,
+        traceId: undefined,
+        reasons: [],
+      });
+      expect(copy.isRegistered).toBe(true);
+      expect(copy.description).toMatch(/connection/i);
+      expect(copy.description).not.toMatch(/sso_connection_string_edit/);
     });
 
     /** @scenario "After the flip, the strings stop being written" */

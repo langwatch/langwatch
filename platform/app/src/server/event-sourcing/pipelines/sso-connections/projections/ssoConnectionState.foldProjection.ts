@@ -21,10 +21,12 @@ import {
   connectionResumedEventSchema,
   connectionSuspendedEventSchema,
   connectionTornDownEventSchema,
+  type DomainAttestedEvent,
   type DomainClaimApprovedEvent,
   type DomainClaimedEvent,
   type DomainClaimRejectedEvent,
   type DomainVerifiedEvent,
+  domainAttestedEventSchema,
   domainClaimApprovedEventSchema,
   domainClaimedEventSchema,
   domainClaimRejectedEventSchema,
@@ -48,6 +50,7 @@ const ssoConnectionEvents = [
   domainClaimRejectedEventSchema,
   connectionDiscardedEventSchema,
   verificationRequestedEventSchema,
+  domainAttestedEventSchema,
   domainVerifiedEventSchema,
   connectionActivatedEventSchema,
   connectionSuspendedEventSchema,
@@ -161,6 +164,13 @@ export class SsoConnectionStateFoldProjection
 
   handleIdentityVerificationRequested(
     event: VerificationRequestedEvent,
+    state: SsoConnectionFoldState,
+  ): SsoConnectionFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityDomainAttested(
+    event: DomainAttestedEvent,
     state: SsoConnectionFoldState,
   ): SsoConnectionFoldState {
     return this.fold(event, state);
