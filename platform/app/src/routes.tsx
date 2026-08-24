@@ -603,6 +603,16 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/[project]/experiments/[experiment]")),
       },
 
+      // Agent Testing (catch-all, behind release_ui_agent_testing_v2_enabled)
+      {
+        path: "/:project/agent-testing",
+        ...page(() => import("./pages/[project]/agent-testing/[[...path]]")),
+      },
+      {
+        path: "/:project/agent-testing/*",
+        ...page(() => import("./pages/[project]/agent-testing/[[...path]]")),
+      },
+
       // Simulations (catch-all)
       {
         path: "/:project/simulations/scenarios",

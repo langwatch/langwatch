@@ -7,15 +7,17 @@
 
 import { Button, HStack, Input } from "@chakra-ui/react";
 import { useRef, useState } from "react";
-import { TagPill } from "./TagPill";
+import { TagPill, type TagPillTone } from "./TagPill";
 
 type TagListProps = {
   labels: string[];
   onRemove?: (label: string, index: number) => void;
   onAdd?: (label: string) => void;
+  /** How the pills are coloured. See TagPill. */
+  tone?: TagPillTone;
 };
 
-export function TagList({ labels, onRemove, onAdd }: TagListProps) {
+export function TagList({ labels, onRemove, onAdd, tone }: TagListProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const submittedRef = useRef(false);
@@ -56,6 +58,7 @@ export function TagList({ labels, onRemove, onAdd }: TagListProps) {
         <TagPill
           key={`${label}-${index}`}
           label={label}
+          tone={tone}
           onRemove={onRemove ? () => onRemove(label, index) : undefined}
         />
       ))}

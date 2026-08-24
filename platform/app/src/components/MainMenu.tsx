@@ -227,6 +227,13 @@ function TestSection({
   pathname,
   pendingAnnotationCount,
 }: ProjectSectionProps & { pendingAnnotationCount: number | undefined }) {
+  // Agent Testing replaces the Simulations group with a single destination.
+  // While the flag is off the group stays exactly as it is.
+  const { enabled: agentTestingEnabled } = useFeatureFlag(
+    "release_ui_agent_testing_v2_enabled",
+    { projectId: project?.id, enabled: !!project?.id },
+  );
+
   return (
     <SidebarSection
       id="test"
@@ -234,36 +241,47 @@ function TestSection({
       showExpanded={showExpanded}
       projectId={project?.id}
     >
-      <CollapsibleMenuGroup
-        icon={featureIcons.simulations.icon}
-        label={projectRoutes.simulations.title}
-        project={project}
-        showLabel={showExpanded}
-        children={[
-          {
-            icon: featureIcons.scenarios.icon,
-            label: projectRoutes.scenarios.title,
-            ...projectScopedDestination({
-              path: projectRoutes.scenarios.path,
+      {agentTestingEnabled ? (
+        <PageMenuLink
+          path={projectRoutes.agent_testing.path}
+          icon={featureIcons.agent_testing.icon}
+          label={projectRoutes.agent_testing.title}
+          project={project}
+          isActive={pathname.includes("/agent-testing")}
+          showLabel={showExpanded}
+        />
+      ) : (
+        <CollapsibleMenuGroup
+          icon={featureIcons.simulations.icon}
+          label={projectRoutes.simulations.title}
+          project={project}
+          showLabel={showExpanded}
+          children={[
+            {
+              icon: featureIcons.scenarios.icon,
               label: projectRoutes.scenarios.title,
-              project,
-            }),
-            isActive: pathname.includes("/simulations/scenarios"),
-          },
-          {
-            icon: featureIcons.simulation_runs.icon,
-            label: projectRoutes.simulation_runs.title,
-            ...projectScopedDestination({
-              path: projectRoutes.simulation_runs.path,
+              ...projectScopedDestination({
+                path: projectRoutes.scenarios.path,
+                label: projectRoutes.scenarios.title,
+                project,
+              }),
+              isActive: pathname.includes("/simulations/scenarios"),
+            },
+            {
+              icon: featureIcons.simulation_runs.icon,
               label: projectRoutes.simulation_runs.title,
-              project,
-            }),
-            isActive:
-              pathname.includes("/simulations") &&
-              !pathname.includes("/simulations/scenarios"),
-          },
-        ]}
-      />
+              ...projectScopedDestination({
+                path: projectRoutes.simulation_runs.path,
+                label: projectRoutes.simulation_runs.title,
+                project,
+              }),
+              isActive:
+                pathname.includes("/simulations") &&
+                !pathname.includes("/simulations/scenarios"),
+            },
+          ]}
+        />
+      )}
 
       <PageMenuLink
         path={projectRoutes.experiments.path}
