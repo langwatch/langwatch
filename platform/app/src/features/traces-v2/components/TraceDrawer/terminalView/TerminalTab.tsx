@@ -65,14 +65,14 @@ export function TerminalTab({
     { projectId, traceId, occurredAtMs },
     { refetchOnWindowFocus: false, staleTime: 60_000 },
   );
-  // The version/model/repo Claude Code itself would print above the prompt.
-  // Sourced from the resource attributes rather than the coding-agent-session
-  // fold: that fold is a bounded aggregate (ADR-041) and deliberately doesn't
-  // carry identity strings the drawer already has a dedicated read for.
+  // The version/model/repo Claude Code itself would print above the prompt,
+  // off the resource attributes (the session fold deliberately carries no
+  // identity strings, ADR-041).
   const resourceQuery = api.tracesV2.resourceInfo.useQuery(
     { projectId, traceId, occurredAtMs },
     { refetchOnWindowFocus: false, staleTime: 60_000 },
   );
+  const sessionCostUsd = useSessionCostUsd({ projectId, traceId });
 
   const toolSpans = useMemo(
     () =>
@@ -115,18 +115,7 @@ export function TerminalTab({
   }
 
   if (transcriptQuery.isError) {
-    return (
-      <VStack
-        align="center"
-        justify="center"
-        height="full"
-        bg={TERMINAL_TOKENS.screenBg}
-      >
-        <Text textStyle="xs" color="fg.error" fontFamily="mono">
-          Couldn&apos;t load this session&apos;s transcript
-        </Text>
-      </VStack>
-    );
+    return <TranscriptError />;
   }
 
   return (
@@ -138,8 +127,46 @@ export function TerminalTab({
       scrollback={scrollback}
       earlierTotals={session.earlierTotals}
       sessionStartAtMs={session.sessionStartAtMs}
+      sessionCostUsd={sessionCostUsd}
       banner={banner}
       sessionName={sessionName}
     />
   );
+}
+
+function TranscriptError() {
+  return (
+    <VStack
+      align="center"
+      justify="center"
+      height="full"
+      bg={TERMINAL_TOKENS.screenBg}
+    >
+      <Text textStyle="xs" color="fg.error" fontFamily="mono">
+        Couldn&apos;t load this session&apos;s transcript
+      </Text>
+    </VStack>
+  );
+}
+
+/**
+ * The whole session's cost for the bottom bar, off the same pre-folded row
+ * the Usage tab reads (and the same query, so opening both tabs fetches
+ * once). The replay walks backward only and its turn list is bounded, so the
+ * bar's running figure alone understates any session bigger than what loaded
+ * — stating this total beside it is what keeps a position-scoped number from
+ * passing for the session total.
+ */
+function useSessionCostUsd({
+  projectId,
+  traceId,
+}: {
+  projectId: string;
+  traceId: string;
+}): number | null {
+  const sessionQuery = api.tracesV2.codingAgentSession.useQuery(
+    { projectId, traceId },
+    { refetchOnWindowFocus: false, staleTime: 60_000 },
+  );
+  return sessionQuery.data?.costUsd ?? null;
 }

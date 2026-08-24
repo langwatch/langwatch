@@ -140,10 +140,14 @@ jobs:
         # here is what makes them run, and they run on forks too. They guard the
         # dspy thread-affinity crash that broke every evaluation after the first
         # one on a long-lived server, the event-loop block that made the health
-        # probe time out under load, and the worker-count detection that has to
-        # survive a bad value without stopping the boot.
+        # probe time out under load, the worker-count detection that has to
+        # survive a bad value without stopping the boot, and the litellm patch
+        # that decides what actually leaves for the provider — `langevals_core/
+        # tests/` runs on the secret-bearing step by default, which forks skip,
+        # so a contributor could otherwise break the request shape and see CI
+        # stay green.
         working-directory: services/langevals
-        run: uv run pytest -x -v evaluators/langevals/tests/test_llm_answer_match_threading.py tests/deterministic/
+        run: uv run pytest -x -v evaluators/langevals/tests/test_llm_answer_match_threading.py tests/deterministic/ langevals_core/tests/
 
   docker-build:
     needs: changes

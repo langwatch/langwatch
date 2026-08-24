@@ -193,12 +193,15 @@ secured.access(requires("evaluations:view")).get(
 );
 
 // ── Create Monitor ──────────────────────────────────────────
-// `:manage`, not `:create`. A monitor is not a definition sitting inert until
-// someone runs it: `executionMode` defaults to ON_MESSAGE, so the moment it
-// exists it evaluates every trace the project ingests, on its own, indefinitely.
-// Creating one is standing up a process, which is administration. The evaluator
-// routes keep `:create`, because an evaluator IS the inert definition.
-secured.access(requires("evaluations:manage")).post(
+// `:create`, matching the tRPC twin at `server/api/routers/monitors.ts` that the
+// UI's own "create monitor" button calls. That path already writes `enabled:
+// true` with the caller's `executionMode` while asking only for `:create`, so
+// demanding `:manage` here made the identical action cost more over REST than it
+// does in the product — it did not hold a line, it just picked off the callers
+// holding a least-privilege key. `:manage` still satisfies this via the rbac
+// hierarchy (`hasPermissionWithHierarchy`), so no existing caller loses access.
+// Deletion stays on `:manage` below, which is where the destructive line sits.
+secured.access(requires("evaluations:create")).post(
   "/",
   describeRoute({
     description: "Create a new online evaluation monitor",

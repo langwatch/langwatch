@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { DashboardService } from "../../dashboards/dashboard.service";
 import { dashboardErrorHandler } from "../../dashboards/middleware";
-import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -18,7 +17,7 @@ export const dashboardsRouter = createTRPCRouter({
    */
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("analytics:view"))
+    .permission("analytics:view")
     .use(dashboardErrorHandler)
     .query(async ({ ctx, input }) => {
       const service = DashboardService.create(ctx.prisma);
@@ -30,7 +29,7 @@ export const dashboardsRouter = createTRPCRouter({
    */
   getById: protectedProcedure
     .input(z.object({ projectId: z.string(), dashboardId: z.string() }))
-    .use(checkProjectPermission("analytics:view"))
+    .permission("analytics:view")
     .use(dashboardErrorHandler)
     .query(async ({ ctx, input }) => {
       const service = DashboardService.create(ctx.prisma);
@@ -47,7 +46,7 @@ export const dashboardsRouter = createTRPCRouter({
         name: z.string(),
       }),
     )
-    .use(checkProjectPermission("analytics:create"))
+    .permission("analytics:create")
     .use(dashboardErrorHandler)
     .mutation(async ({ ctx, input }) => {
       const service = DashboardService.create(ctx.prisma);
@@ -65,7 +64,7 @@ export const dashboardsRouter = createTRPCRouter({
         name: z.string(),
       }),
     )
-    .use(checkProjectPermission("analytics:update"))
+    .permission("analytics:update")
     .use(dashboardErrorHandler)
     .mutation(async ({ ctx, input }) => {
       const service = DashboardService.create(ctx.prisma);
@@ -86,7 +85,7 @@ export const dashboardsRouter = createTRPCRouter({
         dashboardId: z.string(),
       }),
     )
-    .use(checkProjectPermission("analytics:delete"))
+    .permission("analytics:delete")
     .use(dashboardErrorHandler)
     .mutation(async ({ ctx, input }) => {
       const service = DashboardService.create(ctx.prisma);
@@ -103,7 +102,7 @@ export const dashboardsRouter = createTRPCRouter({
         dashboardIds: z.array(z.string()),
       }),
     )
-    .use(checkProjectPermission("analytics:update"))
+    .permission("analytics:update")
     .use(dashboardErrorHandler)
     .mutation(async ({ ctx, input }) => {
       const service = DashboardService.create(ctx.prisma);
@@ -116,7 +115,7 @@ export const dashboardsRouter = createTRPCRouter({
    */
   getOrCreateFirst: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("analytics:view"))
+    .permission("analytics:view")
     .use(dashboardErrorHandler)
     .query(async ({ ctx, input }) => {
       const service = DashboardService.create(ctx.prisma);

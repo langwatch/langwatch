@@ -179,7 +179,7 @@ func TestRewriteRehomesSystemAttachmentToUser(t *testing.T) {
 	assert.Equal(t, "You are a vision grader. Image:", strings.TrimSpace(systemText),
 		"the system message keeps only the text before the image, not the image link")
 	assert.Equal(t, "user", out[1].Role)
-	firstPartOfType(t, out[1], "image_url") // the image rode into the user message
+	firstPartOfType(t, out[1], "image_url")
 }
 
 // @scenario "An unreachable attachment URL fails the run with a clear message naming the URL"

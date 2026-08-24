@@ -52,23 +52,37 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
   # ---------------------------------------------------------------------------
 
   # Between the prompt POST and the agent's first frame the worker prepares its
-  # tools and produces nothing. The manager fills that silence with a status —
-  # but the status must name what is actually happening, and it must not repeat
-  # the same line on every message of a conversation.
+  # tools and produces nothing. The manager fills that silence with a status,
+  # and the status must name what is actually happening: a boot, a round-trip
+  # to a running worker, or a resume.
 
   @unit
-  Scenario: A worker that has not served a turn yet says Langy is waking up
-    Given a turn is dispatched to a worker that has not served a turn yet
+  Scenario: A worker that has not served a turn yet says it is starting up
+    Given a brand-new conversation's turn spawned a worker that has not served a turn
     When the manager opens the turn
-    Then it emits a wake-up status such as "Waking Langy up…", "Giving Langy a pep talk…" or "Poking Langy…" before the first agent frame
-    And the line varies between conversations instead of repeating one phrase
+    Then it emits the status "Starting Langy…" before the first agent frame
 
   @unit
-  Scenario: A warm worker gets a short reaching-Langy line that varies
+  Scenario: A warm worker goes straight to thinking
     Given a turn is dispatched to a worker that has already served a turn
     When the manager opens the turn
-    Then it emits a short status such as "Paging Langy…" or "Pinging Langy…"
-    And the line varies between turns instead of repeating one phrase
+    Then it emits the status "Thinking…" and never the starting-up line
+
+  # The startup line is reserved for the one wait the user really has: a
+  # first-ever boot. A pre-warmed worker booted while the panel sat open, and
+  # a reaped follow-up worker respawns fast on the persisted session; either
+  # saying "starting" reads as the workspace having vanished.
+  @unit
+  Scenario: A pre-warmed worker's first turn goes straight to thinking
+    Given a turn is dispatched to a worker a pre-warm already booted
+    When the manager opens the turn
+    Then it emits the status "Thinking…" and never the starting-up line
+
+  @unit
+  Scenario: A follow-up on a respawned worker goes straight to thinking
+    Given a conversation with earlier replies whose worker was reaped
+    When the next turn respawns the worker and the manager opens the turn
+    Then it emits the status "Thinking…" and never the starting-up line
 
   @unit
   Scenario: A resumed turn says it is picking up where it left off
@@ -170,7 +184,7 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
   # A refresh that lands just as the turn finishes can miss the worker's terminal
   # frame (its relay connection dropped before it), so the buffer has no end/error
   # and the reconnected Stream A used to block until the hard per-turn deadline —
-  # the UI sat on "Starting up…" for minutes though the turn had finished. Stream A
+  # the UI sat on the startup status for minutes though the turn had finished. Stream A
   # now watches the durable fold + per-turn heartbeat and synthesizes the missed
   # terminal, but ONLY once the turn is provably settled so a live or cold-starting
   # turn is never cut off.

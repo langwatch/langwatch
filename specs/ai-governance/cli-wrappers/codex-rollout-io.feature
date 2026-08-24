@@ -138,12 +138,38 @@ Feature: Codex Path B recovers the full request body from the rollout transcript
     branch (which is what links it to its pull request) with no hooks.json
     entry and no per-hook trust grant.
 
+    What codex recorded is the weaker source and is read second. It is written
+    only when the session started inside a repository, and it is never revised,
+    so a reviewer that checks out one pull request's branch after another would
+    report the branch it opened with for the rest of its life. The harvest runs
+    on the machine that ran the turn, moments after it, so it reads the working
+    directory itself and answers for the turn it is harvesting.
+
     @unit
     Scenario: The harvest reports the repository the session worked on
       Given a rollout whose session_meta names a remote and a branch
       When the completed turn is harvested
       Then one session-context record posts beside the conversation
       And the codex session gains its repository and branch
+
+    @unit
+    Scenario: The reported branch follows the checkout, not the session's first minute
+      Given a session that has moved its checkout to another branch since it started
+      When the completed turn is harvested
+      Then the record names the branch the checkout is on now
+
+    @unit
+    Scenario: A session whose transcript records no repository still reports one
+      Given a rollout whose session_meta records no git identity
+      And a working directory that is a checkout
+      When the completed turn is harvested
+      Then the record names the repository of that working directory
+
+    @unit
+    Scenario: A transcript harvested away from its checkout keeps what codex recorded
+      Given a rollout whose working directory cannot be read as a repository
+      When the completed turn is harvested
+      Then the record falls back to the remote and branch in the session_meta
 
     @unit
     Scenario: A notify that fires after every turn posts the repository once

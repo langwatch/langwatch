@@ -4,6 +4,7 @@ import type {
   AuthzMigrationRepository,
   ExistingTeamBinding,
   ExternalMemberFact,
+  GrantHeadRow,
   LegacyBindingRow,
   LegacyRoleRow,
   LegacyTeamRow,
@@ -18,14 +19,12 @@ import type {
 } from "@langwatch/authz-server";
 import type { TenantMigrationStatus } from "@langwatch/system-migrations";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
-import { queryCutoverOnEngine } from "../cutover-gate";
 
-/**
- * How many guarded budget raises are in flight at once while seeding an
- * organization's view budgets. Bounded so an organization with thousands of
- * share links cannot open thousands of concurrent connections.
- */
-const BUDGET_RAISE_CONCURRENCY = 25;
+import { queryOrganizationOnAuthzEngine } from "../engine-gate";
+
+/** Seeds per budget statement. Four binds a row, so this sits well under
+ *  Postgres' 65535-parameter ceiling. */
+const BUDGET_SEED_CHUNK = 5_000;
 
 /**
  * ADR-092 stage B - storage for the in-place TeamUser backfill, the genesis
@@ -151,11 +150,52 @@ export class PrismaAuthzMigrationRepository
     return rows.map((row) => row.id);
   }
 
+  /** Every non-resource Grant head row, revoked included — the ADR-110
+   *  proof needs both directions: a live row to compare and a revoked one to
+   *  recognize as already denied. Resource rows have their own read
+   *  (`findResourceGrantRows`), which carries the tier's extra columns. */
+  async findGrantHeadRows({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<GrantHeadRow[]> {
+    const rows = await this.prisma.grant.findMany({
+      where: { organizationId, scopeType: { not: "RESOURCE" } },
+      select: {
+        id: true,
+        principalType: true,
+        principalId: true,
+        roleKey: true,
+        legacyRole: true,
+        source: true,
+        scopeType: true,
+        scopeId: true,
+        revokedAt: true,
+      },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      principalType: row.principalType,
+      principalId: row.principalId,
+      roleKey: row.roleKey,
+      legacyRole: row.legacyRole,
+      source: row.source,
+      scopeType: row.scopeType,
+      scopeId: row.scopeId,
+      revoked: row.revokedAt !== null,
+    }));
+  }
+
   async findRoleHeads({
     organizationId,
   }: {
     organizationId: string;
   }): Promise<RoleHeadRow[]> {
+    // Deleted heads included, and flagged: the proof has to tell a role the
+    // fold has never seen from one it has already buried. `liveRoles` is the
+    // fence for reads that DECIDE access; dropping tombstones here would make
+    // each read as a role still waiting to fold, holding the organization on
+    // a condition no later pass can clear.
     const rows = await this.prisma.role.findMany({
       where: { organizationId },
       select: {
@@ -164,9 +204,13 @@ export class PrismaAuthzMigrationRepository
         description: true,
         permissions: true,
         kind: true,
+        deletedAt: true,
       },
     });
-    return rows;
+    return rows.map(({ deletedAt, ...row }) => ({
+      ...row,
+      deleted: deletedAt !== null,
+    }));
   }
 
   async findLegacyTeamRows({
@@ -193,6 +237,20 @@ export class PrismaAuthzMigrationRepository
       customRoleId: row.assignedRoleId,
       createdAtMs: row.createdAt.getTime(),
     }));
+  }
+
+  /** Every (userId, groupId) membership in the organization — what lets the
+   *  migration mirror the legacy fallback's suppression predicate, which
+   *  counts bindings held THROUGH a group as bindings the user holds. */
+  async findGroupMemberships({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<Array<{ userId: string; groupId: string }>> {
+    return this.prisma.groupMembership.findMany({
+      where: { group: { organizationId } },
+      select: { userId: true, groupId: true },
+    });
   }
 
   async findExistingTeamBindings({
@@ -265,7 +323,7 @@ export class PrismaAuthzMigrationRepository
       select: { migrationName: true, status: true },
     });
     // `status` is a plain Prisma string column (no DB enum) - wider than the
-    // union the port is pinned to, same reasoning as ledger-write-gate.ts's
+    // union the port is pinned to, same reasoning as engine-gate.ts's
     // own read of this table. The cast is on this map's values, not on the
     // port's declared type, so a rename of the union still catches every
     // caller.
@@ -331,24 +389,19 @@ export class PrismaAuthzMigrationRepository
    * The view budgets, handed over rather than restarted - and RAISED on a
    * re-run, never lowered (the port's own contract; decision 22).
    *
-   * Two writes, each safe on its own terms. The `createMany` with
-   * `skipDuplicates` lands missing rows without touching existing ones. The
-   * per-row guarded update then raises a row the legacy path has outgrown:
-   * while an organization is held, views keep landing on
-   * `ShareLink.viewCount`, and a usage row seeded on an earlier pass would
-   * otherwise sit permanently below it - wedging the import proof, which
-   * compares the two counts exactly. The `viewCount: { lt: ... }` predicate
-   * is the refund guard: a row already at or above the seeded count (a view
-   * consumed since the seed) is left exactly as it is.
+   * ONE guarded upsert per chunk: a missing row is inserted at the seeded
+   * count, an existing one raised only where the seed is strictly higher.
+   * That refund guard lives in the UPDATE itself, so a consume landing
+   * mid-flight cannot be walked back by a filter resolved in an earlier
+   * SELECT.
    *
-   * The raise is `update` on the filtered unique, not `updateMany`, for the
-   * same reason the share consume paths are: the query compiler keeps a
-   * filtered-unique `update`'s full WHERE on the UPDATE statement itself,
-   * while `updateMany` resolves the filter in a prior SELECT - a consume
-   * landing between the two would be silently walked back. A raise the guard
-   * refuses surfaces as P2025 and is swallowed as the no-op it means. Raises
-   * run concurrently in bounded batches; each targets a distinct row, so
-   * they cannot contend with each other.
+   * One statement per chunk rather than one per row because this rides every
+   * pass: the previous shape paid a round trip per share link, and on a
+   * converged organization every one matched nothing. The organization that
+   * found it never finished a pass at all, so never recorded a status.
+   *
+   * `organizationId` and `projectId` are matched rather than overwritten: a
+   * row that disagrees about where it lives is not this seed's to move.
    */
   async seedResourceGrantUsage({
     organizationId,
@@ -358,54 +411,37 @@ export class PrismaAuthzMigrationRepository
     seeds: readonly ResourceGrantUsageSeed[];
   }): Promise<void> {
     if (seeds.length === 0) return;
-    await this.prisma.grantUsage.createMany({
-      data: seeds.map((seed) => ({
-        grantId: seed.grantId,
+    for (let offset = 0; offset < seeds.length; offset += BUDGET_SEED_CHUNK) {
+      await this.raiseGrantUsageBudgets({
         organizationId,
-        projectId: seed.projectId,
-        viewCount: seed.viewCount,
-      })),
-      skipDuplicates: true,
-    });
-    for (
-      let offset = 0;
-      offset < seeds.length;
-      offset += BUDGET_RAISE_CONCURRENCY
-    ) {
-      await Promise.all(
-        seeds
-          .slice(offset, offset + BUDGET_RAISE_CONCURRENCY)
-          .map((seed) => this.raiseGrantUsageBudget({ organizationId, seed })),
-      );
+        seeds: seeds.slice(offset, offset + BUDGET_SEED_CHUNK),
+      });
     }
   }
 
-  private async raiseGrantUsageBudget({
+  private raiseGrantUsageBudgets({
     organizationId,
-    seed,
+    seeds,
   }: {
     organizationId: string;
-    seed: ResourceGrantUsageSeed;
-  }): Promise<void> {
-    try {
-      await this.prisma.grantUsage.update({
-        where: {
-          grantId: seed.grantId,
-          organizationId,
-          projectId: seed.projectId,
-          viewCount: { lt: seed.viewCount },
-        },
-        data: { viewCount: seed.viewCount },
-      });
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2025"
-      ) {
-        return;
-      }
-      throw error;
-    }
+    seeds: readonly ResourceGrantUsageSeed[];
+  }): Prisma.PrismaPromise<number> {
+    return this.prisma.$executeRaw`
+      INSERT INTO "GrantUsage" (
+        "grantId", "organizationId", "projectId", "viewCount", "updatedAt"
+      ) VALUES ${Prisma.join(
+        seeds.map(
+          (seed) =>
+            Prisma.sql`(${seed.grantId}, ${organizationId}, ${seed.projectId}, ${seed.viewCount}, NOW())`,
+        ),
+      )}
+      ON CONFLICT ("grantId") DO UPDATE SET
+        "viewCount" = EXCLUDED."viewCount",
+        "updatedAt" = NOW()
+      WHERE "GrantUsage"."viewCount" < EXCLUDED."viewCount"
+        AND "GrantUsage"."organizationId" = EXCLUDED."organizationId"
+        AND "GrantUsage"."projectId" = EXCLUDED."projectId"
+    `;
   }
 
   async findExternalMemberFacts({
@@ -448,9 +484,12 @@ export class PrismaAuthzMigrationRepository
     organizationId: string;
   }): Promise<ResourceGrantRow[]> {
     const rows = await this.prisma.grant.findMany({
-      where: { organizationId, scopeType: "RESOURCE" },
+      // Live rows only: this read serves the ADR-110 proof, and a revoked
+      // link is a deny already applied, not an extra to reconcile.
+      where: { organizationId, scopeType: "RESOURCE", revokedAt: null },
       select: {
         id: true,
+        source: true,
         token: true,
         resourceKind: true,
         scopeId: true,
@@ -465,8 +504,14 @@ export class PrismaAuthzMigrationRepository
     // The view budget lives on its own table (decision 22), so the proof's
     // "field for field" needs a second read to see it. No usage row means no
     // view has been counted, which is exactly zero.
+    //
+    // Read BY ORGANIZATION, not by naming every grant: `GrantUsage` is
+    // organization-indexed and organization-scoped, so both spellings select
+    // the same budgets, but naming them binds a parameter per grant against
+    // Postgres' 65535 ceiling - which an organization with 428k share links
+    // clears on its own. The lookup below is by id, so extra rows are free.
     const usages = await this.prisma.grantUsage.findMany({
-      where: { organizationId, grantId: { in: rows.map((row) => row.id) } },
+      where: { organizationId },
       select: { grantId: true, viewCount: true },
     });
     const viewCounts = new Map(
@@ -474,6 +519,7 @@ export class PrismaAuthzMigrationRepository
     );
     return rows.map((row) => ({
       grantId: row.id,
+      source: row.source,
       token: row.token,
       resourceKind: row.resourceKind,
       resourceId: row.scopeId,
@@ -519,7 +565,7 @@ export class PrismaAuthzMigrationRepository
   }
 
   /** The same query the request-path gate's own cache miss runs
-   *  (cutover-gate.ts's `queryCutoverOnEngine`) - one predicate, so the
+   *  (engine-gate.ts's `queryOrganizationOnAuthzEngine`) - one predicate, so the
    *  migration awaiting its own flip and the gate serving it can never
    *  drift onto different answers. */
   async findCutoverOnEngine({
@@ -527,6 +573,9 @@ export class PrismaAuthzMigrationRepository
   }: {
     organizationId: string;
   }): Promise<boolean> {
-    return queryCutoverOnEngine({ prisma: this.prisma, organizationId });
+    return queryOrganizationOnAuthzEngine({
+      prisma: this.prisma,
+      organizationId,
+    });
   }
 }

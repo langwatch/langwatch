@@ -980,15 +980,15 @@ For each target in your evaluation, the following columns are exported:
 
 | Column Pattern | Description | Example |
 |----------------|-------------|---------|
-| `{target}_model` | Model used for this target | `gpt-4_model` → `openai/gpt-4` |
-| `{target}_prompt_id` | Prompt configuration ID (for prompt targets) | `gpt-4_prompt_id` → `prompt-abc123` |
-| `{target}_prompt_version` | Prompt version number | `gpt-4_prompt_version` → `2` |
-| `{target}_{metadata_key}` | Custom metadata values | `gpt-4_temperature` → `0.7` |
-| `{target}_output` | Model output (or individual output fields) | `gpt-4_output` → `"The answer is 42"` |
-| `{target}_cost` | Execution cost in USD | `gpt-4_cost` → `0.0012` |
-| `{target}_duration_ms` | Execution time in milliseconds | `gpt-4_duration_ms` → `1250` |
-| `{target}_error` | Error message if execution failed | `gpt-4_error` → `"Rate limit exceeded"` |
-| `{target}_trace_id` | Trace ID for viewing execution details | `gpt-4_trace_id` → `trace_abc123` |
+| `{target}_model` | Model used for this target | `gpt-5-mini_model` → `openai/gpt-5-mini` |
+| `{target}_prompt_id` | Prompt configuration ID (for prompt targets) | `gpt-5-mini_prompt_id` → `prompt-abc123` |
+| `{target}_prompt_version` | Prompt version number | `gpt-5-mini_prompt_version` → `2` |
+| `{target}_{metadata_key}` | Custom metadata values | `gpt-5-mini_seed` → `42` |
+| `{target}_output` | Model output (or individual output fields) | `gpt-5-mini_output` → `"The answer is 42"` |
+| `{target}_cost` | Execution cost in USD | `gpt-5-mini_cost` → `0.0012` |
+| `{target}_duration_ms` | Execution time in milliseconds | `gpt-5-mini_duration_ms` → `1250` |
+| `{target}_error` | Error message if execution failed | `gpt-5-mini_error` → `"Rate limit exceeded"` |
+| `{target}_trace_id` | Trace ID for viewing execution details | `gpt-5-mini_trace_id` → `trace_abc123` |
 
 #### Evaluator Columns (per target, per evaluator)
 
@@ -996,12 +996,12 @@ For each evaluator applied to a target:
 
 | Column Pattern | Description | Example |
 |----------------|-------------|---------|
-| `{target}_{evaluator}_score` | Numeric score (0-1) | `gpt-4_faithfulness_score` → `0.95` |
-| `{target}_{evaluator}_passed` | Boolean pass/fail | `gpt-4_faithfulness_passed` → `true` |
-| `{target}_{evaluator}_label` | Classification label | `gpt-4_sentiment_label` → `positive` |
-| `{target}_{evaluator}_details` | Additional details or explanation | `gpt-4_faithfulness_details` → `"All claims supported"` |
-| `{target}_{evaluator}_cost` | Cost of running the evaluator | `gpt-4_faithfulness_cost` → `0.0005` |
-| `{target}_{evaluator}_duration_ms` | Evaluator execution time | `gpt-4_faithfulness_duration_ms` → `850` |
+| `{target}_{evaluator}_score` | Numeric score (0-1) | `gpt-5-mini_faithfulness_score` → `0.95` |
+| `{target}_{evaluator}_passed` | Boolean pass/fail | `gpt-5-mini_faithfulness_passed` → `true` |
+| `{target}_{evaluator}_label` | Classification label | `gpt-5-mini_sentiment_label` → `positive` |
+| `{target}_{evaluator}_details` | Additional details or explanation | `gpt-5-mini_faithfulness_details` → `"All claims supported"` |
+| `{target}_{evaluator}_cost` | Cost of running the evaluator | `gpt-5-mini_faithfulness_cost` → `0.0005` |
+| `{target}_{evaluator}_duration_ms` | Evaluator execution time | `gpt-5-mini_faithfulness_duration_ms` → `850` |
 
 #### Comparison Columns (per comparison)
 
@@ -1031,12 +1031,12 @@ A row's candidates can be fewer than the comparison's full set of targets, becau
 
 ### Example CSV Output
 
-For an evaluation comparing GPT-4 and Claude with a faithfulness evaluator:
+For an evaluation comparing two targets, `gpt-5-mini` and `claude`, with a faithfulness evaluator:
 
 ```csv
-index,question,expected,gpt-4_model,gpt-4_output,gpt-4_cost,gpt-4_duration_ms,gpt-4_faithfulness_score,gpt-4_faithfulness_passed,claude_model,claude_output,claude_cost,claude_duration_ms,claude_faithfulness_score,claude_faithfulness_passed
-0,What is 2+2?,4,openai/gpt-4,The answer is 4,0.0012,1250,0.95,true,anthropic/claude-3,2+2 equals 4,0.0008,980,0.92,true
-1,Capital of France?,Paris,openai/gpt-4,Paris is the capital of France,0.0015,1100,0.98,true,anthropic/claude-3,The capital of France is Paris,0.0010,890,0.97,true
+index,question,expected,gpt-5-mini_model,gpt-5-mini_output,gpt-5-mini_cost,gpt-5-mini_duration_ms,gpt-5-mini_faithfulness_score,gpt-5-mini_faithfulness_passed,claude_model,claude_output,claude_cost,claude_duration_ms,claude_faithfulness_score,claude_faithfulness_passed
+0,What is 2+2?,4,openai/gpt-5-mini,The answer is 4,0.0012,1250,0.95,true,anthropic/claude-sonnet-5,2+2 equals 4,0.0008,980,0.92,true
+1,Capital of France?,Paris,openai/gpt-5-mini,Paris is the capital of France,0.0015,1100,0.98,true,anthropic/claude-sonnet-5,The capital of France is Paris,0.0010,890,0.97,true
 ```
 
 ### Using the Data

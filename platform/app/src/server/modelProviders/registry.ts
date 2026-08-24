@@ -90,6 +90,9 @@ export type MaybeStoredModelProvider = Omit<
   | "updatedAt"
   | "customModels"
   | "customEmbeddingsModels"
+  // Persisted rows carry the routing handle; the registry defaults the form
+  // seeds from have no row yet, so widen it to optional here.
+  | "routingHandle"
   // Advanced (gateway) fields land on persisted rows; form-time shapes
   // omit them, so widen the type to make them optional here.
   | "rateLimitRpm"
@@ -125,6 +128,12 @@ export type MaybeStoredModelProvider = Omit<
    * the humanized provider name with auto-suffixing for collisions.
    */
   name?: string;
+  /**
+   * The slug that addresses this instance in a gateway model string
+   * ("eu/claude-sonnet-5"). Null or absent when the operator set none, in
+   * which case the provider is reached by its family prefix.
+   */
+  routingHandle?: string | null;
   /** Registry model IDs (populated from the model registry, not user-managed) */
   models?: string[] | null;
   /** Registry embedding model IDs (populated from the model registry) */

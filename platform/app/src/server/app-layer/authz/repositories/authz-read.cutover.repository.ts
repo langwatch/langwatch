@@ -6,7 +6,7 @@
  * about, asks the cutover gate whether that organization is served by the
  * engine, and delegates.
  *
- * `findOrganizationRole`, `findApiKeyOwner`, `findProjectLineage` and
+ * `findOrganizationMembership`, `findApiKeyOwner`, `findProjectLineage` and
  * `findTeamOrganization` go to legacy always, unconditionally - not an
  * exception to the fork: membership and lineage are not grants and were
  * never projected onto the ledger's head, so both implementations run the
@@ -49,11 +49,11 @@ import type {
 import type {
   AuthzReadRepository,
   CustomRolePermissionsRow,
-  OrganizationRole,
+  OrganizationMembership,
   ShareLinkRow,
 } from "@langwatch/authz-server";
 import type { Prisma } from "~/generated/prisma/client";
-import { cutoverOnEngine } from "../cutover-gate";
+import { organizationOnAuthzEngine } from "../engine-gate";
 import { GrantsAuthzReadRepository } from "./authz-read.grants.repository";
 import { PrismaAuthzReadRepository } from "./authz-read.prisma.repository";
 
@@ -85,11 +85,11 @@ export class CutoverAwareAuthzReadRepository implements AuthzReadRepository {
     return new CutoverAwareAuthzReadRepository(this.prisma, this.repositories);
   }
 
-  async findOrganizationRole(args: {
+  async findOrganizationMembership(args: {
     userId: string;
     organizationId: string;
-  }): Promise<OrganizationRole | null> {
-    return this.repositories.legacy.findOrganizationRole(args);
+  }): Promise<OrganizationMembership | null> {
+    return this.repositories.legacy.findOrganizationMembership(args);
   }
 
   async findUserBindings(args: {
@@ -176,7 +176,7 @@ export class CutoverAwareAuthzReadRepository implements AuthzReadRepository {
   ): Promise<AuthzReadRepository> {
     const pinned = this.pinnedHeads.get(organizationId);
     if (pinned) return pinned;
-    const resolving = cutoverOnEngine({
+    const resolving = organizationOnAuthzEngine({
       prisma: this.prisma,
       organizationId,
     }).then((onEngine) =>

@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"errors"
-	"hash/fnv"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -24,45 +23,41 @@ import (
 // carries no internals — the stack is logged by the goroutine's recover.
 var errStreamConsumerCrashed = errors.New("stream ended unexpectedly")
 
-// wakingLangyStatuses are the cold pre-first-frame lines: this worker has never
-// answered, so the wait really is a boot. Varied by turn (see readyStatusFor)
-// because one phrase repeated under every conversation start reads as a looping
-// machine.
-var wakingLangyStatuses = []string{
-	"Waking Langy up…",
-	"Giving Langy a pep talk…",
-	"Poking Langy…",
-}
-
-// reachingLangyStatuses are the warm-worker pre-first-frame lines: the worker
-// has answered before, so the wait is a round-trip, not a boot.
-var reachingLangyStatuses = []string{
-	"Paging Langy…",
-	"Pinging Langy…",
-	"Getting Langy's attention…",
-	"Nudging Langy…",
-}
+// Pre-first-frame status lines. Plain and factual: the cold line names a boot
+// that is really happening, and the resume line names a checkpointed turn
+// being picked back up (ADR-048). The cold line pairs with the panel's own
+// pre-relay ladder ("Preparing Langy's workspace…", langyThinkingLine.ts): the
+// panel covers the spawn window before any frame exists, this status takes
+// over once the worker is up, and the two read as one startup progressing.
+// A warm worker gets "Thinking…": its dispatch is a millisecond round-trip,
+// so the whole window this status fills is the model working — a
+// connection-flavored line there read as a lost connection on every
+// follow-up message.
+const (
+	statusStartingUp = "Starting Langy…"
+	statusThinking   = "Thinking…"
+	statusResuming   = "Picking up where it left off…"
+)
 
 // readyStatusFor words the pre-first-frame status by the transition actually
-// happening: resuming a checkpointed turn (ADR-048), waking a worker that has
-// never answered, or reaching one that has. Lines rotate deterministically off
-// the turn id — stable for a re-drive of the same turn, different across turns.
+// happening. "Starting Langy…" is reserved for the one case where the user
+// really is waiting on a first-ever boot: a brand-new conversation whose
+// worker a turn had to spawn. Everything else thinks:
+//   - a resume from a shutdown handoff names the pick-up (ADR-048);
+//   - a worker that has answered before is a round-trip;
+//   - a pre-warmed worker booted while the panel sat open, so its first turn
+//     has no startup the user should hear about;
+//   - a follow-up whose worker was reaped (non-empty history seed) respawns
+//     fast on the persisted session — the user just spoke to this
+//     conversation, and "starting" reads as the workspace having vanished.
 func readyStatusFor(req ChatRequest, worker Worker) string {
 	if req.ResumeToken != "" {
-		return "Picking up where it left off…"
+		return statusResuming
 	}
-	if !worker.HasServedTurn() {
-		return wakingLangyStatuses[statusIndexOf(req.TurnID, len(wakingLangyStatuses))]
+	if worker.HasServedTurn() || worker.Prewarmed() || req.HistorySeed != "" {
+		return statusThinking
 	}
-	return reachingLangyStatuses[statusIndexOf(req.TurnID, len(reachingLangyStatuses))]
-}
-
-// statusIndexOf maps a turn id onto [0, n) with FNV-1a — cheap, deterministic,
-// and evenly spread, which is all a copy rotation needs.
-func statusIndexOf(turnID string, n int) int {
-	h := fnv.New32a()
-	_, _ = h.Write([]byte(turnID))
-	return int(h.Sum32() % uint32(n)) //nolint:gosec // bounded by n
+	return statusStartingUp
 }
 
 // App is the langyagent application. It composes the worker pool and the
@@ -145,7 +140,7 @@ type ChatRequest struct {
 	UserID string
 	// Intent is the caller's worker-turn label (create/revive/continue), a
 	// semantic hint the transport derives from the route. Recorded on the turn
-	// span + duration metric so per-intent behaviour is visible; it does NOT change
+	// span + duration metric so per-intent behavior is visible; it does NOT change
 	// how the turn runs (Acquire reconciles the real state).
 	Intent string
 }
@@ -173,8 +168,11 @@ type ChatRequest struct {
 // warming only once its credentials are final.
 //
 // At capacity is not an error worth surfacing: the turn itself will report it.
+// AcquireWarm rather than Acquire: a warm may only evict an idle worker that
+// never served a turn (a stale warm cache); a worker holding real session
+// state is evicted only by a real turn's spawn.
 func (a *App) Warm(ctx context.Context, conversationID string, creds domain.Credentials) error {
-	worker, err := a.pool.Acquire(ctx, conversationID, creds)
+	worker, err := a.pool.AcquireWarm(ctx, conversationID, creds)
 	if err != nil {
 		if errors.Is(err, domain.ErrMaxWorkers) {
 			return nil
@@ -186,6 +184,20 @@ func (a *App) Warm(ctx context.Context, conversationID string, creds domain.Cred
 	// outbox dispatch.
 	worker.Touch()
 	return nil
+}
+
+// CancelTurn asks the conversation's live worker to abort the named in-flight
+// turn (ADR-078: the token-burn half of the user's Stop). Deliberately returns
+// nothing: the control plane treats a cancel as fire-and-forget. The stopped
+// terminal is already on the durable record before the cancel is sent, so a
+// cancel that finds nothing to halt (worker gone, turn finished, harness
+// without abort support) has succeeded at its only job, which is best-effort.
+func (a *App) CancelTurn(ctx context.Context, conversationID, turnID string) {
+	clog.Get(ctx).Info("canceling in-flight turn",
+		zap.String("conversation_id", conversationID),
+		zap.String("turn_id", turnID),
+	)
+	a.pool.CancelTurn(conversationID, turnID)
 }
 
 // HasLiveWorker answers the control plane's pre-flight: is there already a worker
@@ -237,6 +249,8 @@ func (a *App) StartTurn(ctx context.Context, req ChatRequest) (func(context.Cont
 	case ClaimBusy:
 		// Expected hot-path control-flow outcome — no stack capture needed.
 		return nil, herr.NewLight(ctx, domain.ErrConversationBusy, nil)
+	case ClaimGranted:
+		// Fall through to drive the turn below.
 	}
 	worker.Touch()
 	return func(runCtx context.Context) { a.driveTurn(runCtx, req, worker) }, nil
@@ -284,13 +298,12 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 	sink := newFrameSink(stream)
 	// A true status for the cold window: between the prompt POST and the first
 	// LLM request the worker prepares its tools (measured at 10s+ on a cold
-	// home) and produces NO frames — the panel would sit on an escalating
-	// "Starting up…" that reads as a hang. The wording names the transition the
-	// manager actually knows (readyStatusFor): a resume from a shutdown handoff
-	// (ADR-048) is picking a checkpointed turn back up, a worker that has never
-	// answered is waking up, and a warm worker gets a short reaching-Langy line
-	// that varies by turn — one phrase repeated under every message reads as a
-	// looping machine. Emitted BEFORE onFirstFrame is wired, so time-to-first-
+	// home) and produces NO frames — without a status the panel would sit on
+	// its own waiting ladder and read as a hang. The wording names the
+	// transition the manager actually knows (readyStatusFor): a resume from a
+	// shutdown handoff (ADR-048) is picking a checkpointed turn back up, a
+	// worker that has never answered is starting, and a warm worker is a
+	// round-trip. Emitted BEFORE onFirstFrame is wired, so time-to-first-
 	// frame keeps meaning the agent's own first output; the client clears the
 	// status the moment real output arrives.
 	if f, err := frames.Status(readyStatusFor(req, worker)); err == nil {
@@ -355,7 +368,7 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 	}
 
 	streamErr := <-errCh
-	// The GitHub gate preempts every other outcome: a trip means WE cancelled
+	// The GitHub gate preempts every other outcome: a trip means WE canceled
 	// the stream deliberately (so streamErr is a benign nil/cancellation, and
 	// letting it fall through would emit a SUCCESS final for a turn we stopped).
 	if message, code, tripped := githubGate.Tripped(); tripped {

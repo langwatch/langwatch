@@ -30,6 +30,13 @@ export const isSecretCredential = isSecretCredentialField;
  *
  * Clearing a secret on purpose still works: the field is sent empty, which
  * names it, and an empty value replaces the stored one.
+ *
+ * A placeholder with nothing behind it is dropped rather than stored as a
+ * literal value, the same rule the extra-header merge follows. The drawer
+ * shows the placeholder for a secret field whenever the row is enabled and
+ * carries no readable credentials, so a save from there would otherwise store
+ * `HAS_KEY...` as the API key and the provider would fail on every request
+ * with a credential that was never real.
  */
 export function mergeStoredCustomKeys({
   incoming,
@@ -38,7 +45,16 @@ export function mergeStoredCustomKeys({
   incoming: Record<string, unknown> | null;
   stored: Record<string, unknown> | null;
 }): Record<string, unknown> {
-  if (!stored) return incoming ?? {};
+  // A masked field carries no value of its own. Either the stored one comes
+  // back through `preserved` below, or there is nothing behind it and the
+  // placeholder must not be stored as though it were a credential.
+  const edited = Object.fromEntries(
+    Object.entries(incoming ?? {}).filter(
+      ([, value]) => value !== MASKED_KEY_PLACEHOLDER,
+    ),
+  );
+
+  if (!stored) return edited;
 
   const preserved = Object.entries(stored).filter(([key, value]) => {
     if (incoming && key in incoming) {
@@ -47,5 +63,5 @@ export function mergeStoredCustomKeys({
     return isSecretCredential(key) && value !== "" && value != null;
   });
 
-  return { ...(incoming ?? {}), ...Object.fromEntries(preserved) };
+  return { ...edited, ...Object.fromEntries(preserved) };
 }

@@ -1,12 +1,11 @@
 /**
- * The shape ./cutover-gate.ts and ./ledger-write-gate.ts both are: a
- * boolean answer, asked once per permission check, cached per organization
- * with a TTL so a rollback or a finalization takes effect fleet-wide without
- * a deploy. This module owns that shape once; each gate supplies only its own
- * query and its own TTLs.
+ * The cache behind ./engine-gate.ts: a boolean answer, asked once per
+ * permission check, cached per organization with a TTL so a finishing
+ * migration takes effect fleet-wide without a deploy. The gate owns the
+ * question; this module owns the caching.
  *
- * Two behaviours live here that the two gates used to (not) have on their
- * own:
+ * Three behaviours live here that the hand-rolled caches this replaced did
+ * not have:
  *
  *   - A read that throws is LOGGED, not swallowed. A silent catch turned a
  *     genuine outage into "the fallback is still on" or "not cut over yet"
@@ -75,23 +74,15 @@ export type PerOrganizationCachedFlag = {
  */
 export const MAX_CACHE_ENTRIES = 5_000;
 
-/**
- * One cached boolean per organization. `positiveTtlMs` and `negativeTtlMs`
- * are separate because the two gates need them separate (the cutover gate's
- * two directions cost the same; the fallback gate's positive answer is a
- * one-way latch and can be trusted far longer than its negative one) - a
- * single TTL is just both arguments given the same value.
- */
+/** One cached boolean per organization, both directions on one bound. */
 export function perOrganizationCachedFlag({
   name,
-  positiveTtlMs,
-  negativeTtlMs,
+  ttlMs,
 }: {
   /** Identifies the gate in the warn log - never used to key the cache
    *  (each gate gets its own map by having its own closure over this call). */
   name: string;
-  positiveTtlMs: number;
-  negativeTtlMs: number;
+  ttlMs: number;
 }): PerOrganizationCachedFlag {
   const cached = new Map<string, CacheEntry>();
   const inFlight = new Map<string, InFlightEntry>();
@@ -159,10 +150,7 @@ export function perOrganizationCachedFlag({
     // `get` re-reads the source.
     if (flight.isStale) return isOn;
     if (cached.size >= MAX_CACHE_ENTRIES) evictUntilUnderCap();
-    cached.set(organizationId, {
-      isOn,
-      expiresAt: Date.now() + (isOn ? positiveTtlMs : negativeTtlMs),
-    });
+    cached.set(organizationId, { isOn, expiresAt: Date.now() + ttlMs });
     return isOn;
   }
 

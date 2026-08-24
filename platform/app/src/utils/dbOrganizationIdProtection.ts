@@ -54,6 +54,23 @@ type OrgScopedModelConfig = {
 };
 
 /**
+ * Prisma's read actions. A token/id hatch that resolves one organization is
+ * safe for a READ, but a write keyed on the same token would still be a
+ * cross-tenant write; scoping a hatch to these keeps a future
+ * `updateMany`/`deleteMany` on that shape from riding through it.
+ */
+const READ_ACTIONS = new Set([
+  "findUnique",
+  "findUniqueOrThrow",
+  "findFirst",
+  "findFirstOrThrow",
+  "findMany",
+  "count",
+  "aggregate",
+  "groupBy",
+]);
+
+/**
  * Read one top-level key off a WHERE clause of unknown shape. The clause comes
  * off `Prisma.MiddlewareParams["args"]`, so it is genuinely untyped input and
  * every bound below has to narrow before it reads.
@@ -281,7 +298,11 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
     // The resource tier's possession path presents only the share token —
     // globally unique, resolving to exactly one organization (ADR-057's
     // ShareLink lookup, inherited when share links become RESOURCE grants).
-    extraBound: ({ clause }) =>
+    // READ actions only: the possession path is a read, and a write keyed on
+    // a bare token would still cross tenants (the ApiKey hatch above scopes
+    // its own widening the same way).
+    extraBound: ({ clause, action }) =>
+      READ_ACTIONS.has(action) &&
       typeof clauseField(clause, "token") === "string",
   },
   // ShareService's view accounting for resource grants (delivery-plan
@@ -300,7 +321,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   },
   Role: {},
   // Which organizations the in-place migration runner processes on cloud
-  // (specs/rbac/in-place-authz-migration.feature, the enrollment scenarios).
+  // (specs/migration/authz-grants-rollout.feature, the enrollment scenarios).
   // The runner's per-pass read and the ops listing are platform-scope by
   // design - the same posture as the ops rollup over
   // SystemMigrationTenantState - so READS are admitted unbounded.
@@ -324,8 +345,6 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   SystemMigrationEnrollment: {
     platformScopeActions: ["findMany", "groupBy"],
   },
-  AuthzProjectionCursor: {},
-  AuthzCutoverProjection: {},
   AiToolEntry: {},
   GatewayBudget: {},
   // Per-bucket period boundaries for attributed-user templates. Bound by

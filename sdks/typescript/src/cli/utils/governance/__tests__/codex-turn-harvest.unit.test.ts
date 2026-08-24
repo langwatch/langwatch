@@ -110,6 +110,37 @@ const spansOf = (bodies: any[]) =>
 const attrOf = (span: any, key: string) =>
 	span.attributes.find((a: any) => a.key === key)?.value?.stringValue;
 
+/** One attribute of the session-context record, from the logs POST. */
+const contextAttr = ({
+	bodies,
+	urls,
+	key,
+}: {
+	bodies: any[];
+	urls: string[];
+	key: string;
+}) => {
+	const at = urls.indexOf("https://e/v1/logs");
+	// Without this the missing POST reads as `bodies[-1]` and the chain
+	// throws a TypeError, which hides which expectation actually failed.
+	expect(at, "no session-context record was posted").toBeGreaterThan(-1);
+	return attrOf(bodies[at].resourceLogs[0].scopeLogs[0].logRecords[0], key);
+};
+
+/**
+ * A working directory git answers for: the checkout the session is sitting in,
+ * on the branch it is on right now, which is what the harvest reads instead of
+ * trusting the transcript's record of the session's first minute.
+ */
+const checkoutOn =
+	(branch: string) =>
+	({ args }: { args: string[]; cwd: string }): string | null => {
+		if (args[0] === "remote") return "https://github.com/acme/acme-app.git";
+		if (args[0] === "branch") return branch;
+		// Not a linked worktree, so readWorktreeName finds nothing to name.
+		return null;
+	};
+
 describe("harvestCodexThread", () => {
 	describe("given a session that ran without the langwatch wrapper", () => {
 		describe("when its completed turn is harvested", () => {
@@ -353,6 +384,94 @@ describe("harvestCodexThread", () => {
 				expect(urls).toContain("https://e/v1/traces");
 			});
 
+			/** @scenario "The reported branch follows the checkout, not the session's first minute" */
+			it("reports the branch the checkout is on now", async () => {
+				writeRollout(THREAD, [
+					sessionMeta(GIT),
+					taskStarted(TRACE),
+					userMessage("hi"),
+					agentFinal("hello"),
+				]);
+				const { bodies, urls, impl } = recordingFetch();
+
+				await harvestCodexThread({
+					threadId: THREAD,
+					nowMs: 1785654950000,
+					endpoint: "https://e/v1/traces",
+					logsEndpoint: "https://e/v1/logs",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					stateDir,
+					fetchImpl: impl,
+					runGit: checkoutOn("review/pr-7412"),
+				});
+
+				expect(contextAttr({ bodies, urls, key: "vcs.ref.head.name" })).toBe(
+					"review/pr-7412",
+				);
+				expect(contextAttr({ bodies, urls, key: "vcs.repository.name" })).toBe(
+					"acme-app",
+				);
+			});
+
+			/** @scenario "A session whose transcript records no repository still reports one" */
+			it("reports the working directory's repository when the transcript has none", async () => {
+				writeRollout(THREAD, [
+					sessionMeta(),
+					taskStarted(TRACE),
+					userMessage("hi"),
+					agentFinal("hello"),
+				]);
+				const { bodies, urls, impl } = recordingFetch();
+
+				await harvestCodexThread({
+					threadId: THREAD,
+					nowMs: 1785654950000,
+					endpoint: "https://e/v1/traces",
+					logsEndpoint: "https://e/v1/logs",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					stateDir,
+					fetchImpl: impl,
+					runGit: checkoutOn("review/pr-7412"),
+				});
+
+				expect(contextAttr({ bodies, urls, key: "vcs.repository.owner" })).toBe("acme");
+				expect(contextAttr({ bodies, urls, key: "vcs.ref.head.name" })).toBe(
+					"review/pr-7412",
+				);
+			});
+
+			/** @scenario "A transcript harvested away from its checkout keeps what codex recorded" */
+			it("falls back to the transcript when git cannot read the directory", async () => {
+				writeRollout(THREAD, [
+					sessionMeta(GIT),
+					taskStarted(TRACE),
+					userMessage("hi"),
+					agentFinal("hello"),
+				]);
+				const { bodies, urls, impl } = recordingFetch();
+
+				await harvestCodexThread({
+					threadId: THREAD,
+					nowMs: 1785654950000,
+					endpoint: "https://e/v1/traces",
+					logsEndpoint: "https://e/v1/logs",
+					token: "sk-lw-test",
+					sessionsRoot: root,
+					stateDir,
+					fetchImpl: impl,
+					runGit: () => null,
+				});
+
+				expect(contextAttr({ bodies, urls, key: "vcs.ref.head.name" })).toBe(
+					"feat/pricing",
+				);
+				expect(contextAttr({ bodies, urls, key: "vcs.repository.name" })).toBe(
+					"acme-app",
+				);
+			});
+
 			/** @scenario "A notify that fires after every turn posts the repository once" */
 			it("does not re-post an unchanged context on the next turn", async () => {
 				writeRollout(THREAD, [
@@ -443,24 +562,6 @@ describe("harvestCodexThread", () => {
 				stateDir,
 				fetchImpl: impl,
 			});
-
-		const contextAttr = ({
-			bodies,
-			urls,
-			key,
-		}: {
-			bodies: any[];
-			urls: string[];
-			key: string;
-		}) => {
-			const at = urls.indexOf("https://e/v1/logs");
-			// Without this the missing POST reads as `bodies[-1]` and the chain
-			// throws a TypeError, which hides which expectation actually failed.
-			expect(at, "no session-context record was posted").toBeGreaterThan(-1);
-			return bodies[at].resourceLogs[0].scopeLogs[0].logRecords[0].attributes.find(
-				(a: any) => a.key === key,
-			)?.value?.stringValue;
-		};
 
 		describe("when the session is harvested", () => {
 			/** @scenario "The harvest names the session by the first thing the user asked" */

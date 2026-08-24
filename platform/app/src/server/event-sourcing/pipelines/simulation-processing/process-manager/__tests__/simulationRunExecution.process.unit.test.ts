@@ -405,6 +405,88 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
     });
   });
 
+  describe("when the queued event records the run's secret parameters", () => {
+    // They ride beside the metadata, encrypted, and stay encrypted through
+    // this hop: the intent payload is persisted verbatim into outbox rows.
+    function executeIntentFor(data: Record<string, unknown>) {
+      const evolution = evolveEvent(
+        initialState,
+        makeEvent({
+          type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
+          occurredAt: 10_000,
+          data: queuedData(data),
+        }),
+      );
+      return evolution.intents[0]?.payload as
+        | Record<string, unknown>
+        | undefined;
+    }
+
+    /** @scenario "A secret value reaches targets through the secrets namespace" */
+    it("forwards them onto the execute intent as they were recorded", () => {
+      const payload = executeIntentFor({
+        secretParameters: { api_token: "ciphertext-of-tok-live-1" },
+      });
+
+      expect(payload?.secretParameters).toEqual({
+        api_token: "ciphertext-of-tok-live-1",
+      });
+    });
+
+    it("emits the intent without any when the queued event records none", () => {
+      const payload = executeIntentFor({
+        metadata: { langwatch: { targetReferenceId: "agent_1" } },
+      });
+
+      expect(payload).not.toHaveProperty("secretParameters");
+    });
+  });
+
+  describe("when the queued event declares a secret it carries no value for", () => {
+    function evolveQueued(data: Record<string, unknown>) {
+      return evolveEvent(
+        initialState,
+        makeEvent({
+          type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
+          occurredAt: 10_000,
+          data: queuedData(data),
+        }),
+      );
+    }
+
+    /** @scenario "A secret parameter value must be supplied when the run starts" */
+    it.each([
+      ["no ciphertext at all", undefined],
+      ["ciphertext for another name", { other_token: "cipher" }],
+      ["an empty ciphertext", { api_token: "" }],
+    ])("finishes the run ERROR with %s", (_case, secretParameters) => {
+      const evolution = evolveQueued({
+        metadata: { secretParameterNames: ["api_token"] },
+        ...(secretParameters ? { secretParameters } : {}),
+      });
+
+      expect(evolution.state.phase).toBe("terminal");
+      expect(evolution.intents).toHaveLength(1);
+      expect(evolution.intents[0]?.intentType).toBe("finish");
+      expect(evolution.intents[0]?.payload).toMatchObject({
+        status: ScenarioRunStatus.ERROR,
+      });
+      expect(
+        (evolution.intents[0]?.payload as { error: string }).error,
+      ).toContain("api_token");
+    });
+
+    it("submits the run when the ciphertext covers every declared name", () => {
+      const evolution = evolveQueued({
+        metadata: { secretParameterNames: ["api_token"] },
+        secretParameters: { api_token: "ciphertext-of-tok-live-1" },
+      });
+
+      expect(evolution.state.phase).toBe("queued");
+      expect(evolution.intents[0]?.intentType).toBe("execute");
+    });
+  });
+
   describe("when activity arrives for a live run", () => {
     const activityTypes = [
       SIMULATION_RUN_EVENT_TYPES.STARTED,
@@ -898,6 +980,8 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
         name: null,
         target: null,
         parameters: null,
+        secretParameters: null,
+        secretParameterNames: null,
       });
     });
 

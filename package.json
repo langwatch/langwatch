@@ -1,6 +1,6 @@
 {
   "name": "@langwatch/server",
-  "version": "3.15.0",
+  "version": "3.16.0",
   "description": "Run LangWatch locally with one command — `npx @langwatch/server`. Complete LangWatch stack: observability, evaluations, AI gateway, agent simulations.",
   "license": "Apache-2.0",
   "homepage": "https://langwatch.ai",
@@ -32,6 +32,7 @@
   },
   "files": [
     "packages/server/dist/",
+    "packages/actor/",
     "packages/api/",
     "packages/authz/",
     "packages/authz-server/",
@@ -59,6 +60,7 @@
     "pnpm-lock.yaml",
     "packages/server/package.json",
     "plugins/langwatch/package.json",
+    "services/langyworker/package.json",
     "tests/agentic-e2e/package.json"
   ],
   "scripts": {

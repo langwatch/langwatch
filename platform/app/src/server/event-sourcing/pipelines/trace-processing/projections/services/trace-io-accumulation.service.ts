@@ -135,7 +135,7 @@ export function extractIOFromLogRecord(data: LogRecordReceivedEventData): {
         return { input: null, output: responseText };
       }
     }
-    // LIGHT path: without OTEL_LOG_RAW_API_BODIES the reply text rides an
+    // LIGHT path: without OTEL_LOG_RAW_API_BODIES the reply text arrives on an
     // `assistant_response` event (attribute `response`) and no
     // api_response_body exists in the session — the two events are
     // per-session alternatives carrying the same reply text, so accepting

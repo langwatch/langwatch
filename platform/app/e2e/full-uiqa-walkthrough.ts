@@ -7,7 +7,7 @@
  * Sections:
  *  A. /me portal — admin POV
  *  B. Govern → AI Gateway sub-tree (virtual-keys list, budgets, usage)
- *  C. Govern → Governance bird-eye + Tool Catalog + Anomaly Rules + Ingestion + Routing
+ *  C. Govern → Governance bird-eye + Tool Tiles + Anomaly Rules + Catalog + Routing
  *  D. Settings → Members + Teams + Roles + Audit Log
  *  E. Tile install drawer (Claude Code)
  *  F. AI Tools Portal cold visit (workspace switcher, /me/devices, /me/settings)

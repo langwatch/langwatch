@@ -17,7 +17,7 @@ import {
 
 /**
  * The statuses a tenant may be rolled back from. The same pair as
- * `LEDGER_WRITE_STATUSES` in ../authz/ledger-write-gate.ts, but the premise
+ * `ON_ENGINE_STATUSES` in ../authz/engine-gate.ts, but the premise
  * is weaker than "already on the ledger": what `migrated` MEANS is each
  * migration's own business (the cutover parks tenants in `migrated` while
  * they merely WAIT on prerequisites or a cohort, and those never touched
@@ -92,6 +92,10 @@ export interface SystemMigrationEnrollmentStore {
      *  for this migration - a later step samples the step before it. */
     enrolledForMigrationName?: string;
     excludeOrganizationIds: string[];
+    /** Lift the enterprise-subscription exclusion for this draw. Defaults to
+     *  false at the repository, so a caller that says nothing gets the safe
+     *  pool rather than the wide one. */
+    includeEnterprise?: boolean;
   }): Promise<Array<{ id: string; name: string }>>;
   createMany(args: {
     organizationIds: string[];
@@ -370,7 +374,7 @@ export class SystemMigrationsService {
 
   /**
    * Enroll one organization for one registered migration
-   * (specs/rbac/in-place-authz-migration.feature, the enrollment scenarios).
+   * (specs/migration/system-migrations-runner.feature, the enrollment scenarios).
    * Takes effect on the next pass - the runner reads enrollment fresh each
    * time - and refuses rather than lies: off cloud (where a row would change
    * nothing, see MigrationEnrollmentCloudOnlyError), for a migration nothing
@@ -413,7 +417,7 @@ export class SystemMigrationsService {
 
   /**
    * Enroll a sampled cohort for one migration in a single action
-   * (specs/rbac/in-place-authz-migration.feature, the cohort scenarios).
+   * (specs/migration/system-migrations-runner.feature, the cohort scenarios).
    * The pool is every organization not yet enrolled for the migration,
    * minus the ones the platform already knows to leave alone by data
    * rather than by a hand-kept list: an active enterprise subscription, or
@@ -422,15 +426,33 @@ export class SystemMigrationsService {
    * some fixed order every time - and the result names every organization
    * it picked, because an action over N organizations is only auditable if
    * it says which N.
+   *
+   * Both exclusions are DEFAULTS, not laws. They exist so an experimental
+   * cohort cannot sweep up the organizations we would least like to
+   * surprise; once a migration has proven itself across the long tail,
+   * finishing the rollout means taking those two classes over too, and an
+   * operator who has decided that should not have to enroll them one id at
+   * a time (the single-organization `enroll` never applied either
+   * exclusion). Each is lifted SEPARATELY and named in the audit trail:
+   * they carry different risks - an enterprise organization is a
+   * commercial one, a private-dataplane organization has its events in a
+   * ClickHouse instance of its own - and one checkbox for both would hide
+   * that.
    */
   async enrollCohort({
     migrationName,
     sampleSize,
     actorUserId,
+    includeEnterprise = false,
+    includePrivateDataplane = false,
   }: {
     migrationName: string;
     sampleSize: number;
     actorUserId: string;
+    /** Draw organizations with an active or pending ENTERPRISE subscription. */
+    includeEnterprise?: boolean;
+    /** Draw organizations whose events live in their own ClickHouse instance. */
+    includePrivateDataplane?: boolean;
   }): Promise<{
     enrolled: Array<{ id: string; name: string }>;
     eligibleCount: number;
@@ -450,7 +472,14 @@ export class SystemMigrationsService {
       await this.deps.enrollments.findCohortEligibleOrganizations({
         migrationName,
         enrolledForMigrationName: previous?.name,
-        excludeOrganizationIds: this.deps.privateDataplaneOrganizationIds(),
+        // Lifting the private-dataplane exclusion is simply not naming the
+        // ids, so the environment stays the only place those organizations
+        // are listed - the same reason the exclusion reads them from the
+        // routing table rather than from a constant.
+        excludeOrganizationIds: includePrivateDataplane
+          ? []
+          : this.deps.privateDataplaneOrganizationIds(),
+        includeEnterprise,
       });
     const picked = sample({ pool: eligible, count: sampleSize });
     const { insertedCount } = await this.deps.enrollments.createMany({
@@ -468,6 +497,10 @@ export class SystemMigrationsService {
         pickedCount: picked.length,
         insertedCount,
         eligibleCount: eligible.length,
+        // Which exclusions this cohort lifted, so a widened pool is legible
+        // in the log rather than inferred from an unusually large sample.
+        includeEnterprise,
+        includePrivateDataplane,
         organizationIds: picked.map((organization) => organization.id),
       },
       "operator enrolled a cohort for the in-place migration rollout",
@@ -481,7 +514,17 @@ export class SystemMigrationsService {
         userId: actorUserId,
         organizationId: organization.id,
         action: "systemMigrations.enrollCohort",
-        args: { migrationName, sampleSize, cohortSize: picked.length },
+        args: {
+          migrationName,
+          sampleSize,
+          cohortSize: picked.length,
+          // On the row itself, not only in the log: "was this organization
+          // drawn because an operator lifted an exclusion?" is a question
+          // asked of one organization, and the audit trail is where it is
+          // answered.
+          includeEnterprise,
+          includePrivateDataplane,
+        },
       });
     }
     return { enrolled: picked, eligibleCount: eligible.length };
@@ -518,7 +561,7 @@ export class SystemMigrationsService {
 
   /**
    * Run one migration for one organization now
-   * (specs/rbac/in-place-authz-migration.feature, "An operator runs one
+   * (specs/migration/system-migrations-runner.feature, "An operator runs one
    * migration for one organization now"). Awaited rather than
    * fire-and-forget - the operator asked about one organization and wants
    * its outcome. Enrollment stays the pacing source of truth on cloud: an
@@ -631,7 +674,7 @@ export class SystemMigrationsService {
 
   /**
    * The operator's rollback: pin a migrated or finalized organization back
-   * onto its legacy path (specs/rbac/in-place-authz-migration.feature, "An
+   * onto its legacy path (specs/migration/system-migrations-runner.feature, "An
    * operator rolls a finalized organization back to its legacy path", "An
    * operator rolls a migrated organization back to its legacy path"), then
    * apply whatever that migration's rollback has to DO.
@@ -640,7 +683,7 @@ export class SystemMigrationsService {
    *
    *   `migrated`     held on the ledger with parity still disagreeing —
    *   `finalized`    parity clean. Both are already live on ledger writes
-   *                  (ledger-write-gate.ts), so both are the operator's to
+   *                  (engine-gate.ts), so both are the operator's to
    *                  pull back. The pin is written FIRST — the stored
    *                  `rolled_back` status is what stops the next pass
    *                  re-finalizing the tenant, so it must land even if the

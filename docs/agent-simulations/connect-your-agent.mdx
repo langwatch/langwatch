@@ -5,7 +5,7 @@ keywords: langwatch, agent simulations, http agent, black box testing, tracepare
 description: Register your agent's HTTP endpoint as a simulation target, so your team runs scenario suites from the platform and the judge verifies behavior against the agent's own traces.
 ---
 
-# Connect Your Agent
+## Getting Started
 
 The fastest path is the connect-agent skill. Install it in your coding agent (Claude Code, Cursor, or any agent with shell access), or copy the full prompt, and the agent performs the whole setup, from finding the endpoint to running the first suite:
 
@@ -299,7 +299,7 @@ The body template renders as a Liquid template on every turn, and `outputPath` i
 | `{{ input }}` | The text of the last user message |
 | `{{ threadId }}` | A conversation id, the same on every turn of a run |
 | `{{ params.NAME }}` | A [run parameter](/agent-simulations/scenario-parameters) |
-| `{{ traceId }}`, `{{ traceparent }}` | The turn's trace identifiers, see [Remote traces](/agent-simulations/remote-traces) |
+| `{{ traceId }}`, `{{ traceparent }}` | The turn's trace identifiers, see [Linking your traces](/agent-simulations/remote-traces) |
 
 The URL and the header values render the same variables.
 
@@ -345,7 +345,7 @@ With standard OpenTelemetry HTTP auto-instrumentation, adoption already happens 
 The agent must report its traces to the same LangWatch project that runs the scenarios. Traces sent to another project, or to another observability backend only, are invisible to the judge.
 
 <Note>
-  **Also check:** [Remote traces](/agent-simulations/remote-traces) explains what the judge sees, how long it waits for traces, and what happens when they do not arrive.
+  **Also check:** [Linking your traces](/agent-simulations/remote-traces) explains what the judge sees, how long it waits for traces, and what happens when they do not arrive.
 </Note>
 
 ## 5. Register the agent and run the first scenario

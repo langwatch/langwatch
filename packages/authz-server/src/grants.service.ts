@@ -9,11 +9,11 @@
  * ./grant-validation.ts owns what a write must satisfy, and ./offboard.ts
  * owns the offboarding flow and its proof.
  */
+import type { LedgerActor } from "@langwatch/actor";
 import { type AuthzScopeRef, scopeOrganizationId } from "@langwatch/authz";
 import type { AuthzCollectorService } from "./authz-collector.service";
 import type {
   AuthzGrantsRepository,
-  LedgerActor,
   OffboardCounts,
   RoleBindingWrite,
 } from "./authz-grants.repository";
@@ -76,6 +76,25 @@ export class GrantsService {
     private readonly repository: AuthzGrantsRepository,
     private readonly deps: GrantsServiceDeps,
   ) {}
+
+  /**
+   * Retire every cached snapshot for the organization, without writing a
+   * grant.
+   *
+   * Grant writes bump the epoch themselves, so this exists for the facts that
+   * change who may act WITHOUT touching a grant — today that is exactly one:
+   * enabling or disabling a membership's seat. Those are plain column writes
+   * on `OrganizationUser`, so without this a disabled member keeps answering
+   * from a cached snapshot until it ages out, and the revocation an admin
+   * just performed appears not to have happened.
+   */
+  async invalidateOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<void> {
+    await this.deps.bumpEpoch({ organizationId });
+  }
 
   /** INSERT (who, role, where) — visible on the next check. */
   async attach({

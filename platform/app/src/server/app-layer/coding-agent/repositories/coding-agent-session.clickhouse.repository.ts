@@ -98,6 +98,7 @@ interface ClickHouseWriteRecord {
   CacheReadTokens: string;
   CacheCreationTokens: string;
   CostUsd: number;
+  AgentReportedCostUsd: number;
 
   ModelCallMs: string;
   ToolMs: string;
@@ -261,6 +262,7 @@ function toRecord({
     CacheReadTokens: big(row.cacheReadTokens),
     CacheCreationTokens: big(row.cacheCreationTokens),
     CostUsd: row.costUsd,
+    AgentReportedCostUsd: row.agentReportedCostUsd,
 
     ModelCallMs: big(row.modelCallMs),
     ToolMs: big(row.toolMs),
@@ -1115,6 +1117,7 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     cacheReadTokens: asNumber(record.CacheReadTokens),
     cacheCreationTokens: asNumber(record.CacheCreationTokens),
     costUsd: asNumber(record.CostUsd),
+    agentReportedCostUsd: asNumber(record.AgentReportedCostUsd),
 
     modelCallMs: asNumber(record.ModelCallMs),
     toolMs: asNumber(record.ToolMs),

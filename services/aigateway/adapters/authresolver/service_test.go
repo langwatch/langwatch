@@ -1065,6 +1065,15 @@ func (f *etagConfigFetcher) edit(revision, cred string) {
 	f.revision, f.cred = revision, cred
 }
 
+// rotateCredentialOnly swaps the credential and leaves the version token
+// where it was, modeling a control plane whose ETag does not cover the
+// provider row behind the config.
+func (f *etagConfigFetcher) rotateCredentialOnly(cred string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.cred = cred
+}
+
 // conditionals reports the If-None-Match each fetch carried, in order.
 func (f *etagConfigFetcher) conditionals() []string {
 	f.mu.Lock()
@@ -1155,6 +1164,34 @@ func TestResolve_ConfigTTLRefresh_IsConditional(t *testing.T) {
 		require.NoError(t, err)
 		awaitConfigRefresh(t, live)
 		assert.Equal(t, []string{"", "42", "43"}, fetcher.conditionals())
+	})
+
+	// The safety net is only as good as the token it revalidates against. A
+	// control plane that moves a provider credential without moving the ETag
+	// answers 304 to every refresh, and the entry keeps serving a credential
+	// the operator already replaced. Nothing here can detect that, which is
+	// why the control plane derives the token from the provider rows the
+	// config is built from and not from the virtual key alone.
+	t.Run("when the credential moved but the version token did not", func(t *testing.T) {
+		fetcher := &etagConfigFetcher{revision: "42", cred: "cred-old"}
+		rawKey := "vk-lw-etag-frozen"
+		svc, e := newETagService(t, fetcher, rawKey)
+
+		fetcher.rotateCredentialOnly("cred-new")
+
+		for range 3 {
+			backdateConfig(t, svc, rawKey, 2*time.Minute)
+			_, err := svc.Resolve(context.Background(), rawKey)
+			require.NoError(t, err)
+			awaitConfigRefresh(t, e)
+		}
+
+		assert.Equal(t, []string{"", "42", "42", "42"}, fetcher.conditionals(),
+			"every refresh offers the token it holds and the control plane keeps confirming it")
+		live, ok := svc.l1.Peek(hashKey(rawKey))
+		require.True(t, ok)
+		assert.Equal(t, "cred-old", live.bundle.Credentials[0].ID,
+			"a frozen token pins the replaced credential in cache for as long as the process runs")
 	})
 
 	t.Run("when the control plane sent no version token", func(t *testing.T) {

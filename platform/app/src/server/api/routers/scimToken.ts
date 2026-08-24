@@ -2,11 +2,10 @@ import { ScimTokenService } from "@ee/scim/scim-token.service";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "../enterprise";
-import { checkOrganizationPermission } from "../rbac";
 
 const enterpriseScimProcedure = protectedProcedure
   .input(z.object({ organizationId: z.string() }))
-  .use(checkOrganizationPermission("organization:manage"))
+  .permission("organization:manage")
   .use(async ({ ctx, input, next }) => {
     await assertEnterprisePlan({
       organizationId: input.organizationId,

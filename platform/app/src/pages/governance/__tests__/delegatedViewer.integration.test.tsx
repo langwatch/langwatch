@@ -241,8 +241,8 @@ describe("governance pages for a delegated viewer", () => {
       expect(screen.getByText(/governance:manage/)).toBeInTheDocument();
     });
 
-    /** @scenario "The tool catalog names its own grant" */
-    it("names aiTools:manage on the tool catalog and renders no editor", () => {
+    /** @scenario "The tool tiles page names its own grant" */
+    it("names aiTools:manage on the tool tiles page and renders no editor", () => {
       renderPage(ToolCatalogPage);
 
       expect(screen.getByText(/aiTools:manage/)).toBeInTheDocument();
@@ -265,7 +265,7 @@ describe("governance pages for a delegated viewer", () => {
   });
 
   describe("when the viewer can read ingestion sources but not manage them", () => {
-    /** @scenario "Ingestion sources offers no controls a viewer cannot use" */
+    /** @scenario "The catalog offers no controls a viewer cannot use" */
     it("offers no source authoring controls", () => {
       harness.permissions = [...DELEGATED_VIEWER, "ingestionSources:view"];
       renderPage(IngestionSourcesPage);

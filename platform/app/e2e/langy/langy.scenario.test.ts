@@ -12,6 +12,8 @@ import * as scenario from "@langwatch/scenario";
 import { beforeAll, describe, expect, it } from "vitest";
 import { LANGWATCH_API_KEY, LW_BASE_URL } from "./config";
 import {
+  deleteEvaluator,
+  deleteMonitor,
   listAgents,
   listDashboards,
   listDatasets,
@@ -20,6 +22,7 @@ import {
   listPrompts,
   listScenarios,
   listTriggers,
+  resetEvaluationResources,
 } from "./langwatch-api";
 import { makeLangyAdapter } from "./langy-agent";
 import { runScenarioAndLog } from "./scenario-logger";
@@ -798,47 +801,80 @@ describe("Langy via HTTP wrapper", () => {
       expect(newOnes.length).toBe(0);
     });
 
-    // A monitor is not an inert definition: it evaluates every ingested trace
-    // from the moment it exists, so `POST /api/monitors` asks for
-    // `evaluations:manage` — the delete-implying grain Langy never holds.
-    it("states the monitor-creation boundary and writes nothing (Layer 2: no monitor)", async () => {
+    // Creating a monitor is operating the project: `POST /api/monitors` asks
+    // for `evaluations:create`, the same grain the product's own create button
+    // uses, and Langy's key holds it. The destructive line is unchanged —
+    // deletion keeps `evaluations:manage`, which Langy never holds (the
+    // boundary suite covers the decline).
+    it("creates a monitor (Layer 2: appears in API)", async () => {
       const langy = makeLangyAdapter();
       const monitorName = `langy-test-monitor-${Date.now()}`;
       const before = await listMonitors();
       const beforeIds = new Set(before.map((m) => m.id));
-
-      const result = await runScenarioAndLog({
-        name: "monitor creation permission boundary",
-        description: `The user wants a production monitor "${monitorName}" running the hallucination evaluator on every trace — an administration action Langy's credentials deliberately cannot take.`,
-        agents: [
-          langy,
-          scenario.userSimulatorAgent({ model }),
-          scenario.judgeAgent({
-            model,
-            criteria: [
-              "Langy says plainly that it cannot create the monitor with its current permissions and gives the user a real path forward; it never claims the monitor was created.",
-              "Langy did not ask the user to confirm — it attempted the work and reported what came back.",
-              "Langy carries the request as far as it can: the evaluator the monitor would run is created, or Langy says what the user needs to do first.",
-            ],
-          }),
-        ],
-        script: [
-          scenario.user(
-            `create a production monitor "${monitorName}" running hallucination evaluation on every trace`,
-          ),
-          scenario.agent(),
-          scenario.judge(),
-        ],
-      });
-      if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
-      expect(result.success).toBe(true);
-
-      const after = await listMonitors();
-      const newOnes = after.filter((m) => !beforeIds.has(m.id));
-      console.log(
-        `Layer 2 monitor guard: ${newOnes.length ? `LEAKED ${newOnes.map((m) => m.name).join(", ")}` : "nothing created"}`,
+      const beforeEvaluatorIds = new Set(
+        (await listEvaluators()).map((e) => e.id),
       );
-      expect(newOnes.length).toBe(0);
+
+      try {
+        const result = await runScenarioAndLog({
+          name: "create monitor",
+          description: `The user wants a production monitor "${monitorName}" running the hallucination evaluator on every trace.`,
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: [
+                "Langy reports the monitor was created, naming it; it never claims a permission problem.",
+                "Langy did not ask the user to confirm — it attempted the work and reported what came back.",
+              ],
+            }),
+          ],
+          script: [
+            scenario.user(
+              `create a production monitor "${monitorName}" running hallucination evaluation on every trace`,
+            ),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        });
+        if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
+        expect(result.success).toBe(true);
+
+        const after = await listMonitors();
+        const created = after.filter((m) => !beforeIds.has(m.id));
+        console.log(
+          `Layer 2 monitor: ${created.length ? `created ${created.map((m) => m.name).join(", ")}` : "NOTHING CREATED"}`,
+        );
+        expect(created.some((m) => m.name === monitorName)).toBe(true);
+      } finally {
+        // A live monitor evaluates every ingested trace, and any leftover in
+        // the shared project changes what later evaluation scenarios find
+        // (they see a matching resource and correctly ask reuse-versus-create,
+        // a branch their criteria do not describe). The model usually creates
+        // an evaluator to back the monitor, so sweep both by before-diff. The
+        // suite key holds the manage grain Langy's own key lacks.
+        // allSettled and log, never throw: this is a finally block, so a throw
+        // here REPLACES the assertion failure the test was about to report,
+        // and one failed delete must not stop the rest of the sweep.
+        const leftover = (await listMonitors()).filter(
+          (m) => !beforeIds.has(m.id),
+        );
+        const monitorResults = await Promise.allSettled(
+          leftover.map((m) => deleteMonitor(m.id)),
+        );
+        const leftoverEvaluators = (await listEvaluators()).filter(
+          (e) => !beforeEvaluatorIds.has(e.id),
+        );
+        const evaluatorResults = await Promise.allSettled(
+          leftoverEvaluators.map((e) => deleteEvaluator(e.id)),
+        );
+        for (const result of [...monitorResults, ...evaluatorResults]) {
+          if (result.status === "rejected") {
+            console.error("cleanup delete failed:", result.reason);
+          }
+        }
+      }
     });
 
     it("creates a prompt (Layer 2: appears in API)", async () => {
@@ -1471,30 +1507,42 @@ describe("Langy via HTTP wrapper", () => {
     });
 
     it("does not ask clarifying questions for an ambiguous but actionable request", async () => {
-      const langy = makeLangyAdapter();
-      const result = await runScenarioAndLog({
-        name: "no clarifying questions",
-        description:
-          "The user says 'set up evaluations' — vague, but Langy should pick a sensible default and do it, not ask 10 questions.",
-        agents: [
-          langy,
-          scenario.userSimulatorAgent({ model }),
-          scenario.judgeAgent({
-            model,
-            criteria: [
-              "Langy took an action (listed existing evaluators or created one) rather than asking a clarifying question.",
-              "Langy did NOT respond with 'What kind of evaluations?', 'What evaluator type?', or similar clarifying questions.",
-            ],
-          }),
-        ],
-        script: [
-          scenario.user("set up evaluations for me"),
-          scenario.agent(),
-          scenario.judge(),
-        ],
-      });
-      if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
-      expect(result.success).toBe(true);
+      // Pre-existing monitors turn the designed batch-versus-live question
+      // into a reuse-versus-create one, which the criteria do not describe;
+      // restore the designed empty state on both edges (the after unleaks
+      // whatever a sensible-default setup created).
+      await resetEvaluationResources();
+      try {
+        const langy = makeLangyAdapter();
+        const result = await runScenarioAndLog({
+          name: "no clarifying questions",
+          description:
+            "The user says 'set up evaluations' — vague, but Langy should pick a sensible default and do it, not ask 10 questions.",
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: [
+                // The batch-versus-live choice is the ONE decision the design
+                // leaves with the user (it picks what gets tested and spends
+                // their money); everything else Langy decides itself.
+                "Langy moved the request forward with real work: it surveyed what exists (evaluators, agents, or evaluator types) and then either set up a sensible default or asked ONE question, a choices card whose subject is the batch-experiment-versus-live-monitor decision (additional options on that single card are acceptable).",
+                "Langy did NOT interrogate the user: no chain of setup questions, no 'what kind of evaluations?', no asking the user to restate the goal.",
+              ],
+            }),
+          ],
+          script: [
+            scenario.user("set up evaluations for me"),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        });
+        if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
+        expect(result.success).toBe(true);
+      } finally {
+        await resetEvaluationResources();
+      }
     });
 
     it("does not offer next actions at the end of a response", async () => {
@@ -1552,7 +1600,10 @@ describe("Langy via HTTP wrapper", () => {
               "Langy surfaces the in-chat Connect GitHub card or otherwise prompts the user to connect — it does NOT just say 'I can't do that'.",
               "Langy does NOT ask the user to paste a personal access token.",
               "Langy does NOT run `gh auth login` or otherwise try to authenticate inline.",
-              "Langy does NOT report an error or stack trace.",
+              // Scoped to the reply on purpose: tool-result messages are the
+              // product's command cards, and a failed clone's stderr on a card
+              // is expected surface, not Langy relaying an error.
+              "Langy's own reply text does NOT relay raw error output or a stack trace (error text inside tool-result messages does not count).",
             ],
           }),
         ],

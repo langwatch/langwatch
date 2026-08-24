@@ -26,7 +26,7 @@ import type {
 import type {
   AuthzReadRepository,
   CustomRolePermissionsRow,
-  OrganizationRole,
+  OrganizationMembership,
   ShareLinkRow,
 } from "@langwatch/authz-server";
 import {
@@ -35,6 +35,7 @@ import {
 } from "@langwatch/authz-server";
 import type { Prisma } from "~/generated/prisma/client";
 import { CUSTOM_ROLE_KIND } from "../../../role/role-kind";
+import { liveGrants, liveRoles } from "./live-rows";
 
 /** The three scope tiers a `CollectedBinding` can carry. RESOURCE rows are
  *  the share tier (findShareLinks) and PLATFORM rows are dormant facts that
@@ -49,18 +50,19 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
   constructor(private readonly prisma: Prisma.TransactionClient) {}
 
   /** Membership is not a grant: the same query the legacy repository runs. */
-  async findOrganizationRole({
+  async findOrganizationMembership({
     userId,
     organizationId,
   }: {
     userId: string;
     organizationId: string;
-  }): Promise<OrganizationRole | null> {
+  }): Promise<OrganizationMembership | null> {
     const row = await this.prisma.organizationUser.findFirst({
       where: { userId, organizationId },
-      select: { role: true },
+      select: { role: true, disabledAt: true },
     });
-    return row?.role ?? null;
+    if (!row) return null;
+    return { role: row.role, disabled: row.disabledAt !== null };
   }
 
   async findUserBindings({
@@ -78,7 +80,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
     // a relation filter is a membership read here. It is the same predicate,
     // and the engine's steps assume it either way.
     if (!(await this.isCurrentMember({ userId, organizationId }))) return [];
-    const rows = await this.prisma.grant.findMany({
+    const rows = await liveGrants(this.prisma).findMany({
       where: {
         organizationId,
         principalType: "USER",
@@ -109,7 +111,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
     // One read for every group, not one per group: the grant carries the group
     // it names, which is the `viaGroupId` the collector needs stamped on each
     // binding.
-    const rows = await this.prisma.grant.findMany({
+    const rows = await liveGrants(this.prisma).findMany({
       where: {
         organizationId,
         principalType: "GROUP",
@@ -136,7 +138,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
     // No membership gate, for the reason the legacy repository gives: a key has
     // no OrganizationUser row of its own, and its owner's standing enters as
     // the §9 ceiling, computed elsewhere.
-    const rows = await this.prisma.grant.findMany({
+    const rows = await liveGrants(this.prisma).findMany({
       where: {
         organizationId,
         principalType: "API_KEY",
@@ -175,7 +177,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
         userId,
         team: {
           organizationId,
-          organization: { members: { some: { userId } } },
+          organization: { members: { some: { userId, disabledAt: null } } },
         },
       },
       select: {
@@ -218,7 +220,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
   }): Promise<CustomRolePermissionsRow[]> {
     if (customRoleIds.length === 0) return [];
     const apiKeyId = principal.type === "apiKey" ? principal.id : null;
-    const rows = await this.prisma.role.findMany({
+    const rows = await liveRoles(this.prisma).findMany({
       where: {
         id: { in: [...customRoleIds] },
         organizationId,
@@ -328,7 +330,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
     tokens: readonly string[];
     links: ReadonlyArray<{ kind: ShareableResourceKind; id: string }>;
   }): Promise<ShareLinkGrantCandidateRow[]> {
-    return this.prisma.grant.findMany({
+    return liveGrants(this.prisma).findMany({
       where: {
         organizationId,
         projectId,
@@ -406,8 +408,12 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
     userId: string;
     organizationId: string;
   }): Promise<boolean> {
+    // `disabledAt: null` is part of the predicate, not a refinement of it: a
+    // seat-disabled membership confers no grants, exactly as a removed one
+    // does. This is the ledger-head twin of the relation fence the legacy
+    // repository puts on each binding query.
     const membership = await this.prisma.organizationUser.findFirst({
-      where: { userId, organizationId },
+      where: { userId, organizationId, disabledAt: null },
       select: { userId: true },
     });
     return membership !== null;
@@ -429,7 +435,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
     apiKeyId: string;
     roleIds: readonly string[];
   }): Promise<Set<string>> {
-    const holders = await this.prisma.grant.findMany({
+    const holders = await liveGrants(this.prisma).findMany({
       where: {
         organizationId,
         roleKey: { in: roleIds.map((roleId) => `custom:${roleId}`) },
@@ -470,7 +476,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
  *
  * A row this cannot translate - `lite-member`, `legacy-admin`, a null key
  * (RESOURCE and PLATFORM rows), anything else - is SKIPPED, not defaulted. Those are the
- * dormant head-only facts the cutover imports (dev/docs/plans/adr-092-authz-delivery-plan.md,
+ * dormant head-only facts the cutover imports (dev/docs/adr/110-grant-aggregates-are-grants.md,
  * decision 13, the dormant-fact principle): they are stored so contract can make them load-bearing, and
  * until then their decisions are still inferred from membership by the engine's
  * org-role floor, exactly as they were before the cutover. Translating one into

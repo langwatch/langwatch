@@ -3,13 +3,18 @@
  *
  * Displays the suite name, scenario/target counts, and estimated job count
  * so the user can review what will be executed before confirming.
+ *
+ * @see specs/scenarios/secret-run-parameters.feature
  */
 
 import { Button, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
-import { Crosshair, FileText, Repeat } from "lucide-react";
+import { Crosshair, FileText, Lock, Repeat } from "lucide-react";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 import { Dialog } from "../ui/dialog";
+
+/** What a secret parameter with no value yet says under its field. */
+const MISSING_SECRET_MESSAGE = "Type the value to start the run.";
 
 export function SuiteRunConfirmationDialog({
   open,
@@ -39,6 +44,14 @@ export function SuiteRunConfirmationDialog({
   onParameterChange?: (name: string, value: string) => void;
 }) {
   const estimatedJobs = scenarioCount * targetCount * repeatCount;
+
+  // A secret has no default and the run refuses to start without it, so the
+  // dialog holds the run here rather than sending it to be rejected.
+  const missingSecrets = parameters.some(
+    (parameter) =>
+      parameter.secret === true &&
+      (parameterValues[parameter.name] ?? "") === "",
+  );
 
   return (
     <Dialog.Root
@@ -129,7 +142,7 @@ export function SuiteRunConfirmationDialog({
               e.stopPropagation();
               onConfirm();
             }}
-            disabled={isLoading}
+            disabled={isLoading || missingSecrets}
           >
             {isLoading ? (
               <Spinner size="sm" />
@@ -146,6 +159,9 @@ export function SuiteRunConfirmationDialog({
 /**
  * One input per parameter the run can carry, prefilled with the value the run
  * would use if nothing here is touched.
+ *
+ * A secret parameter is the exception: it has no default, its field hides what
+ * is typed, and the run waits for it.
  */
 function RunParameterFields({
   parameters,
@@ -177,31 +193,79 @@ function RunParameterFields({
         Parameters
       </Text>
       {parameters.map((parameter) => (
-        <HStack key={parameter.name} gap={2}>
-          <HStack gap={0} width="180px" flexShrink={0} minWidth={0}>
-            <Text fontSize="sm" fontFamily="mono" truncate>
-              {parameter.name}
-            </Text>
-            {parameter.description && (
-              <FieldInfoTooltip
-                description={parameter.description}
-                testId={`suite-run-param-info-${parameter.name}`}
-              />
-            )}
-          </HStack>
-          <Input
-            size="sm"
-            flex={1}
-            fontFamily="mono"
-            fontSize="13px"
-            aria-label={parameter.name}
-            value={values[parameter.name] ?? ""}
-            onChange={(e) => onChange?.(parameter.name, e.target.value)}
-            disabled={disabled}
-            data-testid={`suite-run-parameter-${parameter.name}`}
-          />
-        </HStack>
+        <RunParameterField
+          key={parameter.name}
+          parameter={parameter}
+          value={values[parameter.name] ?? ""}
+          onChange={onChange}
+          disabled={disabled}
+        />
       ))}
+    </VStack>
+  );
+}
+
+/** One name, its description, and the field that holds its value. */
+function RunParameterField({
+  parameter,
+  value,
+  onChange,
+  disabled,
+}: {
+  parameter: ScenarioParameterDefinition;
+  value: string;
+  onChange?: (name: string, value: string) => void;
+  disabled: boolean;
+}) {
+  const isSecret = parameter.secret === true;
+  const isMissing = isSecret && value === "";
+
+  return (
+    <VStack align="stretch" gap={1}>
+      <HStack gap={2}>
+        <HStack gap={0} width="180px" flexShrink={0} minWidth={0}>
+          {isSecret && <Lock size={12} color="var(--chakra-colors-fg-muted)" />}
+          <Text
+            fontSize="sm"
+            fontFamily="mono"
+            truncate
+            paddingLeft={isSecret ? 1 : 0}
+          >
+            {parameter.name}
+          </Text>
+          {parameter.description && (
+            <FieldInfoTooltip
+              description={parameter.description}
+              testId={`suite-run-param-info-${parameter.name}`}
+            />
+          )}
+        </HStack>
+        <Input
+          size="sm"
+          flex={1}
+          fontFamily="mono"
+          fontSize="13px"
+          type={isSecret ? "password" : "text"}
+          autoComplete={isSecret ? "new-password" : undefined}
+          required={isSecret}
+          aria-label={parameter.name}
+          aria-invalid={isMissing || undefined}
+          value={value}
+          onChange={(e) => onChange?.(parameter.name, e.target.value)}
+          disabled={disabled}
+          data-testid={`suite-run-parameter-${parameter.name}`}
+        />
+      </HStack>
+      {isMissing && (
+        <Text
+          fontSize="xs"
+          color="fg.error"
+          paddingLeft="188px"
+          data-testid={`suite-run-parameter-error-${parameter.name}`}
+        >
+          {MISSING_SECRET_MESSAGE}
+        </Text>
+      )}
     </VStack>
   );
 }

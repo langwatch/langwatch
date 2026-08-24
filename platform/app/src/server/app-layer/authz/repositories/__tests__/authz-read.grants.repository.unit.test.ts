@@ -19,23 +19,44 @@ const member = () =>
   vi.fn().mockResolvedValue({ userId: "alice" }) as ReturnType<typeof vi.fn>;
 
 describe("GrantsAuthzReadRepository", () => {
-  describe("when findOrganizationRole reads the membership row", () => {
+  describe("when findOrganizationMembership reads the membership row", () => {
     it("reads the membership row, which the ledger never projected", async () => {
-      const findFirst = vi.fn().mockResolvedValue({ role: "ADMIN" });
+      const findFirst = vi
+        .fn()
+        .mockResolvedValue({ role: "ADMIN", disabledAt: null });
       const repository = new GrantsAuthzReadRepository(
         clientFor({ organizationUser: { findFirst } }),
       );
 
       expect(
-        await repository.findOrganizationRole({
+        await repository.findOrganizationMembership({
           userId: "alice",
           organizationId: "org-1",
         }),
-      ).toBe("ADMIN");
+      ).toEqual({ role: "ADMIN", disabled: false });
       expect(findFirst).toHaveBeenCalledWith({
         where: { userId: "alice", organizationId: "org-1" },
-        select: { role: true },
+        select: { role: true, disabledAt: true },
       });
+    });
+
+    it("reports a seat-disabled row as disabled, so the denial can name the seat", async () => {
+      const repository = new GrantsAuthzReadRepository(
+        clientFor({
+          organizationUser: {
+            findFirst: vi
+              .fn()
+              .mockResolvedValue({ role: "MEMBER", disabledAt: new Date() }),
+          },
+        }),
+      );
+
+      expect(
+        await repository.findOrganizationMembership({
+          userId: "alice",
+          organizationId: "org-1",
+        }),
+      ).toEqual({ role: "MEMBER", disabled: true });
     });
   });
 
@@ -67,6 +88,7 @@ describe("GrantsAuthzReadRepository", () => {
           principalType: "USER",
           principalId: "alice",
           scopeType: { in: ["ORGANIZATION", "TEAM", "PROJECT"] },
+          revokedAt: null,
         },
         select: { roleKey: true, scopeType: true, scopeId: true },
       });
@@ -220,6 +242,7 @@ describe("GrantsAuthzReadRepository", () => {
           principalType: "GROUP",
           principalId: { in: ["group-1", "group-2"] },
           scopeType: { in: ["ORGANIZATION", "TEAM", "PROJECT"] },
+          revokedAt: null,
         },
         select: {
           roleKey: true,
@@ -285,6 +308,7 @@ describe("GrantsAuthzReadRepository", () => {
           principalType: "API_KEY",
           principalId: "key-1",
           scopeType: { in: ["ORGANIZATION", "TEAM", "PROJECT"] },
+          revokedAt: null,
         },
         select: { roleKey: true, scopeType: true, scopeId: true },
       });
@@ -337,7 +361,9 @@ describe("GrantsAuthzReadRepository", () => {
           userId: "alice",
           team: {
             organizationId: "org-1",
-            organization: { members: { some: { userId: "alice" } } },
+            organization: {
+              members: { some: { userId: "alice", disabledAt: null } },
+            },
           },
         },
         select: {
@@ -369,6 +395,7 @@ describe("GrantsAuthzReadRepository", () => {
             id: { in: ["role-1", "role-2"] },
             organizationId: "org-1",
             kind: { not: "system_api_key" },
+            deletedAt: null,
           },
           select: { id: true, permissions: true, kind: true },
         });
@@ -429,13 +456,18 @@ describe("GrantsAuthzReadRepository", () => {
         });
 
         expect(roleFindMany).toHaveBeenCalledWith({
-          where: { id: { in: ["role-1"] }, organizationId: "org-1" },
+          where: {
+            id: { in: ["role-1"] },
+            organizationId: "org-1",
+            deletedAt: null,
+          },
           select: { id: true, permissions: true, kind: true },
         });
         expect(grantFindMany).toHaveBeenCalledWith({
           where: {
             organizationId: "org-1",
             roleKey: { in: ["custom:role-1"] },
+            revokedAt: null,
           },
           select: { roleKey: true, principalType: true, principalId: true },
         });
@@ -592,6 +624,7 @@ describe("GrantsAuthzReadRepository", () => {
           projectId: "proj-1",
           scopeType: "RESOURCE",
           token: { in: ["tok-1"] },
+          revokedAt: null,
           OR: [
             { resourceKind: "TRACE", scopeId: "trace-1" },
             { resourceKind: "THREAD", scopeId: "thread-1" },

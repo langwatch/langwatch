@@ -217,6 +217,21 @@ describe("LangyTurnService.startConversationTurn", () => {
     );
   });
 
+  /** @scenario The first message of a new conversation does not wait for its own projection */
+  it("skips the projection and handoff reads for a new conversation", async () => {
+    mocks.ensureConversation.mockResolvedValue({ id: "conv-1", isNew: true });
+
+    await LangyTurnService.create(deps).startConversationTurn(input());
+
+    // Both reads are lag-tolerant: asked about a conversation whose projection
+    // cannot exist yet, findByIdVisible spends its whole handoff grace window
+    // (3 x 400ms) before answering "not found", which put a flat 1.2 seconds
+    // in front of every first message.
+    expect(deps.conversations.findByIdVisible).not.toHaveBeenCalled();
+    expect(deps.conversations.getPendingHandoff).not.toHaveBeenCalled();
+    expect(mocks.dispatch).toHaveBeenCalledOnce();
+  });
+
   it("omits message_recorded when explicitly re-driving an existing message", async () => {
     await LangyTurnService.create(deps).startConversationTurn(
       input({ isRetry: true }),
@@ -629,9 +644,13 @@ describe("when a follow-up turn depends on what an earlier turn created", () => 
     // The volatile transcript must NOT ride the system lane: a per-turn
     // system re-writes the provider's cached prefix every turn.
     expect(system).not.toContain("THE CONVERSATION SO FAR");
-    // The ask is labelled so the manager-folded seed can never blur into the
-    // user's own words.
-    expect(prompt).toContain("THE USER'S MESSAGE:\nwhat is my name?");
+    // The label travels at the SEED's tail, not on the prompt: the manager
+    // folds `seed + prompt` into a fresh session's first message, so the
+    // label lands between the transcript and the user's words exactly when
+    // the fold happens — and a resumed session's follow-up stays a bare ask.
+    expect(historySeed).toBeDefined();
+    expect(historySeed?.trimEnd().endsWith("THE USER'S MESSAGE:")).toBe(true);
+    expect(prompt).toBe("what is my name?");
     // The stash carries the same seed: an outbox or liveness re-dispatch to a
     // fresh worker continues the conversation too.
     const stashed = (
@@ -1176,5 +1195,68 @@ describe("when no prompt project is configured", () => {
     await LangyTurnService.create(deps).startConversationTurn(input());
 
     expect(getPromptByIdOrHandle).not.toHaveBeenCalled();
+  });
+});
+
+describe("when the harness flag resolves for the turn", () => {
+  it("rides the harness on the probe, the handoff stash and the dispatch", async () => {
+    const { deps, mocks } = makeDeps({
+      resolveHarness: vi.fn(async () => "pi" as const),
+    });
+
+    await LangyTurnService.create(deps).startConversationTurn(input());
+
+    expect(mocks.probe).toHaveBeenCalledWith(
+      expect.objectContaining({ harness: "pi" }),
+    );
+    expect(mocks.stash).toHaveBeenCalledWith(
+      expect.objectContaining({
+        credentials: expect.objectContaining({ harness: "pi" }),
+      }),
+    );
+    expect(mocks.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        credentials: expect.objectContaining({ harness: "pi" }),
+      }),
+    );
+  });
+
+  it("leaves the harness unset when no resolver is composed", async () => {
+    const { deps, mocks } = makeDeps();
+
+    await LangyTurnService.create(deps).startConversationTurn(input());
+
+    const probeArgs = mocks.probe.mock.calls[0]![0] as unknown as {
+      harness?: string;
+    };
+    expect(probeArgs.harness).toBeUndefined();
+  });
+});
+
+describe("when the first message adopts a warmed conversation id", () => {
+  /** @scenario The first message adopts the warmed conversation */
+  it("threads adoptUnknownId so the turn lands on the warmed aggregate", async () => {
+    const { deps, mocks } = makeDeps();
+    mocks.ensureConversation.mockResolvedValue({
+      id: "conv-warmed",
+      isNew: true,
+    });
+
+    await LangyTurnService.create(deps).startConversationTurn(
+      input({
+        requestedConversationId: "conv-warmed",
+        adoptConversationId: true,
+      }),
+    );
+
+    expect(mocks.ensureConversation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationId: "conv-warmed",
+        adoptUnknownId: true,
+      }),
+    );
+    expect(mocks.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ conversationId: "conv-warmed" }),
+    );
   });
 });

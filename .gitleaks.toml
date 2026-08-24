@@ -212,3 +212,18 @@ regexes = [
   '''^hunter2-signing$''',
   '''^tok-live-abc123$''',
 ]
+
+# `ik-lw-fresh1234567890_secret`, the stand-in ingestion token an earlier commit
+# on the ingest-key rotation branch handed the mocked `apiKeys.create`. The tip
+# spells it `ik-lw-fake-token`, which no rule fires on, but gitleaks scans the
+# whole commit range on a pull request, so the earlier commit still needs naming
+# here. The value was invented for a mock return, reaches no provider, and
+# authenticates nothing.
+#
+# Scoped by VALUE and ANCHORED, for the reason given above the block before it:
+# a substring allowlist would also permit a real token that merely starts with
+# this prefix.
+[[allowlists]]
+description = "Stand-in ingestion token in the ingest-key rotation test, issued by nobody"
+targetRules = ["generic-api-key"]
+regexes = ['''^ik-lw-fresh1234567890_secret$''']

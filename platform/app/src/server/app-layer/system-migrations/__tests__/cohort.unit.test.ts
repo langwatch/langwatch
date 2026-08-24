@@ -6,7 +6,7 @@ import {
 
 describe("organizationMigrates", () => {
   describe("when the installation is self-hosted", () => {
-    /** @scenario "A self-hosted installation migrates every organization automatically" */
+    /** @scenario "A self-hosted installation migrates every organization" */
     it("includes every organization, enrolled or not", () => {
       expect(organizationMigrates({ isSaaS: false, enrolled: false })).toBe(
         true,

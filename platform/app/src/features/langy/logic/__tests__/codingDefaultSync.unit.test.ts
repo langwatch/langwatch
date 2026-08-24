@@ -1,18 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useLangyStore } from "../../stores/langyStore";
-import { syncLangyAfterCodingDefaultsWrite } from "../codingDefaultSync";
+import { syncLangyAfterDefaultModelWrite } from "../codingDefaultSync";
 
 /**
- * The client-side follow-up to a codex coding-defaults write: refresh the
- * default-model caches and keep the composer's model pill on the default it
- * was already following, without ever hijacking an explicit user pick.
- * Spec: specs/model-providers/codex-account-provider.feature
+ * The client-side follow-up to any server-side default-model write (a codex
+ * connect with defaults, or the settings drawer saving the Default Models
+ * config): refresh the default-model caches and keep the composer's model
+ * pill on the default it was already following, without ever hijacking an
+ * explicit user pick.
+ * Specs: specs/model-providers/codex-account-provider.feature,
+ *        specs/langy/langy-model-selection.feature
  */
 
 const OLD_DEFAULT = "openai/gpt-5.5";
 const CODEX_MODEL = "openai_codex/gpt-5.6-terra";
 
-type Utils = Parameters<typeof syncLangyAfterCodingDefaultsWrite>[0]["utils"];
+type Utils = Parameters<typeof syncLangyAfterDefaultModelWrite>[0]["utils"];
 
 function buildUtils({
   previousModel,
@@ -36,7 +39,7 @@ function buildUtils({
   return { utils, invalidate, getData, fetch };
 }
 
-describe("syncLangyAfterCodingDefaultsWrite", () => {
+describe("syncLangyAfterDefaultModelWrite", () => {
   beforeEach(() => {
     useLangyStore.getState().setModelOverride("");
   });
@@ -50,7 +53,7 @@ describe("syncLangyAfterCodingDefaultsWrite", () => {
         nextModel: CODEX_MODEL,
       });
 
-      await syncLangyAfterCodingDefaultsWrite({ utils, projectId: "proj-1" });
+      await syncLangyAfterDefaultModelWrite({ utils, projectId: "proj-1" });
 
       expect(useLangyStore.getState().modelOverride).toBe(CODEX_MODEL);
       expect(invalidate).toHaveBeenCalledTimes(1);
@@ -64,7 +67,7 @@ describe("syncLangyAfterCodingDefaultsWrite", () => {
         nextModel: CODEX_MODEL,
       });
 
-      await syncLangyAfterCodingDefaultsWrite({ utils, projectId: "proj-1" });
+      await syncLangyAfterDefaultModelWrite({ utils, projectId: "proj-1" });
 
       expect(useLangyStore.getState().modelOverride).toBe(CODEX_MODEL);
     });
@@ -79,7 +82,7 @@ describe("syncLangyAfterCodingDefaultsWrite", () => {
         nextModel: CODEX_MODEL,
       });
 
-      await syncLangyAfterCodingDefaultsWrite({ utils, projectId: "proj-1" });
+      await syncLangyAfterDefaultModelWrite({ utils, projectId: "proj-1" });
 
       expect(useLangyStore.getState().modelOverride).toBe(
         "anthropic/claude-sonnet-5",
@@ -88,7 +91,7 @@ describe("syncLangyAfterCodingDefaultsWrite", () => {
   });
 
   describe("when the resolver read fails after the write", () => {
-    it("falls back to the codex model the write just installed", async () => {
+    it("falls back to the model the caller says the write installed", async () => {
       useLangyStore.getState().setModelOverride(OLD_DEFAULT);
       const { utils } = buildUtils({
         previousModel: OLD_DEFAULT,
@@ -96,9 +99,43 @@ describe("syncLangyAfterCodingDefaultsWrite", () => {
         fetchFails: true,
       });
 
-      await syncLangyAfterCodingDefaultsWrite({ utils, projectId: "proj-1" });
+      await syncLangyAfterDefaultModelWrite({
+        utils,
+        projectId: "proj-1",
+        fallbackModel: CODEX_MODEL,
+      });
 
       expect(useLangyStore.getState().modelOverride).toBe(CODEX_MODEL);
+    });
+
+    it("follows the previous default when no fallback is given, changing nothing", async () => {
+      useLangyStore.getState().setModelOverride(OLD_DEFAULT);
+      const { utils } = buildUtils({
+        previousModel: OLD_DEFAULT,
+        nextModel: null,
+        fetchFails: true,
+      });
+
+      await syncLangyAfterDefaultModelWrite({ utils, projectId: "proj-1" });
+
+      expect(useLangyStore.getState().modelOverride).toBe(OLD_DEFAULT);
+    });
+  });
+
+  describe("when the settings drawer saves a new default while the panel is open", () => {
+    /** @scenario The composer follows a default-model change made in settings */
+    it("snaps the picker to the new resolved default without a reload", async () => {
+      useLangyStore.getState().setModelOverride(OLD_DEFAULT);
+      const { utils } = buildUtils({
+        previousModel: OLD_DEFAULT,
+        nextModel: "custom/stealth/ox-alpha",
+      });
+
+      await syncLangyAfterDefaultModelWrite({ utils, projectId: "proj-1" });
+
+      expect(useLangyStore.getState().modelOverride).toBe(
+        "custom/stealth/ox-alpha",
+      );
     });
   });
 
@@ -112,10 +149,26 @@ describe("syncLangyAfterCodingDefaultsWrite", () => {
       invalidate.mockRejectedValue(new Error("cache sync unavailable"));
 
       await expect(
-        syncLangyAfterCodingDefaultsWrite({ utils, projectId: "proj-1" }),
+        syncLangyAfterDefaultModelWrite({
+          utils,
+          projectId: "proj-1",
+          fallbackModel: CODEX_MODEL,
+        }),
       ).resolves.toBeUndefined();
 
       expect(useLangyStore.getState().modelOverride).toBe(CODEX_MODEL);
+    });
+  });
+
+  describe("when the query client cannot answer at all", () => {
+    // Callers await this after their write already landed, so a throw here
+    // reaches their catch and reports a saved config as a failed one.
+    it("resolves rather than rejecting", async () => {
+      const utils = { modelProvider: {} } as unknown as Utils;
+
+      await expect(
+        syncLangyAfterDefaultModelWrite({ utils, projectId: "proj-1" }),
+      ).resolves.toBeUndefined();
     });
   });
 
@@ -126,7 +179,7 @@ describe("syncLangyAfterCodingDefaultsWrite", () => {
         nextModel: CODEX_MODEL,
       });
 
-      await syncLangyAfterCodingDefaultsWrite({ utils, projectId: "proj-1" });
+      await syncLangyAfterDefaultModelWrite({ utils, projectId: "proj-1" });
 
       expect(getData).toHaveBeenCalledWith({
         projectId: "proj-1",
@@ -145,7 +198,7 @@ describe("syncLangyAfterCodingDefaultsWrite", () => {
         nextModel: CODEX_MODEL,
       });
 
-      await syncLangyAfterCodingDefaultsWrite({ utils, projectId: "proj-1" });
+      await syncLangyAfterDefaultModelWrite({ utils, projectId: "proj-1" });
 
       expect(fetch).toHaveBeenCalledWith({
         projectId: "proj-1",

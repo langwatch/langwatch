@@ -72,6 +72,10 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // behavior. Without this root those specs could only be @unimplemented.
   "platform/app/e2e",
   "packages",
+  // Langy's pi-harness wrapper: the process that turns the manager's config
+  // into pi's model registry and speaks the stdio protocol. Scenarios about
+  // what the wrapper generates can only bind from its own vitest suite.
+  "services/langyworker/src",
   "mcp/typescript/src",
   "sdks/typescript/src",
   "sdks/python/src",
@@ -265,7 +269,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/caching-passthrough.feature",
   "specs/ai-gateway/cli-integrations.feature",
   "specs/ai-gateway/cli-virtualkeys.feature",
-  "specs/ai-gateway/custom-provider-base-url.feature",
   "specs/ai-gateway/epic.feature",
   "specs/ai-gateway/governance/activity-monitor.feature",
   "specs/ai-gateway/governance/admin-oversight.feature",
@@ -310,7 +313,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/guardrails.feature",
   "specs/ai-gateway/health-checks.feature",
   "specs/ai-gateway/license-gate-governance.feature",
-  "specs/ai-gateway/payload-capture.feature",
   "specs/ai-gateway/prometheus-metrics.feature",
   "specs/ai-gateway/rate-limits.feature",
   "specs/ai-gateway/rbac-legacy-admin-fallback.feature",
@@ -402,7 +404,6 @@ const LEGACY_INERT: string[] = [
   "specs/event-sourcing/pipeline-model.feature",
   "specs/event-sourcing/process-roles.feature",
   "specs/event-sourcing/redis-fold-cache.feature",
-  "specs/event-sourcing/work-conserving-fair-dispatch.feature",
   "specs/experiments-v3/autosave-status.feature",
   "specs/experiments-v3/dataset-inline-editing.feature",
   "specs/experiments-v3/evaluation-creation-entrypoints.feature",
@@ -456,7 +457,6 @@ const LEGACY_INERT: string[] = [
   "specs/langy/langy-card-taxonomy.feature",
   "specs/langy/langy-choice-questions.feature",
   "specs/langy/langy-command-bar-activation.feature",
-  "specs/langy/langy-composer-feedback-and-cards.feature",
   "specs/langy/langy-context-awareness.feature",
   "specs/langy/langy-conversation-title.feature",
   "specs/langy/langy-derived-cards.feature",
@@ -573,7 +573,6 @@ const LEGACY_INERT: string[] = [
   "specs/setup/simplified-setup.feature",
   "specs/skills/agent-insight-skills.feature",
   "specs/skills/docs-skills-directory.feature",
-  "specs/skills/empty-state-skill-setup.feature",
   "specs/skills/onboarding-skills-architecture.feature",
   "specs/skills/platform-integration.feature",
   "specs/skills/prompt-compiler.feature",
@@ -581,7 +580,6 @@ const LEGACY_INERT: string[] = [
   "specs/studio/nlpgo-true-root-span-without-traceparent.feature",
   "specs/suites/simulations-performance.feature",
   "specs/suites/voice-agents-callout.feature",
-  "specs/topic-clustering/event-sourced-scheduling.feature",
   "specs/topic-clustering/run-history.feature",
   "specs/topic-clustering/topics-source-of-truth.feature",
   "specs/trace-drawer/attribute-table.feature",

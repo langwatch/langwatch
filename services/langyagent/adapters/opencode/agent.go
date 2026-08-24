@@ -30,9 +30,21 @@ func (a *Agent) WaitReady(ctx context.Context, ep app.Endpoint) error {
 	return WaitForReadiness(ctx, ep.ExternalPort, ep.InternalPort, ep.BearerToken, a.readinessTimeout)
 }
 
-// OpenSession creates a fresh opencode session and returns its id.
-func (a *Agent) OpenSession(ctx context.Context, ep app.Endpoint) (string, error) {
-	return CreateSession(ctx, ep.ExternalPort, ep.BearerToken)
+// OpenSession resumes the newest session opencode already holds on disk in
+// this worker home, and only creates a fresh one when there is nothing to
+// resume. The home outlives the process on an idle reap or a crash; resuming
+// keeps the conversation's own context (and its byte-stable prompt prefix)
+// instead of re-seeding a transcript into a stranger session. A failed list
+// never fails the spawn — it degrades to the fresh-session path.
+func (a *Agent) OpenSession(ctx context.Context, ep app.Endpoint) (string, bool, error) {
+	sessions, err := ListSessions(ctx, ep.ExternalPort, ep.BearerToken)
+	if err == nil {
+		if newest := NewestSession(sessions); newest != "" {
+			return newest, true, nil
+		}
+	}
+	id, err := CreateSession(ctx, ep.ExternalPort, ep.BearerToken)
+	return id, false, err
 }
 
 // Post queues a turn on the session.

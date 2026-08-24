@@ -165,6 +165,20 @@ function appendAccessMiddleware({
     stack.push(serviceConfig._legacy.organizationMiddleware);
   }
 
+  // Framework-mounted, deliberately BEFORE `config.middleware`: the check an
+  // endpoint declares cannot be displaced by the middleware array it also
+  // carries (the spread-overwrite that once left a declared policy
+  // unenforced).
+  if (config.permission) {
+    const enforce = serviceConfig.permissionEnforcer;
+    if (!enforce) {
+      throw new Error(
+        `Endpoint declares permission "${config.permission}" but the service has no permissionEnforcer`,
+      );
+    }
+    stack.push(enforce(config.permission));
+  }
+
   if (includeResourceLimit && config.resourceLimit) {
     const createResourceLimitMiddleware =
       serviceConfig._legacy?.resourceLimitMiddleware;

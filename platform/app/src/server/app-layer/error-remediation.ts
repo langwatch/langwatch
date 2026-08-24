@@ -206,6 +206,12 @@ const registry = {
     ],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
+  project_visibility_too_wide: {
+    tips: [
+      "Bind the key to the teams or projects it works with instead of the whole organization",
+    ],
+    docsPath: "/api-reference/api-keys/create-api-key",
+  },
   api_key_reserved_name: {
     tips: [
       "This name is reserved for keys LangWatch manages on your behalf — pick a different name",
@@ -352,6 +358,11 @@ const registry = {
   langy_conversation_not_owned: {
     tips: [
       "Shared conversations can be viewed but only the owner can continue them — start a new conversation instead",
+    ],
+  },
+  langy_conversation_id_unadoptable: {
+    tips: [
+      "Retry with a different conversation id, or omit `conversationId` to let the server generate one",
     ],
   },
   langy_model_not_configured: {

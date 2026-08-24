@@ -1,3 +1,4 @@
+import { ledgerActorFor } from "@langwatch/actor";
 import { generate } from "@langwatch/ksuid";
 import type { JsonArray } from "@prisma/client/runtime/client";
 import { nanoid } from "nanoid";
@@ -14,7 +15,6 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
-import { ledgerActorFor } from "~/server/app-layer/authz/ledger-actor";
 import { isRootPrismaClient } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "~/utils/memberRoleConstraints";
@@ -1360,7 +1360,6 @@ export class InviteService {
         },
         actor,
         reason: "replaced by the invite's organization role",
-        skipAppendWhenNoMatches: true,
       });
       await writer.attachBindings({
         organizationId: invite.organizationId,
@@ -1429,7 +1428,6 @@ export class InviteService {
         },
         actor,
         reason: "replaced by the invite's team role",
-        skipAppendWhenNoMatches: true,
       });
     }
     if (teamMembershipData.length > 0) {

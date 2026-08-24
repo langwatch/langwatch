@@ -5,7 +5,7 @@
 
 Strands turns on its own OpenTelemetry instrumentation as soon as a global
 tracer provider exists, so `langwatch.setup()` is enough on its own; no
-separate instrumentor is needed. The attachment rides a native Bedrock
+separate instrumentor is needed. The attachment goes in a native Bedrock
 Converse content block, an `image` block for a picture or a `document`
 block for a PDF, both carrying raw bytes rather than base64 text. The model
 is Claude Haiku 4.5 through the EU cross-region inference profile, which

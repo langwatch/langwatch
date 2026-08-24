@@ -23,7 +23,11 @@ import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { beforeAll, describe, expect, it } from "vitest";
 import { LANGWATCH_API_KEY, LW_BASE_URL } from "./config";
-import { listDatasets, traceExists } from "./langwatch-api";
+import {
+  listDatasets,
+  resetEvaluationResources,
+  traceExists,
+} from "./langwatch-api";
 import { makeLangyAdapter } from "./langy-agent";
 import {
   LANGY_ACTIVITY_OVERVIEW_CRITERIA,
@@ -135,8 +139,51 @@ async function seedFailingApplicationTraces(): Promise<void> {
   );
 }
 
+/**
+ * The navigation flow needs at least one prompt to exist: on an empty project
+ * `langwatch prompt list` returns nothing, there is no `prompt_<id>` to
+ * navigate to, and the model has no correct move left. The handle is fixed so
+ * a re-run hits the 409 duplicate path and keeps the existing prompt.
+ */
+async function seedNavigablePrompt(): Promise<void> {
+  // Retried: on a loaded machine the process's first request has stalled in
+  // front of the app for longer than any sane single-attempt budget while
+  // probes from a fresh process answered instantly, so a short per-attempt
+  // timeout with retries beats one long wait.
+  // Only timeouts and network errors retry: an HTTP error status is a real
+  // answer, so it throws from outside the retried block rather than burning
+  // the two remaining attempts on the same rejection.
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(`${LW_BASE_URL}/api/prompts`, {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": LANGWATCH_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          handle: "langy-dogfood-support-reply",
+          prompt: "You reply to customer support tickets in a friendly tone.",
+        }),
+        signal: AbortSignal.timeout(20_000),
+      });
+    } catch (error) {
+      lastError = error;
+      continue;
+    }
+    if (res.ok || res.status === 409) return;
+    throw new Error(
+      `Seeding the navigable prompt failed: ${res.status} ${await res.text()}`,
+    );
+  }
+  throw lastError;
+}
+
 describe("Langy dogfood: named flows", () => {
   beforeAll(async () => {
+    await seedNavigablePrompt();
     await seedFailingApplicationTraces();
   }, 90_000);
 
@@ -271,36 +318,46 @@ describe("Langy dogfood: named flows", () => {
   describe("when the user asks for an eval without saying which kind", () => {
     /** @scenario An ambiguous "make me an eval" is asked about before anything is created */
     it("asks experiment-vs-evaluator first, then creates the right resource with a valid body", async () => {
-      const langy = makeLangyAdapter();
-      const result = await runScenarioAndLog({
-        name: "make me an eval, ask before creating",
-        description:
-          "The user wants 'an eval' without saying whether they mean a batch experiment or an online evaluator. The choice picks what gets tested, so Langy must ask before creating anything; once answered, the create must go through with a type the platform accepts.",
-        agents: [
-          langy,
-          scenario.userSimulatorAgent({ model }),
-          scenario.judgeAgent({
-            model,
-            criteria: LANGY_EVAL_CREATION_CRITERIA,
-          }),
-        ],
-        script: [
-          scenario.user("make me an eval"),
-          scenario.agent(),
-          // The answer picks the online side and names relevancy. The exact
-          // shape that once lured the agent into the stale
-          // "ragas/answer_relevancy" slug. If it reaches for it again, the
-          // error now carries the accepted types and the judge requires the
-          // corrected retry to happen inside the turn.
-          scenario.user(
-            "score my live production traffic, I want to know when answers go off-topic",
-          ),
-          scenario.agent(),
-          scenario.judge(),
-        ],
-      });
-      if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
-      expect(result.success).toBe(true);
+      // The criteria describe a project with no matching monitor. A leftover
+      // from an earlier run flips the model into a correct reuse-versus-create
+      // question the criteria do not cover, so restore the designed state on
+      // both edges of the conversation (the after also unleaks the live
+      // monitor this scenario creates on purpose).
+      await resetEvaluationResources();
+      try {
+        const langy = makeLangyAdapter();
+        const result = await runScenarioAndLog({
+          name: "make me an eval, ask before creating",
+          description:
+            "The user wants 'an eval' without saying whether they mean a batch experiment or an online evaluator. The choice picks what gets tested, so Langy must ask before creating anything; once answered, the create must go through with a type the platform accepts.",
+          agents: [
+            langy,
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: LANGY_EVAL_CREATION_CRITERIA,
+            }),
+          ],
+          script: [
+            scenario.user("make me an eval"),
+            scenario.agent(),
+            // The answer picks the online side and names relevancy. The exact
+            // shape that once lured the agent into the stale
+            // "ragas/answer_relevancy" slug. If it reaches for it again, the
+            // error now carries the accepted types and the judge requires the
+            // corrected retry to happen inside the turn.
+            scenario.user(
+              "score my live production traffic, I want to know when answers go off-topic",
+            ),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        });
+        if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
+        expect(result.success).toBe(true);
+      } finally {
+        await resetEvaluationResources();
+      }
     });
   });
 
@@ -325,6 +382,18 @@ describe("Langy dogfood: named flows", () => {
           scenario.judge(),
         ],
       });
+      // Layer 2, the hard fact behind the install prompt: the command card the
+      // gate judged reached the stream before the gate canceled it (the sink
+      // pushes, then observes). An install prompt with no command card behind
+      // it is the regression this guards.
+      // Word boundaries cover both edges: a hand-rolled class needed a leading
+      // space injected into every command, and still missed `cd repo && git`,
+      // where the tool name is the last token.
+      expect(
+        langy.state.toolCommands.some((command) =>
+          /\b(gh|git)\b/.test(command),
+        ),
+      ).toBe(true);
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
     });
@@ -535,6 +604,44 @@ describe("Langy dogfood: named flows", () => {
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe("when the user asks to be taken to their prompts", () => {
+    /** @scenario A "take me to" request opens the page the user asked for */
+    it("lands a navigate instruction for the prompts page on the turn stream", async () => {
+      const langy = makeLangyAdapter();
+      const result = await runScenarioAndLog({
+        name: "take me to my prompts navigates in place",
+        description:
+          "The user asks to be taken to the prompt playground. Navigation is agent-driven: the model runs `langwatch navigate open <id>` (often chained onto its lookup) and the relay resolves the platform's own address onto the live turn stream. The reply also says in words where the user was taken.",
+        agents: [
+          langy,
+          scenario.userSimulatorAgent({ model }),
+          scenario.judgeAgent({
+            model,
+            criteria: [
+              "Langy takes the user to the prompts area (a navigate command ran) or names the Prompts page it is opening, and confirms it in one short line.",
+              "Langy does not ask which project.",
+              "Langy's own prose contains no worker-side address: no localhost, no 127.0.0.1, no container port, no raw environment-variable placeholder standing in for a host. Judge only the assistant's text against this. A tool result showing such an address is correct behavior (on a local stack the product's own URLs are localhost URLs) and never fails this criterion.",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user("take me to the prompt playground"),
+          scenario.agent(),
+          scenario.judge(),
+        ],
+      });
+      if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
+      expect(result.success).toBe(true);
+
+      // Layer 2, the hard fact this scenario exists for: a navigate entry
+      // really landed on the turn stream, addressing the prompts page. Words
+      // alone (the old silent-drop failure) do not pass this.
+      expect(
+        langy.state.navigateHrefs.some((href) => href.includes("/prompts")),
+      ).toBe(true);
     });
   });
 });

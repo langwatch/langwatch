@@ -5,7 +5,7 @@
  * router names the migration at the boundary, stamps the acting
  * user from the session, and delegates everything else to
  * `systemMigrationsService`. Corresponds to
- * specs/rbac/in-place-authz-migration.feature (the enrollment scenarios).
+ * specs/migration/authz-grants-rollout.feature (the enrollment scenarios).
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
@@ -160,9 +160,37 @@ describe("ops migration enrollment procedures", () => {
         migrationName: "authz-team-user-backfill",
         sampleSize: 25,
         actorUserId: "user_alex",
+        // A caller that names neither gets the SAFE pool: the zod defaults
+        // are what make an older client's request still mean what it did.
+        includeEnterprise: false,
+        includePrivateDataplane: false,
       });
       expect(demandedPermissions.get("enrollMigrationCohort")).toBe(
         "ops:manage",
+      );
+    });
+
+    /** @scenario "An operator can draw enterprise organizations into a cohort" */
+    it("passes a lifted exclusion through to the service", async () => {
+      service.enrollCohort.mockResolvedValue({
+        enrolled: [],
+        eligibleCount: 0,
+      });
+      const caller = buildCaller();
+
+      await caller.enrollMigrationCohort({
+        migrationName: "authz-team-user-backfill",
+        sampleSize: 25,
+        includeEnterprise: true,
+      });
+
+      expect(service.enrollCohort).toHaveBeenCalledWith(
+        expect.objectContaining({
+          includeEnterprise: true,
+          // Lifting one leaves the other alone, at the route as well as in
+          // the service.
+          includePrivateDataplane: false,
+        }),
       );
     });
 
@@ -191,12 +219,14 @@ describe("ops migration enrollment procedures", () => {
         migrationName: "authz-grants-cutover",
         sampleSize: 10,
         actorUserId: "user_alex",
+        includeEnterprise: false,
+        includePrivateDataplane: false,
       });
     });
   });
 
   describe("when an operator runs one migration for one organization", () => {
-    /** @scenario "An operator runs one migration for one organization now" */
+    /** @scenario "An operator runs the migration for one organization now" */
     it("delegates to the service and demands ops:manage", async () => {
       service.runForOrganization.mockResolvedValue({
         status: "finalized",

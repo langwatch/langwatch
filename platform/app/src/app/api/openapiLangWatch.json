@@ -18145,6 +18145,22 @@
                           "rpd": null
                         }
                       },
+                      "realtime": {
+                        "type": "object",
+                        "properties": {
+                          "maxOpenSessions": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "exclusiveMinimum": 0,
+                            "default": null
+                          }
+                        },
+                        "default": {
+                          "maxOpenSessions": null
+                        }
+                      },
                       "metadata": {
                         "type": "object",
                         "properties": {
@@ -19216,6 +19232,22 @@
                           "rpm": null,
                           "tpm": null,
                           "rpd": null
+                        }
+                      },
+                      "realtime": {
+                        "type": "object",
+                        "properties": {
+                          "maxOpenSessions": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ],
+                            "exclusiveMinimum": 0,
+                            "default": null
+                          }
+                        },
+                        "default": {
+                          "maxOpenSessions": null
                         }
                       },
                       "metadata": {
@@ -46022,7 +46054,12 @@
                                 {
                                   "type": "boolean"
                                 }
-                              ]
+                              ],
+                              "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
+                            },
+                            "secret": {
+                              "type": "boolean",
+                              "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
                             }
                           },
                           "required": [
@@ -46199,7 +46236,12 @@
                               {
                                 "type": "boolean"
                               }
-                            ]
+                            ],
+                            "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
+                          },
+                          "secret": {
+                            "type": "boolean",
+                            "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
                           }
                         },
                         "required": [
@@ -46365,7 +46407,12 @@
                             {
                               "type": "boolean"
                             }
-                          ]
+                          ],
+                          "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
+                        },
+                        "secret": {
+                          "type": "boolean",
+                          "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
                         }
                       },
                       "required": [
@@ -46373,7 +46420,7 @@
                       ]
                     },
                     "maxItems": 20,
-                    "description": "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME."
+                    "description": "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text."
                   }
                 },
                 "required": [
@@ -46451,7 +46498,12 @@
                               {
                                 "type": "boolean"
                               }
-                            ]
+                            ],
+                            "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
+                          },
+                          "secret": {
+                            "type": "boolean",
+                            "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
                           }
                         },
                         "required": [
@@ -46658,7 +46710,12 @@
                               {
                                 "type": "boolean"
                               }
-                            ]
+                            ],
+                            "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
+                          },
+                          "secret": {
+                            "type": "boolean",
+                            "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
                           }
                         },
                         "required": [
@@ -46843,7 +46900,12 @@
                             {
                               "type": "boolean"
                             }
-                          ]
+                          ],
+                          "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
+                        },
+                        "secret": {
+                          "type": "boolean",
+                          "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
                         }
                       },
                       "required": [
@@ -46851,7 +46913,7 @@
                       ]
                     },
                     "maxItems": 20,
-                    "description": "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME."
+                    "description": "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text."
                   }
                 }
               }
@@ -48808,6 +48870,9 @@
                           "runningCount": {
                             "type": "number"
                           },
+                          "settledCount": {
+                            "type": "number"
+                          },
                           "stalledCount": {
                             "type": "number"
                           },
@@ -48827,7 +48892,13 @@
                             "type": [
                               "number",
                               "null"
-                            ]
+                            ],
+                            "description": "Deprecated: read settledCount and isComplete instead. It carries the last update time of a batch where no run is running.",
+                            "deprecated": true
+                          },
+                          "isComplete": {
+                            "type": "boolean",
+                            "description": "True when every run of the batch reached a terminal status."
                           }
                         },
                         "required": [
@@ -48836,11 +48907,13 @@
                           "passCount",
                           "failCount",
                           "runningCount",
+                          "settledCount",
                           "stalledCount",
                           "lastRunAt",
                           "lastUpdatedAt",
                           "firstCompletedAt",
-                          "allCompletedAt"
+                          "allCompletedAt",
+                          "isComplete"
                         ]
                       }
                     },
@@ -48968,6 +49041,205 @@
             "schema": {
               "type": "string"
             }
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/simulation-runs/batches/{batchRunId}": {
+      "get": {
+        "operationId": "getApiSimulationRunsBatchesByBatchRunId",
+        "description": "Get the summary of a single batch run, including its completion flag",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "batchRunId": {
+                      "type": "string"
+                    },
+                    "totalCount": {
+                      "type": "number"
+                    },
+                    "passCount": {
+                      "type": "number"
+                    },
+                    "failCount": {
+                      "type": "number"
+                    },
+                    "runningCount": {
+                      "type": "number"
+                    },
+                    "settledCount": {
+                      "type": "number"
+                    },
+                    "stalledCount": {
+                      "type": "number"
+                    },
+                    "lastRunAt": {
+                      "type": "number"
+                    },
+                    "lastUpdatedAt": {
+                      "type": "number"
+                    },
+                    "firstCompletedAt": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    },
+                    "allCompletedAt": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": "Deprecated: read settledCount and isComplete instead. It carries the last update time of a batch where no run is running.",
+                      "deprecated": true
+                    },
+                    "isComplete": {
+                      "type": "boolean",
+                      "description": "True when every run of the batch reached a terminal status."
+                    }
+                  },
+                  "required": [
+                    "batchRunId",
+                    "totalCount",
+                    "passCount",
+                    "failCount",
+                    "runningCount",
+                    "settledCount",
+                    "stalledCount",
+                    "lastRunAt",
+                    "lastUpdatedAt",
+                    "firstCompletedAt",
+                    "allCompletedAt",
+                    "isComplete"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Batch run not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "batchRunId",
+            "required": true
           }
         ],
         "security": [

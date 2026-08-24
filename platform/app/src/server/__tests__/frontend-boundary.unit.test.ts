@@ -811,7 +811,7 @@ describe("client-imported vocabulary never reaches server-only state", () => {
   // future `import { prisma } from "~/server/db"` would break.
   describe("given a server module that composes over a caller-supplied handle", () => {
     it("reports no chain, so a clean root really is clean", () => {
-      const shadow = path.join(SRC, "server/app-layer/authz/shadow.ts");
+      const shadow = path.join(SRC, "server/app-layer/authz/checks.ts");
 
       expect(CLIENT_IMPORTED_SERVER_MODULES).not.toContain(shadow);
       expect(chainToServerOnlyState(shadow)).toBeNull();

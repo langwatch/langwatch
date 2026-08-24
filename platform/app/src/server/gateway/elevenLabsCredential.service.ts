@@ -14,7 +14,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import { prisma } from "~/server/db";
-import { decryptCustomKeys } from "~/server/modelProviders/customKeys";
+import { readCustomKeys } from "~/server/modelProviders/customKeys";
 import { isElevenLabsHost } from "~/server/modelProviders/registry";
 
 const logger = createLogger("langwatch:gateway:elevenlabs-credential");
@@ -46,7 +46,7 @@ async function elevenLabsKeys(modelProviderId: string): Promise<{
   });
   if (provider?.provider !== "elevenlabs") return null;
   return {
-    keys: decryptCustomKeys(provider.customKeys),
+    keys: readCustomKeys(provider.customKeys).keys,
     organizationId: provider.organizationId,
   };
 }

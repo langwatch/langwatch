@@ -1,0 +1,125 @@
+---
+title: Run Suites from CI
+sidebarTitle: Run from CI
+keywords: langwatch, agent simulations, ci, suite run, batch, batchRunId, isComplete, poll, wait
+description: Start a suite from a CI job and wait for every run of the batch to finish.
+---
+
+## How it works
+
+A CI job starts a suite over the API, keeps the batch id from the response, then polls that batch until every run is finished.
+
+## Start the run
+
+`POST /api/suites/{id}/run` schedules one run for each scenario of the suite:
+
+```bash
+curl -X POST "https://app.langwatch.ai/api/suites/suite_abc123/run" \
+  -H "X-Auth-Token: ${LANGWATCH_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+The response carries the two values the CI job needs:
+
+```json
+{
+  "scheduled": true,
+  "batchRunId": "batch_xyz789",
+  "setId": "set_abc123",
+  "jobCount": 2,
+  "skippedArchived": { "scenarios": [], "targets": [] },
+  "items": [
+    { "scenarioRunId": "run_1", "scenarioId": "scn_1", "name": "Cancel on the free plan" },
+    { "scenarioRunId": "run_2", "scenarioId": "scn_2", "name": "Cancel on the enterprise plan" }
+  ]
+}
+```
+
+`batchRunId` addresses the batch. `jobCount` is the number of runs the batch gets.
+
+## Poll the batch
+
+`GET /api/simulation-runs/batches/{batchRunId}` answers with the counts of one batch:
+
+```bash
+curl "https://app.langwatch.ai/api/simulation-runs/batches/batch_xyz789" \
+  -H "X-Auth-Token: ${LANGWATCH_API_KEY}"
+```
+
+```json
+{
+  "batchRunId": "batch_xyz789",
+  "totalCount": 2,
+  "passCount": 1,
+  "failCount": 0,
+  "runningCount": 1,
+  "settledCount": 1,
+  "stalledCount": 0,
+  "lastRunAt": 1755691200000,
+  "lastUpdatedAt": 1755691260000,
+  "firstCompletedAt": 1755691230000,
+  "allCompletedAt": null,
+  "isComplete": false
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `totalCount` | Runs the batch holds now. |
+| `runningCount` | Runs that are queued or in progress. |
+| `settledCount` | Runs that are neither queued nor in progress: passed, failed, errored, cancelled or stalled. |
+| `isComplete` | True when `settledCount` equals `totalCount`. |
+
+Stop the poll when `isComplete` is true **and** `totalCount` is at least `jobCount`. The two conditions go together: the platform creates the runs asynchronously, so a batch read right after the trigger can hold fewer runs than `jobCount`, and a batch of two created runs out of six reports itself complete.
+
+The same asynchronous creation makes the first read answer `404`. The batch becomes readable when its first run is stored, which is a moment after the trigger returns. Treat a `404` as "not stored yet" and poll again until your own timeout expires. A `404` is a missing batch only after that timeout.
+
+Every other status stops the job at once. A wrong token answers `401` and a failed read answers `5xx`, and a loop that polls through them reports a batch timeout thirty minutes later for a fault that was clear on the first read.
+
+Exit the CI job nonzero when `failCount` is above zero **or** `stalledCount` is above zero. A stalled run settles without passing, so it counts in `settledCount` but not in `failCount`, and a job that reads `failCount` alone reports success for a batch that never finished its work. Open the batch in the platform for the run details.
+
+```bash
+# Poll until the batch is complete, then set the exit code.
+deadline=$(( $(date +%s) + 1800 ))
+while [ "$(date +%s)" -lt "$deadline" ]; do
+  body=$(curl -s -w '\n%{http_code}' --connect-timeout 10 --max-time 30 \
+    "https://app.langwatch.ai/api/simulation-runs/batches/${BATCH_RUN_ID}" \
+    -H "X-Auth-Token: ${LANGWATCH_API_KEY}")
+  status=$(printf '%s' "$body" | tail -n1)
+  summary=$(printf '%s' "$body" | sed '$d')
+
+  case "$status" in
+    200)
+      if [ "$(printf '%s' "$summary" | jq '.isComplete')" = "true" ] \
+        && [ "$(printf '%s' "$summary" | jq ".totalCount >= ${JOB_COUNT}")" = "true" ]; then
+        printf '%s' "$summary" | jq -e '.failCount == 0 and .stalledCount == 0'
+        exit $?
+      fi
+      ;;
+    # 404 is a batch whose first run is not stored yet, 000 is a request that
+    # did not complete. Both are read again.
+    404|000) ;;
+    *)
+      echo "The batch read answered ${status}: ${summary}"
+      exit 1
+      ;;
+  esac
+  sleep 10
+done
+
+echo "The batch did not finish before the timeout."
+exit 1
+```
+
+The request carries its own time limits, so a read that hangs cannot hold the job open. The deadline is read between requests, so the job stops within one request and one sleep of it, which is 40 seconds with the values above.
+
+## Or let the CLI wait
+
+The CLI does the same poll:
+
+```bash
+langwatch suite run suite_abc123 --wait
+```
+
+The command exits when the batch is complete, and its exit code follows the results.
