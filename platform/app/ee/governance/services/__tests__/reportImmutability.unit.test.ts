@@ -105,6 +105,18 @@ describe("assertReportUnchangedOncePulled", () => {
         }),
       ).not.toThrow();
     });
+
+    it("asks nothing of the caller for an edit that keeps the report", () => {
+      // This yes stays true whatever the cursor does next, and making the
+      // caller pin it would fail an ordinary save because a scheduled pull
+      // happened to land while the drawer was open.
+      expect(
+        assertReportUnchangedOncePulled({
+          existing: sourceWith({ report: "usage", pollerCursor: "abc" }),
+          incoming: { report: "usage", bucketWidth: "1h" },
+        }),
+      ).toEqual({ cursorMustNotMove: false });
+    });
   });
 
   describe("given a source that has not pulled yet", () => {
@@ -117,6 +129,18 @@ describe("assertReportUnchangedOncePulled", () => {
           incoming: { report: "cost" },
         }),
       ).not.toThrow();
+    });
+
+    it("obliges the caller to hold the cursor still while it acts", () => {
+      // The permission is only true of the row as it was read. A pull run
+      // finishing before the write turns this yes into the exact refusal
+      // above, so the yes has to say so and the write has to check.
+      expect(
+        assertReportUnchangedOncePulled({
+          existing: sourceWith({ report: "usage", pollerCursor: null }),
+          incoming: { report: "cost" },
+        }),
+      ).toEqual({ cursorMustNotMove: true });
     });
 
     it("treats a serialised empty cursor as not having pulled", () => {

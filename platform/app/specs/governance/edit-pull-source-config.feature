@@ -70,6 +70,27 @@ Feature: Edit the configuration of a pull-mode ingestion source
       Then the backfill start is shown but cannot be changed
       And the form explains that the cursor has already moved past it
 
+  Rule: The report kind is fixed once a source has pulled
+
+    # The adapter's two reports price the same spend twice over, and its own
+    # header states the rule as "Never both". A changed report no longer
+    # matches the stored cursor, so the new report replays from the backfill
+    # start and its events land beside the old ones under different ids —
+    # nothing collides, nothing complains, and the same money is counted twice.
+
+    Scenario: The report cannot be changed once a cursor exists
+      Given the source has completed at least one pull
+      When the admin submits a change of report
+      Then the save is refused
+      And the refusal points at archiving and recreating the source instead
+
+    Scenario: A source that starts pulling mid-save does not lose the rule
+      Given the source has not yet completed a pull
+      And the admin submits a change of report
+      When a pull run records a cursor before the change is written
+      Then the save is refused rather than applied
+      And the source keeps the report and the cursor the pull run left it with
+
   Rule: Copy that does not apply to a pull source is not shown
 
     # Hiding the rotate control itself for pull sources is an access decision,
