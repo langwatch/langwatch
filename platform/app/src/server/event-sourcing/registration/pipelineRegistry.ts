@@ -1,6 +1,6 @@
 import {
+  AppGovernancePipelineRuntime,
   type EnterprisePipelineSetConfig,
-  registerEnterprisePipelineSet,
 } from "@ee/event-sourcing/pipelineSet";
 import type { GatewayDebitsProcessDeps } from "@ee/governance/process-manager/gatewayDebits.process";
 import {
@@ -621,10 +621,10 @@ export class PipelineRegistry {
       this.registerLangyConversationPipeline();
     const { pipeline: topicClusteringPipeline } =
       this.registerTopicClusteringPipeline();
-    const enterprisePipelines = registerEnterprisePipelineSet({
+    const enterprisePipelines = AppGovernancePipelineRuntime.create({
       ...this.deps.enterprisePipelines,
       eventSourcing: this.deps.eventSourcing,
-    });
+    }).register();
     const billingPipeline = this.registerBillingReportingPipeline();
     // The grants ledger (ADR-092 §13). The write paths emit through the
     // app-layer ledger module, gated PER ORGANIZATION (decision 4): only an

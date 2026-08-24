@@ -22,7 +22,7 @@ import {
   StripeUsageReportingService,
   SubscriptionItemCalculatorService,
 } from "~/runtime/app/features/billing";
-import { createNoopEnterprisePipelineCommands } from "@ee/event-sourcing/pipelineSet";
+import { AppGovernancePipelineRuntime } from "@ee/event-sourcing/pipelineSet";
 import { resolveSourceNonBillable } from "@ee/governance/services/costAttributionPolicy.service";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
@@ -2491,7 +2491,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         recordClusteringRunFailed: noop,
         recordTopics: noop,
       } as AppCommands["topicClustering"],
-      ...createNoopEnterprisePipelineCommands(),
+      ...AppGovernancePipelineRuntime.noopCommands(),
       billing: {
         reportUsageForMonth: noop,
       } as AppCommands["billing"],

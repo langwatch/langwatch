@@ -1,4 +1,4 @@
-import type { IngestionPullRunStatusData } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/projections/ingestionPullRunStatus.foldProjection";
+import type { IngestionPullRunStatusData } from "@langwatch/enterprise-governance-server";
 import type {
   ProjectionStoreContext,
   StateProjectionStore,

@@ -1,77 +1,174 @@
-import { createIngestionPullProcessingPipeline } from "@ee/event-sourcing/pipelines/ingestion-pull-processing";
-import type { IngestionPullOutcomeCommands } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/process-manager/ingestionPullEffects";
-import { createPulledUsageProcessingPipeline } from "@ee/event-sourcing/pipelines/pulled-usage-processing";
-import type { PulledUsageLedgerProcessDeps } from "@ee/governance/process-manager/pulledUsageLedger.process";
+import {
+  IngestionPullEventingAdapter,
+  IngestionPullOutcomePort,
+  IngestionPullProcessService,
+  IngestionPullRunPort,
+  IngestionPullService,
+  PulledUsageEventingAdapter,
+} from "@langwatch/enterprise-governance-server";
+import type { EventSourcing } from "@langwatch/eventing";
+import { mapCommands } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { AppIngestionPullMetricsPort } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/process-manager/ingestionPullEffects";
+import { UtcIngestionPullSchedulePort } from "@ee/event-sourcing/pipelines/ingestion-pull-processing";
+import {
+  AppPulledUsageLedgerService,
+  type AppPulledUsageLedgerConfig,
+} from "@ee/governance/process-manager/pulledUsageLedger.process";
 import { reconcileIngestionPullProcesses } from "@ee/governance/services/pullers/ingestionPullLifecycle";
 import {
   type PulledUsageDispatcher,
   runIngestionPull,
 } from "@ee/governance/services/pullers/pullerWorker";
 import { PrismaIngestionPullRunProjectionRepository } from "@ee/governance/services/pullers/repositories/ingestion-pull-run-projection.prisma.repository";
-import type { EventSourcing } from "@langwatch/eventing";
-import { mapCommands } from "@langwatch/eventing";
-import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "~/generated/prisma/client";
 
-const logger = createLogger("langwatch:enterprise:event-sourcing");
+const logger = createLogger("langwatch:enterprise:governance-runtime");
 
-/** Enterprise-owned pipeline dependencies supplied by the app composition root. */
 export interface EnterprisePipelineSetConfig {
   prisma: PrismaClient;
   runsWorkers: boolean;
-  /**
-   * The pulled-usage ledger writer. Absent without ClickHouse — the pipeline
-   * still records every observation, only the ledger row is skipped.
-   */
-  pulledUsageLedger?: PulledUsageLedgerProcessDeps;
+  pulledUsageLedger?: AppPulledUsageLedgerConfig;
 }
 
 type EnterprisePipelineRuntimeDeps = EnterprisePipelineSetConfig & {
   eventSourcing: EventSourcing;
 };
 
-function registerIngestionPullPipeline(
-  deps: EnterprisePipelineRuntimeDeps & {
-    /** The pulled-usage write surface the pull effect emits cost through. */
-    pulledUsage: PulledUsageDispatcher;
-  },
-) {
-  // Late-bind the outcome commands: they are this same pipeline's own write
-  // surface and exist only after `.build()`; dispatch happens long after that.
-  let outcomeCommands: IngestionPullOutcomeCommands | null = null;
-  const pipeline = deps.eventSourcing.register(
-    createIngestionPullProcessingPipeline({
-      runStatusStore: new PrismaIngestionPullRunProjectionRepository(
-        deps.prisma,
-      ),
-      dispatch: {
-        runPort: {
-          run: (params) =>
-            runIngestionPull({ ...params, pulledUsage: deps.pulledUsage }),
-        },
-        commands: () => {
-          if (!outcomeCommands) {
-            throw new Error(
-              "Ingestion pull outcome commands used before the pipeline was built",
-            );
-          }
-          return outcomeCommands;
-        },
-      },
-    }),
-  );
-  const ingestionPullCommands = mapCommands(pipeline.commands);
-  outcomeCommands = {
-    recordRunCompleted: (args) =>
-      ingestionPullCommands.recordRunCompleted(args as never),
-    recordRunFailed: (args) =>
-      ingestionPullCommands.recordRunFailed(args as never),
-  };
+type IngestionPullOutcomeCommands = {
+  recordRunCompleted(
+    input: Parameters<IngestionPullOutcomePort["completed"]>[0],
+  ): Promise<unknown>;
+  recordRunFailed(
+    input: Parameters<IngestionPullOutcomePort["failed"]>[0],
+  ): Promise<unknown>;
+};
 
-  if (deps.runsWorkers) {
+class AppIngestionPullRunPort extends IngestionPullRunPort {
+  private constructor(private readonly pulledUsage: PulledUsageDispatcher) {
+    super();
+  }
+
+  static create(pulledUsage: PulledUsageDispatcher): AppIngestionPullRunPort {
+    return new AppIngestionPullRunPort(pulledUsage);
+  }
+
+  run(input: { sourceId: string; cursor: string | null }) {
+    return runIngestionPull({ ...input, pulledUsage: this.pulledUsage });
+  }
+}
+
+class AppIngestionPullOutcomePort extends IngestionPullOutcomePort {
+  private commands: IngestionPullOutcomeCommands | undefined;
+
+  static create(): AppIngestionPullOutcomePort {
+    return new AppIngestionPullOutcomePort();
+  }
+
+  connect(commands: IngestionPullOutcomeCommands): void {
+    this.commands = commands;
+  }
+
+  async completed(
+    input: Parameters<IngestionPullOutcomePort["completed"]>[0],
+  ): Promise<void> {
+    await this.requireCommands().recordRunCompleted(input);
+  }
+
+  async failed(
+    input: Parameters<IngestionPullOutcomePort["failed"]>[0],
+  ): Promise<void> {
+    await this.requireCommands().recordRunFailed(input);
+  }
+
+  private requireCommands(): IngestionPullOutcomeCommands {
+    if (!this.commands) {
+      throw new Error(
+        "Ingestion pull outcome commands used before the pipeline was registered",
+      );
+    }
+    return this.commands;
+  }
+}
+
+export class AppGovernancePipelineRuntime {
+  private constructor(private readonly deps: EnterprisePipelineRuntimeDeps) {}
+
+  static create(
+    deps: EnterprisePipelineRuntimeDeps,
+  ): AppGovernancePipelineRuntime {
+    return new AppGovernancePipelineRuntime(deps);
+  }
+
+  static noopCommands(): EnterprisePipelineCommands {
+    const noop = async () => undefined;
+    return {
+      ingestionPull: {
+        configure: noop,
+        disable: noop,
+        recordRunCompleted: noop,
+        recordRunFailed: noop,
+      },
+      pulledUsage: { recordPulledUsage: noop },
+    } satisfies EnterprisePipelineCommands;
+  }
+
+  register() {
+    const pulledUsage = this.registerPulledUsage();
+    const ingestionPull = this.registerIngestionPull({
+      recordPulledUsage: pulledUsage.commands.recordPulledUsage,
+    });
+    return {
+      commands: {
+        ingestionPull: ingestionPull.commands,
+        pulledUsage: pulledUsage.commands,
+      },
+    };
+  }
+
+  private registerPulledUsage() {
+    const repository = this.deps.pulledUsageLedger?.budgetCHRepository;
+    const ledger = repository
+      ? AppPulledUsageLedgerService.create(repository).process()
+      : undefined;
+    const pipeline = this.deps.eventSourcing.register(
+      PulledUsageEventingAdapter.create({ ledger }).build(),
+    );
+    return { commands: mapCommands(pipeline.commands) };
+  }
+
+  private registerIngestionPull(pulledUsage: PulledUsageDispatcher) {
+    const outcomes = AppIngestionPullOutcomePort.create();
+    const execution = IngestionPullService.create(
+      AppIngestionPullRunPort.create(pulledUsage),
+      outcomes,
+      AppIngestionPullMetricsPort.create(),
+    );
+    const process = IngestionPullProcessService.create({
+      schedule: UtcIngestionPullSchedulePort.create(),
+      execution,
+    });
+    const pipeline = this.deps.eventSourcing.register(
+      IngestionPullEventingAdapter.create({
+        runStatusStore: new PrismaIngestionPullRunProjectionRepository(
+          this.deps.prisma,
+        ),
+        process,
+      }).build(),
+    );
+    const commands = mapCommands(pipeline.commands);
+    outcomes.connect(commands);
+    this.reconcile(commands);
+    return { commands };
+  }
+
+  private reconcile(
+    commands: EnterprisePipelineCommands["ingestionPull"],
+  ): void {
+    if (!this.deps.runsWorkers) return;
     void reconcileIngestionPullProcesses({
-      prisma: deps.prisma,
-      commands: ingestionPullCommands,
+      prisma: this.deps.prisma,
+      commands,
     })
       .then(({ reconciled, failed }) => {
         if (failed > 0) {
@@ -88,71 +185,8 @@ function registerIngestionPullPipeline(
         );
       });
   }
-
-  return { commands: ingestionPullCommands };
-}
-
-/**
- * The `pulled_usage` write surface (ADR-088).
- *
- * A sibling of the ingestion-pull pipeline rather than a part of it: that one
- * is per-source and per-run, this one is per usage item, and a per-run stream
- * cannot carry a per-item price. The puller effect dispatches
- * `recordPulledUsage` in the same loop that writes the OCSF audit row.
- */
-function registerPulledUsagePipeline(deps: EnterprisePipelineRuntimeDeps) {
-  const pipeline = deps.eventSourcing.register(
-    createPulledUsageProcessingPipeline({ ledger: deps.pulledUsageLedger }),
-  );
-  return { commands: mapCommands(pipeline.commands) };
-}
-
-/**
- * Registers the complete enterprise pipeline set with the shared
- * event-sourcing runtime. Domain definitions stay under /ee; their process
- * managers are declared on the pipelines (ADR-052 builder), so the shared
- * ProcessRuntime owns all workers — the core registry only composes this set
- * with the core pipelines.
- */
-export function registerEnterprisePipelineSet(
-  deps: EnterprisePipelineRuntimeDeps,
-) {
-  // Pulled usage registers first because the pull effect emits through it.
-  // Its commands exist the moment its own pipeline is built, so this one
-  // needs no late-binding getter — only the ingestion-pull pipeline's own
-  // outcome commands do, and those are its own write surface.
-  const pulledUsage = registerPulledUsagePipeline(deps);
-  const ingestionPull = registerIngestionPullPipeline({
-    ...deps,
-    // No cast. The dispatcher's argument type IS the command's, so renaming a
-    // field on the event schema breaks this line at compile time instead of
-    // surfacing as an outbox parse failure in production.
-    pulledUsage: { recordPulledUsage: pulledUsage.commands.recordPulledUsage },
-  });
-
-  return {
-    commands: {
-      ingestionPull: ingestionPull.commands,
-      pulledUsage: pulledUsage.commands,
-    },
-  };
 }
 
 export type EnterprisePipelineCommands = ReturnType<
-  typeof registerEnterprisePipelineSet
+  AppGovernancePipelineRuntime["register"]
 >["commands"];
-
-export function createNoopEnterprisePipelineCommands(): EnterprisePipelineCommands {
-  const noop = async () => undefined;
-  return {
-    ingestionPull: {
-      configure: noop,
-      disable: noop,
-      recordRunCompleted: noop,
-      recordRunFailed: noop,
-    },
-    pulledUsage: {
-      recordPulledUsage: noop,
-    },
-  } satisfies EnterprisePipelineCommands;
-}

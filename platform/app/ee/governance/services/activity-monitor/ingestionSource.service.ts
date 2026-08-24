@@ -21,7 +21,7 @@
  * window.
  */
 
-import { pullScheduleSchema } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/events";
+import { pullScheduleSchema } from "@langwatch/enterprise-governance-contract";
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
 import { syncIngestionPullSource } from "@ee/governance/services/pullers/ingestionPullLifecycle";
 import {

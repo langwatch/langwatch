@@ -46,12 +46,7 @@ vi.hoisted(() => {
 });
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import { createPulledUsageProcessingPipeline } from "@ee/event-sourcing/pipelines/pulled-usage-processing";
-import {
-  EventSourcing,
-  InMemoryProcessStore,
-  mapCommands,
-} from "@langwatch/eventing";
+import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import http from "http";
 import { nanoid } from "nanoid";
 import type { AddressInfo } from "net";
@@ -60,6 +55,7 @@ import type { Prisma } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import { AppGovernancePipelineRuntime } from "@ee/event-sourcing/pipelineSet";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   clearClickHouseTestApp,
@@ -105,14 +101,14 @@ async function pullThroughTheRealPipeline(params: {
     executionTarget: "all",
   });
   try {
-    const pipeline = eventSourcing.register(
-      createPulledUsageProcessingPipeline({
-        ledger: { budgetCHRepository: chRepo },
-      }),
-    );
-    const commands = mapCommands(pipeline.commands);
+    const { commands } = AppGovernancePipelineRuntime.create({
+      eventSourcing,
+      prisma,
+      runsWorkers: false,
+      pulledUsageLedger: { budgetCHRepository: chRepo },
+    }).register();
     const pulledUsage: PulledUsageDispatcher = {
-      recordPulledUsage: commands.recordPulledUsage,
+      recordPulledUsage: commands.pulledUsage.recordPulledUsage,
     };
 
     const outcome = await runIngestionPull({ ...params, pulledUsage });

@@ -15,9 +15,8 @@
  * Decision: ADR-088.
  */
 import {
-  type PulledUsageLedgerProcessDeps,
-  runWritePulledUsage,
-  type WritePulledUsagePayload,
+  AppPulledUsageLedgerService,
+  type AppWritePulledUsagePayload,
 } from "@ee/governance/process-manager/pulledUsageLedger.process";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -55,7 +54,7 @@ const BUCKET_AT = new Date("2026-08-03T00:00:00.000Z");
 
 let chRepo: GatewayBudgetClickHouseRepository;
 let service: GatewayBudgetService;
-let writePulledUsage: (payload: WritePulledUsagePayload) => Promise<void>;
+let writePulledUsage: (payload: AppWritePulledUsagePayload) => Promise<void>;
 
 /** One pulled usage item, as the process manager mints it. */
 function pulledItem(options: {
@@ -65,7 +64,7 @@ function pulledItem(options: {
   teamId?: string | null;
   observedAt: Date;
   tokensInput?: number;
-}): WritePulledUsagePayload {
+}): AppWritePulledUsagePayload {
   return {
     restatement_key: options.restatementKey,
     tenant_id: GOV_PROJECT_ID,
@@ -203,8 +202,8 @@ beforeAll(async () => {
   };
   chRepo = new GatewayBudgetClickHouseRepository(resolveClient);
   service = new GatewayBudgetService(prisma, undefined, undefined, chRepo);
-  const deps: PulledUsageLedgerProcessDeps = { budgetCHRepository: chRepo };
-  writePulledUsage = runWritePulledUsage(deps);
+  const ledger = AppPulledUsageLedgerService.create(chRepo);
+  writePulledUsage = (payload) => ledger.write(payload);
 }, 180_000);
 
 afterAll(async () => {

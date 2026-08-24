@@ -21,7 +21,7 @@
  *
  * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
  */
-import type { PulledUsageObservedEventData } from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/events";
+import type { PulledUsageObservedEventData } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";

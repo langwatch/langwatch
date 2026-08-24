@@ -18,9 +18,9 @@ import { createHash } from "node:crypto";
 import {
   PULLED_USAGE_COST_BASIS,
   PULLED_USAGE_COST_STATUS,
-} from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/constants";
-import type { PulledUsageObservedEventData } from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/events";
-import { pricePulledUsage } from "@ee/event-sourcing/pipelines/pulled-usage-processing/services/pulled-usage-pricing.service";
+  type PulledUsageObservedEventData,
+} from "@langwatch/enterprise-governance-contract";
+import { AppPulledUsagePricingService } from "@ee/event-sourcing/pipelines/pulled-usage-processing/services/pulled-usage-pricing.service";
 import { z } from "zod";
 
 import type { NormalizedPullEvent } from "./pullerAdapter";
@@ -167,9 +167,10 @@ export function buildPulledUsageRecord({
   };
   const model = hint.model ?? event.target;
 
+  const pricing = AppPulledUsagePricingService.create();
   const priced =
     hint.costBasis === PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED
-      ? pricePulledUsage({
+      ? pricing.price({
           basis: PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED,
           // The string when the adapter kept one, so no digit is lost to the
           // float `cost_usd` had to be to fit the canonical event shape.
@@ -177,7 +178,7 @@ export function buildPulledUsageRecord({
           // Present by the schema's own refinement on this branch.
           costStatus: hint.costStatus!,
         })
-      : pricePulledUsage({
+      : pricing.price({
           basis: PULLED_USAGE_COST_BASIS.COMPUTED,
           model,
           quantities,
