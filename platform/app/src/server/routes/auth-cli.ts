@@ -770,6 +770,32 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
       );
     }
 
+    // Membership is re-derived HERE, not trusted from approval time: an admin
+    // can disable the seat between approve and exchange, and both branches
+    // below hand out credentials the owner ceiling never reaches (a project
+    // key has no owner; a device session mints keys of its own). Refused,
+    // the device code is consumed so the CLI stops polling for a session it
+    // will never get.
+    const activeMembership = await prisma.organizationUser.findFirst({
+      where: {
+        userId: user.id,
+        organizationId: organization.id,
+        disabledAt: null,
+      },
+      select: { userId: true },
+    });
+    if (!activeMembership) {
+      await redis.del(deviceCodeKey(device_code));
+      await redis.del(userCodeKey(record.user_code));
+      return c.json(
+        {
+          error: "access_denied",
+          error_description: "Not an active member of the organization",
+        },
+        403,
+      );
+    }
+
     const responseEndpoint = controlPlaneBaseUrl();
 
     // No-paste API-key flow: the user picked a project on /cli/auth and the

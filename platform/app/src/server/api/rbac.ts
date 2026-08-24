@@ -16,6 +16,7 @@ import { authzChecksFor } from "~/server/app-layer/authz/checks";
 import { organizationOnAuthzEngine } from "~/server/app-layer/authz/engine-gate";
 import {
   LiteMemberRestrictedError,
+  MembershipDisabledError,
   ProjectPermissionDeniedError,
 } from "~/server/app-layer/permissions/errors";
 import type { Session } from "~/server/auth";
@@ -572,6 +573,21 @@ export type PermissionMiddleware<InputType> = (
 ) => Promise<any>;
 
 /**
+ * A disabled seat outranks the role-shaped denials that follow it: the person
+ * HAS a role, so the lite-member modal and the "ask an admin for this
+ * permission" copy would both point them at something nobody can grant while
+ * the seat is off.
+ */
+function membershipDisabledDenial(): TRPCError {
+  const disabled = new MembershipDisabledError();
+  return new TRPCError({
+    code: "UNAUTHORIZED",
+    message: disabled.message,
+    cause: disabled,
+  });
+}
+
+/**
  * Check if user has permission for a project.
  *
  * ADR-092 decision 25: procedures declare `.permission("…")` now — this
@@ -586,13 +602,13 @@ export const checkProjectPermission =
     input,
     next,
   }: PermissionMiddlewareParams<{ projectId: string }>) => {
-    const { permitted, organizationRole } = await resolveProjectPermission(
-      ctx,
-      input.projectId,
-      permission,
-    );
+    const { permitted, organizationRole, denialReason } =
+      await resolveProjectPermission(ctx, input.projectId, permission);
 
     if (!permitted) {
+      if (denialReason === "membership-disabled") {
+        throw membershipDisabledDenial();
+      }
       if (organizationRole === OrganizationUserRole.EXTERNAL) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
@@ -635,13 +651,13 @@ export const checkTeamPermission =
     input,
     next,
   }: PermissionMiddlewareParams<{ teamId: string }>) => {
-    const { permitted, organizationRole } = await resolveTeamPermission(
-      ctx,
-      input.teamId,
-      permission,
-    );
+    const { permitted, organizationRole, denialReason } =
+      await resolveTeamPermission(ctx, input.teamId, permission);
 
     if (!permitted) {
+      if (denialReason === "membership-disabled") {
+        throw membershipDisabledDenial();
+      }
       if (organizationRole === OrganizationUserRole.EXTERNAL) {
         throw new TRPCError({
           code: "UNAUTHORIZED",

@@ -526,6 +526,56 @@ describe("CLI login personal-project guards", () => {
       });
     });
 
+    describe("when the seat is disabled between approval and exchange", () => {
+      /** @scenario project-login exchange denies a member whose seat was disabled after approval */
+      it("returns forbidden, never the project's API key, and consumes the code", async () => {
+        // Approval is not the last word: the code is exchanged later, and an
+        // admin can switch the seat off in between. The handout is what must
+        // re-derive membership.
+        const dcRes = await app.request("/api/auth/cli/device-code", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ credential_type: "project_api_key" }),
+        });
+        const dc = (await dcRes.json()) as {
+          device_code: string;
+          user_code: string;
+        };
+        const approved = await approve({
+          user_code: dc.user_code,
+          project_id: SHARED_PROJECT_ID,
+        });
+        expect(approved.status).toBe(200);
+
+        await prisma.organizationUser.updateMany({
+          where: { userId: USER_ID, organizationId: ORG_ID },
+          data: { disabledAt: new Date() },
+        });
+        try {
+          const exchange = () =>
+            app.request("/api/auth/cli/exchange", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ device_code: dc.device_code }),
+            });
+
+          const first = await exchange();
+          expect(first.status).toBe(403);
+          expect(await first.text()).not.toContain(SHARED_API_KEY);
+
+          // Consumed: a CLI still polling is told the code is gone, not
+          // left waiting on an approval that will never be honoured.
+          const second = await exchange();
+          expect(second.status).toBe(408);
+        } finally {
+          await prisma.organizationUser.updateMany({
+            where: { userId: USER_ID, organizationId: ORG_ID },
+            data: { disabledAt: null },
+          });
+        }
+      });
+    });
+
     describe("when the caller lacks write access to the picked project", () => {
       /** @scenario project-login approval denies a project the caller cannot write */
       it("returns forbidden and never the project's API key", async () => {
