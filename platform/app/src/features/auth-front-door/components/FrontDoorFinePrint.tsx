@@ -1,5 +1,6 @@
 import { Text } from "@chakra-ui/react";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { LEGAL_LINKS } from "~/utils/legalLinks";
 import "../authFrontDoor.css";
 
 /**
@@ -17,12 +18,12 @@ export function FrontDoorFinePrint() {
   return (
     <Text fontSize="11.5px" lineHeight="1.6" color="fg.muted">
       By continuing, you agree to our{" "}
-      <FinePrintLink href="https://langwatch.ai/legal/terms-conditions">
-        Terms
+      <FinePrintLink href={LEGAL_LINKS.terms.href}>
+        {LEGAL_LINKS.terms.label}
       </FinePrintLink>{" "}
       and{" "}
-      <FinePrintLink href="https://langwatch.ai/legal/privacy-policy">
-        Privacy Policy
+      <FinePrintLink href={LEGAL_LINKS.privacy.href}>
+        {LEGAL_LINKS.privacy.label}
       </FinePrintLink>
       .
     </Text>
