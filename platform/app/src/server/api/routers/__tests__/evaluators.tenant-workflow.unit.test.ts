@@ -6,6 +6,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { appPermissionsService } from "~/test-utils/appPermissionsMock";
+import type { App } from "~/server/app-layer/app";
 import { createInnerTRPCContext } from "../../trpc";
 import { evaluatorsRouter } from "../evaluators";
 
@@ -67,7 +68,7 @@ const createCaller = () => {
       permissions: appPermissionsService(prisma),
       authzGrants: {} as never,
       governance: {} as never,
-    },
+    } as unknown as App,
   });
   ctx.prisma = prisma;
   return evaluatorsRouter.createCaller(ctx);

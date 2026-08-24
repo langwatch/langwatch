@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { appPermissionsService } from "~/test-utils/appPermissionsMock";
+import type { App } from "~/server/app-layer/app";
 import { MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
 import { createInnerTRPCContext } from "../../trpc";
 import { modelProviderRouter } from "../modelProviders";
@@ -147,7 +148,7 @@ function callerForUser(userId: string) {
       permissions: appPermissionsService(database),
       authzGrants: {} as never,
       governance: {} as never,
-    },
+    } as unknown as App,
   });
   ctx.prisma = database;
   return modelProviderRouter.createCaller(ctx);
