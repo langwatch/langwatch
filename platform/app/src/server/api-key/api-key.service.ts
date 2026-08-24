@@ -85,9 +85,19 @@ type RoleBindingBase = {
   scopeId: string;
 };
 
-type RoleBindingInput =
+export type RoleBindingInput =
   | (RoleBindingBase & { role: "ADMIN" | "MEMBER" | "VIEWER" })
-  | (RoleBindingBase & { role: "CUSTOM"; customRoleId?: string });
+  | CustomRoleBindingInput;
+
+/**
+ * A binding carrying an explicit permission list rather than a built-in role.
+ * Only these are mintable under `permissionMode: "restricted"`, so the
+ * selection dry run takes exactly this shape.
+ */
+export type CustomRoleBindingInput = RoleBindingBase & {
+  role: "CUSTOM";
+  customRoleId?: string;
+};
 
 type CreatorScope =
   | { type: "org"; id: string }
@@ -567,6 +577,58 @@ export class ApiKeyService {
         meta: { userId, organizationId },
       });
     }
+  }
+
+  /**
+   * The mint-time validation of {@link create}, exposed as a dry run for
+   * callers that decide a selection long before they mint (the CLI device-flow
+   * approval stamps a selection that `create` only consumes at exchange time).
+   * Same checks, same errors, nothing persisted: the permission format, the
+   * empty-input refusals, org membership, every binding within the user's own
+   * ceiling for every permission, and personal-team scopes owned by the user.
+   * An input this method accepts is an input `create` mints.
+   *
+   * The bindings are CUSTOM by type, not by runtime guard: `create` refuses a
+   * restricted key whose bindings carry a built-in role, and the ceiling walk
+   * routes a built-in role to a one-permission probe that never reads the
+   * supplied list. Accepting one here would be both permissive and weaker
+   * than the mint, so the compiler rules it out instead.
+   */
+  async assertSelectionWithinCeiling({
+    userId,
+    organizationId,
+    bindings,
+    permissions,
+  }: {
+    userId: string;
+    organizationId: string;
+    bindings: CustomRoleBindingInput[];
+    permissions: string[];
+  }): Promise<void> {
+    if (permissions.length === 0) {
+      throw new ApiKeyScopeViolationError(
+        "CUSTOM bindings require at least one permission",
+      );
+    }
+    if (bindings.length === 0) {
+      throw new ApiKeyScopeViolationError(
+        "A personal API key needs at least one role binding",
+      );
+    }
+    ApiKeyService.assertPermissionFormat(permissions);
+    await this.ensureCallerIsOrgMember({ userId, organizationId });
+    await this.assertBindingsWithinCeiling({
+      prisma: this.prisma,
+      ceilingUserId: userId,
+      organizationId,
+      bindings,
+      rawPermissions: [...permissions].sort(),
+    });
+    await assertPersonalTeamScopesOwnedBy({
+      client: this.prisma,
+      scopes: bindings,
+      ownerUserId: userId,
+    });
   }
 
   /**

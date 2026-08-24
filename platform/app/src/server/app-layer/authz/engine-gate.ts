@@ -51,15 +51,17 @@ export function setAuthzEngineGateFailureReporter(
 }
 
 /**
- * The statuses that mean this organization's whole grant history is in the
- * event log and its projection is fed — so the engine can both answer and be
- * written to. Anything else (absent, pending, parked) means the history is
- * not there, and the organization stays on the legacy path.
+ * Only `finalized` moves an organization onto the engine. `migrated` is the
+ * HELD state (the runner's own contract): the work landed but the
+ * migration's proof found the projection behind or disagreeing, and the ops
+ * page promises the operator such an organization "stays on its legacy
+ * path, behaving exactly as before". Reads from a half-fed projection would
+ * deny access the customer holds; writes fork on this same predicate, and a
+ * held organization's imperative legacy writes are what the next pass
+ * restates, rekeys or revokes — that loop is how it heals into `finalized`.
+ * Anything else (absent, pending, parked, rolled back) is legacy too.
  */
-const ON_ENGINE_STATUSES: readonly MigrationTenantStatus[] = [
-  "migrated",
-  "finalized",
-];
+const ON_ENGINE_STATUSES: readonly MigrationTenantStatus[] = ["finalized"];
 
 /**
  * One bound for both directions. The negative one is what lets a finishing
@@ -155,13 +157,13 @@ export async function organizationOnAuthzEngine({
 
 /**
  * Drop one organization's cached answer, so the next check re-reads. Intended
- * to be called the moment a migration finalizes an organization, so the switch
- * is immediate on the pod that ran it while every other pod converges on the
- * TTL. NOT wired yet: the ADR-110 one-shot migration is not registered
- * (`registeredMigrations()` is empty), so nothing calls this today — until it
- * lands, a finalized organization waits out the full TTL even on its own pod.
- * Pod-local by design — cross-pod invalidation would need a bus and would buy
- * sixty seconds.
+ * for a caller that has just changed the stored status and needs its own pod
+ * to re-read it. Nothing calls it in production BY DESIGN: the migration
+ * returns `finalized` before the runner persists the status, so a call from
+ * there would re-cache the old answer; every pod — the finalizing one
+ * included — converges on the TTL instead, the same sixty-second bound
+ * ADR-110 documents for rollback. Pod-local — cross-pod invalidation would
+ * need a bus and would buy sixty seconds.
  */
 export function invalidateAuthzEngineGate({
   organizationId,

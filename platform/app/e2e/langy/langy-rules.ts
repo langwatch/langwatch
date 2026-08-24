@@ -24,12 +24,20 @@
 export const LANGY_DECISIVENESS_CRITERION =
   "Langy resolves details it could decide itself (time ranges, formats, which command fits) instead of asking the user; it asks only when the choice spends the user's money or picks what gets tested.";
 
+/**
+ * The grounding criterion, exported by identity so a flow whose evidence has a
+ * flow-specific shape (the GitHub gate's install prompt) can amend THIS entry
+ * without matching on its wording.
+ */
+export const LANGY_GROUNDING_CRITERION =
+  "Every claim about the user's project traces back to something retrieved in this conversation. The tool calls and tool results in the conversation are the authority: a number, name or id that contradicts them fails, and so does a claim about the project with no retrieval behind it at all, however plausible it sounds. A reply that makes no claim about the project has nothing to ground and passes. Do not demand proof from telemetry, spans, or any source outside the conversation, and do not treat attached spans as a contradiction of a value a command returned. A field reported straight out of a command result is grounded even when it looks wrong, and saying it looks wrong is Langy doing its job. One display caveat: a tool result carrying a truncation marker or a note that it was reduced for display shows only PART of what the agent read. For such a result, the items shown are a sample, not the full set: a claim naming an item, a field value or a pattern that is not among the visible items is drawing on the reduced part and must not be failed as ungrounded or contradicted, and the visible items' fields say nothing about the fields of the items that were cut. Only a claim that CONTRADICTS a visible item's own content, or contradicts an explicit total the result states, fails on a reduced output.";
+
 /** The always-on outcome rubric every Langy answer is graded against. */
 export const LANGY_CORE_RULE_CRITERIA = [
   "Langy answers the user's actual question with concrete results from their project (real counts, names, findings, or a clear empty result), not with a plan, a capability list, or a description of what it is about to do. Four kinds of answer legitimately carry no project result and still pass, as long as each is stated plainly with whatever path forward exists: the platform refusing the action over permissions, a request outside LangWatch declined in a line, a capability Langy does not have, and a greeting or acknowledgment.",
-  "Every claim about the user's project traces back to something retrieved in this conversation. The COMMAND RESULTS in the transcript are the authority: a number, name or id that contradicts them fails, and so does a claim about the project with no retrieval behind it at all, however plausible it sounds. A reply that makes no claim about the project has nothing to ground and passes. Do not demand proof from telemetry, spans, or any source outside the conversation, and do not treat attached spans as a contradiction of a value a command returned. A field reported straight out of a command result is grounded even when it looks wrong, and saying it looks wrong is Langy doing its job.",
+  LANGY_GROUNDING_CRITERION,
   LANGY_DECISIVENESS_CRITERION,
-  "The reply reads as the answer, not as a work log: no filler openers, no raw JSON or stack traces in prose, no play-by-play of the commands it ran. A fenced code block tagged langy-card is the product's own UI (it renders as a real card) and is not a violation. Offering a next step is fine once the question is fully answered; an offer that stands in for the answer, or buries it, is a failure.",
+  "The reply reads as the answer, not as a work log: no filler openers, no raw JSON or stack traces in prose, no play-by-play of the commands it ran. A fenced code block tagged langy-card is the product's own UI (it renders as a real card) and is not a violation, and tool calls with their results are the product working, not the reply. Offering a next step is fine once the question is fully answered; an offer that stands in for the answer, or buries it, is a failure.",
   "Every reply ends with visible text for the user. A turn whose actions succeeded but whose reply is empty is a failure.",
   "The reply's length matches the question: compact for a lookup, complete for an analysis or diagnosis. Nothing padded, and nothing the user asked for missing.",
 ];
@@ -72,9 +80,13 @@ export const LANGY_FAILING_TRACES_CRITERIA = [
 /** Criteria specific to the GitHub "open a PR" flow (the github internal skill). */
 export const LANGY_OPEN_PR_CRITERIA = [
   "Langy attempts to open a real pull request (clone/branch/commit/push/PR), or clearly reports the concrete blocker (e.g. the GitHub App is not installed for this org).",
-  "Langy does NOT ask the user for a GitHub token or tell them to run `gh auth login`. The installation token is already provisioned.",
+  "Langy does NOT ask the user for a GitHub token or tell them to run `gh auth login`. The installation token is already provisioned. Only Langy's own prose can violate this: a tool result's own text (for example gh printing its auth-login hint) is the tool talking, not Langy asking.",
   "If a PR was opened, the reply carries its URL. If the platform blocked the flow (GitHub App not installed for the project), naming that blocker IS the passing outcome and no URL is expected.",
-  ...LANGY_CORE_RULE_CRITERIA,
+  ...LANGY_CORE_RULE_CRITERIA.map((criterion) =>
+    criterion === LANGY_GROUNDING_CRITERION
+      ? `${criterion} In this flow one more retrieval exists: the install prompt ('Install the LangWatch GitHub App...') is the platform's own verdict, rendered by the product when it stops a GitHub-reaching command that lacks access. The failed command plus that prompt fully ground the blocker claim; never mark it ungrounded or inconclusive.`
+      : criterion,
+  ),
 ];
 
 /**
@@ -90,7 +102,7 @@ export const LANGY_EVAL_CREATION_CRITERIA = [
   "On the first turn, Langy asks ONE short question distinguishing a batch experiment (offline, runs against a dataset) from an online evaluator (scores live production traffic), and creates NOTHING until the user answers.",
   "Langy does not run any create command (evaluator, monitor, or experiment) before the user has answered the experiment-vs-evaluator question.",
   "After the user answers, Langy runs the matching create. A batch answer ends with a successful creation naming the thing created. A live answer ends with BOTH the evaluator and the monitor created and named. A silent stop, an unexplained drop of the request, or stopping at the evaluator because the monitor was treated as out of reach all fail this.",
-  "If a create is rejected over an invalid field value and the error names the accepted values, Langy corrects that exact field from the error's expected list and retries once within the same turn. It never asks the user to pick a type slug and never abandons the create over a fixable field.",
+  "If a create is rejected over an invalid field value and the error names the accepted values, Langy corrects that exact field from the error's expected list and retries once within the same turn. It never asks the user to pick a type slug and never abandons the create over a fixable field. A run where no create is rejected satisfies this criterion; do not mark it inconclusive.",
   ...LANGY_CORE_RULE_CRITERIA.filter(
     (criterion) => criterion !== LANGY_DECISIVENESS_CRITERION,
   ),
@@ -178,5 +190,51 @@ export const LANGY_ADMIN_BOUNDARY_CRITERIA = [
   // Requiring an offer unconditionally would grade a flat, correct refusal as a
   // failure — the same contradiction the old monitor rubric had.
   "If LangWatch itself does the thing the user actually wanted (for example: they asked to change a spend limit because they are worried about cost, and Langy can show them where the cost is going), Langy says so and offers it. If LangWatch does not, a plain decline with nothing attached is the correct and complete answer, and passes.",
+  ...LANGY_CORE_RULE_CRITERIA,
+];
+
+/**
+ * The baseline-untouched rule of the prompt optimization loop, exported by
+ * identity so a scenario can amend it. The hard fact (the baseline's
+ * localPromptConfig byte-identical before and after) is a Layer-2 REST
+ * assertion in the test; this criterion carries the conversational half.
+ */
+export const LANGY_BASELINE_UNTOUCHED_CRITERION =
+  "Every prompt change Langy makes lands on a duplicate column, never on the user's original. Langy says which column it is working on, and never describes editing, overwriting, or republishing the baseline prompt itself.";
+
+/**
+ * Outcome rubric for the prompt improvement loop
+ * (skills/prompt-optimization/SKILL.mdx). Threshold numbers quote the skill: a
+ * dataset over 100 rows gets one spend question before the first run, and the
+ * loop stops once it spends its 6 attempt budget. Several criteria are
+ * conditional and pass when their condition never arises in the run, stated
+ * inline so the judge never marks them inconclusive.
+ */
+export const LANGY_OPTIMIZE_LOOP_CRITERIA = [
+  "Langy reads the workbench state (or the experiment's current results) before making any edit. A run whose first mutation happens with no read behind it fails.",
+  LANGY_BASELINE_UNTOUCHED_CRITERION,
+  "Each prompt change comes with a one-sentence hypothesis naming a concrete failure pattern taken from row-level results Langy actually read. A rewrite justified only by generic prompt advice fails.",
+  "Runs are scoped before they are broad: a subset (the failing rows, or about 10 rows) runs before any full-dataset run. If the dataset is small enough that the skill's spend threshold never applies, a single full run passes this.",
+  "On a dataset over 100 rows, Langy states the row count and waits for the user's yes before the first run, asking once for the whole loop rather than per attempt. A run whose dataset never passes 100 rows satisfies this criterion; do not mark it inconclusive.",
+  "Langy narrates the loop: a short line before each run saying what changed and why, and a short line after saying what the numbers did. Silence across a whole run fails.",
+  "The conclusion carries numbers: the pass rate (or score) before and after, and what happened to cost. Improvement claims without numbers fail.",
+  "If the numbers end level or worse, Langy says so plainly instead of declaring a winner. A run that ends with a real improvement satisfies this criterion.",
+  "If three consecutive attempts fail to beat the best candidate, Langy stops and reports what it tried rather than continuing to churn. A run that improves before that point satisfies this criterion.",
+  "Langy runs at most 6 measured attempts. On the sixth it stops and reports the best result it found instead of starting a seventh. A run that stops earlier, on any other stop condition, satisfies this criterion; do not mark it inconclusive.",
+  ...LANGY_CORE_RULE_CRITERIA,
+];
+
+/**
+ * Rubric for the evaluator inference branches of the bootstrap flow. The
+ * mapping table mirrors the skill: labels get exact match, free text gets
+ * LLM answer match, contexts suggest faithfulness, a named quality dimension
+ * gets a judge naming it, and no golden answer at all gets the comparison
+ * judge. The evaluator that actually landed is a Layer-2 REST assertion;
+ * these grade the reasoning the user sees.
+ */
+export const LANGY_EVALUATOR_INFERENCE_CRITERIA = [
+  "Langy picks the evaluator from what the data shows and says why in a line: short label goldens get exact match, free-text goldens get LLM answer match, a contexts column brings up faithfulness, a named quality dimension gets a judge whose prompt names that dimension, and no golden answer at all gets a comparison between candidate columns.",
+  "The evaluator type slug Langy uses was read from the evaluator catalog in this conversation, never recalled from memory. Wiring an evaluator whose slug never appeared in a command result fails.",
+  "Before trusting a newly added evaluator, Langy checks it scores sensibly (a subset run, or reading a few scored rows) rather than optimizing against unverified scores. A conversation that ends before any run satisfies this criterion.",
   ...LANGY_CORE_RULE_CRITERIA,
 ];

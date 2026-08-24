@@ -57,7 +57,7 @@ function buildPrisma({
     systemMigrationTenantState: {
       findUnique: vi
         .fn()
-        .mockResolvedValue(onEngine ? { status: "migrated" } : null),
+        .mockResolvedValue(onEngine ? { status: "finalized" } : null),
     },
     project: {
       findUnique: vi.fn().mockResolvedValue({
@@ -66,7 +66,9 @@ function buildPrisma({
     },
     team: { findUnique: vi.fn().mockResolvedValue(null) },
     organizationUser: {
-      findFirst: vi.fn().mockResolvedValue({ role: "MEMBER" }),
+      findFirst: vi
+        .fn()
+        .mockResolvedValue({ role: "MEMBER", disabledAt: null }),
     },
     groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
     roleBinding: {

@@ -11,17 +11,57 @@ const LW_KEY = LANGWATCH_API_KEY;
 /** How long seeded traces get to become queryable before the suite gives up. */
 const INGESTION_VISIBILITY_TIMEOUT_MS = 60_000;
 
-async function lwGet(path: string): Promise<any> {
-  const res = await fetch(`${LW_BASE}${path}`, {
-    headers: { "X-Auth-Token": LW_KEY },
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!res.ok) {
-    throw new Error(
-      `GET ${path} -> ${res.status}: ${(await res.text()).slice(0, 200)}`,
-    );
+/**
+ * An HTTP error status. Its own type, not a message shape: the retry loop
+ * below decides on the class, so rewording the message can never turn a real
+ * answer back into something worth retrying.
+ */
+class LwHttpError extends Error {}
+
+/**
+ * Retried fetch for the verification helpers: on a loaded machine a single
+ * request has stalled in front of the app past any sane one-shot budget while
+ * a fresh attempt answered instantly, so three short attempts beat one long
+ * wait. Only timeouts and network errors retry — an HTTP error status is a
+ * real answer and throws straight away.
+ */
+async function lwFetch({
+  path,
+  init,
+}: {
+  path: string;
+  init: RequestInit;
+}): Promise<any> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(`${LW_BASE}${path}`, {
+        ...init,
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (!res.ok) {
+        throw new LwHttpError(
+          `${init.method ?? "GET"} ${path} -> ${res.status}: ${(await res.text()).slice(0, 200)}`,
+        );
+      }
+      return res.json();
+    } catch (error) {
+      if (error instanceof LwHttpError) throw error;
+      lastError = error;
+      // A stalled attempt is retried against the same loaded machine, so give
+      // it a moment rather than firing all three inside a few milliseconds.
+      if (attempt < 2) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, 500 * (attempt + 1)),
+        );
+      }
+    }
   }
-  return res.json();
+  throw lastError;
+}
+
+async function lwGet(path: string): Promise<any> {
+  return lwFetch({ path, init: { headers: { "X-Auth-Token": LW_KEY } } });
 }
 
 async function lwPost({
@@ -31,18 +71,14 @@ async function lwPost({
   path: string;
   body: unknown;
 }): Promise<any> {
-  const res = await fetch(`${LW_BASE}${path}`, {
-    method: "POST",
-    headers: { "X-Auth-Token": LW_KEY, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(15_000),
+  return lwFetch({
+    path,
+    init: {
+      method: "POST",
+      headers: { "X-Auth-Token": LW_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
   });
-  if (!res.ok) {
-    throw new Error(
-      `POST ${path} -> ${res.status}: ${(await res.text()).slice(0, 200)}`,
-    );
-  }
-  return res.json();
 }
 
 // Normalize the various list payload shapes ({ data: [...] }, a bare array, or
@@ -73,9 +109,94 @@ export async function listAgents(): Promise<
 }
 
 export async function listEvaluators(): Promise<
-  Array<{ id: string; name: string }>
+  Array<{ id: string; name: string; config?: { evaluatorType?: string } }>
 > {
   return toArray(await lwGet("/api/evaluators"));
+}
+
+/**
+ * The named evaluator, created through the API when the project does not have
+ * it yet. A scenario premise that names a resource seeds it here so the premise
+ * holds on any project state, and a rerun reuses the existing one.
+ */
+export async function ensureEvaluator({
+  name,
+  evaluatorType,
+}: {
+  name: string;
+  evaluatorType: string;
+}): Promise<void> {
+  const existing = (await listEvaluators()).find(
+    (evaluator) => evaluator.name === name,
+  );
+  // The name alone does not make it the right fixture. A retained evaluator of
+  // a DIFFERENT type leaves the scenario asserting against the wrong resource
+  // while the premise reads as satisfied, so the type is checked too, and a
+  // mismatch is replaced rather than reused. The type is what the API keeps
+  // under config.evaluatorType; the top-level `type` is the record kind
+  // ("evaluator" for everything created here) and cannot tell them apart.
+  if (existing) {
+    if (existing.config?.evaluatorType === evaluatorType) return;
+    await deleteEvaluator(existing.id);
+  }
+  await lwPost({
+    path: "/api/evaluators",
+    body: { name, config: { evaluatorType } },
+  });
+}
+
+export async function deleteEvaluator(id: string): Promise<void> {
+  const response = await fetch(`${LW_BASE}/api/evaluators/${id}`, {
+    method: "DELETE",
+    headers: { "X-Auth-Token": LW_KEY },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (response.ok || response.status === 404) return;
+  throw new Error(
+    `Failed to delete evaluator ${id}: ${response.status} ${response.statusText}.`,
+  );
+}
+
+/**
+ * Evaluators the reset below must never remove: scenario premises seed them by
+ * name (ensureEvaluator) and expect them present on any project state.
+ */
+const SEEDED_EVALUATOR_NAMES = new Set(["e2e-offtopic"]);
+
+/**
+ * Restores the project's designed evaluation state: zero monitors, and no
+ * evaluators beyond the seeded fixtures. Scenarios that create monitors or
+ * evaluators call this before AND after the conversation. Before, because a
+ * leftover from a crashed earlier run changes the model's behavior (finding a
+ * monitor matching the request, it correctly asks reuse-versus-create instead
+ * of creating, and the judge grades a branch the criteria do not describe).
+ * After, because a leaked live monitor evaluates every ingested trace and
+ * spends real money until someone notices.
+ */
+export async function resetEvaluationResources(): Promise<void> {
+  // allSettled, not all: every deletion must be ATTEMPTED even when an earlier
+  // one fails. Under Promise.all the first rejected monitor delete skipped the
+  // evaluator sweep entirely, which is the leak this function exists to stop.
+  // The failures are collected and raised once every attempt is in.
+  const monitors = await listMonitors();
+  const monitorResults = await Promise.allSettled(
+    monitors.map((monitor) => deleteMonitor(monitor.id)),
+  );
+  const evaluators = await listEvaluators();
+  const evaluatorResults = await Promise.allSettled(
+    evaluators
+      .filter((evaluator) => !SEEDED_EVALUATOR_NAMES.has(evaluator.name))
+      .map((evaluator) => deleteEvaluator(evaluator.id)),
+  );
+  const failures = [...monitorResults, ...evaluatorResults]
+    .filter((result) => result.status === "rejected")
+    .map((result) => (result as PromiseRejectedResult).reason);
+  if (failures.length > 0) {
+    throw new AggregateError(
+      failures,
+      `resetEvaluationResources: ${failures.length} deletion(s) failed`,
+    );
+  }
 }
 
 export async function listScenarios(): Promise<

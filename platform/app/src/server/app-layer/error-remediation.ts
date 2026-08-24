@@ -206,6 +206,12 @@ const registry = {
     ],
     docsPath: "/api-reference/api-keys/create-api-key",
   },
+  project_visibility_too_wide: {
+    tips: [
+      "Bind the key to the teams or projects it works with instead of the whole organization",
+    ],
+    docsPath: "/api-reference/api-keys/create-api-key",
+  },
   api_key_reserved_name: {
     tips: [
       "This name is reserved for keys LangWatch manages on your behalf — pick a different name",
@@ -378,6 +384,52 @@ const registry = {
       "Wait for the current response to finish before sending another message",
     ],
   },
+  langy_ui_turn_inactive: {
+    tips: [
+      "UI actions only work while your own turn is running — this command must be run by the agent during a conversation, not standalone",
+    ],
+  },
+  langy_ui_action_unknown: {
+    tips: [
+      "Run `langwatch ui actions` to list the actions the current page accepts",
+    ],
+  },
+  langy_ui_payload_invalid: {
+    tips: [
+      "Read meta.issues — each entry names the offending payload field and what was expected",
+      "Run `langwatch ui actions` to see the action's payload schema",
+    ],
+  },
+  langy_ui_no_browser: {
+    tips: [
+      "The user has no page open that can run this action — tell them what you wanted to do, or use the equivalent API command instead",
+    ],
+  },
+  langy_ui_experiment_required: {
+    tips: [
+      "Pass --experiment <slug> so the backend knows which experiment to apply the action to; the slug is on the experiment context chip and in `langwatch experiment list`",
+    ],
+  },
+  langy_ui_page_out_of_date: {
+    tips: [
+      "The open page holds an older version and cannot save. Pass --experiment <slug> so the change is applied to the saved evaluation instead, and tell the user their page needs a reload",
+    ],
+  },
+  langy_ui_save_failed: {
+    tips: [
+      "The page applied the change but could not write it to the server, so the saved evaluation does not have it. Do not build the next step on it: pass --experiment <slug> to apply the change to the saved evaluation instead",
+    ],
+  },
+  langy_ui_timeout: {
+    tips: [
+      "The page may have applied part of the action — read the current state (for example `langwatch workbench get-state`) before retrying",
+    ],
+  },
+  langy_ui_handler_failed: {
+    tips: [
+      "Read meta.errorCode for the page's own failure reason, re-read the current state, and adjust the payload before retrying",
+    ],
+  },
   langy_rate_limited: {
     tips: ["Wait a few seconds before sending another message"],
   },
@@ -527,4 +579,21 @@ export function remediation(code: RemediationCode): {
     ...(entry.tips ? { tips: entry.tips } : {}),
     ...(entry.docsPath ? { docsUrl: docsUrl(entry.docsPath) } : {}),
   };
+}
+
+/**
+ * The tips for a code that is only known at runtime.
+ *
+ * One error can carry another's code: the UI-action channel wraps whatever the
+ * page reported, and its own advice is "read meta.errorCode for the page's own
+ * reason". Following that advice should then reach the inner code's tips rather
+ * than end at its name, so the wrapper looks the inner code up here. Unknown
+ * codes answer with nothing, because a code from a page is data.
+ */
+export function remediationFor(code: string | undefined): {
+  tips?: readonly string[];
+  docsUrl?: string;
+} {
+  if (!code || !(code in registry)) return {};
+  return remediation(code as RemediationCode);
 }

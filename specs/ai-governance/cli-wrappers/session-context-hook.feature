@@ -158,6 +158,18 @@ Rule: The hook reports the git identity of the session
     Then a new record is posted with the new branch
 
   @unit
+  Scenario: A native worktree switch changes the reported checkout
+    Given a Claude Code session launched in one checkout
+    When a Stop invocation's payload cwd names a different worktree of the repository
+    Then the record reports the worktree the payload names, not the launch directory
+
+  @unit
+  Scenario: A payload with no cwd falls back to the launch directory
+    Given a Claude Code invocation whose payload carries only the session id
+    When the hook runs with CLAUDE_PROJECT_DIR set
+    Then the record reports the git identity of that directory
+
+  @unit
   Scenario: Two agents reporting the same session id keep separate fingerprints
     Given a session id already reported for one agent
     When another agent reports the same session id

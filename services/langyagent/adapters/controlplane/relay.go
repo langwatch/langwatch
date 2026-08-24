@@ -112,7 +112,7 @@ func (c *RelayClient) Open(ctx context.Context, endpoint, runToken, projectID, u
 
 // RelayStream is one turn's push connection to the relay. Emit is safe to call
 // from the stream goroutine and the heartbeat goroutine concurrently (a single
-// write mutex serialises lines, exactly like the in-band writeMu it replaces).
+// write mutex serializes lines, exactly like the in-band writeMu it replaces).
 type RelayStream struct {
 	runToken string
 	id       frameauth.Identity

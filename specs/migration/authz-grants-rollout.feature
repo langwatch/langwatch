@@ -4,9 +4,10 @@
 # surfaces are the generic runner's and live in
 # specs/migration/system-migrations-runner.feature.
 #
-# Scenarios tagged @unimplemented describe the ADR-110 one-shot migration,
-# which is designed but not yet registered (registeredMigrations() returns
-# nothing for it). They become bindable the moment that migration lands.
+# The ADR-110 one-shot migration is registered
+# (platform/app/src/server/app-layer/authz/authz-engine.migration.ts); the
+# scenarios still tagged @unimplemented are the integration-level ones its
+# unit harness cannot honestly bind.
 
 @migration @authz
 Feature: Moving an organization onto the grants projection
@@ -26,7 +27,7 @@ Feature: Moving an organization onto the grants projection
 
   # ═══ What it reads ════════════════════════════════════════════════════
 
-  @unit @unimplemented
+  @unit
   Scenario Outline: Every legacy table is a source of facts
     Given "org_acme" has <source>
     When the migration runs
@@ -43,14 +44,14 @@ Feature: Moving an organization onto the grants projection
       | a share link                  | a resource grant held by anyone     |
       | a project credential          | a project-scoped grant for that key |
 
-  @unit @unimplemented
+  @unit
   Scenario: Team membership is stated directly, not promoted first
     Given "org_acme" has team memberships with no matching role binding
     When the migration runs
     Then each membership is stated as a grant
     And no legacy role binding row is created for it
 
-  @unit @unimplemented
+  @unit
   Scenario: The organization member floor is stated once
     Given "org_acme" has a member holding no binding anywhere
     When the migration runs
@@ -65,14 +66,14 @@ Feature: Moving an organization onto the grants projection
 
   # ═══ How it runs ══════════════════════════════════════════════════════
 
-  @unit @unimplemented
+  @unit
   Scenario: The migration states its facts and checks once
     When the migration runs for "org_acme"
     Then it states every fact
     And it reads the projection once
     And it does not poll waiting for the projection
 
-  @unit @unimplemented
+  @unit
   Scenario: A projection that has not caught up holds the organization
     Given a pass that has stated every fact
     When the projection does not yet hold them
@@ -80,32 +81,79 @@ Feature: Moving an organization onto the grants projection
     And no error is logged
     And a later pass revisits it
 
-  @unit @unimplemented
+  @unit
   Scenario: A held organization names what is outstanding
     Given a pass whose projection is missing facts
     When the organization is reported
     Then the report names how many facts are outstanding
     And it names a sample of the outstanding ids
 
-  @unit @unimplemented
+  @unit
   Scenario: Re-running the migration states the same facts
     Given a pass that already ran for "org_acme"
     When it runs again against the same legacy rows
     Then every restated fact carries the id it carried before
     And no second copy of any fact is appended
 
-  @unit @unimplemented
+  # A restated fact dedupes at the event store, but the queue has already paid
+  # to carry it. A grant is its own aggregate, so a held organization restaged
+  # one group per grant on every worker boot. An organization holding a large
+  # share-link population converged on nothing while it repeated them.
+  @unit
+  Scenario: A pass states only the facts the heads do not carry
+    Given an organization whose projection already holds some of its facts
+    When a pass runs
+    Then a fact the heads carry unchanged is not stated again
+    And a fact the heads do not carry is stated
+    And a fact whose head is revoked is stated again
+    And a fact whose head disagrees on a field is stated again
+    And a share link whose head only lags on views is not stated again
+    And the first pass over an organization still states everything
+    And the held report is unchanged by what the pass skipped
+
+  @unit
   Scenario: A pass that failed partway is safe to repeat
     Given a pass that failed after stating some facts
     When the migration runs again
     Then the facts that landed append nothing
     And the facts that did not land append normally
 
-  @unit @unimplemented
+  @unit
   Scenario: A row deleted on the legacy side is revoked, not left behind
     Given a grant the migration stated whose legacy row has since been deleted
     When the migration runs again
     Then that grant is revoked
+
+  @unit
+  Scenario: A custom role deleted before the migration finished stays deleted
+    Given a custom role the migration has already deleted
+    And the organization no longer has that role
+    When the migration runs again
+    Then the organization finalizes
+    And that role's deletion is not repeated
+
+  @unit
+  Scenario: A deleted custom role that exists again is reported, not quietly restored
+    Given a custom role the migration has already deleted
+    And the organization has that role again under the same id
+    When the migration runs again
+    Then the organization is held
+    And the report names that role as a disagreement
+    And the role is not restored automatically
+
+  @unit
+  Scenario: A view budget is raised on a re-run, never lowered
+    Given a share link whose usage row was seeded on an earlier pass
+    When the migration seeds the budgets again
+    Then a usage row below the legacy count is raised to it
+    And a usage row already at or above it is left exactly as it is
+    And a usage row that disagrees about which project it belongs to is untouched
+
+  @unit
+  Scenario: A link viewed between passes does not hold the organization
+    Given a share link that has been viewed since the last pass
+    When the migration runs
+    Then the organization is not held for that link
 
   @integration @unimplemented
   Scenario: The migration is unavailable while the queue is
@@ -142,7 +190,7 @@ Feature: Moving an organization onto the grants projection
     When the status lookup's cached answer expires
     Then its authorization writes go to the ledger, not the legacy tables
 
-  @unit @unimplemented
+  @unit
   Scenario: The check that precedes finalizing is proven, not assumed
     Given "org_acme" whose projection disagrees with the legacy path
     When the migration runs
@@ -161,6 +209,22 @@ Feature: Moving an organization onto the grants projection
     When the read path is inspected
     Then the organization's migration status is the only fork
     And no separate cutover record exists
+
+  # ═══ Self-hosted installations ════════════════════════════════════════
+  #
+  # Cloud paces this migration per organization by enrollment. Self-hosted
+  # has no enrollment: a migration either runs for every organization or for
+  # none, and which it is comes from the migration's own release
+  # declaration. Releasing it is the prerequisite for ever removing the
+  # legacy authorization path, because that removal is only safe once every
+  # installation that might upgrade into it has already had a release that
+  # runs this migration.
+
+  @unit
+  Scenario: The migration is released for self-hosted installations
+    When the migration's release declaration is read
+    Then it runs automatically on a self-hosted installation
+    And every organization there migrates without anyone enrolling it
 
   # ═══ Undoing it ═══════════════════════════════════════════════════════
   # The operator action and its mechanics are the runner's. What is authz-

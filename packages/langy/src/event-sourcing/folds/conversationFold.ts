@@ -68,6 +68,13 @@ export interface LangyConversationStateData {
   CurrentTurnId: string | null;
   LastError: string | null;
   /**
+   * The model the latest accepted turn ran on (provider-prefixed). Reopening
+   * the conversation seeds the composer's picker from it, so a conversation
+   * keeps the model it was last used with. Null until a turn carrying the
+   * field is accepted (conversations predating it stay null).
+   */
+  LastModel: string | null;
+  /**
    * ADR-048 shutdown-handoff. When a turn checkpoints on pod termination it
    * leaves an opaque, worker-authored resume token here; the next turn threads
    * it to a fresh worker and clears it. Null when there is nothing to resume.
@@ -108,6 +115,7 @@ export function initLangyConversationState(): LangyConversationStateFoldState {
     LastActivityAt: null,
     CurrentTurnId: null,
     LastError: null,
+    LastModel: null,
     PendingHandoffToken: null,
     PendingHandoffTurnId: null,
     RunToken: null,
@@ -284,6 +292,7 @@ export function foldLangyConversationState<
         ConversationId: state.ConversationId || event.data.conversationId,
         Status: nextStatus(state, LANGY_CONVERSATION_STATUS.RUNNING),
         CurrentTurnId: event.data.turnId,
+        LastModel: event.data.model ?? state.LastModel,
         LastActivityAt: event.occurredAt,
       };
     }

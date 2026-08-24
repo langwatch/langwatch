@@ -16,6 +16,8 @@ import {
   ModelProviderCredentialsWouldBeDroppedError,
   ModelProviderDeprecatedError,
   ModelProviderNotFoundError,
+  ModelProviderRoutingHandleInvalidError,
+  ModelProviderRoutingHandleTakenError,
   ModelProviderScopesRequiredError,
   ModelProviderTestRateLimitedError,
 } from "./errors";
@@ -39,6 +41,11 @@ import {
   modelProviders,
   providerDeprecation,
 } from "./registry";
+import {
+  isRoutingHandleConflict,
+  normalizeRoutingHandle,
+  routingHandleProblem,
+} from "./routingHandle";
 import { seedOnboardingDefaultsForProvider } from "./seedOnboardingDefaults";
 
 /**
@@ -47,6 +54,35 @@ import { seedOnboardingDefaultsForProvider } from "./seedOnboardingDefaults";
  * Hono routes, workers) without dragging the full tRPC Context in.
  */
 export type AuthzContext = { prisma: PrismaClient; session: Session | null };
+
+/**
+ * Everything one model-provider write needs, after the checks have run and
+ * before the transaction opens. Carried as one value so the update and create
+ * branches read the same payload rather than each re-deriving it.
+ */
+type ModelProviderWrite = {
+  existingProvider: Awaited<
+    ReturnType<ModelProviderService["findExistingProvider"]>
+  >;
+  createScopes: ScopeInput[] | undefined;
+  isHandleProvided: boolean;
+  normalizedHandle: string | null;
+  input: UpdateModelProviderInput;
+  validatedKeys: Record<string, unknown> | null;
+  customKeysProvided: boolean;
+  scopes: ScopeInput[] | undefined;
+};
+
+/** The advanced gateway settings that ride the same row as the basic fields. */
+function advancedFields(input: UpdateModelProviderInput): AdvancedGatewayInput {
+  return {
+    rateLimitRpm: input.rateLimitRpm,
+    rateLimitTpm: input.rateLimitTpm,
+    rateLimitRpd: input.rateLimitRpd,
+    fallbackPriorityGlobal: input.fallbackPriorityGlobal,
+    providerConfig: input.providerConfig,
+  };
+}
 
 /**
  * A provider row this service materialized, as opposed to a form-time shape.
@@ -84,6 +120,13 @@ export type UpdateModelProviderInput = {
   customKeys?: Record<string, unknown> | null;
   customModels?: CustomModelsInput | null;
   customEmbeddingsModels?: CustomModelsInput | null;
+  /**
+   * The slug that addresses THIS instance in a gateway model string
+   * ("eu/claude-sonnet-5"). Omit to leave the stored handle alone; send an
+   * empty string or null to clear it, which releases the name for another
+   * provider in the organization.
+   */
+  routingHandle?: string | null;
   extraHeaders?: { key: string; value: string }[] | null;
   defaultModel?: string;
   /**
@@ -578,40 +621,39 @@ export class ModelProviderService {
     input: UpdateModelProviderInput,
     ctx?: AuthzContext,
   ) {
+    // Only what the checks below read. The rest of the payload is carried
+    // whole into `writeModelProvider`, which is what performs the write.
     const {
       id,
       projectId,
       organizationId,
       provider,
-      enabled,
       customKeys,
-      customModels,
-      customEmbeddingsModels,
-      extraHeaders,
-      defaultModel,
-      name,
-      rateLimitRpm,
-      rateLimitTpm,
-      rateLimitRpd,
-      fallbackPriorityGlobal,
-      providerConfig,
+      routingHandle,
     } = input;
 
     if (!projectId && !organizationId) {
       throw new ModelProviderAnchorRequiredError("project_or_organization");
     }
 
-    const advanced = {
-      rateLimitRpm,
-      rateLimitTpm,
-      rateLimitRpd,
-      fallbackPriorityGlobal,
-      providerConfig,
-    };
-
     // Validate provider exists
     if (!(provider in modelProviders)) {
       throw new Error("Invalid provider");
+    }
+
+    // The handle is checked before any database work: a name that is not a
+    // handle, or one that already means a provider family, is refused whatever
+    // else the save carries.
+    const isHandleProvided = routingHandle !== undefined;
+    const normalizedHandle = normalizeRoutingHandle(routingHandle);
+    if (isHandleProvided) {
+      const problem = routingHandleProblem(normalizedHandle);
+      if (problem) {
+        throw new ModelProviderRoutingHandleInvalidError({
+          handle: normalizedHandle ?? "",
+          problem,
+        });
+      }
     }
 
     // Validate and clean custom keys
@@ -706,85 +748,165 @@ export class ModelProviderService {
       throw new ModelProviderScopesRequiredError();
     }
 
-    return await this.prisma.$transaction(async (tx) => {
-      let result;
-
-      if (existingProvider) {
-        result = await this.updateExisting(
+    return await this.withRoutingHandleConflict({
+      handle: normalizedHandle,
+      write: () =>
+        this.writeModelProvider({
           existingProvider,
-          {
-            provider,
-            enabled,
-            name,
-            scopes,
-            customModels: customModels ?? [],
-            customEmbeddingsModels: customEmbeddingsModels ?? [],
-            extraHeaders: extraHeaders ?? [],
-            advanced,
-          },
+          createScopes,
+          isHandleProvided,
+          normalizedHandle,
+          input,
           validatedKeys,
           customKeysProvided,
-          tx,
-        );
-
-        // A running gateway is serving the previous credential, base URL and
-        // headers from cache. Rotating a key is exactly the moment where that
-        // matters, so the eviction rides the same transaction as the write:
-        // either both land or the operator sees the write fail.
-        await this.changeEvents.append(
-          {
-            organizationId: existingProvider.organizationId,
-            kind: "MODEL_PROVIDER_UPDATED",
-            modelProviderId: existingProvider.id,
-          },
-          tx,
-        );
-      } else {
-        result = await this.createNew(
-          {
-            provider,
-            enabled,
-            name: name ?? this.deriveDefaultName(provider),
-            scopes: createScopes!,
-            customModels: customModels ?? undefined,
-            customEmbeddingsModels: customEmbeddingsModels ?? undefined,
-            extraHeaders: extraHeaders ?? [],
-            advanced,
-          },
-          validatedKeys,
-          customKeysProvided,
-          tx,
-        );
-
-        // Onboarding seed: writes one role-level ModelDefault row per
-        // role the provider can fulfill (DEFAULT / FAST / EMBEDDINGS),
-        // at every scope the new credential is bound to. Strictly
-        // additive — `seedOnboardingDefaultsForProvider` skips any
-        // (scope, role) pair that already has a row, so enabling a
-        // second provider later can't silently replace a user's
-        // configured choice. Without this wiring the seed function is
-        // dead code; the bug surfaces as a fresh org showing
-        // "not configured" on every role despite having a provider
-        // enabled. See
-        // specs/model-providers/model-resolver-and-registry.feature.
-        for (const scope of createScopes!) {
-          await seedOnboardingDefaultsForProvider({
-            prisma: tx as unknown as PrismaClient,
-            provider,
-            scopeType: scope.scopeType,
-            scopeId: scope.scopeId,
-          });
-        }
-      }
-
-      // The legacy `defaultModel` parameter is accepted in the input
-      // shape for backwards compatibility but no longer writes anywhere.
-      // Default-model writes go through `setRoleAtScope` against
-      // ModelDefaultConfig (see useProviderFormSubmit).
-      void defaultModel;
-
-      return result;
+          scopes,
+        }),
     });
+  }
+
+  /**
+   * Turns the routing-handle unique-index violation into the refusal a person
+   * reads. The index is what actually makes the name unique, because two saves
+   * racing each other both pass any read-then-write check; this is only the
+   * translation.
+   */
+  private async withRoutingHandleConflict<T>({
+    handle,
+    write,
+  }: {
+    handle: string | null;
+    write: () => Promise<T>;
+  }): Promise<T> {
+    try {
+      return await write();
+    } catch (error) {
+      if (handle !== null && isRoutingHandleConflict(error)) {
+        throw new ModelProviderRoutingHandleTakenError({ handle });
+      }
+      throw error;
+    }
+  }
+
+  private async writeModelProvider(write: ModelProviderWrite) {
+    return await this.prisma.$transaction(async (tx) =>
+      write.existingProvider
+        ? await this.applyUpdate({
+            write,
+            existingProvider: write.existingProvider,
+            tx,
+          })
+        : await this.applyCreate({ write, tx }),
+    );
+  }
+
+  /** Updates a stored row and evicts the gateway config in the same write. */
+  private async applyUpdate({
+    write,
+    existingProvider,
+    tx,
+  }: {
+    write: ModelProviderWrite;
+    existingProvider: NonNullable<ModelProviderWrite["existingProvider"]>;
+    tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
+  }) {
+    const { input, isHandleProvided, normalizedHandle, scopes } = write;
+    const result = await this.updateExisting(
+      existingProvider,
+      {
+        provider: input.provider,
+        enabled: input.enabled,
+        name: input.name,
+        scopes,
+        customModels: input.customModels ?? [],
+        customEmbeddingsModels: input.customEmbeddingsModels ?? [],
+        extraHeaders: input.extraHeaders ?? [],
+        ...(isHandleProvided && { routingHandle: normalizedHandle }),
+        advanced: advancedFields(input),
+      },
+      write.validatedKeys,
+      write.customKeysProvided,
+      tx,
+    );
+
+    // A running gateway is serving the previous credential, base URL, headers
+    // and routing handle from cache. Rotating a key or renaming a handle is
+    // exactly the moment where that matters, so the eviction rides the same
+    // transaction as the write: either both land or the operator sees the
+    // write fail.
+    await this.changeEvents.append(
+      {
+        organizationId: existingProvider.organizationId,
+        kind: "MODEL_PROVIDER_UPDATED",
+        modelProviderId: existingProvider.id,
+      },
+      tx,
+    );
+
+    return result;
+  }
+
+  /** Creates a new row and seeds the role defaults it can fulfill. */
+  private async applyCreate({
+    write,
+    tx,
+  }: {
+    write: ModelProviderWrite;
+    tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
+  }) {
+    const { input, isHandleProvided, normalizedHandle } = write;
+    const createScopes = write.createScopes!;
+    const result = await this.createNew(
+      {
+        provider: input.provider,
+        enabled: input.enabled,
+        name: input.name ?? this.deriveDefaultName(input.provider),
+        scopes: createScopes,
+        customModels: input.customModels ?? undefined,
+        customEmbeddingsModels: input.customEmbeddingsModels ?? undefined,
+        extraHeaders: input.extraHeaders ?? [],
+        ...(isHandleProvided && { routingHandle: normalizedHandle }),
+        advanced: advancedFields(input),
+      },
+      write.validatedKeys,
+      write.customKeysProvided,
+      tx,
+    );
+
+    // Onboarding seed: writes one role-level ModelDefault row per role the
+    // provider can fulfill (DEFAULT / FAST / EMBEDDINGS), at every scope the
+    // new credential is bound to. Strictly additive —
+    // `seedOnboardingDefaultsForProvider` skips any (scope, role) pair that
+    // already has a row, so enabling a second provider later can't silently
+    // replace a user's configured choice. Without this wiring the seed
+    // function is dead code; the bug surfaces as a fresh org showing
+    // "not configured" on every role despite having a provider enabled. See
+    // specs/model-providers/model-resolver-and-registry.feature.
+    for (const scope of createScopes) {
+      await seedOnboardingDefaultsForProvider({
+        prisma: tx as unknown as PrismaClient,
+        provider: input.provider,
+        scopeType: scope.scopeType,
+        scopeId: scope.scopeId,
+      });
+    }
+
+    // A running gateway is serving a bundle that predates this row, so until it
+    // is evicted the new provider is not in any key's chain and its routing
+    // handle is not a handle the resolver knows. An unknown first segment is
+    // read as part of the model name, so "eu/claude-sonnet-5" does not fail
+    // loudly: it becomes a model nobody declares and lands on whichever bound
+    // provider declared no catalog. Creating a provider therefore evicts on the
+    // same terms as updating one.
+    await this.changeEvents.append(
+      {
+        organizationId: result.organizationId,
+        kind: "MODEL_PROVIDER_UPDATED",
+        modelProviderId: result.id,
+      },
+      tx,
+    );
+
+    return result;
   }
 
   /**
@@ -1199,6 +1321,9 @@ export class ModelProviderService {
       name: mp.name,
       provider: mp.provider,
       enabled: mp.enabled,
+      // Surfaced so the drawer can show the prefix that reaches THIS instance,
+      // and so the settings list can show which instance owns a handle.
+      routingHandle: mp.routingHandle,
       // Whether the credential has been withdrawn. The gateway already
       // refuses to route to a withdrawn provider; surfacing it lets the
       // frontend surfaces that preview routing agree with that decision
@@ -1561,6 +1686,7 @@ export class ModelProviderService {
       customModels: CustomModelsInput;
       customEmbeddingsModels: CustomModelsInput;
       extraHeaders: { key: string; value: string }[];
+      routingHandle?: string | null;
       advanced: AdvancedGatewayInput;
     },
     validatedKeys: Record<string, unknown> | null,
@@ -1600,6 +1726,9 @@ export class ModelProviderService {
         ),
         ...(data.name !== undefined && { name: data.name }),
         ...(data.scopes !== undefined && { scopes: data.scopes }),
+        ...(data.routingHandle !== undefined && {
+          routingHandle: data.routingHandle,
+        }),
         ...(customKeysToSave !== undefined && {
           customKeys: customKeysToSave,
         }),
@@ -1618,6 +1747,7 @@ export class ModelProviderService {
       customEmbeddingsModels?: CustomModelsInput;
       extraHeaders: { key: string; value: string }[];
       scopes: ScopeInput[];
+      routingHandle?: string | null;
       advanced: AdvancedGatewayInput;
     },
     validatedKeys: Record<string, unknown> | null,
@@ -1635,6 +1765,9 @@ export class ModelProviderService {
         // instead of being stored literally.
         extraHeaders: this.mergeExtraHeaders(data.extraHeaders, null),
         scopes: data.scopes,
+        ...(data.routingHandle !== undefined && {
+          routingHandle: data.routingHandle,
+        }),
         ...(customKeysProvided &&
           validatedKeys && { customKeys: validatedKeys }),
         ...pickAdvancedFields(data.advanced),

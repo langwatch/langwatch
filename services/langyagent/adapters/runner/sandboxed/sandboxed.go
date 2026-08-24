@@ -43,6 +43,7 @@ func (Runner) CommandContext(ctx context.Context, binary string, args ...string)
 		"--",
 		binary,
 	}
+	//nolint:gosec // G204: the executable is the fixed /usr/bin/prlimit; binary+args are the manager-built worker command, not caller input
 	return exec.CommandContext(ctx, "/usr/bin/prlimit", append(limitArgs, args...)...)
 }
 

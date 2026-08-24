@@ -31,6 +31,7 @@ export {
 export type {
   AuthzReadRepository,
   CustomRolePermissionsRow,
+  OrganizationMembership,
   OrganizationRole,
   ScopeLineageRepository,
   ShareLinkRow,
@@ -41,6 +42,7 @@ export type {
   AuthzMigrationRepository,
   ExistingTeamBinding,
   ExternalMemberFact,
+  GrantHeadRow,
   LegacyBindingRow,
   LegacyRoleRow,
   LegacyTeamRow,

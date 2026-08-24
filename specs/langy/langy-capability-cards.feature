@@ -100,6 +100,15 @@ Feature: Langy renders domain-capability cards for tool calls
     And each figure rolls up from zero as a rolling number
     And the figures stay still for people who prefer reduced motion
 
+  # The card used to word-match its badge anywhere in the payload, so reading
+  # the failing rows of a run painted a red "failed" badge on a call that
+  # succeeded, and the body under it was the first two lines of the JSON.
+  @integration
+  Scenario: A run card reads its state from the run, not from its rows
+    When Langy reads the failing rows of a run that succeeded
+    Then the card shows no failure
+    And it counts the rows it read instead of printing their JSON
+
   @integration
   Scenario: An unmapped tool falls through to the raw view
     When Langy runs a tool that is not a LangWatch action and has no capability card
@@ -233,6 +242,18 @@ Feature: Langy renders domain-capability cards for tool calls
       Then reading it as a created-resource card succeeds
       And the recorded result does not mark the outcome as unconfirmed
 
+    # `prompt create` scaffolds a file on disk and exits 0 with
+    # { name, path, dependency: "file:..." } — a result about a local file,
+    # not about anything on the platform. Its name alone must not draw
+    # "Created and ready to use" with a deep link to a prompt the platform
+    # does not hold; that copy is only true after a successful push or sync.
+    @unit
+    Scenario: A create that only scaffolded a local file is not a platform create
+      When the CLI result for a create names a local file dependency and no server id
+      Then reading it as a created-resource card fails
+      And the recorded result marks the outcome as unconfirmed
+      But a create result that carries a server id still passes with a file path beside it
+
     @unit
     Scenario: A genuinely empty read still earns its card
       When Langy runs a read action and it genuinely matched nothing
@@ -277,6 +298,24 @@ Feature: Langy renders domain-capability cards for tool calls
     Scenario: A turn that failed immediately still leads with the failure
       Given the first thing Langy did in a turn failed
       Then the failure is the first thing in the transcript
+
+    # Ordering held inside the activity block and nowhere else. The block itself
+    # sat above the reply and the whole reply below it, so a turn that wrote a
+    # paragraph, ran a tool, wrote another paragraph and ran another tool showed
+    # both cards on top and both paragraphs underneath. Watching it was worse
+    # than reading it: the cards changed in one place while the text grew in
+    # another, and nothing said which paragraph followed which call.
+    @integration
+    Scenario: A tool card sits between the paragraphs it ran between
+      Given Langy wrote a paragraph, ran a tool, and then wrote another paragraph
+      Then the tool's card is shown after the first paragraph and before the second
+      And the reply is not collected into one block underneath the cards
+
+    @integration
+    Scenario: A turn is read in the order it was watched in
+      Given a turn that wrote text and ran tools in turn
+      When it settles
+      Then the settled turn keeps the order the reader watched it arrive in
 
   # The scenario library lives under Simulations, and a scenario's own page is
   # the library with that scenario open. Pointing at the Simulations index sent

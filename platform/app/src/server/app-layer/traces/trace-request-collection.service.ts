@@ -139,7 +139,34 @@ function normalizeSpanIds(span: OtlpSpan): NormalizedIdSpan {
 }
 
 export interface TraceRequestCollectionResult {
+  /**
+   * Spans that did not reach storage: parse/age drops plus dispatch failures.
+   * Kept as the single headline number the HTTP receivers echo back.
+   */
   rejectedSpans: number;
+  /**
+   * The subset of `rejectedSpans` that failed to *dispatch* — an exception out
+   * of `recordSpan`, i.e. the queue, Redis, or the edge hook being unavailable.
+   *
+   * Split out from the total because the two halves have opposite retry
+   * answers. A drop is permanent (a span that fails `spanSchema` fails it every
+   * time; a span older than `SPAN_MAX_PAST_MS` is older still on the next
+   * attempt), so a caller that retries on drops never stops retrying. A
+   * dispatch failure is transient, so a caller with a durable cursor — the
+   * ingestion puller — MUST treat it as a failed run or the window advances
+   * over spans that never landed.
+   */
+  ingestionFailures: number;
+  /**
+   * Only the dispatch failures' messages, for a caller that retries on them and
+   * has to say what it is retrying for.
+   *
+   * `errorMessage` below is unsuitable for that: it also carries drop reasons,
+   * which describe a different span than the one that failed to dispatch, and a
+   * rejected span's serialized schema error runs to kilobytes — a payload that
+   * would follow the caller into whatever durable store it records failures in.
+   */
+  ingestionFailureMessage: string;
   errorMessage: string;
 }
 
@@ -159,6 +186,91 @@ export interface TraceRequestCollectionDeps {
   processCommandData?: (
     data: RecordSpanCommandData,
   ) => Promise<RecordSpanCommandData>;
+}
+
+/**
+ * Per-request tally of span outcomes, and the one place that decides what each
+ * outcome means to a caller.
+ *
+ * It exists as its own unit because two of those decisions are load-bearing and
+ * were previously inline: filtered spans are NOT rejections, and drops and
+ * dispatch failures are rejections with opposite retry answers (see
+ * `TraceRequestCollectionResult`).
+ */
+class SpanIngestionTally {
+  private collected = 0;
+  private dropped = 0;
+  private deduped = 0;
+  private filtered = 0;
+  private failed = 0;
+  // Per-reason breakdown of rejected spans (issue #5898 acceptance
+  // criterion 5). The set of keys is closed (validation/age/queue) so a
+  // numeric counter per key is enough — no need for a Map.
+  private rejectedByValidation = 0;
+  private rejectedByAge = 0;
+  private rejectedByQueue = 0;
+  private readonly errors: string[] = [];
+  private readonly failureErrors: string[] = [];
+
+  record(result: SpanIngestionResult): void {
+    switch (result.status) {
+      case "collected":
+        this.collected++;
+        break;
+      case "dropped":
+        this.dropped++;
+        if (result.dropReason === "validation") this.rejectedByValidation++;
+        else if (result.dropReason === "age") this.rejectedByAge++;
+        break;
+      case "deduped":
+        this.deduped++;
+        break;
+      case "filtered":
+        this.filtered++;
+        break;
+      case "failed":
+        this.failed++;
+        if (result.dropReason === "queue") this.rejectedByQueue++;
+        if (result.error) this.failureErrors.push(result.error);
+        break;
+    }
+    if (result.error) this.errors.push(result.error);
+  }
+
+  annotate(span: OtelSpan): void {
+    span.setAttribute("spans.ingestion.successes", this.collected);
+    span.setAttribute("spans.ingestion.failures", this.failed);
+    span.setAttribute("spans.ingestion.drops", this.dropped);
+    span.setAttribute("spans.ingestion.deduped", this.deduped);
+    span.setAttribute("spans.ingestion.filtered", this.filtered);
+    // Rejected-span breakdown by rejection reason. Emitted as separate
+    // attributes so dashboards can sum any slice without parsing a JSON
+    // blob, and so the existing `spans.ingestion.drops`/`failures`
+    // attributes stay back-compatible.
+    span.setAttribute(
+      "spans.ingestion.rejected.by_reason.validation",
+      this.rejectedByValidation,
+    );
+    span.setAttribute(
+      "spans.ingestion.rejected.by_reason.age",
+      this.rejectedByAge,
+    );
+    span.setAttribute(
+      "spans.ingestion.rejected.by_reason.queue",
+      this.rejectedByQueue,
+    );
+  }
+
+  toResult(): TraceRequestCollectionResult {
+    return {
+      // Filtered spans are intentionally not stored (coding-agent infra
+      // noise), so they are NOT rejections.
+      rejectedSpans: this.dropped + this.failed,
+      ingestionFailures: this.failed,
+      ingestionFailureMessage: this.failureErrors.join("; "),
+      errorMessage: this.errors.join("; "),
+    };
+  }
 }
 
 /**
@@ -197,18 +309,7 @@ export class TraceRequestCollectionService {
         },
       },
       async (span) => {
-        let collectedSpanCount = 0;
-        let droppedSpanCount = 0;
-        let dedupedSpanCount = 0;
-        let ingestionFailureCount = 0;
-        let filteredSpanCount = 0;
-        // Per-reason breakdown of rejected spans (issue #5898 acceptance
-        // criterion 5). The set of keys is closed (validation/age/queue) so a
-        // numeric counter per key is enough — no need for a Map.
-        let rejectedByValidation = 0;
-        let rejectedByAge = 0;
-        let rejectedByQueue = 0;
-        const errors: string[] = [];
+        const tally = new SpanIngestionTally();
 
         for (const resourceSpan of traceRequest.resourceSpans ?? []) {
           const resource = resourceSpan?.resource;
@@ -241,62 +342,13 @@ export class TraceRequestCollectionService {
                 otelSpanRef: span,
               });
 
-              switch (result.status) {
-                case "collected":
-                  collectedSpanCount++;
-                  break;
-                case "dropped":
-                  droppedSpanCount++;
-                  if (result.dropReason === "validation") rejectedByValidation++;
-                  else if (result.dropReason === "age") rejectedByAge++;
-                  break;
-                case "deduped":
-                  dedupedSpanCount++;
-                  break;
-                case "filtered":
-                  filteredSpanCount++;
-                  break;
-                case "failed":
-                  ingestionFailureCount++;
-                  if (result.dropReason === "queue") rejectedByQueue++;
-                  break;
-              }
-              if (result.error) {
-                errors.push(result.error);
-              }
+              tally.record(result);
             }
           }
         }
 
-        span.setAttribute("spans.ingestion.successes", collectedSpanCount);
-        span.setAttribute("spans.ingestion.failures", ingestionFailureCount);
-        span.setAttribute("spans.ingestion.drops", droppedSpanCount);
-        span.setAttribute("spans.ingestion.deduped", dedupedSpanCount);
-        span.setAttribute("spans.ingestion.filtered", filteredSpanCount);
-        // Rejected-span breakdown by rejection reason. Emitted as separate
-        // attributes so dashboards can sum any slice without parsing a JSON
-        // blob, and so the existing `spans.ingestion.drops`/`failures`
-        // attributes stay back-compatible.
-        span.setAttribute(
-          "spans.ingestion.rejected.by_reason.validation",
-          rejectedByValidation,
-        );
-        span.setAttribute(
-          "spans.ingestion.rejected.by_reason.age",
-          rejectedByAge,
-        );
-        span.setAttribute(
-          "spans.ingestion.rejected.by_reason.queue",
-          rejectedByQueue,
-        );
-
-        // Filtered spans are intentionally not stored (coding-agent infra
-        // noise), so they are NOT rejections.
-        const rejectedSpans = droppedSpanCount + ingestionFailureCount;
-        return {
-          rejectedSpans,
-          errorMessage: buildBoundedErrorMessage(errors),
-        };
+        tally.annotate(span);
+        return tally.toResult();
       },
     );
   }

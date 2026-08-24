@@ -1082,10 +1082,59 @@ model Experiment {
   workbenchState   Json?
   monitor          Monitor?
 
+  // Monotonic counter for the workbench state. Every accepted write bumps it
+  // by one, and the bump is the compare-and-set guard: a writer names the
+  // version it read, and a write whose expected version no longer matches the
+  // stored one is refused before anything is written. Existing rows read 0.
+  workbenchVersion Int               @default(0)
+
   @@unique([projectId, slug])
   @@index([projectId])
   @@index([workflowId])
   @@index([projectId, archivedAt])
+}
+
+// One snapshot of an experiment's workbench state, at one version.
+//
+// Ordinary typing in the workbench writes a single rolling row with
+// `autoSaved = true`, updated in place so a long editing session does not
+// leave one row per keystroke behind. A commit, an agent write and a restore
+// each write a new `autoSaved = false` row, which is what a person sees in
+// the version list. `version` matches the `Experiment.workbenchVersion` the
+// write produced, so history and the live row share one number line.
+//
+// `state` never carries run results: those live only on the live experiment
+// row, because a snapshot exists to restore a setup, not to replay an old run.
+// A restore therefore writes the snapshot's setup and carries the live row's
+// current results across, so bringing an old setup back never clears the
+// output cells and evaluator scores of the run the experiment holds now.
+model ExperimentVersion {
+  id           String @id @default(nanoid())
+  experimentId String
+  projectId    String
+  version      Int
+
+  autoSaved     Boolean @default(false)
+  commitMessage String?
+
+  authorId String?
+  /// Who wrote this version: "user", "langy" or "api".
+  authorLabel String
+
+  state Json
+  /// Schema version of `state`, so a later shape change can be read forward.
+  schemaVersion String @default("1")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([experimentId, version])
+  @@index([projectId, experimentId, autoSaved])
+  // The version list pages by version inside one experiment, and a restore
+  // reads one version number. Both name all three columns, so the sort key
+  // belongs in the index rather than being applied to fetched rows.
+  @@index([projectId, experimentId, version])
+  @@index([createdAt])
 }
 
 // Annotation - a reviewer's comment on a trace, or on one part of it.
@@ -1151,6 +1200,13 @@ model ModelProvider {
   // scope for a project.
   name                   String
   provider               String
+  // Operator-chosen slug that addresses THIS instance in a gateway model
+  // string ("eu/claude-sonnet-5"). A provider family prefix names a kind, so
+  // with two Anthropic rows on one key "anthropic/..." matches both and the
+  // chain order decides; a handle is the name that pins one row. Lowercase
+  // [a-z0-9][a-z0-9_-]*, at most 32 characters, unique per organization, and
+  // never a provider family spelling. Null when the operator set none.
+  routingHandle          String?
   enabled                Boolean
   customKeys             Json?
   // Provider-side custom headers - appended on every request the
@@ -1191,6 +1247,12 @@ model ModelProvider {
   // provider resolves to the same organization, so this column is that org.
   organizationId String
 
+  // A handle names ONE row inside the organization, so the database owns the
+  // rule the gateway reads. Declared here rather than only in the migration:
+  // an index Prisma cannot see in the schema is drift to it, and the next
+  // `migrate dev` writes a DROP INDEX for it. Postgres treats NULLs as
+  // distinct in a unique index, so every row without a handle still fits.
+  @@unique([organizationId, routingHandle])
   @@index([healthStatus])
   @@index([fallbackPriorityGlobal])
   @@index([organizationId])
@@ -1438,6 +1500,8 @@ model LangyConversationProjection {
   /// The turn in flight, or null when idle (busy guard reads this).
   CurrentTurnId        String?                    @map("currentTurnId")
   LastError            String?                    @map("lastError")
+  /// The model the latest accepted turn ran on; reopening seeds the picker from it.
+  LastModel            String?                    @map("lastModel")
   /// ADR-048 shutdown-handoff resume token (opaque, worker-authored).
   PendingHandoffToken  String?                    @map("pendingHandoffToken")
   PendingHandoffTurnId String?                    @map("pendingHandoffTurnId")
@@ -2225,12 +2289,16 @@ model Scenario {
   criteria        String[]
   labels          String[]
   // Named parameters the scenario declares, as an array of
-  // { name, description?, defaultValue? }. Values are supplied or overridden
-  // when a run starts, delivered to the target under test, and readable from
-  // the scenario's own situation and criteria as `params.NAME`. Null and an
-  // empty array both mean "this scenario declares none", which is the path
+  // { name, description?, defaultValue?, secret? }. Values are supplied or
+  // overridden when a run starts, delivered to the target under test, and
+  // readable from the scenario's own situation and criteria as `params.NAME`.
+  // A declaration with `secret: true` carries no default: its value is
+  // supplied per run, encrypted before it is recorded, delivered as
+  // `secrets.NAME`, and never readable from the scenario's own text. Null and
+  // an empty array both mean "this scenario declares none", which is the path
   // that renders its text untouched. See
-  // specs/scenarios/scenario-run-parameters.feature.
+  // specs/scenarios/scenario-run-parameters.feature and
+  // specs/scenarios/secret-run-parameters.feature.
   parameters      Json?
   // Optional per-scenario model overrides for the run. When null the run
   // resolves the project's scenarios.user_simulator / scenarios.judge
@@ -3177,6 +3245,15 @@ model IngestionSource {
   /// Status flag. 'active' (default), 'disabled' (admin paused), or
   /// 'awaiting_first_event' (created but never received).
   status String @default("awaiting_first_event")
+
+  /// ADR-088 v7: optional trace DESTINATION for conversation-bearing pulls
+  /// (Databricks Genie). Null = don't route. Same shape as
+  /// VirtualKey.traceProjectId: a destination is NOT a scope row and grants
+  /// no access to the source; it only decides where routed conversation
+  /// traces land. Must be a project of this org (validated at write time).
+  /// Freely editable; already-routed history stays where it landed.
+  /// NOT the deferred cost-attribution projectId (ADR-088 Decision 4).
+  traceProjectId String?
 
   /// Last event timestamp observed (any direction). Surfaces in the
   /// admin UI as "last event 2 minutes ago".

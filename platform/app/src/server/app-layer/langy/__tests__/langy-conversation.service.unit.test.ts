@@ -20,6 +20,7 @@ type Row = {
   status: string;
   currentTurnId: string | null;
   lastError: string | null;
+  lastModel: string | null;
   messageCount: number;
   lastActivityAtMs: number;
   cursorActivityAtMs?: number | null;
@@ -73,6 +74,7 @@ const row = (o: Partial<Row> = {}): Row => ({
   status: "active",
   currentTurnId: null,
   lastError: null,
+  lastModel: null,
   messageCount: 0,
   lastActivityAtMs: 0,
   createdAtMs: Date.parse("2026-04-01T00:00:00.000Z"),

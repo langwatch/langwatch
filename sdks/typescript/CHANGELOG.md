@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.8.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.7.0...typescript-sdk@v1.8.0) (2026-08-22)
+
+
+### Features
+
+* **scenarios:** secret run parameters and a truthful batch completion signal ([#7397](https://github.com/langwatch/langwatch/issues/7397)) ([ab564c0](https://github.com/langwatch/langwatch/commit/ab564c0e01afefeebe1864e2990d0c9afebfe806))
+
+
+### Bug Fixes
+
+* **cli:** the session-context hook follows a native worktree switch ([#7400](https://github.com/langwatch/langwatch/issues/7400)) ([f7efa27](https://github.com/langwatch/langwatch/commit/f7efa275f61ef878ec5f3c23da9fdb048b2e36e1))
+* **governance:** one projection hold per ingestion-key rotation, and a spinner while the wrapper sets up ([#7395](https://github.com/langwatch/langwatch/issues/7395)) ([a22237f](https://github.com/langwatch/langwatch/commit/a22237fd016181469d1cdc450a3f7b26829739be))
+* **langy:** composer typing performance, session resume, and cards that tell the truth ([#7403](https://github.com/langwatch/langwatch/issues/7403)) ([6dc0d81](https://github.com/langwatch/langwatch/commit/6dc0d8153995d263a2f0ca5a5c4218380e3a6777))
+
 ## [1.7.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.6.0...typescript-sdk@v1.7.0) (2026-08-21)
 
 

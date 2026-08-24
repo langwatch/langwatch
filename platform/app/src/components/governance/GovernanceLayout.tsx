@@ -1,6 +1,7 @@
 import type { PropsWithChildren } from "react";
 import { SectionNavigationLayout } from "~/components/ui/layouts/SectionNavigationLayout";
 import { governanceNavItems } from "~/features/navigation/sectionNavItems";
+import { useVisibleSectionNavItems } from "~/features/navigation/useVisibleSectionNavItems";
 
 /**
  * Layout for `/governance/*` - wraps DashboardLayout in `orgScope` mode
@@ -16,13 +17,14 @@ export default function GovernanceLayout({
   children,
   pageTitle,
 }: PropsWithChildren<{ pageTitle?: string }>) {
+  const visibleItems = useVisibleSectionNavItems(governanceNavItems);
   return (
     <SectionNavigationLayout
       sectionLabel="AI Governance"
       orgScope
       pageTitle={pageTitle}
       standDownRailInProductShell
-      navigationItems={governanceNavItems.map((item) => ({
+      navigationItems={visibleItems.map((item) => ({
         label: item.label,
         href: item.href,
         includePath: item.includePath,

@@ -26,7 +26,7 @@ import type {
 import type {
   AuthzReadRepository,
   CustomRolePermissionsRow,
-  OrganizationRole,
+  OrganizationMembership,
   ShareLinkRow,
 } from "@langwatch/authz-server";
 import {
@@ -50,18 +50,19 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
   constructor(private readonly prisma: Prisma.TransactionClient) {}
 
   /** Membership is not a grant: the same query the legacy repository runs. */
-  async findOrganizationRole({
+  async findOrganizationMembership({
     userId,
     organizationId,
   }: {
     userId: string;
     organizationId: string;
-  }): Promise<OrganizationRole | null> {
+  }): Promise<OrganizationMembership | null> {
     const row = await this.prisma.organizationUser.findFirst({
       where: { userId, organizationId },
-      select: { role: true },
+      select: { role: true, disabledAt: true },
     });
-    return row?.role ?? null;
+    if (!row) return null;
+    return { role: row.role, disabled: row.disabledAt !== null };
   }
 
   async findUserBindings({
@@ -176,7 +177,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
         userId,
         team: {
           organizationId,
-          organization: { members: { some: { userId } } },
+          organization: { members: { some: { userId, disabledAt: null } } },
         },
       },
       select: {
@@ -407,8 +408,12 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
     userId: string;
     organizationId: string;
   }): Promise<boolean> {
+    // `disabledAt: null` is part of the predicate, not a refinement of it: a
+    // seat-disabled membership confers no grants, exactly as a removed one
+    // does. This is the ledger-head twin of the relation fence the legacy
+    // repository puts on each binding query.
     const membership = await this.prisma.organizationUser.findFirst({
-      where: { userId, organizationId },
+      where: { userId, organizationId, disabledAt: null },
       select: { userId: true },
     });
     return membership !== null;

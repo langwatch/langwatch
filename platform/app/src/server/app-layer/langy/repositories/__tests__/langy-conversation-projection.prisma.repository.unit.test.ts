@@ -36,6 +36,7 @@ function row(overrides: Partial<Row> = {}): Row {
     LastActivityAt: 150,
     CurrentTurnId: null,
     LastError: null,
+    LastModel: null,
     PendingHandoffToken: null,
     PendingHandoffTurnId: null,
     RunToken: "run-token",

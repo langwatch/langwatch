@@ -5,6 +5,7 @@ import { badRequestSchema } from "~/app/api/shared/schemas";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
+import type { BatchSummary } from "~/server/scenarios/scenario-event.types";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { baseResponses } from "../../shared/base-responses";
 import { scenarioRunPlatformUrl } from "../scenario-run-platform-url";
@@ -52,12 +53,45 @@ const batchSummarySchema = z.object({
   passCount: z.number(),
   failCount: z.number(),
   runningCount: z.number(),
+  settledCount: z.number(),
   stalledCount: z.number(),
   lastRunAt: z.number(),
   lastUpdatedAt: z.number(),
   firstCompletedAt: z.number().nullable(),
-  allCompletedAt: z.number().nullable(),
+  allCompletedAt: z
+    .number()
+    .nullable()
+    .describe(
+      "Deprecated: read settledCount and isComplete instead. It carries the last update time of a batch where no run is running.",
+    )
+    // Machine-readable beside the sentence: a generated client marks the field
+    // deprecated from this, not from the prose.
+    .openapi({ deprecated: true }),
+  isComplete: z
+    .boolean()
+    .describe("True when every run of the batch reached a terminal status."),
 });
+
+/**
+ * Adds the completion flag the API exposes on top of the stored counts.
+ * An empty batch is never complete: it has nothing that settled.
+ */
+function toBatchSummaryResponse(batch: BatchSummary) {
+  return {
+    batchRunId: batch.batchRunId,
+    totalCount: batch.totalCount,
+    passCount: batch.passCount,
+    failCount: batch.failCount,
+    runningCount: batch.runningCount,
+    settledCount: batch.settledCount,
+    stalledCount: batch.stalledCount,
+    lastRunAt: batch.lastRunAt,
+    lastUpdatedAt: batch.lastUpdatedAt,
+    firstCompletedAt: batch.firstCompletedAt,
+    allCompletedAt: batch.allCompletedAt,
+    isComplete: batch.settledCount === batch.totalCount && batch.totalCount > 0,
+  };
+}
 
 const listQuerySchema = z.object({
   scenarioSetId: z.string().optional(),
@@ -276,21 +310,51 @@ secured.access(requires("scenarios:view")).get(
     });
 
     return c.json({
-      batches: result.batches.map((b) => ({
-        batchRunId: b.batchRunId,
-        totalCount: b.totalCount,
-        passCount: b.passCount,
-        failCount: b.failCount,
-        runningCount: b.runningCount,
-        stalledCount: b.stalledCount,
-        lastRunAt: b.lastRunAt,
-        lastUpdatedAt: b.lastUpdatedAt,
-        firstCompletedAt: b.firstCompletedAt,
-        allCompletedAt: b.allCompletedAt,
-      })),
+      batches: result.batches.map(toBatchSummaryResponse),
       hasMore: result.hasMore,
       nextCursor: result.nextCursor,
     });
+  },
+);
+
+// ── Get Single Batch ──────────────────────────────────────
+secured.access(requires("scenarios:view")).get(
+  "/batches/:batchRunId",
+  describeRoute({
+    description:
+      "Get the summary of a single batch run, including its completion flag",
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Success",
+        content: {
+          "application/json": { schema: resolver(batchSummarySchema) },
+        },
+      },
+      404: {
+        description: "Batch run not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const { batchRunId } = c.req.param();
+    logger.info({ projectId: project.id, batchRunId }, "Getting batch summary");
+
+    const simulationRuns = getApp().simulations.runs;
+    const batch = await simulationRuns.getBatchSummary({
+      projectId: project.id,
+      batchRunId,
+    });
+
+    if (!batch) {
+      return c.json({ error: "Batch run not found" }, 404);
+    }
+
+    return c.json(toBatchSummaryResponse(batch));
   },
 );
 

@@ -1,3 +1,15 @@
+/**
+ * The legacy api-key authorization surface, kept alive as the ADR-110 fork
+ * seam for the gateway and virtual-key paths.
+ *
+ * Every export here is `@deprecated`. They still RUN — each one asks the
+ * engine for a migrated organization and walks the legacy binding tables for
+ * one that is not — so this is the code the contract PR deletes, not dead
+ * code. New callers decide through `getApp().permissions` /
+ * `AuthzService.checkByIds` with an `apiKey` principal, which applies the same
+ * ADR-092 §9 owner ceiling (`effective(key) = grants(key) ∩ grants(owner)`)
+ * without depending on this fork surviving.
+ */
 import { createLogger } from "@langwatch/observability";
 import {
   OrganizationUserRole,
@@ -26,6 +38,10 @@ const logger = createLogger("langwatch:rbac:role-binding-resolver");
 // Types
 // ============================================================================
 
+/**
+ * @deprecated Use `AuthzScopeRef` from `@langwatch/authz` instead — the
+ * engine's scope reference, which the resolvers here convert to anyway.
+ */
 export type ScopeRef =
   | { type: "org"; id: string }
   | { type: "team"; id: string }
@@ -35,6 +51,9 @@ export type ScopeRef =
  * A principal is the entity whose permissions are being checked.
  * - "user": a human user (supports group memberships)
  * - "apiKey": an API key (no groups)
+ */
+/**
+ * @deprecated Use `AuthzPrincipalRef` from `@langwatch/authz` instead.
  */
 export type Principal =
   | { type: "user"; id: string }
@@ -133,7 +152,9 @@ async function collectBindingsForUser({
       where: {
         organizationId,
         userId,
-        user: { orgMemberships: { some: { organizationId } } },
+        user: {
+          orgMemberships: { some: { organizationId, disabledAt: null } },
+        },
       },
       select: {
         role: true,
@@ -153,7 +174,9 @@ async function collectBindingsForUser({
           members: {
             some: {
               userId,
-              user: { orgMemberships: { some: { organizationId } } },
+              user: {
+                orgMemberships: { some: { organizationId, disabledAt: null } },
+              },
             },
           },
         },
@@ -268,6 +291,13 @@ function systemRoleGuard(principal: Principal) {
  * the requested permission.
  *
  * Accepts either a userId string (backwards-compatible) or a Principal object.
+ *
+ * @deprecated Not for new callers. The ADR-110 fork seam for the api-key
+ * paths: the engine answers for a migrated organization, the legacy union
+ * for one that is not, and this goes away with the legacy half. New code
+ * decides through `getApp().permissions` / `AuthzService.checkByIds` with
+ * an `apiKey` principal, which applies the same ADR-092 §9 owner ceiling
+ * without depending on the fork surviving.
  */
 export async function checkRoleBindingPermission({
   prisma,
@@ -459,6 +489,9 @@ async function checkRoleBindingPermissionInner({
  * version that returned a bare role had already lost two of them at one call
  * site apiece.
  */
+/**
+ * @deprecated The legacy ceiling's answer shape — see `resolveLegacyCeiling`.
+ */
 export type LegacyCeiling = {
   /** Whether the legacy role confers this permission, all floors applied. */
   grants: (permission: Permission) => boolean;
@@ -466,6 +499,11 @@ export type LegacyCeiling = {
 
 const LEGACY_CEILING_DENIES_ALL: LegacyCeiling = { grants: () => false };
 
+/**
+ * @deprecated The legacy half of the api-key ceiling, deprecated with the fork
+ * that calls it — see `resolveApiKeyPermission`. The engine expresses the same
+ * ceiling as `decideWithCeiling`.
+ */
 export async function resolveLegacyCeiling({
   prisma,
   userId,
@@ -485,10 +523,13 @@ export async function resolveLegacyCeiling({
   // and the group ids, in one round trip. The org role is needed because
   // EXTERNAL members are capped before any team role is consulted.
   const user = await prisma.user.findFirst({
-    where: { id: userId, orgMemberships: { some: { organizationId } } },
+    where: {
+      id: userId,
+      orgMemberships: { some: { organizationId, disabledAt: null } },
+    },
     select: {
       orgMemberships: {
-        where: { organizationId },
+        where: { organizationId, disabledAt: null },
         select: { role: true },
       },
       groupMemberships: {
@@ -566,6 +607,13 @@ export async function resolveLegacyCeiling({
  * Returns true only if BOTH the API key's own bindings AND the owning user's
  * current bindings grant the requested permission. If the user's role has been
  * downgraded, the API key auto-degrades immediately.
+ *
+ * @deprecated Not for new callers. The ADR-110 fork seam for the api-key
+ * paths: the engine answers for a migrated organization, the legacy union
+ * for one that is not, and this goes away with the legacy half. New code
+ * decides through `getApp().permissions` / `AuthzService.checkByIds` with
+ * an `apiKey` principal, which applies the same ADR-092 §9 owner ceiling
+ * without depending on the fork surviving.
  */
 export async function resolveApiKeyPermission({
   prisma,

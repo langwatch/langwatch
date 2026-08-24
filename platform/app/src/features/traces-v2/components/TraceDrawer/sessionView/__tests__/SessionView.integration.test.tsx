@@ -81,6 +81,7 @@ const REAL_SESSION: CodingAgentSessionRow = {
   cacheReadTokens: 14_030_972,
   cacheCreationTokens: 284_220,
   costUsd: 10.6188605,
+  agentReportedCostUsd: 10.9,
   modelCallMs: 713_056,
   toolMs: 687_202,
   ttftMsTotal: 0,
@@ -218,6 +219,21 @@ describe("SessionView", () => {
         traceIds: ["trace-a", "trace-b", "trace-c"],
       });
       expect(screen.getByText("spans 3 traces")).toBeTruthy();
+    });
+  });
+
+  describe("given a session that saturated the fold's bounded sets", () => {
+    /** @scenario "Saturated session sets state their bound" */
+    it("states each saturated figure as a floor, not an exact count", () => {
+      // The fold keeps its dedup sets bounded at 50, so exactly 50 means "at
+      // least 50" — a long session must not present the cap as the total.
+      renderSession({
+        traceIds: Array.from({ length: 50 }, (_, i) => `trace-${i}`),
+        subAgents: 50,
+        filesTouched: Array.from({ length: 50 }, (_, i) => `src/f-${i}.ts`),
+      });
+      expect(screen.getByText("spans 50+ traces")).toBeTruthy();
+      expect(screen.getAllByText("50+")).toHaveLength(2);
     });
   });
 

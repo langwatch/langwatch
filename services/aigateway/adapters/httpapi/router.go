@@ -188,6 +188,13 @@ func NewRouter(deps RouterDeps) http.Handler {
 			// credential opens goes client to vendor and never comes here.
 			v1.Post("/realtime/client_secrets", openAIRealtimeSessionHandler(deps))
 			v1.Get("/convai/conversation/get-signed-url", elevenLabsSignedURLHandler(deps))
+			// ElevenLabs' own audio paths, mirrored for the same reason the
+			// mint above is: an ElevenLabs SDK reaches them by base URL alone,
+			// so a customer already using that SDK gets metering, budgets and
+			// traces without rewriting their calls into the OpenAI shape the
+			// /v1/audio routes take.
+			v1.Post("/text-to-speech/{voice_id}", elevenLabsSpeechHandler(deps))
+			v1.Post("/speech-to-text", elevenLabsTranscriptionHandler(deps))
 			// The OpenAI socket reports its usage to the client, not to us, so
 			// the client posts it back to close the session's spend record.
 			v1.Post("/realtime/sessions/{session_id}/usage", realtimeUsageHandler(deps))
@@ -611,6 +618,242 @@ func elevenLabsSignedURLHandler(deps RouterDeps) http.HandlerFunc {
 	}
 }
 
+// maxElevenLabsSpeechBodyBytes caps a native synthesis body. The vendor's own
+// text limit is tens of thousands of characters, and the rest of the body is
+// voice settings, so a megabyte is far past any real request and well short of
+// a payload worth forwarding by mistake.
+const maxElevenLabsSpeechBodyBytes = 1 << 20
+
+// maxElevenLabsUploadBytes caps a native transcription upload, at the same
+// 26 MB the OpenAI-wire transcription route uses so the two audio routes agree.
+//
+// It is its own constant rather than the gateway-wide request ceiling because
+// this upload is held in memory twice: once as the parsed file, and again in
+// the multipart body rebuilt for the vendor, for as long as the vendor call
+// runs. The vendor accepts far larger files, and a caller who has one sends a
+// cloud_storage_url part instead, which ElevenLabs fetches itself and which
+// costs this process nothing.
+const maxElevenLabsUploadBytes = maxTranscriptionBodyBytes
+
+// elevenLabsSpeechHandler terminates POST /v1/text-to-speech/{voice_id},
+// ElevenLabs' own synthesis path.
+//
+// The body reaches the vendor as the caller wrote it. Only the model is read
+// here, so the virtual key's aliases, allowlist, budgets and spend record all
+// apply to it, and the response is the vendor's audio bytes unchanged.
+func elevenLabsSpeechHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+		body, ok := readFullBody(deps.Logger, w, r, maxElevenLabsSpeechBodyBytes)
+		if !ok {
+			return
+		}
+		if gjson.GetBytes(body, "text").String() == "" {
+			writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+				"message": `text is required: ElevenLabs synthesis takes the text to speak in a top-level "text" field`,
+				"fault":   "customer",
+			}))
+			return
+		}
+		// Absent means the vendor's own default, so the gateway names that
+		// model rather than leaving the request unmetered and ungated.
+		model := gjson.GetBytes(body, domain.ElevenLabsModelField).String()
+		if model == "" {
+			model = domain.ElevenLabsDefaultSpeechModel
+		}
+
+		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
+			return deps.App.HandleElevenLabsSpeech(r.Context(), bundle, app.ElevenLabsAudioDispatch{
+				Model: model,
+				Body:  body,
+				Route: domain.ElevenLabsAudioRequest{
+					VoiceID:  chi.URLParam(r, "voice_id"),
+					RawQuery: r.URL.RawQuery,
+				},
+			})
+		})
+		if err != nil {
+			writeError(deps.Logger, hw, r.Context(), err)
+			return
+		}
+		setMetaHeaders(hw, result.Meta)
+		writeJSONResponse(hw, result.Response)
+	}
+}
+
+// elevenLabsTranscriptionHandler terminates POST /v1/speech-to-text,
+// ElevenLabs' own transcription path.
+//
+// Multipart like the OpenAI-wire transcription route, and parsed here for the
+// same reason: this is the only layer holding the *http.Request. Every text
+// part is carried through to the vendor rather than filtered to a known list,
+// because on a route that mirrors a vendor's own path the caller's settings
+// are the request.
+func elevenLabsTranscriptionHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+		upload, ok := parseElevenLabsUpload(deps, w, r)
+		if !ok {
+			return
+		}
+		// Not defaulted: ElevenLabs has no default transcription model, so a
+		// request without one is incomplete and guessing would bill a model
+		// the caller never chose. An empty value is refused by the resolver,
+		// which is the one place that says where each surface names its model.
+		result, hw, err := withHeartbeat(r.Context(), w, deps.HeartbeatInterval, func() (*app.CompletionResult, error) {
+			return deps.App.HandleElevenLabsTranscription(r.Context(), bundle, app.ElevenLabsAudioDispatch{
+				Model:  upload.Params[domain.ElevenLabsModelField],
+				Upload: upload,
+				Route:  domain.ElevenLabsAudioRequest{RawQuery: r.URL.RawQuery},
+			})
+		})
+		if err != nil {
+			writeError(deps.Logger, hw, r.Context(), err)
+			return
+		}
+		setMetaHeaders(hw, result.Meta)
+		writeJSONResponse(hw, result.Response)
+	}
+}
+
+// parseElevenLabsUpload reads the native transcription form into the shared
+// upload shape.
+//
+// The audio part is optional, because this vendor also accepts a
+// cloud_storage_url it fetches itself; a request with neither is refused here
+// rather than at the vendor. The size cap is the gateway's own request
+// ceiling: the vendor accepts far larger files through that URL, and a
+// multi-gigabyte upload through this process is not something to hold in
+// memory.
+func parseElevenLabsUpload(deps RouterDeps, w http.ResponseWriter, r *http.Request) (*domain.TranscriptionUpload, bool) {
+	if err := readElevenLabsForm(w, r); err != nil {
+		writeError(deps.Logger, w, r.Context(), err)
+		return nil, false
+	}
+	upload, err := elevenLabsUploadFromForm(r)
+	if err != nil {
+		writeError(deps.Logger, w, r.Context(), err)
+		return nil, false
+	}
+	return upload, true
+}
+
+// readElevenLabsForm caps the body and parses the multipart envelope.
+func readElevenLabsForm(w http.ResponseWriter, r *http.Request) error {
+	maxBytes := int64(maxElevenLabsUploadBytes)
+	if err := prepareRequestBody(w, r, maxBytes); err != nil {
+		return err
+	}
+	// Memory threshold: parts up to 10 MB stay in memory, larger ones spill to
+	// a temp file ParseMultipartForm cleans up on r.Body close.
+	//nolint:gosec // G120: prepareRequestBody already wrapped r.Body in a MaxBytesReader at maxBytes
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		if bodyReadErrorCode(err) == domain.ErrPayloadTooLarge {
+			return herr.New(r.Context(), domain.ErrPayloadTooLarge, herr.M{
+				"message": fmt.Sprintf(
+					"the audio upload exceeds this gateway's %d byte limit; "+
+						"send a cloud_storage_url part instead for a file this large", maxBytes),
+			})
+		}
+		return herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+			"message": "malformed multipart/form-data body: " + err.Error(),
+		})
+	}
+	return nil
+}
+
+// elevenLabsUploadFromForm lifts the parsed form into the shared upload shape.
+func elevenLabsUploadFromForm(r *http.Request) (*domain.TranscriptionUpload, error) {
+	upload := &domain.TranscriptionUpload{Params: elevenLabsFormValues(r)}
+	if err := refuseElevenLabsAsyncTranscription(r, upload.Params); err != nil {
+		return nil, err
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		// No audio uploaded is a complete request when the caller named a
+		// cloud_storage_url, which this vendor fetches itself.
+		if upload.Params["cloud_storage_url"] != "" {
+			return upload, nil
+		}
+		return nil, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+			"message": `missing audio: send a "file" part, or a "cloud_storage_url" part for the provider to fetch`,
+			"fault":   "customer",
+		})
+	}
+	defer func() { _ = file.Close() }()
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return nil, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+			"message": "failed reading uploaded file: " + err.Error(),
+		})
+	}
+	upload.File = data
+	upload.Filename = header.Filename
+	return upload, nil
+}
+
+// elevenLabsFormValues collects every text part the caller sent. They are all
+// carried through rather than filtered to a known list, because on a route
+// that mirrors a vendor's own path the caller's settings are the request, and
+// an allowlist goes stale the moment the vendor adds a parameter.
+func elevenLabsFormValues(r *http.Request) map[string]string {
+	values := map[string]string{}
+	if r.MultipartForm == nil {
+		return values
+	}
+	for name, part := range r.MultipartForm.Value {
+		if len(part) > 0 {
+			values[name] = part[0]
+		}
+	}
+	return values
+}
+
+// refuseElevenLabsAsyncTranscription rejects the vendor's own asynchronous
+// mode on this route.
+//
+// With a webhook part, ElevenLabs answers before it has transcribed anything
+// and delivers the result to a workspace webhook later. That first answer
+// carries no duration and no word timings, so the call would confirm its spend
+// record at zero seconds and bill nothing for audio the customer was charged
+// for. The gateway has no settlement path for those deliveries either: the
+// existing /v1/convai/webhook relay is for Conversational AI post-call
+// reports, which are a different payload keyed on a different id.
+//
+// Refusing says so, rather than billing zero and looking like it worked. The
+// synchronous request the caller can send instead is the one line of the fix.
+func refuseElevenLabsAsyncTranscription(r *http.Request, params map[string]string) error {
+	// The vendor names this parameter "webhook" and reports it back as
+	// `"param": "webhook"` on its own validation errors (measured against the
+	// live API, 2026-08-21). Any truthy spelling is refused, because the
+	// spelling that gets through is the one that bills nothing.
+	if value, ok := params["webhook"]; !ok || !isTruthyFormValue(value) {
+		return nil
+	}
+	return herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+		"message": "webhook=true is not supported on this gateway route: the vendor answers " +
+			"before it has transcribed anything, so the call carries no duration to bill. " +
+			"Send the request without the webhook part and read the transcript from the response",
+		"fault": "customer",
+	})
+}
+
+// isTruthyFormValue reads a boolean the way a form part spells one.
+func isTruthyFormValue(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "true", "1", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
 // maxRealtimeUsageBodyBytes caps a usage report. It is one usage object.
 const maxRealtimeUsageBodyBytes = 64 << 10
 
@@ -887,6 +1130,12 @@ func modelsHandler(deps RouterDeps) http.HandlerFunc {
 // instance) are attributed to the gateway rather than to an empty string:
 // `owned_by` is a required string in the OpenAI Model object, and a
 // blank one renders as an unlabelled row in model pickers.
+//
+// This stays the provider FAMILY even for an instance carrying a routing
+// handle. `owned_by` is the vendor a client groups the picker by, so putting
+// a handle here would file an Anthropic model under "europe". The handle
+// belongs in the id, which is what a caller sends, and Model.ListingSpelling
+// puts it there.
 func modelOwnedBy(m domain.Model) string {
 	if m.ProviderID == "" {
 		return "langwatch"
@@ -1470,6 +1719,7 @@ func registerErrorStatusesOnce() {
 	herr.RegisterStatus(domain.ErrPolicyViolation, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrModelNotAllowed, http.StatusBadRequest)
 	herr.RegisterStatus(domain.ErrProviderNotBound, http.StatusBadRequest)
+	herr.RegisterStatus(domain.ErrModelNotRecognized, http.StatusBadRequest)
 	herr.RegisterStatus(domain.ErrProviderError, http.StatusBadGateway)
 	herr.RegisterStatus(domain.ErrProviderTimeout, http.StatusGatewayTimeout)
 	herr.RegisterStatus(domain.ErrBadRequest, http.StatusBadRequest)

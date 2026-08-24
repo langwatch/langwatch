@@ -58,7 +58,7 @@ describe("the cohort's private-dataplane exclusion wiring", () => {
   });
 
   describe("when a cohort's eligible pool is read through the real composition", () => {
-    /** @scenario "A cohort never includes an enterprise organization" */
+    /** @scenario "A cohort leaves out an enterprise organization by default" */
     it.skip("excludes the organizations named by the private ClickHouse routing table", async () => {
       await systemMigrationsService.enrollCohort({
         migrationName: "authz-team-user-backfill",

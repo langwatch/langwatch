@@ -98,6 +98,26 @@ describe("ScenarioService", () => {
     });
 
     /** @scenario "Parameter definitions are persisted on a scenario" */
+    it("reads a secret declaration back as secret", async () => {
+      const created = await service.create({
+        projectId,
+        name: "Secret Test",
+        situation: "The agent calls the billing API",
+        criteria: ["Calls the API"],
+        labels: [],
+        parameters: [
+          { name: "api_token", description: "The billing token", secret: true },
+        ],
+      });
+
+      const readBack = await service.getById({ id: created.id, projectId });
+
+      expect(parseScenarioParameterDefinitions(readBack?.parameters)).toEqual([
+        { name: "api_token", description: "The billing token", secret: true },
+      ]);
+    });
+
+    /** @scenario "Parameter definitions are persisted on a scenario" */
     it("reads a scenario that declares none as declaring none", async () => {
       const created = await service.create({
         projectId,

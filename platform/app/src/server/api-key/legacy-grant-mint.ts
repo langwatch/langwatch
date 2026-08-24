@@ -131,14 +131,19 @@ function sweepGuard(): void {
 }
 
 /**
- * The statuses that mean this organization's genesis import actually cut it
+ * The statuses that mean this organization's migration actually cut it
  * over — mirrors `ON_ENGINE_STATUSES` in engine-gate.ts (kept as its
  * own literal here rather than imported: that gate answers a present-tense
  * "is this organization on the ledger today", this answers "when did it get
  * there", and the two must not be forced to share a type only one of them
  * needs).
+ *
+ * `finalized` only, matching the gate: `migrated` is the HELD state — the
+ * organization's writes are still imperative legacy rows, so a key created
+ * while held belongs to the legacy era and the next migration pass adopts
+ * its bindings; there is no ledger era to date it against yet.
  */
-const CUTOVER_STATUSES: readonly string[] = ["migrated", "finalized"];
+const CUTOVER_STATUSES: readonly string[] = ["finalized"];
 
 /**
  * The moment this organization's genesis import actually cut it over onto the

@@ -52,23 +52,37 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
   # ---------------------------------------------------------------------------
 
   # Between the prompt POST and the agent's first frame the worker prepares its
-  # tools and produces nothing. The manager fills that silence with a status —
-  # but the status must name what is actually happening, and it must not repeat
-  # the same line on every message of a conversation.
+  # tools and produces nothing. The manager fills that silence with a status,
+  # and the status must name what is actually happening: a boot, a round-trip
+  # to a running worker, or a resume.
 
   @unit
-  Scenario: A worker that has not served a turn yet says Langy is waking up
-    Given a turn is dispatched to a worker that has not served a turn yet
+  Scenario: A worker that has not served a turn yet says it is starting up
+    Given a brand-new conversation's turn spawned a worker that has not served a turn
     When the manager opens the turn
-    Then it emits a wake-up status such as "Waking Langy up…", "Giving Langy a pep talk…" or "Poking Langy…" before the first agent frame
-    And the line varies between conversations instead of repeating one phrase
+    Then it emits the status "Starting Langy…" before the first agent frame
 
   @unit
-  Scenario: A warm worker gets a short reaching-Langy line that varies
+  Scenario: A warm worker goes straight to thinking
     Given a turn is dispatched to a worker that has already served a turn
     When the manager opens the turn
-    Then it emits a short status such as "Paging Langy…" or "Pinging Langy…"
-    And the line varies between turns instead of repeating one phrase
+    Then it emits the status "Thinking…" and never the starting-up line
+
+  # The startup line is reserved for the one wait the user really has: a
+  # first-ever boot. A pre-warmed worker booted while the panel sat open, and
+  # a reaped follow-up worker respawns fast on the persisted session; either
+  # saying "starting" reads as the workspace having vanished.
+  @unit
+  Scenario: A pre-warmed worker's first turn goes straight to thinking
+    Given a turn is dispatched to a worker a pre-warm already booted
+    When the manager opens the turn
+    Then it emits the status "Thinking…" and never the starting-up line
+
+  @unit
+  Scenario: A follow-up on a respawned worker goes straight to thinking
+    Given a conversation with earlier replies whose worker was reaped
+    When the next turn respawns the worker and the manager opens the turn
+    Then it emits the status "Thinking…" and never the starting-up line
 
   @unit
   Scenario: A resumed turn says it is picking up where it left off
@@ -170,7 +184,7 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
   # A refresh that lands just as the turn finishes can miss the worker's terminal
   # frame (its relay connection dropped before it), so the buffer has no end/error
   # and the reconnected Stream A used to block until the hard per-turn deadline —
-  # the UI sat on "Starting up…" for minutes though the turn had finished. Stream A
+  # the UI sat on the startup status for minutes though the turn had finished. Stream A
   # now watches the durable fold + per-turn heartbeat and synthesizes the missed
   # terminal, but ONLY once the turn is provably settled so a live or cold-starting
   # turn is never cut off.
@@ -182,11 +196,33 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
     Then it yields a synthesized end (or error, carrying the failure) and closes
     And the client reconciles the full transcript from langy.messages
 
+  @unit
   Scenario: Stream A stays patient while a turn is still live or cold-starting
     Given I am watching a turn whose durable fold still reports it in flight
     When no tokens arrive on the live edge for a while
     Then Stream A keeps following and does not synthesize a terminal
     And a turn that keeps a fresh heartbeat is never cut off
+
+  # The stream used to carry a second deadline as well: an absolute two minute
+  # timeout, borrowed from the budget we give the MANAGER to answer one request.
+  # A prompt improvement loop runs for ten minutes, so the page went deaf
+  # half-way through every one of them. The panel kept the last thing it had
+  # heard on screen, and each agent action after the cap found no page listening
+  # and ran on the backend instead, so the second half of the loop arrived as a
+  # single refetch at the end. Length is not a symptom. Silence is.
+  @unit
+  Scenario: A turn that runs longer than the manager's request budget keeps its stream
+    Given I am watching a turn that has been running for ten minutes
+    And its heartbeat is fresh because the worker is still working
+    Then Stream A is still following the live edge
+    And the agent's UI actions still reach the page that is watching
+
+  @unit
+  Scenario: A turn that neither settles nor beats gives its stream up
+    Given I am watching a turn whose durable fold never settles
+    And its heartbeat has read stale for ninety seconds
+    Then Stream A stops following and releases its blocking connection
+    And it synthesizes no terminal, because how the turn ended is not known
 
   # ---------------------------------------------------------------------------
   # Transport honesty: streaming must actually stream, end to end

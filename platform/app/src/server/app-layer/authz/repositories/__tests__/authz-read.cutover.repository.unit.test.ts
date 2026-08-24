@@ -13,7 +13,7 @@ import { CutoverAwareAuthzReadRepository } from "../authz-read.cutover.repositor
  */
 const spyRepository = (name: string): AuthzReadRepository =>
   ({
-    findOrganizationRole: vi.fn().mockResolvedValue(name),
+    findOrganizationMembership: vi.fn().mockResolvedValue(name),
     findUserBindings: vi.fn().mockResolvedValue([]),
     findGroupBindings: vi.fn().mockResolvedValue([]),
     findApiKeyBindings: vi.fn().mockResolvedValue([]),
@@ -36,7 +36,7 @@ const repositoryFor = (onEngine: boolean) => {
     systemMigrationTenantState: {
       findUnique: vi
         .fn()
-        .mockResolvedValue(onEngine ? { status: "migrated" } : null),
+        .mockResolvedValue(onEngine ? { status: "finalized" } : null),
     },
   } as unknown as Prisma.TransactionClient;
   return {
@@ -167,7 +167,7 @@ describe("CutoverAwareAuthzReadRepository", () => {
       // both implementations run the same query against the same table, so
       // forking them would cost a gate read and change nothing.
       expect(
-        await repository.findOrganizationRole({
+        await repository.findOrganizationMembership({
           userId: "alice",
           organizationId: "org-1",
         }),
@@ -178,7 +178,7 @@ describe("CutoverAwareAuthzReadRepository", () => {
       await repository.findProjectLineage({ projectId: "proj-1" });
       await repository.findTeamOrganization({ teamId: "team-1" });
 
-      expect(grants.findOrganizationRole).not.toHaveBeenCalled();
+      expect(grants.findOrganizationMembership).not.toHaveBeenCalled();
       expect(grants.findApiKeyOwner).not.toHaveBeenCalled();
       expect(grants.findProjectLineage).not.toHaveBeenCalled();
       expect(grants.findTeamOrganization).not.toHaveBeenCalled();
@@ -208,7 +208,7 @@ describe("CutoverAwareAuthzReadRepository", () => {
 
   describe("when several calls ask about the same organization", () => {
     it("reads the projection once, because the gate caches the answer", async () => {
-      const findUnique = vi.fn().mockResolvedValue({ status: "migrated" });
+      const findUnique = vi.fn().mockResolvedValue({ status: "finalized" });
       const prisma = {
         systemMigrationTenantState: { findUnique },
       } as unknown as Prisma.TransactionClient;
@@ -235,7 +235,7 @@ describe("CutoverAwareAuthzReadRepository", () => {
     const gateFlippingAfterFirstRead = () => {
       const findUnique = vi
         .fn()
-        .mockResolvedValueOnce({ status: "migrated" })
+        .mockResolvedValueOnce({ status: "finalized" })
         .mockResolvedValue(null);
       const prisma = {
         systemMigrationTenantState: { findUnique },

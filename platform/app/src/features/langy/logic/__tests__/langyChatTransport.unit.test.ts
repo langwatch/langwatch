@@ -78,7 +78,7 @@ describe("createLangyChatTransport", () => {
     subscription.mockClear();
   });
 
-  describe("given no conversation id yet (a fresh conversation)", () => {
+  describe("when no conversation id yet (a fresh conversation)", () => {
     it("starts the turn via langy.createConversation and adopts the minted ids", async () => {
       const { transport, onIds } = makeTransport({ conversationId: null });
       await transport.sendMessages(options());
@@ -92,6 +92,60 @@ describe("createLangyChatTransport", () => {
         conversationId: "conv-1",
         turnId: "turn-1",
       });
+    });
+
+    it("sends only the user's own messages on a create", async () => {
+      // Starting a new chat while the previous reply streams leaves the old
+      // assistant message in useChat state; a create must not seed the new
+      // conversation (or its title) with it.
+      const { transport } = makeTransport({ conversationId: null });
+      await transport.sendMessages(
+        options({
+          messages: [
+            {
+              id: "m0",
+              role: "assistant",
+              parts: [{ type: "text", text: "the previous reply" }],
+            },
+            { id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] },
+          ],
+        }),
+      );
+
+      const [, input] = mutation.mock.calls[0]!;
+      expect((input as { messages: Array<{ role: string }> }).messages).toEqual(
+        [{ id: "m1", role: "user", parts: [{ type: "text", text: "hi" }] }],
+      );
+    });
+
+    it("sends only THIS message, not the previous conversation's questions", async () => {
+      // Dropping the assistant turns is not enough. The state that survives a
+      // mid-stream new chat holds the old USER messages too, and sending those
+      // seeds the new conversation, and the title generated from it, with
+      // questions the user did not just ask.
+      const { transport } = makeTransport({ conversationId: null });
+      await transport.sendMessages(
+        options({
+          messages: [
+            {
+              id: "m0",
+              role: "user",
+              parts: [{ type: "text", text: "the previous question" }],
+            },
+            {
+              id: "m1",
+              role: "assistant",
+              parts: [{ type: "text", text: "the previous reply" }],
+            },
+            { id: "m2", role: "user", parts: [{ type: "text", text: "hi" }] },
+          ],
+        }),
+      );
+
+      const [, input] = mutation.mock.calls[0]!;
+      expect((input as { messages: Array<{ id: string }> }).messages).toEqual([
+        { id: "m2", role: "user", parts: [{ type: "text", text: "hi" }] },
+      ]);
     });
 
     it("mints a fresh idempotency key for each logical send", async () => {
@@ -115,7 +169,7 @@ describe("createLangyChatTransport", () => {
     });
   });
 
-  describe("given an active conversation id", () => {
+  describe("when an active conversation id", () => {
     it("continues via langy.continueConversation carrying that conversation id", async () => {
       const { transport } = makeTransport({ conversationId: "conv-active" });
       await transport.sendMessages(options());
@@ -124,9 +178,36 @@ describe("createLangyChatTransport", () => {
       expect(path).toBe("langy.continueConversation");
       expect(input).toMatchObject({ conversationId: "conv-active" });
     });
+
+    it("ignores a pending warm id once a conversation is active", async () => {
+      const { transport } = makeTransport({
+        conversationId: "conv-active",
+        pendingConversationId: "conv-warmed",
+      });
+      await transport.sendMessages(options());
+
+      const [path, input] = mutation.mock.calls[0]!;
+      expect(path).toBe("langy.continueConversation");
+      expect(input).toMatchObject({ conversationId: "conv-active" });
+    });
   });
 
-  describe("given per-send context (model override + composer chips)", () => {
+  describe("when a pending conversation id from a panel-open warm", () => {
+    /** @scenario The first message adopts the warmed conversation */
+    it("creates the conversation under the warmed id so the turn reuses the warm worker", async () => {
+      const { transport } = makeTransport({
+        conversationId: null,
+        pendingConversationId: "conv-warmed",
+      });
+      await transport.sendMessages(options());
+
+      const [path, input] = mutation.mock.calls[0]!;
+      expect(path).toBe("langy.createConversation");
+      expect(input).toMatchObject({ conversationId: "conv-warmed" });
+    });
+  });
+
+  describe("when per-send context (model override + composer chips)", () => {
     it("threads only the present fields onto the turn input", async () => {
       const { transport } = makeTransport({
         conversationId: null,
@@ -147,7 +228,7 @@ describe("createLangyChatTransport", () => {
     });
   });
 
-  describe("given the turn-start mutation rejects", () => {
+  describe("when the turn-start mutation rejects", () => {
     it("propagates the error to useChat and never subscribes to a stream", async () => {
       mutation.mockRejectedValue(new Error("boom"));
       const { transport, onIds } = makeTransport({ conversationId: null });
@@ -158,7 +239,7 @@ describe("createLangyChatTransport", () => {
     });
   });
 
-  describe("given a full send round-trip", () => {
+  describe("when a full send round-trip", () => {
     it("resolves the send, adopts the ids and opens the live stream", async () => {
       const { transport, onIds } = makeTransport({ conversationId: null });
 
@@ -173,7 +254,7 @@ describe("createLangyChatTransport", () => {
     });
   });
 
-  describe("given the live stream carries plan and sub-status entries", () => {
+  describe("when the live stream carries plan and sub-status entries", () => {
     /** Grab the onData callback the transport handed the subscription. */
     function streamHandlers() {
       const opts = subscription.mock.calls[0]![2] as {
@@ -193,7 +274,7 @@ describe("createLangyChatTransport", () => {
       const { onData } = streamHandlers();
 
       // The manager's cold-window placeholder, then the first real output (plan).
-      onData({ type: "status", status: "Waking Langy up…" });
+      onData({ type: "status", status: "Starting Langy…" });
       onData({
         type: "plan",
         items: [{ content: "Find the slow traces", status: "in_progress" }],
@@ -209,6 +290,35 @@ describe("createLangyChatTransport", () => {
         ([s]) => s.type === "status" && s.status === "",
       );
       expect(cleared).toHaveLength(1);
+    });
+
+    it("marks a pre-output status as readiness and a post-output status as real", async () => {
+      // A replayed stream re-delivers the readiness placeholder after the
+      // answer is already on screen; the flag is what lets the panel suppress
+      // it there instead of rendering "Thinking…" under the visible reply.
+      const onSignal = vi.fn();
+      const { transport } = makeTransport(
+        { conversationId: null },
+        { onSignal },
+      );
+      await transport.sendMessages(options());
+      const { onData } = streamHandlers();
+
+      onData({ type: "status", status: "Thinking…" });
+      onData({ type: "delta", text: "Sure —" });
+      onData({ type: "status", status: "Analysing 1,204 traces…" });
+
+      const statuses = onSignal.mock.calls
+        .map(([s]) => s)
+        .filter((s) => s.type === "status" && s.status !== "");
+      expect(statuses).toEqual([
+        { type: "status", status: "Thinking…", readiness: true },
+        {
+          type: "status",
+          status: "Analysing 1,204 traces…",
+          readiness: false,
+        },
+      ]);
     });
 
     it("shows a mid-turn sub-status between outputs (not wiped by the cold-start clear)", async () => {
@@ -231,15 +341,17 @@ describe("createLangyChatTransport", () => {
       expect(onSignal).toHaveBeenNthCalledWith(1, {
         type: "status",
         status: "Searching traces…",
+        readiness: false,
       });
       expect(onSignal).toHaveBeenNthCalledWith(2, {
         type: "status",
         status: "",
+        readiness: false,
       });
     });
   });
 
-  describe("given the live stream terminates", () => {
+  describe("when the live stream terminates", () => {
     function handlers() {
       return subscription.mock.calls[0]![2] as {
         onData: (entry: unknown) => void;
@@ -296,7 +408,7 @@ describe("createLangyChatTransport", () => {
     });
   });
 
-  describe("given the live stream carries a navigate instruction", () => {
+  describe("when the live stream carries a navigate instruction", () => {
     function streamHandlers() {
       const opts = subscription.mock.calls[0]![2] as {
         onData: (entry: unknown) => void;
@@ -336,6 +448,191 @@ describe("createLangyChatTransport", () => {
       const { onData } = streamHandlers();
 
       expect(() => onData({ type: "navigate", href: "/demo/x" })).not.toThrow();
+    });
+  });
+
+  describe("when the live stream carries a UI action", () => {
+    function streamHandlers() {
+      const opts = subscription.mock.calls[0]![2] as {
+        onData: (entry: unknown) => void;
+        onComplete: () => void;
+      };
+      return opts;
+    }
+
+    it("forwards it to onUiAction as a bare passthrough, not a message chunk", async () => {
+      const onUiAction = vi.fn();
+      const onSignal = vi.fn();
+      const { transport } = makeTransport(
+        { conversationId: null },
+        { onUiAction, onSignal },
+      );
+      await transport.sendMessages(options());
+      const { onData } = streamHandlers();
+
+      const entry = {
+        type: "ui",
+        actionId: "a1",
+        kind: "workbench.duplicateTarget",
+        payload: { targetId: "t1" },
+      };
+      onData(entry);
+
+      expect(onUiAction).toHaveBeenCalledWith(entry);
+      expect(onSignal).not.toHaveBeenCalled();
+    });
+
+    it("does not throw when no onUiAction dep is wired", async () => {
+      const { transport } = makeTransport({ conversationId: null }, {});
+      await transport.sendMessages(options());
+      const { onData } = streamHandlers();
+
+      expect(() =>
+        onData({ type: "ui", actionId: "a1", kind: "x", payload: {} }),
+      ).not.toThrow();
+    });
+  });
+
+  describe("when text and tool calls alternate in one turn", () => {
+    function streamHandlers() {
+      const opts = subscription.mock.calls[0]![2] as {
+        onData: (entry: unknown) => void;
+        onComplete: () => void;
+      };
+      return opts;
+    }
+
+    /** Read every chunk the transport enqueues, until the stream closes. */
+    function collect(stream: ReadableStream<{ type: string; id?: string }>) {
+      const chunks: Array<{ type: string; id?: string }> = [];
+      const reader = stream.getReader();
+      const done = (async () => {
+        for (;;) {
+          const next = await reader.read();
+          if (next.done) return;
+          chunks.push(next.value);
+        }
+      })();
+      return { chunks, done };
+    }
+
+    /**
+     * A turn's prose is the paragraphs between its calls. Held in ONE text part
+     * for the whole turn, the parts array said "all the text, then all the
+     * tools" whatever order they arrived in — which is what drew every card
+     * above the reply and grew the reply below them.
+     */
+    /** @scenario "A tool card sits between the paragraphs it ran between" */
+    it("closes the paragraph a call interrupts and opens a new one after it", async () => {
+      const { transport } = makeTransport({ conversationId: null });
+      const stream = (await transport.sendMessages(
+        options(),
+      )) as unknown as ReadableStream<{ type: string; id?: string }>;
+      const { chunks, done } = collect(stream);
+      const { onData } = streamHandlers();
+
+      onData({ type: "delta", text: "Looking at the failures." });
+      onData({
+        type: "tool",
+        id: "t1",
+        name: "bash",
+        phase: "start",
+        input: {},
+      });
+      onData({
+        type: "tool",
+        id: "t1",
+        name: "bash",
+        phase: "end",
+        output: "ok",
+      });
+      onData({ type: "delta", text: "They are all timeouts." });
+      onData({ type: "end" });
+      await done;
+
+      expect(chunks.map((chunk) => chunk.type)).toEqual([
+        "start",
+        "text-start",
+        "text-delta",
+        "text-end",
+        "tool-input-available",
+        "tool-output-available",
+        "text-start",
+        "text-delta",
+        "text-end",
+        "finish",
+      ]);
+      const runs = chunks
+        .filter((chunk) => chunk.type === "text-start")
+        .map((chunk) => chunk.id);
+      expect(new Set(runs).size).toBe(2);
+    });
+
+    /**
+     * Only a STARTING call ends a paragraph. An output that lands after the
+     * model has moved on would otherwise cut the paragraph it is writing in
+     * two, and the card would still be back where the call began.
+     */
+    it("leaves the open paragraph alone when a call reports its output", async () => {
+      const { transport } = makeTransport({ conversationId: null });
+      const stream = (await transport.sendMessages(
+        options(),
+      )) as unknown as ReadableStream<{ type: string; id?: string }>;
+      const { chunks, done } = collect(stream);
+      const { onData } = streamHandlers();
+
+      onData({
+        type: "tool",
+        id: "t1",
+        name: "bash",
+        phase: "start",
+        input: {},
+      });
+      onData({ type: "delta", text: "While that runs," });
+      onData({
+        type: "tool",
+        id: "t1",
+        name: "bash",
+        phase: "end",
+        output: "ok",
+      });
+      onData({ type: "delta", text: " here is what I expect." });
+      onData({ type: "end" });
+      await done;
+
+      expect(chunks.map((chunk) => chunk.type)).toEqual([
+        "start",
+        "tool-input-available",
+        "text-start",
+        "text-delta",
+        "tool-output-available",
+        "text-delta",
+        "text-end",
+        "finish",
+      ]);
+    });
+
+    it("opens no paragraph at all for a turn that only ran tools", async () => {
+      const { transport } = makeTransport({ conversationId: null });
+      const stream = (await transport.sendMessages(
+        options(),
+      )) as unknown as ReadableStream<{ type: string; id?: string }>;
+      const { chunks, done } = collect(stream);
+      const { onData } = streamHandlers();
+
+      onData({
+        type: "tool",
+        id: "t1",
+        name: "bash",
+        phase: "start",
+        input: {},
+      });
+      onData({ type: "end" });
+      await done;
+
+      expect(chunks.some((chunk) => chunk.type.startsWith("text-"))).toBe(
+        false,
+      );
     });
   });
 

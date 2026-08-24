@@ -114,6 +114,27 @@ const missingModelDescriptions = {
   passthrough: "Put the model in the Gemini request URL, then try again.",
 } as const satisfies Record<MissingModelRequestType, string>;
 
+/**
+ * Names the prefixes the key can reach, when the gateway listed them.
+ *
+ * The list arrives as data (`meta.options`) rather than as a finished
+ * sentence, so the words a customer reads stay here, in the registry, and a
+ * relayed message is never rendered back to them. Empty when the gateway sent
+ * nothing, and the surrounding copy then stands on its own.
+ */
+const reachableSentence = (error: HandledErrorShape): string => {
+  const options = strList(error, "options");
+  if (options.length === 0) return "";
+  return ` This key can reach ${listLabels(options)}.`;
+};
+
+/** Reads a `meta` string and compares it, treating anything unexpected as no match. */
+const strEq = (
+  error: HandledErrorShape,
+  key: string,
+  expected: string,
+): boolean => str(error, key, "") === expected;
+
 const describeMissingModel = (error: HandledErrorShape): string =>
   (missingModelDescriptions as Record<string, string>)[
     str(error, "request_type", "")
@@ -377,6 +398,21 @@ const presentations = {
     describe: () =>
       "This feature isn't switched on for this workspace yet. Ask your workspace administrator to enable it, or contact support.",
   },
+  cli_key_selection_invalid: {
+    title: "Check the access selection",
+    describe: (error) => {
+      const fieldErrors = error.meta.fieldErrors;
+      if (fieldErrors && typeof fieldErrors === "object") {
+        if (Object.hasOwn(fieldErrors, "bindings")) {
+          return "Select at least one workspace, team, or project for the key.";
+        }
+        if (Object.hasOwn(fieldErrors, "permissions")) {
+          return "Select at least one valid permission for the key.";
+        }
+      }
+      return "The selected scopes and permissions aren't valid.";
+    },
+  },
   clickhouse_unavailable: {
     title: "Search is temporarily unavailable",
     describe: () => "We're on it. Try again in a moment.",
@@ -477,6 +513,33 @@ const presentations = {
     title: "Experiment not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
   },
+  experiment_stale_workbench_state: {
+    // Nothing was written: the save is refused before the update, so the copy
+    // can promise the customer's own edit is still theirs to redo.
+    title: "This evaluation changed since you loaded it",
+    describe: () =>
+      "Reload to pick up the latest version, then make your change again.",
+  },
+  experiment_workbench_missing_reference: {
+    title: "This evaluation points at something that no longer exists",
+    describe: () =>
+      "One of its targets, evaluators or datasets was deleted. Remove it or pick another one, then save again.",
+  },
+  experiment_invalid_workbench_state: {
+    title: "This evaluation's setup could not be saved",
+    describe: () =>
+      "Part of it is incomplete. Check the targets, evaluators and datasets, then save again.",
+  },
+  experiment_type_mismatch: {
+    title: "This experiment is not an evaluation workbench",
+    describe: () =>
+      "It was made with another kind of experiment and opens in its own view. Pick an evaluation instead.",
+  },
+  experiment_version_not_found: {
+    title: "That version is not available",
+    describe: () =>
+      "It may have been removed. Open the version list to see what this evaluation still has.",
+  },
   invalid_experiment_configuration: {
     // fault: platform. The saved workbench state stopped matching its schema,
     // which nobody typed and nobody can repair through the API — so the copy
@@ -551,6 +614,12 @@ const presentations = {
   api_key_scope_violation: {
     title: "This API key can't do that",
     describe: () => "It doesn't include the required scope.",
+  },
+
+  project_visibility_too_wide: {
+    title: "Too many projects to list for this key",
+    describe: () =>
+      "This key reaches more projects than we can list in one request. Bind it to the teams or projects it works with, then try again.",
   },
 
   // ==========================================================================
@@ -676,6 +745,15 @@ const presentations = {
     title: "You can't change default models here",
     describe: () =>
       "They're managed above where you can act. Ask an admin on your team to change them.",
+  },
+  model_default_user_key_required: {
+    // Not a permission refusal like `model_default_scope_forbidden`: the
+    // person may well be allowed: the key just does not say who they are, so
+    // there is nobody to check. Only an API or CLI caller can reach this, so
+    // the copy names the two ways out rather than sending them to an admin.
+    title: "This API key can't change default models",
+    describe: () =>
+      "Default models are set per user, and this key is not tied to one. Use a user API key, or change the default in settings.",
   },
   model_not_configured: {
     // Distinct from `no_provider_configured` (nothing connected at all) and
@@ -1030,6 +1108,14 @@ const presentations = {
     describe: () =>
       "Free a seat by disabling a membership, or upgrade the plan to add more.",
   },
+  membership_disabled: {
+    // The person IS a member, so nothing here may suggest they are not, and
+    // nothing may suggest a role they could ask for instead — the seat is the
+    // whole problem. Names the one action that works: ask an admin.
+    title: "Your access to this organization is turned off",
+    describe: () =>
+      "Your membership is still here with everything you did. An organization admin can turn your access back on when a seat is free.",
+  },
   migration_enrollment_already_exists: {
     title: "This organization is already enrolled",
     describe: (error) => {
@@ -1298,6 +1384,15 @@ const presentations = {
     describe: () =>
       "Check the role, the scope, and whether an equivalent binding already exists, then try again.",
   },
+  health_check_failed: {
+    // Raised by /api/health/* probes when the canary work they exercise
+    // (trace ingestion, evaluation, workflow) does not complete. Read by
+    // monitoring bots far more often than people; the copy exists for the
+    // human who follows the alert in.
+    title: "A health check failed",
+    describe: () =>
+      "Part of LangWatch didn't respond to its own health probe. We're on it — no action is needed from you.",
+  },
   offboard_incomplete: {
     // The offboarding transaction proves the member's access resolves to
     // nothing before committing; when the proof fails everything rolls back,
@@ -1442,6 +1537,43 @@ const presentations = {
   scenario_run_export_forbidden: {
     title: "You can't export this project's simulation runs",
     describe: () => "Ask an admin for access to simulations on this project.",
+  },
+  // ---- secret run parameters ----
+  // Only names reach these strings. The value is the thing the whole feature
+  // exists to keep out of anything a person or a log can read.
+  scenario_secret_parameter_missing: {
+    title: "This run needs a secret value",
+    describe: (error) => {
+      const missing = strList(error, "names");
+      const plural = missing.length > 1;
+      const subject =
+        missing.length > 0
+          ? `${listLabels(missing)} ${plural ? "are secret parameters" : "is a secret parameter"} with no value.`
+          : "A secret parameter has no value.";
+      return `${subject} A secret has no default, so ${plural ? "each value" : "the value"} has to be typed in for this run.`;
+    },
+  },
+  scenario_secret_parameter_conflict: {
+    title: "One name is secret in one scenario and plain in another",
+    describe: (error) => {
+      const names = strList(error, "names");
+      const subject =
+        names.length > 0
+          ? `${listLabels(names)} ${names.length > 1 ? "are" : "is"} declared secret by one scenario in this run and plain by another.`
+          : "A name is declared secret by one scenario in this run and plain by another.";
+      return `${subject} Declare it the same way in every scenario, or rename one of them, then start the run again.`;
+    },
+  },
+  scenario_secret_parameter_in_text: {
+    title: "A scenario reads a secret parameter in its own text",
+    describe: (error) => {
+      const names = strList(error, "names");
+      const subject =
+        names.length > 0
+          ? `${scenarioFieldLabel(error)} reads ${listLabels(names)}, which ${names.length > 1 ? "are secret parameters" : "is a secret parameter"}.`
+          : `${scenarioFieldLabel(error)} reads a secret parameter.`;
+      return `${subject} A secret reaches the target as secrets.name and cannot be written into the scenario text, because that text is recorded with the run.`;
+    },
   },
   // ---- billing ----
   billing_customer_email_required: {
@@ -1797,6 +1929,51 @@ const presentations = {
     describe: () =>
       "Langy didn't finish in time. Try again, or ask for a narrower slice: a shorter time range, or a single trace.",
   },
+  langy_ui_turn_inactive: {
+    title: "Langy isn't replying right now",
+    describe: () =>
+      "Langy can only drive this page while it is answering you. Send it a message and ask again.",
+  },
+  langy_ui_action_unknown: {
+    title: "Langy tried something this page doesn't do",
+    describe: () =>
+      "Langy asked the page for an action it doesn't offer. Ask Langy to try a different way.",
+  },
+  langy_ui_payload_invalid: {
+    title: "Langy sent a change this page couldn't read",
+    describe: () =>
+      "The change didn't match what the page expects, so nothing was applied. Ask Langy to try again.",
+  },
+  langy_ui_experiment_required: {
+    title: "Langy needs to know which evaluation to change",
+    describe: () =>
+      "No page was open, and Langy didn't name the evaluation to apply the change to. Ask again with the evaluation named, or open it first.",
+  },
+  langy_ui_page_out_of_date: {
+    title: "This page is behind the saved evaluation",
+    describe: () =>
+      "The evaluation changed elsewhere, so this page could not save Langy's change. Reload the page and ask again.",
+  },
+  langy_ui_save_failed: {
+    title: "Langy's change was not saved",
+    describe: () =>
+      "The change is on this page but could not be saved. Check your connection, then ask Langy again.",
+  },
+  langy_ui_no_browser: {
+    title: "No page was open to make the change",
+    describe: () =>
+      "Langy tried to change a page you don't have open. Open the page and ask again, or ask Langy to make the change directly.",
+  },
+  langy_ui_timeout: {
+    title: "Langy's change didn't finish",
+    describe: () =>
+      "Langy tried to update this page and the update didn't finish in time. Check whether the change landed before asking it to retry.",
+  },
+  langy_ui_handler_failed: {
+    title: "Langy's change didn't apply",
+    describe: () =>
+      "The page couldn't carry out the change Langy asked for. Nothing else was affected. Ask Langy to try again.",
+  },
   langy_agent_at_capacity: {
     title: "Langy is busy right now",
     describe: () =>
@@ -1884,6 +2061,17 @@ const presentations = {
     title: "Choose a model for Langy",
     describe: () =>
       "Langy needs a model to run. Pick one in your project's model settings, then try again.",
+  },
+  langy_model_unavailable: {
+    // The other half of `langy_model_not_configured`: there nothing is chosen,
+    // here something is and this project cannot serve it. The gateway's own
+    // `model_provider_not_bound` copy says to bind the provider to the key or
+    // drop the prefix from the model name, which is correct for whoever
+    // configures a virtual key and unusable in the panel, where the model came
+    // from a menu.
+    title: "Langy can't use that model",
+    describe: () =>
+      "The model chosen for Langy has no provider connected in this project. Pick another model, or connect its provider in model settings.",
   },
   langy_codex_plan_limit: {
     // fault: provider. The limit belongs to the customer's OpenAI plan, not to
@@ -2048,9 +2236,32 @@ const presentations = {
     describe: () => "Add a provider in settings to continue.",
   },
   model_provider_not_bound: {
+    // The gateway builds the list of prefixes this key actually reaches, so
+    // the reader is told what to type instead of only what failed. When the
+    // message is absent (an older gateway), the generic sentence still stands.
     title: "That provider isn't bound to this key",
+    describe: (error) =>
+      `The model name asks for a provider this virtual key has no slot for.${reachableSentence(error)} Bind that provider to the key, or drop the prefix from the model name.`,
+  },
+  model_not_recognized: {
+    // Different from model_provider_not_bound: there the caller named a
+    // provider, here they named a model and no bound provider serves it. The
+    // two fixes differ, so the two errors do.
+    title: "No provider on this key serves that model",
+    describe: (error) =>
+      `No provider bound to this virtual key declares that model.${reachableSentence(error)} Add the model to the provider that serves it, or name the provider in the model string.`,
+  },
+  model_provider_routing_handle_invalid: {
+    title: "That routing handle can't be used",
+    describe: (error) =>
+      strEq(error, "problem", "reserved")
+        ? "That name already means a provider type, so requests using it would be ambiguous. Choose a different name."
+        : "A routing handle starts with a letter or a number, then uses only letters, numbers, hyphens and underscores, up to 32 characters.",
+  },
+  model_provider_routing_handle_taken: {
+    title: "That routing handle is already in use",
     describe: () =>
-      "The model name asks for a provider this virtual key has no slot for. Bind that provider to the key, or drop the prefix from the model name.",
+      "Another model provider in this organization uses that routing handle. A handle has to name one provider, so choose a different name.",
   },
   realtime_session_limit: {
     // The request-rate limits do not bound voice: one mint opens a call that

@@ -62,6 +62,13 @@ Feature: Langy is tested with LangWatch's own scenario and evaluation tooling
     And the judge confirms that a create rejected over a type slug is corrected from the
       error's accepted values and retried once, never turned into a question
 
+  @e2e
+  Scenario: A "take me to" request opens the page the user asked for
+    Given a Langy dogfood scenario where the user asks to be taken to their prompts
+    When the scenario runs against Langy
+    Then the user is taken to this project's prompts page
+    And the judge confirms the reply names where the user was taken
+
   # ---------------------------------------------------------------------------
   # Delivering a request to a destination the conversation named is refused on
   # the request, not on the payload. A stock install's egress proxy decides how

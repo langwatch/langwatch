@@ -10,6 +10,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { encryptRunSecretValues } from "~/server/scenarios/run-secret-values";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import {
   type AgentFetcher,
@@ -27,12 +28,14 @@ import {
 } from "../data-prefetcher";
 import type { ExecutionContext, LiteLLMParams, TargetConfig } from "../types";
 
-// Mock only env.mjs since it's a module-level import
+// Mock only env.mjs since it's a module-level import. CREDENTIALS_SECRET is a
+// 32-byte hex key so the real encrypt/decrypt pair runs for secret parameters.
 vi.mock("~/env.mjs", () => ({
   env: {
     LANGWATCH_NLP_SERVICE: "http://langwatch_nlp:5561",
     LANGWATCH_ENDPOINT: "http://app:5560",
     // BASE_HOST no longer needed — telemetry endpoint comes from LANGWATCH_ENDPOINT
+    CREDENTIALS_SECRET: "11".repeat(32),
   },
 }));
 
@@ -2089,6 +2092,124 @@ describe("prefetchScenarioData", () => {
         type: "http",
         secrets: { AGENT_TOKEN: "tok-123" },
       });
+    });
+  });
+
+  describe("given a run carrying secret parameter values", () => {
+    const httpDepsWithProjectSecrets = (secrets: Record<string, string>) =>
+      createMockDeps({
+        agentFetcher: {
+          findById: vi.fn().mockResolvedValue({
+            id: "agent_http",
+            type: "http",
+            config: { url: "https://api.test/chat", method: "POST" },
+          }),
+        },
+        projectSecretsFetcher: {
+          getSecrets: vi.fn().mockResolvedValue(secrets),
+        },
+      });
+
+    /** @scenario "A secret value reaches targets through the secrets namespace" */
+    it("delivers the run's secrets alongside the project's", async () => {
+      const deps = httpDepsWithProjectSecrets({ PROJECT_TOKEN: "project-1" });
+
+      const result = await prefetchScenarioData({
+        context: {
+          ...defaultContext,
+          secretParameters: encryptRunSecretValues({
+            api_token: "tok-live-1",
+          }),
+        },
+        target: { type: "http", referenceId: "agent_http" },
+        deps,
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.adapterData).toMatchObject({
+        secrets: { PROJECT_TOKEN: "project-1", api_token: "tok-live-1" },
+      });
+    });
+
+    /** @scenario "A run value overrides a project secret with the same name for that run" */
+    it("lets the run's value win over the project's for that name", async () => {
+      const deps = httpDepsWithProjectSecrets({ API_TOKEN: "project-value" });
+
+      const result = await prefetchScenarioData({
+        context: {
+          ...defaultContext,
+          secretParameters: encryptRunSecretValues({
+            API_TOKEN: "run-value",
+          }),
+        },
+        target: { type: "http", referenceId: "agent_http" },
+        deps,
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.adapterData).toMatchObject({
+        secrets: { API_TOKEN: "run-value" },
+      });
+    });
+
+    it("fails the run when the values can no longer be decrypted", async () => {
+      const deps = httpDepsWithProjectSecrets({});
+
+      const result = await prefetchScenarioData({
+        context: {
+          ...defaultContext,
+          secretParameters: { api_token: "not-a-ciphertext" },
+        },
+        target: { type: "http", referenceId: "agent_http" },
+        deps,
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error).toContain("api_token");
+    });
+
+    /** @scenario "A secret value is never written to the simulation runs store" */
+    it("keeps the secret out of the values the child reads as params", async () => {
+      const deps = createMockDeps({
+        scenarioFetcher: {
+          getById: vi.fn().mockResolvedValue({
+            ...defaultScenario,
+            parameters: [
+              { name: "api_token", secret: true },
+              { name: "region", defaultValue: "eu-central" },
+            ],
+          }),
+        },
+        promptFetcher: {
+          getPromptByIdOrHandle: vi.fn().mockResolvedValue({
+            id: "prompt_123",
+            prompt: "You are helpful",
+            messages: [],
+            model: "openai/gpt-4",
+          }),
+        },
+      });
+
+      const result = await prefetchScenarioData({
+        context: {
+          ...defaultContext,
+          // A build that queued the run before the split could still put the
+          // value here, so the prefetch drops it rather than trusting it.
+          parameters: { api_token: "tok-live-1" },
+          secretParameters: encryptRunSecretValues({
+            api_token: "tok-live-1",
+          }),
+        },
+        target: { type: "prompt", referenceId: "prompt_123" },
+        deps,
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.data.parameters).toEqual({ region: "eu-central" });
     });
   });
 

@@ -17,14 +17,21 @@ import { env } from "~/env.mjs";
 import { normalizeToSnakeCase } from "~/optimization_studio/components/properties/llm-configs/normalizeToSnakeCase";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
+import { ModelNotConfiguredError } from "../../modelProviders/modelNotConfiguredError";
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
 import { extractSuiteId } from "../../suites/suite-set-id";
 import { parseSuiteTargets } from "../../suites/types";
 import {
   mergeRunParameters,
   parseScenarioParameterDefinitions,
+  partitionParameterDefinitions,
   type RunParameterValues,
+  withoutParameterNames,
 } from "../parameters";
+import {
+  decryptRunSecretValues,
+  type RunSecretCiphertext,
+} from "../run-secret-values";
 import { renderScenarioContent } from "./scenario-content-template";
 import { validateWorkflowAgentMappings } from "./validate-workflow-mappings";
 
@@ -171,6 +178,7 @@ export type ModelParamsFailureReason =
   | "provider_not_found"
   | "provider_not_enabled"
   | "missing_params"
+  | "model_not_configured"
   | "preparation_error";
 
 /** Structured result from model params preparation */
@@ -255,7 +263,39 @@ export type PrefetchContext = ExecutionContext & {
    * same answer twice.
    */
   parameters?: RunParameterValues;
+  /**
+   * The run's secret parameter values, encrypted, as recorded on the queued
+   * event. Decrypted once here and merged over the project's own secrets, so
+   * the target reads them as `secrets.NAME` like any other secret.
+   */
+  secretParameters?: RunSecretCiphertext;
 };
+
+/**
+ * Merges the run's own secrets over the project's.
+ *
+ * One wrapper rather than a merge in each of the three fetch functions that
+ * load secrets: they then keep one source of secrets, and a fourth target type
+ * cannot be added that reads the project's set alone.
+ *
+ * The run's value wins on a name collision. Overriding a project secret for one
+ * run is the point: the same scenario runs against staging with the staging
+ * credential without a second project set up for it.
+ */
+function withRunSecrets({
+  fetcher,
+  runSecrets,
+}: {
+  fetcher: ProjectSecretsFetcher;
+  runSecrets: Record<string, string>;
+}): ProjectSecretsFetcher {
+  return {
+    getSecrets: async (projectId: string) => ({
+      ...(await fetcher.getSecrets(projectId)),
+      ...runSecrets,
+    }),
+  };
+}
 
 /**
  * Pre-fetch all data needed for scenario execution.
@@ -295,6 +335,31 @@ export async function prefetchScenarioData({
     "Prefetching scenario data",
   );
 
+  // Decrypted once, before anything is fetched. A key that no longer opens the
+  // values fails the run here rather than sending the target a request with a
+  // credential missing from it, which would report a result about the
+  // credential instead of about the scenario.
+  let secretDeps = deps;
+  if (
+    context.secretParameters &&
+    Object.keys(context.secretParameters).length > 0
+  ) {
+    try {
+      secretDeps = {
+        ...deps,
+        projectSecretsFetcher: withRunSecrets({
+          fetcher: deps.projectSecretsFetcher,
+          runSecrets: decryptRunSecretValues(context.secretParameters),
+        }),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
   // The scenario, the project, the target adapter and the suite config are
   // independent lookups keyed off ids we already hold, so they go out together
   // rather than one await at a time. This runs on the path between a run being
@@ -310,7 +375,7 @@ export async function prefetchScenarioData({
     suppliedParameters: context.parameters,
   });
   const projectPromise = fetchProject(context.projectId, deps.projectFetcher);
-  const adapterPromise = fetchAgentData(context.projectId, target, deps);
+  const adapterPromise = fetchAgentData(context.projectId, target, secretDeps);
   const suitePromise = deps.suiteConfigFetcher.getBySetId(
     context.setId,
     context.projectId,
@@ -470,7 +535,16 @@ export async function prefetchScenarioData({
       err instanceof Error
         ? err.message
         : "No default model configured for this project";
-    return { success: false, error: message };
+    // A project with no model set for scenarios is the customer's to fix and
+    // carries its own remediation message, so it is named rather than left
+    // reasonless — otherwise the caller cannot tell it from a fault of ours.
+    return {
+      success: false,
+      error: message,
+      ...(err instanceof ModelNotConfiguredError
+        ? { reason: "model_not_configured" as const }
+        : {}),
+    };
   }
 
   const [modelParamsResult, simulatorParamsResult, judgeParamsResult] =
@@ -599,9 +673,17 @@ async function fetchScenario({
   if (!scenario) return null;
 
   const definitions = parseScenarioParameterDefinitions(scenario.parameters);
+  // The secret declarations are taken out before the merge, so no secret value
+  // can reach `params` or the scenario's own text. They stay in
+  // `declaredNames`, which is what makes a `params.SECRET` reference fail here
+  // as a backstop, the same way the run request already refused it.
+  const { plain, secret } = partitionParameterDefinitions(definitions);
   const parameters = mergeRunParameters({
-    definitions,
-    values: suppliedParameters,
+    definitions: plain,
+    values: withoutParameterNames({
+      values: suppliedParameters,
+      names: new Set(secret.map((definition) => definition.name)),
+    }),
   });
 
   const rendered = await renderScenarioContent({

@@ -1234,7 +1234,11 @@ export interface paths {
          */
         get: operations["getApiExperiments"];
         put?: never;
-        post?: never;
+        /**
+         * Create an experiment and its setup
+         * @description Create an evaluations experiment. Send a setup to start from, or send none and get a blank workbench with one inline dataset. The slug it answers with is what every other experiment endpoint takes.
+         */
+        post: operations["postApiExperiments"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1435,6 +1439,70 @@ export interface paths {
         get: operations["getApiExperimentsRunsByRunIdResults"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/experiments/{slug}/workbench-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read an experiment's setup
+         * @description The experiment's datasets, targets and evaluators, with the version to send back when you save. Ask for `fields=version` to check for changes without transferring the setup.
+         */
+        get: operations["getApiExperimentsBySlugWorkbenchState"];
+        /**
+         * Save an experiment's setup
+         * @description Replace the experiment's setup. Send `expectedVersion` with the version you read and the save is refused with a 409 when someone else wrote first, instead of overwriting their work.
+         */
+        put: operations["putApiExperimentsBySlugWorkbenchState"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/experiments/{slug}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List an experiment's versions
+         * @description Every saved version of the experiment's setup, newest first. Page through them with `limit` and `cursor`.
+         */
+        get: operations["getApiExperimentsBySlugVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/experiments/{slug}/versions/{version}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore an experiment version
+         * @description Bring an old setup back by writing it forward as a new save. History is never rewritten: the version you restored from stays in the list, and the restore is one more entry after it.
+         */
+        post: operations["postApiExperimentsBySlugVersionsByVersionRestore"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3053,6 +3121,23 @@ export interface paths {
         };
         /** @description List batch summaries for a scenario set (pass/fail counts per batch) */
         get: operations["getApiSimulationRunsBatchesList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/simulation-runs/batches/{batchRunId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get the summary of a single batch run, including its completion flag */
+        get: operations["getApiSimulationRunsBatchesByBatchRunId"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7350,6 +7435,99 @@ export interface operations {
             };
         };
     };
+    postApiExperiments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Name for the experiment. A draft name is picked when omitted. */
+                    name?: string;
+                    /** @description Setup to start from. Omit for a blank workbench with one inline dataset. */
+                    state?: {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Experiment created */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Identifier of the created experiment */
+                        id: string;
+                        /** @description Slug to address the experiment by */
+                        slug: string;
+                        /** @description Version of the saved setup, starting at 1 */
+                        version: number;
+                    };
+                };
+            };
+            /** @description The setup did not match the schema (experiment_invalid_workbench_state) or points at something that no longer exists (experiment_workbench_missing_reference) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
     getApiEvaluationsList: {
         parameters: {
             query?: never;
@@ -8637,6 +8815,430 @@ export interface operations {
                         fault?: string;
                         tips?: string[];
                         docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getApiExperimentsBySlugWorkbenchState: {
+        parameters: {
+            query?: {
+                /** @description Set to `version` to answer with the version and timestamp only */
+                fields?: "version";
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The experiment's setup, or its version alone */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        slug: string;
+                        name: string | null;
+                        /** @description The experiment setup: datasets, targets and evaluators. Read it, change it, send it back whole. */
+                        state: {
+                            [key: string]: unknown;
+                        } | null;
+                        /** @description Send this back as expectedVersion to save safely */
+                        version: number;
+                        /** @description ISO 8601 timestamp of the last save */
+                        updatedAt: string;
+                    } | {
+                        id: string;
+                        slug: string;
+                        version: number;
+                        /** @description ISO 8601 timestamp of the last save */
+                        updatedAt: string;
+                    };
+                };
+            };
+            /** @description The experiment is not an evaluations workbench (experiment_type_mismatch) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Missing or invalid API key, or the key lacks the permission */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description No such experiment or run in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    putApiExperimentsBySlugWorkbenchState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The full setup to save */
+                    state: {
+                        [key: string]: unknown;
+                    };
+                    /** @description The version you read. Sending it refuses the save when someone else already wrote on top of it. */
+                    expectedVersion?: number;
+                    /** @description Names this version in the history list */
+                    commitMessage?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Setup saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The version the save produced */
+                        version: number;
+                    };
+                };
+            };
+            /** @description The setup did not match the schema (experiment_invalid_workbench_state), points at something that no longer exists (experiment_workbench_missing_reference), or the experiment is not an evaluations workbench (experiment_type_mismatch) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Missing or invalid API key, or the key lacks the permission */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description No such experiment or run in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Someone else saved since you read this state (experiment_stale_workbench_state). `currentVersion` carries the version to read again. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                        /** @description The stored version now. Read the setup again at this one. */
+                        currentVersion: number;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getApiExperimentsBySlugVersions: {
+        parameters: {
+            query?: {
+                /** @description Versions per page, capped at 100 */
+                limit?: number;
+                /** @description The `nextCursor` of the previous page */
+                cursor?: number;
+            };
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Versions of the experiment */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Newest first */
+                        versions: {
+                            version: number;
+                            /** @description True for a version written by an ordinary save */
+                            autoSaved: boolean;
+                            commitMessage: string | null;
+                            /**
+                             * @description Who wrote it: user, langy or api
+                             * @example user
+                             */
+                            authorLabel: string;
+                            /** @description User id, when a person wrote it */
+                            authorId: string | null;
+                            /** @description ISO 8601 timestamp */
+                            createdAt: string;
+                        }[];
+                        /** @description Pass as `cursor` to read the next page, null on the last one */
+                        nextCursor: number | null;
+                    };
+                };
+            };
+            /** @description The experiment is not an evaluations workbench (experiment_type_mismatch) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Missing or invalid API key, or the key lacks the permission */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description No such experiment or run in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    postApiExperimentsBySlugVersionsByVersionRestore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The version to restore, as listed by `GET /api/experiments/{slug}/versions` */
+                version: number;
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Version restored */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The new version the restore wrote. History is never rewritten, so the restored version is still in the list. */
+                        version: number;
+                    };
+                };
+            };
+            /** @description The setup did not match the schema (experiment_invalid_workbench_state), points at something that no longer exists (experiment_workbench_missing_reference), or the experiment is not an evaluations workbench (experiment_type_mismatch) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Missing or invalid API key, or the key lacks the permission */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description No such experiment or run in this project */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Someone else saved since you read this state (experiment_stale_workbench_state). `currentVersion` carries the version to read again. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Stable failure code; branch on this */
+                        error: string;
+                        message?: string;
+                        /** @description Who the failure is attributable to: customer, platform, provider */
+                        fault?: string;
+                        tips?: string[];
+                        docsUrl?: string;
+                        /** @description The stored version now. Read the setup again at this one. */
+                        currentVersion: number;
                     } & {
                         [key: string]: unknown;
                     };
@@ -10290,6 +10892,15 @@ export interface operations {
                         };
                         /**
                          * @default {
+                         *       "maxOpenSessions": null
+                         *     }
+                         */
+                        realtime?: {
+                            /** @default null */
+                            maxOpenSessions?: number | null;
+                        };
+                        /**
+                         * @default {
                          *       "tags": []
                          *     }
                          */
@@ -10717,6 +11328,15 @@ export interface operations {
                             tpm?: number | null;
                             /** @default null */
                             rpd?: number | null;
+                        };
+                        /**
+                         * @default {
+                         *       "maxOpenSessions": null
+                         *     }
+                         */
+                        realtime?: {
+                            /** @default null */
+                            maxOpenSessions?: number | null;
                         };
                         /**
                          * @default {
@@ -21270,7 +21890,10 @@ export interface operations {
                         parameters: {
                             name: string;
                             description?: string;
+                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                             defaultValue?: string | number | boolean;
+                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                            secret?: boolean;
                         }[];
                         /** Format: uri */
                         platformUrl: string;
@@ -21343,11 +21966,14 @@ export interface operations {
                     criteria?: string[];
                     /** @default [] */
                     labels?: string[];
-                    /** @description The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. */
+                    /** @description The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text. */
                     parameters?: {
                         name: string;
                         description?: string;
+                        /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                         defaultValue?: string | number | boolean;
+                        /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                        secret?: boolean;
                     }[];
                 };
             };
@@ -21368,7 +21994,10 @@ export interface operations {
                         parameters: {
                             name: string;
                             description?: string;
+                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                             defaultValue?: string | number | boolean;
+                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                            secret?: boolean;
                         }[];
                         /** Format: uri */
                         platformUrl: string;
@@ -21451,7 +22080,10 @@ export interface operations {
                         parameters: {
                             name: string;
                             description?: string;
+                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                             defaultValue?: string | number | boolean;
+                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                            secret?: boolean;
                         }[];
                         /** Format: uri */
                         platformUrl: string;
@@ -21536,11 +22168,14 @@ export interface operations {
                     situation?: string;
                     criteria?: string[];
                     labels?: string[];
-                    /** @description The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. */
+                    /** @description The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text. */
                     parameters?: {
                         name: string;
                         description?: string;
+                        /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                         defaultValue?: string | number | boolean;
+                        /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                        secret?: boolean;
                     }[];
                 };
             };
@@ -21561,7 +22196,10 @@ export interface operations {
                         parameters: {
                             name: string;
                             description?: string;
+                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                             defaultValue?: string | number | boolean;
+                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                            secret?: boolean;
                         }[];
                         /** Format: uri */
                         platformUrl: string;
@@ -22738,11 +23376,18 @@ export interface operations {
                             passCount: number;
                             failCount: number;
                             runningCount: number;
+                            settledCount: number;
                             stalledCount: number;
                             lastRunAt: number;
                             lastUpdatedAt: number;
                             firstCompletedAt: number | null;
+                            /**
+                             * @deprecated
+                             * @description Deprecated: read settledCount and isComplete instead. It carries the last update time of a batch where no run is running.
+                             */
                             allCompletedAt: number | null;
+                            /** @description True when every run of the batch reached a terminal status. */
+                            isComplete: boolean;
                         }[];
                         hasMore?: boolean;
                         nextCursor?: string;
@@ -22763,6 +23408,106 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiSimulationRunsBatchesByBatchRunId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batchRunId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        batchRunId: string;
+                        totalCount: number;
+                        passCount: number;
+                        failCount: number;
+                        runningCount: number;
+                        settledCount: number;
+                        stalledCount: number;
+                        lastRunAt: number;
+                        lastUpdatedAt: number;
+                        firstCompletedAt: number | null;
+                        /**
+                         * @deprecated
+                         * @description Deprecated: read settledCount and isComplete instead. It carries the last update time of a batch where no run is running.
+                         */
+                        allCompletedAt: number | null;
+                        /** @description True when every run of the batch reached a terminal status. */
+                        isComplete: boolean;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Batch run not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

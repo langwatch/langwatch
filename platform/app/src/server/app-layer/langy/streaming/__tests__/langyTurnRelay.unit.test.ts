@@ -620,6 +620,47 @@ describe("LangyTurnRelay", () => {
       expect(conversations.recordToolCallCompleted).toHaveBeenCalled();
     });
 
+    /** @scenario "A chained lookup-and-open compound resolves through the platform fallback" */
+    it("resolves a CHAINED lookup-and-open through the platform fallback when the link store is empty", async () => {
+      // The reported failure: "take me to the prompt playground" made the
+      // model run ONE compound call (`langwatch prompt list --format json &&
+      // langwatch navigate open prompt_x`). Compound stdout never seeds the
+      // link store (stdout provenance), so the store is EMPTY, and the old
+      // fallback resolved only scenariorun_ ids, so the navigate silently
+      // dropped for every other resource. The fallback table must answer.
+      const resolveResourceUrl = vi.fn(
+        async () => "https://app.langwatch.ai/acme/prompts?promptId=prompt_x",
+      );
+      const { relay, buffer } = makeRelay({ resolveResourceUrl });
+
+      const command =
+        "langwatch prompt list --format json && langwatch navigate open prompt_x";
+      for (const phase of [
+        { phase: "start" as const },
+        { phase: "end" as const, output: "ok" },
+      ]) {
+        await relay.handle(
+          frame({
+            type: "tool",
+            id: "call-prompt-chained",
+            name: "bash",
+            ...phase,
+            input: { command },
+          }),
+        );
+      }
+
+      expect(resolveResourceUrl).toHaveBeenCalledWith({
+        projectId: "proj-1",
+        resourceId: "prompt_x",
+      });
+      expect(buffer.appendNavigate).toHaveBeenCalledWith({
+        conversationId: "conv-1",
+        turnId: "turn-1",
+        href: "/acme/prompts?promptId=prompt_x",
+      });
+    });
+
     it("falls back to the platform's own verified lookup when the conversation never remembered the id", async () => {
       // Legitimate flows miss the link cache: a chained lookup (compound
       // stdout is never trusted for remembering) or a surfacing payload with

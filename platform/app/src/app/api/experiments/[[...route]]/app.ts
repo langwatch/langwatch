@@ -1,10 +1,18 @@
 /**
  * Public REST API for experiments.
  *
- * Currently exposes only the list endpoint that complements the existing
+ * Exposes the two endpoints that complement the existing
  * `/api/experiments/{slug}/run` and `/runs/{runId}` routes:
  *
- *   GET /api/experiments
+ *   GET  /api/experiments
+ *   POST /api/experiments
+ *
+ * The workbench endpoints an integrator uses to read and write one
+ * experiment's setup live in `server/routes/experiments-v3.ts`, which serves
+ * the rest of the `/api/experiments` namespace. Create lives HERE rather than
+ * next to them because both apps publish into one OpenAPI document and the
+ * generator replaces a path wholesale per app: a second app declaring the bare
+ * `/api/experiments` path would drop the list operation from the document.
  *
  * Auth: standard project API key (X-Auth-Token / Bearer / Basic).
  *
@@ -18,9 +26,18 @@ import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import type { Experiment } from "~/generated/prisma/client";
 import { createProjectApp, requires } from "~/server/api/security";
+import { validator as zValidator } from "~/server/api/validation";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
+import { createBlankWorkbenchState } from "~/server/experiments/blankWorkbenchState";
 import { ExperimentService } from "~/server/experiments/experiment.service";
+import { workbenchActorFrom } from "~/server/experiments/workbenchActor";
 import { ExperimentRunService } from "~/server/experiments-v3/services/experiment-run.service";
+import {
+  createExperimentBodySchema,
+  createExperimentResponseSchema,
+  handledErrorEnvelopeSchema,
+} from "~/server/routes/experiments-v3.schemas";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { baseResponses } from "../../shared/base-responses";
 
@@ -102,6 +119,7 @@ secured.access(requires("experiments:view")).get(
     summary: "List experiments for the project",
     description:
       "List experiments for the project. Includes a runs count and last-run timestamp per experiment.",
+    tags: ["Experiments"],
     parameters: [
       {
         in: "query",
@@ -151,9 +169,9 @@ secured.access(requires("experiments:view")).get(
       "Listing experiments",
     );
 
-    const { experiments: paged, totalHits } = await ExperimentService.create(
+    const { experiments: paged, totalHits } = await ExperimentService.create({
       prisma,
-    ).getPage({
+    }).getPage({
       projectId: project.id,
       page,
       pageSize,
@@ -190,6 +208,67 @@ secured.access(requires("experiments:view")).get(
         totalHits,
         hasMore: offset + paged.length < totalHits,
       },
+    });
+  },
+);
+
+secured.access(requires("experiments:create")).post(
+  "/",
+  describeRoute({
+    summary: "Create an experiment and its setup",
+    description:
+      "Create an evaluations experiment. Send a setup to start from, or send none and get a blank workbench with one inline dataset. The slug it answers with is what every other experiment endpoint takes.",
+    tags: ["Experiments"],
+    responses: {
+      ...baseResponses,
+      400: {
+        description:
+          "The setup did not match the schema (experiment_invalid_workbench_state) or points at something that no longer exists (experiment_workbench_missing_reference)",
+        content: {
+          "application/json": {
+            schema: resolver(handledErrorEnvelopeSchema),
+          },
+        },
+      },
+      200: {
+        description: "Experiment created",
+        content: {
+          "application/json": {
+            schema: resolver(createExperimentResponseSchema),
+          },
+        },
+      },
+    },
+  }),
+  zValidator("json", createExperimentBodySchema),
+  async (c) => {
+    const project = c.get("project");
+    const body = c.req.valid("json");
+
+    // A caller that sends no setup still gets a workbench they can open, so
+    // the create call is usable on its own rather than only as step one of a
+    // create-then-save pair.
+    const state = body.state ?? createBlankWorkbenchState({ name: body.name });
+
+    // The wired instance, not a fresh one: only it carries the broadcaster, so
+    // only it tells the tenant a new experiment exists. An open experiments
+    // list picks the row up from that signal instead of waiting for a reload.
+    const created = await getApp().experiments.createEvaluationsV3({
+      projectId: project.id,
+      ...(body.name ? { name: body.name } : {}),
+      state,
+      actor: workbenchActorFrom({ resolved: c.get("resolvedToken") }),
+    });
+
+    logger.info(
+      { projectId: project.id, slug: created.slug },
+      "Experiment created over REST",
+    );
+
+    return c.json({
+      id: created.experimentId,
+      slug: created.slug,
+      version: created.version,
     });
   },
 );

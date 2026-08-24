@@ -25,7 +25,11 @@ import type { LangyMessagePart } from "@langwatch/langy";
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { createLogger } from "@langwatch/observability";
 import { trace } from "@opentelemetry/api";
-import type { LangyCredentialService } from "~/server/app-layer/langy/LangyCredentialService";
+import type {
+  LangyCredentialService,
+  LangyCredentials,
+} from "~/server/app-layer/langy/LangyCredentialService";
+import { stripGithubCredentials } from "~/server/app-layer/langy/LangyCredentialService";
 import { LangySessionKeyScopeError } from "~/server/app-layer/langy/langyApiKey";
 import {
   extractLangyConversationMemory,
@@ -33,6 +37,7 @@ import {
   renderLangyConversationMemory,
   renderLangyConversationTranscript,
 } from "~/server/app-layer/langy/langyConversationMemory";
+import type { LangyHarness } from "~/server/app-layer/langy/langyHarness";
 import {
   LANGY_PROMPT_HANDLES,
   LANGY_TURN_OVERRIDE_FALLBACK,
@@ -50,6 +55,7 @@ import type { LangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyT
 import type { LangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
 import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import type { Session } from "~/server/auth";
+import { featureFlagService } from "~/server/featureFlag";
 import { getLangyTurnsCounter } from "~/server/metrics";
 import type { PromptService } from "~/server/prompt-config/prompt.service";
 import {
@@ -182,6 +188,47 @@ export function __resetLangyTurnOverrideCacheForTests(): void {
   lastRegistryOverrideText = null;
 }
 
+/** The flag that opens the agent-to-page UI-action channel. */
+const LANGY_UI_ACTIONS_FLAG = "release_langy_ui_actions" as const;
+
+/**
+ * Whether this turn may be told the open page accepts live UI actions.
+ *
+ * The turn context advertises `langwatch ui actions` / `langwatch ui call`, and
+ * `routes/langy-ui-actions.ts` refuses both with a dark 404 while the flag is
+ * off. Resolved here so the two ends agree: an agent told about a command that
+ * answers "never deployed" spends the turn on a surface it cannot reach.
+ *
+ * Never throws — the same contract `resolveLangyHarness` holds. A flag-store
+ * blip must not keep a turn from starting, so it resolves to closed: the turn
+ * runs without live page control, which is the flag's own rollback position.
+ * Resolving to open would be the worse half of the trade, because it is the
+ * one answer that can send the agent to a surface answering "never deployed".
+ */
+async function resolveLangyUiActionsOpen({
+  userId,
+  projectId,
+  organizationId,
+}: {
+  userId: string;
+  projectId: string;
+  organizationId: string;
+}): Promise<boolean> {
+  try {
+    return await featureFlagService.isEnabled(LANGY_UI_ACTIONS_FLAG, {
+      distinctId: userId,
+      projectId,
+      organizationId,
+    });
+  } catch (error) {
+    logger.warn(
+      { error, projectId },
+      "langy ui-actions flag evaluation failed, holding the channel closed",
+    );
+    return false;
+  }
+}
+
 /**
  * Turn identity binds the client's idempotency key to WHO sent it and WHAT was
  * sent. Three properties fall out structurally:
@@ -227,14 +274,17 @@ export const LANGY_USER_MESSAGE_LABEL = "THE USER'S MESSAGE:";
 /**
  * Compose the turn's user-message prompt.
  *
- * A bare ask stays a bare ask: when nothing is (or could be) prepended, the
- * prompt is exactly the user's text, as it always was. The moment anything
- * rides ahead of it (the screen-context block, the cap note, or a history
- * seed the manager may fold in), the ask is set apart under
- * {@link LANGY_USER_MESSAGE_LABEL} so no prepended DATA can blur into the
- * user's own words. `hasHistorySeed` exists because the SEED is prepended by
- * the worker manager, not here: the label must already be in place on the
- * wire for the composition the manager may produce.
+ * A bare ask stays a bare ask: when nothing is prepended, the prompt is
+ * exactly the user's text, as it always was — and that is the COMMON turn,
+ * so the label must never ride a message that carries no data ahead of the
+ * ask (it used to appear on every follow-up merely because a history seed
+ * EXISTED, though the manager folds a seed into a fresh session's first
+ * message only). The moment the screen-context block or the cap note rides
+ * ahead of the ask, it is set apart under {@link LANGY_USER_MESSAGE_LABEL}
+ * so no prepended DATA can blur into the user's own words. The history seed
+ * carries its own trailing label for the same reason (see the seed assembly
+ * in `startConversationTurn`), placed there so the label exists exactly when
+ * the fold does.
  *
  * Volatile content lives HERE, in the message, and never in the system
  * parameter: the system lane must stay byte-identical across a conversation's
@@ -244,19 +294,22 @@ export const LANGY_USER_MESSAGE_LABEL = "THE USER'S MESSAGE:";
 export function composeLangyTurnPrompt({
   contextBlock,
   capNote,
-  hasHistorySeed,
   userText,
 }: {
   contextBlock: string | null;
   capNote: string;
-  hasHistorySeed: boolean;
   userText: string;
-}): string {
+}): { prompt: string; labelled: boolean } {
   const preamble = [contextBlock, capNote]
     .map((block) => (block ?? "").trim())
     .filter((block) => block.length > 0);
-  if (preamble.length === 0 && !hasHistorySeed) return userText;
-  return [...preamble, `${LANGY_USER_MESSAGE_LABEL}\n${userText}`].join("\n\n");
+  if (preamble.length === 0) return { prompt: userText, labelled: false };
+  return {
+    prompt: [...preamble, `${LANGY_USER_MESSAGE_LABEL}\n${userText}`].join(
+      "\n\n",
+    ),
+    labelled: true,
+  };
 }
 
 export interface LangyChatMessageInput {
@@ -303,8 +356,13 @@ export interface LangyTurnServiceDeps {
    */
   resolveModel: (args: { projectId: string }) => Promise<{ modelId: string }>;
   /** Direct fast-path dispatch plus durable process-effect recovery. `cancel`
-   * is the best-effort worker abort behind a user Stop (ADR-078). */
-  worker: Pick<LangyWorkerPort, "probe" | "dispatch" | "cancel"> | null;
+   * is the best-effort worker abort behind a user Stop (ADR-078); `warm` is
+   * the fire-and-forget panel-open pre-boot
+   * (specs/langy/langy-worker-prewarm.feature). */
+  worker: Pick<
+    LangyWorkerPort,
+    "probe" | "dispatch" | "cancel" | "warm"
+  > | null;
   /**
    * The durable token buffer (ADR-044). A user Stop reads its `delta` tail to
    * reconstruct the partial answer as the source of truth, then `markEnd`s it so
@@ -317,6 +375,25 @@ export interface LangyTurnServiceDeps {
     resetAt: number;
   }>;
   releasePermit: (args: { userId: string }) => Promise<void>;
+  /**
+   * Check-only view of the per-day PR cap, no permit is reserved. The warm
+   * path uses it for signature parity with the turn (which strips the GitHub
+   * token when the cap is reached) without spending PR budget on a panel
+   * open. Optional: absent means the warm assumes the cap is not reached.
+   */
+  checkPermit?: (args: { userId: string }) => Promise<{ allowed: boolean }>;
+  /**
+   * Which worker harness serves this turn (`release_langy_pi_harness`),
+   * resolved once per turn in the base-dependency phase. Contract:
+   * never throws (see `resolveLangyHarness`). Optional: absent (tests,
+   * minimal compositions) leaves `credentials.harness` unset, which the
+   * manager treats as its default harness.
+   */
+  resolveHarness?: (args: {
+    userId: string;
+    projectId: string;
+    organizationId: string;
+  }) => Promise<LangyHarness>;
   perDayPrCap: number;
   /** Mint the per-turn session key (prisma pre-bound at composition). */
   mintSessionKey: (args: {
@@ -339,6 +416,46 @@ export interface LangyTurnServiceDeps {
    * a turn without its memory is degraded, not broken.
    */
   messages: Pick<LangyMessageRepository, "findAllByConversation"> | null;
+}
+
+/**
+ * The probe payload for the worker this credential bundle + model would spawn.
+ * ONE definition, shared by the turn path and the panel-open warm
+ * (specs/langy/langy-worker-prewarm.feature): the manager canonicalises these
+ * capability fields into the worker signature, so any drift between the two
+ * callers would make every warm boot a worker the turn cannot reuse. The model
+ * is part of the signature (a model change is a probe MISS and the worker
+ * re-provisions), as are the GitHub scope, the egress list, the ADR-061 mirror
+ * tier and the harness.
+ */
+function buildWorkerProbeArgs({
+  projectId,
+  actorUserId,
+  conversationId,
+  model,
+  credentials,
+}: {
+  projectId: string;
+  actorUserId: string;
+  conversationId: string;
+  model: string;
+  credentials: LangyCredentials;
+}): Parameters<LangyWorkerPort["probe"]>[0] {
+  return {
+    projectId,
+    actorUserId,
+    conversationId,
+    model,
+    hasGithubAuth: !!credentials.githubToken,
+    ...(credentials.githubRepoScopeKey
+      ? { githubRepoScopeKey: credentials.githubRepoScopeKey }
+      : {}),
+    ...(credentials.egressAllowlist
+      ? { egressAllowlist: credentials.egressAllowlist }
+      : {}),
+    ...(credentials.mirrorTier ? { mirrorTier: credentials.mirrorTier } : {}),
+    ...(credentials.harness ? { harness: credentials.harness } : {}),
+  };
 }
 
 /**
@@ -462,6 +579,187 @@ export class LangyTurnService {
       worker?.cancel({ conversationId, turnId, projectId }) ??
         Promise.resolve(),
     ]);
+  }
+
+  /**
+   * Pre-boot the conversation's worker on panel open, BEFORE the first message
+   * (specs/langy/langy-worker-prewarm.feature). Resolves the SAME credential
+   * surface a turn would, the worker signature is made of exactly those parts,
+   * so any divergence boots a worker the first turn cannot reuse, then probes,
+   * mints a session key only on a probe miss (a warm IS a spawn, and the
+   * manager refuses a keyless spawn), and fires the manager's warm without
+   * waiting on the boot.
+   *
+   * Returns the conversation id (server-minted when none was given) so the
+   * first message can adopt the warmed conversation, plus whether a worker is
+   * warm or warming. NEVER throws: a warm is an optimisation, every failure
+   * degrades to the cold start the user would have had anyway, and the first
+   * real message is where errors get their proper surfacing, a warm error
+   * card would only front-run it.
+   *
+   * Key lifecycle on this path, spelled out because there is no turn attempt
+   * holding a rollback: the minted key's id rides the credentials so the
+   * manager can revoke it on worker death (idle reap included), and the
+   * key's own expiry is the backstop for a warm that never reaches the
+   * manager (the warm port is fire-and-forget and swallows transport
+   * failures), see specs/langy/langy-session-key-lifecycle.feature.
+   */
+  async warmConversationWorker(args: {
+    projectId: string;
+    session: Session;
+    /**
+     * Warm an EXISTING conversation's worker, or null to mint the id the first
+     * message will adopt. An unknown id is ADOPTED (same semantics the first
+     * message applies via `ensureConversation(adoptUnknownId)`), so warm and
+     * turn agree on the aggregate key; an unadoptable id warms nothing.
+     */
+    requestedConversationId: string | null;
+    modelOverride?: string;
+  }): Promise<{ conversationId: string | null; warmed: boolean }> {
+    // Written by resolveAndWarm as soon as the id exists, so a later failure
+    // still hands the caller the id the first message could adopt.
+    const progress: { conversationId: string | null } = {
+      conversationId: null,
+    };
+    try {
+      return await this.resolveAndWarm({ ...args, progress });
+    } catch (error) {
+      const { projectId } = args;
+      const conversationId = progress.conversationId;
+      if (error instanceof LangySessionKeyScopeError) {
+        // A user whose role carries no Langy scope gets the proper refusal on
+        // the first real message; the warm stays silent on purpose.
+        logger.debug(
+          { error, projectId, conversationId },
+          "langy warm skipped, session key scope refusal, first message will surface it",
+        );
+      } else {
+        logger.warn(
+          { error, projectId, conversationId },
+          "langy warm failed, the first message cold-starts the worker",
+        );
+      }
+      return { conversationId, warmed: false };
+    }
+  }
+
+  /**
+   * The warm happy path, throws freely; `warmConversationWorker` is the one
+   * catch that turns every failure into a silent cold start.
+   */
+  private async resolveAndWarm({
+    projectId,
+    session,
+    requestedConversationId,
+    modelOverride,
+    progress,
+  }: {
+    projectId: string;
+    session: Session;
+    requestedConversationId: string | null;
+    modelOverride?: string;
+    /**
+     * Written as soon as the conversation id exists, so a later failure still
+     * hands the caller the id the first message could adopt.
+     */
+    progress: { conversationId: string | null };
+  }): Promise<{ conversationId: string | null; warmed: boolean }> {
+    const { worker } = this.deps;
+    const userId = session.user.id;
+    const { speculativeConversation, credentials, resolvedModel } =
+      await resolveLangyTurnBaseDependencies({
+        deps: this.deps,
+        projectId,
+        userId,
+        session,
+        requestedConversationId,
+        ...(requestedConversationId ? { adoptConversationId: true } : {}),
+        ...(modelOverride ? { modelOverride } : {}),
+      });
+    const conversationId = speculativeConversation.id;
+    progress.conversationId = conversationId;
+
+    const warmModel = modelOverride ?? resolvedModel;
+    if (!worker || !warmModel) {
+      return { conversationId, warmed: false };
+    }
+
+    // Allowlist parity with the turn: warming on a model the turn would
+    // reject boots a worker the turn can never reuse.
+    const modelsAllowed = await this.deps.credentials.getModelsAllowed({
+      projectId,
+      organizationId: credentials.organizationId,
+    });
+    if (modelsAllowed && !modelsAllowed.includes(warmModel)) {
+      return { conversationId, warmed: false };
+    }
+
+    await this.applyWarmPrCapParity({ credentials, userId });
+
+    const alive = await worker.probe(
+      buildWorkerProbeArgs({
+        projectId,
+        actorUserId: userId,
+        conversationId,
+        model: warmModel,
+        credentials,
+      }),
+    );
+    if (alive) {
+      // Already warm. The probe is what keeps this path inside the
+      // key-lifecycle rule: never mint a key a running worker would discard.
+      return { conversationId, warmed: true };
+    }
+
+    const minted = await this.deps.mintSessionKey({
+      session,
+      projectId,
+      organizationId: credentials.organizationId,
+    });
+    credentials.langwatchApiKey = minted.token;
+    credentials.langwatchApiKeyId = minted.apiKeyId;
+
+    // Fire-and-forget: the panel is not waiting on the boot, only on the id
+    // above. Nothing awaits this promise, so the outer catch cannot see a
+    // rejection: it would leave the process on Node's unhandled-rejection
+    // path, on the one code path whose entire contract is that a warm failure
+    // is a cold start. The dispatch call in this same file catches for the
+    // same reason.
+    void worker
+      .warm({
+        projectId,
+        actorUserId: userId,
+        conversationId,
+        credentials,
+        modelOverride: warmModel,
+      })
+      .catch((error: unknown) => {
+        logger.warn(
+          { error, projectId, conversationId },
+          "langy warm dispatch failed, the first message cold-starts the worker",
+        );
+      });
+    return { conversationId, warmed: true };
+  }
+
+  /**
+   * GitHub PR-cap parity for the warm, WITHOUT reserving: the turn strips the
+   * token when the cap is reached, so the warm must produce the same worker
+   * signature, but a panel open must never spend a PR permit, so it only
+   * peeks through the check-only `checkPermit` view.
+   */
+  private async applyWarmPrCapParity({
+    credentials,
+    userId,
+  }: {
+    credentials: LangyCredentials;
+    userId: string;
+  }): Promise<void> {
+    if (!credentials.githubToken || !this.deps.checkPermit) return;
+    const { allowed } = await this.deps.checkPermit({ userId });
+    if (!allowed) {
+      stripGithubCredentials(credentials);
+    }
   }
 
   /**
@@ -602,35 +900,29 @@ export class LangyTurnService {
 
     try {
       const questionParts = lastUserMessage?.parts ?? [];
+      // The FIRST USER message names the conversation, never messages[0]
+      // verbatim: a client can send assistant parts it still held (a new chat
+      // started while the previous reply streamed), and those must not become
+      // the title.
       const title =
-        extractTextFromParts(messages[0]?.parts).slice(0, 80) || null;
+        extractTextFromParts(
+          messages.find((message) => message.role === "user")?.parts,
+        ).slice(0, 80) || null;
 
       // The per-conversation frame-signing key is created from resolved
       // conversation state, never from a caller-supplied "new" flag.
       const mintedRunToken = conversation.isNew ? mintRunToken() : null;
 
       const probeWorker = () =>
-        worker.probe({
-          projectId,
-          actorUserId: userId,
-          conversationId: conversation.id,
-          // The model is part of the worker signature, so a model change —
-          // override or configured default — is a probe MISS and the worker
-          // re-provisions rather than running on the model it booted with.
-          model: turnModel,
-          hasGithubAuth: !!credentials.githubToken,
-          ...(credentials.githubRepoScopeKey
-            ? { githubRepoScopeKey: credentials.githubRepoScopeKey }
-            : {}),
-          ...(credentials.egressAllowlist
-            ? { egressAllowlist: credentials.egressAllowlist }
-            : {}),
-          // ADR-061 mirror tier is part of the worker signature, so a tier
-          // change must be a probe MISS (re-warm) rather than a stale mirror.
-          ...(credentials.mirrorTier
-            ? { mirrorTier: credentials.mirrorTier }
-            : {}),
-        });
+        worker.probe(
+          buildWorkerProbeArgs({
+            projectId,
+            actorUserId: userId,
+            conversationId: conversation.id,
+            model: turnModel,
+            credentials,
+          }),
+        );
 
       // With no GitHub capability, the signature is already final; overlap the
       // cheap probe with the conversation-scoped reads.
@@ -643,16 +935,27 @@ export class LangyTurnService {
         modelsAllowedResult,
         memoryResult,
         overrideResult,
+        uiActionsOpenResult,
       ] = await Promise.allSettled([
-        conversationService.findByIdVisible({
-          id: conversation.id,
-          projectId,
-          userId,
-        }),
-        conversationService.getPendingHandoff({
-          projectId,
-          conversationId: conversation.id,
-        }),
+        // The busy-hint read, for EXISTING conversations only. A new
+        // conversation has no projection row by construction, and this read
+        // tolerates dispatch lag: asked about a row that cannot exist yet it
+        // spends its whole handoff grace window (3 x 400ms) before answering
+        // "not found" — which put a flat 1.2 seconds in front of every first
+        // message. isNew already answers the question the read would.
+        conversation.isNew
+          ? Promise.resolve(null)
+          : conversationService.findByIdVisible({
+              id: conversation.id,
+              projectId,
+              userId,
+            }),
+        conversation.isNew
+          ? Promise.resolve(null)
+          : conversationService.getPendingHandoff({
+              projectId,
+              conversationId: conversation.id,
+            }),
         mintedRunToken
           ? Promise.resolve(mintedRunToken)
           : conversationService.getRunToken({
@@ -682,6 +985,15 @@ export class LangyTurnService {
         // a value that is the same for every tenant. Unconfigured (the default)
         // resolves synchronously and costs nothing here either.
         resolveLangyTurnOverride(this.deps),
+        // Whether the turn context may advertise live UI actions. In this
+        // batch for the same reason as the override: it is one cached flag
+        // read, and awaiting it at the composition site would put a serial
+        // round trip in front of time-to-first-token on every turn.
+        resolveLangyUiActionsOpen({
+          userId,
+          projectId,
+          organizationId: credentials.organizationId,
+        }),
       ]);
 
       // The runToken IS the frame-signing key, and a turn without one is
@@ -784,8 +1096,7 @@ export class LangyTurnService {
           ].join(" ")
         : "";
       if (!permit.allowed) {
-        delete (credentials as { githubToken?: string }).githubToken;
-        delete (credentials as { githubLogin?: string }).githubLogin;
+        stripGithubCredentials(credentials);
       }
 
       const workerIsLive = await (earlyWorkerProbe ?? probeWorker());
@@ -871,19 +1182,41 @@ export class LangyTurnService {
       // session freshness and folds the seed into the session's FIRST message
       // only; once in, it persists in the session's own transcript (and in the
       // provider's cached prefix) for every later turn.
-      const historySeed = [conversationTranscript, conversationMemory]
-        .filter((block): block is string => !!block && block.trim().length > 0)
-        .join("\n\n");
+      const seedBlocks = [conversationTranscript, conversationMemory].filter(
+        (block): block is string => !!block && block.trim().length > 0,
+      );
+
+      // `resolveLangyUiActionsOpen` never rejects, so a settled-rejected slot
+      // can only mean the batch itself failed; the flag's own default (on) is
+      // the same answer that resolver would have given.
+      const isUiActionSurfaceOpen =
+        uiActionsOpenResult.status === "fulfilled"
+          ? uiActionsOpenResult.value
+          : true;
 
       // The per-turn user-message lane: what the user is looking at and the
       // turn-scoped cap note precede a clearly labelled ask, so the model
       // reads the DATA before the message that may refer to it.
-      const prompt = composeLangyTurnPrompt({
-        contextBlock: renderLangyTurnContext(turnContext),
+      const { prompt, labelled } = composeLangyTurnPrompt({
+        contextBlock: renderLangyTurnContext({
+          context: turnContext,
+          isUiActionSurfaceOpen,
+        }),
         capNote: capReachedNote,
-        hasHistorySeed: historySeed.length > 0,
         userText,
       });
+      // The seed ends with the ask's label when the prompt itself carries
+      // none: the manager folds `seed + prompt` into a fresh session's first
+      // message, and the label must sit between the transcript and the user's
+      // words there — while a resumed session, the common case, gets the bare
+      // ask with no label at all.
+      const historySeed =
+        seedBlocks.length > 0
+          ? [
+              ...seedBlocks,
+              ...(labelled ? [] : [LANGY_USER_MESSAGE_LABEL]),
+            ].join("\n\n")
+          : "";
 
       if (handoffResult.status === "rejected") {
         logger.warn(
@@ -934,6 +1267,7 @@ export class LangyTurnService {
           conversationId: conversation.id,
           turnId,
           questionParts,
+          model: turnModel,
           ...(conversation.isNew
             ? {
                 conversationStart: {

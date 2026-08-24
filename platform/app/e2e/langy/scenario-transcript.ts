@@ -38,6 +38,16 @@ function assistantMessages(
 }
 
 /**
+ * The prose view of one assistant message. Tool traffic never rides in
+ * assistant text (langy-agent.ts returns it as role:"tool" messages), and a
+ * tool-call-only assistant message flattens to "" here, so these helpers see
+ * only what Langy itself said.
+ */
+function proseOf(content: unknown): string {
+  return flattenContent(content).trim();
+}
+
+/**
  * Every assistant reply in the run, flattened and newline-joined.
  *
  * Use this for anything that must hold across the WHOLE conversation — a
@@ -47,7 +57,7 @@ function assistantMessages(
  */
 export function allAssistantText(result: ScenarioResult): string {
   return assistantMessages(result)
-    .map((msg) => flattenContent(msg.content))
+    .map((msg) => proseOf(msg.content))
     .filter((text) => text.length > 0)
     .join("\n");
 }
@@ -61,5 +71,5 @@ export function allAssistantText(result: ScenarioResult): string {
 export function lastAssistantText(result: ScenarioResult): string {
   const assistants = assistantMessages(result);
   const last = assistants[assistants.length - 1];
-  return last ? flattenContent(last.content) : "";
+  return last ? proseOf(last.content) : "";
 }

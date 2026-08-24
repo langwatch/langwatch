@@ -17,7 +17,7 @@ import (
 // stream line to Observe in order, then read the assembled result once via Result
 // after the stream has ended. NOT safe for concurrent use: Observe runs on the
 // single stream-consumer goroutine, and Result is called after that goroutine has
-// signalled completion (a happens-before, so no lock is needed).
+// signaled completion (a happens-before, so no lock is needed).
 type Accumulator struct {
 	text  strings.Builder
 	order []string
@@ -47,7 +47,7 @@ type frame struct {
 	IsError *bool           `json:"isError"`
 }
 
-// Observe folds one output frame into the final. Best-effort: an unrecognised or
+// Observe folds one output frame into the final. Best-effort: an unrecognized or
 // malformed frame is ignored. A `delta` appends its text; a `tool` upserts the
 // call. Ephemeral frames (status / progress / heartbeat / card) and the terminal
 // frames (final / error / handoff) carry no accumulation content and are skipped.
