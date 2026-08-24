@@ -453,10 +453,20 @@ const LEGACY_INERT: string[] = [
   "specs/features/workflow-cli.feature",
   "specs/home/onboarding-progress-ui.feature",
   "specs/home/voice-agents-home-banner.feature",
+  // D12's join requests, written ahead of the deliverable: every scenario is
+  // @unimplemented on purpose, and the implementing PRs bind them as they
+  // land. Remove each entry with its first binding.
+  "specs/identity/domain-auto-join.feature",
   // ADR-116's design contract, every scenario @unimplemented on purpose: the
   // ADR ships ahead of the identity storage adapter, and the adapter PR binds
   // these as it lands. Remove this entry with the first binding.
   "specs/identity/identity-storage-adapter.feature",
+  "specs/identity/join-before-create.feature",
+  "specs/identity/join-matching-and-privacy.feature",
+  "specs/identity/join-requests.feature",
+  // D08's connection-scoped directory sync, same arrangement as the D12 files
+  // above: written ahead of the deliverable, bound as it lands.
+  "specs/identity/scim-connection-sync.feature",
   "specs/langy/langy-agent-service-conventions.feature",
   "specs/langy/langy-baseline.feature",
   "specs/langy/langy-card-taxonomy.feature",
