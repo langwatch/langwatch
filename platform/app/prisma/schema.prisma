@@ -610,8 +610,13 @@ model PlatformToolPolicy {
 enum INVITE_STATUS {
   PENDING
   ACCEPTED
+  // Deprecated (D11): the member-approval workflow is retired; existing rows
+  // were migrated to REVOKED and nothing writes this value any more. The
+  // enum member stays because dropping a Postgres enum value means
+  // rebuilding the type.
   WAITING_APPROVAL
   PAYMENT_PENDING
+  REVOKED
 }
 
 model OrganizationInvite {
@@ -628,6 +633,10 @@ model OrganizationInvite {
   requestedBy     String?
   requestedByUser User?                @relation(fields: [requestedBy], references: [id])
   subscriptionId  String?
+  // Who accepted, and through which VERIFIED identifier the acceptance
+  // matched (null for pre-identifier users, who match on User.email).
+  acceptedByUserId        String?
+  acceptedViaIdentifierId String?
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @default(now()) @updatedAt
 

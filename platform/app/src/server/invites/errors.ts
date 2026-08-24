@@ -69,6 +69,23 @@ export class AlreadyOrganizationMemberError extends HandledError {
   }
 }
 
+/**
+ * The invitation exists but its window has passed. Distinct from
+ * `invite_not_found` on purpose: an expired invitation is recoverable — the
+ * inviter resends it in one click (D11) — so the person holding the link
+ * gets told to ask for a fresh one instead of a dead end.
+ */
+export class InviteExpiredError extends HandledError {
+  declare readonly code: "invite_expired";
+
+  constructor() {
+    super("invite_expired", "This invitation has expired", {
+      httpStatus: 410,
+    });
+    this.name = "InviteExpiredError";
+  }
+}
+
 export class InviteNotFoundError extends HandledError {
   declare readonly code: "invite_not_found";
 

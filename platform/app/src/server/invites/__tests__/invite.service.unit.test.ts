@@ -152,15 +152,20 @@ describe("InviteService", () => {
     mockPrisma = {
       // The membership row and the invite's acceptance are one transaction:
       // a PENDING invite must never be one that has already granted access.
-      // The stub runs the batch it is handed, and `$connect` is what marks it
+      // The stub runs the batch it is handed — or, for the claim's callback
+      // form, hands itself back as `tx` — and `$connect` is what marks it
       // as a root client rather than somebody else's transaction.
       $connect: vi.fn(),
-      $transaction: (writes: Promise<unknown>[]) => Promise.all(writes),
+      $transaction: (arg: unknown) =>
+        typeof arg === "function"
+          ? (arg as (tx: unknown) => unknown)(mockPrisma)
+          : Promise.all(arg as Promise<unknown>[]),
       organizationInvite: {
         findFirst: vi.fn(),
         findMany: vi.fn(),
         create: vi.fn(),
         update: vi.fn(),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       organization: {
         findFirst: vi.fn(),
@@ -924,10 +929,15 @@ describe("InviteService", () => {
         expect(teamBinding!.principal).toEqual({ userId: "user-flow-1" });
         expect(teamBinding!.scopeId).toBe("team-1");
 
-        // Verify: invite was marked ACCEPTED
-        expect(mockPrisma.organizationInvite.update).toHaveBeenCalledWith(
+        // Verify: invite was claimed ACCEPTED — a conditional update on the
+        // PENDING status, recording who accepted.
+        expect(mockPrisma.organizationInvite.updateMany).toHaveBeenCalledWith(
           expect.objectContaining({
-            data: { status: "ACCEPTED" },
+            where: expect.objectContaining({ status: "PENDING" }),
+            data: expect.objectContaining({
+              status: "ACCEPTED",
+              acceptedByUserId: "user-flow-1",
+            }),
           }),
         );
       });
@@ -948,7 +958,9 @@ describe("InviteService", () => {
 
       beforeEach(() => {
         (mockPrisma as any).organizationUser = { createMany: vi.fn() };
-        mockPrisma.organizationInvite.update.mockResolvedValue({});
+        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
+          count: 1,
+        });
         // The writer is module-level and shared, so what the previous test
         // sent it would otherwise be counted as this one's.
         ledger.attachBindings.mockClear();
@@ -963,9 +975,9 @@ describe("InviteService", () => {
       describe("when it is applied", () => {
         it("accepts the invite before granting anything, so a pending invite never carries access", async () => {
           const order: string[] = [];
-          mockPrisma.organizationInvite.update.mockImplementation(() => {
+          mockPrisma.organizationInvite.updateMany.mockImplementation(() => {
             order.push("accepted");
-            return Promise.resolve({});
+            return Promise.resolve({ count: 1 });
           });
           ledger.attachBindings.mockImplementation(() => {
             order.push("granted");

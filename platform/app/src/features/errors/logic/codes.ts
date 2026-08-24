@@ -127,6 +127,7 @@ export const APP_ERROR_CODES = [
   "invalid_cursor",
   "invalid_email_recipient",
   "invalid_experiment_configuration",
+  "invite_expired",
   "invite_not_found",
   "langy_agent_at_capacity",
   "langy_agent_errored",

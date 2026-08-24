@@ -1168,6 +1168,11 @@ const presentations = {
         : "A pending invite for this address already exists. Revoke it first to send a new one.";
     },
   },
+  invite_expired: {
+    title: "This invitation has expired",
+    describe: () =>
+      "Ask the person who invited you for a new invitation — they can resend it in one click.",
+  },
   invite_not_found: {
     title: "Invite not found",
     describe: () =>

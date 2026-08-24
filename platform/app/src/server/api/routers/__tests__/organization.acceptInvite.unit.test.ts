@@ -118,9 +118,7 @@ describe("organization.acceptInvite", () => {
     ledger.attachBindings.mockResolvedValue({ attached: [], duplicates: [] });
     ledger.revokeBindingsWhere.mockResolvedValue(0);
     findUniqueMock = vi.fn();
-    inviteUpdateMock = vi
-      .fn()
-      .mockResolvedValue(makeInvite({ status: "ACCEPTED" }));
+    inviteUpdateMock = vi.fn().mockResolvedValue({ count: 1 });
     createManyMock = vi.fn().mockResolvedValue({ count: 1 });
   });
 
@@ -131,20 +129,25 @@ describe("organization.acceptInvite", () => {
         expires: "2099-01-01",
       },
     });
-    (ctx as any).prisma = {
+    const prismaStub: any = {
       // Acceptance and the membership row land in one transaction, and the
       // service refuses to run on somebody else's: `$connect` is what marks
-      // this stub as the root client it stands in for.
+      // this stub as the root client it stands in for. The claim runs the
+      // callback form of `$transaction`, handing the stub back as `tx`.
       $connect: vi.fn(),
-      $transaction: (writes: Promise<unknown>[]) => Promise.all(writes),
+      $transaction: (arg: unknown) =>
+        typeof arg === "function"
+          ? (arg as (tx: unknown) => unknown)(prismaStub)
+          : Promise.all(arg as Promise<unknown>[]),
       organizationInvite: {
         findUnique: findUniqueMock,
-        update: inviteUpdateMock,
+        updateMany: inviteUpdateMock,
         findFirst: vi.fn().mockResolvedValue(null),
       },
       organizationUser: { createMany: createManyMock },
       project: { findFirst: vi.fn().mockResolvedValue(null) },
     };
+    (ctx as any).prisma = prismaStub;
     return organizationRouter.createCaller(ctx);
   }
 
@@ -167,12 +170,25 @@ describe("organization.acceptInvite", () => {
       expect(createManyMock.mock.invocationCallOrder[0]!).toBeLessThan(
         ledger.attachBindings.mock.invocationCallOrder[0]!,
       );
+      // The claim is conditional on the (status, inviteCode) pair the caller
+      // read — that is what makes two racers on one PENDING invite unable to
+      // both win — and it records who accepted.
       expect(inviteUpdateMock).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { status: "ACCEPTED" } }),
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: "PENDING",
+            inviteCode: "test-code",
+          }),
+          data: {
+            status: "ACCEPTED",
+            acceptedByUserId: "user-1",
+            acceptedViaIdentifierId: null,
+          },
+        }),
       );
-      // The ACCEPTED update rides the same transaction as the membership row,
+      // The ACCEPTED claim rides the same transaction as the membership row,
       // and the ledger grant is emitted only once that transaction has
-      // committed — so the update must be ordered before the grant just like
+      // committed — so the claim must be ordered before the grant just like
       // the membership row is.
       expect(inviteUpdateMock.mock.invocationCallOrder[0]!).toBeLessThan(
         ledger.attachBindings.mock.invocationCallOrder[0]!,

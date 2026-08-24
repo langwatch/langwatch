@@ -34,8 +34,12 @@ import {
   TeamNotInOrganizationError,
 } from "./errors";
 
-/** Duration in milliseconds before an invite expires (48 hours). */
-export const INVITE_EXPIRATION_MS = 2 * 24 * 60 * 60 * 1000;
+/**
+ * Duration in milliseconds before an invite expires (14 days, D11).
+ * Resend is one click, so the window can be generous; the old 48-hour
+ * window plus an ops-only resend was where invitations went to die.
+ */
+export const INVITE_EXPIRATION_MS = 14 * 24 * 60 * 60 * 1000;
 
 /**
  * Ceiling on the batch-invite transaction, derived from the work it holds:
@@ -78,6 +82,34 @@ import { assertNoPersonalTeamScope } from "../role-bindings/personal-team-scope"
 import { buildInviteAcceptUrl } from "./invite-link";
 
 const logger = createLogger("langwatch:invites");
+
+/**
+ * The state an invitation is IN, as a person sees it. EXPIRED is derived
+ * from `expiration` rather than stored — there is no sweeper to run and no
+ * row to forget to sweep; a PENDING row past its expiry IS expired,
+ * everywhere this function is used (display, acceptance, resend).
+ */
+export type InviteDisplayStatus =
+  | "PENDING"
+  | "ACCEPTED"
+  | "EXPIRED"
+  | "REVOKED"
+  | "WAITING_APPROVAL"
+  | "PAYMENT_PENDING";
+
+export function resolveInviteDisplayStatus(
+  invite: Pick<OrganizationInvite, "status" | "expiration">,
+  now: Date = new Date(),
+): InviteDisplayStatus {
+  if (
+    invite.status === "PENDING" &&
+    invite.expiration !== null &&
+    invite.expiration <= now
+  ) {
+    return "EXPIRED";
+  }
+  return invite.status;
+}
 
 /**
  * Team assignment input for invite creation.
@@ -980,10 +1012,17 @@ export class InviteService {
    * carries. The link is included because a provisioning tool with no email
    * provider configured has no other way to hand the invite to the person.
    */
+  /**
+   * Outstanding invitations with their state visible (D11): expired and
+   * revoked rows are part of the answer now — an admin resends an EXPIRED
+   * one instead of wondering where it went. ACCEPTED rows are members, and
+   * PAYMENT_PENDING rides the checkout surface; neither belongs here.
+   */
   async listInvites({ organizationId }: { organizationId: string }): Promise<
     Array<
       OrganizationInvite & {
         inviteUrl: string;
+        displayStatus: InviteDisplayStatus;
         requestedByUser: {
           id: string;
           name: string | null;
@@ -995,8 +1034,7 @@ export class InviteService {
     const invites = await this.prisma.organizationInvite.findMany({
       where: {
         organizationId,
-        status: { in: ["PENDING", "WAITING_APPROVAL"] },
-        OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
+        status: { in: ["PENDING", "WAITING_APPROVAL", "REVOKED"] },
       },
       include: {
         requestedByUser: {
@@ -1009,17 +1047,22 @@ export class InviteService {
     return invites.map((invite) => ({
       ...invite,
       inviteUrl: buildInviteAcceptUrl(invite.inviteCode),
+      displayStatus: resolveInviteDisplayStatus(invite),
     }));
   }
 
   /**
-   * Deletes a pending invite. Organization-scoped: an invite id from another
-   * organization reads as not found, never as someone else's invite.
+   * Revocation is a state, not a delete (D11): the row stays, visible as
+   * REVOKED, and the code on it stops opening anything. Organization-scoped:
+   * an invite id from another organization reads as not found, never as
+   * someone else's invite.
    *
-   * No grants to take back, and that is a property of `applyInvite` rather
-   * than an omission here: it marks the invite ACCEPTED in the same
-   * transaction that creates the membership, before it emits a single grant.
-   * A revocable invite is therefore always one that has granted nothing.
+   * Only invitations that were never accepted can be revoked — taking access
+   * back from an accepted one is member removal, a different operation with
+   * a different audit trail. No grants to take back, and that is a property
+   * of `applyInvite` rather than an omission here: it marks the invite
+   * ACCEPTED in the same transaction that creates the membership, before it
+   * emits a single grant. A revocable invite has granted nothing.
    */
   async revokeInvite({
     organizationId,
@@ -1028,16 +1071,17 @@ export class InviteService {
     organizationId: string;
     inviteId: string;
   }): Promise<{ success: true }> {
-    const invite = await this.prisma.organizationInvite.findFirst({
-      where: { id: inviteId, organizationId },
-      select: { id: true },
+    const revoked = await this.prisma.organizationInvite.updateMany({
+      where: {
+        id: inviteId,
+        organizationId,
+        status: { in: ["PENDING", "WAITING_APPROVAL", "PAYMENT_PENDING"] },
+      },
+      data: { status: "REVOKED" },
     });
-    if (!invite) {
+    if (revoked.count === 0) {
       throw new InviteNotFoundError("Invitation not found");
     }
-    await this.prisma.organizationInvite.delete({
-      where: { id: invite.id, organizationId },
-    });
     return { success: true };
   }
 
@@ -1263,9 +1307,13 @@ export class InviteService {
   async applyInvite({
     userId,
     invite,
+    viaIdentifierId,
   }: {
     userId: string;
     invite: OrganizationInvite;
+    /** The VERIFIED identifier the acceptance matched on, when the user is
+     *  on identifiers; null/absent for the legacy User.email match. */
+    viaIdentifierId?: string | null;
   }): Promise<void> {
     if (invite.status !== "PENDING") {
       const isCallerRetryingItsOwnAccept =
@@ -1284,9 +1332,30 @@ export class InviteService {
     // Root client only, and it always was: the grants below are ledger
     // commands that cannot ride a caller's transaction, and the acceptance
     // now opens one of its own.
+    //
+    // The acceptance CLAIMS the row (D11): a conditional update on the
+    // expected (status, inviteCode) pair, inside the same transaction as the
+    // membership write. Two racers on one PENDING invite cannot both win —
+    // the loser's update matches nothing, the transaction rolls back, and
+    // no membership row is written for them.
     const prisma = this.requireRootClient();
-    await prisma.$transaction([
-      prisma.organizationUser.createMany({
+    const claimed = await prisma.$transaction(async (tx) => {
+      const claim = await tx.organizationInvite.updateMany({
+        where: {
+          id: invite.id,
+          organizationId: invite.organizationId,
+          inviteCode: invite.inviteCode,
+          status: "PENDING",
+          OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
+        },
+        data: {
+          status: "ACCEPTED",
+          acceptedByUserId: userId,
+          acceptedViaIdentifierId: viaIdentifierId ?? null,
+        },
+      });
+      if (claim.count === 0) return false;
+      await tx.organizationUser.createMany({
         data: [
           {
             userId,
@@ -1295,12 +1364,31 @@ export class InviteService {
           },
         ],
         skipDuplicates: true,
-      }),
-      prisma.organizationInvite.update({
-        where: { id: invite.id, organizationId: invite.organizationId },
-        data: { status: "ACCEPTED" },
-      }),
-    ]);
+      });
+      return true;
+    });
+
+    if (!claimed) {
+      // The row moved between the caller's read and the claim. If it moved
+      // because THIS user's own concurrent accept won, the grant tail is a
+      // repair, exactly as in the retry path above; anyone else sees the
+      // stale-code refusal.
+      const current = await prisma.organizationInvite.findUnique({
+        where: { id: invite.id },
+        select: { status: true },
+      });
+      const isCallerRacingItself =
+        current?.status === "ACCEPTED" &&
+        (await this.callerHoldsMembership({
+          userId,
+          organizationId: invite.organizationId,
+        }));
+      if (isCallerRacingItself) {
+        await this.applyInviteGrants({ userId, invite });
+        return;
+      }
+      throw new InviteNotFoundError("Invitation is no longer open");
+    }
 
     await this.applyInviteGrants({ userId, invite });
   }
