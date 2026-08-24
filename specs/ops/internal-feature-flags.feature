@@ -197,10 +197,10 @@ Feature: Internal feature flag system for system-level kill switches
           unresponsive toggle
 
     @integration
-    Scenario: The Product section names this store as what customers actually get
+    Scenario: The Product section tells operators what the value they set actually reaches
       Given an operator opens /ops/feature-flags on a shared install
-      Then the Product section says the value set here is what customers get
-           when no targeting rule matches and no env override is configured
+      Then the Product section says customers get the value set here when no
+           targeting rule matches and no env override is configured
       And it names no external flag service, because none is in the chain
 
     @integration
@@ -242,8 +242,9 @@ Feature: Internal feature flag system for system-level kill switches
           whole fleet
       And the explanation points the operator at a per-organization or
           per-project rule for a rollout
-      And that explanation sits on the badge's accessible label rather than on
-          hover alone, so it survives a reader who never hovers
+      And that explanation is rendered into the page rather than living only in
+          hover-only tooltip content, so an operator who never hovers — or who
+          reads the page with a screen reader — is warned too
 
   Rule: Self-hosted parity
 

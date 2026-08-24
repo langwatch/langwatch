@@ -235,11 +235,17 @@ function ScopeSection({
 
 /**
  * Blast-radius note for a PRODUCT flag on a shared install. Held as one
- * constant because it is both the tooltip content and the badge's accessible
- * label: tooltip content is not rendered until hover, so a note kept only
- * there is out of reach of a screen reader — and out of reach of any
- * assertion, which is how the previous wording survived being replaced
- * wholesale with "x" while its bound test stayed green.
+ * constant because it is rendered twice: as the tooltip content for a sighted
+ * operator, and as screen-reader-only text inside the badge for everyone else.
+ * Tooltip content is not in the DOM until hover, so a note kept only there
+ * reaches neither a screen reader nor any assertion — which is how the
+ * previous wording survived being replaced wholesale with "x" while its bound
+ * test stayed green.
+ *
+ * The srOnly copy is deliberate rather than an `aria-label` on the badge:
+ * Chakra renders Badge as a role-less <span>, and ARIA prohibits naming a
+ * generic element, so an aria-label there is ignored by screen readers even
+ * though Testing Library's getByLabelText happily matches it.
  */
 const FLEET_REACH_NOTE =
   "This flag gates a customer-facing feature, and a value set here applies to every organization that no targeting rule matches. On a shared install that is the whole fleet, so prefer a per-organization or per-project rule when rolling one out.";
@@ -349,13 +355,9 @@ function FlagRowView({
             <ScopeBadge scope={row.scope} />
             {showProductWarning && (
               <Tooltip content={FLEET_REACH_NOTE}>
-                <Badge
-                  colorPalette="yellow"
-                  size="sm"
-                  variant="subtle"
-                  aria-label={FLEET_REACH_NOTE}
-                >
+                <Badge colorPalette="yellow" size="sm" variant="subtle">
                   All customers
+                  <Text srOnly>{FLEET_REACH_NOTE}</Text>
                 </Badge>
               </Tooltip>
             )}
