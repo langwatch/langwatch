@@ -2,6 +2,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Session } from "~/server/auth";
 import { prisma } from "~/server/db";
+import { getApp } from "~/server/app-layer/app";
 import { cleanupTestRows, requireAssigned } from "~/test-utils/cleanupTestRows";
 import { getTestUser } from "~/utils/testUtils";
 import { saveOrCommitWorkflowVersion } from "../workflows";
@@ -58,6 +59,7 @@ describe("saveOrCommitWorkflowVersion", () => {
   const getCtx = () => ({
     prisma,
     session: { user: { id: userId } } as Session,
+    app: { workflows: getApp().workflows },
   });
 
   describe("when a signature node has localPromptConfig", () => {

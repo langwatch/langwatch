@@ -174,6 +174,15 @@ export class WorkflowService extends WorkflowServiceContract {
     return this.options.repository.publish(command);
   }
 
+  async unpublish(input: { id: string; projectId: string }): Promise<Workflow> {
+    await this.getById(input);
+    return this.options.repository.updateWorkflow({
+      id: input.id,
+      projectId: input.projectId,
+      data: { publishedId: null, publishedById: null },
+    });
+  }
+
   async archive(input: import("@langwatch/workflow-contract").ArchiveWorkflowCommand): Promise<Workflow> {
     const command = this.parse(archiveWorkflowCommandSchema, input);
     await this.getById(command);

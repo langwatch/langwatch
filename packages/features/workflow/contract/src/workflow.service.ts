@@ -19,6 +19,7 @@ export abstract class WorkflowService {
   abstract update(input: UpdateWorkflowCommand): Promise<Workflow>;
   abstract saveVersion(input: SaveWorkflowVersionCommand): Promise<WorkflowVersion>;
   abstract publish(input: PublishWorkflowCommand): Promise<Workflow>;
+  abstract unpublish(input: { id: string; projectId: string }): Promise<Workflow>;
   abstract archive(input: ArchiveWorkflowCommand): Promise<Workflow>;
   abstract copy(input: CopyWorkflowCommand): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }>;
   abstract getCopies(input: { workflowId: string; projectId: string }): Promise<Workflow[]>;

@@ -32,6 +32,7 @@ class FakeWorkflowRepository extends WorkflowRepository {
   async updateAutoSavedVersion(input: PersistWorkflowVersionInput & { id: string }): Promise<WorkflowVersion> { return this.createVersion(input); }
   async setVersionPointers(): Promise<void> {}
   async publish(input: { id: string; projectId: string; versionId: string; actorId?: string }): Promise<Workflow> { return this.updateWorkflow({ id: input.id, projectId: input.projectId, data: { publishedId: input.versionId, publishedById: input.actorId ?? null } }); }
+  async unpublish(input: { id: string; projectId: string }): Promise<Workflow> { return this.updateWorkflow({ id: input.id, projectId: input.projectId, data: { publishedId: null, publishedById: null } }); }
   async findCopies(): Promise<Workflow[]> { return []; }
 }
 
@@ -46,6 +47,20 @@ describe("WorkflowService", () => {
   it("throws a concrete error when a workflow is not published", async () => {
     const service = ServerWorkflowService.create({ repository: new FakeWorkflowRepository() });
     await expect(service.getPublishedVersion({ workflowId: "workflow_1", projectId: "project_1" })).rejects.toBeInstanceOf(WorkflowNotPublishedError);
+  });
+
+  it("unpublishes through the workflow repository boundary", async () => {
+    const repository = new FakeWorkflowRepository();
+    const service = ServerWorkflowService.create({ repository });
+    await repository.publish({
+      id: "workflow_1",
+      projectId: "project_1",
+      versionId: "version_1",
+    });
+    await service.unpublish({ id: "workflow_1", projectId: "project_1" });
+    await expect(
+      service.getById({ id: "workflow_1", projectId: "project_1" }),
+    ).resolves.toMatchObject({ publishedId: null, publishedById: null });
   });
 
   it("exposes evaluator fields without exposing persistence", async () => {

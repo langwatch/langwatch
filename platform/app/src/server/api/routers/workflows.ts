@@ -1,6 +1,6 @@
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
+import type { DatasetService } from "@langwatch/dataset-contract";
 import { pMapLimited } from "@langwatch/eventing";
-import { NotFoundError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { JsonValue } from "@prisma/client/runtime/client";
 import { TRPCError } from "@trpc/server";
@@ -9,13 +9,13 @@ import { createPatch } from "diff";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { fireWorkflowCreatedNurturing } from "~/server/app-layer/billing/nurturing/featureAdoption";
-import type {
-  Prisma,
-  PrismaClient,
-  WorkflowVersion,
-} from "~/generated/prisma/client";
+import type { Prisma, PrismaClient, WorkflowVersion } from "~/generated/prisma/client";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import type { Session } from "~/server/auth";
+import {
+  WorkflowNotFoundError,
+  type WorkflowService,
+} from "@langwatch/workflow-contract";
 import { captureException } from "~/utils/posthogErrorCapture";
 import {
   type Workflow,
@@ -28,7 +28,6 @@ import {
 } from "../../../optimization_studio/utils/dslUtils";
 import { mergeLocalConfigsIntoDsl } from "../../../optimization_studio/utils/mergeLocalConfigs";
 import type { Unpacked } from "../../../utils/types";
-import { DatasetService } from "../../datasets/dataset.service";
 import { wrapAiCall } from "../../modelProviders/aiCallFailedError";
 import { featureByKey } from "../../modelProviders/featureRegistry";
 import { getVercelAIModel } from "../../modelProviders/utils";
@@ -66,49 +65,26 @@ export const workflowRouter = createTRPCRouter({
     )
     .permission("workflows:create")
     .mutation(async ({ ctx, input }) => {
-      const workflow = await ctx.prisma.workflow.create({
-        data: {
-          id: `workflow_${nanoid()}`,
-          projectId: input.projectId,
-          name: input.dsl.name,
-          icon: input.dsl.icon,
-          description: input.dsl.description,
-        },
+      const workflowId = `workflow_${nanoid()}`;
+      const dsl = await prepareWorkflowDsl({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+        dsl: { ...input.dsl, workflow_id: workflowId },
       });
-
-      const version = await saveOrCommitWorkflowVersion({
-        ctx,
-        input: {
-          projectId: input.projectId,
-          workflowId: workflow.id,
-          dsl: {
-            ...input.dsl,
-            workflow_id: workflow.id,
-          },
-        },
-        autoSaved: false,
+      const { workflow, version } = await ctx.app.workflows.create({
+        id: workflowId,
+        projectId: input.projectId,
+        dsl,
         commitMessage: input.commitMessage,
+        publish: input.publish,
+        authorId: ctx.session.user.id,
       });
 
-      // Auto-publish the first version if requested
-      if (input.publish) {
-        await ctx.prisma.workflow.update({
-          where: { id: workflow.id, projectId: input.projectId },
-          data: {
-            publishedId: version.id,
-            publishedById: ctx.session.user.id,
-          },
-        });
-      }
-
-      void ctx.prisma.workflow
-        .count({
-          where: { projectId: input.projectId, archivedAt: null },
-        })
-        .then((count) => {
+      void ctx.app.workflows.list({ projectId: input.projectId })
+        .then((workflows) => {
           fireWorkflowCreatedNurturing({
             userId: ctx.session.user.id,
-            workflowCount: count,
+            workflowCount: workflows.length,
             workflowId: workflow.id,
             projectId: input.projectId,
           });
@@ -144,58 +120,15 @@ export const workflowRouter = createTRPCRouter({
         });
       }
 
-      const workflow = await ctx.prisma.workflow.findUnique({
-        where: {
-          id: input.workflowId,
-          projectId: input.sourceProjectId,
-        },
-        include: {
-          latestVersion: true,
-        },
-      });
-
-      if (!workflow?.latestVersion?.dsl) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Workflow not found",
-        });
-      }
-
-      const { workflowId, dsl } = await copyWorkflowWithDatasets({
-        ctx,
-        workflow,
+      const { workflow, version } = await ctx.app.workflows.copy({
+        sourceWorkflowId: input.workflowId,
         targetProjectId: input.projectId,
         sourceProjectId: input.sourceProjectId,
         copyDatasets: input.copyDatasets,
         copiedFromWorkflowId: input.workflowId,
+        authorId: ctx.session.user.id,
       });
-
-      const newWorkflow = await ctx.prisma.workflow.findFirst({
-        where: {
-          id: workflowId,
-          projectId: input.projectId,
-        },
-      });
-
-      if (!newWorkflow) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to create workflow",
-        });
-      }
-
-      const version = await saveOrCommitWorkflowVersion({
-        ctx,
-        input: {
-          projectId: input.projectId,
-          workflowId,
-          dsl,
-        },
-        autoSaved: false,
-        commitMessage: "Copied from " + workflow.name,
-      });
-
-      return { workflow: newWorkflow, version };
+      return { workflow, version };
     }),
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
@@ -420,14 +353,19 @@ export const workflowRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), workflowId: z.string() }))
     .permission("workflows:view")
     .query(async ({ ctx, input }) => {
-      const workflow = await ctx.prisma.workflow.findUnique({
-        where: {
+      let workflow;
+      try {
+        workflow = await ctx.app.workflows.getById({
           id: input.workflowId,
           projectId: input.projectId,
-          archivedAt: null,
-        },
-        include: { currentVersion: true },
-      });
+          includeVersion: true,
+        });
+      } catch (error) {
+        if (error instanceof WorkflowNotFoundError) {
+          throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+        }
+        throw error;
+      }
 
       // Handled, like the same failure already is in `runWorkflow.ts`. As a
       // bare `TRPCError` this crossed the boundary as prose, so the client had
@@ -436,14 +374,6 @@ export const workflowRouter = createTRPCRouter({
       // and — because an unrecognised code is not something the reader can be
       // told how to fix — offered them an error id for a workflow that had
       // simply been deleted.
-      if (!workflow) {
-        throw new NotFoundError(
-          "workflow_not_found",
-          "Workflow",
-          input.workflowId,
-        );
-      }
-
       if (workflow.currentVersion) {
         workflow.currentVersion.dsl = migrateDSLVersion(
           workflow.currentVersion.dsl as unknown as Workflow,
@@ -654,27 +584,11 @@ export const workflowRouter = createTRPCRouter({
     )
     .permission("workflows:update")
     .mutation(async ({ ctx, input }) => {
-      const version = await ctx.prisma.workflowVersion.findUnique({
-        where: {
-          id: input.versionId,
-          workflowId: input.workflowId,
-          projectId: input.projectId,
-        },
-      });
-
-      if (!version) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Workflow version not found",
-        });
-      }
-
-      return ctx.prisma.workflow.update({
-        where: { id: input.workflowId, projectId: input.projectId },
-        data: {
-          publishedId: input.versionId,
-          publishedById: ctx.session.user.id,
-        },
+      return ctx.app.workflows.publish({
+        id: input.workflowId,
+        projectId: input.projectId,
+        versionId: input.versionId,
+        actorId: ctx.session.user.id,
       });
     }),
 
@@ -682,12 +596,9 @@ export const workflowRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), workflowId: z.string() }))
     .permission("workflows:update")
     .mutation(async ({ ctx, input }) => {
-      return ctx.prisma.workflow.update({
-        where: { id: input.workflowId, projectId: input.projectId },
-        data: {
-          publishedId: null,
-          publishedById: null,
-        },
+      return ctx.app.workflows.unpublish({
+        id: input.workflowId,
+        projectId: input.projectId,
       });
     }),
 
@@ -953,14 +864,11 @@ export const workflowRouter = createTRPCRouter({
     .permission("workflows:view")
     .query(async ({ ctx, input }) => {
       // Find evaluators linked to this workflow
-      const evaluators = await ctx.prisma.evaluator.findMany({
-        where: {
-          workflowId: input.workflowId,
-          projectId: input.projectId,
-          archivedAt: null,
-        },
-        select: { id: true, name: true },
-      });
+      const evaluators = (await ctx.app.evaluators.getAll({
+        projectId: input.projectId,
+      }))
+        .filter((evaluator) => evaluator.workflowId === input.workflowId)
+        .map(({ id, name }) => ({ id, name }));
 
       // Find agents linked to this workflow
       const agents = await ctx.prisma.agent.findMany({
@@ -1072,11 +980,10 @@ export const workflowRouter = createTRPCRouter({
     )
     .permission("workflows:delete")
     .mutation(async ({ ctx, input }) => {
-      return ctx.prisma.workflow.update({
-        where: { id: input.workflowId, projectId: input.projectId },
-        data: {
-          archivedAt: input.unarchive ? null : new Date(),
-        },
+      return ctx.app.workflows.archive({
+        id: input.workflowId,
+        projectId: input.projectId,
+        unarchive: input.unarchive,
       });
     }),
 
@@ -1193,7 +1100,7 @@ export const copyWorkflowWithDatasets = async ({
   copyDatasets,
   copiedFromWorkflowId,
 }: {
-  ctx: { prisma: PrismaClient; session: Session };
+  ctx: { prisma: PrismaClient; session: Session; app: { dataset: DatasetService } };
   workflow: {
     id: string;
     name: string;
@@ -1222,8 +1129,6 @@ export const copyWorkflowWithDatasets = async ({
   const datasetIdMap = new Map<string, { id: string; name: string }>();
 
   if (copyDatasets) {
-    const datasetService = DatasetService.create(ctx.prisma);
-
     // Type guard for dataset reference
     const isDatasetRef = (
       value: unknown,
@@ -1251,7 +1156,7 @@ export const copyWorkflowWithDatasets = async ({
       }
 
       // Create new dataset in target project using service
-      const newDataset = await datasetService.copyDataset({
+      const newDataset = await ctx.app.dataset.copyDataset({
         sourceDatasetId: datasetRef.id,
         sourceProjectId,
         targetProjectId,
@@ -1318,7 +1223,11 @@ export const saveOrCommitWorkflowVersion = async ({
   commitMessage,
   setAsLatestVersion = true,
 }: {
-  ctx: { prisma: PrismaClient; session: Session };
+  ctx: {
+    prisma: PrismaClient;
+    session: Session;
+    app: { workflows: WorkflowService };
+  };
   input: {
     projectId: string;
     workflowId: string;
@@ -1328,92 +1237,19 @@ export const saveOrCommitWorkflowVersion = async ({
   commitMessage: string;
   setAsLatestVersion?: boolean;
 }): Promise<WorkflowVersion> => {
-  const workflow = await ctx.prisma.workflow.findUnique({
-    where: {
-      id: input.workflowId,
-      projectId: input.projectId,
-      archivedAt: null,
-    },
-    include: { latestVersion: true, currentVersion: true },
-  });
-  const autoSavedVersion = await ctx.prisma.workflowVersion.findFirst({
-    where: {
-      workflowId: input.workflowId,
-      projectId: input.projectId,
-      autoSaved: true,
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  if (!workflow) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Workflow not found",
-    });
-  }
-
-  const latestVersion = workflow.latestVersion;
-
-  const [versionMajor] = (latestVersion?.version ?? "0.0").split(".");
-  const nextVersion = `${parseInt(versionMajor ?? "0") + 1}`;
-
-  // Cast required: input.dsl.nodes is z.array(z.any()) from the Zod schema,
-  // while mergeLocalConfigsIntoDsl expects Node<Component>[]. The Zod schema
-  // uses z.any() for nodes because the DSL node types are too polymorphic
-  // for a single Zod discriminated union.
-  const dslWithMergedConfigs = {
-    ...input.dsl,
-    nodes: mergeLocalConfigsIntoDsl(input.dsl.nodes as any) as any,
-    state: {},
-  };
-  await materializeNodeLlmConfigs({
+  const dslWithMergedConfigs = await prepareWorkflowDsl({
     prisma: ctx.prisma,
     projectId: input.projectId,
-    dsl: dslWithMergedConfigs,
+    dsl: input.dsl,
   });
-  const dslWithoutStates = JSON.parse(JSON.stringify(dslWithMergedConfigs));
-  const data = {
-    commitMessage,
-    authorId: ctx.session.user.id,
+  const updatedVersion = await ctx.app.workflows.saveVersion({
     projectId: input.projectId,
     workflowId: input.workflowId,
+    dsl: JSON.parse(JSON.stringify(dslWithMergedConfigs)),
     autoSaved,
-    dsl: dslWithoutStates as object,
-  };
-
-  let updatedVersion: WorkflowVersion;
-  if (autoSavedVersion) {
-    updatedVersion = await ctx.prisma.workflowVersion.update({
-      where: { id: autoSavedVersion.id, projectId: input.projectId },
-      data: {
-        ...data,
-        ...(workflow.currentVersionId !== autoSavedVersion.id && {
-          parentId: workflow.currentVersionId,
-        }),
-      },
-    });
-  } else {
-    updatedVersion = await ctx.prisma.workflowVersion.create({
-      data: {
-        id: nanoid(),
-        parentId: latestVersion?.id,
-        version: autoSaved ? nextVersion : input.dsl.version,
-        ...data,
-      },
-    });
-  }
-
-  await ctx.prisma.workflow.update({
-    where: { id: input.workflowId, projectId: input.projectId },
-    data: {
-      name: input.dsl.name,
-      icon: input.dsl.icon,
-      description: input.dsl.description,
-      currentVersionId: updatedVersion.id,
-      latestVersionId: setAsLatestVersion
-        ? updatedVersion.id
-        : latestVersion?.id,
-    },
+    commitMessage,
+    authorId: ctx.session.user.id,
+    setAsLatestVersion,
   });
 
   // Fire-and-forget: auto-compute handles its own errors internally, but the
@@ -1433,3 +1269,30 @@ export const saveOrCommitWorkflowVersion = async ({
 
   return updatedVersion;
 };
+
+/** Application-owned preparation for legacy Studio node configuration. */
+async function prepareWorkflowDsl({
+  prisma,
+  projectId,
+  dsl,
+}: {
+  prisma: PrismaClient;
+  projectId: string;
+  dsl: z.infer<typeof workflowJsonSchema>;
+}): Promise<z.infer<typeof workflowJsonSchema>> {
+  // Cast required: input.dsl.nodes is z.array(z.any()) from the Zod schema,
+  // while mergeLocalConfigsIntoDsl expects Node<Component>[]. The Zod schema
+  // uses z.any() for nodes because the DSL node types are too polymorphic
+  // for a single Zod discriminated union.
+  const dslWithMergedConfigs = {
+    ...dsl,
+    nodes: mergeLocalConfigsIntoDsl(dsl.nodes as any) as any,
+    state: {},
+  };
+  await materializeNodeLlmConfigs({
+    prisma,
+    projectId,
+    dsl: dslWithMergedConfigs,
+  });
+  return dslWithMergedConfigs;
+}

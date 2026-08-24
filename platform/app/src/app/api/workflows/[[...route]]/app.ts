@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { WorkflowNotFoundError } from "@langwatch/workflow-contract";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
@@ -6,13 +7,13 @@ import type { Workflow } from "~/generated/prisma/client";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { requireApiKeyPermission } from "~/server/api-key/auth-middleware";
-import { prisma } from "~/server/db";
+import { appFromContext } from "~/app/api/middleware/app-context";
 import {
   EvaluationInputError,
   NoCommittedVersionError,
   WorkflowEvaluationService,
-  WorkflowNotFoundError,
 } from "~/server/workflows/workflowEvaluation.service";
+import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
@@ -71,9 +72,8 @@ secured.access(requires("workflows:view")).get(
     const project = c.get("project");
     logger.info({ projectId: project.id }, "Listing workflows");
 
-    const workflows = await prisma.workflow.findMany({
-      where: { projectId: project.id, archivedAt: null },
-      orderBy: { updatedAt: "desc" },
+    const workflows = await appFromContext(c).workflows.list({
+      projectId: project.id,
     });
 
     return c.json(
@@ -115,11 +115,14 @@ secured.access(requires("workflows:view")).get(
     const { id } = c.req.param();
     logger.info({ projectId: project.id, workflowId: id }, "Getting workflow");
 
-    const workflow = await prisma.workflow.findFirst({
-      where: { id, projectId: project.id, archivedAt: null },
-    });
-
-    if (!workflow) {
+    let workflow;
+    try {
+      workflow = await appFromContext(c).workflows.getById({
+        id,
+        projectId: project.id,
+      });
+    } catch (error) {
+      if (!(error instanceof WorkflowNotFoundError)) throw error;
       return c.json({ error: "Workflow not found" }, 404);
     }
 
@@ -171,17 +174,17 @@ secured.access(requires("workflows:update")).patch(
     const body = c.req.valid("json");
     logger.info({ projectId: project.id, workflowId: id }, "Updating workflow");
 
-    const workflow = await prisma.workflow.findFirst({
-      where: { id, projectId: project.id, archivedAt: null },
-    });
-
-    if (!workflow) {
+    const workflows = appFromContext(c).workflows;
+    try {
+      await workflows.assertInProject({ workflowId: id, projectId: project.id });
+    } catch (error) {
+      if (!(error instanceof WorkflowNotFoundError)) throw error;
       return c.json({ error: "Workflow not found" }, 404);
     }
-
-    const updated = await prisma.workflow.update({
-      where: { id, projectId: project.id },
-      data: body,
+    const updated = await workflows.update({
+      id,
+      projectId: project.id,
+      ...body,
     });
 
     return c.json({
@@ -227,18 +230,15 @@ secured.access(requires("workflows:manage")).delete(
       "Archiving workflow",
     );
 
-    const workflow = await prisma.workflow.findFirst({
-      where: { id, projectId: project.id, archivedAt: null },
-    });
-
-    if (!workflow) {
+    try {
+      await appFromContext(c).workflows.archive({
+        id,
+        projectId: project.id,
+      });
+    } catch (error) {
+      if (!(error instanceof WorkflowNotFoundError)) throw error;
       return c.json({ error: "Workflow not found" }, 404);
     }
-
-    await prisma.workflow.update({
-      where: { id, projectId: project.id },
-      data: { archivedAt: new Date() },
-    });
 
     return c.json({ id, archived: true });
   },
