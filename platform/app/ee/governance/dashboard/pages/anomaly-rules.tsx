@@ -1012,10 +1012,10 @@ function RuleComposer({
                 onChange={(event) =>
                   setComposer({
                     ...composer,
-                    destinationConfig: destinationConfigWithEmailRecipients(
-                      composer.destinationConfig,
-                      event.target.value,
-                    ),
+                    destinationConfig: destinationConfigWithEmailRecipients({
+                      raw: composer.destinationConfig,
+                      recipientsText: event.target.value,
+                    }),
                   })
                 }
               />

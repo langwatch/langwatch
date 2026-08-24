@@ -48,10 +48,13 @@ export function emailRecipientsFromDestinationConfig(raw: string): string {
   return parseDestinationConfigForEditor(raw).emailRecipients.join("\n");
 }
 
-export function destinationConfigWithEmailRecipients(
-  raw: string,
-  recipientsText: string,
-): string {
+export function destinationConfigWithEmailRecipients({
+  raw,
+  recipientsText,
+}: {
+  raw: string;
+  recipientsText: string;
+}): string {
   const { nonEmailDestinations } = parseDestinationConfigForEditor(raw);
   const to = recipientsText
     .split(/[\n,]/)

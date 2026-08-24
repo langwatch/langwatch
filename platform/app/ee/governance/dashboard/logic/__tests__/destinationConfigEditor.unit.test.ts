@@ -25,7 +25,10 @@ describe("destination config email editor", () => {
 
     expect(
       JSON.parse(
-        destinationConfigWithEmailRecipients(raw, "fixed@example.com"),
+        destinationConfigWithEmailRecipients({
+          raw,
+          recipientsText: "fixed@example.com",
+        }),
       ),
     ).toEqual({
       destinations: [
@@ -43,7 +46,12 @@ describe("destination config email editor", () => {
       nonEmailDestinations: [],
     });
     expect(
-      JSON.parse(destinationConfigWithEmailRecipients(raw, "new@example.com")),
+      JSON.parse(
+        destinationConfigWithEmailRecipients({
+          raw,
+          recipientsText: "new@example.com",
+        }),
+      ),
     ).toEqual({
       destinations: [{ type: "email", to: ["new@example.com"] }],
     });
