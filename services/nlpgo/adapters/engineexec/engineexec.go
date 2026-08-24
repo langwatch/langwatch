@@ -6,7 +6,9 @@
 // copies drifted: one dropped UntilNodeID and the api-key context, another
 // dropped seven more request fields plus the cost and duration on the result.
 // A harness that mistranslates the request cannot fail on a translation bug,
-// so the copies are gone and this is the only translation.
+// so the copies are gone and this is the only translation. That sentence is a
+// claim prose cannot keep, so sole_translation_test.go holds it: it fails when
+// any file outside this package builds an engine.ExecuteRequest of its own.
 //
 // The dependency graph stays one-way: this package imports app and engine,
 // and neither imports it.

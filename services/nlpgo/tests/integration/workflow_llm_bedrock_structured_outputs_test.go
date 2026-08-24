@@ -32,13 +32,13 @@ import (
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/services/aigateway/dispatcher"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/dispatcheradapter"
+	"github.com/langwatch/langwatch/services/nlpgo/adapters/engineexec"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/llmexecutor"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
-	"github.com/langwatch/langwatch/services/nlpgo/app/engine/dsl"
 )
 
 func setupStackWithLLM_bedrockStructured(t *testing.T) *stack {
@@ -54,7 +54,7 @@ func setupStackWithLLM_bedrockStructured(t *testing.T) *stack {
 	codeExec, err := codeblock.New(codeblock.Options{})
 	require.NoError(t, err)
 	eng := engine.New(engine.Options{HTTP: httpExec, Code: codeExec, LLM: llm})
-	executor := liveBedrockStructuredExecutorAdapter{eng: eng}
+	executor := engineexec.New(eng)
 	application := app.New(app.WithWorkflowExecutor(executor))
 	probes := health.New("test")
 	probes.MarkStarted()
@@ -65,60 +65,6 @@ func setupStackWithLLM_bedrockStructured(t *testing.T) *stack {
 	return &stack{url: srv.URL, upstream: upstream, upstreamURL: upstream.URL}
 }
 
-type liveBedrockStructuredExecutorAdapter struct{ eng *engine.Engine }
-
-func (a liveBedrockStructuredExecutorAdapter) ExecuteStream(ctx context.Context, req app.WorkflowRequest, opts app.WorkflowStreamOptions) (<-chan app.WorkflowStreamEvent, error) {
-	wf, err := dsl.ParseWorkflow(req.WorkflowJSON)
-	if err != nil {
-		ch := make(chan app.WorkflowStreamEvent, 1)
-		ch <- app.WorkflowStreamEvent{Type: "error", Payload: map[string]any{"message": err.Error()}}
-		close(ch)
-		return ch, nil
-	}
-	in, err := a.eng.ExecuteStream(ctx, engine.ExecuteRequest{
-		Workflow: wf, Inputs: req.Inputs, Origin: req.Origin, TraceID: req.TraceID,
-	}, engine.ExecuteStreamOptions{Heartbeat: opts.Heartbeat})
-	if err != nil {
-		ch := make(chan app.WorkflowStreamEvent, 1)
-		ch <- app.WorkflowStreamEvent{Type: "error", Payload: map[string]any{"message": err.Error()}}
-		close(ch)
-		return ch, nil
-	}
-	out := make(chan app.WorkflowStreamEvent, 16)
-	go func() {
-		defer close(out)
-		for ev := range in {
-			out <- app.WorkflowStreamEvent{Type: ev.Type, TraceID: ev.TraceID, Payload: ev.Payload}
-		}
-	}()
-	return out, nil
-}
-
-func (a liveBedrockStructuredExecutorAdapter) Execute(ctx context.Context, req app.WorkflowRequest) (*app.WorkflowResult, error) {
-	wf, err := dsl.ParseWorkflow(req.WorkflowJSON)
-	if err != nil {
-		return &app.WorkflowResult{Status: "error", Error: &app.WorkflowError{Type: "invalid_workflow", Message: err.Error()}}, nil
-	}
-	res, err := a.eng.Execute(ctx, engine.ExecuteRequest{
-		Workflow: wf, Inputs: req.Inputs, Origin: req.Origin, TraceID: req.TraceID,
-	})
-	if err != nil {
-		return &app.WorkflowResult{Status: "error", Error: &app.WorkflowError{Type: "engine_error", Message: err.Error()}}, nil
-	}
-	out := &app.WorkflowResult{TraceID: res.TraceID, Status: res.Status, Result: res.Result}
-	if res.Error != nil {
-		out.Error = &app.WorkflowError{NodeID: res.Error.NodeID, Type: res.Error.Type, Message: res.Error.Message}
-	}
-	if len(res.Nodes) > 0 {
-		out.Nodes = make(map[string]any, len(res.Nodes))
-		for k, v := range res.Nodes {
-			out.Nodes[k] = v
-		}
-	}
-	return out, nil
-}
-
-// @scenario bedrock + anthropic response_format rewrites to forced tool_use
 func TestSync_RealWorkflowEndToEnd_BedrockStructuredOutputs(t *testing.T) {
 	accessKey := os.Getenv("AWS_ACCESS_KEY_ID")
 	secretKey := os.Getenv("AWS_SECRET_ACCESS_KEY")

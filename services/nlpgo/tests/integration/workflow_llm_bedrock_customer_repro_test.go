@@ -35,6 +35,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/services/aigateway/dispatcher"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/dispatcheradapter"
+	"github.com/langwatch/langwatch/services/nlpgo/adapters/engineexec"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/llmexecutor"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
@@ -57,7 +58,7 @@ func setupStackWithLLM_bedrockCustomerRepro(t *testing.T) *stack {
 	codeExec, err := codeblock.New(codeblock.Options{})
 	require.NoError(t, err)
 	eng := engine.New(engine.Options{HTTP: httpExec, Code: codeExec, LLM: llm})
-	executor := liveBedrockStructuredExecutorAdapter{eng: eng}
+	executor := engineexec.New(eng)
 	application := app.New(app.WithWorkflowExecutor(executor))
 	probes := health.New("test")
 	probes.MarkStarted()

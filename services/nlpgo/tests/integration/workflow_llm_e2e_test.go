@@ -40,7 +40,6 @@ import (
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
-	"github.com/langwatch/langwatch/services/nlpgo/app/engine/dsl"
 )
 
 // setupStackWithLLM is the live-test variant of setupStack — wires
