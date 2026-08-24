@@ -1,3 +1,4 @@
+import { GRANT_EVENT_SOURCES } from "@langwatch/authz-server";
 import { describe, expect, it } from "vitest";
 import {
   attachGrantCommandDataSchema,
@@ -256,6 +257,25 @@ describe("the grants ledger's wire boundary", () => {
           },
         }).success,
       ).toBe(false);
+    });
+  });
+
+  describe("when the grant names where it came from", () => {
+    /** The wire derives its enum from `GRANT_EVENT_SOURCES` rather than
+     *  restating it, so adding a source to the vocabulary is the whole
+     *  change. Driving the vocabulary itself is what pins that: a restated
+     *  union would pass for the sources it copied and fail for the new one.
+     *  @scenario "The wire accepts every source the vocabulary names" */
+    it("accepts every source the vocabulary names", () => {
+      for (const source of GRANT_EVENT_SOURCES) {
+        expect(parse({}, { source }).success).toBe(true);
+      }
+    });
+
+    it("refuses a source the vocabulary does not name", () => {
+      expect(parse({}, { source: "a-surface-nobody-declared" }).success).toBe(
+        false,
+      );
     });
   });
 });

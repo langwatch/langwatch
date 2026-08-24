@@ -32,11 +32,16 @@ export type LedgerScopeType = StoredScopeTier;
  * backfill-b and cutover-import of the three-migration model ADR-110 folded
  * into one. The audit subscriber skips it, so a customer's audit page does
  * not fill with thousands of rows for changes nobody made.
+ *
+ * `join-request` is the opposite case, and deliberately so: somebody asked
+ * to join and the request was approved, which is a live change a customer
+ * should see. It stays auditable.
  */
 export const GRANT_EVENT_SOURCES = [
   "grants-service",
   "scim",
   "invite",
+  "join-request",
   "read-through-mint",
   "migration",
 ] as const;

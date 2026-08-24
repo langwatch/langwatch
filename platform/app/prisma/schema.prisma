@@ -2502,7 +2502,7 @@ model Grant {
   // lets a projection reloaded from these rows reconstruct the fact rather
   // than a lossy copy. Null on everything ledger-born; retired at cutover.
   legacyRole String? // ADMIN | MEMBER | VIEWER | CUSTOM
-  source     String // which writer emitted the fact: grants-service | scim | invite | backfill-b | genesis-import | read-through-mint | cutover-import
+  source     String // which writer emitted the fact: grants-service | scim | invite | join-request | read-through-mint | migration (the vocabulary is GRANT_EVENT_SOURCES in @langwatch/authz-server; ADR-110 folded backfill-b, genesis-import and cutover-import into `migration`)
 
   scopeType GrantScopeType
   scopeId   String
