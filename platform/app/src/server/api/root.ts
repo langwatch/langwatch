@@ -32,6 +32,7 @@ import { evaluatorsRouter } from "./routers/evaluators";
 import { experimentsRouter } from "./routers/experiments";
 import { exportRouter } from "./routers/export";
 import { featureFlagRouter } from "./routers/featureFlag";
+import { frontDoorRouter } from "./routers/frontDoor";
 import { gatewayBudgetsRouter } from "./routers/gatewayBudgets";
 import { gatewayCacheRulesRouter } from "./routers/gatewayCacheRules";
 import { gatewayGuardrailsRouter } from "./routers/gatewayGuardrails";
@@ -120,6 +121,7 @@ const coreRouters = {
   automation: automationRouter,
   authz: authzRouter,
   identity: identityRouter,
+  frontDoor: frontDoorRouter,
   experiments: experimentsRouter,
   featureFlag: featureFlagRouter,
   annotation: annotationRouter,

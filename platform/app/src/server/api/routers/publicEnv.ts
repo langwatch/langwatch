@@ -2,6 +2,7 @@ import { resolveGatewayBaseUrl } from "@ee/governance/services/gatewayUrl";
 import { resolveAuthProvider } from "@ee/sso/sso-gate";
 import { RUM_DEFAULT_SAMPLE_RATIO } from "@langwatch/react-rum/constants";
 import { z } from "zod";
+import { signInRouterMode } from "~/server/better-auth/signInRouterShadow";
 import { env } from "../../../env.mjs";
 import { hasEmailProvider } from "../../mailer/providers";
 import { publicProcedure } from "../trpc";
@@ -30,6 +31,13 @@ export const publicEnvRouter = publicProcedure
       // a disabled IdP. `resolveAuthProvider()` is the single source of
       // truth — never read `env.NEXTAUTH_PROVIDER` directly here.
       NEXTAUTH_PROVIDER: await resolveAuthProvider(),
+      // ADR-117 §7: whether the identifier-first screens are the front door
+      // on this deployment. A derived boolean rather than the flag's value,
+      // because the only thing a browser may act on is "are these screens
+      // live" — the router also runs in shadow, and screens never render
+      // then. `signInRouterMode()` is the single source of truth for the
+      // flag, so the live path and the screens can never disagree.
+      IDENTITY_FRONT_DOOR: signInRouterMode() === "enforce",
       DEMO_PROJECT_SLUG: env.DEMO_PROJECT_SLUG,
       NODE_ENV: env.NODE_ENV,
 
