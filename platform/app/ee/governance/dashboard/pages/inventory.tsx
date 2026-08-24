@@ -50,6 +50,7 @@ import {
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { ToolCatalogPanel } from "~/components/governance/ToolCatalogPanel";
 import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import {
   DialogBody,
@@ -193,35 +194,13 @@ function resolvePullConfig(
   return { pullConfig: pullAdapter ? { adapter: pullAdapter } : null };
 }
 
-function IngestionSourcesHeader({
-  isEnterprise,
-  sourceCount,
-  canManage,
-  onAdd,
-}: {
-  isEnterprise: boolean;
-  sourceCount: number;
-  canManage: boolean;
-  onAdd: (sourceType: SourceType) => void;
-}) {
+function InventoryHeader() {
   return (
-    <HStack alignItems="end">
-      <HStack gap={2}>
-        <Heading size="md">Catalog</Heading>
-        <Badge colorPalette="purple" size="sm" variant="surface">
-          Preview
-        </Badge>
-      </HStack>
-      <Spacer />
-      {/* The writes are all `ingestionSources:manage`. A viewer who only
-          reads is not offered a composer the server refuses. */}
-      {canManage && (
-        <AddSourceControl
-          isEnterprise={isEnterprise}
-          sourceCount={sourceCount}
-          onAdd={onAdd}
-        />
-      )}
+    <HStack gap={2}>
+      <Heading size="md">Inventory</Heading>
+      <Badge colorPalette="purple" size="sm" variant="surface">
+        Preview
+      </Badge>
     </HStack>
   );
 }
@@ -506,6 +485,8 @@ function useIngestionSourcesPage() {
   const { isEnterprise } = useActivePlan();
   const canRead = hasAnyPermission("ingestionSources:view");
   const canManage = hasAnyPermission("ingestionSources:manage");
+  // The Catalog pane's own grant — decides the inventory default tab.
+  const canManageCatalog = hasAnyPermission("aiTools:manage");
 
   const sourcesQuery = api.ingestionSources.list.useQuery(
     { organizationId: orgId },
@@ -536,11 +517,30 @@ function useIngestionSourcesPage() {
     if (input) mutations.create.mutate(input);
   };
 
+  /**
+   * Open the composer on a fresh draft for the picked type — a draft left
+   * over from a different type must never leak its parser or OTTL state
+   * into this one.
+   */
+  const startComposer = (sourceType: SourceType) => {
+    setComposer({ ...blankComposer(), sourceType });
+    setComposing(true);
+  };
+
+  /** Close the composer and drop the draft. */
+  const closeComposer = () => {
+    setComposing(false);
+    setComposer(blankComposer());
+  };
+
   return {
     orgId,
     isEnterprise,
     canRead,
     canManage,
+    canManageCatalog,
+    startComposer,
+    closeComposer,
     sourcesQuery,
     grouped: useGroupedSources(sourcesQuery.data),
     composing,
@@ -557,51 +557,72 @@ function useIngestionSourcesPage() {
 }
 
 /**
- * The catalog's tabs. Sources is the only one today and therefore the
- * default; later tabs (the tool grid) hang off this list.
+ * The inventory's tabs: Catalog (the tool-tiles editor, formerly
+ * /governance/tool-catalog) and Sources (the ingestion-sources table).
  */
-const CATALOG_TABS = ["sources"] as const;
-type CatalogTab = (typeof CATALOG_TABS)[number];
-const DEFAULT_CATALOG_TAB: CatalogTab = "sources";
+const INVENTORY_TABS = ["catalog", "sources"] as const;
+type InventoryTab = (typeof INVENTORY_TABS)[number];
 
-const isCatalogTab = (value: string | null): value is CatalogTab =>
-  CATALOG_TABS.some((tab) => tab === value);
+const isInventoryTab = (value: string | null): value is InventoryTab =>
+  INVENTORY_TABS.some((tab) => tab === value);
 
 /**
- * Which tab is open is part of the address (?tab=), so a shared link lands
- * on the same pane. The default stays out of the address entirely, and an
- * unknown or stale value degrades to the default instead of a blank pane.
+ * A selected non-default tab is part of the address (?tab=); the default
+ * stays out of it, and an unknown or stale value degrades to the default
+ * instead of a blank pane. The default is permission-sensitive — Catalog
+ * for aiTools:manage holders, Sources otherwise — so the BARE address
+ * means "your default pane" and can resolve differently for different
+ * recipients of the same link. Accepted deliberately (see the spec): the
+ * ?tab= form is the stable shareable address.
  */
-function useCatalogTab() {
+function useInventoryTab({ defaultTab }: { defaultTab: InventoryTab }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get("tab");
-  const catalogTab = isCatalogTab(requestedTab)
-    ? requestedTab
-    : DEFAULT_CATALOG_TAB;
-  const selectCatalogTab = (tab: string) =>
+  const inventoryTab = isInventoryTab(requestedTab) ? requestedTab : defaultTab;
+  const selectInventoryTab = (tab: string) =>
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
-        if (tab === DEFAULT_CATALOG_TAB) next.delete("tab");
+        if (tab === defaultTab) next.delete("tab");
         else next.set("tab", tab);
         return next;
       },
       { replace: true },
     );
-  return { catalogTab, selectCatalogTab };
+  return { inventoryTab, selectInventoryTab };
 }
 
-/** The catalog's tab shell; the sources table is the only pane today. */
-function CatalogTabs({ children }: { children: ReactNode }) {
-  const { catalogTab, selectCatalogTab } = useCatalogTab();
+/**
+ * The inventory's tab shell. The Catalog pane mounts the tool-tiles
+ * editor; the Sources pane renders the children (the sources table) under
+ * an optional actions row (the add-source control, which belongs beside
+ * the list it adds to).
+ */
+function InventoryTabs({
+  defaultTab,
+  sourcesActions,
+  children,
+}: {
+  defaultTab: InventoryTab;
+  sourcesActions?: ReactNode;
+  children: ReactNode;
+}) {
+  const { inventoryTab, selectInventoryTab } = useInventoryTab({ defaultTab });
   return (
     <Tabs.Root
-      value={catalogTab}
-      onValueChange={({ value }) => selectCatalogTab(value)}
+      value={inventoryTab}
+      onValueChange={({ value }) => selectInventoryTab(value)}
       variant="line"
       lazyMount
     >
       <Tabs.List>
+        <Tabs.Trigger
+          value="catalog"
+          color="fg.muted"
+          _selected={{ color: "fg", fontWeight: "semibold" }}
+        >
+          Catalog
+        </Tabs.Trigger>
         <Tabs.Trigger
           value="sources"
           color="fg.muted"
@@ -610,21 +631,31 @@ function CatalogTabs({ children }: { children: ReactNode }) {
           Sources
         </Tabs.Trigger>
       </Tabs.List>
-      <Tabs.Content value="sources">{children}</Tabs.Content>
+      <Tabs.Content value="catalog" paddingTop={4}>
+        <ToolCatalogPanel />
+      </Tabs.Content>
+      <Tabs.Content value="sources" paddingTop={4}>
+        <VStack align="stretch" gap={4} width="full">
+          {sourcesActions}
+          {children}
+        </VStack>
+      </Tabs.Content>
     </Tabs.Root>
   );
 }
 
-function IngestionSourcesPage() {
+function InventoryPage() {
   const {
     orgId,
     isEnterprise,
     canRead,
     canManage,
+    canManageCatalog,
+    startComposer,
+    closeComposer,
     sourcesQuery,
     grouped,
     composing,
-    setComposing,
     composer,
     setComposer,
     editingSourceId,
@@ -636,21 +667,9 @@ function IngestionSourcesPage() {
   } = useIngestionSourcesPage();
 
   return (
-    <GovernanceLayout pageTitle="Catalog · Governance · LangWatch">
+    <GovernanceLayout pageTitle="Inventory · Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
-        <IngestionSourcesHeader
-          isEnterprise={isEnterprise}
-          sourceCount={sourcesQuery.data?.length ?? 0}
-          canManage={canManage}
-          onAdd={(sourceType) => {
-            // Always start from a blank composer for the picked type — a
-            // draft left over from a different type must never leak its
-            // parser or OTTL state into this one.
-            setComposer({ ...blankComposer(), sourceType });
-            setComposing(true);
-          }}
-        />
-
+        <InventoryHeader />
         <SourceComposerDrawer
           isOpen={composing}
           organizationId={orgId}
@@ -658,13 +677,21 @@ function IngestionSourcesPage() {
           setComposer={setComposer}
           isPending={mutations.create.isPending}
           onSubmit={onSubmit}
-          onClose={() => {
-            setComposing(false);
-            setComposer(blankComposer());
-          }}
+          onClose={closeComposer}
         />
 
-        <CatalogTabs>
+        <InventoryTabs
+          defaultTab={canManageCatalog ? "catalog" : "sources"}
+          sourcesActions={
+            canManage ? (
+              <SourcesActionsRow
+                isEnterprise={isEnterprise}
+                sourceCount={sourcesQuery.data?.length ?? 0}
+                onAdd={startComposer}
+              />
+            ) : undefined
+          }
+        >
           <IngestionSourceList
             canRead={canRead}
             canManage={canManage}
@@ -681,23 +708,74 @@ function IngestionSourcesPage() {
               mutations.archive.mutate({ organizationId: orgId, id })
             }
           />
-        </CatalogTabs>
+        </InventoryTabs>
       </VStack>
 
       <SecretModal details={secretModal} onClose={() => setSecretModal(null)} />
 
-      <SourceEditDrawer
-        organizationId={orgId}
-        source={
-          editingSourceId
-            ? (sourcesQuery.data?.find((s) => s.id === editingSourceId) ?? null)
-            : null
-        }
-        onClose={() => setEditingSourceId(null)}
-        onSubmit={(input) => mutations.update.mutate(input)}
-        isPending={mutations.update.isPending}
+      <EditingSourceDrawer
+        orgId={orgId}
+        editingSourceId={editingSourceId}
+        setEditingSourceId={setEditingSourceId}
+        sourcesQuery={sourcesQuery}
+        update={mutations.update}
       />
     </GovernanceLayout>
+  );
+}
+
+/** The edit drawer, resolved from the id the list put in page state. */
+function EditingSourceDrawer({
+  orgId,
+  editingSourceId,
+  setEditingSourceId,
+  sourcesQuery,
+  update,
+}: {
+  orgId: string;
+  editingSourceId: string | null;
+  setEditingSourceId: (id: string | null) => void;
+  sourcesQuery: ReturnType<typeof useIngestionSourcesPage>["sourcesQuery"];
+  update: ReturnType<typeof useIngestionSourcesPage>["mutations"]["update"];
+}) {
+  return (
+    <SourceEditDrawer
+      organizationId={orgId}
+      source={
+        editingSourceId
+          ? (sourcesQuery.data?.find((s) => s.id === editingSourceId) ?? null)
+          : null
+      }
+      onClose={() => setEditingSourceId(null)}
+      onSubmit={(input) => update.mutate(input)}
+      isPending={update.isPending}
+    />
+  );
+}
+
+/**
+ * The right-aligned add-source row at the top of the Sources pane.
+ * Mounted only for `ingestionSources:manage` holders — a viewer who only
+ * reads is not offered a composer the server refuses.
+ */
+function SourcesActionsRow({
+  isEnterprise,
+  sourceCount,
+  onAdd,
+}: {
+  isEnterprise: boolean;
+  sourceCount: number;
+  onAdd: (sourceType: SourceType) => void;
+}) {
+  return (
+    <HStack>
+      <Spacer />
+      <AddSourceControl
+        isEnterprise={isEnterprise}
+        sourceCount={sourceCount}
+        onAdd={onAdd}
+      />
+    </HStack>
   );
 }
 
@@ -768,7 +846,7 @@ function SourceRow({
       <VStack align="start" gap={0} flex={1} minWidth={0}>
         <HStack gap={2}>
           <Link
-            href={`/governance/catalog/${source.id}`}
+            href={`/governance/inventory/${source.id}`}
             color="fg"
             _hover={{ color: "orange.600" }}
           >
@@ -2304,7 +2382,7 @@ function SecretModal({
           </VStack>
         </DialogBody>
         <DialogFooter>
-          <Link href={`/governance/catalog/${details.sourceId}`}>
+          <Link href={`/governance/inventory/${details.sourceId}`}>
             <Button variant="outline">View source page →</Button>
           </Link>
           <Button colorPalette="blue" onClick={onClose}>
@@ -2321,5 +2399,5 @@ export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
 })(
   withPermissionGuard("governance:view", {
     bypassOnboardingRedirect: true,
-  })(IngestionSourcesPage),
+  })(InventoryPage),
 );

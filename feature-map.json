@@ -1044,7 +1044,7 @@
         },
         {
           "id": "ai-gateway.ingest",
-          "name": "Catalog (ingestion)",
+          "name": "Inventory (ingestion)",
           "description": "OCSF-normalised event ingestion: inspect ingestion sources, tail events, check health, and recover coding-agent conversation content",
           "surfaces": {
             "code": {
@@ -1062,7 +1062,7 @@
               "docs": "https://langwatch.ai/docs/ai-gateway/governance/overview.md"
             },
             "platform": {
-              "ui": "/governance/catalog",
+              "ui": "/governance/inventory",
               "mcp": null,
               "skill": null,
               "docs": null

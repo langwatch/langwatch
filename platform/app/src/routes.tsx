@@ -212,16 +212,15 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/governance/index")),
       },
       {
-        // The catalog: a tabbed shell whose only tab today is Sources (the
-        // ingestion-sources table). The retired /governance/ingestion-sources
-        // prefix redirects here via legacyRedirectRoutes.
-        path: "/governance/catalog",
-        ...page(
-          () => import("@ee/governance/dashboard/pages/ingestion-sources"),
-        ),
+        // The inventory: a tabbed shell — Catalog (the tool-tiles editor)
+        // and Sources (the ingestion-sources table). The retired
+        // /governance/{catalog,ingestion-sources,tool-catalog} addresses
+        // redirect here via legacyRedirectRoutes.
+        path: "/governance/inventory",
+        ...page(() => import("@ee/governance/dashboard/pages/inventory")),
       },
       {
-        path: "/governance/catalog/:id",
+        path: "/governance/inventory/:id",
         ...page(
           () =>
             import("@ee/governance/dashboard/pages/ingestion-source-detail"),
@@ -232,22 +231,29 @@ const routes: RouteObject[] = [
         ...page(() => import("@ee/governance/dashboard/pages/anomaly-rules")),
       },
       {
-        path: "/governance/tool-catalog",
-        ...page(() => import("./pages/governance/tool-catalog")),
+        path: "/governance/people",
+        ...page(() => import("./pages/governance/people")),
       },
       {
-        path: "/governance/departments",
-        ...page(() => import("./pages/governance/departments")),
+        // Behind release_ui_governance_billed_cost_enabled (the pages
+        // guard themselves); the nav items are filtered on the same flag.
+        path: "/governance/costs",
+        ...page(() => import("./pages/governance/costs")),
       },
       {
-        // The departments page was once named cost centers; old bookmarks
-        // land on the new name (the legacy /settings/governance/cost-centers
-        // address chains through here).
+        path: "/governance/billed",
+        ...page(() => import("./pages/governance/billed")),
+      },
+      {
+        // The people page has been cost centers and then departments; old
+        // bookmarks land on the newest name in one hop (the legacy
+        // /settings/governance/cost-centers address chains through here,
+        // and /governance/departments redirects via legacyRedirectRoutes).
         path: "/governance/cost-centers",
         element: (
           <LegacyPrefixRedirect
             from="/governance/cost-centers"
-            to="/governance/departments"
+            to="/governance/people"
           />
         ),
       },
