@@ -276,7 +276,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/governance/anomaly-rules.feature",
   "specs/ai-gateway/governance/architecture-invariants.feature",
   "specs/ai-gateway/governance/birds-eye-dashboard-v2.feature",
-  "specs/ai-gateway/governance/c3-alert-dispatch.feature",
   "specs/ai-gateway/governance/cli-402-license-gate.feature",
   "specs/ai-gateway/governance/cli-deep-links.feature",
   "specs/ai-gateway/governance/cli-ingest-debug.feature",

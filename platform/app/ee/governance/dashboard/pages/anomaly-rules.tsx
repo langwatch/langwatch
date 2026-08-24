@@ -408,6 +408,45 @@ function buildRulePayload({
   };
 }
 
+function emailRecipientsFromDestinationConfig(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw || "{}") as {
+      destinations?: Array<{ type?: string; to?: unknown }>;
+    };
+    const email = parsed.destinations?.find(({ type }) => type === "email");
+    return Array.isArray(email?.to) ? email.to.join("\n") : "";
+  } catch {
+    return "";
+  }
+}
+
+function destinationConfigWithEmailRecipients(
+  raw: string,
+  recipientsText: string,
+): string {
+  const parsed = JSON.parse(raw || "{}") as {
+    destinations?: Array<Record<string, unknown>>;
+  };
+  const destinations = (parsed.destinations ?? []).filter(
+    ({ type }) => type !== "email",
+  );
+  const to = recipientsText
+    .split(/[\n,]/)
+    .map((address) => address.trim())
+    .filter(Boolean);
+  return JSON.stringify(
+    {
+      ...parsed,
+      destinations: [
+        ...destinations,
+        ...(to.length ? [{ type: "email", to }] : []),
+      ],
+    },
+    null,
+    2,
+  );
+}
+
 /** The three mutations the page drives, with their toasts and cache busting. */
 function useAnomalyRuleMutations({
   refetch,
@@ -980,13 +1019,13 @@ function RuleComposer({
               borderRadius="sm"
             >
               <Text fontSize="xs" color="purple.900">
-                <strong>Alert destinations:</strong> alerts surface on the{" "}
+                <strong>Alert destinations:</strong> alerts always surface on
+                the{" "}
                 <Link href="/governance" color="blue.600">
                   governance dashboard
                 </Link>{" "}
-                today. Slack, PagerDuty, webhook, and email destinations ship in
-                a follow-up release — the composer will gain structured
-                destination fields then. (See{" "}
+                . Add up to 10 active organization-member email addresses below,
+                one per line. Existing webhook destinations are preserved. (See{" "}
                 <Link
                   href="/ai-gateway/governance/anomaly-rules"
                   color="blue.600"
@@ -995,6 +1034,26 @@ function RuleComposer({
                 </Link>{" "}
                 for the dispatch coverage table.)
               </Text>
+              <Textarea
+                marginTop={3}
+                size="sm"
+                backgroundColor="white"
+                rows={3}
+                aria-label="Email alert recipients"
+                placeholder={"member@example.com\nadmin@example.com"}
+                value={emailRecipientsFromDestinationConfig(
+                  composer.destinationConfig,
+                )}
+                onChange={(event) =>
+                  setComposer({
+                    ...composer,
+                    destinationConfig: destinationConfigWithEmailRecipients(
+                      composer.destinationConfig,
+                      event.target.value,
+                    ),
+                  })
+                }
+              />
             </Box>
           </VStack>
         </Drawer.Body>

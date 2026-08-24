@@ -132,6 +132,113 @@ const baseInput = (suffix: string) => ({
 });
 
 describe("AnomalyRule.thresholdConfig — structured schema", () => {
+  describe("email destination recipients", () => {
+    /** @scenario Email destination recipients must be active organization members */
+    it("accepts an organization member and rejects an outside address", async () => {
+      const caller = callerFor(adminUserId);
+      const memberEmail = `tcfg-admin-${ns}@example.com`;
+      const created = await caller.anomalyRules.create({
+        ...baseInput("member-email"),
+        thresholdConfig: validSpendSpikeConfig,
+        destinationConfig: {
+          destinations: [
+            { type: "email", to: [` ${memberEmail.toUpperCase()} `] },
+          ],
+        },
+      });
+      expect(created.destinationConfig).toEqual({
+        destinations: [{ type: "email", to: [memberEmail] }],
+      });
+
+      const updated = await caller.anomalyRules.update({
+        organizationId,
+        id: created.id,
+        destinationConfig: {
+          destinations: [{ type: "email", to: [memberEmail.toUpperCase()] }],
+        },
+      });
+      expect(updated.destinationConfig).toEqual({
+        destinations: [{ type: "email", to: [memberEmail] }],
+      });
+
+      await expect(
+        caller.anomalyRules.create({
+          ...baseInput("outside-email"),
+          thresholdConfig: validSpendSpikeConfig,
+          destinationConfig: {
+            destinations: [{ type: "email", to: ["outside@example.com"] }],
+          },
+        }),
+      ).rejects.toMatchObject({ data: { code: "validation_error" } });
+
+      await prisma.organizationUser.update({
+        where: {
+          userId_organizationId: { userId: adminUserId, organizationId },
+        },
+        data: { disabledAt: new Date() },
+      });
+      await expect(
+        caller.anomalyRules.update({
+          organizationId,
+          id: created.id,
+          destinationConfig: {
+            destinations: [{ type: "email", to: [memberEmail] }],
+          },
+        }),
+      ).rejects.toBeDefined();
+      await prisma.organizationUser.update({
+        where: {
+          userId_organizationId: { userId: adminUserId, organizationId },
+        },
+        data: { disabledAt: null },
+      });
+
+      await prisma.user.update({
+        where: { id: adminUserId },
+        data: { deactivatedAt: new Date() },
+      });
+      await expect(
+        caller.anomalyRules.create({
+          ...baseInput("deactivated-email"),
+          thresholdConfig: validSpendSpikeConfig,
+          destinationConfig: {
+            destinations: [{ type: "email", to: [memberEmail] }],
+          },
+        }),
+      ).rejects.toBeDefined();
+      await prisma.user.update({
+        where: { id: adminUserId },
+        data: { deactivatedAt: null },
+      });
+
+      const orphan = await prisma.user.create({
+        data: { email: `orphan-${ns}@example.com` },
+      });
+      await prisma.organizationUser.create({
+        data: {
+          userId: orphan.id,
+          organizationId,
+          role: OrganizationUserRole.MEMBER,
+        },
+      });
+      await prisma.user.delete({ where: { id: orphan.id } });
+      await expect(
+        caller.anomalyRules.create({
+          ...baseInput("orphan-email"),
+          thresholdConfig: validSpendSpikeConfig,
+          destinationConfig: {
+            destinations: [
+              { type: "email", to: [memberEmail, `orphan-${ns}@example.com`] },
+            ],
+          },
+        }),
+      ).rejects.toBeDefined();
+      await prisma.organizationUser.delete({
+        where: { userId_organizationId: { userId: orphan.id, organizationId } },
+      });
+    });
+  });
+
   describe("valid configs round-trip", () => {
     /** @scenario A valid spend_spike threshold config persists unchanged */
     it("persists a valid spend_spike config exactly as supplied", async () => {

@@ -217,10 +217,19 @@ export interface RecentAnomalyRow {
   state: string;
   currentState: "open" | "acknowledged" | "resolved";
   detail: Record<string, unknown>;
+  emailDeliveryStatus: EmailDeliveryStatus | null;
   /** Back-compat alias - same as `ruleName`, used by the iter-10 dashboard renderer. */
   rule: string;
   /** Best-effort source label pulled from `detail` for the dashboard row. */
   sourceLabel: string;
+}
+
+export interface EmailDeliveryStatus {
+  status: "accepted" | "partial_failure" | "failed";
+  acceptedCount: number;
+  failedCount: number;
+  totalCount: number;
+  updatedAtIso: string;
 }
 
 export interface SourceHealthMetrics {
@@ -1259,6 +1268,7 @@ export class ActivityMonitorService {
       state: row.state,
       currentState: row.state as "open" | "acknowledged" | "resolved",
       detail: row.detail as Record<string, unknown>,
+      emailDeliveryStatus: parseEmailDeliveryStatus(row.destinationStatus),
       // Back-compat aliases for the existing /governance dashboard
       // (renderer was sketched against the iter-10 mock shape).
       rule: row.ruleName,
@@ -1720,4 +1730,23 @@ export class ActivityMonitorService {
       lastSuccessIso: lastMs > 0 ? new Date(lastMs).toISOString() : null,
     };
   }
+}
+
+function parseEmailDeliveryStatus(value: unknown): EmailDeliveryStatus | null {
+  if (!value || typeof value !== "object" || !("email" in value)) return null;
+  const email = (value as { email?: unknown }).email;
+  if (!email || typeof email !== "object") return null;
+  const candidate = email as Record<string, unknown>;
+  if (
+    !["accepted", "partial_failure", "failed"].includes(
+      String(candidate.status),
+    ) ||
+    typeof candidate.acceptedCount !== "number" ||
+    typeof candidate.failedCount !== "number" ||
+    typeof candidate.totalCount !== "number" ||
+    typeof candidate.updatedAtIso !== "string"
+  ) {
+    return null;
+  }
+  return candidate as unknown as EmailDeliveryStatus;
 }

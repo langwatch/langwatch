@@ -38,7 +38,10 @@ import type {
   Prisma,
   PrismaClient,
 } from "~/generated/prisma/client";
-import { AnomalyAlertDispatcherService } from "./activity-monitor/anomalyAlertDispatcher.service";
+import {
+  AnomalyAlertDispatcherService,
+  type DispatchOutcome,
+} from "./activity-monitor/anomalyAlertDispatcher.service";
 import { safeParseSpendSpikeThresholdConfig } from "./activity-monitor/thresholdConfig.schema";
 import type { GovernanceKpisClickHouseRepository } from "./governanceKpis.clickhouse.repository";
 import { PROJECT_KIND } from "./governanceProject.service";
@@ -370,15 +373,14 @@ export class SpendSpikeAnomalyEvaluator {
     // evaluator stays log-only-equivalent on permanent webhook
     // failures.
     let dispatchTag: string;
-    let dispatchOutcomes: Prisma.InputJsonValue = [];
+    let dispatchOutcomes: DispatchOutcome[] = [];
     try {
       const dispatchResult = await this.dispatcher.dispatchAlert({
         rule,
         alert,
       });
       dispatchTag = dispatchResult.dispatchTag;
-      dispatchOutcomes =
-        dispatchResult.outcomes as unknown as Prisma.InputJsonValue;
+      dispatchOutcomes = dispatchResult.outcomes;
     } catch (err) {
       logger.error(
         {
@@ -399,11 +401,44 @@ export class SpendSpikeAnomalyEvaluator {
         detail: {
           ...(alert.detail as Record<string, unknown>),
           dispatch: dispatchTag,
-          dispatchOutcomes,
+          dispatchOutcomes:
+            dispatchOutcomes as unknown as Prisma.InputJsonValue,
         },
+        destinationStatus: buildDestinationStatus(
+          dispatchOutcomes,
+        ) as Prisma.InputJsonValue,
       },
     });
   }
+}
+
+function buildDestinationStatus(
+  outcomes: DispatchOutcome[],
+): Record<string, unknown> {
+  const emailOutcomes = outcomes.filter((outcome) => outcome.type === "email");
+  const acceptedCount = emailOutcomes.reduce(
+    (count, outcome) => count + (outcome.acceptedCount ?? 0),
+    0,
+  );
+  const failedCount = emailOutcomes.reduce(
+    (count, outcome) => count + (outcome.failedCount ?? 0),
+    0,
+  );
+  if (emailOutcomes.length === 0) return {};
+  return {
+    email: {
+      status:
+        failedCount === 0
+          ? "accepted"
+          : acceptedCount > 0
+            ? "partial_failure"
+            : "failed",
+      acceptedCount,
+      failedCount,
+      totalCount: acceptedCount + failedCount,
+      updatedAtIso: new Date().toISOString(),
+    },
+  };
 }
 
 /**

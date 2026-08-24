@@ -11,7 +11,7 @@
  *
  * Spec: specs/ai-gateway/governance/anomaly-rules.feature
  */
-import { NotFoundError } from "@langwatch/handled-error";
+import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type {
   AnomalyRule,
@@ -19,7 +19,11 @@ import type {
   PrismaClient,
 } from "~/generated/prisma/client";
 
-import { validateDestinationConfig } from "./destinationConfig.schema";
+import {
+  type DestinationConfigParsed,
+  validateDestinationConfig,
+} from "./destinationConfig.schema";
+import { resolveActiveOrganizationMemberEmails } from "./organizationMemberEmails";
 import { validateThresholdConfig } from "./thresholdConfig.schema";
 import { unsupportedValue } from "./unsupportedValue";
 
@@ -161,7 +165,9 @@ export class AnomalyRuleService {
       input.destinationConfig !== undefined &&
       Object.keys(input.destinationConfig).length > 0
     ) {
-      validateDestinationConfig(input.destinationConfig);
+      const config = validateDestinationConfig(input.destinationConfig);
+      await this.validateEmailRecipients(input.organizationId, config);
+      input.destinationConfig = config;
     }
     return this.prisma.anomalyRule.create({
       data: {
@@ -236,7 +242,9 @@ export class AnomalyRuleService {
       // (back to log-only). Anything non-empty must round-trip the
       // strict schema.
       if (Object.keys(input.destinationConfig).length > 0) {
-        validateDestinationConfig(input.destinationConfig);
+        const config = validateDestinationConfig(input.destinationConfig);
+        await this.validateEmailRecipients(input.organizationId, config);
+        input.destinationConfig = config;
       }
       data.destinationConfig = input.destinationConfig as Prisma.InputJsonValue;
     }
@@ -253,5 +261,29 @@ export class AnomalyRuleService {
       where: { id: existing.id },
       data: { archivedAt: new Date(), status: "disabled" },
     });
+  }
+
+  private async validateEmailRecipients(
+    organizationId: string,
+    config: DestinationConfigParsed,
+  ): Promise<void> {
+    const recipients = config.destinations.flatMap((destination) =>
+      destination.type === "email" ? destination.to : [],
+    );
+    if (recipients.length === 0) return;
+
+    const memberEmails = new Set(
+      await resolveActiveOrganizationMemberEmails({
+        prisma: this.prisma,
+        organizationId,
+      }),
+    );
+    if (recipients.some((recipient) => !memberEmails.has(recipient))) {
+      const complaint =
+        "Email destination recipients must be active organization members.";
+      throw new ValidationError(complaint, {
+        meta: { formErrors: [complaint] },
+      });
+    }
   }
 }

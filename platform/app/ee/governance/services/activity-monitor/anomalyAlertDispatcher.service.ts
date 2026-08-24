@@ -18,14 +18,19 @@
  */
 import { createHmac } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
+import { env } from "~/env.mjs";
 import type { AnomalyAlert, AnomalyRule } from "~/generated/prisma/client";
+import { prisma } from "~/server/db";
+import { sendGovernanceAlertEmail } from "~/server/mailer/governanceAlertEmail";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 
 import {
   type Destination,
+  type EmailDestination,
   safeParseDestinationConfig,
   type WebhookDestination,
 } from "./destinationConfig.schema";
+import { resolveActiveOrganizationMemberEmails } from "./organizationMemberEmails";
 
 const logger = createLogger("langwatch:anomaly-alert-dispatcher");
 
@@ -50,7 +55,29 @@ export type DispatchOutcome =
       type: "webhook";
       status: "failed";
       reason: string;
+    }
+  | {
+      destinationIndex: number;
+      type: "email";
+      status: "succeeded" | "partial_failure";
+      acceptedCount: number;
+      failedCount: number;
+      totalCount: number;
+    }
+  | {
+      destinationIndex: number;
+      type: "email";
+      status: "failed";
+      reason: string;
+      acceptedCount?: number;
+      failedCount?: number;
+      totalCount?: number;
     };
+
+export type SendGovernanceAlertEmailLike = typeof sendGovernanceAlertEmail;
+export type ListOrganizationMemberEmails = (
+  organizationId: string,
+) => Promise<string[]>;
 
 export type DispatchResult = {
   /** Tag written to AnomalyAlert.detail.dispatch for audit/UX. */
@@ -59,10 +86,22 @@ export type DispatchResult = {
 };
 
 export class AnomalyAlertDispatcherService {
-  constructor(private readonly fetchImpl: FetchLike = defaultFetch) {}
+  constructor(
+    private readonly fetchImpl: FetchLike = defaultFetch,
+    private readonly sendEmailImpl: SendGovernanceAlertEmailLike = sendGovernanceAlertEmail,
+    private readonly listOrganizationMemberEmails: ListOrganizationMemberEmails = defaultListOrganizationMemberEmails,
+  ) {}
 
-  static create(fetchImpl?: FetchLike): AnomalyAlertDispatcherService {
-    return new AnomalyAlertDispatcherService(fetchImpl);
+  static create(
+    fetchImpl?: FetchLike,
+    sendEmailImpl?: SendGovernanceAlertEmailLike,
+    listOrganizationMemberEmails?: ListOrganizationMemberEmails,
+  ): AnomalyAlertDispatcherService {
+    return new AnomalyAlertDispatcherService(
+      fetchImpl,
+      sendEmailImpl,
+      listOrganizationMemberEmails,
+    );
   }
 
   async dispatchAlert({
@@ -100,12 +139,38 @@ export class AnomalyAlertDispatcherService {
     const outcomes: DispatchOutcome[] = [];
     for (let i = 0; i < parsed.data.destinations.length; i++) {
       const dest = parsed.data.destinations[i]!;
-      const outcome = await this.dispatchOne({
-        destination: dest,
-        body,
-        destinationIndex: i,
-        ruleId: rule.id,
-      });
+      let outcome: DispatchOutcome;
+      try {
+        outcome = await this.dispatchOne({
+          destination: dest,
+          body,
+          destinationIndex: i,
+          rule,
+          alert,
+        });
+      } catch {
+        logger.warn(
+          { ruleId: rule.id, destinationIndex: i, type: dest.type },
+          "anomaly alert destination dispatch failed",
+        );
+        outcome =
+          dest.type === "email"
+            ? {
+                destinationIndex: i,
+                type: "email",
+                status: "failed",
+                reason: "destination dispatch failed",
+                acceptedCount: 0,
+                failedCount: dest.to.length,
+                totalCount: dest.to.length,
+              }
+            : {
+                destinationIndex: i,
+                type: "webhook",
+                status: "failed",
+                reason: "destination dispatch failed",
+              };
+      }
       outcomes.push(outcome);
     }
     return { dispatchTag: summariseOutcomes(outcomes), outcomes };
@@ -115,29 +180,98 @@ export class AnomalyAlertDispatcherService {
     destination,
     body,
     destinationIndex,
-    ruleId,
+    rule,
+    alert,
   }: {
     destination: Destination;
     body: string;
     destinationIndex: number;
-    ruleId: string;
+    rule: AnomalyRule;
+    alert: AnomalyAlert;
   }): Promise<DispatchOutcome> {
-    if (destination.type !== "webhook") {
-      // Discriminator schema only allows "webhook" today; this
-      // branch keeps the exhaustiveness for future destinations.
-      return {
+    if (destination.type === "email") {
+      return this.dispatchEmail({
+        destination,
         destinationIndex,
-        type: "webhook",
-        status: "failed",
-        reason: `Unsupported destination type`,
-      };
+        rule,
+        alert,
+      });
     }
     return this.dispatchWebhook({
       destination,
       body,
       destinationIndex,
-      ruleId,
+      ruleId: rule.id,
     });
+  }
+
+  private async dispatchEmail({
+    destination,
+    destinationIndex,
+    rule,
+    alert,
+  }: {
+    destination: EmailDestination;
+    destinationIndex: number;
+    rule: AnomalyRule;
+    alert: AnomalyAlert;
+  }): Promise<DispatchOutcome> {
+    const memberEmails = new Set(
+      (await this.listOrganizationMemberEmails(rule.organizationId)).map(
+        (email) => email.toLowerCase(),
+      ),
+    );
+    if (destination.to.some((address) => !memberEmails.has(address))) {
+      return {
+        destinationIndex,
+        type: "email",
+        status: "failed",
+        reason: "recipient is not an active organization member",
+        acceptedCount: 0,
+        failedCount: destination.to.length,
+        totalCount: destination.to.length,
+      };
+    }
+
+    const dashboardUrl = `${(env.BASE_HOST ?? "https://app.langwatch.ai").replace(/\/$/, "")}/governance`;
+    const results = await Promise.allSettled(
+      destination.to.map((to) =>
+        this.sendEmailImpl({
+          to,
+          monitorName: "Activity Monitor",
+          ruleName: rule.name,
+          source: safeSourceLabel(rule),
+          windowStartIso: alert.triggerWindowStart.toISOString(),
+          windowEndIso: alert.triggerWindowEnd.toISOString(),
+          dashboardUrl,
+        }),
+      ),
+    );
+    const failed = results.filter((result) => result.status === "rejected");
+    if (failed.length === 0) {
+      return {
+        destinationIndex,
+        type: "email",
+        status: "succeeded",
+        acceptedCount: results.length,
+        failedCount: 0,
+        totalCount: results.length,
+      };
+    }
+
+    logger.warn(
+      { ruleId: rule.id, destinationIndex, failed: failed.length },
+      "anomaly alert email dispatch failed",
+    );
+    return {
+      destinationIndex,
+      type: "email",
+      status: failed.length === results.length ? "failed" : "partial_failure",
+      reason: `${failed.length} of ${results.length} email deliveries failed`,
+      acceptedCount: results.length - failed.length,
+      failedCount: failed.length,
+      totalCount: results.length,
+    };
   }
 
   private async dispatchWebhook({
@@ -237,13 +371,19 @@ function buildAlertPayload({
 }
 
 function summariseOutcomes(outcomes: DispatchOutcome[]): string {
-  const succeeded = outcomes.filter((o) => o.status === "succeeded").length;
-  const failed = outcomes.filter((o) => o.status === "failed").length;
-  if (succeeded > 0 && failed === 0) return `dispatched_webhook_${succeeded}`;
+  const succeeded = outcomes.filter(
+    (o) => o.status === "succeeded" || o.status === "partial_failure",
+  ).length;
+  const failed = outcomes.filter(
+    (o) => o.status === "failed" || o.status === "partial_failure",
+  ).length;
+  const types = [...new Set(outcomes.map((outcome) => outcome.type))];
+  const type = types.length === 1 ? types[0] : "destinations";
+  if (succeeded > 0 && failed === 0) return `dispatched_${type}_${succeeded}`;
   if (succeeded > 0 && failed > 0) {
-    return `dispatched_webhook_${succeeded}_failed_${failed}`;
+    return `dispatched_${type}_${succeeded}_failed_${failed}`;
   }
-  return `failed_webhook_${failed}`;
+  return `failed_${type}_${failed}`;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -264,3 +404,15 @@ const defaultFetch: FetchLike = async (url, init) => {
     statusText: res.statusText,
   };
 };
+
+const defaultListOrganizationMemberEmails: ListOrganizationMemberEmails =
+  async (organizationId) =>
+    resolveActiveOrganizationMemberEmails({ prisma, organizationId });
+
+function safeSourceLabel(rule: AnomalyRule): string {
+  if (rule.scope === "source") return "Configured ingestion source";
+  if (rule.scope === "source_type") return `Source type: ${rule.scopeId}`;
+  if (rule.scope === "team") return "All sources in the configured team";
+  if (rule.scope === "project") return "All sources in the configured project";
+  return "All organization sources";
+}
