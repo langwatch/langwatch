@@ -19,8 +19,19 @@ const { mockComplete } = vi.hoisted(() => ({
   mockComplete: vi.fn<(...args: unknown[]) => Promise<void>>(),
 }));
 
+// The router reaches the runtime for the ceremony; the module graph behind
+// it (auth -> better-auth) reaches the same module for the adapter and the
+// hooks, so the whole composition root is stubbed rather than a slice of it.
 vi.mock("~/server/app-layer/identity/runtime", () => ({
   verificationCeremony: () => ({ completeEmailVerification: mockComplete }),
+  identityDatabase: () => () => ({}),
+  identityCeremonies: () => ({
+    beforeAccountCreate: async () => undefined,
+    beforeAccountDelete: async () => undefined,
+    beforeUserDelete: async () => undefined,
+  }),
+  identityEmail: () => ({ resolveEmail: async () => null }),
+  isLatched: async () => false,
 }));
 
 /** A syntactically valid RFC 7636 verifier (43-128 unreserved characters). */
