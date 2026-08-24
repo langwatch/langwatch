@@ -25,6 +25,7 @@ type SimulationSuite = {
   projectId: string;
   name: string;
   slug: string;
+  kind: string;
   description: string | null;
   scenarioIds: string[];
   targets: Array<{ type: string; referenceId: string }>;
