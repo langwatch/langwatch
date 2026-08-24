@@ -67,24 +67,24 @@ as a directory rename.
 | `user` | user profile, preferences, deactivation, password-facing profile operations and avatar | `user` tRPC, `/api/me`, `/api/user-avatar`, pages and components below `me` | User feature packages plus compatibility portions of `server/api/routers/user.ts` | contract/server landed; profile, activation, preferences and avatar use one User service; Auth and cross-feature procedures remain in the app router |
 | `organization` | organization, team, group, membership, invite and personal-workspace lifecycle | `organization`, `team`, `group`, and `personalWorkspaceFeatures` tRPC; `/api/organization`, `/api/organizations`, `/api/teams`, `/api/groups` | Organization feature package plus remaining `app-layer/{organizations,role-bindings}` and `server/invites` compatibility code | Team REST/tRPC and both Group transports use the process-owned service; Team membership reads and writes are AuthZ-backed with privacy, last-admin, additive-grant and concurrency invariants; invite and remaining organization membership compatibility behaviour remains |
 | `project` | project identity, lifecycle and settings | `project` tRPC and `/api/projects` | Project feature package plus compatibility transports | canonical contract/server, tRPC and REST transports, runtime composition, project/team invariants, and compatibility callers migrated; API-key collaboration remains |
-| `api-key` | API credential issuance, rotation, restrictions and revocation | `apiKey` tRPC and `/api/api-keys` | `server/api-key`, Hono API-key middleware and settings UI | contract and process-owned service integration landed; the legacy implementation still supplies behavior not yet moved into the strict server package |
+| `api-key` | API credential issuance, rotation, restrictions and revocation | `apiKey` tRPC and `/api/api-keys` | `server/api-key`, Hono API-key middleware and settings UI | canonical contract/server landed and the duplicate lifecycle repository/service is deleted; extraction remains incomplete while legacy-grant minting holds domain logic and token resolution reads Project persistence outside the Project service |
 
 ### AI assets and execution
 
 | Feature | Owns | Current API surfaces | Principal legacy implementation | State |
 | --- | --- | --- | --- | --- |
 | `model-provider` | provider credentials, provider instances, models, default-model policy, model metadata, model costs and Codex-account provider credentials | `modelProvider`, `llmModelCost`, `translate`; `/api/model-providers`, `/api/model-defaults` | `server/modelProviders`, model-provider settings/components and model configuration hooks | strict contract/server and process-owned route integration landed with scope authorization and default/cost parity; remaining execution-internal resolvers migrate with their owning features |
-| `prompt` | prompt definitions, versions, tags and prompt configuration | `prompts`, `promptTags`; `/api/prompts` | `server/prompt-config`, `src/prompts`, prompt components/hooks | strict package landed; semantic App and compatibility-transport integration in progress |
-| `dataset` | datasets, records, imports and dataset file handling | `dataset`, `datasetRecord`; `/api/dataset`, `/api/dataset/generate` | `server/datasets`, dataset components | strict package landed; semantic App, storage/queue ports and compatibility-transport integration in progress |
+| `prompt` | prompt definitions, versions, tags and prompt configuration | `prompts`, `promptTags`; `/api/prompts` | `server/prompt-config`, `src/prompts`, prompt components/hooks | contract/server/web packages landed; page composition, client query adapters and cross-feature Trace/Evaluation bridges remain in the application |
+| `dataset` | datasets, records, imports and dataset file handling | `dataset`, `datasetRecord`; `/api/dataset`, `/api/dataset/generate` | `server/datasets`, dataset components | contract/server/web packages landed; remaining application files are transport, page composition and cross-feature execution seams |
 | `agent` | agent definitions and agent-specific HTTP node configuration | `agents`, `/api/agents`; agent portions of `httpProxy` and `setupSkills` | Agent feature package plus remaining `server/agents` and agent UI | package partial |
-| `workflow` | workflow definitions, versions, graph nodes and workflow execution-facing behaviour | `workflow`; `/api/workflows`, legacy workflow routes | `server/workflows`, `optimization_studio` workflow domain and workflow UI | depends on Dataset and Model Provider services |
-| `evaluator` | evaluator definitions, evaluator providers and evaluator configuration | `evaluators`, evaluator portion of `optimization`; `/api/evaluators` | `server/evaluators`, evaluator components | separate from Evaluation |
-| `evaluation` | evaluation definitions, execution, runs, results and DSPy evaluation steps | `evaluations`, `batchRecord`; legacy evaluation REST | `server/evaluations`, `app-layer/evaluations`, `app-layer/dspy-steps`, evaluation UI | consumes Evaluator, Trace and Dataset services |
-| `monitor` | online monitor definition and lifecycle | `monitors`; `/api/monitors` | `app-layer/monitors`, monitor router and online-evaluation UI | consumes Evaluator and Evaluation services |
-| `experiment` | experiment definition and run history | `experiments`; `/api/experiments`, experiment-v3 REST | `server/experiments*`, experiment event pipeline and UI | consumes Evaluation/Evaluator services |
-| `scenario` | scenario definition, events and cancellation | `scenarios`; `/api/scenarios`, `/api/scenario-events`, scenario generation route | `server/scenarios`, scenario components/hooks | Simulation is a collaborator, not part of Scenario |
-| `simulation` | simulation execution, batches and simulation-run results | simulation procedures currently nested below `scenarios`; `/api/simulation-runs` | `app-layer/simulations`, simulation event pipeline and UI | consumes Scenario service |
-| `suite` | suite definition, run plan and suite-run history | `suites`; `/api/suites` | `server/suites`, `app-layer/suites`, suite event pipeline and UI | consumes Scenario, Evaluator and Model Provider services |
+| `workflow` | workflow definitions, versions, graph nodes and workflow execution-facing behaviour | `workflow`; `/api/workflows`, legacy workflow routes | `server/workflows`, `optimization_studio` workflow domain and workflow UI | contract/server and process App service landed; ordinary CRUD transports delegate to it, while version/copy propagation and execution composition still contain legacy persistence |
+| `evaluator` | evaluator definitions, evaluator providers and evaluator configuration | `evaluators`, evaluator portion of `optimization`; `/api/evaluators` | `server/evaluators`, evaluator components | contract/server/web packages landed and the duplicate app service is deleted; copy/cascade transport orchestration remains |
+| `evaluation` | evaluation definitions, execution, runs, results and DSPy evaluation steps | `evaluations`, `batchRecord`; legacy evaluation REST | `server/evaluations`, `app-layer/evaluations`, `app-layer/dspy-steps`, evaluation UI | contract/server scaffold landed but is not integrated: its ClickHouse repository must first absorb the hardened production retention, deduplication, projection-id and write-cap behavior, then execution/Eventing/UI residue must move |
+| `monitor` | online monitor definition and lifecycle | `monitors`; `/api/monitors` | `app-layer/monitors`, monitor router and online-evaluation UI | contract/server packages and process App service landed; remaining dataset-provider and UI seams still need draining |
+| `experiment` | experiment definition and run history | `experiments`; `/api/experiments`, experiment-v3 REST | `server/experiments*`, experiment event pipeline and UI | definition contract/server and App transport migration landed; ClickHouse run history is the active package drain |
+| `scenario` | scenario definition, events and cancellation | `scenarios`; `/api/scenarios`, `/api/scenario-events`, scenario generation route | `server/scenarios`, scenario components/hooks | contract/server and request-App CRUD/runner/worker integration landed; cancellation, failure handling and browser coordination remain explicit execution seams |
+| `simulation` | simulation execution, batches and simulation-run results | simulation procedures currently nested below `scenarios`; `/api/simulation-runs` | `app-layer/simulations`, simulation event pipeline and UI | Zod 4 read contract/server landed; ClickHouse adapter and request-App integration are active, while Eventing execution remains separate |
+| `suite` | suite definition, run plan and suite-run history | `suites`; `/api/suites` | `server/suites`, `app-layer/suites`, suite event pipeline and UI | definition contract/server and request-App CRUD integration landed; run orchestration and archived-name resolution are the active drain |
 
 ### Observability, analysis and collaboration
 
@@ -325,10 +325,18 @@ Once reusable behaviour belongs to feature packages:
 A feature is not counted as extracted until all applicable items are true:
 
 - singular catalogue entry, boundary ADR and Gherkin spec exist;
+- feature-specific ADRs, specs and developer documentation have moved to the
+  feature root, been corrected for the final boundary, and been compressed to
+  current facts, durable decisions and useful journey context;
 - contract package exposes portable Zod 4 values and the canonical service;
 - server package owns its service, private repositories, adapters and durable
   eventing behaviour;
 - web package owns reusable feature UI;
+- the feature inventory has been drained across every legacy application root,
+  including `src/runtime`, `src/features`, `src/server`,
+  `src/server/app-layer`, `src/server/event-sourcing`, `src/components`, hooks,
+  jobs and route-local helpers; a new package beside an old implementation is
+  an incomplete extraction, not a compatibility layer;
 - tRPC and REST compatibility transports delegate to the App service graph;
 - API and worker runtime roots construct one implementation and close its
   resources;
@@ -337,29 +345,37 @@ A feature is not counted as extracted until all applicable items are true:
 - architecture lint, Oxlint and declaration-boundary checks pass for the moved
   slice.
 
-## Immediate implementation queue
+Before a slice starts, its inventory records every production module and every
+ADR, spec or developer document that owns the subject or imports its old
+implementation. On completion, any remaining application file must be named
+explicitly as a transport registration, process composition module, page shell,
+or infrastructure adapter. Those remnants may wire feature capabilities, but
+may not contain domain validation, persistence, Eventing definitions, reusable
+UI, or a second service implementation. Feature documentation must not remain
+split between its package and `dev/docs`; cross-cutting application and
+repository decisions are the only material that stays in `dev/docs`.
+Architecture lint will keep a shrink-only baseline for the remaining legacy
+fragments and reject new ones; the baseline is deleted feature by feature as
+the inventory reaches zero.
 
-The active queue reflects the later decision to prove several independent
-feature moves in parallel before returning to the identity spine:
+## Current implementation queue
 
-1. ~~register the five catalogue corrections and write the Wave 1/2 ownership
-   inventory~~;
-2. ~~make the process App, `actor()`, input-dependent `authorize()`, validated
-   project target, and required input/output schemas first-class API rules~~;
-3. ~~finish Automation/Trigger as one process-owned `AutomationService`, rewire
-   transports and durable callers, and delete displaced legacy implementation~~;
-4. finish Langy as one process-owned `LangyService`: remove the remaining
-   feature-server deep imports from app turn, relay and test code, keep private
-   repositories inside the server adapter, then delete displaced legacy
-   implementation;
-5. ~~wire explicit boot/config into API and worker entrypoints without changing
-   deployments or eagerly validating configuration at module import, and inject
-   allow-listed public configuration into the HTML shell~~;
-6. finish the remaining Organization and API Key implementation moves; Project
-   and Model Provider are process-owned and route-integrated; and
-7. finish Prompt and Dataset semantic integration before beginning Workflow or
-   Evaluation consumers.
+The foundation, identity spine, Automation, Prompt, Dataset and the first
+execution package boundaries are landed. The queue now tracks only unfinished
+vertical drains:
 
-Enterprise cleanup, optional-lookup naming, and unrelated service rewrites are
-not part of this queue. A package scaffold or compatibility facade does not
-complete an item: the per-feature completion definition above still applies.
+1. finish Experiment run history, Simulation ClickHouse reads and Suite run
+   orchestration, then remove their displaced app services;
+2. finish Scenario cancellation/failure/browser execution seams and the
+   remaining Workflow version/copy/execution paths;
+3. harden and integrate Evaluation's production ClickHouse semantics, then
+   finish Monitor and Evaluator cross-feature orchestration;
+4. finish Langy turn/relay and API Key grant/project-resolution seams;
+5. run the inventory-to-zero pass for Prompt, Dataset and execution-feature UI;
+6. begin Telemetry, Trace and Annotation only after the execution services are
+   stable; and
+7. compress and relocate feature-owned ADRs, specs and developer docs as each
+   feature reaches zero legacy fragments.
+
+A package scaffold or compatibility facade does not complete an item. The
+per-feature completion definition remains the gate.
