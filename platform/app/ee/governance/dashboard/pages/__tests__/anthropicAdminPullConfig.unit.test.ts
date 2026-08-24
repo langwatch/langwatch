@@ -17,7 +17,7 @@ import {
   buildAnthropicAdminPullConfig,
   buildParserConfig,
   type ComposerState,
-} from "../ingestion-sources";
+} from "../inventory";
 
 function composer(
   parserConfig: Record<string, string>,

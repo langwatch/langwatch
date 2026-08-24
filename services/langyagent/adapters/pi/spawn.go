@@ -135,12 +135,15 @@ func modelLane(model string) workerModelConfig {
 	case strings.HasPrefix(model, "openai_codex/"):
 		lane.API = "openai-responses"
 		lane.Reasoning = true
-		lane.Compat = map[string]any{
-			"supportsStore": false,
-			// With retention long, pi sets prompt_cache_retention "24h" on
-			// the Responses lane; OpenAI charges no write premium for it.
-			"supportsLongCacheRetention": true,
-		}
+		// NO supportsLongCacheRetention here: the ChatGPT codex backend
+		// answers 400 "Unsupported parameter: prompt_cache_retention" on the
+		// field the flag makes pi send (the API-key Responses endpoint
+		// accepts it, which is how it slipped past the spike). The gateway
+		// keeps the codex body to what that backend accepts, which is what
+		// covers the fields pi sends with no flag of ours behind them (its
+		// own default max output tokens, for one), so this lane only avoids
+		// asking for what it knows cannot be served.
+		lane.Compat = map[string]any{"supportsStore": false}
 	case strings.HasPrefix(model, "openai/"):
 		lane.API = "openai-responses"
 		lane.Reasoning = true
@@ -396,6 +399,10 @@ func buildWorkerEnv(in SpawnInput) []string {
 		// anthropic stamps ttl "1h" on its cache_control breakpoints, the
 		// Responses lane asks for 24h prompt_cache_retention.
 		"PI_CACHE_RETENTION=long",
+		// The CLI's `ui call` names the conversation it is driving with this.
+		// It is a claim, not a credential: the control plane verifies the id
+		// belongs to the session key's owning user before doing anything.
+		"LANGY_CONVERSATION_ID="+in.ConversationID,
 	)
 	for _, c := range in.Capabilities {
 		env = append(env, c.Contribute()...)

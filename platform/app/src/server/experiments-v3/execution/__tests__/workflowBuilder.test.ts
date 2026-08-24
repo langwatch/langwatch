@@ -826,6 +826,52 @@ describe("buildSignatureNodeFromPrompt", () => {
       });
     });
   });
+
+  describe("given the read model's synthesized system message", () => {
+    // VersionedPrompt.messages always starts with a synthesized
+    // `{role:"system", content: prompt}` entry (prompt.service.ts). The
+    // node's `instructions` parameter already carries that text, so
+    // forwarding the entry too made every prompt-target request open with
+    // two identical system messages.
+    const buildNodeWith = (messages: VersionedPrompt["messages"]) =>
+      buildSignatureNodeFromPrompt({
+        nodeId: "target-1",
+        prompt: { ...createVersionedPrompt(), messages },
+        targetConfig: createPromptTargetConfig(),
+        cell: createCell(),
+      });
+
+    const messagesParameterOf = (node: ReturnType<typeof buildNodeWith>) =>
+      (node.data as LlmPromptConfigComponent).parameters?.find(
+        (p) => p.identifier === "messages",
+      )?.value;
+
+    it("keeps system text out of the forwarded template messages", () => {
+      const node = buildNodeWith([
+        { role: "system", content: "You are a support router." },
+        { role: "user", content: "{{input}}" },
+      ]);
+
+      expect(messagesParameterOf(node)).toEqual([
+        { role: "user", content: "{{input}}" },
+      ]);
+    });
+
+    describe("when the prompt has no template messages of its own", () => {
+      // An API-created prompt often carries only `prompt` text. Its
+      // synthesized system entry must not become the template history:
+      // a non-empty history suppresses the engine's scalar-input fold,
+      // which produced requests with no user message at all — the
+      // provider rejected every cell of the run.
+      it("forwards an empty template list so the engine folds inputs into a user turn", () => {
+        const node = buildNodeWith([
+          { role: "system", content: "You are a support router." },
+        ]);
+
+        expect(messagesParameterOf(node)).toEqual([]);
+      });
+    });
+  });
 });
 
 describe("buildSignatureNodeFromLocalConfig", () => {

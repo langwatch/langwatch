@@ -248,6 +248,14 @@ export const FEATURE_FLAGS = [
     description:
       "Gates the personal keys, admin oversight, RoutingPolicy, IngestionSource UI surfaces, the onboarding intent fork, and the org Primary use setting (ADR-038). On by default; switch off per org via the operator store (or deployment-wide via RELEASE_UI_AI_GOVERNANCE_ENABLED=0) to hide governance and refuse AI-tools device login. Distinct from release_ui_ai_gateway_menu_enabled: the gateway product ships on its own flag.",
   },
+  {
+    key: "release_ui_governance_billed_cost_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Reveals the Costs and Billed governance placeholder pages and their sidebar items (spec: specs/ai-gateway/governance/governance-home-routing.feature). Composed ON TOP of release_ui_ai_governance_enabled, never instead of it: the section flag off still hides everything. Default off — the pages are empty shells shipped ahead of the spend views. Enable per organization via the operator store; for local dev use FEATURE_FLAG_FORCE_ENABLE=release_ui_governance_billed_cost_enabled.",
+    family: "Governance",
+  },
   // ADR-034 Phase 3 — routes analytics getTimeseries reads to the slim
   // `trace_analytics` / rollup `trace_analytics_rollup` tables (Phases 1+2)
   // when the query shape allows. OFF (default) = legacy trace_summaries reads
@@ -305,6 +313,15 @@ export const FEATURE_FLAGS = [
     family: "Langy",
     description:
       "Runs Langy turns on the pi worker harness instead of opencode. Evaluated once per turn and rides the worker credential signature, so flipping it re-warms the conversation's worker on the next message rather than mutating a running one. Default ON = pi everywhere; the flag is the per-project rollback lever to opencode. Managed only from the internal flag store (/ops/feature-flags); PostHog and env vars are not consulted.",
+  },
+  {
+    key: "release_langy_ui_actions",
+    scope: "SYSTEM",
+    defaultValue: true,
+    envOverridable: false,
+    family: "Langy",
+    description:
+      "Lets the agent drive the open page through typed UI actions (spec: specs/langy/langy-ui-actions.feature): `langwatch ui call` dispatches a manifest-validated action over the turn's live stream, the attached page claims and executes it, and the result returns to the agent in the same call. Off = the dispatch surface 404s like it was never deployed and the panel ignores `ui` stream entries; the rollback position loses live page control and nothing else. Managed only from the internal flag store (/ops/feature-flags).",
   },
   {
     key: "release_langy_promo_enabled",

@@ -1201,10 +1201,59 @@ model Experiment {
   workbenchState   Json?
   monitor          Monitor?
 
+  // Monotonic counter for the workbench state. Every accepted write bumps it
+  // by one, and the bump is the compare-and-set guard: a writer names the
+  // version it read, and a write whose expected version no longer matches the
+  // stored one is refused before anything is written. Existing rows read 0.
+  workbenchVersion Int               @default(0)
+
   @@unique([projectId, slug])
   @@index([projectId])
   @@index([workflowId])
   @@index([projectId, archivedAt])
+}
+
+// One snapshot of an experiment's workbench state, at one version.
+//
+// Ordinary typing in the workbench writes a single rolling row with
+// `autoSaved = true`, updated in place so a long editing session does not
+// leave one row per keystroke behind. A commit, an agent write and a restore
+// each write a new `autoSaved = false` row, which is what a person sees in
+// the version list. `version` matches the `Experiment.workbenchVersion` the
+// write produced, so history and the live row share one number line.
+//
+// `state` never carries run results: those live only on the live experiment
+// row, because a snapshot exists to restore a setup, not to replay an old run.
+// A restore therefore writes the snapshot's setup and carries the live row's
+// current results across, so bringing an old setup back never clears the
+// output cells and evaluator scores of the run the experiment holds now.
+model ExperimentVersion {
+  id           String @id @default(nanoid())
+  experimentId String
+  projectId    String
+  version      Int
+
+  autoSaved     Boolean @default(false)
+  commitMessage String?
+
+  authorId String?
+  /// Who wrote this version: "user", "langy" or "api".
+  authorLabel String
+
+  state Json
+  /// Schema version of `state`, so a later shape change can be read forward.
+  schemaVersion String @default("1")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([experimentId, version])
+  @@index([projectId, experimentId, autoSaved])
+  // The version list pages by version inside one experiment, and a restore
+  // reads one version number. Both name all three columns, so the sort key
+  // belongs in the index rather than being applied to fetched rows.
+  @@index([projectId, experimentId, version])
+  @@index([createdAt])
 }
 
 // Annotation - a reviewer's comment on a trace, or on one part of it.
@@ -2572,7 +2621,7 @@ model Grant {
   // lets a projection reloaded from these rows reconstruct the fact rather
   // than a lossy copy. Null on everything ledger-born; retired at cutover.
   legacyRole String? // ADMIN | MEMBER | VIEWER | CUSTOM
-  source     String // which writer emitted the fact: grants-service | scim | invite | backfill-b | genesis-import | read-through-mint | cutover-import
+  source     String // which writer emitted the fact: grants-service | scim | invite | join-request | read-through-mint | migration (the vocabulary is GRANT_EVENT_SOURCES in @langwatch/authz-server; ADR-110 folded backfill-b, genesis-import and cutover-import into `migration`)
 
   scopeType GrantScopeType
   scopeId   String
@@ -3315,6 +3364,15 @@ model IngestionSource {
   /// Status flag. 'active' (default), 'disabled' (admin paused), or
   /// 'awaiting_first_event' (created but never received).
   status String @default("awaiting_first_event")
+
+  /// ADR-088 v7: optional trace DESTINATION for conversation-bearing pulls
+  /// (Databricks Genie). Null = don't route. Same shape as
+  /// VirtualKey.traceProjectId: a destination is NOT a scope row and grants
+  /// no access to the source; it only decides where routed conversation
+  /// traces land. Must be a project of this org (validated at write time).
+  /// Freely editable; already-routed history stays where it landed.
+  /// NOT the deferred cost-attribution projectId (ADR-088 Decision 4).
+  traceProjectId String?
 
   /// Last event timestamp observed (any direction). Surfaces in the
   /// admin UI as "last event 2 minutes ago".

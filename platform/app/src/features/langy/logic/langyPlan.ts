@@ -39,14 +39,6 @@ export interface LangyPlan {
   completedCount: number;
   /** Steps that count toward the total — everything except cancelled. */
   totalCount: number;
-  /**
-   * The other (non-`todowrite`) tool parts attributed to each item, parallel to
-   * `items`: a call belongs to whichever item was uniquely in-progress when the
-   * call appeared in the stream. Rendered nested under the current step.
-   */
-  itemParts: unknown[][];
-  /** Tool parts that ran BEFORE any step was current (no plan yet). */
-  preamble: unknown[];
 }
 
 const PLAN_STATUSES = new Set<LangyPlanItemStatus>([
@@ -158,11 +150,12 @@ function normaliseItem(item: {
  * agent never maintained a todo list (⇒ no checklist, today's rendering).
  *
  * The LATEST full list wins: `todowrite` rewrites the whole list every call, so
- * the last valid snapshot is the plan. Attribution is TEMPORAL and derived from
- * the snapshot history — we walk the parts in order, tracking which item was
- * in-progress at each point (mapped onto the latest list by content), and file
- * every non-plan tool call under the step that owned it. A call before any step
- * was current lands in the preamble.
+ * the last valid snapshot is the plan.
+ *
+ * The plan is the checklist and nothing else. The calls a step made are not
+ * filed under it: the transcript already carries every call where it happened
+ * (logic/langyTranscript.ts), and a card cannot be in the transcript and inside
+ * the checklist at the same time without being read twice.
  */
 export function langyPlan(
   message: { parts: readonly unknown[] },
@@ -196,31 +189,6 @@ export function langyPlan(
   const items = override ?? derived;
   if (!items || items.length === 0) return null;
 
-  const itemParts: unknown[][] = items.map(() => []);
-  const preamble: unknown[] = [];
-
-  // Walk the stream, tracking which LATEST-list item is currently in-progress.
-  let currentItemIndex = -1;
-  for (const part of parts) {
-    if (isPlanToolPart(part)) {
-      const snapshot = parseTodoList(partInput(part));
-      if (!snapshot) continue;
-      const ip = inProgressIndex(snapshot);
-      if (ip !== -1) {
-        // Map the snapshot's in-progress item onto the latest list by content:
-        // a call made while step 2 ran belongs to step 2 even now that it reads
-        // "completed". An item whose text has since changed falls to preamble.
-        currentItemIndex = items.findIndex(
-          (it) => it.content === snapshot[ip]!.content,
-        );
-      }
-      continue;
-    }
-    if (rawToolName(part) === undefined) continue; // not a tool call
-    if (currentItemIndex >= 0) itemParts[currentItemIndex]!.push(part);
-    else preamble.push(part);
-  }
-
   const completedCount = items.filter((it) => it.status === "completed").length;
   const totalCount = items.filter((it) => it.status !== "cancelled").length;
 
@@ -229,7 +197,5 @@ export function langyPlan(
     currentIndex: inProgressIndex(items),
     completedCount,
     totalCount,
-    itemParts,
-    preamble,
   };
 }

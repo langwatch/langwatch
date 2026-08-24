@@ -21,6 +21,7 @@ import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
 import { prisma } from "~/server/db";
+import { sendCanary } from "~/server/health-probes/canary.service";
 import type { CollectorRESTParams } from "~/server/tracer/types";
 import type { DeepPartial } from "~/utils/types";
 
@@ -138,38 +139,22 @@ secured
       ],
     };
 
-    const [restCollectorResponse, otelCollectorResponse] = await Promise.all([
-      fetch(`${env.BASE_HOST}/api/collector`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": authToken,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(restParams),
+    const [, otelCollectorResponse] = await Promise.all([
+      sendCanary({
+        probe: "collector",
+        transport: "rest",
+        url: `${env.BASE_HOST}/api/collector`,
+        authToken,
+        body: restParams,
       }),
-      fetch(`${env.BASE_HOST}/api/otel/v1/traces`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": authToken,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(otelParams),
+      sendCanary({
+        probe: "collector",
+        transport: "otlp",
+        url: `${env.BASE_HOST}/api/otel/v1/traces`,
+        authToken,
+        body: otelParams,
       }),
     ]);
-
-    if (!restCollectorResponse.ok) {
-      return c.json(
-        { message: "Failed to send trace to LangWatch using REST" },
-        { status: 500 },
-      );
-    }
-
-    if (!otelCollectorResponse.ok) {
-      return c.json(
-        { message: "Failed to send trace to LangWatch using OTLP" },
-        { status: 500 },
-      );
-    }
 
     const otelBody = await otelCollectorResponse.json();
     return c.json({
@@ -322,21 +307,19 @@ secured
     );
 
     const [restCollectorResponse, otelResponse] = await Promise.all([
-      fetch(`${env.BASE_HOST}/api/collector`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": authToken,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(restParams),
+      sendCanary({
+        probe: "processor",
+        transport: "rest",
+        url: `${env.BASE_HOST}/api/collector`,
+        authToken,
+        body: restParams,
       }),
-      fetch(`${env.BASE_HOST}/api/otel/v1/traces`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": authToken,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(otelParams),
+      sendCanary({
+        probe: "processor",
+        transport: "otlp",
+        url: `${env.BASE_HOST}/api/otel/v1/traces`,
+        authToken,
+        body: otelParams,
       }),
     ]);
 
@@ -351,20 +334,6 @@ secured
       },
       "Canary traces sent",
     );
-
-    if (!restCollectorResponse.ok) {
-      return c.json(
-        { message: "Failed to send trace to LangWatch using REST" },
-        { status: 500 },
-      );
-    }
-
-    if (!otelResponse.ok) {
-      return c.json(
-        { message: "Failed to send trace to LangWatch using OTLP" },
-        { status: 500 },
-      );
-    }
 
     const otelBody = await otelResponse.json();
 

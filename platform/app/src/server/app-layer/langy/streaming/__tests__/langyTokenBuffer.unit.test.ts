@@ -319,4 +319,25 @@ describe("LangyTokenBuffer hybrid flush", () => {
       });
     });
   });
+
+  describe("given the agent dispatches a UI action", () => {
+    it("lands the typed entry on the live stream exactly as given", async () => {
+      const { redis, entries } = makeRedis();
+      const buffer = new LangyTokenBuffer({ redis });
+
+      await buffer.appendUiAction({
+        ...ids,
+        actionId: "a1",
+        kind: "workbench.duplicateTarget",
+        payload: { targetId: "t1" },
+      });
+
+      expect(entries.at(-1)).toEqual({
+        type: "ui",
+        actionId: "a1",
+        kind: "workbench.duplicateTarget",
+        payload: { targetId: "t1" },
+      });
+    });
+  });
 });

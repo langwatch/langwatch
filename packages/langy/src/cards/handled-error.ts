@@ -197,7 +197,7 @@ interface ErrorBody {
 }
 
 /**
- * Read the platform's error body. The REST surface speaks this in THREE
+ * Read the platform's error body. The REST surface speaks this in FOUR
  * dialects, and all are real — verified against the routes, not assumed:
  *
  *   1. THE COMMON ONE, from the shared Hono error handler every `SecuredApp`
@@ -220,6 +220,14 @@ interface ErrorBody {
  *      and never crosses the boundary (ADR-045). Prose, when the server
  *      deliberately authored some, arrives as `meta.message` and wins.
  *
+ *   4. THE CANONICAL ONE, from every `SecuredApp` that publishes the canonical
+ *      envelope (`app/api/shared/schemas.ts`): the failure NESTED under `error`
+ *      — `{ error: { type, code, message, meta?, trace_id?, span_id? } }`, with
+ *      the trace ids in snake_case. Unreadable until this dialect existed, so
+ *      an agent got no code and a customer's card printed the whole envelope
+ *      verbatim under "this step couldn't be completed", with the one sentence
+ *      that explained the failure buried in the middle of it.
+ *
  * `code` is the name TypeScript uses, `type` the OpenAI-compatible name Go
  * emits; the framework sets all three to the same value (`errors.ts` assigns
  * `body.kind = body.code` and `body.type = body.code`), so which one answers
@@ -238,6 +246,30 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
   // name a domain failure — it falls through to the status-derived reading,
   // which calls it `network_error` and means it.
   if (isSystemError(record)) return null;
+
+  // Dialect 4: the canonical envelope, nested under `error`. Read first because
+  // it is unambiguous — dialects 1 and 3 both need `error` to be a STRING, so an
+  // object there naming a code can only be this one.
+  const canonical = asRecord(record.error);
+  if (
+    canonical &&
+    (typeof canonical.code === "string" || typeof canonical.type === "string")
+  ) {
+    const code =
+      typeof canonical.code === "string"
+        ? canonical.code
+        : (canonical.type as string);
+    return {
+      code,
+      message:
+        typeof canonical.message === "string" ? canonical.message : undefined,
+      meta: asRecord(canonical.meta) ?? {},
+      traceId:
+        typeof canonical.trace_id === "string" ? canonical.trace_id : undefined,
+      reasons: asReasons(asRecord(canonical.meta)?.reasons),
+      suggestions: asSuggestions(asRecord(canonical.meta)?.suggestions),
+    };
+  }
 
   // Dialect 2: the serialised HandledError, carried whole under `domainError`.
   const serialized = asRecord(record.domainError);

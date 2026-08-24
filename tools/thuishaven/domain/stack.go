@@ -92,7 +92,15 @@ type Stack struct {
 	// sandboxed. It decides whether the worker runs in colima or on the host and
 	// which callback URLs the overlay hands the control plane.
 	LangyTier LangyTier `json:"langyTier,omitempty"`
-	Services  []Service `json:"services"`
+	// PortlessDisabled marks a stack provisioned with PORTLESS=0: every service
+	// serves plain HTTP on its own loopback port instead of routing through the
+	// portless proxy. The zero value is false (portless enabled, the historical
+	// behavior), so a stack persisted before this field existed reads back as it
+	// always behaved. `up` compares it against the requested run so flipping
+	// PORTLESS between runs restarts the stack onto the requested mode instead of
+	// silently keeping the old one (see reconcileRunningStack).
+	PortlessDisabled bool      `json:"portlessDisabled,omitempty"`
+	Services         []Service `json:"services"`
 	// UpdatedAt is refreshed by the launcher's heartbeat; the daemon reaps a
 	// stack whose launcher has died or whose heartbeat has gone stale.
 	UpdatedAt time.Time `json:"updatedAt"`

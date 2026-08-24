@@ -189,14 +189,24 @@
                 "experiment run",
                 "experiment status",
                 "experiment list-runs",
-                "experiment results"
+                "experiment results",
+                "experiment create",
+                "experiment get-state",
+                "experiment set-state",
+                "experiment versions",
+                "experiment restore"
               ],
               "hints": {
                 "experiment list": "langwatch experiment list --limit 20 -o json",
                 "experiment run": "langwatch experiment run <slug> --wait",
                 "experiment status": "langwatch experiment status <slug> -o json",
                 "experiment list-runs": "langwatch experiment list-runs <slug> -o json",
-                "experiment results": "langwatch experiment results <slug> --filter failed -o json"
+                "experiment results": "langwatch experiment results <slug> --filter failed -o json",
+                "experiment create": "langwatch experiment create --name \"Checkout quality\" -o json",
+                "experiment get-state": "langwatch experiment get-state <slug> -o json",
+                "experiment set-state": "langwatch experiment set-state <slug> --file state.json --expected-version 4 --message \"Added a target\"",
+                "experiment versions": "langwatch experiment versions <slug> -o json",
+                "experiment restore": "langwatch experiment restore <slug> 3"
               },
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/evaluations/experiments/sdk.md"
@@ -473,6 +483,7 @@
                 "prompt tag rename",
                 "prompt tag assign",
                 "prompt tag delete",
+                "prompt get",
                 "prompt versions",
                 "prompt restore"
               ],
@@ -1044,7 +1055,7 @@
         },
         {
           "id": "ai-gateway.ingest",
-          "name": "Catalog (ingestion)",
+          "name": "Inventory (ingestion)",
           "description": "OCSF-normalised event ingestion: inspect ingestion sources, tail events, check health, and recover coding-agent conversation content",
           "surfaces": {
             "code": {
@@ -1062,7 +1073,7 @@
               "docs": "https://langwatch.ai/docs/ai-gateway/governance/overview.md"
             },
             "platform": {
-              "ui": "/governance/ingestion-sources",
+              "ui": "/governance/inventory",
               "mcp": null,
               "skill": null,
               "docs": null

@@ -385,7 +385,7 @@ func (a *Agent) Spawn(ctx context.Context, in SpawnInput) (*exec.Cmd, error) {
 	cmd := in.Runner.CommandContext(ctx, in.BinaryPath,
 		"serve", "--port", strconv.Itoa(in.Port), "--hostname", "127.0.0.1",
 	)
-	cmd.Env = buildWorkerEnv(in.Home, in.Creds, in.OpenCodePassword, in.EgressPort, in.Mediation, in.Capabilities)
+	cmd.Env = buildWorkerEnv(in.Home, in.ConversationID, in.Creds, in.OpenCodePassword, in.EgressPort, in.Mediation, in.Capabilities)
 	cmd.Dir = in.Home
 	// Discard opencode's stdout/stderr. opencode emits LLM completions, tool
 	// outputs (env dumps, file contents), and the raw user prompt — all of which
@@ -465,7 +465,7 @@ const LangyAgentPrompt = "You are Langy, the AI assistant built into LangWatch, 
 // LLM traffic go direct (they have their own explicit NetworkPolicy egress
 // rules; routing them through the per-worker proxy would add a hop and expose
 // LLM streaming to the throttle).
-func buildWorkerEnv(workerHome string, creds domain.Credentials, openCodePassword string, egressPort int, med Mediation, caps []app.Capability) []string {
+func buildWorkerEnv(workerHome, conversationID string, creds domain.Credentials, openCodePassword string, egressPort int, med Mediation, caps []app.Capability) []string {
 	env := workerenv.BaseEnv()
 
 	// LLM wiring. Mediated (phase 2): OPENAI_BASE_URL points at the manager's
@@ -493,6 +493,10 @@ func buildWorkerEnv(workerHome string, creds domain.Credentials, openCodePasswor
 		// below) and the LLM virtual key (above).
 		"LANGWATCH_API_KEY="+creds.LangwatchAPIKey,
 		"LANGWATCH_ENDPOINT="+creds.LangwatchEndpoint,
+		// The CLI's `ui call` names the conversation it is driving with this.
+		// A claim, not a credential: the control plane verifies the id belongs
+		// to the session key's owning user before doing anything.
+		"LANGY_CONVERSATION_ID="+conversationID,
 		// Requires opencode's HTTP control server to authenticate with HTTP
 		// Basic (user "opencode", this password) instead of serving every
 		// request unauthenticated. This is the sibling-isolation guarantee
