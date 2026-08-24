@@ -18,9 +18,54 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
   #             └→ DISCARDED           ACTIVE|SUSPENDED → TEARDOWN_PENDING
   #                                              └→ TORN_DOWN (grace elapsed)
   #
-  # Domain claims need LangWatch ops manual approval - no blocklist; DNS TXT
-  # (or license token, self-hosted) proves the domain; first verifier owns,
-  # globally on SaaS. Existing ssoDomain/ssoProvider orgs are grandfathered
+  # Domain claims need LangWatch ops manual approval - no blocklist; first
+  # verifier owns, globally on SaaS. Four things can prove a claimed domain,
+  # and which one proved it stays recorded on the connection forever:
+  #
+  #   dns-txt              the customer publishes the record we gave them
+  #   license-token        a self-hosted installation's own licence (D05
+  #                        tier 2)
+  #   operator-attested    a LangWatch operator states out of band that the
+  #                        domain is that organization's (D05 tier 1) -
+  #                        amended in, see below
+  #   legacy-configuration years of production sign-ins through the old
+  #                        strings; stated only by the grandfather migration
+  #                        and requestable by nobody
+  #
+  # AMENDMENT (D05): operator attestation. An operator onboarding a hosted
+  # customer already approves that customer's domain claim, and the approval
+  # IS the trust decision. Waiting afterwards on a record the customer has to
+  # publish buys a round-trip and no security, because the same operator in
+  # the same session already decided the claim was genuine. So attestation
+  # replaces the PROOF and never the APPROVAL: the claim is still claimed,
+  # still approved, still an audited operator's act, and an attested domain
+  # is exactly as trustworthy as that approval - no more. It is requestable
+  # only by a platform operator, so an organization administrator can never
+  # attest their own domain, and hosted self-serve (D05 tier 3) keeps DNS
+  # TXT, which is the tier where the customer proves their own domain and
+  # where attestation would defeat the point.
+  #
+  # An attestation does not expire, and there is no later DNS upgrade. The
+  # reasoning, written so it can be argued with rather than rediscovered:
+  # no other method's verification expires either - DNS TXT expires the
+  # TOKEN before it is found, never the verification it produced, and
+  # legacy-configuration rests on history that only grows - so an expiry
+  # unique to attestation would make the operator path the only one that can
+  # stop routing without anybody having decided anything, which is precisely
+  # the lockout class the break-glass binding exists to prevent. What an
+  # expiry would buy is re-confirmation that the customer still holds the
+  # domain; what buys that better is suspend, which is always available,
+  # immediate, reversible, and taken by a human at the moment it matters,
+  # with teardown behind it. A dispute is resolved from event history, which
+  # is what the history is for. An upgrade path would mean a re-verification
+  # transition on a live connection that nothing else in the lifecycle
+  # needs, serving only the case suspend already serves. The price of
+  # standing indefinitely is that the weaker evidence must never become
+  # invisible: the connection and the operator lookup always name who
+  # attested the domain and when, and an attested domain never reads as one
+  # the customer proved.
+  #
+  # Existing ssoDomain/ssoProvider orgs are grandfathered
   # by a system migration whose finalized proof is a routing comparison -
   # the same one SSOCONN_ROUTING shadow mode runs. Secrets follow ADR-101's
   # payload rule: events carry references and token hashes, never values.
@@ -72,6 +117,65 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     When verification is requested with the DNS method
     Then the verification_requested event carries the token's hash
     And finding the TXT record moves the connection to VERIFIED
+
+  # ── Operator attestation (D05 amendment) ───────────────────────────────
+
+  @unit @unimplemented
+  Scenario: An operator attests a domain instead of waiting for a record
+    Given an APPROVED connection for "acme.com"
+    When a platform operator attests that "acme.com" belongs to "acme"
+    Then the connection is VERIFIED with nothing published anywhere
+    And the fact records the attesting operator, the domain and when they attested it
+
+  @unit @unimplemented
+  Scenario: Attestation replaces the proof and never the approval
+    Given a CLAIMED connection for "acme.com" that nobody has approved
+    When a platform operator attests the domain
+    Then the command is refused and no event is emitted
+    And attesting becomes available only once the claim is approved
+
+  @unit @unimplemented
+  Scenario: How a domain was proved is its own recorded method, permanently
+    Given one domain proved by a published record and another attested by an operator
+    When each connection's history is read
+    Then each domain names the method that proved it
+    And nothing anywhere can present an attested domain as one the customer proved
+
+  @unit @unimplemented
+  Scenario: An organization administrator can never attest their own domain
+    Given an APPROVED connection for "acme.com"
+    And an administrator of "acme" holding every permission the organization can grant
+    When they attest the domain
+    Then the command is refused and no event is emitted
+    And publishing the record stays the way their domain is proved
+
+  @unit @unimplemented
+  Scenario: Attestation is a platform operator's act on any deployment
+    Given a self-hosted installation whose platform operator attests a domain
+    When the attestation is handled
+    Then it succeeds and is recorded against that operator
+    And whoever administers the organization still cannot attest it themselves
+
+  @unit @unimplemented
+  Scenario: An attested domain cannot take one another ACTIVE connection holds
+    Given "acme.com" is verified on another organization's ACTIVE connection
+    When a platform operator attests "acme.com" for a second organization
+    Then the command is refused exactly as any other method is refused
+    And the first verifier keeps the domain
+
+  @unit @unimplemented
+  Scenario: An attestation stands until somebody decides otherwise
+    Given a domain verified by operator attestation a year ago
+    When the connection is read
+    Then the domain is still verified and still routing
+    And nothing has asked for it to be proved again
+
+  @unit @unimplemented
+  Scenario: A disputed attested domain is answered by suspending, not by expiring
+    Given a domain verified by operator attestation is disputed
+    When an operator suspends the connection
+    Then the domain stops routing immediately
+    And the attestation, the dispute and the suspension are all readable in the history
 
   @unit
   Scenario: A domain owned by another ACTIVE connection cannot be verified

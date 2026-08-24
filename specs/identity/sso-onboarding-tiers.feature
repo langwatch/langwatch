@@ -22,8 +22,15 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
   #
   #   TIER 1  ops-assisted, hosted                        BUILD FIRST
   #     an operator, in the back office
-  #     register -> claim -> approve -> prove (DNS record) -> activate
-  #     no queue: the person who would staff it is the person already here
+  #     register -> claim -> approve -> attest -> activate
+  #     no queue, because the person who would staff one is already here;
+  #     and no round-trip to the customer, because the operator who approved
+  #     the claim attests the domain in the same sitting. Attestation is a
+  #     D04 amendment (see sso-connection-lifecycle.feature): it replaces the
+  #     PROOF, never the approval, so the trust decision is the same audited
+  #     operator act it always was. The only thing left that needs the
+  #     customer is somebody completing a test sign-in, which is the entire
+  #     point of a test sign-in.
   #
   #   TIER 2  self-hosted self-serve, licence-bound       SECOND, SIMPLEST
   #     an organization administrator, in Settings
@@ -88,17 +95,24 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
   # ── Tier 1: an operator sets a customer up ─────────────────────────────
 
   @integration @unimplemented
-  Scenario: An operator takes a customer from nothing to a connection awaiting its proof
-    When "olive" registers "acme"'s identity provider, claims "acme.com", approves the claim and asks for the domain proof
-    Then "acme" is given the exact record to publish and the date it stops being accepted
+  Scenario: An operator takes a customer from nothing to a connection ready to go live
+    When "olive" registers "acme"'s identity provider, claims "acme.com", approves the claim and attests the domain
+    Then the connection is ready to activate before "olive" leaves the page
     And every step is recorded as a separate fact with "olive" named on it
 
   @integration @unimplemented
-  Scenario: The operator's work does not wait on the customer's DNS
-    Given "olive" has asked for the domain proof for "acme.com"
-    When "olive" leaves the page
-    Then the connection is listed as waiting for its domain proof, saying what it is waiting for
-    And picking it up later needs no step repeating
+  Scenario: Setting a customer up asks the customer for nothing until they sign in
+    Given "olive" has attested "acme.com" for "acme"
+    When the setup is read back
+    Then the only thing still wanted from "acme" is somebody completing a test sign-in
+    And "acme" was never asked to publish a record or to wait for anybody
+
+  @integration @unimplemented
+  Scenario: What proved the domain is on the connection wherever it is read
+    Given "olive" attested "acme.com"
+    When the connection is opened, in the back office or from the operator lookup
+    Then it says the domain was attested, by whom, and when
+    And it never reads as a domain the customer proved
 
   @unit @unimplemented
   Scenario: The operator approving the claim they just made is recorded as exactly that
@@ -196,6 +210,13 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
     And that local way in keeps working after activation
 
   @unit @unimplemented
+  Scenario: A self-hosted administrator is not offered attestation either
+    Given a self-hosted installation holding a genuine licence
+    When "ana" asks to prove "acme.com"
+    Then the licence is what proves it
+    And attesting the domain is not something she can reach
+
+  @unit @unimplemented
   Scenario: The licence-bound path is not offered to a hosted organization
     Given "acme" is on the hosted service
     When "ana" opens single sign-on setup
@@ -252,6 +273,13 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
     When the queue is opened
     Then the longest-waiting claim is first
     And how long each one has waited is recorded and readable afterwards
+
+  @unit @unimplemented
+  Scenario: A customer proving their own domain is the whole point of this tier
+    Given "acme" is setting single sign-on up itself on the hosted service
+    When "ana" looks for a way to skip publishing the record
+    Then there is none, because attesting a domain is a LangWatch operator's act
+    And her domain is proved by the record she publishes, or not at all
 
   @unit @unimplemented
   Scenario: Setting single sign-on up yourself is unavailable until the organization is opted in
