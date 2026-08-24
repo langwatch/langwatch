@@ -1,0 +1,53 @@
+import { HandledError, NotFoundError } from "@langwatch/handled-error";
+
+export class EvaluatorNotFoundError extends NotFoundError {
+  declare readonly code: "evaluator_not_found";
+  constructor(id: string) {
+    super("evaluator_not_found", "Evaluator", id);
+    this.name = "EvaluatorNotFoundError";
+  }
+}
+
+export class EvaluatorInvalidTypeError extends HandledError {
+  declare readonly code: "evaluator_invalid_type";
+  constructor(type: string) {
+    super("evaluator_invalid_type", `Unsupported evaluator type: ${type}`, {
+      httpStatus: 400,
+      meta: { type },
+      fault: "customer",
+    });
+    this.name = "EvaluatorInvalidTypeError";
+  }
+}
+
+export class EvaluatorIsNotCopyError extends HandledError {
+  declare readonly code: "evaluator_is_not_copy";
+  constructor(evaluatorId: string) {
+    super("evaluator_is_not_copy", "This evaluator is not a copy.", {
+      httpStatus: 409,
+      meta: { evaluatorId },
+      fault: "customer",
+    });
+    this.name = "EvaluatorIsNotCopyError";
+  }
+}
+
+export class EvaluatorSourceNotFoundError extends NotFoundError {
+  declare readonly code: "evaluator_source_not_found";
+  constructor(sourceEvaluatorId: string) {
+    super("evaluator_source_not_found", "Source evaluator", sourceEvaluatorId);
+    this.name = "EvaluatorSourceNotFoundError";
+  }
+}
+
+export class EvaluatorCopySelectionError extends HandledError {
+  declare readonly code: "evaluator_copy_selection_invalid";
+  constructor(evaluatorId: string) {
+    super("evaluator_copy_selection_invalid", "No valid evaluator copies were selected.", {
+      httpStatus: 400,
+      meta: { evaluatorId },
+      fault: "customer",
+    });
+    this.name = "EvaluatorCopySelectionError";
+  }
+}
