@@ -28,7 +28,7 @@
  */
 
 import { execFile } from "node:child_process";
-import { readdir, readFile, readlink } from "node:fs/promises";
+import { opendir, readFile, readlink } from "node:fs/promises";
 import { basename, join, resolve, sep } from "node:path";
 
 import { ROLLOUT_SESSION_ID } from "./codex-live-session";
@@ -103,8 +103,10 @@ async function readParentPid(pid: number): Promise<number | null> {
 /**
  * Resolve a directory of symlinks, in batches, giving up when the deadline
  * passes. A process can hold thousands of descriptors, and resolving all of
- * them in one unbounded pass would blow the walk budget before the walk got
- * the chance to check it.
+ * them would blow the walk budget before the walk got the chance to check it.
+ *
+ * The directory is streamed rather than listed, so a huge descriptor table is
+ * never materialised and the clock is checked before every batch starts.
  */
 export async function readSymlinkedPaths({
   dir,
@@ -116,22 +118,41 @@ export async function readSymlinkedPaths({
   nowMs?: () => number;
 }): Promise<string[]> {
   const deadline = nowMs() + timeoutMs;
-  let names: string[];
+  if (nowMs() >= deadline) return [];
+
+  let handle: Awaited<ReturnType<typeof opendir>>;
   try {
-    names = await readdir(dir);
+    handle = await opendir(dir);
   } catch {
     return [];
   }
 
   const paths: string[] = [];
-  for (let start = 0; start < names.length; start += FD_BATCH) {
-    if (nowMs() >= deadline) break;
+  const drain = async (batch: string[]): Promise<void> => {
     const resolved = await Promise.all(
-      names
-        .slice(start, start + FD_BATCH)
-        .map((name) => readlink(join(dir, name)).catch(() => "")),
+      batch.map((name) => readlink(join(dir, name)).catch(() => "")),
     );
     for (const path of resolved) if (path) paths.push(path);
+  };
+
+  try {
+    let batch: string[] = [];
+    for await (const entry of handle) {
+      if (nowMs() >= deadline) break;
+      batch.push(entry.name);
+      if (batch.length < FD_BATCH) continue;
+      await drain(batch);
+      batch = [];
+    }
+    if (batch.length > 0 && nowMs() < deadline) await drain(batch);
+  } catch {
+    /* the process exited mid-read: what was resolved still counts */
+  } finally {
+    try {
+      await handle.close();
+    } catch {
+      /* finishing or breaking out of `for await` already closed it */
+    }
   }
   return paths;
 }

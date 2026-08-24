@@ -43,21 +43,8 @@ export interface ResolvedSession {
   codexMeta: CodexRolloutMeta | null;
 }
 
-export /**
- * Which session is asking. Flags first, then the claude environment, then
- * the newest recently-active codex rollout. Announces its own failure,
- * because "nothing was declared" must never be silent to the agent.
- */
-async function resolveSession({
-  sessionId,
-  agent,
-  env,
-  now,
-  codexSessionsRoot,
-  ancestorStartPid,
-  ancestorProbe,
-  writeLine,
-}: {
+/** What every resolution tier needs to answer. */
+interface ResolutionInputs {
   sessionId?: string;
   agent?: string;
   env: NodeJS.ProcessEnv;
@@ -66,40 +53,54 @@ async function resolveSession({
   ancestorStartPid: number;
   ancestorProbe?: AncestorProbe;
   writeLine: (line: string) => void;
-}): Promise<ResolvedSession | null> {
-  if (sessionId || agent) {
-    const normalized = agent?.trim().toLowerCase().replace(/-/g, "_") ?? "";
-    const trimmedSessionId = sessionId?.trim() ?? "";
-    if (!trimmedSessionId || !AGENTS.has(normalized)) {
-      writeLine(
-        "Pass both --agent (claude-code, codex or opencode) and --session-id to declare for an explicit session.",
-      );
-      return null;
-    }
-    return {
-      agent: normalized,
-      sessionId: trimmedSessionId,
-      codexMeta:
-        normalized === "codex"
-          ? await readCodexMeta({
-              sessionId: trimmedSessionId,
-              codexSessionsRoot,
-            })
-          : null,
-    };
-  }
+}
 
-  // The claude environment wins over the rollout sweep: a codex (or any
-  // other process) started from inside a claude session inherits these, and
-  // the session doing the work, the one whose cost this checkout explains,
-  // is the claude one.
+/** The session the flags name, or null with the reason said out loud. */
+async function resolveExplicitSession({
+  sessionId,
+  agent,
+  codexSessionsRoot,
+  writeLine,
+}: ResolutionInputs): Promise<ResolvedSession | null> {
+  const normalized = agent?.trim().toLowerCase().replace(/-/g, "_") ?? "";
+  const trimmedSessionId = sessionId?.trim() ?? "";
+  if (!trimmedSessionId || !AGENTS.has(normalized)) {
+    writeLine(
+      "Pass both --agent (claude-code, codex or opencode) and --session-id to declare for an explicit session.",
+    );
+    return null;
+  }
+  return {
+    agent: normalized,
+    sessionId: trimmedSessionId,
+    codexMeta:
+      normalized === "codex"
+        ? await readCodexMeta({ sessionId: trimmedSessionId, codexSessionsRoot })
+        : null,
+  };
+}
+
+/**
+ * The claude session this process runs inside, from the variables claude
+ * exports into every shell it spawns.
+ */
+function resolveClaudeSession(env: NodeJS.ProcessEnv): ResolvedSession | null {
   const claudeSessionId = env.CLAUDE_CODE_SESSION_ID?.trim();
-  if (env.CLAUDECODE && claudeSessionId) {
-    return { agent: "claude_code", sessionId: claudeSessionId, codexMeta: null };
-  }
+  if (!env.CLAUDECODE || !claudeSessionId) return null;
+  return { agent: "claude_code", sessionId: claudeSessionId, codexMeta: null };
+}
 
-  // The process tree answers exactly when it can, so it is asked before the
-  // machine-wide inference below.
+/**
+ * The codex session: the one this process runs under when the process tree
+ * answers, the one active on this machine when it does not.
+ */
+async function resolveCodexSession({
+  now,
+  codexSessionsRoot,
+  ancestorStartPid,
+  ancestorProbe,
+  writeLine,
+}: ResolutionInputs): Promise<ResolvedSession | null> {
   const ancestor = await resolveCodexSessionFromAncestors({
     startPid: ancestorStartPid,
     sessionsRoot: codexSessionsRoot,
@@ -126,17 +127,29 @@ async function resolveSession({
       codexMeta: live.session.meta,
     };
   }
-  if (live.kind === "ambiguous") {
-    writeLine(
-      "Multiple active codex sessions; run with --agent codex --session-id <id>.",
-    );
-    return null;
-  }
-
   writeLine(
-    "Could not find a live coding-agent session on this machine. Pass --agent and --session-id to name one.",
+    live.kind === "ambiguous"
+      ? "Multiple active codex sessions; run with --agent codex --session-id <id>."
+      : "Could not find a live coding-agent session on this machine. Pass --agent and --session-id to name one.",
   );
   return null;
+}
+
+/**
+ * Which session is asking, in the order above. Each tier announces its own
+ * failure, because "nothing was declared" must never be silent to the agent.
+ */
+export async function resolveSession(
+  inputs: ResolutionInputs,
+): Promise<ResolvedSession | null> {
+  if (inputs.sessionId || inputs.agent) {
+    return resolveExplicitSession(inputs);
+  }
+  // The claude environment wins over every codex reading: a codex (or any
+  // other process) started from inside a claude session inherits these, and
+  // the session doing the work, the one whose cost this checkout explains,
+  // is the claude one.
+  return resolveClaudeSession(inputs.env) ?? (await resolveCodexSession(inputs));
 }
 
 /** The rollout identity at a known transcript path, best-effort. */
