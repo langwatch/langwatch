@@ -21,9 +21,13 @@ import { resolveFlagDefinition } from "../registry";
  * directly, so they exercise the same predicate the service does — including
  * family-prefix matches — instead of a copy that can drift from it.
  *
- * Two keys predate this check and are pinned below rather than changed here;
- * altering either is a behavior change that belongs in its own PR, not in a
- * test that exists to stop the NEXT one.
+ * The keys below are pinned rather than changed here; altering any of them
+ * is a behavior change that belongs in its own PR, not in a test that
+ * exists to stop the NEXT one. `release_langy_ui_actions` joined the
+ * pinned list when merging main surfaced it alongside this check for the
+ * first time (#7357 added the check, #7424 added the flag, independently
+ * and concurrently) — same shape as the other grandfathered entries, just
+ * discovered at merge time instead of at either PR's own review.
  */
 
 /**
@@ -36,9 +40,14 @@ const UNREGISTERED_GRANDFATHERED = ["ops_ui_ops_menu_pinned"];
 
 /**
  * Registered but deliberately not PRODUCT-scoped. `release_langy_enabled`
- * is SYSTEM with `envOverridable: false`, which reads as intentional.
+ * and `release_langy_ui_actions` are both SYSTEM with `envOverridable:
+ * false` and both documented as "Managed only from the internal flag
+ * store (/ops/feature-flags)", which reads as intentional.
  */
-const NON_PRODUCT_GRANDFATHERED = ["release_langy_enabled"];
+const NON_PRODUCT_GRANDFATHERED = [
+  "release_langy_enabled",
+  "release_langy_ui_actions",
+];
 
 describe("frontend feature flags", () => {
   describe("when a flag is exposed to the frontend via tRPC", () => {
@@ -69,9 +78,12 @@ describe("frontend feature flags", () => {
   });
 
   describe("when the grandfathered exceptions are listed", () => {
-    it("names exactly the two keys that predate this check", () => {
+    it("names exactly the keys that predate or are pinned by this check", () => {
       expect(UNREGISTERED_GRANDFATHERED).toEqual(["ops_ui_ops_menu_pinned"]);
-      expect(NON_PRODUCT_GRANDFATHERED).toEqual(["release_langy_enabled"]);
+      expect(NON_PRODUCT_GRANDFATHERED).toEqual([
+        "release_langy_enabled",
+        "release_langy_ui_actions",
+      ]);
     });
   });
 });
