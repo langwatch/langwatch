@@ -1,15 +1,12 @@
 import { Heading, HStack, Spacer, Tabs, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 
-import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import type { AiToolEntry } from "~/components/me/tiles/types";
 import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import { AiToolEntryDrawer } from "~/components/settings/governance/AiToolEntryDrawer";
 import { IngestionTemplatesEditor } from "~/components/settings/governance/IngestionTemplatesEditor";
 import { ToolCatalogEditor } from "~/components/settings/governance/ToolCatalogEditor";
-import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 /**
@@ -29,7 +26,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
  * delegated viewer arrives here from the section navigation and is told which
  * grant the catalog needs rather than being refused the whole page.
  */
-function ToolCatalogPage() {
+export function ToolCatalogPanel() {
   const { organization, hasAnyPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
@@ -48,20 +45,18 @@ function ToolCatalogPage() {
 
   if (!canManageCatalog) {
     return (
-      <GovernanceLayout pageTitle="Tool Tiles · Governance · LangWatch">
-        <VStack align="stretch" gap={6} width="full">
-          <ToolCatalogHeading />
-          <PermissionRequiredNotice
-            permission="aiTools:manage"
-            detail="The tiles and the ingestion templates stay hidden until then."
-          />
-        </VStack>
-      </GovernanceLayout>
+      <VStack align="stretch" gap={6} width="full">
+        <ToolCatalogHeading />
+        <PermissionRequiredNotice
+          permission="aiTools:manage"
+          detail="The tiles and the ingestion templates stay hidden until then."
+        />
+      </VStack>
     );
   }
 
   return (
-    <GovernanceLayout pageTitle="Tool Tiles · Governance · LangWatch">
+    <>
       <VStack align="stretch" gap={6} width="full">
         <ToolCatalogHeading />
 
@@ -110,7 +105,7 @@ function ToolCatalogPage() {
         state={drawerState}
         onClose={() => setDrawerState(null)}
       />
-    </GovernanceLayout>
+    </>
   );
 }
 
@@ -129,11 +124,3 @@ function ToolCatalogHeading() {
     </HStack>
   );
 }
-
-export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
-  bypassOnboardingRedirect: true,
-})(
-  withPermissionGuard("governance:view", {
-    bypassOnboardingRedirect: true,
-  })(ToolCatalogPage),
-);

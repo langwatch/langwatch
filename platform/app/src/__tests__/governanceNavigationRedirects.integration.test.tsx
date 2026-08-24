@@ -8,7 +8,7 @@
  * Spec: specs/governance/governance-navigation.feature
  */
 
-import { render } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
 import {
   createMemoryRouter,
   type RouteObject,
@@ -40,6 +40,28 @@ function renderRouterAt(initialEntries: string[]) {
       ),
     },
     { path: "/governance/people", element: <div>people page</div> },
+    // The same objects routes.tsx mounts for the inventory unification.
+    {
+      path: "/governance/tool-catalog",
+      element: (
+        <LegacyPrefixRedirect
+          from="/governance/tool-catalog"
+          to="/governance/inventory"
+          search="?tab=catalog"
+        />
+      ),
+    },
+    {
+      path: "/governance/ingestion-sources",
+      element: (
+        <LegacyPrefixRedirect
+          from="/governance/ingestion-sources"
+          to="/governance/inventory"
+          search="?tab=sources"
+        />
+      ),
+    },
+    { path: "/governance/inventory", element: <div>inventory page</div> },
   ];
   const router = createMemoryRouter(routes, {
     initialEntries,
@@ -52,16 +74,42 @@ function renderRouterAt(initialEntries: string[]) {
 describe("given governance pages that were renamed", () => {
   describe("when a reader opens the old departments address from a bookmark", () => {
     // @scenario "Old departments bookmarks land on the people page"
-    it("lands on the people page", () => {
+    it("lands on the people page", async () => {
       const router = renderRouterAt(["/start", "/governance/departments"]);
-      expect(router.state.location.pathname).toBe("/governance/people");
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/people");
+      });
     });
   });
 
   describe("when a reader opens the older cost-centers address", () => {
-    it("chains onto the people page", () => {
+    it("chains onto the people page", async () => {
       const router = renderRouterAt(["/start", "/governance/cost-centers"]);
-      expect(router.state.location.pathname).toBe("/governance/people");
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/people");
+      });
+    });
+  });
+
+  describe("when a reader opens a retired inventory-family address", () => {
+    // @scenario "Old catalog addresses land on the matching inventory tab"
+    it("lands tool-catalog on the catalog tab of inventory", async () => {
+      const router = renderRouterAt(["/start", "/governance/tool-catalog"]);
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/inventory");
+      });
+      expect(router.state.location.search).toBe("?tab=catalog");
+    });
+
+    it("lands ingestion-sources on the sources tab of inventory", async () => {
+      const router = renderRouterAt([
+        "/start",
+        "/governance/ingestion-sources",
+      ]);
+      await waitFor(() => {
+        expect(router.state.location.pathname).toBe("/governance/inventory");
+      });
+      expect(router.state.location.search).toBe("?tab=sources");
     });
   });
 });

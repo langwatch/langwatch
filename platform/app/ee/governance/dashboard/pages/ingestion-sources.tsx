@@ -47,7 +47,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import {
   DialogBody,
@@ -61,8 +60,6 @@ import {
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
-import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useActivePlan } from "~/hooks/useActivePlan";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -565,7 +562,7 @@ function useIngestionSourcesPage() {
   };
 }
 
-function IngestionSourcesPage() {
+export function IngestionSourcesPanel() {
   const {
     orgId,
     isEnterprise,
@@ -586,7 +583,7 @@ function IngestionSourcesPage() {
   } = useIngestionSourcesPage();
 
   return (
-    <GovernanceLayout pageTitle="Catalog · Governance · LangWatch">
+    <>
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
         <IngestionSourcesHeader
           isEnterprise={isEnterprise}
@@ -645,7 +642,7 @@ function IngestionSourcesPage() {
         onSubmit={(input) => mutations.update.mutate(input)}
         isPending={mutations.update.isPending}
       />
-    </GovernanceLayout>
+    </>
   );
 }
 
@@ -2264,10 +2261,3 @@ function SecretModal({
   );
 }
 
-export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
-  bypassOnboardingRedirect: true,
-})(
-  withPermissionGuard("governance:view", {
-    bypassOnboardingRedirect: true,
-  })(IngestionSourcesPage),
-);

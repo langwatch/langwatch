@@ -93,22 +93,16 @@ export const governanceNavItems: readonly SectionNavItemData[] = [
     icon: Eye,
   },
   {
-    label: "Catalog",
-    href: "/governance/ingestion-sources",
-    includePath: "/governance/ingestion-sources",
-    icon: PlugZap,
+    label: "Inventory",
+    href: "/governance/inventory",
+    includePath: "/governance/inventory",
+    icon: PackageOpen,
   },
   {
     label: "Anomaly Rules",
     href: "/governance/anomaly-rules",
     includePath: "/governance/anomaly-rules",
     icon: AlertTriangle,
-  },
-  {
-    label: "Tool Tiles",
-    href: "/governance/tool-catalog",
-    includePath: "/governance/tool-catalog",
-    icon: PackageOpen,
   },
   {
     label: "People",

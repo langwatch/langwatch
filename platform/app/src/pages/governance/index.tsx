@@ -245,7 +245,7 @@ function GovernanceOverviewPage() {
                 }
                 title="Add tools to the catalog"
                 description="Publish the coding assistants, model providers, and internal tools your team installs from their /me portal."
-                href="/governance/tool-catalog"
+                href="/governance/inventory?tab=catalog"
                 ctaLabel={
                   hasCatalogTiles
                     ? `${catalogTiles.length} tile${catalogTiles.length === 1 ? "" : "s"} in the catalog`

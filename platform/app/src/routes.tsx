@@ -212,9 +212,20 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/governance/index")),
       },
       {
+        // Inventory unifies the ingestion sources and the tool catalog
+        // behind one address; `?tab=` picks the view and keeps both
+        // linkable.
+        path: "/governance/inventory",
+        ...page(() => import("./pages/governance/inventory")),
+      },
+      {
         path: "/governance/ingestion-sources",
-        ...page(
-          () => import("@ee/governance/dashboard/pages/ingestion-sources"),
+        element: (
+          <LegacyPrefixRedirect
+            from="/governance/ingestion-sources"
+            to="/governance/inventory"
+            search="?tab=sources"
+          />
         ),
       },
       {
@@ -230,7 +241,13 @@ const routes: RouteObject[] = [
       },
       {
         path: "/governance/tool-catalog",
-        ...page(() => import("./pages/governance/tool-catalog")),
+        element: (
+          <LegacyPrefixRedirect
+            from="/governance/tool-catalog"
+            to="/governance/inventory"
+            search="?tab=catalog"
+          />
+        ),
       },
       {
         path: "/governance/people",
