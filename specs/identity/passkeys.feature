@@ -26,14 +26,25 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
   #
   # ── Open Q4 is decided: a passkey satisfies a two-step requirement ─────
   #
-  # A session minted by a passkey records `phw`, and that is enough for an
-  # organization that requires two-step verification (D06). A passkey is
-  # something you have, and it cannot be handed to a convincing website -
-  # which is precisely the attack the requirement exists to stop, and
-  # precisely the attack an authenticator code does NOT stop. A passkey
+  # `mfaRequired` is a membership condition - "every member of this
+  # organization can prove a second factor" (D06) - and a passkey is one of
+  # the three ways to prove one, beside a setup on the account and an
+  # identity provider that asserts a factor. A person who signs in with a
+  # passkey is never held at the enrollment gate.
+  #
+  # A passkey is something you have, and it cannot be handed to a convincing
+  # website - which is precisely the attack the requirement exists to stop,
+  # and precisely the attack an authenticator code does NOT stop. A passkey
   # synced across a person's devices is weaker than one bound to a single
   # piece of hardware, and still at least as strong as a code typed off a
   # screen, so it does not change the answer.
+  #
+  # It satisfies the requirement per SIGN-IN, not for the account: the
+  # passkey proved itself on the session it minted, and a password sign-in
+  # by the same person is a different sign-in that proves nothing extra. So
+  # a person whose only second factor is a passkey still meets the gate when
+  # they sign in another way - and signing in with the passkey is the
+  # shortest way through it.
   #
   # Out of scope until somebody asks for it: an organization-level "keys
   # bound to one device only" refinement. Nothing here forecloses it - the
@@ -173,40 +184,37 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
   @unit @unimplemented
   Scenario: A passkey satisfies an organization's two-step requirement
     Given "acme" requires two-step verification
+    And "sam" has no two-step verification set up on their account
     When "sam" signs in with a passkey
-    Then the session is usable immediately
-    And no step-up is asked for
+    Then "acme"'s data is reachable immediately
+    And "sam" is not held at the enrollment gate
 
   @unit @unimplemented
   Scenario: A passkey held on the person's own devices satisfies it the same way
     Given "acme" requires two-step verification
     And "sam"'s passkey is one their devices keep in sync
     When "sam" signs in with it
-    Then the session is usable immediately, exactly as any other passkey's is
+    Then "acme"'s data is reachable immediately, exactly as any other passkey's is
 
-  # The step-up itself belongs to
+  # The gate itself belongs to
   # specs/identity/mfa-and-session-shape.feature. Named here to say that
   # deciding a passkey is enough does not weaken anything else.
   @unit @unimplemented
-  Scenario: A password sign-in in the same organization is still stepped up
+  Scenario: Holding a passkey does not carry over to a password sign-in
     Given "acme" requires two-step verification
-    When "sam" signs in with an email address and a password
-    Then a step-up is asked for, unchanged by passkeys existing
-
-  @unit @unimplemented
-  Scenario: Holding a passkey does not excuse a password sign-in
-    Given "acme" requires two-step verification
-    And "sam" holds both a passkey and a password
-    When "sam" signs in with the password
-    Then a step-up is asked for
-    And offering to sign in with the passkey instead is one of the ways out
+    And "sam" holds a passkey and a password, and has set nothing up on their account
+    When "sam" signs in with the password instead
+    Then "sam" is held at the enrollment gate for "acme"
+    And signing in with the passkey is offered as the shorter way through
+    And setting two-step verification up on the account is the other way
 
   @unit @unimplemented
   Scenario: A passkey is never asked for as a second step
-    Given "acme" requires two-step verification
-    When "sam" is asked to complete a step-up
-    Then the step-up asks for an authenticator code or a backup code
+    Given "sam" has two-step verification set up on their account
+    When "sam" signs in and is challenged
+    Then the challenge asks for an authenticator code or a backup code
     And a passkey is not one of the things it asks for
+    And registering a passkey never counts as setting two-step verification up
 
   # ── Removing ───────────────────────────────────────────────────────────
 
