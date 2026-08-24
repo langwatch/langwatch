@@ -12,7 +12,7 @@
  * against the real picker without mounting the whole inventory page.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { RouterOutputs } from "~/utils/api";
 
@@ -57,46 +57,4 @@ export function useDestinationContext(
     }),
     [orgId, organization],
   );
-}
-
-/**
- * The edit drawer's local form state, re-seeded whenever the drawer opens on a
- * different source so a previous source's edits never bleed into this one.
- *
- * `destination` deliberately starts as `undefined` and stays there until the
- * admin touches the picker — see `buildUpdateInput` in `inventory.tsx` for why
- * an untouched destination must not be echoed back to the server.
- */
-export function useSourceEditForm(source: Source | null) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [statements, setStatements] = useState<string[]>([]);
-  const [destination, setDestination] = useState<string | null | undefined>(
-    undefined,
-  );
-
-  useEffect(() => {
-    if (!source) return;
-    setName(source.name);
-    setDescription(source.description ?? "");
-    setDestination(undefined);
-    const parser = (source.parserConfig as Record<string, unknown>) ?? {};
-    const raw = parser.ottlStatements;
-    setStatements(
-      Array.isArray(raw)
-        ? raw.filter((s): s is string => typeof s === "string")
-        : [],
-    );
-  }, [source?.id]);
-
-  return {
-    name,
-    setName,
-    description,
-    setDescription,
-    statements,
-    setStatements,
-    destination,
-    setDestination,
-  };
 }
