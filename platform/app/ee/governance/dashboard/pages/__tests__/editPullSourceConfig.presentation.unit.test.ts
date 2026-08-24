@@ -19,7 +19,7 @@ import {
   lockedParserKeys,
   parserFieldPresentation,
   seedComposerParserConfig,
-} from "../ingestion-sources";
+} from "../inventory";
 import { composer } from "./editPullSourceConfig.fixture";
 
 // `resolvePullConfig` toasts the offending field when a pull config will not

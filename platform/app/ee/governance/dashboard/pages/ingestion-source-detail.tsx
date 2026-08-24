@@ -60,7 +60,7 @@ import {
   useSourceEventsPager,
 } from "../components/useSourceEventsPager";
 import type { PageRequest } from "../logic/eventsPager";
-import { SourceEditDrawer } from "./ingestion-sources";
+import { SourceEditDrawer } from "./inventory";
 
 /**
  * Per-source detail page - health metrics + a cursor-walked table of every

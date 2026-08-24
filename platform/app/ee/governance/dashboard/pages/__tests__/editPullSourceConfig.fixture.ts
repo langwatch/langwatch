@@ -8,7 +8,7 @@
  * would drift into testing three slightly different forms.
  */
 
-import type { ComposerState } from "../ingestion-sources";
+import type { ComposerState } from "../inventory";
 
 export function composer(
   parserConfig: Record<string, string>,

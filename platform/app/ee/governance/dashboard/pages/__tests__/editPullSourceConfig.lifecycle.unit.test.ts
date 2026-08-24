@@ -14,7 +14,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { syncIngestionPullSource } from "../../../services/pullers/ingestionPullLifecycle";
 import { recommendedPullSchedule } from "../../logic/pullCadence";
-import { buildEditSubmission } from "../ingestion-sources";
+import { buildEditSubmission } from "../inventory";
 
 // `resolvePullConfig` toasts the offending field when a pull config will not
 // build. That is the behaviour under test's own reporting channel, not a
