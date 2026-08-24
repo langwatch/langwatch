@@ -2,7 +2,23 @@
 
 **Date:** 2026-01-29 (initial), 2026-05-17 (scope split + registry)
 
-**Status:** Accepted
+**Status:** Accepted — amended 2026-08-20, see below
+
+## Amendment (2026-08-20): PostHog removed from the resolver
+
+PR #7194 deleted `FeatureFlagServicePostHog` and the PostHog branch of `featureFlagService.isEnabled`. **Both scopes now resolve identically**, and PostHog is not consulted for any flag:
+
+```
+SYSTEM and PRODUCT:  env override -> FEATURE_FLAG_FORCE_ENABLE -> postgres store (targeting rules, then row value) -> registry default
+```
+
+Three consequences the rest of this document predates:
+
+- **Targeting is scope-independent.** `FeatureFlagStorePostgres.get` evaluates `rules` against the caller's `{ projectId, organizationId }` without reading `scope`, so a SYSTEM flag takes per-project and per-org rules exactly like a PRODUCT one. The claim below that "SYSTEM flags ignore `projectId` / `organizationId`" no longer holds.
+- **Scope is now a classification, not a resolver switch.** It survives because `/ops/feature-flags` groups and badges by it, and because it records who owns the lever: SYSTEM means the internal flag store is the only administration point (usually paired with `envOverridable: false`). It no longer implies anything about *how* the value is fetched.
+- **A SYSTEM-scoped flag exposed to the frontend is a legitimate shape.** `FeatureFlagKey` is the union of all registered keys regardless of scope, so the `featureFlag.isEnabled` router's cast is safe either way. The Langy family relies on this: internal levers that gate a product surface. A guard added in #7357 asserted the opposite — that every frontend-exposed flag must be PRODUCT — and went red on `main` when #7424 landed a SYSTEM flag in `FRONTEND_FEATURE_FLAGS` (issue #7511); it was removed rather than extended, because the premise was inherited from this ADR after the code beneath it had changed.
+
+Sections below describing a PostHog path (Resolution order, Architecture Flow, Targeting via personProperties, PostHog local evaluation) are retained as history of the 2026-05 design and are **not** the current behaviour. `POSTHOG_FEATURE_FLAGS_KEY` no longer affects flag resolution; PostHog remains in the product for analytics and error capture only.
 
 ## Context
 

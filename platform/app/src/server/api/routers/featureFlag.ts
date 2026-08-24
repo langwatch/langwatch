@@ -58,10 +58,14 @@ export const featureFlagRouter = createTRPCRouter({
         "Feature flag check requested",
       );
 
-      // `input.flag` is runtime-validated against FRONTEND_FEATURE_FLAGS
-      // (a subset of registered PRODUCT keys), so the cast is safe;
-      // FRONTEND_FEATURE_FLAGS is wider than the inferred zod enum value
-      // type, hence the explicit FeatureFlagKey narrowing.
+      // `input.flag` is runtime-validated against FRONTEND_FEATURE_FLAGS,
+      // whose entries are registered keys of either scope (FeatureFlagKey
+      // is scope-agnostic, so the cast is safe for SYSTEM and PRODUCT
+      // alike). FRONTEND_FEATURE_FLAGS is wider than the inferred zod enum
+      // value type, hence the explicit FeatureFlagKey narrowing. The one
+      // deliberately unregistered entry, `ops_ui_ops_menu_pinned`, resolves
+      // false server-side by design; frontendFlagsRegistered.unit.test.ts
+      // pins that exception so a new unregistered key cannot slip in.
       const enabled = await featureFlagService.isEnabled(
         input.flag as FeatureFlagKey,
         {

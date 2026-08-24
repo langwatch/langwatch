@@ -36,13 +36,21 @@
  *
  * ## Targeting
  *
- * Flags can target users, projects, or organizations via PostHog personProperties.
- * Configure targeting in PostHog release conditions, not in the flag name.
- * Pass `projectId` or `organizationId` to `useFeatureFlag` for targeted evaluation.
+ * Flags target projects or organizations through the operator store's rules,
+ * written at /ops/feature-flags. Configure targeting there, not in the flag
+ * name. Pass `projectId` or `organizationId` to `useFeatureFlag` for targeted
+ * evaluation. Targeting is scope-independent: a SYSTEM flag takes per-project
+ * and per-org rules exactly like a PRODUCT one (PostHog was removed from the
+ * resolver — see ADR-005).
  *
  * ## Adding New Flags
  *
- * 1. Create the flag in PostHog with your desired release conditions
+ * 1. Register the flag in `registry.ts` (`FEATURE_FLAGS`) with a scope and a
+ *    default. Listing a key here WITHOUT registering it is the one real
+ *    failure mode: the service falls through to the legacy in-memory path,
+ *    /ops/feature-flags can neither list nor write it, and targeting rules
+ *    never apply. `__tests__/frontendFlagsRegistered.unit.test.ts` enforces
+ *    this.
  * 2. Add the flag key to this array
  * 3. Use `useFeatureFlag("your_flag_key")` in components
  *

@@ -93,12 +93,11 @@ export function FeatureFlagsContent() {
     <Stack gap={8} paddingY={4} maxWidth="1200px">
       <Box>
         <Text fontSize="sm" color="fg.muted">
-          System-scoped flags are kill switches and pipeline toggles served from
-          this LangWatch postgres database. They never round-trip to PostHog, so
-          flipping them is fast and free.{" "}
-          {isSaas
-            ? "Product-scoped flags still resolve through PostHog for user targeting and A/B tests; postgres values here only apply as an emergency override."
-            : "Product-scoped flags fall back to this postgres store when PostHog is not configured."}
+          Every flag is served from this LangWatch postgres database, whichever
+          scope it carries, so flipping one is fast and free. Scope says who the
+          flag is for: system-scoped flags are kill switches and pipeline
+          toggles, product-scoped flags are customer-facing features. Targeting
+          rules work the same for both.
         </Text>
       </Box>
 
@@ -338,9 +337,9 @@ function FlagRowView({
             </Text>
             <ScopeBadge scope={row.scope} />
             {showProductWarning && (
-              <Tooltip content="PRODUCT flags normally resolve through PostHog. Setting a postgres value here will override PostHog for every caller; emergency use only.">
+              <Tooltip content="This flag gates a customer-facing feature, and a value set here applies to every organization no targeting rule matches. On a shared install that is the whole fleet, so prefer a per-organization or per-project rule when rolling one out.">
                 <Badge colorPalette="yellow" size="sm" variant="subtle">
-                  PostHog managed
+                  All customers
                 </Badge>
               </Tooltip>
             )}
