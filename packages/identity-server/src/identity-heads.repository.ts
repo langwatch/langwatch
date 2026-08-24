@@ -58,4 +58,13 @@ export interface IdentityHeadsRepository {
   }): Promise<IdentifierFact | null>;
   /** The user's live identifiers — the account-list read (ADR-116). */
   findLiveIdentifiers(args: { userId: string }): Promise<IdentifierFact[]>;
+  /**
+   * One identifier by its own id, without knowing whose it is (ADR-116).
+   * The credential row names an identifier and nothing else, so a read that
+   * starts from a row id has no user to scope by yet — the user is what this
+   * answers. Every caller then puts the user it learns through the gate.
+   */
+  findIdentifierById(args: {
+    identifierId: string;
+  }): Promise<IdentifierFact | null>;
 }

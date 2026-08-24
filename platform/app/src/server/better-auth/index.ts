@@ -16,12 +16,14 @@ import { createLogger } from "@langwatch/observability";
 import { RedisConfigService } from "@langwatch/redis-client";
 import { compare, hash } from "bcrypt";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
-import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError } from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { env } from "~/env.mjs";
 import { tryGetApp } from "~/server/app-layer/app";
-import { identityCeremonies } from "~/server/app-layer/identity/runtime";
+import {
+  identityCeremonies,
+  identityDatabase,
+} from "~/server/app-layer/identity/runtime";
 import { prisma } from "~/server/db";
 import { fireActivityTrackingNurturing } from "../../../ee/billing/nurturing/hooks/activityTracking";
 import { ensureUserSyncedToCio } from "../../../ee/billing/nurturing/hooks/userSync";
@@ -216,7 +218,13 @@ export const auth = betterAuth({
           : []),
       ],
   secret: isBuildTime ? "build-time-only" : env.NEXTAUTH_SECRET,
-  database: prismaAdapter(prisma, { provider: "postgresql" }),
+  /**
+   * ADR-116: the stock prismaAdapter for every model except `account`,
+   * which identity serves from its own projection joined with the
+   * credential table. A user whose backfill has not finalized falls through
+   * to the legacy `Account` row, so this changes nothing until they do.
+   */
+  database: identityDatabase(),
 
   /**
    * Tell BetterAuth's rate limiter (and session IP tracking) which

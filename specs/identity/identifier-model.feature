@@ -242,6 +242,52 @@ Feature: The identifier model - identity as an event-sourced pipeline
     Then no identifier answers, so the legacy column stands
     And attaching an address can therefore never redirect "sam"'s mail
 
+  # ADR-116: the linkage half of the old Account row is the projection, and
+  # the credential half is AccountCredential. better-auth reads `account`
+  # through an adapter over the join; every other model keeps the stock one.
+  # The fallback to the legacy table IS the migration - a user with no
+  # identifiers has not been backfilled, and that table is still their truth.
+
+  @unit
+  Scenario: better-auth reads an account from the identifiers
+    Given "sam"'s identifier backfill has finalized
+    When better-auth looks up an account by its provider and subject
+    Then the identifier answers who holds it
+    And the credential row answers what secrets it carries
+    And better-auth cannot tell the row moved
+
+  @unit
+  Scenario: A tombstoned identifier can never sign anyone in
+    Given "sam" holds a DETACHED identifier for a provider subject
+    When better-auth looks that subject up
+    Then nothing answers, and no session is created from a tombstone
+
+  @unit
+  Scenario: An unmigrated user's accounts come from the legacy table
+    Given "sam"'s identifier backfill has not finalized
+    When better-auth looks up any of "sam"'s accounts
+    Then the projection answers nothing and the legacy Account row answers
+    And an operator rollback returns a finalized user to the same path
+
+  @unit
+  Scenario: A token refresh touches secrets and emits no event
+    Given "sam"'s identifier backfill has finalized
+    When an OAuth refresh rewrites the access token
+    Then only the credential row is written
+    And no identity command is dispatched, because a refresh is not a fact
+
+  @unit
+  Scenario: The account adapter answers only the shapes it knows
+    When better-auth issues one of its account queries
+    Then the adapter recognises it and answers from the projection
+
+  @unit
+  Scenario: An unanswerable account query refuses instead of guessing
+    Given better-auth issues an account query shape the adapter cannot serve
+    When the adapter is asked to answer it
+    Then it throws naming the shape
+    And it never answers nothing, which would read as a missing sign-in method
+
   @unit
   Scenario: The gate costs nothing before anyone is enrolled
     Given no user has finalized the identifier backfill

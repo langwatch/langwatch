@@ -41,18 +41,29 @@ function toRow(row: Row): AccountCredentialRow {
   };
 }
 
-/** Only the fields the patch actually names — absent means "leave alone". */
+/** Columns a patch carries through unchanged, name for name. */
+const PASS_THROUGH_FIELDS = [
+  "accessToken",
+  "refreshToken",
+  "idToken",
+  "password",
+  "scope",
+  "tokenType",
+  "sessionState",
+  "type",
+  "extExpiresIn",
+] as const satisfies readonly (keyof AccountCredentialPatch)[];
+
+/**
+ * Only the fields the patch actually names — absent means "leave alone", and
+ * an explicit null means "clear it". The distinction matters: a token refresh
+ * that omits `refreshToken` must not erase the one already stored.
+ */
 function toPrismaPatch(patch: AccountCredentialPatch) {
   const data: Record<string, unknown> = {};
-  if ("accessToken" in patch) data.accessToken = patch.accessToken;
-  if ("refreshToken" in patch) data.refreshToken = patch.refreshToken;
-  if ("idToken" in patch) data.idToken = patch.idToken;
-  if ("password" in patch) data.password = patch.password;
-  if ("scope" in patch) data.scope = patch.scope;
-  if ("tokenType" in patch) data.tokenType = patch.tokenType;
-  if ("sessionState" in patch) data.sessionState = patch.sessionState;
-  if ("type" in patch) data.type = patch.type;
-  if ("extExpiresIn" in patch) data.extExpiresIn = patch.extExpiresIn;
+  for (const field of PASS_THROUGH_FIELDS) {
+    if (field in patch) data[field] = patch[field];
+  }
   if ("expiresAtMs" in patch) {
     data.expiresAt =
       patch.expiresAtMs == null ? null : new Date(patch.expiresAtMs);
@@ -108,8 +119,7 @@ export class PrismaAccountCredentialsRepository
         scope: row.scope,
         tokenType: row.tokenType,
         sessionState: row.sessionState,
-        expiresAt:
-          row.expiresAtMs == null ? null : new Date(row.expiresAtMs),
+        expiresAt: row.expiresAtMs == null ? null : new Date(row.expiresAtMs),
         extExpiresIn: row.extExpiresIn,
       },
       update: {},

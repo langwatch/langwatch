@@ -112,6 +112,17 @@ export class PrismaIdentityHeadsRepository implements IdentityHeadsRepository {
     return row === null ? null : rowToFact(row);
   }
 
+  async findIdentifierById({
+    identifierId,
+  }: {
+    identifierId: string;
+  }): Promise<IdentifierFact | null> {
+    const row = await this.prisma.identifier.findUnique({
+      where: { id: identifierId },
+    });
+    return row === null ? null : rowToFact(row);
+  }
+
   async findLiveIdentifiers({
     userId,
   }: {

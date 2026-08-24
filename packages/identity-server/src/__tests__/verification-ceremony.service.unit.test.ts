@@ -73,6 +73,7 @@ function harness(options?: {
       findIdentifierIdForAccount: async () => null,
       findLiveIdentifierByProviderAccount: async () => null,
       findLiveIdentifiers: async () => [],
+      findIdentifierById: async () => null,
     },
     { verifyIdentifier: verifyIdentifier as never },
     {

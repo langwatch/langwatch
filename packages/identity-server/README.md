@@ -32,9 +32,11 @@ package.
                                mintUserHashKey · s256Challenge
  identity-command-id           every form a command id takes, in one place
  identity-backfill-plan        what the legacy rows imply, as a pure plan
- ./better-auth                 IdentityCeremonies — the four methods the app binds
-                               to better-auth's own databaseHooks (attach, detach,
-                               hash-key mint, erase)
+ ./better-auth                 IdentityCeremonies — the ceremonies the app binds
+                               to better-auth's databaseHooks; and
+                               IdentityAccountAdapter, which serves better-auth's
+                               `account` model from Identifier x AccountCredential
+                               (ADR-116) and delegates every other model
 ```
 
 Nothing here reads the environment or a database. The write gate, the
@@ -50,9 +52,11 @@ Server-only by construction: nothing in the browser reaches this package,
 and the app's frontend-boundary test fails the build if that changes, so
 `node:crypto` lives on the root entry rather than behind a subpath.
 
-The package does not depend on better-auth in any form — not a dependency,
-not a peer, not a type import. The ceremonies take plain row shapes, and the
-app is what knows they came from a hook.
+better-auth appears only as a PEER, and only on the `./better-auth` subpath —
+`IdentityAccountAdapter` implements its `DBAdapter` contract for the
+`account` model (ADR-116). The root entry, and therefore every service, is
+free of it: the ceremonies take plain row shapes and never learn a hook
+called them.
 
 Spec: `specs/identity/identifier-model.feature`,
 `specs/identity/identity-packages.feature`.

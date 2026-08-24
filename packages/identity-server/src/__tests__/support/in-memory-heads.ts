@@ -102,6 +102,18 @@ export class InMemoryHeads implements IdentityHeadsRepository {
     return null;
   }
 
+  async findIdentifierById({
+    identifierId,
+  }: {
+    identifierId: string;
+  }): Promise<IdentifierFact | null> {
+    for (const heads of this.heads.values()) {
+      const head = heads.identifiers[identifierId];
+      if (head) return head;
+    }
+    return null;
+  }
+
   async findLiveIdentifiers({
     userId,
   }: {
