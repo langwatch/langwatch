@@ -1,4 +1,7 @@
-import type { GovernanceSetupState } from "@langwatch/enterprise-governance-contract";
+import {
+  GovernanceSetupStateService as GovernanceSetupStateServiceContract,
+  type GovernanceSetupState,
+} from "@langwatch/enterprise-governance-contract";
 import type {
   GovernanceSetupActivityPort,
   GovernanceSetupStateRepository,
@@ -6,19 +9,21 @@ import type {
 
 const RECENT_ACTIVITY_WINDOW_MS = 30 * 24 * 60 * 60 * 1_000;
 
-export class GovernanceSetupStateService {
+export class DefaultGovernanceSetupStateService extends GovernanceSetupStateServiceContract {
   private constructor(
     private readonly repository: GovernanceSetupStateRepository,
     private readonly activity: GovernanceSetupActivityPort | undefined,
     private readonly now: () => number,
-  ) {}
+  ) {
+    super();
+  }
 
   static create(options: {
     repository: GovernanceSetupStateRepository;
     activity?: GovernanceSetupActivityPort;
     now?: () => number;
-  }): GovernanceSetupStateService {
-    return new GovernanceSetupStateService(
+  }): DefaultGovernanceSetupStateService {
+    return new DefaultGovernanceSetupStateService(
       options.repository,
       options.activity,
       options.now ?? Date.now,

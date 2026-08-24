@@ -28,7 +28,6 @@ import {
 import {
   AppQuarantineFillEvaluatorService,
 } from "@ee/governance/services/quarantineFillEvaluator.service";
-import { AppGovernanceSetupStateService } from "@ee/governance/services/setupState.service";
 import { z } from "zod";
 import {
   ENTERPRISE_FEATURE_ERRORS,
@@ -57,11 +56,7 @@ export const governanceRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("governance:view")
     .query(async ({ ctx, input }) => {
-      const service = AppGovernanceSetupStateService.create({
-        prisma: ctx.prisma,
-        traceActivity: getApp().governance.traceActivity,
-      });
-      return await service.resolve(input.organizationId);
+      return await ctx.app.governance.setupState.resolve(input.organizationId);
     }),
 
   /**
@@ -85,10 +80,6 @@ export const governanceRouter = createTRPCRouter({
     .permission("organization:view")
     .query(async ({ ctx, input }): Promise<PersonaResolution> => {
       const userId = ctx.session.user.id;
-      const setupService = AppGovernanceSetupStateService.create({
-        prisma: ctx.prisma,
-        traceActivity: getApp().governance.traceActivity,
-      });
       const usageService = UsageStatsService.create(ctx.prisma);
 
       const [
@@ -101,7 +92,7 @@ export const governanceRouter = createTRPCRouter({
         organizationIntent,
       ] = await Promise.all([
         // hasApplicationTraces is part of setupState as of 9d2688c84.
-        setupService.resolve(input.organizationId),
+        ctx.app.governance.setupState.resolve(input.organizationId),
         // The user's first project via team membership. Personal workspaces
         // are excluded outright: they are the governance data home, never a
         // navigable org project (ADR-038 v6).

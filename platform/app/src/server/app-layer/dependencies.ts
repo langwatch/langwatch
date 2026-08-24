@@ -9,6 +9,7 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import type { ManagedProviderService } from "@langwatch/enterprise-managed-providers-contract";
 import type { IngestionTemplatesService } from "@langwatch/enterprise-governance-contract";
+import type { GovernanceSetupStateService } from "@langwatch/enterprise-governance-contract";
 import type {
   BillableEventsRepository as BillingEventsReadRepository,
   BillableEventsQueryService,
@@ -277,6 +278,8 @@ export interface AppDependencies {
   governance: {
     /** The process-owned template catalogue and authoring service. */
     ingestionTemplates: IngestionTemplatesService;
+    /** Process-owned Governance persona/setup detection. */
+    setupState: GovernanceSetupStateService;
     ocsfEvents: GovernanceOcsfEventsClickHouseRepository | undefined;
     /** Governance-domain reads over the shared `trace_summaries` table —
      *  the persona-detection activity probe and the quarantine-fill

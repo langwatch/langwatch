@@ -1,6 +1,6 @@
 import type { GovernanceSetupActivityPort } from "../ports/governance-setup-state.port";
 import { PrismaGovernanceSetupStateRepository } from "../repositories/prisma/prisma.governance-setup-state.repository";
-import { GovernanceSetupStateService } from "../services/governance-setup-state.service";
+import { DefaultGovernanceSetupStateService } from "../services/governance-setup-state.service";
 
 export class PostgresGovernanceSetupStateAdapter {
   private constructor(
@@ -18,8 +18,8 @@ export class PostgresGovernanceSetupStateAdapter {
     );
   }
 
-  build(): GovernanceSetupStateService {
-    return GovernanceSetupStateService.create({
+  build(): DefaultGovernanceSetupStateService {
+    return DefaultGovernanceSetupStateService.create({
       repository: PrismaGovernanceSetupStateRepository.create(this.database),
       activity: this.activity,
     });

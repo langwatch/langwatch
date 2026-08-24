@@ -4,7 +4,7 @@ import {
   GovernanceSetupStateRepository,
   type GovernanceSetupCounts,
 } from "../src/ports/governance-setup-state.port";
-import { GovernanceSetupStateService } from "../src/services/governance-setup-state.service";
+import { DefaultGovernanceSetupStateService } from "../src/services/governance-setup-state.service";
 
 const emptyCounts = (): GovernanceSetupCounts => ({
   personalVirtualKeys: 0,
@@ -29,9 +29,9 @@ class RecordingActivityPort extends GovernanceSetupActivityPort {
   readonly hasRecentActivity = vi.fn().mockResolvedValue(false);
 }
 
-describe("GovernanceSetupStateService", () => {
+describe("DefaultGovernanceSetupStateService", () => {
   it("returns inactive when no governance state exists", async () => {
-    const state = await GovernanceSetupStateService.create({
+    const state = await DefaultGovernanceSetupStateService.create({
       repository: new FixedSetupRepository(emptyCounts()),
     }).resolve("organization");
 
@@ -47,7 +47,7 @@ describe("GovernanceSetupStateService", () => {
   });
 
   it("activates governance for any persisted governance feature", async () => {
-    const state = await GovernanceSetupStateService.create({
+    const state = await DefaultGovernanceSetupStateService.create({
       repository: new FixedSetupRepository({
         ...emptyCounts(),
         ingestionSources: 1,
@@ -61,7 +61,7 @@ describe("GovernanceSetupStateService", () => {
   it("probes recent activity only when a governance tenant exists", async () => {
     const activity = new RecordingActivityPort();
     activity.hasRecentActivity.mockResolvedValue(true);
-    const service = GovernanceSetupStateService.create({
+    const service = DefaultGovernanceSetupStateService.create({
       repository: new FixedSetupRepository({
         ...emptyCounts(),
         governanceTenantId: "governance-project",
@@ -81,7 +81,7 @@ describe("GovernanceSetupStateService", () => {
   });
 
   it("reports application traces without treating them as governance state", async () => {
-    const state = await GovernanceSetupStateService.create({
+    const state = await DefaultGovernanceSetupStateService.create({
       repository: new FixedSetupRepository({
         ...emptyCounts(),
         applicationProjectsWithTraces: 1,

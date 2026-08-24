@@ -43,7 +43,6 @@ import {
   RoutingPolicyHasNoProvidersError,
 } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
-import { AppGovernanceSetupStateService } from "@ee/governance/services/setupState.service";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { z } from "zod";
@@ -1973,11 +1972,9 @@ secured.access(CLI_POLICY).get("/governance/status", async (c: Context) => {
     ENTERPRISE_FEATURE_ERRORS.INGESTION_SOURCES,
   );
   if (gate) return gate;
-  const setupService = AppGovernanceSetupStateService.create({
-    prisma,
-    traceActivity: getApp().governance.traceActivity,
-  });
-  const setup = await setupService.resolve(tokenRecord.organization_id);
+  const setup = await c.var.langwatchApp.governance.setupState.resolve(
+    tokenRecord.organization_id,
+  );
   return c.json({ setup });
 });
 

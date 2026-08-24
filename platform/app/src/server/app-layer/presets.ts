@@ -1669,7 +1669,9 @@ export function initializeDefaultApp(options?: {
     redis: (redis ?? null) as unknown as RedisLike | null,
   });
 
-  const governanceRuntime = AppGovernanceRuntime.create(prisma);
+  const governanceRuntime = AppGovernanceRuntime.create(prisma, {
+    setupActivity: governanceTraceActivityRepository,
+  });
   const pullRequestUsage = new PullRequestUsageService({
     pullRequests: githubPullRequestsRepository,
     sessions: repositories.codingAgentSession,
@@ -1931,6 +1933,7 @@ export function initializeDefaultApp(options?: {
     },
     governance: {
       ingestionTemplates: governanceRuntime.ingestionTemplates,
+      setupState: governanceRuntime.setupState,
       ocsfEvents: governanceOcsfEventsRepository,
       traceActivity: governanceTraceActivityRepository,
       kpis: governanceKpisRepository,
@@ -2293,6 +2296,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     },
     governance: {
       ingestionTemplates: testGovernanceRuntime.ingestionTemplates,
+      setupState: testGovernanceRuntime.setupState,
       ocsfEvents: undefined,
       traceActivity: undefined,
       kpis: undefined,

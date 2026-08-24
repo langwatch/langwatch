@@ -75,6 +75,10 @@ types may occur only inside strict `server/src/repositories/prisma/**` adapters.
 
 Services, projections, and adapters are classes constructed by composition
 roots. Importing a governance package does not register a worker or timer.
+The process composition root constructs each Governance capability once and
+places that same capability graph on the application. Request transports read
+it directly from their typed context; they do not construct adapters, open
+database clients or fall back to a global application lookup.
 
 ## Environment and configuration
 

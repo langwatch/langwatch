@@ -101,6 +101,13 @@ Feature: Enterprise governance package boundary
     Then every retired platform copy is archived and disabled
     And repeating the synchronization does not create duplicate templates
 
+  Scenario: Request transports reuse the process-owned Governance application
+    Given the process composition root has constructed the Governance capabilities
+    When a tRPC or Hono request resolves Governance setup state
+    Then the transport reads the capability directly from its typed request context
+    And it does not construct a service, adapter or database client for the request
+    And it does not fall back to a global application lookup
+
   Scenario: Contracts are transport independent
     Given a browser imports the governance contract root
     Then no server, Eventing, application, environment, or generated database module loads
