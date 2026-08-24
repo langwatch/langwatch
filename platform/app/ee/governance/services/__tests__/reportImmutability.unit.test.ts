@@ -83,6 +83,19 @@ describe("assertReportUnchangedOncePulled", () => {
       }
     });
 
+    it("refuses an omitted report without calling it a change", () => {
+      // `parserConfig` is replaced wholesale, so an omitted report would
+      // delete the stored one rather than keep it — still a refusal. But the
+      // caller sent no new report, and telling them they changed it would
+      // send them looking for an edit that never happened.
+      expect(() =>
+        assertReportUnchangedOncePulled({
+          existing: sourceWith({ report: "usage", pollerCursor: "abc" }),
+          incoming: { bucketWidth: "1h" },
+        }),
+      ).toThrow(/has to carry the same report value rather than omit it/);
+    });
+
     it("allows an edit that leaves the report alone", () => {
       // The common edit: a renamed source, a moved cadence, a rotated key.
       expect(() =>

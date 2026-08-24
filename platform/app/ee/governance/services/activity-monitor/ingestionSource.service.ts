@@ -226,6 +226,20 @@ export function assertReportUnchangedOncePulled({
   if (incoming.report === storedReport) return;
   if (!hasPollerCursor(existing.pollerCursor)) return;
 
+  // An omitted report is still refused — `data.parserConfig` replaces the
+  // stored JSON wholesale, so letting it through would delete the report
+  // rather than preserve it, and the source would come back up configured for
+  // neither. But it is not the same mistake as asking for the other report,
+  // and telling a caller they changed something they never sent is how a
+  // serialization bug gets read as a deliberate edit.
+  if (incoming.report === undefined) {
+    const missing =
+      `This source is configured for its ${storedReport} report, and has ` +
+      "already pulled it. An update that replaces the configuration has to " +
+      "carry the same report value rather than omit it.";
+    throw new ValidationError(missing, { meta: { formErrors: [missing] } });
+  }
+
   const complaint =
     `This source has already pulled its ${storedReport} report. ` +
     "Changing the report would record the same spend a second time under " +

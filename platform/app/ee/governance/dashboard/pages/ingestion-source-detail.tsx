@@ -409,7 +409,7 @@ function useSourceDetailMutations({
 
 /**
  * Everything the page needs: the source it addresses, what the viewer may do,
- * the three queries behind it and the two mutations that act on it. State and
+ * the three queries behind it and the three mutations that act on it. State and
  * callbacks only, the component owns the markup.
  */
 function useIngestionSourceDetailPage() {

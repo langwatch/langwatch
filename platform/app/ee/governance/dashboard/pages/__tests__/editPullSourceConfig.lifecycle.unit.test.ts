@@ -30,6 +30,12 @@ vi.mock("../../../services/governanceProject.service", () => ({
   PROJECT_KIND: { INTERNAL_GOVERNANCE: "internal_governance" },
 }));
 
+/**
+ * Reaches across into the poller lifecycle on purpose. The cadence bug was
+ * never visible inside either half: the drawer emitted a defensible `null`
+ * and the lifecycle correctly read `null` as "disable". Only a test that runs
+ * the edit path's output through the thing that consumes it can fail.
+ */
 describe("a saved edit reaching the pull lifecycle", () => {
   function sourceRowFrom(submission: { pullSchedule?: string | null }) {
     return {
