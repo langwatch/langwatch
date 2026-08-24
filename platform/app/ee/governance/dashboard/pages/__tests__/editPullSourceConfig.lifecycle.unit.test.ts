@@ -217,3 +217,65 @@ describe("an unrelated edit on a row whose two schedules disagree", () => {
     );
   });
 });
+
+describe("renaming a source an admin has deliberately disabled", () => {
+  // `status: "disabled"` is the sanctioned off switch: it is a first-class
+  // value of the router's status enum, and the edit path never writes status,
+  // so a rename cannot reach it. This is the guarantee worth pinning — the
+  // review asked whether an edit can revive a stopped source, and for the
+  // way sources are actually stopped, the answer has to stay no.
+  const STORED = {
+    adapter: "anthropic_admin",
+    report: "usage",
+    bucketWidth: "1h",
+    schedule: "0 */6 * * *",
+  };
+
+  it("leaves it disabled, whatever cadence the form submits", async () => {
+    const submission = buildEditSubmission({
+      organizationId: "org_1",
+      source: {
+        id: "src_1",
+        sourceType: "anthropic_admin",
+        parserConfig: STORED,
+      },
+      name: "renamed while stopped",
+      description: "",
+      parserConfig: {
+        credentialsToken: "",
+        report: "usage",
+        bucketWidth: "1h",
+      },
+      ottlStatements: [],
+      pullSchedule: seedPullSchedule({
+        pullSchedule: "0 */6 * * *",
+        storedParserConfig: STORED,
+      }),
+    });
+
+    // The submission carries a perfectly good cron. The status is what stops
+    // it, and the submission has no opinion about the status.
+    expect(submission?.pullSchedule).toBe("0 */6 * * *");
+    expect(submission).not.toHaveProperty("status");
+
+    const commands = { configure: vi.fn(), disable: vi.fn() };
+    await syncIngestionPullSource({
+      prisma: {} as never,
+      source: {
+        id: "src_1",
+        organizationId: "org_1",
+        status: "disabled",
+        archivedAt: null,
+        updatedAt: new Date("2026-01-01T00:00:00Z"),
+        pollerCursor: null,
+        pullSchedule: submission?.pullSchedule ?? null,
+      } as unknown as Parameters<typeof syncIngestionPullSource>[0]["source"],
+      commands,
+    });
+
+    expect(commands.disable).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceId: "src_1" }),
+    );
+    expect(commands.configure).not.toHaveBeenCalled();
+  });
+});
