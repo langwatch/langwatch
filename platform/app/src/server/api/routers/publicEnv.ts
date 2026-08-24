@@ -2,6 +2,7 @@ import { resolveGatewayBaseUrl } from "@ee/governance/services/gatewayUrl";
 import { resolveAuthProvider } from "@ee/sso/sso-gate";
 import { RUM_DEFAULT_SAMPLE_RATIO } from "@langwatch/react-rum/constants";
 import { z } from "zod";
+import { deploymentOffersPasskeys } from "~/server/app-layer/identity/signin-method-policy";
 import { signInRouterMode } from "~/server/better-auth/signInRouterShadow";
 import { env } from "../../../env.mjs";
 import { hasEmailProvider } from "../../mailer/providers";
@@ -38,6 +39,13 @@ export const publicEnvRouter = publicProcedure
       // then. `signInRouterMode()` is the single source of truth for the
       // flag, so the live path and the screens can never disagree.
       IDENTITY_FRONT_DOOR: signInRouterMode() === "enforce",
+      // Whether this deployment mounted the passkey plugin at boot. A derived
+      // boolean rather than the raw setting, because the only thing a browser
+      // may act on is "is there an endpoint behind the button" — offering to
+      // create a passkey where the plugin was never mounted is an offer we
+      // cannot honour. Same read the plugin registration makes, so the button
+      // and the endpoint cannot disagree.
+      PASSKEYS_ENABLED: deploymentOffersPasskeys(),
       DEMO_PROJECT_SLUG: env.DEMO_PROJECT_SLUG,
       NODE_ENV: env.NODE_ENV,
 

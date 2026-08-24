@@ -8,6 +8,7 @@ import { safeRedirectTarget, signIn, useSession } from "~/utils/auth-client";
 import { replaceLocation } from "~/utils/browserNavigation";
 import Link from "~/utils/compat/next-link";
 import { useSearchParams } from "~/utils/compat/next-navigation";
+import { usePasskeyAutofill } from "../hooks/usePasskeyAutofill";
 import { useSignInRouting } from "../hooks/useSignInRouting";
 import type { FrontDoorDepth } from "../logic/groundPalette";
 import { usePublishFrontDoorStage } from "../logic/groundStage";
@@ -72,6 +73,14 @@ export function IdentifierFirstSignIn() {
   // passkey is refused from a button part-way down the rail of methods, and
   // an alert opening there pushes the rest of the rail down the page.
   const [passkeyError, setPasskeyError] = useState<unknown>(null);
+
+  // The recommended way in, ahead of the button in the rail below: a passkey
+  // offered from the address field's own autofill, where somebody who does not
+  // remember making one will still find it.
+  usePasskeyAutofill({
+    enabled: instanceMethods.some((method) => method.kind === "passkey"),
+    callbackUrl,
+  });
 
   useEffect(() => {
     if (!session) return;
