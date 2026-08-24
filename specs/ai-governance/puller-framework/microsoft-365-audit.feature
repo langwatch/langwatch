@@ -155,8 +155,12 @@ Feature: microsoft_365_audit ingestion source (Office 365 Management Activity AP
   Scenario: A token-endpoint refusal is raised as TokenAcquisitionError
     Given the token endpoint refuses the client credentials
     When the adapter tries to obtain a token
-    Then the failure is raised as a token acquisition error carrying only the status
-    And the refusal body is not carried on the error
+    Then the failure is raised as a token acquisition error carrying the status
+    And it carries the numeric codes the endpoint sent, so that a wrong secret,
+      an app missing from the tenant, a tenant that does not exist and an
+      unprovisioned resource principal are told apart rather than all reading
+      as the same refusal
+    And the refusal text is not carried on the error
     And a failure that is not a refusal keeps the type it already had
 
   # ---------------------------------------------------------------------------
