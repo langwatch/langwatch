@@ -593,7 +593,7 @@ describe("the product-switcher top bar", () => {
     /** @scenario Typing highlights the top result */
     it("highlights the first result as I type, with no arrow key", async () => {
       renderShell();
-      await openProjectPicker();
+      const user = await openProjectPicker();
       const field = screen.getByPlaceholderText("Search projects");
 
       searchFor("billing");
@@ -606,9 +606,13 @@ describe("the product-switcher top bar", () => {
         expect(field).toHaveAttribute("aria-activedescendant", first?.id);
       });
 
-      // Enter opening the highlighted project is the sibling scenario
-      // above; what this one pins is that typing alone does the
-      // highlighting, so no arrow key is needed to get there.
+      // Enter alone opens it, which is the point of the highlight.
+      await user.keyboard("{Enter}");
+      await waitFor(() => {
+        expect(pushMock).toHaveBeenCalledWith(
+          expect.stringContaining("billing-sync"),
+        );
+      });
     });
 
     /** @scenario Creating a project stays available while the list is unfiltered */
