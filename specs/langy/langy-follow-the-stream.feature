@@ -97,6 +97,10 @@ Feature: The Langy conversation follows the stream
       When I select text in the answer, and then the column jumps upward on its own
       Then the column keeps following, and offers nothing to jump to
 
+    # The drag is followed after it leaves the column, because that is where it
+    # earns its answer: a mouse takes no pointer capture, so once the cursor is
+    # above the column the moves are addressed elsewhere, and that is the
+    # moment the selection starts scrolling.
     @integration
     Scenario: A selection dragged above the column stops the follow
       Given the Langy panel is open and an answer is streaming

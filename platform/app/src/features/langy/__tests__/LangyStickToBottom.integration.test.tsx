@@ -144,9 +144,13 @@ function touch({
 }
 
 /**
- * A mouse on the column. `target` is what separates the scrollbar from the
- * message content: a press on the scroller ITSELF is its scrollbar, a press on
- * a child is a click or a selection. Both bubble to the same listener.
+ * A mouse, at an element and a height. `target` is what separates the
+ * scrollbar from the message content: a press on the scroller ITSELF is its
+ * scrollbar, a press on a child is a click or a selection.
+ *
+ * A move is dispatched where the cursor actually IS, which for a drag is
+ * frequently outside the column, exactly as a browser addresses it. One
+ * `pointerId` throughout, because it is one hand.
  */
 function pointer({
   target,
@@ -154,10 +158,17 @@ function pointer({
   clientY = 50,
 }: {
   target: HTMLElement;
-  type: "pointerdown" | "pointermove";
+  type: "pointerdown" | "pointermove" | "pointerup";
   clientY?: number;
 }) {
-  target.dispatchEvent(new MouseEvent(type, { bubbles: true, clientY }));
+  target.dispatchEvent(
+    new PointerEvent(type, {
+      bubbles: true,
+      clientY,
+      pointerId: 1,
+      pointerType: "mouse",
+    }),
+  );
 }
 
 /**
@@ -392,15 +403,34 @@ describe("given the Langy message column follows a stream", () => {
       grow({ scroller, to: 500 });
 
       // A selection DOES scroll the column, but only once it is dragged past
-      // the top edge — and there the pointer says so itself. The scroller's box
-      // is all zeros under jsdom, so above it is a negative clientY.
+      // the top edge — and there the pointer says so itself. The move is
+      // dispatched OUTSIDE the column, because that is where the cursor is and
+      // a mouse takes no pointer capture, so that is where a browser addresses
+      // it. The scroller's box is all zeros under jsdom, so above it is a
+      // negative clientY.
       act(() => {
         pointer({ target: content, type: "pointerdown", clientY: 50 });
-        pointer({ target: content, type: "pointermove", clientY: -10 });
+        pointer({ target: document.body, type: "pointermove", clientY: -10 });
       });
       layoutScrollTo({ scroller, top: 100 });
 
       expect(pinned()).toBe("false");
+    });
+
+    /** @scenario "Selecting text in the column does not stop the follow" */
+    it("keeps the pin for a selection dragged sideways out of the column", () => {
+      const { scroller, content, pinned } = setup();
+      grow({ scroller, to: 500 });
+
+      // Leaving the column is not the same as leaving it upward. A selection
+      // dragged out to the side scrolls nothing.
+      act(() => {
+        pointer({ target: content, type: "pointerdown", clientY: 50 });
+        pointer({ target: document.body, type: "pointermove", clientY: 60 });
+      });
+      layoutScrollTo({ scroller, top: 100 });
+
+      expect(pinned()).toBe("true");
     });
   });
 

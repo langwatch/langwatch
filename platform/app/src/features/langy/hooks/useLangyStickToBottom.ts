@@ -76,12 +76,23 @@ const UPWARD_KEYS = new Set(["ArrowUp", "PageUp", "Home"]);
  * go; a press that lands on a child is a click or a text selection, which
  * moves nothing. A selection does eventually scroll the column, but only once
  * it is dragged past the top edge, and there the pointer says so itself.
+ *
+ * The drag is followed on the WINDOW, not on the scroller. A mouse takes no
+ * implicit pointer capture, so its moves are addressed to whatever sits under
+ * it, and both drags leave the column by design: the scrollbar drag ends
+ * wherever the hand stops, and the selection only scrolls once it is ABOVE the
+ * column. Listening on the scroller would go deaf at exactly the moment there
+ * is something to hear.
  */
 function trackReaderGestures(el: HTMLElement) {
   const controller = new AbortController();
   let lastUpwardAt = 0;
   let touchY: number | null = null;
-  let drag: { onScrollbar: boolean; topEdge: number } | null = null;
+  let drag: {
+    isOnScrollbar: boolean;
+    topEdge: number;
+    pointerId: number;
+  } | null = null;
 
   const onWheel = (event: WheelEvent) => {
     if (event.deltaY < 0) lastUpwardAt = Date.now();
@@ -102,17 +113,24 @@ function trackReaderGestures(el: HTMLElement) {
   // Touch reports its own direction above, so a resting finger is not a drag.
   const onPointerDown = (event: PointerEvent) => {
     if (event.pointerType === "touch") return;
-    const onScrollbar = event.target === el;
-    drag = { onScrollbar, topEdge: el.getBoundingClientRect().top };
+    drag = {
+      isOnScrollbar: event.target === el,
+      topEdge: el.getBoundingClientRect().top,
+      pointerId: event.pointerId,
+    };
   };
+  // `drag` is tested on its own rather than through `drag?.pointerId`, which
+  // reads the same and is not: the types promise every pointer event carries a
+  // `pointerId`, a synthetic one need not, and two undefineds comparing equal
+  // walks straight into the null.
   const onPointerMove = (event: PointerEvent) => {
-    if (!drag) return;
-    if (drag.onScrollbar || event.clientY < drag.topEdge) {
+    if (!drag || event.pointerId !== drag.pointerId) return;
+    if (drag.isOnScrollbar || event.clientY < drag.topEdge) {
       lastUpwardAt = Date.now();
     }
   };
-  const onPointerUp = () => {
-    drag = null;
+  const onPointerUp = (event: PointerEvent) => {
+    if (drag && event.pointerId === drag.pointerId) drag = null;
   };
 
   const opts = { passive: true, signal: controller.signal };
@@ -121,9 +139,9 @@ function trackReaderGestures(el: HTMLElement) {
   el.addEventListener("touchstart", onTouchStart, opts);
   el.addEventListener("touchmove", onTouchMove, opts);
   el.addEventListener("pointerdown", onPointerDown, opts);
-  el.addEventListener("pointermove", onPointerMove, opts);
-  // On the window, because a drag that starts on the scrollbar routinely ends
-  // with the pointer somewhere else entirely.
+  // On the window: only the PRESS has to land on the column, and the rest of
+  // the drag is followed wherever it goes.
+  window.addEventListener("pointermove", onPointerMove, opts);
   window.addEventListener("pointerup", onPointerUp, opts);
   window.addEventListener("pointercancel", onPointerUp, opts);
 
