@@ -247,16 +247,62 @@ func codexSessionExpiredError(ctx context.Context) error {
 	})
 }
 
+// codexAllowedFields is what the ChatGPT codex backend accepts on a Responses
+// body. Everything else comes back 400 "Unsupported parameter: <name>" before
+// a single token is generated, so the gateway keeps the caller's body to this
+// set instead of removing offenders one at a time.
+//
+// It is an allowlist because the backend keeps one of its own. A strip list
+// costs a production outage per field, and it took two of them to learn that:
+// pi sends prompt_cache_retention AND max_output_tokens, so stripping the
+// first only uncovered the second. Verified against the live backend, which
+// refuses at least max_output_tokens, max_tool_calls, prompt_cache_options,
+// prompt_cache_retention, temperature, top_p, top_logprobs, truncation,
+// metadata, service_tier, background, user, safety_identifier and
+// previous_response_id, and accepts every field below.
+//
+// A field OpenAI adds later is dropped until it is listed here, and that is
+// the safe direction: the same field on an unlisted body would have failed
+// the whole request anyway.
+var codexAllowedFields = map[string]bool{
+	"model":               true,
+	"input":               true,
+	"instructions":        true,
+	"stream":              true,
+	"stream_options":      true,
+	"store":               true,
+	"include":             true,
+	"tools":               true,
+	"tool_choice":         true,
+	"parallel_tool_calls": true,
+	"reasoning":           true,
+	"text":                true,
+	"prompt_cache_key":    true,
+}
+
 // codexRequestBody pins the backend's invariants onto the caller's raw body:
 // the bare model name (the gateway stays in control of what lands upstream),
-// stream on, store off, and no sampling params the backend refuses.
+// stream on, store off, and nothing the backend does not accept.
 func codexRequestBody(raw []byte, model string) ([]byte, error) {
 	body := raw
 	if len(bytes.TrimSpace(body)) == 0 {
 		body = []byte("{}")
 	}
-	bare := strings.TrimPrefix(model, codexModelPrefix)
+	var refused []string
+	gjson.ParseBytes(body).ForEach(func(key, _ gjson.Result) bool {
+		if !codexAllowedFields[key.String()] {
+			refused = append(refused, key.String())
+		}
+		return true
+	})
 	var err error
+	for _, field := range refused {
+		body, err = sjson.DeleteBytes(body, sjsonKey(field))
+		if err != nil {
+			return nil, fmt.Errorf("drop %s from codex body: %w", field, err)
+		}
+	}
+	bare := strings.TrimPrefix(model, codexModelPrefix)
 	for _, set := range []struct {
 		path  string
 		value any
@@ -270,22 +316,26 @@ func codexRequestBody(raw []byte, model string) ([]byte, error) {
 			return nil, fmt.Errorf("rewrite %s on codex body: %w", set.path, err)
 		}
 	}
-	// The codex backend refuses params the wider Responses API accepts: a body
-	// carrying temperature, top_p, or prompt_cache_retention comes back
-	// 400 Bad Request ("Unsupported parameter", verified against the live
-	// backend; prompt_cache_key passes). Clients that set them for other
-	// providers would break every codex call — the title generator and the
-	// tiny assists send temperature, and pi's long-cache-retention mode sends
-	// prompt_cache_retention — so strip them here where the gateway already
-	// owns the backend's invariants. DeleteBytes is a no-op when the key is
-	// absent, so this is safe for the opencode turns that never set them.
-	for _, path := range []string{"temperature", "top_p", "prompt_cache_retention"} {
-		body, err = sjson.DeleteBytes(body, path)
-		if err != nil {
-			return nil, fmt.Errorf("strip %s from codex body: %w", path, err)
-		}
-	}
 	return body, nil
+}
+
+// sjsonKey turns a top-level object key into an sjson path that means exactly
+// that key. sjson reads a path, not a name: ".", "*", "?" and ":" select
+// something else, and "|", "#" and "@" make the path "complex", which
+// DeleteBytes refuses outright and which would fail the caller's whole
+// request over a field name.
+//
+// Every byte is escaped rather than a chosen set, because sjson decides what
+// an operator is and its list can grow. An escape before an ordinary byte
+// means the byte itself, and a multi-byte character survives byte by byte, so
+// escaping everything is both correct and free of a list to keep in step.
+func sjsonKey(key string) string {
+	var escaped strings.Builder
+	for _, char := range []byte(key) {
+		escaped.WriteByte('\\')
+		escaped.WriteByte(char)
+	}
+	return escaped.String()
 }
 
 func (r *BifrostRouter) doCodexRequest(

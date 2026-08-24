@@ -100,7 +100,6 @@ func TestUpstreamReasonReadsEveryShapeProvidersUse(t *testing.T) {
 		{"the codex backend", `{"detail":"Unsupported parameter: prompt_cache_retention"}`, "Unsupported parameter: prompt_cache_retention"},
 		{"a bare message", `{"message":"model not found"}`, "model not found"},
 		{"a plain error string", `{"error":"invalid virtual key"}`, "invalid virtual key"},
-		{"an edge page in front of the provider", "<html>\n<body>error 1010</body>\n</html>", "<html>"},
 		{"a body with nothing in it", "", ""},
 	}
 	for _, tc := range cases {
@@ -111,12 +110,33 @@ func TestUpstreamReasonReadsEveryShapeProvidersUse(t *testing.T) {
 }
 
 // @scenario "A forwarded provider rejection names the provider's own reason"
+func TestUpstreamReasonNeverQuotesABodyItCannotRead(t *testing.T) {
+	// An edge page or a plain-text rejection can reflect the request that
+	// caused it. Quoting one would copy a prompt, a key or personal data onto
+	// an operator's log line, so an unreadable body is described by its size.
+	//
+	// The stand-in key is assembled rather than written out: a test about not
+	// leaking a credential should not commit something shaped like one.
+	credential := "sk-" + "live-" + strings.Repeat("0", 24)
+	reflected := "Bad request: input=my patient's diagnosis is ... key=" + credential
+	reason := upstreamReason([]byte(reflected))
+	assert.NotContains(t, reason, "patient")
+	assert.NotContains(t, reason, credential)
+	assert.Equal(t, fmt.Sprintf("unrecognized upstream body, %d bytes", len(reflected)), reason)
+
+	edge := "<html>\n<body>error 1010</body>\n</html>"
+	assert.Equal(t, fmt.Sprintf("unrecognized upstream body, %d bytes", len(edge)),
+		upstreamReason([]byte(edge)),
+		"the operator still learns a body came back, and how big")
+}
+
+// @scenario "A forwarded provider rejection names the provider's own reason"
 func TestUpstreamReasonIsBoundedAndNotRepeated(t *testing.T) {
 	t.Run("when the body is longer than the cap", func(t *testing.T) {
 		long := strings.Repeat("x", upstreamReasonLimit*4)
 		reason := upstreamReason([]byte(`{"detail":"` + long + `"}`))
 		assert.Len(t, reason, upstreamReasonLimit,
-			"an unknown body must not put a request payload on the log line")
+			"a provider answering at length must not take the log line over")
 		assert.True(t, strings.HasSuffix(reason, "..."), "a cut reason says it was cut")
 	})
 

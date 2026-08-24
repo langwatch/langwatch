@@ -290,13 +290,20 @@ func TestCodex_NonStreamingAggregatesTheSSE(t *testing.T) {
 	}
 }
 
-func TestCodexRequestBody_PinsInvariantsAndStripsSampling(t *testing.T) {
-	// A caller's body carrying sampling params and a client include: rewrite the
-	// model to bare, force stream on / store off, strip temperature and top_p
-	// (the codex backend answers 400 on them), and leave the client's include
-	// and input untouched.
+// @scenario "A codex request carries only what its backend accepts"
+func TestCodexRequestBody_PinsInvariantsAndKeepsOnlyAcceptedFields(t *testing.T) {
+	// A caller's body carrying every field the live backend refuses, plus the
+	// ones it accepts: rewrite the model to bare, force stream on / store off,
+	// drop the refused fields, and leave the accepted ones untouched.
 	raw := []byte(`{"model":"openai_codex/gpt-5.6-terra","temperature":0.2,"top_p":0.9,` +
-		`"prompt_cache_retention":"24h","prompt_cache_key":"session-1",` +
+		`"prompt_cache_retention":"24h","prompt_cache_options":{"mode":"explicit"},` +
+		`"max_output_tokens":16384,"max_tool_calls":5,"truncation":"auto",` +
+		`"metadata":{"a":"b"},"service_tier":"auto","background":false,"user":"u",` +
+		`"safety_identifier":"s","top_logprobs":0,"previous_response_id":"resp_1",` +
+		`"prompt_cache_key":"session-1","instructions":"be brief",` +
+		`"tools":[{"type":"function","name":"t"}],"tool_choice":"auto",` +
+		`"parallel_tool_calls":true,"reasoning":{"effort":"medium","summary":"auto"},` +
+		`"text":{"verbosity":"medium"},"stream_options":{"include_obfuscation":false},` +
 		`"input":[{"role":"user"}],"include":["reasoning.encrypted_content"]}`)
 	body, err := codexRequestBody(raw, "openai_codex/gpt-5.6-terra")
 	if err != nil {
@@ -311,26 +318,78 @@ func TestCodexRequestBody_PinsInvariantsAndStripsSampling(t *testing.T) {
 	if gjson.GetBytes(body, "store").Bool() {
 		t.Error("store must be forced off")
 	}
-	if gjson.GetBytes(body, "temperature").Exists() {
-		t.Errorf("temperature must be stripped (codex 400s on it): %s", body)
+	// Every one of these answers 400 "Unsupported parameter" from the live
+	// backend, before a token is generated. max_output_tokens is the one pi
+	// sends on every turn, from its own 16384 default.
+	for _, field := range []string{
+		"temperature", "top_p", "prompt_cache_retention", "prompt_cache_options",
+		"max_output_tokens", "max_tool_calls", "truncation", "metadata",
+		"service_tier", "background", "user", "safety_identifier",
+		"top_logprobs", "previous_response_id",
+	} {
+		if gjson.GetBytes(body, field).Exists() {
+			t.Errorf("%s must be dropped (the codex backend 400s on it): %s", field, body)
+		}
 	}
-	if gjson.GetBytes(body, "top_p").Exists() {
-		t.Errorf("top_p must be stripped: %s", body)
-	}
-	if gjson.GetBytes(body, "prompt_cache_retention").Exists() {
-		t.Errorf("prompt_cache_retention must be stripped (codex 400s on it): %s", body)
-	}
-	// prompt_cache_key the backend accepts — it must survive so the session's
-	// cache routing keeps working.
+	// What the backend accepts must survive: prompt_cache_key keeps the
+	// session's cache routing, and the rest is the turn itself.
 	if got := gjson.GetBytes(body, "prompt_cache_key").String(); got != "session-1" {
 		t.Errorf("prompt_cache_key must pass through, got %q in %s", got, body)
 	}
-	// The client's include (reasoning round-trip) and input pass through.
+	for _, field := range []string{
+		"instructions", "tools", "tool_choice", "parallel_tool_calls",
+		"reasoning", "text", "stream_options", "input",
+	} {
+		if !gjson.GetBytes(body, field).Exists() {
+			t.Errorf("%s must pass through: %s", field, body)
+		}
+	}
+	if got := gjson.GetBytes(body, "reasoning.summary").String(); got != "auto" {
+		t.Errorf("an accepted field must keep its value, got %q in %s", got, body)
+	}
 	if got := gjson.GetBytes(body, "include.0").String(); got != "reasoning.encrypted_content" {
 		t.Errorf("client include must pass through: %s", body)
 	}
-	if !gjson.GetBytes(body, "input").Exists() {
-		t.Errorf("input must be preserved: %s", body)
+}
+
+func TestCodexRequestBody_DropsAKeyThatLooksLikeAPath(t *testing.T) {
+	// sjson reads a path, not a name. Two ways a refused field's own name used
+	// to break the call it was supposed to save:
+	//   ".", "*" and ":" select something else, so ":input" deleted "input",
+	//   the one field a turn cannot go out without, and kept itself.
+	//   "|", "#" and "@" make the path complex, which DeleteBytes refuses, so
+	//   the whole request failed over a field name.
+	refused := []string{"a.b", "c*d", ":input", "e|f", "g#h", "i@j", "café"}
+	raw := []byte(`{"model":"openai_codex/gpt-5.6-terra","a.b":1,"c*d":2,":input":3,` +
+		`"e|f":4,"g#h":5,"i@j":6,"café":7,` +
+		`"reasoning":{"effort":"medium"},"input":[{"role":"user"}]}`)
+	body, err := codexRequestBody(raw, "openai_codex/gpt-5.6-terra")
+	if err != nil {
+		t.Fatalf("codexRequestBody: %v", err)
+	}
+	for _, key := range refused {
+		if got := gjson.GetBytes(body, sjsonKey(key)); got.Exists() {
+			t.Errorf("the refused key %q must be dropped: %s", key, body)
+		}
+	}
+	if got := gjson.GetBytes(body, "input.0.role").String(); got != "user" {
+		t.Errorf("the turn's own input must survive, got %q in %s", got, body)
+	}
+	if got := gjson.GetBytes(body, "reasoning.effort").String(); got != "medium" {
+		t.Errorf("an accepted nested field must survive, got %q in %s", got, body)
+	}
+}
+
+func TestCodexRequestBody_EmptyBodyStillCarriesTheInvariants(t *testing.T) {
+	body, err := codexRequestBody(nil, "openai_codex/gpt-5.6-terra")
+	if err != nil {
+		t.Fatalf("codexRequestBody: %v", err)
+	}
+	if got := gjson.GetBytes(body, "model").String(); got != "gpt-5.6-terra" {
+		t.Errorf("model not pinned on an empty body: %s", body)
+	}
+	if !gjson.GetBytes(body, "stream").Bool() || gjson.GetBytes(body, "store").Bool() {
+		t.Errorf("stream/store not pinned on an empty body: %s", body)
 	}
 }
 
