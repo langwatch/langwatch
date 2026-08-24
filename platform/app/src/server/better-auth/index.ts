@@ -1,3 +1,4 @@
+import { passkey } from "@better-auth/passkey";
 import {
   buildGenericOAuthConfigs,
   buildSocialProviders,
@@ -20,7 +21,6 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError } from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
-import { passkey } from "@better-auth/passkey";
 import { env } from "~/env.mjs";
 import { tryGetApp } from "~/server/app-layer/app";
 import { identityCeremonies } from "~/server/app-layer/identity/runtime";

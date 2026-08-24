@@ -103,7 +103,7 @@ Feature: Two-step verification - one setup per person, and organizations that re
 
   # ── Setting it up ──────────────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: Starting a setup records the fact and never the secret
     When "sam" starts setting up two-step verification
     Then an mfa_enrolled event is appended under tenant "sam"
@@ -111,28 +111,28 @@ Feature: Two-step verification - one setup per person, and organizations that re
     And the event names the method and nothing else about it
     And neither the shared secret nor any backup code appears in any event
 
-  @unit @unimplemented
+  @unit
   Scenario: A correct code finishes the setup
     Given "sam" has a PENDING enrollment
     When "sam" enters a code their authenticator produced
     Then the enrollment becomes ENABLED and the confirmation is an event
     And "sam" is asked for a code at every sign-in from then on
 
-  @unit @unimplemented
+  @unit
   Scenario: One person has one setup, however many organizations they belong to
     Given "sam" belongs to "acme" and to two other organizations
     When "sam" sets up two-step verification
     Then all three organizations see a member who can prove a second factor
     And no organization holds a setup of its own for "sam"
 
-  @unit @unimplemented
+  @unit
   Scenario: A setup left unfinished expires on its own
     Given "sam" started a setup a day ago and never entered a code
     When the expiry wake runs
     Then the enrollment becomes EXPIRED and the expiry is an event
     And the secret issued for it is no longer accepted anywhere
 
-  @unit @unimplemented
+  @unit
   Scenario: Entering a code for an expired setup says so and offers the way forward
     Given "sam"'s enrollment expired unfinished
     When "sam" enters a code for it
@@ -140,14 +140,14 @@ Feature: Two-step verification - one setup per person, and organizations that re
     And the screen tells "sam" to start setting it up again
     And starting again issues a new secret, leaving the expired one in the history
 
-  @unit @unimplemented
+  @unit
   Scenario: Two setup attempts at once leave one setup
     Given "sam" has no enrollment
     When two setup requests for "sam" are handled concurrently
     Then exactly one PENDING enrollment exists
     And the loser is refused rather than issued a second secret
 
-  @unit @unimplemented
+  @unit
   Scenario: Turning it off takes the password and a current code
     Given "sam"'s enrollment is ENABLED and no organization "sam" belongs to requires one
     When "sam" asks to turn two-step verification off with only their password
@@ -155,7 +155,7 @@ Feature: Two-step verification - one setup per person, and organizations that re
     But with the password and a correct code the enrollment becomes DISABLED
     And the disable event records that the person did it themselves
 
-  @unit @unimplemented
+  @unit
   Scenario: An administrator resets it for a member who lost their authenticator
     Given "sam"'s enrollment is ENABLED
     When "ana" resets two-step verification for "sam"
@@ -165,7 +165,7 @@ Feature: Two-step verification - one setup per person, and organizations that re
     And "sam" is asked to set it up again rather than let in without one
     But a member who does not administer "acme" cannot reset it for "sam"
 
-  @unit @unimplemented
+  @unit
   Scenario: History survives being turned off
     Given "sam" set one up, confirmed it, used a backup code and turned it off
     When the MfaEnrollment projection is rebuilt from the event log alone
@@ -181,14 +181,14 @@ Feature: Two-step verification - one setup per person, and organizations that re
 
   # ── Backup codes ───────────────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: Backup codes are shown once and never given back
     When "sam" finishes setting up two-step verification
     Then a set of backup codes is issued and shown once
     And no read of the stored codes returns anything that can be entered as one
     And no event carries a code
 
-  @unit @unimplemented
+  @unit
   Scenario: A backup code works exactly once
     Given "sam" holds unused backup codes
     When "sam" signs in using one of them
@@ -196,7 +196,7 @@ Feature: Two-step verification - one setup per person, and organizations that re
     And using the same code again is refused
     And the refusal is the same one a wrong code gets
 
-  @unit @unimplemented
+  @unit
   Scenario: Using a backup code is observable without exposing it
     Given "sam" holds unused backup codes
     When "sam" uses one
@@ -204,14 +204,14 @@ Feature: Two-step verification - one setup per person, and organizations that re
     And the event does not carry the code
     And "sam" is told how many codes are left
 
-  @unit @unimplemented
+  @unit
   Scenario: Regenerating replaces every code that was left
     Given "sam" holds unused backup codes
     When "sam" generates a new set
     Then none of the previous codes is accepted afterwards
     And the new set is shown once
 
-  @unit @unimplemented
+  @unit
   Scenario: Running out of backup codes is a named, actionable refusal
     Given "sam" has used every backup code and lost their authenticator
     When "sam" tries to sign in
@@ -227,7 +227,7 @@ Feature: Two-step verification - one setup per person, and organizations that re
 
   # ── Every sign-in answers the challenge ────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: Someone who has set it up answers a challenge every time
     Given "sam"'s enrollment is ENABLED
     When "sam" signs in with an email address and a password
@@ -238,7 +238,7 @@ Feature: Two-step verification - one setup per person, and organizations that re
   # This is the invariant the whole shape rests on, and it is worth a test
   # of its own: there is no step-up in this deliverable because there is no
   # session that could need one.
-  @unit @unimplemented
+  @unit
   Scenario: A session that never answered a challenge cannot exist for them
     Given "sam"'s enrollment is ENABLED
     When every way of minting a session for "sam" is exercised
@@ -299,7 +299,7 @@ Feature: Two-step verification - one setup per person, and organizations that re
     Then those members reach "acme"'s data without signing in again
     And the members who did set one up keep it, and are still asked for it
 
-  @unit @unimplemented
+  @unit
   Scenario: Turning it off is refused while an organization requires it
     Given "sam"'s enrollment is ENABLED
     And "acme" requires two-step verification
@@ -315,7 +315,7 @@ Feature: Two-step verification - one setup per person, and organizations that re
   # who signs in through one has no setup here to enable. This is the only
   # reason the session records what it proved: for these people the
   # requirement is satisfied by the sign-in, not by the account.
-  @unit @unimplemented
+  @unit
   Scenario: A provider that asserted a second factor satisfies the requirement
     Given "acme" requires two-step verification
     And "sam" signs in through "acme"'s identity provider
@@ -323,7 +323,7 @@ Feature: Two-step verification - one setup per person, and organizations that re
     Then "sam" reaches "acme"'s data with no setup of their own
     And the session records the factor the provider asserted
 
-  @unit @unimplemented
+  @unit
   Scenario: A provider that asserts nothing satisfies nothing
     Given "acme" requires two-step verification
     And "sam" signs in through "acme"'s identity provider
@@ -343,7 +343,7 @@ Feature: Two-step verification - one setup per person, and organizations that re
 
   # ── When the code is wrong ─────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: Repeated wrong codes stop the factor answering for a while
     Given "sam"'s enrollment is ENABLED
     When "sam" enters wrong codes up to the limit
@@ -358,27 +358,27 @@ Feature: Two-step verification - one setup per person, and organizations that re
     Then it is refused and stays unused
     And the wait is not shortened by trying
 
-  @unit @unimplemented
+  @unit
   Scenario: A correct code before the limit clears the count
     Given "sam" has entered wrong codes but is not yet locked out
     When "sam" enters a correct code
     Then the sign-in succeeds
     And a later run of wrong codes starts counting from nothing
 
-  @unit @unimplemented
+  @unit
   Scenario: The lockout follows the person, not the browser
     Given "sam" is locked out after repeated wrong codes
     When "sam" tries again from a different browser and a different address
     Then the refusal is the same
     And no new session, tab or window resets the wait
 
-  @unit @unimplemented
+  @unit
   Scenario: Every failure is evidence, and none of it is the code
     When "sam" enters a wrong code
     Then a verification-failed event records how many failures have run together
     And no event carries the value that was entered
 
-  @unit @unimplemented
+  @unit
   Scenario: A wrong code and a code for a setup nobody holds answer the same way
     When a code is entered for an ENABLED enrollment and is wrong
     And a code is entered against an enrollment that does not exist
@@ -439,7 +439,7 @@ Feature: Two-step verification - one setup per person, and organizations that re
     Then the decision records the operator and "sam"
     And the audit trail can answer who really did it
 
-  @unit @unimplemented
+  @unit
   Scenario: Impersonating into an organization that requires it takes the operator's own
     Given "acme" requires two-step verification
     And the operator has not set two-step verification up on their own account
@@ -496,7 +496,7 @@ Feature: Two-step verification - one setup per person, and organizations that re
 
   # ── The flag ───────────────────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: With the flag off nothing about two-step verification exists
     Given the two-step verification flag is off
     When "sam" signs in and opens their security settings

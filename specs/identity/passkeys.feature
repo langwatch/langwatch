@@ -181,7 +181,7 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
 
   # ── A passkey and an organization that requires two steps ──────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: A passkey satisfies an organization's two-step requirement
     Given "acme" requires two-step verification
     And "sam" has no two-step verification set up on their account
@@ -189,7 +189,7 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     Then "acme"'s data is reachable immediately
     And "sam" is not held at the enrollment gate
 
-  @unit @unimplemented
+  @unit
   Scenario: A passkey held on the person's own devices satisfies it the same way
     Given "acme" requires two-step verification
     And "sam"'s passkey is one their devices keep in sync
@@ -199,7 +199,7 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
   # The gate itself belongs to
   # specs/identity/mfa-and-session-shape.feature. Named here to say that
   # deciding a passkey is enough does not weaken anything else.
-  @unit @unimplemented
+  @unit
   Scenario: Holding a passkey does not carry over to a password sign-in
     Given "acme" requires two-step verification
     And "sam" holds a passkey and a password, and has set nothing up on their account
@@ -208,7 +208,7 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     And signing in with the passkey is offered as the shorter way through
     And setting two-step verification up on the account is the other way
 
-  @unit @unimplemented
+  @unit
   Scenario: A passkey is never asked for as a second step
     Given "sam" has two-step verification set up on their account
     When "sam" signs in and is challenged
@@ -225,7 +225,7 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     Then it disappears from the list
     And "sam"'s other ways in keep working
 
-  @unit @unimplemented
+  @unit
   Scenario: Removing the last way in is refused
     Given "sam"'s only verified sign-in method is a passkey
     When "sam" tries to remove it
@@ -233,7 +233,7 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     And the screen tells "sam" to add another way in first
     And the passkey still works
 
-  @unit @unimplemented
+  @unit
   Scenario: Removing is refused when nothing is left to recover with
     Given "sam" holds two passkeys and no verified email address
     When "sam" tries to remove one of them
@@ -242,7 +242,7 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
 
   # The detach guards are specs/identity/identifier-model.feature's. A
   # passkey is an identifier, so it gets no guard of its own.
-  @unit @unimplemented
+  @unit
   Scenario: Removal follows the same guards as every other identifier
     When a passkey is removed
     Then the guards that govern every identifier are the ones that decide it
@@ -280,7 +280,7 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
 
   # ── The flag ───────────────────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: With the flag off, passkeys do not exist
     Given the passkey flag is off
     When the method picker is rendered and the security settings are opened

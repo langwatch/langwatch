@@ -309,18 +309,12 @@ export function createEnvConfig() {
       // verification is reachable. Turning it back off leaves everybody who
       // set one up signed in and their enrollment rows intact — it stops
       // being ASKED for, and nothing is deleted.
-      MFA_ENROLLMENT_OPEN: z
-        .enum(["off", "on"])
-        .optional()
-        .default("off"),
+      MFA_ENROLLMENT_OPEN: z.enum(["off", "on"]).optional().default("off"),
       // D07: whether passkeys exist. Same reasoning — registering a passkey
       // is reached signed out, on the sign-in screen. Off unmounts the
       // ceremony routes and hides the option; passkeys already registered
       // are left alone, so turning it on again finds them still there.
-      PASSKEYS_ENABLED: z
-        .enum(["off", "on"])
-        .optional()
-        .default("off"),
+      PASSKEYS_ENABLED: z.enum(["off", "on"]).optional().default("off"),
       // ADR-117 §5: where the router's DOMAIN LOOKUP reads from. Three-valued
       // and shipped `off` for the same reason the router's own flag is: the
       // front door is the highest-risk flip in the identity program.
