@@ -54,6 +54,8 @@ export const listSimulationRunsCommand = async (options: {
         totalCost?: number;
         timestamp?: number;
         updatedAt?: number;
+        note?: string | null;
+        scenarioVersion?: number | null;
         results?: {
           verdict?: string | null;
         } | null;
@@ -101,8 +103,16 @@ export const listSimulationRunsCommand = async (options: {
           const cost = run.totalCost ? `$${run.totalCost.toFixed(4)}` : "";
           const when = run.timestamp ? formatRelativeTime(new Date(run.timestamp).toISOString()) : "—";
 
+          // The note and the version keep their place whether or not the run
+          // carries them, so the block reads the same down the whole list.
+          const note = run.note ?? chalk.gray("—");
+          const version = run.scenarioVersion
+            ? `v${run.scenarioVersion}`
+            : chalk.gray("—");
+
           console.log(`  ${statusColor("●")} ${chalk.cyan(run.name ?? run.scenarioId)} ${statusColor(run.status)}${verdictStr} ${chalk.gray(`· ${when}`)}`);
           console.log(`    ${chalk.gray("Run ID:")} ${run.scenarioRunId}  ${chalk.gray("Duration:")} ${duration}  ${cost ? chalk.gray("Cost:") + " " + cost : ""}`);
+          console.log(`    ${chalk.gray("Version:")} ${version}  ${chalk.gray("Note:")} ${note}`);
           console.log();
         }
 

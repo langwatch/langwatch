@@ -363,6 +363,7 @@ describe("runSuiteCommand()", () => {
 
       expect(mockRun).toHaveBeenCalledWith("suite_abc123", {
         parameters: undefined,
+        note: undefined,
       });
     });
   });
@@ -385,6 +386,7 @@ describe("runSuiteCommand()", () => {
           beta: false,
           order: "007",
         },
+        note: undefined,
       });
     });
   });
@@ -422,6 +424,7 @@ describe("runSuiteCommand()", () => {
 
       expect(mockRun).toHaveBeenCalledWith("suite_abc123", {
         parameters: undefined,
+        note: undefined,
       });
     });
   });
@@ -455,6 +458,138 @@ describe("runSuiteCommand()", () => {
       );
 
       await expect(runSuiteCommand({ id: "nonexistent", options: {} })).rejects.toThrow(ProcessExitError);
+    });
+  });
+
+  describe("when --note is given", () => {
+    /** @scenario "Run a suite with a note" */
+    it("schedules the run with that note", async () => {
+      mockRun.mockResolvedValue(makeRunResult());
+
+      await runSuiteCommand({
+        id: "suite_abc123",
+        options: { note: "nightly regression after the retry fix" },
+      });
+
+      expect(mockRun).toHaveBeenCalledWith("suite_abc123", {
+        parameters: undefined,
+        note: "nightly regression after the retry fix",
+      });
+    });
+
+    /** @scenario "Run a suite with a note" */
+    it("shows the note beside the batch run ID", async () => {
+      mockRun.mockResolvedValue(makeRunResult());
+
+      await runSuiteCommand({
+        id: "suite_abc123",
+        options: { note: "nightly regression after the retry fix" },
+      });
+
+      const printed = vi.mocked(console.log).mock.calls.flat().join("\n");
+      expect(printed).toContain("batch_123");
+      expect(printed).toContain("nightly regression after the retry fix");
+    });
+
+    /** @scenario "Run a suite with a note and wait for completion" */
+    it("schedules the run with the note and then polls for completion", async () => {
+      mockRun.mockResolvedValue(makeRunResult({ jobCount: 1 }));
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            runs: [
+              {
+                batchRunId: "batch_123",
+                status: "SUCCESS",
+                results: { verdict: "success" },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+      await runSuiteCommand({
+        id: "suite_abc123",
+        options: { note: "nightly regression", wait: true },
+      });
+
+      expect(mockRun).toHaveBeenCalledWith("suite_abc123", {
+        parameters: undefined,
+        note: "nightly regression",
+      });
+      expect(fetchSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe("when --note is longer than the limit", () => {
+    /** @scenario "Run a suite with a note over two hundred characters" */
+    it("refuses the command instead of scheduling a run", async () => {
+      await expect(
+        runSuiteCommand({
+          id: "suite_abc123",
+          options: { note: "x".repeat(201) },
+        }),
+      ).rejects.toThrow(ProcessExitError);
+
+      expect(mockRun).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when --note holds only spaces", () => {
+    /** @scenario "Run a suite with a note of only spaces" */
+    it("schedules the run with no note", async () => {
+      mockRun.mockResolvedValue(makeRunResult());
+
+      await runSuiteCommand({ id: "suite_abc123", options: { note: "   " } });
+
+      expect(mockRun).toHaveBeenCalledWith("suite_abc123", {
+        parameters: undefined,
+        note: undefined,
+      });
+    });
+  });
+
+  // A folder IS a suite, so `suite run` takes a folder id with no branch of
+  // its own: the same request, the same result, the same reporting.
+  describe("when the id names a test suite folder", () => {
+    /** @scenario "Run a test suite folder" */
+    it("runs it through the same path a run plan uses", async () => {
+      mockRun.mockResolvedValue(makeRunResult({ batchRunId: "batch_folder" }));
+
+      await runSuiteCommand({ id: "folder_abc", options: {} });
+
+      expect(mockRun).toHaveBeenCalledWith("folder_abc", {
+        parameters: undefined,
+        note: undefined,
+      });
+    });
+
+    /** @scenario "Run a test suite folder" */
+    it("reports the job count and the batch run ID", async () => {
+      mockRun.mockResolvedValue(
+        makeRunResult({ batchRunId: "batch_folder", jobCount: 4 }),
+      );
+
+      await runSuiteCommand({ id: "folder_abc", options: {} });
+
+      const printed = vi.mocked(console.log).mock.calls.flat().join("\n");
+      expect(printed).toContain("batch_folder");
+      expect(printed).toContain("4");
+    });
+
+    /** @scenario "Run a test suite folder that has no targets" */
+    it("reports the platform's refusal when the folder has no target", async () => {
+      mockRun.mockRejectedValue(
+        new SuitesApiError(
+          "A suite needs at least one target to run against",
+          "POST /api/suites/folder_abc/run",
+        ),
+      );
+
+      await expect(
+        runSuiteCommand({ id: "folder_abc", options: {} }),
+      ).rejects.toThrow(ProcessExitError);
     });
   });
 });

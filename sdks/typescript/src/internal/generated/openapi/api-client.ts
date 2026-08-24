@@ -2973,6 +2973,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/scenarios/{id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List the saved versions of a scenario, newest first. A scenario saved before versions were recorded closes its history with a synthesized Created entry. */
+        get: operations["getApiScenariosByIdVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scenarios/{id}/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get one saved version of a scenario, with the name, situation, criteria, labels and parameters as that version saved them. */
+        get: operations["getApiScenariosByIdVersionsByVersion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects": {
         parameters: {
             query?: never;
@@ -3199,7 +3233,7 @@ export interface paths {
         get: operations["getApiSuitesById"];
         put?: never;
         post?: never;
-        /** @description Archive (soft-delete) a suite (run plan) */
+        /** @description Archive (soft-delete) a suite. Archiving a folder also archives every test case filed in it, in one transaction. */
         delete: operations["deleteApiSuitesById"];
         options?: never;
         head?: never;
@@ -22653,6 +22687,228 @@ export interface operations {
                 };
             };
             /** @description Scenario not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiScenariosByIdVersions: {
+        parameters: {
+            query?: {
+                limit?: number;
+                /** @description Read the page below this version number. */
+                cursor?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        versions: {
+                            /** @description The version number, counting from 1. */
+                            version: number;
+                            /** @description Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a case saved before versions were recorded. */
+                            authorLabel: string | null;
+                            /** @description The user who saved the version. Null when the save came from an API key. */
+                            authorId: string | null;
+                            changeDescription: string | null;
+                            /** @description The fields whose value this save changed. */
+                            changedFields: string[];
+                            /** @description When the version was written, in ISO 8601. */
+                            createdAt: string;
+                            /** @description True on the Created entry a case saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back. */
+                            synthesized: boolean;
+                        }[];
+                        /** @description Pass as cursor to read the page below this one. Null on the last page. */
+                        nextCursor: number | null;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Scenario not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiScenariosByIdVersionsByVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version: number;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description The version number, counting from 1. */
+                        version: number;
+                        /** @description Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a case saved before versions were recorded. */
+                        authorLabel: string | null;
+                        /** @description The user who saved the version. Null when the save came from an API key. */
+                        authorId: string | null;
+                        changeDescription: string | null;
+                        /** @description The fields whose value this save changed. */
+                        changedFields: string[];
+                        /** @description When the version was written, in ISO 8601. */
+                        createdAt: string;
+                        /** @description True on the Created entry a case saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back. */
+                        synthesized: boolean;
+                        /** @description The shape the snapshot was written in. */
+                        schemaVersion: number;
+                        /** @description The editable content of the case as this version saved it. */
+                        snapshot: {
+                            name: string;
+                            situation: string;
+                            criteria: string[];
+                            labels: string[];
+                            parameters: {
+                                name: string;
+                                description?: string;
+                                /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
+                                defaultValue?: string | number | boolean;
+                                /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
+                                secret?: boolean;
+                            }[];
+                            simulatorModel: string | null;
+                            judgeModel: string | null;
+                            maxTurns: number | null;
+                            minTurns: number | null;
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Scenario or version not found */
             404: {
                 headers: {
                     [name: string]: unknown;

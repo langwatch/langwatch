@@ -226,3 +226,121 @@ describe("getSimulationRunCommand()", () => {
     });
   });
 });
+
+/**
+ * The note belongs to the batch and the version is the test case version the
+ * run used. Both read as named fields: the run's raw metadata is internal and
+ * never part of what the CLI shows or returns.
+ *
+ * Spec: specs/features/simulation-runs-cli.feature
+ */
+describe("the note and the scenario version", () => {
+  let mockFetch: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch = vi.fn();
+    global.fetch = mockFetch as unknown as typeof fetch;
+    vi.spyOn(console, "log").mockImplementation(noop);
+    vi.spyOn(console, "error").mockImplementation(noop);
+    mockProcessExit();
+    process.env.LANGWATCH_API_KEY = "test-key";
+    process.env.LANGWATCH_ENDPOINT = "http://localhost:5560";
+  });
+
+  const printed = () => vi.mocked(console.log).mock.calls.flat().join("\n");
+
+  describe("listSimulationRunsCommand()", () => {
+    /** @scenario "List simulation runs shows the note and the scenario version" */
+    it("shows the note of the batch and the version each run used", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          runs: [makeRun({ note: "after the retry fix", scenarioVersion: 3 })],
+          hasMore: false,
+        }),
+      });
+
+      const result = await listSimulationRunsCommand({});
+      result!.table();
+
+      expect(printed()).toContain("after the retry fix");
+      expect(printed()).toContain("v3");
+    });
+
+    /** @scenario "List simulation runs where a run has no note" */
+    it("leaves the note empty and keeps every other field in place", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          runs: [makeRun({ note: null, scenarioVersion: null })],
+          hasMore: false,
+        }),
+      });
+
+      const result = await listSimulationRunsCommand({});
+      result!.table();
+
+      const output = printed();
+      expect(output).toContain("Note:");
+      expect(output).toContain("Version:");
+      expect(output).toContain("run_abc123");
+      expect(output).toContain("Login Flow Test");
+    });
+
+    /** @scenario "JSON output carries the note and the version as named fields" */
+    it("carries note and scenarioVersion as fields, and no raw metadata", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          runs: [makeRun({ note: "after the retry fix", scenarioVersion: 3 })],
+          hasMore: false,
+        }),
+      });
+
+      const result = await listSimulationRunsCommand({});
+
+      const runs = (result!.data as { runs: Record<string, unknown>[] }).runs;
+      expect(runs[0]).toMatchObject({
+        note: "after the retry fix",
+        scenarioVersion: 3,
+      });
+      expect(runs[0]).not.toHaveProperty("metadata");
+    });
+  });
+
+  describe("getSimulationRunCommand()", () => {
+    /** @scenario "Get simulation run shows the note and the scenario version" */
+    it("shows the note of the batch and the version the run used", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () =>
+          makeRun({ note: "after the retry fix", scenarioVersion: 3 }),
+      });
+
+      const result = await getSimulationRunCommand("run_abc123");
+      result!.table();
+
+      expect(printed()).toContain("after the retry fix");
+      expect(printed()).toContain("v3");
+    });
+
+    /** @scenario "Get a simulation run stored before versions were recorded" */
+    it("shows no version for a run stored before versions were recorded", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => makeRun({ note: null, scenarioVersion: null }),
+      });
+
+      const result = await getSimulationRunCommand("run_abc123");
+      result!.table();
+
+      const output = printed();
+      expect(output).not.toContain("Version:");
+      // The rest of the details are shown exactly as before.
+      expect(output).toContain("run_abc123");
+      expect(output).toContain("Login Flow Test");
+      expect(output).toContain("Verdict:");
+    });
+  });
+});

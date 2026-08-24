@@ -528,7 +528,8 @@ secured.access(requires("scenarios:create")).post(
 secured.access(requires("scenarios:manage")).delete(
   "/:id",
   describeRoute({
-    description: "Archive (soft-delete) a suite (run plan)",
+    description:
+      "Archive (soft-delete) a suite. Archiving a folder also archives every test case filed in it, in one transaction.",
     responses: {
       ...baseResponses,
       200: {
@@ -555,6 +556,19 @@ secured.access(requires("scenarios:manage")).delete(
     logger.info({ projectId: project.id, suiteId: id }, "Archiving suite");
 
     const service = createService();
+    const existing = await service.getById({ id, projectId: project.id });
+
+    if (!existing) {
+      return c.json({ error: "Suite not found" }, 404);
+    }
+
+    // A folder holds the cases filed into it, so archiving it archives them
+    // too. A run plan only references cases and leaves them where they are.
+    if (existing.kind === "folder") {
+      await service.archiveFolder({ projectId: project.id, folderId: id });
+      return c.json({ id, archived: true });
+    }
+
     const result = await service.archive({ id, projectId: project.id });
 
     if (!result) {

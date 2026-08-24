@@ -55,6 +55,46 @@ const collectParam = (pair: string, previous: string[] = []): string[] => [
   pair,
 ];
 
+/**
+ * Help for the `--note` flag the run commands share. Written here rather than
+ * imported so the command tree keeps its own boot cost; the reading it
+ * describes lives in `cli/utils/runNote.ts`.
+ */
+const NOTE_FLAG_HELP =
+  "Why this run is being started: its hypothesis or commit message. It is kept with the batch and shown beside every run in it. Up to 200 characters.";
+
+/** Help for the `--folder` flag on the scenario write commands. */
+const FOLDER_FLAG_HELP =
+  "The test suite folder to file this test case in, named by ID or by name.";
+
+/**
+ * Reads the `--folder` / `--no-folder` pair.
+ *
+ * Commander gives both flags ONE attribute, so whichever comes last on the
+ * line silently wins and a caller passing both is never told. Each flag is
+ * recorded as it is read instead, so the command can refuse the pair. The
+ * reader clears what it read, so a second parse in the same process starts
+ * from nothing.
+ */
+const trackFolderFlags = (
+  command: Command,
+): (() => { folder?: string; noFolder: boolean }) => {
+  let folder: string | undefined;
+  let noFolder = false;
+  command.on("option:folder", (value: string) => {
+    folder = value;
+  });
+  command.on("option:no-folder", () => {
+    noFolder = true;
+  });
+  return () => {
+    const read = { ...(folder !== undefined && { folder }), noFolder };
+    folder = undefined;
+    noFolder = false;
+    return read;
+  };
+};
+
 // Import commands with proper async handling
 const addCommand = async (name: string, options: { version?: string; localFile?: string }): Promise<void> => {
   const { addCommand: addCommandImpl } = await import("./commands/add.js");
@@ -2693,25 +2733,40 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .requiredOption("--situation <situation>", "The situation/context for the scenario")
       .option("--criteria <criteria>", "Comma-separated list of evaluation criteria")
       .option("--labels <labels>", "Comma-separated list of labels")
+      .option("--folder <folder>", FOLDER_FLAG_HELP)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (name: string, options: { situation: string; criteria?: string; labels?: string }) => {
+    async (name: string, options: { situation: string; criteria?: string; labels?: string; folder?: string }) => {
       const { createScenarioCommand: impl } = await import("./commands/scenarios/create.js");
       return impl(name, options);
     },
   );
 
+  const scenarioUpdateCmd = scenarioCmd
+    .command("update <id>")
+    .description("Update an existing scenario")
+    .option("--name <name>", "New scenario name")
+    .option("--situation <situation>", "New situation/context")
+    .option("--criteria <criteria>", "New comma-separated list of criteria (replaces existing)")
+    .option("--labels <labels>", "New comma-separated list of labels (replaces existing)")
+    .option("--folder <folder>", FOLDER_FLAG_HELP)
+    .option("--no-folder", "Take the test case out of its test suite folder")
+    .option("-f, --format <format>", "Output format: table (default) or json", "table");
+
+  const readScenarioFolderFlags = trackFolderFlags(scenarioUpdateCmd);
+
   emitsResult(
-    scenarioCmd
-      .command("update <id>")
-      .description("Update an existing scenario")
-      .option("--name <name>", "New scenario name")
-      .option("--situation <situation>", "New situation/context")
-      .option("--criteria <criteria>", "New comma-separated list of criteria (replaces existing)")
-      .option("--labels <labels>", "New comma-separated list of labels (replaces existing)")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    scenarioUpdateCmd,
     async (id: string, options: { name?: string; situation?: string; criteria?: string; labels?: string }) => {
+      const { folder, noFolder } = readScenarioFolderFlags();
       const { updateScenarioCommand: impl } = await import("./commands/scenarios/update.js");
-      return impl(id, options);
+      return impl(id, {
+        name: options.name,
+        situation: options.situation,
+        criteria: options.criteria,
+        labels: options.labels,
+        folder,
+        noFolder,
+      });
     },
   );
 
@@ -2721,11 +2776,41 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .requiredOption("--target <target>", "Target to run against, as <type>:<referenceId> (e.g., http:agent_abc123)")
     .option("--wait", "Wait for the scenario run to complete")
     .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
+    .option("--note <text>", NOTE_FLAG_HELP)
     .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { target: string; wait?: boolean; format?: string; param?: string[] }) => {
+    .action(async (id: string, options: { target: string; wait?: boolean; format?: string; param?: string[]; note?: string }) => {
       const { runScenarioCommand: impl } = await import("./commands/scenarios/run.js");
       await impl(id, options);
     });
+
+  // Version history of a test case. Nested under `scenario` because a version
+  // is a state of one case, never a resource of its own.
+  const scenarioVersionCmd = scenarioCmd
+    .command("version")
+    .description("Read the saved versions of a scenario");
+
+  emitsResult(
+    scenarioVersionCmd
+      .command("list <scenarioId>")
+      .description("List the saved versions of a scenario, newest first")
+      .option("--limit <n>", "Max versions to read (default: 20)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (scenarioId: string, options: { limit?: string }) => {
+      const { listScenarioVersionsCommand: impl } = await import("./commands/scenarios/versions/list.js");
+      return impl(scenarioId, options);
+    },
+  );
+
+  emitsResult(
+    scenarioVersionCmd
+      .command("get <scenarioId> <version>")
+      .description("Read one saved version of a scenario")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (scenarioId: string, version: string) => {
+      const { getScenarioVersionCommand: impl } = await import("./commands/scenarios/versions/get.js");
+      return impl(scenarioId, version);
+    },
+  );
 
   emitsResult(
     scenarioCmd
@@ -2814,8 +2899,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .description("Execute a suite run — schedules all scenario × target × repeat jobs")
     .option("--wait", "Wait for the suite run to complete before returning")
     .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
+    .option("--note <text>", NOTE_FLAG_HELP)
     .option("-f, --format <format>", "Output format: table (default) or json", "table")
-    .action(async (id: string, options: { wait?: boolean; format?: string; param?: string[] }) => {
+    .action(async (id: string, options: { wait?: boolean; format?: string; param?: string[]; note?: string }) => {
       const { runSuiteCommand: impl } = await import("./commands/suites/run.js");
       await impl({ id, options });
     });
@@ -2828,6 +2914,57 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     async (id: string) => {
       const { deleteSuiteCommand: impl } = await import("./commands/suites/delete.js");
       return impl(id);
+    },
+  );
+
+  // Test suite folders. Nested under `suite` because a folder IS a suite: it
+  // holds the test cases filed into it and runs through the same path a run
+  // plan does, with `langwatch suite run <folder-id>`.
+  const suiteFolderCmd = suiteCmd
+    .command("folder")
+    .description("Manage test suite folders, the groups a test case is filed in");
+
+  emitsResult(
+    suiteFolderCmd
+      .command("list")
+      .description("List the test suite folders in the project")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { listFoldersCommand: impl } = await import("./commands/suites/folders/list.js");
+      return impl();
+    },
+  );
+
+  emitsResult(
+    suiteFolderCmd
+      .command("create <name>")
+      .description("Create an empty test suite folder")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (name: string) => {
+      const { createFolderCommand: impl } = await import("./commands/suites/folders/create.js");
+      return impl(name);
+    },
+  );
+
+  emitsResult(
+    suiteFolderCmd
+      .command("rename <folder> <name>")
+      .description("Rename a test suite folder")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (folder: string, name: string) => {
+      const { renameFolderCommand: impl } = await import("./commands/suites/folders/rename.js");
+      return impl(folder, name);
+    },
+  );
+
+  emitsResult(
+    suiteFolderCmd
+      .command("delete <folder>")
+      .description("Archive a test suite folder and every test case filed in it")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (folder: string) => {
+      const { deleteFolderCommand: impl } = await import("./commands/suites/folders/delete.js");
+      return impl(folder);
     },
   );
 

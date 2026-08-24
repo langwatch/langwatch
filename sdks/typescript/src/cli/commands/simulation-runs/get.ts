@@ -100,6 +100,8 @@ export const getSimulationRunCommand = async (
       updatedAt: number;
       durationInMs: number;
       totalCost?: number;
+      note?: string | null;
+      scenarioVersion?: number | null;
     };
 
     spinner.succeed(`Found simulation run "${run.name ?? run.scenarioRunId}"`);
@@ -124,6 +126,15 @@ export const getSimulationRunCommand = async (
           console.log(`    ${chalk.gray("Cost:")}        $${run.totalCost.toFixed(4)}`);
         }
         console.log(`    ${chalk.gray("Started:")}     ${new Date(run.timestamp).toLocaleString()}`);
+        // Both lines are left out when the run carries nothing: a run stored
+        // before versions were recorded has no version to name, and a batch
+        // started without a note has no note.
+        if (run.scenarioVersion) {
+          console.log(`    ${chalk.gray("Version:")}     v${run.scenarioVersion}`);
+        }
+        if (run.note) {
+          console.log(`    ${chalk.gray("Note:")}        ${run.note}`);
+        }
 
         if (run.results) {
           console.log();

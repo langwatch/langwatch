@@ -48922,6 +48922,533 @@
         ]
       }
     },
+    "/api/scenarios/{id}/versions": {
+      "get": {
+        "operationId": "getApiScenariosByIdVersions",
+        "description": "List the saved versions of a scenario, newest first. A scenario saved before versions were recorded closes its history with a synthesized Created entry.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "versions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "version": {
+                            "type": "integer",
+                            "description": "The version number, counting from 1."
+                          },
+                          "authorLabel": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a case saved before versions were recorded."
+                          },
+                          "authorId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "description": "The user who saved the version. Null when the save came from an API key."
+                          },
+                          "changeDescription": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "changedFields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "The fields whose value this save changed."
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "description": "When the version was written, in ISO 8601."
+                          },
+                          "synthesized": {
+                            "type": "boolean",
+                            "description": "True on the Created entry a case saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back."
+                          }
+                        },
+                        "required": [
+                          "version",
+                          "authorLabel",
+                          "authorId",
+                          "changeDescription",
+                          "changedFields",
+                          "createdAt",
+                          "synthesized"
+                        ]
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "description": "Pass as cursor to read the page below this one. Null on the last page."
+                    }
+                  },
+                  "required": [
+                    "versions",
+                    "nextCursor"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Scenario not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "description": "Read the page below this version number."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/scenarios/{id}/versions/{version}": {
+      "get": {
+        "operationId": "getApiScenariosByIdVersionsByVersion",
+        "description": "Get one saved version of a scenario, with the name, situation, criteria, labels and parameters as that version saved them.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "integer",
+                      "description": "The version number, counting from 1."
+                    },
+                    "authorLabel": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a case saved before versions were recorded."
+                    },
+                    "authorId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The user who saved the version. Null when the save came from an API key."
+                    },
+                    "changeDescription": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "changedFields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "The fields whose value this save changed."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "description": "When the version was written, in ISO 8601."
+                    },
+                    "synthesized": {
+                      "type": "boolean",
+                      "description": "True on the Created entry a case saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back."
+                    },
+                    "schemaVersion": {
+                      "type": "integer",
+                      "description": "The shape the snapshot was written in."
+                    },
+                    "snapshot": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "situation": {
+                          "type": "string"
+                        },
+                        "criteria": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "labels": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "parameters": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "description": {
+                                "type": "string",
+                                "maxLength": 500
+                              },
+                              "defaultValue": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 4096
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  }
+                                ],
+                                "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
+                              },
+                              "secret": {
+                                "type": "boolean",
+                                "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
+                              }
+                            },
+                            "required": [
+                              "name"
+                            ]
+                          }
+                        },
+                        "simulatorModel": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "judgeModel": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "maxTurns": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "minTurns": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "situation",
+                        "criteria",
+                        "labels",
+                        "parameters",
+                        "simulatorModel",
+                        "judgeModel",
+                        "maxTurns",
+                        "minTurns"
+                      ],
+                      "description": "The editable content of the case as this version saved it."
+                    }
+                  },
+                  "required": [
+                    "version",
+                    "authorLabel",
+                    "authorId",
+                    "changeDescription",
+                    "changedFields",
+                    "createdAt",
+                    "synthesized",
+                    "schemaVersion",
+                    "snapshot"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Scenario or version not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
     "/api/projects": {
       "get": {
         "operationId": "listProjects",
@@ -52131,7 +52658,7 @@
       },
       "delete": {
         "operationId": "deleteApiSuitesById",
-        "description": "Archive (soft-delete) a suite (run plan)",
+        "description": "Archive (soft-delete) a suite. Archiving a folder also archives every test case filed in it, in one transaction.",
         "responses": {
           "200": {
             "description": "Suite archived",

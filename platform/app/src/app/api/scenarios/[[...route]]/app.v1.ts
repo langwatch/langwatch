@@ -12,8 +12,8 @@ import {
   scenarioParameterDefinitionSchema,
   scenarioParameterDefinitionsSchema,
 } from "~/server/scenarios/parameters";
-import type { ScenarioActor } from "~/server/scenarios/scenario-versioning";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
+import type { ScenarioActor } from "~/server/scenarios/scenario-versioning";
 import type { AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
@@ -39,6 +39,79 @@ const scenarioResponseSchema = z.object({
 
 const scenarioResponseWithPlatformUrlSchema = scenarioResponseSchema.extend({
   platformUrl: z.string().url(),
+});
+
+const scenarioVersionSummarySchema = z.object({
+  version: z.number().int().describe("The version number, counting from 1."),
+  authorLabel: z
+    .string()
+    .nullable()
+    .describe(
+      "Which surface wrote the version: user, api, cli or langy. Null on the synthesized Created entry of a case saved before versions were recorded.",
+    ),
+  authorId: z
+    .string()
+    .nullable()
+    .describe(
+      "The user who saved the version. Null when the save came from an API key.",
+    ),
+  changeDescription: z.string().nullable(),
+  changedFields: z
+    .array(z.string())
+    .describe("The fields whose value this save changed."),
+  createdAt: z.string().describe("When the version was written, in ISO 8601."),
+  synthesized: z
+    .boolean()
+    .describe(
+      "True on the Created entry a case saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back.",
+    ),
+});
+
+const scenarioVersionListResponseSchema = z.object({
+  versions: z.array(scenarioVersionSummarySchema),
+  nextCursor: z
+    .number()
+    .int()
+    .nullable()
+    .describe(
+      "Pass as cursor to read the page below this one. Null on the last page.",
+    ),
+});
+
+const scenarioVersionDetailResponseSchema = scenarioVersionSummarySchema.extend(
+  {
+    schemaVersion: z
+      .number()
+      .int()
+      .describe("The shape the snapshot was written in."),
+    snapshot: z
+      .object({
+        name: z.string(),
+        situation: z.string(),
+        criteria: z.array(z.string()),
+        labels: z.array(z.string()),
+        parameters: z.array(scenarioParameterDefinitionSchema),
+        simulatorModel: z.string().nullable(),
+        judgeModel: z.string().nullable(),
+        maxTurns: z.number().nullable(),
+        minTurns: z.number().nullable(),
+      })
+      .describe("The editable content of the case as this version saved it."),
+  },
+);
+
+const listScenarioVersionsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  cursor: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .optional()
+    .describe("Read the page below this version number."),
+});
+
+const versionPathSchema = z.object({
+  version: z.coerce.number().int().min(1),
 });
 
 const parametersDescription =
@@ -104,6 +177,8 @@ export function registerScenarioRoutes(
   registerCreateScenarioRoute(secured);
   registerUpdateScenarioRoute(secured);
   registerDeleteScenarioRoute(secured);
+  registerListScenarioVersionsRoute(secured);
+  registerGetScenarioVersionRoute(secured);
 }
 
 /** List every scenario in the project. */
@@ -380,6 +455,158 @@ function registerDeleteScenarioRoute(
       try {
         await service.archive({ id, projectId: project.id });
         return c.json({ id, archived: true });
+      } catch (error) {
+        if (error instanceof ScenarioNotFoundError) {
+          return c.json({ error: "Scenario not found" }, 404);
+        }
+        throw error;
+      }
+    },
+  );
+}
+
+/** The version history of a scenario, newest first. */
+function registerListScenarioVersionsRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
+  secured.access(requires("scenarios:view")).get(
+    "/:id/versions",
+    describeRoute({
+      description:
+        "List the saved versions of a scenario, newest first. A scenario saved before versions were recorded closes its history with a synthesized Created entry.",
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Success",
+          content: {
+            "application/json": {
+              schema: resolver(scenarioVersionListResponseSchema),
+            },
+          },
+        },
+        404: {
+          description: "Scenario not found",
+          content: {
+            "application/json": { schema: resolver(badRequestSchema) },
+          },
+        },
+      },
+    }),
+    zValidator("query", listScenarioVersionsQuerySchema),
+    async (c) => {
+      const project = c.get("project");
+      const { id } = c.req.param();
+      const { limit, cursor } = c.req.valid("query");
+
+      logger.info(
+        { projectId: project.id, scenarioId: id },
+        "Listing scenario versions",
+      );
+
+      const service = getService();
+      try {
+        const page = await service.listVersions({
+          projectId: project.id,
+          scenarioId: id,
+          ...(limit !== undefined && { limit }),
+          ...(cursor !== undefined && { cursor }),
+        });
+        return c.json({
+          versions: page.versions.map((version) => ({
+            version: version.version,
+            authorLabel: version.authorLabel,
+            authorId: version.authorId,
+            changeDescription: version.changeDescription,
+            changedFields: version.changedFields,
+            createdAt: version.createdAt.toISOString(),
+            synthesized: version.synthesized,
+          })),
+          nextCursor: page.nextCursor,
+        });
+      } catch (error) {
+        if (error instanceof ScenarioNotFoundError) {
+          return c.json({ error: "Scenario not found" }, 404);
+        }
+        throw error;
+      }
+    },
+  );
+}
+
+/**
+ * One version of a scenario with the content it saved.
+ *
+ * A version number that names nothing refuses with the
+ * `scenario_version_not_found` code, which the synthesized Created entry also
+ * answers: it has no stored snapshot to serve.
+ */
+function registerGetScenarioVersionRoute(
+  secured: SecuredApp<{ Variables: AuthMiddlewareVariables }>,
+): void {
+  secured.access(requires("scenarios:view")).get(
+    "/:id/versions/:version",
+    describeRoute({
+      description:
+        "Get one saved version of a scenario, with the name, situation, criteria, labels and parameters as that version saved them.",
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Success",
+          content: {
+            "application/json": {
+              schema: resolver(scenarioVersionDetailResponseSchema),
+            },
+          },
+        },
+        404: {
+          description: "Scenario or version not found",
+          content: {
+            "application/json": { schema: resolver(badRequestSchema) },
+          },
+        },
+      },
+    }),
+    zValidator("param", versionPathSchema),
+    async (c) => {
+      const project = c.get("project");
+      const { id } = c.req.param();
+      const { version } = c.req.valid("param");
+
+      logger.info(
+        { projectId: project.id, scenarioId: id, version },
+        "Getting scenario version",
+      );
+
+      const service = getService();
+      try {
+        const detail = await service.getVersion({
+          projectId: project.id,
+          scenarioId: id,
+          version,
+        });
+        return c.json({
+          version: detail.version,
+          authorLabel: detail.authorLabel,
+          authorId: detail.authorId,
+          changeDescription: detail.changeDescription,
+          changedFields: detail.changedFields,
+          createdAt: detail.createdAt.toISOString(),
+          synthesized: detail.synthesized,
+          schemaVersion: detail.schemaVersion,
+          snapshot: {
+            name: detail.fields.name,
+            situation: detail.fields.situation,
+            criteria: detail.fields.criteria,
+            labels: detail.fields.labels,
+            parameters: parseScenarioParameterDefinitions(
+              detail.fields.parameters,
+            ),
+            simulatorModel: detail.fields.simulatorModel,
+            judgeModel: detail.fields.judgeModel,
+            maxTurns: detail.fields.maxTurns,
+            minTurns: detail.fields.minTurns,
+          },
+        });
       } catch (error) {
         if (error instanceof ScenarioNotFoundError) {
           return c.json({ error: "Scenario not found" }, 404);

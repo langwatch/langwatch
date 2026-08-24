@@ -533,4 +533,148 @@ describe("Scenarios API", () => {
       });
     });
   });
+
+  // The version endpoints of the REST surface. The history itself is built by
+  // ScenarioService; what is pinned here is the wire shape the CLI reads.
+  describe("GET /api/scenarios/:id/versions", () => {
+    async function createScenarioWithSaves(saveCount: number) {
+      const created = await helpers.api.post("/api/scenarios", {
+        name: "Login Flow",
+        situation: "User attempts to log in",
+        criteria: ["Greets the user"],
+        labels: ["auth"],
+      });
+      const scenario = (await created.json()) as { id: string };
+      for (let index = 0; index < saveCount; index++) {
+        await helpers.api.put(`/api/scenarios/${scenario.id}`, {
+          situation: `Save number ${index + 1}`,
+        });
+      }
+      return scenario;
+    }
+
+    it("lists the versions newest first, with author, date and changed fields", async () => {
+      const scenario = await createScenarioWithSaves(2);
+
+      const res = await helpers.api.get(
+        `/api/scenarios/${scenario.id}/versions`,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.versions.map((v: { version: number }) => v.version)).toEqual([
+        3, 2, 1,
+      ]);
+      expect(body.versions[0]).toMatchObject({
+        authorLabel: "api",
+        authorId: null,
+        changedFields: ["situation"],
+        synthesized: false,
+      });
+      expect(typeof body.versions[0].createdAt).toBe("string");
+      expect(body.nextCursor).toBeNull();
+    });
+
+    it("pages with limit and cursor", async () => {
+      const scenario = await createScenarioWithSaves(3);
+
+      const first = await helpers.api.get(
+        `/api/scenarios/${scenario.id}/versions?limit=2`,
+      );
+      const firstBody = await first.json();
+      expect(
+        firstBody.versions.map((v: { version: number }) => v.version),
+      ).toEqual([4, 3]);
+      expect(firstBody.nextCursor).toBe(3);
+
+      const second = await helpers.api.get(
+        `/api/scenarios/${scenario.id}/versions?limit=2&cursor=${firstBody.nextCursor}`,
+      );
+      const secondBody = await second.json();
+      expect(
+        secondBody.versions.map((v: { version: number }) => v.version),
+      ).toEqual([2, 1]);
+    });
+
+    it("returns 404 for a scenario that does not exist", async () => {
+      const res = await helpers.api.get(
+        "/api/scenarios/nonexistent-id/versions",
+      );
+
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe("GET /api/scenarios/:id/versions/:version", () => {
+    it("returns the content the version saved", async () => {
+      const created = await helpers.api.post("/api/scenarios", {
+        name: "Login Flow",
+        situation: "User attempts to log in",
+        criteria: ["Greets the user"],
+        labels: ["auth"],
+      });
+      const scenario = (await created.json()) as { id: string };
+      await helpers.api.put(`/api/scenarios/${scenario.id}`, {
+        situation: "Rewritten",
+      });
+
+      const res = await helpers.api.get(
+        `/api/scenarios/${scenario.id}/versions/1`,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toMatchObject({
+        version: 1,
+        authorLabel: "api",
+        schemaVersion: 1,
+        synthesized: false,
+      });
+      expect(body.snapshot).toMatchObject({
+        name: "Login Flow",
+        situation: "User attempts to log in",
+        criteria: ["Greets the user"],
+        labels: ["auth"],
+        parameters: [],
+      });
+    });
+
+    it("refuses a version number that names nothing with scenario_version_not_found", async () => {
+      const created = await helpers.api.post("/api/scenarios", {
+        name: "Login Flow",
+        situation: "User attempts to log in",
+      });
+      const scenario = (await created.json()) as { id: string };
+
+      const res = await helpers.api.get(
+        `/api/scenarios/${scenario.id}/versions/9`,
+      );
+
+      expect(res.status).toBe(404);
+      const body = await res.json();
+      expect(body.error).toBe("scenario_version_not_found");
+    });
+
+    it("returns 404 for a scenario that does not exist", async () => {
+      const res = await helpers.api.get(
+        "/api/scenarios/nonexistent-id/versions/1",
+      );
+
+      expect(res.status).toBe(404);
+    });
+
+    it("refuses a version that is not a whole number", async () => {
+      const created = await helpers.api.post("/api/scenarios", {
+        name: "Login Flow",
+        situation: "User attempts to log in",
+      });
+      const scenario = (await created.json()) as { id: string };
+
+      const res = await helpers.api.get(
+        `/api/scenarios/${scenario.id}/versions/not-a-number`,
+      );
+
+      expect(res.status).toBe(422);
+    });
+  });
 });

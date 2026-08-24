@@ -337,6 +337,100 @@ describe("Feature: Suites REST API", () => {
     });
   });
 
+  // A folder holds the cases filed into it, so archiving the folder archives
+  // them with it. A run plan only references cases and leaves them alone.
+  describe("DELETE /api/suites/:id for a folder", () => {
+    async function createFolderWithCases(name: string, caseCount: number) {
+      const folder = await prisma.simulationSuite.create({
+        data: {
+          id: `suite_${nanoid()}`,
+          projectId: testProjectId,
+          name,
+          slug: `${name.toLowerCase()}-${nanoid(6)}`,
+          kind: "folder",
+          scenarioIds: [],
+          targets: [],
+          labels: [],
+        },
+      });
+      const cases: Scenario[] = [];
+      for (let index = 0; index < caseCount; index++) {
+        const scenario = await createScenario(`${name} case ${index}`);
+        await prisma.scenario.updateMany({
+          where: { id: scenario.id, projectId: testProjectId },
+          data: { folderId: folder.id },
+        });
+        cases.push(scenario);
+      }
+      await prisma.simulationSuite.updateMany({
+        where: { id: folder.id, projectId: testProjectId },
+        data: { scenarioIds: cases.map((one) => one.id) },
+      });
+      return { folder, cases };
+    }
+
+    it("archives the folder", async () => {
+      const { folder } = await createFolderWithCases("Refunds", 2);
+
+      const res = await helpers.api.delete(`/api/suites/${folder.id}`);
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ id: folder.id, archived: true });
+
+      const stored = await prisma.simulationSuite.findFirst({
+        where: { id: folder.id, projectId: testProjectId },
+      });
+      expect(stored?.archivedAt).not.toBeNull();
+    });
+
+    it("archives every test case filed in it", async () => {
+      const { folder, cases } = await createFolderWithCases("Refunds", 2);
+
+      await helpers.api.delete(`/api/suites/${folder.id}`);
+
+      const stored = await prisma.scenario.findMany({
+        where: {
+          id: { in: cases.map((one) => one.id) },
+          projectId: testProjectId,
+        },
+      });
+      expect(stored).toHaveLength(2);
+      for (const scenario of stored) {
+        expect(scenario.archivedAt).not.toBeNull();
+      }
+    });
+
+    it("leaves the cases of a run plan alone", async () => {
+      const scenario = await createScenario("Still active");
+      const plan = await prisma.simulationSuite.create({
+        data: {
+          id: `suite_${nanoid()}`,
+          projectId: testProjectId,
+          name: "Nightly",
+          slug: `nightly-${nanoid(6)}`,
+          scenarioIds: [scenario.id],
+          targets: [{ type: "http", referenceId: "agent_test" }],
+          repeatCount: 1,
+          labels: [],
+        },
+      });
+
+      const res = await helpers.api.delete(`/api/suites/${plan.id}`);
+
+      expect(res.status).toBe(200);
+      const stored = await prisma.scenario.findFirst({
+        where: { id: scenario.id, projectId: testProjectId },
+      });
+      expect(stored?.archivedAt).toBeNull();
+    });
+
+    it("answers 404 for an id that names no suite", async () => {
+      const res = await helpers.api.delete("/api/suites/suite_nonexistent");
+
+      expect(res.status).toBe(404);
+    });
+  });
+
   describe("GET /api/suites/:id", () => {
     describe("when suite exists", () => {
       it("returns the suite with all fields", async () => {
