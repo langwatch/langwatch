@@ -26,6 +26,7 @@ import {
 } from "~/generated/prisma/client";
 
 import { prisma } from "~/server/db";
+import { getApp } from "~/server/app-layer/app";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { registerGovernanceMcpTools } from "../governance-tools";
 
@@ -155,6 +156,7 @@ describe("governance MCP tools — audit-uniform contract", () => {
       const mock = mockMcpServer();
       registerGovernanceMcpTools(mock as any, {
         prisma,
+        governance: getApp().governance,
         apiKey: API_KEY,
         callerUserId: ADMIN_ID,
       });
@@ -182,6 +184,7 @@ describe("governance MCP tools — audit-uniform contract", () => {
       const mock = mockMcpServer();
       registerGovernanceMcpTools(mock as any, {
         prisma,
+        governance: getApp().governance,
         apiKey: API_KEY,
         // callerUserId intentionally omitted — direct project apiKey only.
       });

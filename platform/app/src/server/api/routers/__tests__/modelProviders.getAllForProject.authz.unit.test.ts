@@ -146,6 +146,7 @@ function callerForUser(userId: string) {
       agents: {} as never,
       permissions: appPermissionsService(database),
       authzGrants: {} as never,
+      governance: {} as never,
     },
   });
   ctx.prisma = database;

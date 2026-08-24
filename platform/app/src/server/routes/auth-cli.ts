@@ -36,7 +36,6 @@ import {
   IngestionKeyService,
   PersonalWorkspaceMissingError,
 } from "@ee/governance/services/ingestionKey.service";
-import { IngestionTemplateService } from "@ee/governance/services/ingestionTemplate.service";
 import {
   NoEligibleProvidersError,
   PersonalVirtualKeyAlreadyExistsError,
@@ -49,6 +48,7 @@ import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { z } from "zod";
 import { env } from "~/env.mjs";
+import type { AppContextVariables } from "~/app/api/middleware/app-context";
 import {
   assertEnterprisePlan,
   ENTERPRISE_FEATURE_ERRORS,
@@ -75,7 +75,9 @@ import { resolveSupportContact } from "~/server/organizations/resolveSupportCont
 
 const logger = createLogger("langwatch:auth-cli");
 
-const secured = createServiceApp({ basePath: "/api/auth/cli" });
+const secured = createServiceApp<{ Variables: AppContextVariables }>({
+  basePath: "/api/auth/cli",
+});
 
 const CLI_REASON = "CLI device-flow / user session validated in-handler";
 
@@ -1994,7 +1996,7 @@ secured.access(CLI_POLICY).get("/governance/status", async (c: Context) => {
 
 secured
   .access(CLI_POLICY)
-  .get("/governance/ingestion-templates", async (c: Context) => {
+  .get("/governance/ingestion-templates", async (c) => {
     const tokenRecord = await validateAccessToken(
       c.req.header("Authorization"),
     );
@@ -2008,7 +2010,7 @@ secured
         401,
       );
     }
-    const service = IngestionTemplateService.create(prisma);
+    const service = c.var.langwatchApp.governance.ingestionTemplates;
     const rows = await service.listForUser({
       organizationId: tokenRecord.organization_id,
     });

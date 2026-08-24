@@ -11,6 +11,7 @@
     "ingestion-credentials",
     "ingestion-pull",
     "ingestion-source",
+    "ingestion-template",
     "ocsf-export",
     "ottl",
     "persona-home",

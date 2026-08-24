@@ -61,6 +61,10 @@ CRUD and assignment invariants live in the feature server; tRPC only applies
 authentication and permission checks.
 Governance owns the OCSF export cursor and tenant-resolution policy; the
 application injects the ClickHouse event reader.
+Governance owns ingestion-template validation, tenant visibility, authoring,
+platform-catalog reconciliation and audit intent. The application owns only
+authentication, permission checks and transport mapping. Template and audit
+writes remain one Postgres transaction in the private feature repository.
 
 ## Persistence
 

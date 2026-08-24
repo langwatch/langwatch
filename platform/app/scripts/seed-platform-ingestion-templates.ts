@@ -17,10 +17,14 @@
  */
 
 import { prisma } from "~/server/db";
-import { seedPlatformIngestionTemplates } from "../ee/governance/services/platformIngestionTemplates.seeds";
+import { PostgresIngestionTemplateAdapter } from "@langwatch/enterprise-governance-server";
 
 async function main() {
-  const result = await seedPlatformIngestionTemplates(prisma);
+  const result = await PostgresIngestionTemplateAdapter.create({
+    database: prisma,
+  })
+    .build()
+    .syncPlatformCatalog();
   process.stdout.write(
     JSON.stringify({
       created: result.created,

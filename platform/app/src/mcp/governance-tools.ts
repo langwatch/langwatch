@@ -28,6 +28,7 @@
 
 import { type ZodRawShape, z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
+import type { RequestAppServices } from "~/runtime/app/requestApp";
 
 type ToolCallback = (
   // The MCP SDK passes parsed input as the first arg; we don't currently
@@ -52,7 +53,6 @@ type McpServerLike = {
 };
 
 import { IngestionKeyService } from "../../ee/governance/services/ingestionKey.service";
-import { IngestionTemplateService } from "../../ee/governance/services/ingestionTemplate.service";
 import type { Permission } from "../server/api/rbac";
 import { probeOrganizationPermission } from "../server/app-layer/permissions/imperative";
 
@@ -63,6 +63,7 @@ const NEEDS_OAUTH_PREFIX = "AUTH_REQUIRED: ";
 
 export interface GovernanceMcpContext {
   prisma: PrismaClient;
+  governance: RequestAppServices["governance"];
   /** Project apiKey from the MCP session (used to derive organizationId). */
   apiKey: string;
   /**
@@ -150,7 +151,7 @@ export function registerGovernanceMcpTools(
     return null;
   };
 
-  const templateService = IngestionTemplateService.create(ctx.prisma);
+  const templateService = ctx.governance.ingestionTemplates;
   const ingestionKeyService = IngestionKeyService.create(ctx.prisma);
 
   const text = (value: string) => ({

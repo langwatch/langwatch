@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
-  IngestionTemplateService,
   InvalidSourceTypeError,
   PlatformTemplateImmutableError,
   TemplateNotFoundError,
-} from "@ee/governance/services/ingestionTemplate.service";
+} from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 /**
  * Public Hono REST API for governance resources.
@@ -30,6 +29,7 @@ import { createLogger } from "@langwatch/observability";
 import type { MiddlewareHandler } from "hono";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
+import type { AppContextVariables } from "~/app/api/middleware/app-context";
 import { apiKeyPermission, createProjectApp } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
@@ -221,7 +221,9 @@ function resolveSurfaceFromRequest(c: {
 
 // ── App ─────────────────────────────────────────────────────────────────────
 
-const secured = createProjectApp({ basePath: "/api/governance" });
+const secured = createProjectApp<AppContextVariables>({
+  basePath: "/api/governance",
+});
 
 // ── Ingestion Templates ───────────────────────────────────────────────
 
@@ -249,8 +251,9 @@ secured.access(apiKeyPermission("aiTools:view")).get(
   async (c) => {
     const project = c.get("project");
     const organizationId = await orgIdForProject(project.id);
-    const service = IngestionTemplateService.create(prisma);
-    const rows = await service.listForUser({ organizationId });
+    const rows = await c.var.langwatchApp.governance.ingestionTemplates.listForUser(
+      { organizationId },
+    );
     return c.json({ data: rows.map(toTemplateDto) });
   },
 );
@@ -280,8 +283,9 @@ secured.access(apiKeyPermission("aiTools:manage")).get(
   async (c) => {
     const project = c.get("project");
     const organizationId = await orgIdForProject(project.id);
-    const service = IngestionTemplateService.create(prisma);
-    const rows = await service.listForOrgAdmin({ organizationId });
+    const rows = await c.var.langwatchApp.governance.ingestionTemplates.listForOrgAdmin(
+      { organizationId },
+    );
     return c.json({ data: rows.map(toTemplateDto) });
   },
 );
@@ -317,8 +321,9 @@ secured.access(apiKeyPermission("aiTools:view")).get(
     const project = c.get("project");
     const id = c.req.param("id");
     const organizationId = await orgIdForProject(project.id);
-    const service = IngestionTemplateService.create(prisma);
-    const row = await service.findByIdForOrg({ id, organizationId });
+    const row = await c.var.langwatchApp.governance.ingestionTemplates.findByIdForOrg(
+      { id, organizationId },
+    );
     if (!row) {
       return c.json(
         {
@@ -377,13 +382,12 @@ secured.access(apiKeyPermission("aiTools:manage")).post(
       );
     }
     const organizationId = await orgIdForProject(project.id);
-    const service = IngestionTemplateService.create(prisma);
     const callerUserId = callerUserIdFromContext(
       c.get("apiKeyUserId") ?? undefined,
       project.id,
     );
     try {
-      const row = await service.createOrgTemplate({
+      const row = await c.var.langwatchApp.governance.ingestionTemplates.createOrgTemplate({
         organizationId,
         callerUserId,
         sourceType: body.data.source_type,
@@ -457,13 +461,12 @@ secured.access(apiKeyPermission("aiTools:manage")).patch(
       );
     }
     const organizationId = await orgIdForProject(project.id);
-    const service = IngestionTemplateService.create(prisma);
     const callerUserId = callerUserIdFromContext(
       c.get("apiKeyUserId") ?? undefined,
       project.id,
     );
     try {
-      const row = await service.updateOttlRules({
+      const row = await c.var.langwatchApp.governance.ingestionTemplates.updateOttlRules({
         organizationId,
         callerUserId,
         id,
@@ -511,13 +514,12 @@ secured.access(apiKeyPermission("aiTools:manage")).delete(
     const project = c.get("project");
     const id = c.req.param("id");
     const organizationId = await orgIdForProject(project.id);
-    const service = IngestionTemplateService.create(prisma);
     const callerUserId = callerUserIdFromContext(
       c.get("apiKeyUserId") ?? undefined,
       project.id,
     );
     try {
-      await service.archiveOrgTemplate({
+      await c.var.langwatchApp.governance.ingestionTemplates.archiveOrgTemplate({
         organizationId,
         callerUserId,
         id,
@@ -574,13 +576,12 @@ secured.access(apiKeyPermission("aiTools:manage")).post(
       );
     }
     const organizationId = await orgIdForProject(project.id);
-    const service = IngestionTemplateService.create(prisma);
     const callerUserId = callerUserIdFromContext(
       c.get("apiKeyUserId") ?? undefined,
       project.id,
     );
     try {
-      const row = await service.cloneFromPlatform({
+      const row = await c.var.langwatchApp.governance.ingestionTemplates.cloneFromPlatform({
         organizationId,
         callerUserId,
         sourceTemplateId: body.data.source_template_id,

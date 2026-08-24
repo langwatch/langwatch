@@ -132,6 +132,7 @@ export const createInnerTRPCContext = (opts: CreateContextOptions) => {
         session: opts.session,
         permissions: getApp().permissions,
         authzGrants: getApp().authzGrants,
+        governance: getApp().governance,
       }),
     permissionChecked: opts.permissionChecked ?? false,
     publiclyShared: opts.publiclyShared ?? false,

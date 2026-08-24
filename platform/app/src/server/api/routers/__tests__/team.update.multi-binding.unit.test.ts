@@ -136,6 +136,7 @@ describe("team.update", () => {
         agents: {} as never,
         permissions: appPermissionsService(prisma),
         authzGrants: ledger as never,
+        governance: {} as never,
       },
     });
     ctx.prisma = prisma;

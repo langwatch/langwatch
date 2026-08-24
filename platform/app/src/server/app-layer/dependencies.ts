@@ -8,6 +8,7 @@ import type { EventSourcing } from "@langwatch/eventing";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import type { ManagedProviderService } from "@langwatch/enterprise-managed-providers-contract";
+import type { IngestionTemplatesService } from "@langwatch/enterprise-governance-contract";
 import type {
   BillableEventsRepository as BillingEventsReadRepository,
   BillableEventsQueryService,
@@ -274,6 +275,8 @@ export interface AppDependencies {
    * ClickHouse.
    */
   governance: {
+    /** The process-owned template catalogue and authoring service. */
+    ingestionTemplates: IngestionTemplatesService;
     ocsfEvents: GovernanceOcsfEventsClickHouseRepository | undefined;
     /** Governance-domain reads over the shared `trace_summaries` table —
      *  the persona-detection activity probe and the quarantine-fill

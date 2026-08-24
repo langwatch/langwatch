@@ -8,6 +8,7 @@ export * from "./governance-signals";
 export * from "./governance.errors";
 export * from "./governance.service";
 export * from "./ingestion-source";
+export * from "./ingestion-template";
 export * from "./ingestion-pull.commands";
 export * from "./ingestion-pull.events";
 export * from "./ottl";

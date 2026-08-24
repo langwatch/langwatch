@@ -18,13 +18,13 @@
  */
 import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
+import {
+  PlatformTemplateImmutableError,
+  PostgresIngestionTemplateAdapter,
+  TemplateNotFoundError,
+} from "@langwatch/enterprise-governance-server";
 
 import { prisma } from "~/server/db";
-
-import {
-  IngestionTemplateService,
-  TemplateNotFoundError,
-} from "../ingestionTemplate.service";
 
 const suffix = nanoid(8);
 const ORG_ID = `org-itauth-${suffix}`;
@@ -33,7 +33,9 @@ const ADMIN_ID = `usr-admin-${suffix}`;
 const PLATFORM_TEMPLATE_ID = `tmpl-platform-${suffix}`;
 
 describe("IngestionTemplateService admin authoring", () => {
-  const service = IngestionTemplateService.create(prisma);
+  const service = PostgresIngestionTemplateAdapter.create({
+    database: prisma,
+  }).build();
 
   beforeAll(async () => {
     await prisma.organization.createMany({
@@ -161,12 +163,7 @@ describe("IngestionTemplateService admin authoring", () => {
           id: PLATFORM_TEMPLATE_ID,
           ottlRules: "forged",
         }),
-      ).rejects.toThrow(TemplateNotFoundError);
-      // Note: The org-scoped findFirst returns null for platform rows
-      // (organizationId IS NULL doesn't match ORG_ID), so we get
-      // TemplateNotFoundError before reaching the platformPublished
-      // check. This is intentional — platform rows are not addressable
-      // via the org-mutation surface at all.
+      ).rejects.toThrow(PlatformTemplateImmutableError);
     });
 
     it("rejects archiveOrgTemplate with NOT_FOUND for the same reason", async () => {
@@ -176,7 +173,7 @@ describe("IngestionTemplateService admin authoring", () => {
           callerUserId: ADMIN_ID,
           id: PLATFORM_TEMPLATE_ID,
         }),
-      ).rejects.toThrow(TemplateNotFoundError);
+      ).rejects.toThrow(PlatformTemplateImmutableError);
     });
   });
 

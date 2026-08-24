@@ -66,6 +66,7 @@ const createCaller = () => {
       agents: {} as never,
       permissions: appPermissionsService(prisma),
       authzGrants: {} as never,
+      governance: {} as never,
     },
   });
   ctx.prisma = prisma;

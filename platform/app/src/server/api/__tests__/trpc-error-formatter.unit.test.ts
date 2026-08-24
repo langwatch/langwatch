@@ -212,6 +212,7 @@ describe("tRPC error response boundary", () => {
         // to the shared ValidationError so it travels the one handled-error
         // channel, and its issues ride in meta like every other domain fact.
         const parsed = z.object({ name: z.string().min(1) }).safeParse({});
+        if (parsed.success) throw new Error("Expected validation to fail");
         const cause = parsed.error;
         const error = new TRPCError({
           code: "BAD_REQUEST",

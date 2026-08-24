@@ -88,6 +88,19 @@ Feature: Enterprise governance package boundary
     And an organization without a Governance tenant receives an empty page
     And ClickHouse remains behind the injected event reader
 
+  Scenario: Ingestion template authoring is tenant safe and auditable
+    Given an organization can see platform templates and its own templates
+    When an administrator creates, updates, clones or archives a template
+    Then Governance validates the template and applies tenant visibility rules
+    And each mutation and its audit fact commit in one Postgres transaction
+    And a platform template is immutable while a cross-organization template is not found
+
+  Scenario: The platform ingestion template catalog reconciles idempotently
+    Given retired platform template rows may remain from an earlier release
+    When Governance synchronizes the current platform catalog
+    Then every retired platform copy is archived and disabled
+    And repeating the synchronization does not create duplicate templates
+
   Scenario: Contracts are transport independent
     Given a browser imports the governance contract root
     Then no server, Eventing, application, environment, or generated database module loads

@@ -33,7 +33,7 @@ import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import type { Redis } from "ioredis";
-import { tryGetApp } from "../server/app-layer/app";
+import { getApp, tryGetApp } from "../server/app-layer/app";
 import { prisma } from "../server/db";
 import type { NextApiRequest } from "../types/next-stubs";
 import { decrypt, encrypt } from "../utils/encryption";
@@ -1372,6 +1372,7 @@ export function createMcpHandler(): McpHandler {
     const sessionServer = createMcpServer();
     registerGovernanceMcpTools(sessionServer, {
       prisma,
+      governance: getApp().governance,
       apiKey: redisApiKey,
       callerUserId: recoveredCtx?.userId,
     });
@@ -1491,6 +1492,7 @@ export function createMcpHandler(): McpHandler {
       const sessionServer = createMcpServer();
       registerGovernanceMcpTools(sessionServer, {
         prisma,
+        governance: getApp().governance,
         apiKey,
         callerUserId: userId,
       });
@@ -1711,6 +1713,7 @@ export function createMcpHandler(): McpHandler {
     const sessionServer = createMcpServer();
     registerGovernanceMcpTools(sessionServer, {
       prisma,
+      governance: getApp().governance,
       apiKey,
       callerUserId: sseUserId,
     });

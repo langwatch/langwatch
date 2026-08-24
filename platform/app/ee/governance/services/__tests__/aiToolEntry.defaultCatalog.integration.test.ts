@@ -21,7 +21,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 
 import { AiToolEntryService, STARTER_PACK_TILES } from "../aiToolEntry.service";
-import { seedPlatformIngestionTemplates } from "../platformIngestionTemplates.seeds";
+import { PostgresIngestionTemplateAdapter } from "@langwatch/enterprise-governance-server";
 
 const ns = `dfltcat-${nanoid(8)}`;
 const createdOrgIds: string[] = [];
@@ -201,7 +201,11 @@ describe("seedPlatformIngestionTemplates with no platform defaults", () => {
         });
 
     try {
-      const result = await seedPlatformIngestionTemplates(prisma);
+      const result = await PostgresIngestionTemplateAdapter.create({
+        database: prisma,
+      })
+        .build()
+        .syncPlatformCatalog();
       // The seed input is empty: nothing is created or updated, ever.
       expect(result.created).toBe(0);
       expect(result.updated).toBe(0);
@@ -217,7 +221,11 @@ describe("seedPlatformIngestionTemplates with no platform defaults", () => {
       expect(after.enabled).toBe(false);
 
       // Idempotent: a second run has nothing left to archive.
-      const again = await seedPlatformIngestionTemplates(prisma);
+      const again = await PostgresIngestionTemplateAdapter.create({
+        database: prisma,
+      })
+        .build()
+        .syncPlatformCatalog();
       expect(again).toEqual({ created: 0, updated: 0, archived: 0 });
     } finally {
       // Leave the DB converged (archived) when the row pre-existed;
@@ -257,7 +265,11 @@ describe("seedPlatformIngestionTemplates with no platform defaults", () => {
       createdIds.push((await makeRow()).id);
       createdIds.push((await makeRow()).id);
 
-      const result = await seedPlatformIngestionTemplates(prisma);
+      const result = await PostgresIngestionTemplateAdapter.create({
+        database: prisma,
+      })
+        .build()
+        .syncPlatformCatalog();
       expect(result.created).toBe(0);
       expect(result.updated).toBe(0);
 

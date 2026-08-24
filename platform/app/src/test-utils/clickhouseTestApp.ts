@@ -1,5 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { ClickHouseBillingAdapter } from "~/runtime/app/features/billing";
+import { AppGovernanceRuntime } from "~/runtime/app/features/governance";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/services/governanceTraceActivity.clickhouse.repository";
@@ -8,6 +9,7 @@ import { WebhookEventsClickHouseRepository } from "~/runtime/app/features/webhoo
 import type { RedisConnection } from "@langwatch/redis-client";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
+import { prisma } from "~/server/db";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 
 type ClickHouseClientLike = ClickHouseClient;
@@ -97,6 +99,8 @@ export function installClickHouseTestApp({
       webhookEvents: WebhookEventsClickHouseRepository.create(required),
     },
     governance: {
+      ingestionTemplates:
+        AppGovernanceRuntime.create(prisma).ingestionTemplates,
       ocsfEvents: new GovernanceOcsfEventsClickHouseRepository(required),
       traceActivity: new GovernanceTraceActivityClickHouseRepository(required),
       kpis: new GovernanceKpisClickHouseRepository(required),

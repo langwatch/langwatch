@@ -1930,6 +1930,7 @@ export function initializeDefaultApp(options?: {
       ),
     },
     governance: {
+      ingestionTemplates: governanceRuntime.ingestionTemplates,
       ocsfEvents: governanceOcsfEventsRepository,
       traceActivity: governanceTraceActivityRepository,
       kpis: governanceKpisRepository,
@@ -2014,6 +2015,7 @@ export function initializeDefaultApp(options?: {
 /** Tests — noop commands, null-backed services. */
 export function createTestApp(overrides?: Partial<AppDependencies>): App {
   const testPrisma = globalPrisma;
+  const testGovernanceRuntime = AppGovernanceRuntime.create(testPrisma);
   AppAuditLogRuntime.install({ prisma: testPrisma });
   const testRetentionPolicyRepo = new DataRetentionPolicyRepository(testPrisma);
   const testRetentionPolicyCache = new RetentionPolicyCache(
@@ -2290,6 +2292,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       }),
     },
     governance: {
+      ingestionTemplates: testGovernanceRuntime.ingestionTemplates,
       ocsfEvents: undefined,
       traceActivity: undefined,
       kpis: undefined,

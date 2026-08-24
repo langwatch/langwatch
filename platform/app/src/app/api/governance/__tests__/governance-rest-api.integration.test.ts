@@ -451,16 +451,13 @@ describe("Feature: Governance REST API", () => {
           enabled: true,
         },
       });
-      // The org-mutation surface filters by organizationId === ORG_ID, so a
-      // platform row (organizationId IS NULL) returns 404 before the
-      // platformPublished guard fires. This is the documented behavior in
-      // the service layer + integration test (TemplateNotFoundError leaks
-      // first; PlatformTemplateImmutableError only fires for clones).
+      // Platform rows are globally visible but immutable. Cross-organization
+      // authored rows still collapse to 404.
       const res = await api.patch(
         `/api/governance/ingestion-templates/${platformId}/ottl-rules`,
         { ottl_rules: "forged" },
       );
-      expect(res.status).toBe(404);
+      expect(res.status).toBe(403);
     });
   });
 

@@ -14,9 +14,8 @@
  */
 
 import {
-  IngestionTemplateService,
   TemplateNotFoundError,
-} from "@ee/governance/services/ingestionTemplate.service";
+} from "@langwatch/enterprise-governance-contract";
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -45,7 +44,7 @@ export const ingestionTemplatesRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("aiTools:view")
     .query(async ({ ctx, input }) => {
-      const service = IngestionTemplateService.create(ctx.prisma);
+      const service = ctx.app.governance.ingestionTemplates;
       return await service.listForUser({
         organizationId: input.organizationId,
       });
@@ -60,7 +59,7 @@ export const ingestionTemplatesRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("aiTools:manage")
     .query(async ({ ctx, input }) => {
-      const service = IngestionTemplateService.create(ctx.prisma);
+      const service = ctx.app.governance.ingestionTemplates;
       return await service.listForOrgAdmin({
         organizationId: input.organizationId,
       });
@@ -75,7 +74,7 @@ export const ingestionTemplatesRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .permission("aiTools:view")
     .query(async ({ ctx, input }) => {
-      const service = IngestionTemplateService.create(ctx.prisma);
+      const service = ctx.app.governance.ingestionTemplates;
       const row = await service.findByIdForOrg({
         id: input.id,
         organizationId: input.organizationId,
@@ -108,7 +107,7 @@ export const ingestionTemplatesRouter = createTRPCRouter({
     )
     .permission("aiTools:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = IngestionTemplateService.create(ctx.prisma);
+      const service = ctx.app.governance.ingestionTemplates;
       return await service.createOrgTemplate({
         organizationId: input.organizationId,
         callerUserId: ctx.session.user.id,
@@ -140,7 +139,7 @@ export const ingestionTemplatesRouter = createTRPCRouter({
     )
     .permission("aiTools:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = IngestionTemplateService.create(ctx.prisma);
+      const service = ctx.app.governance.ingestionTemplates;
       return await service.updateOttlRules({
         organizationId: input.organizationId,
         callerUserId: ctx.session.user.id,
@@ -157,7 +156,7 @@ export const ingestionTemplatesRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .permission("aiTools:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = IngestionTemplateService.create(ctx.prisma);
+      const service = ctx.app.governance.ingestionTemplates;
       await service.archiveOrgTemplate({
         organizationId: input.organizationId,
         callerUserId: ctx.session.user.id,
@@ -182,7 +181,7 @@ export const ingestionTemplatesRouter = createTRPCRouter({
     )
     .permission("aiTools:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = IngestionTemplateService.create(ctx.prisma);
+      const service = ctx.app.governance.ingestionTemplates;
       return await service.cloneFromPlatform({
         organizationId: input.organizationId,
         callerUserId: ctx.session.user.id,

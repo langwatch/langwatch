@@ -25,7 +25,7 @@
  *       (@bdd @governance-api @audit-uniform)
  */
 
-import { IngestionTemplateService } from "@ee/governance/services/ingestionTemplate.service";
+import { PostgresIngestionTemplateAdapter } from "@langwatch/enterprise-governance-server";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { app as governanceApp } from "~/app/api/governance/[[...route]]/app";
@@ -198,7 +198,9 @@ describe("Audit uniformity: identical payload shape across all governance surfac
   });
 
   it("audit rows from tRPC + Hono + CLI + MCP entrypoints share an identical shape apart from metadata.surface", async () => {
-    const service = IngestionTemplateService.create(prisma);
+    const service = PostgresIngestionTemplateAdapter.create({
+      database: prisma,
+    }).build();
 
     // 1. tRPC pass-through — mirrors ee/governance/routers/ingestionTemplates.ts
     //    which calls `service.createOrgTemplate({ ..., surface: "trpc" })`.
@@ -347,7 +349,9 @@ describe("Audit uniformity: identical payload shape across all governance surfac
     // "trpc" / "mcp" / anything else → "hono". Locks the defense
     // against an external HTTP caller forging an in-process surface
     // tag to confuse forensic readers.
-    const service = IngestionTemplateService.create(prisma);
+    const service = PostgresIngestionTemplateAdapter.create({
+      database: prisma,
+    }).build();
     const inputBase = {
       organizationId: testOrg.id,
       callerUserId: testUser.id,

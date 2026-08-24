@@ -3,12 +3,14 @@ import type {
   AuthzGrantsService,
   AuthzService,
 } from "@langwatch/authz-contract";
+import type { IngestionTemplatesService } from "@langwatch/enterprise-governance-contract";
 import { AgentsFeature, type AgentsRuntimeContext } from "./features/agents";
 
 export type RequestAppServices = {
   agents: AgentServiceContract;
   permissions: AuthzService;
   authzGrants: AuthzGrantsService;
+  governance: { ingestionTemplates: IngestionTemplatesService };
 };
 
 /**
@@ -23,12 +25,14 @@ export class RequestApp implements RequestAppServices {
     context: AgentsRuntimeContext & {
       permissions: AuthzService;
       authzGrants: AuthzGrantsService;
+      governance: { ingestionTemplates: IngestionTemplatesService };
     },
   ): RequestApp {
     return new RequestApp(
       AgentsFeature.create(context),
       context.permissions,
       context.authzGrants,
+      context.governance,
     );
   }
 
@@ -36,5 +40,6 @@ export class RequestApp implements RequestAppServices {
     readonly agents: AgentServiceContract,
     readonly permissions: AuthzService,
     readonly authzGrants: AuthzGrantsService,
+    readonly governance: { ingestionTemplates: IngestionTemplatesService },
   ) {}
 }
