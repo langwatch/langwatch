@@ -72,6 +72,59 @@ func TestWriteErrorLogsUpstreamRejectionAsCustomerFault(t *testing.T) {
 	assert.Equal(t, "customer", entry.ContextMap()["fault"])
 }
 
+// @scenario "A forwarded provider rejection names the provider's own reason"
+func TestWriteErrorLogsTheProviderReasonFromTheForwardedBody(t *testing.T) {
+	// The line that named nothing: the codex backend answered 400 with the
+	// parameter it refused, the client got that body verbatim, and the log said
+	// only "codex backend HTTP 400". Every codex turn in production failed for
+	// a week's worth of debugging over a sentence we already held.
+	logs := observedWriteError(t, context.Background(), &domain.UpstreamError{
+		StatusCode: 400,
+		Message:    "codex backend HTTP 400",
+		Body:       []byte(`{"detail":"Unsupported parameter: prompt_cache_retention"}`),
+	})
+	fields := requireSingleFailureLog(t, logs).ContextMap()
+	assert.Equal(t, "Unsupported parameter: prompt_cache_retention", fields["upstream_reason"])
+	assert.Equal(t, int64(400), fields["status"])
+}
+
+// @scenario "A forwarded provider rejection names the provider's own reason"
+func TestUpstreamReasonReadsEveryShapeProvidersUse(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want string
+	}{
+		{"openai and anthropic", `{"error":{"type":"invalid_request_error","message":"credit balance too low"}}`, "credit balance too low"},
+		{"the codex backend", `{"detail":"Unsupported parameter: prompt_cache_retention"}`, "Unsupported parameter: prompt_cache_retention"},
+		{"a bare message", `{"message":"model not found"}`, "model not found"},
+		{"a plain error string", `{"error":"invalid virtual key"}`, "invalid virtual key"},
+		{"an edge page in front of the provider", "<html>\n<body>error 1010</body>\n</html>", "<html>"},
+		{"a body with nothing in it", "", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, upstreamReason([]byte(tc.body)))
+		})
+	}
+}
+
+// @scenario "A forwarded provider rejection names the provider's own reason"
+func TestUpstreamReasonIsBoundedAndNotRepeated(t *testing.T) {
+	t.Run("when the body is longer than the cap", func(t *testing.T) {
+		long := strings.Repeat("x", upstreamReasonLimit*4)
+		reason := upstreamReason([]byte(`{"detail":"` + long + `"}`))
+		assert.Len(t, reason, upstreamReasonLimit+len("..."),
+			"an unknown body must not put a request payload on the log line")
+	})
+
+	t.Run("when our message already states the reason", func(t *testing.T) {
+		body := []byte(`{"error":{"message":"credit balance too low"}}`)
+		assert.Empty(t, unstatedReason("credit balance too low", body))
+		assert.Equal(t, "credit balance too low", unstatedReason("provider HTTP 402", body))
+	})
+}
+
 // @scenario "A gateway-classified error is logged by its error code"
 func TestWriteErrorLogsHerrCodesWithTheirFault(t *testing.T) {
 	cases := []struct {
