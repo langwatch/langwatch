@@ -18,6 +18,7 @@ import type {
   RoleBindingWrite,
 } from "./authz-grants.repository";
 import type { AuthzReadRepository } from "./authz-read.repository";
+import type { GrantEventSource } from "./ledger/facts";
 import {
   assertBindingInOrganization,
   assertRoleUsable,
@@ -96,17 +97,27 @@ export class GrantsService {
     await this.deps.bumpEpoch({ organizationId });
   }
 
-  /** INSERT (who, role, where) — visible on the next check. */
+  /**
+   * INSERT (who, role, where) — visible on the next check.
+   *
+   * `source` is WHERE the grant came from, which the actor cannot say: a
+   * SCIM reconciler and a join-request approval both act as the platform,
+   * and only the source separates "the directory says so" from "an admin
+   * approved a request". It defaults to this service, which is what a
+   * hand-made grant through the settings UI or the REST API is.
+   */
   async attach({
     actor,
     who,
     role,
     where,
+    source = "grants-service",
   }: {
     actor: Actor;
     who: GrantPrincipal;
     role: GrantRole;
     where: AuthzScopeRef;
+    source?: GrantEventSource;
   }): Promise<{ bindingId: string }> {
     if (where.type === "resource") {
       throw new GrantValidationError(RESOURCE_SCOPE_REJECTION, {
@@ -125,7 +136,7 @@ export class GrantsService {
 
     const row = this.bindingRow({ who, role, where, organizationId });
     try {
-      await repository.createBinding({ row, actor: writeActor(actor) });
+      await repository.createBinding({ row, actor: writeActor(actor), source });
     } catch (error) {
       rethrowKnownWriteFailure(error, {
         scopeType: where.type,

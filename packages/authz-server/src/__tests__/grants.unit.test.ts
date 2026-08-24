@@ -10,6 +10,7 @@ import type { AuthzReadRepository } from "../authz-read.repository";
 import { AuthzService } from "../authz.service";
 import { GrantValidationError } from "../grant-validation";
 import { GrantsService } from "../grants.service";
+import { GRANT_EVENT_SOURCES } from "../ledger/facts";
 import { OffboardIncompleteError } from "../offboard";
 import { makeReader } from "./support/authz-read.stub";
 
@@ -104,6 +105,7 @@ describe("GrantsService.attach", () => {
           principal: { userId: "alice" },
         },
         actor: WRITE_ACTOR,
+        source: "grants-service",
       });
       expect(bumpEpoch).toHaveBeenCalledWith({ organizationId: ORG });
     });
@@ -172,6 +174,67 @@ describe("GrantsService.attach", () => {
       });
 
       expect(repository.createBinding).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the caller states where the grant came from", () => {
+    /** @scenario "A grant states which surface authored it" */
+    it("stamps that source onto the write", async () => {
+      const repository = makeRepository();
+      const { service } = makeService(repository);
+
+      await service.attach({
+        actor,
+        who: { type: "user", id: "alice" },
+        role: { builtin: "MEMBER" },
+        where: { type: "team", id: TEAM, organizationId: ORG },
+        source: "join-request",
+      });
+
+      expect(repository.createBinding).toHaveBeenCalledWith(
+        expect.objectContaining({ source: "join-request" }),
+      );
+    });
+
+    /** Every vocabulary entry reaches the port unchanged: the seam is the
+     *  vocabulary's, not a private list of the two callers that exist today.
+     *  @scenario "A grant states which surface authored it" */
+    it("carries every source the vocabulary names", async () => {
+      for (const source of GRANT_EVENT_SOURCES) {
+        const repository = makeRepository();
+        const { service } = makeService(repository);
+
+        await service.attach({
+          actor,
+          who: { type: "user", id: "alice" },
+          role: { builtin: "MEMBER" },
+          where: { type: "team", id: TEAM, organizationId: ORG },
+          source,
+        });
+
+        expect(repository.createBinding).toHaveBeenCalledWith(
+          expect.objectContaining({ source }),
+        );
+      }
+    });
+  });
+
+  describe("when the caller states no source", () => {
+    /** @scenario "A grant nobody attributed is the grants service's own" */
+    it("attributes the grant to the grants service", async () => {
+      const repository = makeRepository();
+      const { service } = makeService(repository);
+
+      await service.attach({
+        actor,
+        who: { type: "user", id: "alice" },
+        role: { builtin: "MEMBER" },
+        where: { type: "team", id: TEAM, organizationId: ORG },
+      });
+
+      expect(repository.createBinding).toHaveBeenCalledWith(
+        expect.objectContaining({ source: "grants-service" }),
+      );
     });
   });
 

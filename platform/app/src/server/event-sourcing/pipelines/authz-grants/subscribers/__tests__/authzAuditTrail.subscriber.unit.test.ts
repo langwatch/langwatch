@@ -1,3 +1,4 @@
+import { GRANT_EVENT_SOURCES } from "@langwatch/authz-server";
 import { describe, expect, it } from "vitest";
 import { createTenantId } from "../../../..";
 import {
@@ -20,6 +21,7 @@ import {
   type AuthzAuditRow,
   type AuthzAuditTrailStore,
   createAuthzAuditTrailSubscriber,
+  NON_AUDITABLE_SOURCES,
 } from "../authzAuditTrail.subscriber";
 
 const ORG = "org_acme";
@@ -163,12 +165,21 @@ describe("authz audit trail subscriber", () => {
       expect(store.inserts).toHaveLength(0);
     });
 
-    /** @scenario "Facts stated by the platform itself never reach the audit trail" */
-    it("still writes a row for a live source", async () => {
+    /** Driven from the vocabulary rather than from a list of the sources
+     *  that exist today: a source added to `GRANT_EVENT_SOURCES` and left
+     *  out of the skip list is a change a customer made, and it audits by
+     *  default. A new one that ought to be skipped has to say so.
+     *  @scenario "A grant an automated surface made still reaches the audit trail" */
+    it.each(
+      GRANT_EVENT_SOURCES.filter(
+        (source) => !NON_AUDITABLE_SOURCES.includes(source),
+      ),
+    )("still writes a row for %s", async (source) => {
       const store = recordingStore();
-      await deliver(store, attached({ source: "invite" }));
+      await deliver(store, attached({ source }));
 
       expect(store.inserts).toHaveLength(1);
+      expect(store.inserts[0]!.metadata).toMatchObject({ source });
     });
   });
 
