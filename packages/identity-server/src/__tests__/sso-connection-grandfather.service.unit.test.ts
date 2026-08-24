@@ -8,6 +8,7 @@ import { SsoConnectionService } from "../sso-connection.service";
 import {
   InMemoryConnections,
   StubBreakGlassBindings,
+  StubPlatformOperators,
   StubStranding,
 } from "./support/in-memory-connections";
 
@@ -81,6 +82,9 @@ function serviceOf(store: InMemoryConnections): SsoConnectionService {
       connections: store,
       breakGlass: new StubBreakGlassBindings(true),
       stranding: new StubStranding([]),
+      // The grandfather verb states history and runs no operator gate; an
+      // empty operator set proves it does not need one.
+      platformOperators: new StubPlatformOperators(),
     }),
     ledger,
   );

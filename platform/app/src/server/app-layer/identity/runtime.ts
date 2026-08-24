@@ -35,6 +35,7 @@ import { InProcessBreakGlassLimiter } from "./break-glass-limiter";
 import { IdentitySsoConnectionGrandfatherMigration } from "./connection-grandfather.migration";
 import { IdentityIdentifierBackfillMigration } from "./identifier-backfill.migration";
 import { IdentityLedgerWriter } from "./ledger";
+import { AdminEmailPlatformOperators } from "./platform-operators";
 import { PrismaIdentityBackfillRepository } from "./repositories/identity-backfill.prisma.repository";
 import { PrismaIdentityHeadsRepository } from "./repositories/identity-heads.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./repositories/identity-projection.prisma.repository";
@@ -210,6 +211,7 @@ export function ssoConnections(): SsoConnectionService {
       connections: new PrismaSsoConnectionReadRepository(prisma),
       breakGlass: new LocalDoorBreakGlassBinding(),
       stranding: new PrismaSsoConnectionStrandingRepository(prisma),
+      platformOperators: new AdminEmailPlatformOperators(prisma),
     }),
     new SsoConnectionLedgerWriter({
       projectionStore: new PrismaSsoConnectionProjectionRepository(prisma),

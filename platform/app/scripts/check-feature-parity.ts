@@ -469,7 +469,6 @@ const LEGACY_INERT: string[] = [
   "specs/identity/passkeys.feature",
   "specs/identity/platform-ops-identity-lookup.feature",
   "specs/identity/scim-connection-sync.feature",
-  "specs/identity/sso-onboarding-tiers.feature",
   "specs/langy/langy-agent-service-conventions.feature",
   "specs/langy/langy-baseline.feature",
   "specs/langy/langy-card-taxonomy.feature",

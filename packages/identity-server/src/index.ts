@@ -130,6 +130,7 @@ export type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
+  SsoPlatformOperatorRepository,
 } from "./sso-connection.repository";
 export { SsoConnectionService } from "./sso-connection.service";
 export {

@@ -223,6 +223,7 @@ import { NullGithubInstallationsRepository } from "./github/repositories/github-
 import { PrismaGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.prisma.repository";
 import { NullGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
 import { LocalDoorBreakGlassBinding } from "./identity/break-glass-binding";
+import { AdminEmailPlatformOperators } from "./identity/platform-operators";
 import { PrismaIdentityHeadsRepository } from "./identity/repositories/identity-heads.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./identity/repositories/identity-projection.prisma.repository";
 import { PrismaSsoConnectionProjectionRepository } from "./identity/repositories/sso-connection-projection.prisma.repository";
@@ -904,6 +905,7 @@ export function initializeDefaultApp(options?: {
     ssoConnectionReads: new PrismaSsoConnectionReadRepository(prisma),
     ssoConnectionStranding: new PrismaSsoConnectionStrandingRepository(prisma),
     ssoBreakGlassBindings: new LocalDoorBreakGlassBinding(),
+    ssoPlatformOperators: new AdminEmailPlatformOperators(prisma),
     ssoConnectionTeardown: new SsoConnectionTeardownDispatcher(),
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,

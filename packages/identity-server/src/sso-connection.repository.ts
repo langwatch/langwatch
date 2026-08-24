@@ -43,6 +43,21 @@ export interface SsoBreakGlassBindingRepository {
 }
 
 /**
+ * Whether an actor is a LangWatch PLATFORM operator — not an administrator of
+ * the organization whose connection is being changed, however many
+ * permissions that organization can grant them (D05 amendment).
+ *
+ * A port rather than a field on the command, because a boolean on the wire
+ * saying "I am an operator" is the caller authorizing itself. It is also a
+ * port rather than a deployment branch: a self-hosted installation has
+ * platform operators too, so the guard asks the same question everywhere and
+ * the deployment answers it.
+ */
+export interface SsoPlatformOperatorRepository {
+  isPlatformOperator(args: { actorId: string }): Promise<boolean>;
+}
+
+/**
  * Who a teardown would strand: users whose only live sign-in identifiers
  * belong to this connection. Read over the identity heads — the `Identifier`
  * projection D01 built — because that is where "how can this person get in"

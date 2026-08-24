@@ -8,6 +8,7 @@ import type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
+  SsoPlatformOperatorRepository,
 } from "../../sso-connection.repository";
 
 /**
@@ -78,6 +79,24 @@ export class StubBreakGlassBindings implements SsoBreakGlassBindingRepository {
 
   set(live: boolean): void {
     this.live = live;
+  }
+}
+
+/**
+ * Which actors this deployment counts as LangWatch platform operators. A set
+ * of ids rather than a boolean, so a test can hold an operator and an
+ * organization administrator at once — which is the shape every scenario
+ * about who may attest a domain actually needs.
+ */
+export class StubPlatformOperators implements SsoPlatformOperatorRepository {
+  private readonly operators: Set<string>;
+
+  constructor(operatorIds: string[] = []) {
+    this.operators = new Set(operatorIds);
+  }
+
+  async isPlatformOperator({ actorId }: { actorId: string }): Promise<boolean> {
+    return this.operators.has(actorId);
   }
 }
 

@@ -2,9 +2,12 @@ import {
   ACTIVATE_CONNECTION_COMMAND_TYPE,
   type ActivateConnectionCommandData,
   APPROVE_DOMAIN_CLAIM_COMMAND_TYPE,
+  ATTEST_DOMAIN_COMMAND_TYPE,
   type ApproveDomainClaimCommandData,
+  type AttestDomainCommandData,
   activateConnectionCommandDataSchema,
   approveDomainClaimCommandDataSchema,
+  attestDomainCommandDataSchema,
   CLAIM_DOMAIN_COMMAND_TYPE,
   type ClaimDomainCommandData,
   COMPLETE_TEARDOWN_COMMAND_TYPE,
@@ -48,7 +51,7 @@ import { ssoConnectionEventsFor } from "../envelope";
 import type { SsoConnectionEvent } from "../schemas/events";
 
 /**
- * The connection pipeline's twelve verbs plus grandfathering, as the queue's
+ * The connection pipeline's thirteen verbs plus grandfathering, as the queue's
  * STAGED RE-RUN of each: the same guard the calling path ran, the same
  * envelope. A retried command carries the same commandId, so the re-run
  * costs no second event.
@@ -151,6 +154,15 @@ export const RequestVerificationCommand = connectionCommand({
   verb: "requestVerification",
 });
 export type RequestVerificationPayload = RequestVerificationCommandData;
+
+export const AttestDomainCommand = connectionCommand({
+  type: ATTEST_DOMAIN_COMMAND_TYPE,
+  schema: attestDomainCommandDataSchema,
+  description:
+    "Record a platform operator attesting that a domain is the organization's",
+  verb: "attestDomain",
+});
+export type AttestDomainPayload = AttestDomainCommandData;
 
 export const VerifyDomainCommand = connectionCommand({
   type: VERIFY_DOMAIN_COMMAND_TYPE,

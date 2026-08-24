@@ -156,6 +156,46 @@ export class SsoConnectionTeardownStrandsUsersError extends SsoConnectionCommand
 }
 
 /**
+ * Somebody other than a LangWatch platform operator tried to take an
+ * operator's act — attesting a domain, or deciding a domain claim.
+ *
+ * Refused in the guard rather than only at the surface, so the rule holds for
+ * every caller the aggregate will ever have: an organization administrator
+ * cannot attest their own domain on any deployment, however they reach the
+ * command. The copy points at the way their domain IS proved, which is
+ * publishing the record — a refusal that only says "no" would leave a
+ * customer administrator with nothing to do next.
+ */
+export class SsoConnectionOperatorActRequiredError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super(
+      "sso_connection_operator_act_required",
+      "sso_connection_operator_act_required",
+      { httpStatus: 403, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "SsoConnectionOperatorActRequiredError";
+  }
+}
+
+/**
+ * A SAML connection registered through a self-serve surface. Refused by name
+ * rather than accepted and left dark: D05 is OIDC only, the aggregate is
+ * protocol-agnostic on purpose, and which engine terminates SAML is a
+ * decision D09 makes against a named customer's connection. The words say to
+ * talk to LangWatch and name no engine, library or release.
+ */
+export class SsoSamlNotSelfServeError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_saml_not_self_serve", "sso_saml_not_self_serve", {
+      httpStatus: 422,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoSamlNotSelfServeError";
+  }
+}
+
+/**
  * A legacy `ssoDomain` / `ssoProvider` edit after the routing flip. Refused
  * rather than ignored: once the connection projection decides sign-in, a
  * string edit changes nothing a person would experience, and silently

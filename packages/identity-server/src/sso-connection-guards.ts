@@ -3,6 +3,8 @@ import {
   type ActivateConnectionCommandData,
   APPROVE_DOMAIN_CLAIM_COMMAND_TYPE,
   type ApproveDomainClaimCommandData,
+  ATTEST_DOMAIN_COMMAND_TYPE,
+  type AttestDomainCommandData,
   CLAIM_DOMAIN_COMMAND_TYPE,
   type ClaimDomainCommandData,
   COMPLETE_TEARDOWN_COMMAND_TYPE,
@@ -15,12 +17,14 @@ import {
   CONNECTION_TORN_DOWN_EVENT_TYPE,
   DISCARD_CONNECTION_COMMAND_TYPE,
   type DiscardConnectionCommandData,
+  DOMAIN_ATTESTED_EVENT_TYPE,
   DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
   DOMAIN_CLAIM_REJECTED_EVENT_TYPE,
   DOMAIN_CLAIMED_EVENT_TYPE,
   DOMAIN_VERIFIED_EVENT_TYPE,
   GRANDFATHER_CONNECTION_COMMAND_TYPE,
   type GrandfatherConnectionCommandData,
+  type IdentityActor,
   normalizeDomain,
   REGISTER_CONNECTION_COMMAND_TYPE,
   REJECT_DOMAIN_CLAIM_COMMAND_TYPE,
@@ -40,6 +44,7 @@ import {
   SsoConnectionActivationBlockedError,
   SsoConnectionDomainTakenError,
   SsoConnectionInvalidTransitionError,
+  SsoConnectionOperatorActRequiredError,
   SsoConnectionTeardownStrandsUsersError,
   type SuspendConnectionCommandData,
   TEARDOWN_REQUESTED_EVENT_TYPE,
@@ -51,6 +56,7 @@ import type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
+  SsoPlatformOperatorRepository,
 } from "./sso-connection.repository";
 
 /**
@@ -83,6 +89,10 @@ const ALLOWED_FROM: Record<
   [REJECT_DOMAIN_CLAIM_COMMAND_TYPE]: ["CLAIMED"],
   [DISCARD_CONNECTION_COMMAND_TYPE]: ["DRAFT"],
   [REQUEST_VERIFICATION_COMMAND_TYPE]: ["APPROVED"],
+  // Attestation replaces the PROOF, never the approval: it is commandable
+  // from APPROVED and from nowhere else, which is what makes an attestation
+  // against an unapproved claim a refusal rather than a shortcut.
+  [ATTEST_DOMAIN_COMMAND_TYPE]: ["APPROVED"],
   [VERIFY_DOMAIN_COMMAND_TYPE]: ["VERIFICATION_PENDING"],
   [ACTIVATE_CONNECTION_COMMAND_TYPE]: ["VERIFIED"],
   [SUSPEND_CONNECTION_COMMAND_TYPE]: ["ACTIVE"],
@@ -95,17 +105,20 @@ export interface SsoConnectionGuardsDeps {
   connections: SsoConnectionReadRepository;
   breakGlass: SsoBreakGlassBindingRepository;
   stranding: SsoConnectionStrandingRepository;
+  platformOperators: SsoPlatformOperatorRepository;
 }
 
 export class SsoConnectionGuards {
   private readonly connections: SsoConnectionReadRepository;
   private readonly breakGlass: SsoBreakGlassBindingRepository;
   private readonly stranding: SsoConnectionStrandingRepository;
+  private readonly platformOperators: SsoPlatformOperatorRepository;
 
   constructor(deps: SsoConnectionGuardsDeps) {
     this.connections = deps.connections;
     this.breakGlass = deps.breakGlass;
     this.stranding = deps.stranding;
+    this.platformOperators = deps.platformOperators;
   }
 
   async registerConnection(
@@ -228,12 +241,24 @@ export class SsoConnectionGuards {
     ];
   }
 
+  /**
+   * Deciding a domain claim is a LangWatch operator's act, on every tier and
+   * every deployment. It is the abuse boundary the whole design rests on:
+   * first-verifier-owns means an approved claim is what lets a connection
+   * take a domain, so an organization administrator approving their own would
+   * make the queue a formality. Checked here rather than only on the surface,
+   * so the rule holds for every caller the aggregate will ever have.
+   */
   async approveDomainClaim(
     data: ApproveDomainClaimCommandData,
   ): Promise<SsoConnectionFactInput[]> {
     const state = await this.require(data, APPROVE_DOMAIN_CLAIM_COMMAND_TYPE);
     const domain = normalizeDomain(data.domain);
     if (state.approvedDomains.includes(domain)) return [];
+    await this.requirePlatformOperator({
+      actor: data.actor,
+      act: `approve the claim on ${domain}`,
+    });
     this.requireClaimed({ state, domain });
     return [
       {
@@ -248,11 +273,17 @@ export class SsoConnectionGuards {
     ];
   }
 
+  /** The same decision with the opposite answer, so the same operator gate:
+   *  a claim is decided by LangWatch or it is not decided. */
   async rejectDomainClaim(
     data: RejectDomainClaimCommandData,
   ): Promise<SsoConnectionFactInput[]> {
     const state = await this.require(data, REJECT_DOMAIN_CLAIM_COMMAND_TYPE);
     const domain = normalizeDomain(data.domain);
+    await this.requirePlatformOperator({
+      actor: data.actor,
+      act: `reject the claim on ${domain}`,
+    });
     this.requireClaimed({ state, domain });
     return [
       {
@@ -312,6 +343,58 @@ export class SsoConnectionGuards {
           domain,
           method: data.method,
           tokenHash: data.tokenHash,
+          actor: data.actor,
+          source: data.source,
+        },
+      },
+    ];
+  }
+
+  /**
+   * A platform operator states out of band that the domain is that
+   * organization's (D05 tier 1 / D04 amendment). One step, APPROVED straight
+   * to VERIFIED, because nothing is published and so nothing is pending.
+   *
+   * Three things this deliberately does NOT do:
+   *
+   * - It does not replace the approval. `ALLOWED_FROM` admits it from
+   *   APPROVED alone, so an attestation against a claim nobody approved is
+   *   refused and states no fact. The trust decision stays where it has
+   *   always been, and an attested domain is exactly as trustworthy as that
+   *   approval — no more.
+   * - It does not relax first-verifier-owns. The identical ownership check
+   *   the DNS ceremony runs runs here, so an operator cannot attest a domain
+   *   another ACTIVE connection holds.
+   * - It does not expire. Nothing here writes a deadline, and nothing
+   *   elsewhere reads one: the answer to a disputed attestation is suspend,
+   *   which is immediate, reversible, and taken by a human at the moment it
+   *   matters.
+   */
+  async attestDomain(
+    data: AttestDomainCommandData,
+  ): Promise<SsoConnectionFactInput[]> {
+    const state = await this.require(data, ATTEST_DOMAIN_COMMAND_TYPE);
+    const domain = normalizeDomain(data.domain);
+    if (state.verifiedDomains.includes(domain)) return [];
+    await this.requirePlatformOperator({
+      actor: data.actor,
+      act: `attest ${domain}`,
+    });
+    if (!state.approvedDomains.includes(domain)) {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${data.connectionId}: domain ${domain} has no approved claim to attest`,
+      );
+    }
+    await this.refuseIfDomainOwnedElsewhere({
+      domain,
+      connectionId: data.connectionId,
+    });
+    return [
+      {
+        type: DOMAIN_ATTESTED_EVENT_TYPE,
+        data: {
+          connectionId: data.connectionId,
+          domain,
           actor: data.actor,
           source: data.source,
         },
@@ -515,6 +598,38 @@ export class SsoConnectionGuards {
       );
     }
     return state;
+  }
+
+  /**
+   * The operator gate, asked of the port rather than of the command. The
+   * refusal is the same whoever the actor is and whatever the deployment: an
+   * organization administrator holding every permission their organization
+   * can grant is still not a LangWatch operator, and a self-hosted
+   * installation's platform operator still is one.
+   */
+  private async requirePlatformOperator({
+    actor,
+    act,
+  }: {
+    actor: IdentityActor;
+    act: string;
+  }): Promise<void> {
+    // A system actor is refused before the port is asked. These acts record
+    // WHO decided, and an unattributable trust decision is precisely what the
+    // attestation's visibility requirement forbids — so "the platform did it"
+    // is not an answer either of them accepts.
+    if (actor.type !== "user" || actor.id === null) {
+      throw new SsoConnectionOperatorActRequiredError(
+        `a ${actor.type} actor is not a platform operator and may not ${act}`,
+      );
+    }
+    const isOperator = await this.platformOperators.isPlatformOperator({
+      actorId: actor.id,
+    });
+    if (isOperator) return;
+    throw new SsoConnectionOperatorActRequiredError(
+      `actor ${actor.id} is not a platform operator and may not ${act}`,
+    );
   }
 
   private requireClaimed({

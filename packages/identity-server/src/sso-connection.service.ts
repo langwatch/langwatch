@@ -5,6 +5,9 @@ import {
   APPROVE_DOMAIN_CLAIM_COMMAND_TYPE,
   type ApproveDomainClaimCommandData,
   approveDomainClaimCommandDataSchema,
+  ATTEST_DOMAIN_COMMAND_TYPE,
+  type AttestDomainCommandData,
+  attestDomainCommandDataSchema,
   CLAIM_DOMAIN_COMMAND_TYPE,
   type ClaimDomainCommandData,
   claimDomainCommandDataSchema,
@@ -46,7 +49,7 @@ import type { SsoConnectionGuards } from "./sso-connection-guards";
 import type { SsoConnectionLedger } from "./sso-connection-ledger";
 
 /**
- * The SSO connection write surface (D04, ADR-117 §5): thirteen verbs, each
+ * The SSO connection write surface (D04, ADR-117 §5): fourteen verbs, each
  * the same move — parse the input, run the guard, hand the command and its
  * facts to the ledger.
  *
@@ -121,6 +124,19 @@ export class SsoConnectionService {
     return this.commit(
       { type: REQUEST_VERIFICATION_COMMAND_TYPE, data },
       await this.guards.requestVerification(data),
+    );
+  }
+
+  /** Tier 1's ceremony, in one verb: a platform operator states the domain is
+   *  the organization's, and the connection is VERIFIED with nothing
+   *  published anywhere. */
+  async attestDomain(
+    input: AttestDomainCommandData,
+  ): Promise<SsoConnectionFact[]> {
+    const data = attestDomainCommandDataSchema.parse(input);
+    return this.commit(
+      { type: ATTEST_DOMAIN_COMMAND_TYPE, data },
+      await this.guards.attestDomain(data),
     );
   }
 
