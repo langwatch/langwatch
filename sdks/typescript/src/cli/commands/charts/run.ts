@@ -2,6 +2,7 @@ import chalk from "chalk";
 import { createSpinner } from "../../utils/spinner";
 import {
   type ChartParameterValue,
+  type ChartRunGranularitySeconds,
   ChartsApiService,
 } from "@/client-sdk/services/charts/charts-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
@@ -44,13 +45,11 @@ export const runChartCommand = async (
     );
     process.exit(1);
   }
-  let granularitySeconds: number | undefined;
+  let granularitySeconds: ChartRunGranularitySeconds | undefined;
   if (options.granularity !== undefined) {
-    granularitySeconds = Number(options.granularity);
+    const requested = Number(options.granularity);
     if (
-      !(OFFERED_GRANULARITY_STEPS as readonly number[]).includes(
-        granularitySeconds,
-      )
+      !(OFFERED_GRANULARITY_STEPS as readonly number[]).includes(requested)
     ) {
       console.error(
         chalk.red(
@@ -59,6 +58,10 @@ export const runChartCommand = async (
       );
       process.exit(1);
     }
+    // The `includes` check above proves `requested` is one of the offered
+    // steps, but `Array<T>.includes` doesn't narrow its argument's type —
+    // this cast just names what was already true at runtime.
+    granularitySeconds = requested as ChartRunGranularitySeconds;
   }
 
   const service = new ChartsApiService();

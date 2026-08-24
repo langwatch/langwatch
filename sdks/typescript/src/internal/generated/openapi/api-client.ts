@@ -5209,7 +5209,7 @@ export interface operations {
                         start: string | number;
                         end: string | number;
                     };
-                    granularitySeconds?: number;
+                    granularitySeconds?: 1 | 60 | 3600;
                 };
             };
         };

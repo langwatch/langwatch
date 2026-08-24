@@ -34,6 +34,17 @@ export type AnalyticsSchema =
 export type ChartRunResult =
   paths["/api/v1/projects/{projectId}/analytics/query/clickhouse"]["post"]["responses"]["200"]["content"]["application/json"];
 
+/**
+ * The datapoint step `runQuery` may request — one of the offered steps, as
+ * the route itself restricts it (server-side: `lwqlGranularityStepSchema`,
+ * built from `LWQL_GRANULARITY_STEPS`). Derived from the generated request
+ * body rather than a hand-written `1 | 60 | 3600` copy, so a step the API
+ * adds or removes changes what this method accepts without a second edit.
+ */
+export type ChartRunGranularitySeconds = NonNullable<
+  paths["/api/v1/projects/{projectId}/analytics/query/clickhouse"]["post"]["requestBody"]["content"]["application/json"]["granularitySeconds"]
+>;
+
 export class ChartsApiError extends Error {
   constructor(
     message: string,
@@ -211,7 +222,7 @@ export class ChartsApiService {
     sql: string;
     parameters?: Record<string, ChartParameterValue>;
     timeWindow?: { start: string; end: string };
-    granularitySeconds?: number;
+    granularitySeconds?: ChartRunGranularitySeconds;
   }): Promise<ChartRunResult> {
     const projectId = this.projectId("run chart");
     const { data, error, response } = await this.apiClient.POST(
