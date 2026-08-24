@@ -194,6 +194,15 @@ export class SystemMigrationsService {
         description: string;
         requiresOperatorConfirmation: boolean;
         runsAutomaticallyOnSelfHosted: boolean;
+        /**
+         * Which axis the runner drives this migration over. Organization
+         * migrations form the ordered per-organization pipeline; a user
+         * migration (ADR-101 §6) is paced by the same organization
+         * enrollment but its tenants are the organization's MEMBERS, so it
+         * is neither a step in that pipeline nor readable back by
+         * organization id. Omitted means organization.
+         */
+        tenant?: "organization" | "user";
       }>;
       /** Read per call, so the answer is never a boot-time capture. */
       isSaaS: () => boolean;
@@ -463,7 +472,14 @@ export class SystemMigrationsService {
     // step's pool is the step before it: an organization enrolled for a
     // step whose predecessor nothing will ever run would sit pending
     // forever. The first step keeps sampling the whole installation.
-    const ordered = this.deps.migrations();
+    // A user-rooted migration is not a step in that pipeline: it pools
+    // from the whole installation like a first step, and it is never
+    // another step's predecessor.
+    const ordered = this.deps
+      .migrations()
+      .filter(
+        (migration) => (migration.tenant ?? "organization") === "organization",
+      );
     const index = ordered.findIndex(
       (migration) => migration.name === migrationName,
     );
@@ -580,24 +596,11 @@ export class SystemMigrationsService {
     actorUserId: string;
   }): Promise<{ status: TenantMigrationStatus | null; waiting: boolean }> {
     const migration = this.requireRegisteredMigration(migrationName);
-    if (!this.deps.isSaaS() && !migration.runsAutomaticallyOnSelfHosted) {
-      throw new MigrationNotAvailableOnInstallationError();
-    }
-    const organization = await this.deps.enrollments.findOrganizationById({
+    await this.requireRunnableForOrganization({
+      migration,
       organizationId,
+      migrationName,
     });
-    if (!organization) {
-      throw new MigrationEnrollmentOrganizationNotFoundError();
-    }
-    if (this.deps.isSaaS()) {
-      const enrolled = await this.deps.enrollments.isEnrolled({
-        organizationId,
-        migrationName,
-      });
-      if (!enrolled) {
-        throw new MigrationRunRequiresEnrollmentError({ migrationName });
-      }
-    }
     await this.deps.audit({
       userId: actorUserId,
       organizationId,
@@ -608,7 +611,61 @@ export class SystemMigrationsService {
       organizationId,
       migrationName,
     });
-    if (summary.claimed > 0) throw new MigrationPassAlreadyRunningError();
+    // Every tenant the run covered was claimed elsewhere, so this run did
+    // nothing and the operator should retry. For an organization-rooted run
+    // that is one tenant, so `claimed > 0` and this condition are the same
+    // thing. For a USER-rooted run the tenants are the organization's
+    // members, and one contended member is partial progress: aborting on it
+    // would discard the outcomes of every member that finalized, and the
+    // operator would be told to retry a run that mostly succeeded.
+    if (summary.claimed > 0 && summary.claimed === summary.tenantsSeen) {
+      throw new MigrationPassAlreadyRunningError();
+    }
+    if ((migration.tenant ?? "organization") === "user") {
+      // The tenants were the organization's members, so there is no single
+      // record to read back: the pass summary is the answer. Any held,
+      // parked or still-contended member keeps the organization on the
+      // operator's list.
+      return { status: statusOfMemberSummary(summary), waiting: false };
+    }
+    return this.organizationRecordStatus({ migrationName, organizationId });
+  }
+
+  private async requireRunnableForOrganization({
+    migration,
+    organizationId,
+    migrationName,
+  }: {
+    migration: { runsAutomaticallyOnSelfHosted: boolean };
+    organizationId: string;
+    migrationName: string;
+  }): Promise<void> {
+    if (!this.deps.isSaaS() && !migration.runsAutomaticallyOnSelfHosted) {
+      throw new MigrationNotAvailableOnInstallationError();
+    }
+    const organization = await this.deps.enrollments.findOrganizationById({
+      organizationId,
+    });
+    if (!organization) {
+      throw new MigrationEnrollmentOrganizationNotFoundError();
+    }
+    if (!this.deps.isSaaS()) return;
+    const enrolled = await this.deps.enrollments.isEnrolled({
+      organizationId,
+      migrationName,
+    });
+    if (!enrolled) {
+      throw new MigrationRunRequiresEnrollmentError({ migrationName });
+    }
+  }
+
+  private async organizationRecordStatus({
+    migrationName,
+    organizationId,
+  }: {
+    migrationName: string;
+    organizationId: string;
+  }): Promise<{ status: TenantMigrationStatus | null; waiting: boolean }> {
     const record = await this.deps.state.findRecord({
       migrationName,
       tenantId: organizationId,
@@ -642,13 +699,9 @@ export class SystemMigrationsService {
   }
 
   /** The migration a name refers to, or the refusal the operator can act on. */
-  private requireRegisteredMigration(migrationName: string): {
-    name: string;
-    title: string;
-    description: string;
-    requiresOperatorConfirmation: boolean;
-    runsAutomaticallyOnSelfHosted: boolean;
-  } {
+  private requireRegisteredMigration(
+    migrationName: string,
+  ): ReturnType<SystemMigrationsService["deps"]["migrations"]>[number] {
     const migration = this.deps
       .migrations()
       .find((candidate) => candidate.name === migrationName);
@@ -813,4 +866,29 @@ function rollbackDecidedAt(report: Record<string, unknown>): string | null {
   if (rolledBack == null || typeof rolledBack !== "object") return null;
   const at = (rolledBack as Record<string, unknown>).at;
   return typeof at === "string" && at !== "" ? at : null;
+}
+
+/**
+ * One status for a targeted run over an organization's members: the WORST
+ * outcome wins (parked over held over finalized), because the operator is
+ * deciding whether the organization needs attention, and null when no
+ * member was in the cohort at all. Members already terminal before the run
+ * keep their terminal color: rolled-back members answer "rolled_back" (an
+ * operator's pin is never a successful finalization), and a membership
+ * finished earlier answers "finalized" - done, not "nobody was in the
+ * cohort".
+ *
+ * A member another pass was working reads as held, for the same reason: the
+ * organization is not finished, and the next pass picks that member up.
+ */
+function statusOfMemberSummary(
+  summary: MigrationPassSummary,
+): TenantMigrationStatus | null {
+  if (summary.parked > 0) return "parked";
+  if (summary.held > 0 || summary.claimed > 0) return "migrated";
+  if (summary.alreadyRolledBack > 0) return "rolled_back";
+  if (summary.finalized > 0 || summary.alreadyFinalized > 0) {
+    return "finalized";
+  }
+  return null;
 }

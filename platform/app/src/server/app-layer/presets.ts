@@ -222,6 +222,10 @@ import { PrismaGithubInstallationsRepository } from "./github/repositories/githu
 import { NullGithubInstallationsRepository } from "./github/repositories/github-installations.repository";
 import { PrismaGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.prisma.repository";
 import { NullGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
+import { PrismaIdentityHeadsRepository } from "./identity/repositories/identity-heads.prisma.repository";
+import { PrismaIdentityProjectionRepository } from "./identity/repositories/identity-projection.prisma.repository";
+import { PrismaIdentityReservationRepository } from "./identity/repositories/identity-reservations.prisma.repository";
+import { PrismaIdentityUsersRepository } from "./identity/repositories/identity-users.prisma.repository";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import {
   createLangyTrustedMessageReader,
@@ -803,6 +807,10 @@ export function initializeDefaultApp(options?: {
     messages: createLangyTrustedMessageReader(langyMessageRepository),
   });
 
+  // The address lock is shared: the guards claim through it and the fold
+  // releases through it, so the two must be the same instance (ADR-116 §6).
+  const identityReservations = new PrismaIdentityReservationRepository(prisma);
+
   // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
   const repositories: PipelineRepositories = {
     suiteRunState: clickhouseEnabled
@@ -887,6 +895,13 @@ export function initializeDefaultApp(options?: {
     processStore: new PrismaProcessStore(prisma),
     authzGrantsWrite: new PrismaAuthzGrantsWriteRepository(prisma),
     authzAuditTrail: new PrismaAuthzAuditTrailRepository(prisma),
+    identityProjection: new PrismaIdentityProjectionRepository(
+      prisma,
+      identityReservations,
+    ),
+    identityHeads: new PrismaIdentityHeadsRepository(prisma),
+    identityUsers: new PrismaIdentityUsersRepository(prisma),
+    identityReservations,
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,
     ),
