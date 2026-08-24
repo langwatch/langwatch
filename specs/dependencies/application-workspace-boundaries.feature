@@ -78,6 +78,14 @@ Feature: Physical application workspace boundaries
       And the UI does not import AppRouter or another declaration from the API implementation
       And a type-only import is not accepted as an application boundary
 
+    @architecture @trpc @migration
+    Scenario: The temporary API contract cannot drift from the router
+      Given a legacy application procedure is represented by @langwatch/platform-api-contract
+      When the API contract conformance check compares it with the implemented tRPC router
+      Then every public procedure input and output remains compatible
+      And the contract imports no router, handler or API implementation declaration
+      And a mismatch fails before the UI or API is built
+
     @architecture @api @typecheck
     Scenario: The API package owns only the interactive process
       Given the API application is built
@@ -297,6 +305,27 @@ Feature: Physical application workspace boundaries
       And checking the worker does not evaluate UI or API transport source
 
   Rule: Migration stages remain runnable and temporary seams disappear
+
+    @architecture @migration
+    Scenario: Migration lint prevents new debt while allowing the baseline to shrink
+      Given platform/app still contains legacy application-boundary edges
+      And those exact edges are recorded in the checked-in migration baseline
+      When architecture lint checks the repository
+      Then an existing recorded edge may remain temporarily
+      And a new cross-application edge, apps/shared directory or @ee import is rejected
+      And removing an edge requires removing its baseline entry
+      And the completed split has no migration baseline
+
+    @architecture @migration
+    Scenario: Product behaviour moves vertically before its application root
+      Given reusable product behaviour still lives inside platform/app
+      When its owning feature is extracted
+      Then portable schemas and capabilities move to the feature contract
+      And backend services and adapters move to the feature server package
+      And browser behaviour moves to the feature web package when present
+      And route, consumer and task installers move with the owning feature
+      And the still-runnable application consumes those package exports
+      And no application root becomes a replacement product implementation package
 
     @integration @migration
     Scenario: Every extraction stage preserves supported entry points

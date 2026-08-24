@@ -84,6 +84,16 @@ remain under `packages`. There is no `apps/shared` package and no shared
 backend app: code required by more than one process moves to its owning feature
 package or to a deliberately named reusable infrastructure package.
 
+The physical split therefore does not copy the monolith into four smaller
+directories. Before an application root is cut over, reusable product behaviour
+in its slice moves vertically: portable schemas and capabilities to a feature
+contract, backend services and adapters to its feature server package, and
+browser behaviour to its feature web package. The application retains only
+process bootstrap, runtime configuration, routing or task composition, and
+lifecycle. During migration the existing application may consume the extracted
+packages, so each feature move can land independently without creating a second
+runtime.
+
 `apps/ui` owns the Vite/React application, browser routing and browser runtime
 composition. It may import feature contracts, feature web packages, the Design
 System, and browser-safe API client contracts. It does not import API or worker
@@ -218,10 +228,12 @@ graph into the UI. Feature-owned procedures expose these schemas and types from
 their feature contract. Legacy application procedures that have not yet moved
 to a feature use a temporary `@langwatch/platform-api-contract` package. The
 tRPC router implementation remains in `apps/api`; the temporary contract
-package owns no router or handler and is deleted after its last legacy
-procedure moves. Existing whole-router inference is a migration seam, not an
-accepted cross-app boundary, and must be removed before `platform/app` is
-deleted.
+package owns no router or handler. Its portable procedure type map is either
+declared directly or produced as a checked-in generated artifact, and a
+conformance test compares that map with the implemented router so the two
+cannot silently drift. It is deleted after its last legacy procedure moves.
+Existing whole-router inference is a migration seam, not an accepted cross-app
+boundary, and must be removed before `platform/app` is deleted.
 
 ### Prisma becomes an owned infrastructure client package
 
@@ -289,30 +301,45 @@ one universal package or service locator.
 
 The repository migrates in dependency order:
 
-1. establish the app workspace, dependency-direction lint rules and the
-   contributor-only `tools/dev-runtime` composition exception;
-2. move the Enterprise `LICENSE.md` and README first; establish
+1. establish application classifications, target-ownership tests and
+   dependency-direction lint rules. Existing `platform/app` debt is captured in
+   a deterministic checked-in migration baseline that may only shrink; new
+   cross-application edges, `apps/shared` and new `@ee/*` uses fail immediately.
+   The baseline is not an accepted architecture surface and is deleted with the
+   monolith;
+2. extract the portable runtime-composition primitives and
+   `@langwatch/prisma-client`, move contributor environment ownership to the
+   repository root, and define the UI artifact-location and temporary portable
+   API-contract seams before either side of those seams moves;
+3. move the Enterprise `LICENSE.md` and README first; establish
    `@langwatch/enterprise` and its separate API, worker and web composition
    packages; update workspace discovery and staging for those paths in the same
    stage; then extract `platform/app/ee` feature by feature into
    `packages/enterprise/features`, replacing `@ee/*` imports with package
    exports;
-3. move the runtime-composition contract out of `platform/app`, then extract
-   `@langwatch/prisma-client` so API and worker have a neutral owner for
-   their shared PostgreSQL client;
-4. move contributor environment files to the repository root, then extract the
-   browser build to `apps/ui` and make static assets an explicit
-   build artifact;
-5. extract HTTP and interactive runtime composition to `apps/api`, replace
+4. extract remaining reusable core product behaviour feature by feature. Each
+   vertical move includes its contract, server and optional web surfaces plus
+   route, consumer or task installers, while the still-runnable monolith switches
+   to those package exports;
+5. extract the browser bootstrap, router, application shell and static build to
+   `apps/ui`; product screens come from feature web packages and static assets
+   remain an explicit build artifact;
+6. extract HTTP and interactive runtime composition to `apps/api`, replace
    whole-router browser inference with feature contracts and the temporary
    legacy API contract;
-6. extract background composition and task execution to `apps/worker`;
-7. move the self-host CLI from `packages/server` to `apps/server`;
-8. complete remaining workspace filters, root scripts, generated-file checks,
-   Docker, Helm, CI, npm staging, Oxc lint/format migration and the detailed
-   runtime, Prisma, static-delivery and self-host contracts; and
-9. remove `platform/app`, its `ee` directory and the `@ee/*` alias after no
-   compatibility source edge remains.
+7. extract background composition and the task registry to `apps/worker`, then
+   establish the contributor-only `tools/dev-runtime` parent composition;
+8. move the self-host CLI from `packages/server` to `apps/server` and make the
+   repository root private only after the new package can assemble and verify
+   its complete staged workspace closure;
+9. complete remaining workspace filters, root scripts, generated-file checks,
+   Docker, Helm, CI, npm staging and the detailed runtime, Prisma,
+   static-delivery and self-host contracts;
+10. remove `platform/app`, its aliases, the migration baseline and temporary
+    forwarding paths after no compatibility source edge remains; and
+11. perform the repository-wide Oxlint/Oxfmt cutover as an isolated final
+    series. The formatting-only rewrite lands separately from source moves so
+    rename history, review and rebases remain intelligible.
 
 Every stage keeps the current application, worker and self-host commands
 runnable. Transitional aliases or forwarding entry points are removed with the
