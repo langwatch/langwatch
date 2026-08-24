@@ -61,8 +61,19 @@ export function FrontDoorValuePanel({
           fontSize="clamp(30px, 3.4vw, 52px)"
           fontFamily={HEADING_FONT}
           fontWeight={400}
-          letterSpacing="-0.03em"
-          lineHeight="0.98"
+          // Tight tracking and sub-1 leading are DISPLAY-size devices. The
+          // headline is the same sentence at every width, so a narrow viewport
+          // does not shrink it — it wraps it, and three tight lines become
+          // five, which is when 0.98 stops reading as confident and starts
+          // reading as squashed.
+          //
+          // So both open up as the type comes down, and they do it with the
+          // size rather than at a breakpoint: the line box has its own clamp,
+          // rising from ~1.27x the type at the small end to ~1.02x at full
+          // display size. Between them it is always the right leading for the
+          // size actually rendered, and there is no width at which it jumps.
+          letterSpacing={{ base: "-0.018em", md: "-0.03em" }}
+          lineHeight="clamp(38px, calc(18px + 2.3vw), 54px)"
           // The site's `.display` treatment, value for value: the subtle
           // vertical stretch and the ligatures are what make Sentient read
           // as the site's voice rather than merely the same file.

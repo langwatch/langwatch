@@ -94,8 +94,11 @@ describe("the identifier-first sign-in router", () => {
       expect(identifier.normalized).toBe(
         normalizeIdentifierValue("Sam.J+news@Acme.com"),
       );
+      // The tag survives the fold, and the DOMAIN is still what routes: a
+      // tagged address reaches its organization's connection exactly as the
+      // bare one does.
       expect(identifier).toEqual({
-        normalized: "sam.j@acme.com",
+        normalized: "sam.j+news@acme.com",
         domain: "acme.com",
       });
     });

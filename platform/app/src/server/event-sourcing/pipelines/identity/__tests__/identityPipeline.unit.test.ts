@@ -123,7 +123,7 @@ describe("identity pipeline", () => {
         const facts = Object.values(projection.state.identifiers);
         expect(facts).toHaveLength(1);
         expect(facts[0]!.userId).toBe(USER);
-        expect(facts[0]!.value).toBe("sam.j@acme.com");
+        expect(facts[0]!.value).toBe("sam.j+x@acme.com");
         expect(facts[0]!.state).toBe("VERIFIED");
         // The cursor is the commit marker: it names the applied event.
         expect(projection.cursor.eventId).not.toBe("");
