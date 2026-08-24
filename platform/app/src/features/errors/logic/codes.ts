@@ -108,6 +108,7 @@ export const APP_ERROR_CODES = [
   "group_not_found",
   "group_not_in_organization",
   "guardrail_attach_forbidden",
+  "health_check_failed",
   "idempotency_error",
   "ingestion_source_cap_reached",
   "ingestion_source_not_found",
