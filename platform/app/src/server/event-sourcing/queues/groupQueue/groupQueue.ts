@@ -360,6 +360,27 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   private readonly deathThreshold = readConfirmedDeathThreshold();
 
   private shutdownRequested = false;
+  /**
+   * Whether `send`/`sendBatch` may still stage work.
+   *
+   * NOT the same thing as `shutdownRequested`, and the difference is the whole
+   * point. Shutdown is requested at the START of close(), while the drain that
+   * follows is still running jobs — and those jobs store events and dispatch
+   * them onward, into this same queue, because the projection, subscriber, map
+   * and fold queues are all facades over it. Gating sends on
+   * `shutdownRequested` meant the queue refused the work its own drain was
+   * producing, and nothing above retried it: every rollout quietly dropped a
+   * burst of projection dispatches (prod, 2026-08-24).
+   *
+   * Accepting them is safe. `send` stages into Redis over `redisConnection`,
+   * which the drain leaves alone — only the blocking connection is closed here,
+   * and the shared connections go afterwards, in App.close. Staged work is
+   * durable and shared, so anything staged during a drain is picked up by
+   * another pod rather than lost with this one.
+   *
+   * So the gate closes when the drain is over, however it ended.
+   */
+  private stagingClosed = false;
   /** Tracks in-flight jobs for active count metrics. */
   private activeJobCount = 0;
 
@@ -618,11 +639,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     payload: Payload,
     options?: QueueSendOptions<Payload>,
   ): Promise<void> {
-    if (this.shutdownRequested) {
+    if (this.stagingClosed) {
       throw new QueueError(
         this.queueName,
         "send",
-        "Cannot send to queue after shutdown has been requested",
+        "Cannot send to queue after its drain has finished",
       );
     }
     assertNoReservedKeys(
@@ -734,11 +755,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     payloads: Payload[],
     options?: QueueSendOptions<Payload>,
   ): Promise<void> {
-    if (this.shutdownRequested) {
+    if (this.stagingClosed) {
       throw new QueueError(
         this.queueName,
         "sendBatch",
-        "Cannot send to queue after shutdown has been requested",
+        "Cannot send to queue after its drain has finished",
       );
     }
 
@@ -2816,6 +2837,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       throw error;
     } finally {
       clearTimeout(shutdownTimer);
+      // Here, not at the top of close(): until this point the drain was still
+      // running jobs whose fan-out has to be allowed to stage. Past it the
+      // shared transports are about to go, so staging more is pointless. The
+      // timeout path lands here too — a drain that overran was abandoned, not
+      // finished, and either way nothing further should be staged.
+      this.stagingClosed = true;
     }
   }
 
