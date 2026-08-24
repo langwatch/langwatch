@@ -12,7 +12,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Imported at the top: vitest hoists the vi.mock / vi.hoisted calls below above
 // these statements, so the modules under test still resolve the mocks.
-import DepartmentsPage from "~/pages/governance/departments";
+import PeoplePage from "~/pages/governance/people";
 import { DepartmentPicker } from "../DepartmentPicker";
 import { useDepartmentColumn } from "../useDepartmentColumn";
 
@@ -154,7 +154,7 @@ describe("department assignment UI", () => {
   describe("given the departments page", () => {
     /** @scenario The departments page manages departments and links out to assign them */
     it("manages departments and links to the members and teams pages instead of listing every person", () => {
-      renderWithChakra(<DepartmentsPage />);
+      renderWithChakra(<PeoplePage />);
 
       expect(screen.getByText("Create a department")).toBeDefined();
       expect(
