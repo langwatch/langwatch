@@ -124,7 +124,7 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
   # ---------------------------------------------------------------------------
 
   @bdd @ingestion-templates @admin-readonly
-  Scenario: Admin sees only non-coding-assistant templates as READ-ONLY in tool-catalog
+  Scenario: Admin sees only non-coding-assistant templates as READ-ONLY in the Inventory Catalog
     Given admin "carol@acme.com" has the `ingestionTemplate:view` permission
     When carol navigates to "/governance/inventory?tab=catalog" and selects the "Ingestion Templates" tab
     # Existing P7-B6 ToolCatalogEditor surface (AiToolEntry catalog) gets a
