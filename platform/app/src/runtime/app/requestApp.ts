@@ -4,6 +4,7 @@ import type {
   AuthzService,
 } from "@langwatch/authz-contract";
 import type {
+  GovernanceOttlGateway,
   GovernanceOcsfExportService,
   GovernanceSetupStateService,
   IngestionTemplatesService,
@@ -18,6 +19,7 @@ export type RequestAppServices = {
     ingestionTemplates: IngestionTemplatesService;
     setupState: GovernanceSetupStateService;
     ocsfExport: GovernanceOcsfExportService;
+    ottlGateway: GovernanceOttlGateway;
   };
 };
 
@@ -37,6 +39,7 @@ export class RequestApp implements RequestAppServices {
         ingestionTemplates: IngestionTemplatesService;
         setupState: GovernanceSetupStateService;
         ocsfExport: GovernanceOcsfExportService;
+        ottlGateway: GovernanceOttlGateway;
       };
     },
   ): RequestApp {
@@ -56,6 +59,7 @@ export class RequestApp implements RequestAppServices {
       ingestionTemplates: IngestionTemplatesService;
       setupState: GovernanceSetupStateService;
       ocsfExport: GovernanceOcsfExportService;
+      ottlGateway: GovernanceOttlGateway;
     },
   ) {}
 }

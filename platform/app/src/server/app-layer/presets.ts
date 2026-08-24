@@ -1672,6 +1672,10 @@ export function initializeDefaultApp(options?: {
   const governanceRuntime = AppGovernanceRuntime.create(prisma, {
     setupActivity: governanceTraceActivityRepository,
     ocsfEvents: governanceOcsfEventsRepository,
+    ottl: {
+      baseUrl: env.LW_GATEWAY_INTERNAL_URL ?? env.LW_GATEWAY_BASE_URL,
+      secret: env.LW_GATEWAY_INTERNAL_SECRET,
+    },
   });
   const pullRequestUsage = new PullRequestUsageService({
     pullRequests: githubPullRequestsRepository,
@@ -1936,6 +1940,8 @@ export function initializeDefaultApp(options?: {
       ingestionTemplates: governanceRuntime.ingestionTemplates,
       setupState: governanceRuntime.setupState,
       ocsfExport: governanceRuntime.ocsfExport,
+      ottlGateway: governanceRuntime.ottlGateway,
+      canonicalCostExtractor: governanceRuntime.canonicalCostExtractor,
       ocsfEvents: governanceOcsfEventsRepository,
       traceActivity: governanceTraceActivityRepository,
       kpis: governanceKpisRepository,
@@ -2300,6 +2306,8 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       ingestionTemplates: testGovernanceRuntime.ingestionTemplates,
       setupState: testGovernanceRuntime.setupState,
       ocsfExport: testGovernanceRuntime.ocsfExport,
+      ottlGateway: testGovernanceRuntime.ottlGateway,
+      canonicalCostExtractor: testGovernanceRuntime.canonicalCostExtractor,
       ocsfEvents: undefined,
       traceActivity: undefined,
       kpis: undefined,

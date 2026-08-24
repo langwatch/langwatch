@@ -111,6 +111,8 @@ export function installClickHouseTestApp({
       ingestionTemplates: governanceRuntime.ingestionTemplates,
       setupState: governanceRuntime.setupState,
       ocsfExport: governanceRuntime.ocsfExport,
+      ottlGateway: governanceRuntime.ottlGateway,
+      canonicalCostExtractor: governanceRuntime.canonicalCostExtractor,
       ocsfEvents: governanceOcsfEvents,
       traceActivity: governanceTraceActivity,
       kpis: new GovernanceKpisClickHouseRepository(required),

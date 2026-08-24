@@ -9,10 +9,12 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import type { ManagedProviderService } from "@langwatch/enterprise-managed-providers-contract";
 import type {
+  GovernanceOttlGateway,
   GovernanceOcsfExportService,
   GovernanceSetupStateService,
   IngestionTemplatesService,
 } from "@langwatch/enterprise-governance-contract";
+import type { CanonicalCostExtractorService } from "@langwatch/enterprise-governance-server";
 import type {
   BillableEventsRepository as BillingEventsReadRepository,
   BillableEventsQueryService,
@@ -285,6 +287,10 @@ export interface AppDependencies {
     setupState: GovernanceSetupStateService;
     /** Process-owned, cursor-paginated OCSF export. */
     ocsfExport: GovernanceOcsfExportService;
+    /** Process-owned OTTL validation and transformation gateway. */
+    ottlGateway: GovernanceOttlGateway;
+    /** Canonical usage extraction shared by every Governance receiver. */
+    canonicalCostExtractor: CanonicalCostExtractorService;
     ocsfEvents: GovernanceOcsfEventsClickHouseRepository | undefined;
     /** Governance-domain reads over the shared `trace_summaries` table —
      *  the persona-detection activity probe and the quarantine-fill

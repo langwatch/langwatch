@@ -32,13 +32,12 @@
  */
 
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
-import { transformOttlPayload } from "@ee/governance/services/activity-monitor/ottlGatewayClient";
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
 import {
   enforceApiKeyIdOnLogRequest,
   enforceApiKeyIdOnMetricRequest,
   enforceApiKeyIdOnTraceRequest,
-} from "@ee/governance/services/ingestKeyProvenance.utils";
+} from "./ingest-key-provenance.utils";
 import { createLogger } from "@langwatch/observability";
 import type {
   IExportLogsServiceRequest,
@@ -48,12 +47,10 @@ import type {
 } from "@opentelemetry/otlp-transformer";
 import type { Context } from "hono";
 import type { IngestionSource } from "~/generated/prisma/client";
-import {
-  AppGovernanceRuntime,
-  type CanonicalCostEvent,
-} from "~/runtime/app/features/governance";
+import type { CanonicalCostEvent } from "~/runtime/app/features/governance";
+import type { AppContextVariables } from "~/app/api/middleware/app-context";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
-import { getApp } from "~/server/app-layer/app";
+import type { App } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
@@ -221,8 +218,6 @@ function buildWebhookLogRequest(
 }
 
 const logger = createLogger("langwatch:ingest");
-const governanceRuntime = AppGovernanceRuntime.create(prisma);
-
 /**
  * Cost-event extraction via OTTL.
  *
@@ -258,6 +253,7 @@ async function extractCostEventsForSource(input: {
   parsed: IExportLogsServiceRequest;
   rawBody: ArrayBuffer;
   contentType: string | undefined;
+  governance: Pick<App["governance"], "canonicalCostExtractor" | "ottlGateway">;
 }): Promise<CanonicalCostEvent[]> {
   const parserConfig =
     (input.source.parserConfig as Record<string, unknown> | null) ?? {};
@@ -279,7 +275,7 @@ async function extractCostEventsForSource(input: {
   const payloadB64 = Buffer.from(input.rawBody).toString("base64");
 
   try {
-    const result = await transformOttlPayload({
+    const result = await input.governance.ottlGateway.transform({
       sourceId: input.source.id,
       kind: "log",
       encoding,
@@ -295,7 +291,7 @@ async function extractCostEventsForSource(input: {
         },
         "OTTL transform rejected statements at receive — falling back to un-mutated extraction",
       );
-      return governanceRuntime.extractCanonicalCostEvents(input.parsed);
+      return input.governance.canonicalCostExtractor.extract(input.parsed);
     }
     const mutatedBuffer = Buffer.from(result.payloadB64, "base64");
     const mutatedBytes = mutatedBuffer.buffer.slice(
@@ -312,19 +308,23 @@ async function extractCostEventsForSource(input: {
         { sourceId: input.source.id, err: reparsed.error },
         "OTTL transform returned unparseable payload — falling back to un-mutated extraction",
       );
-      return governanceRuntime.extractCanonicalCostEvents(input.parsed);
+      return input.governance.canonicalCostExtractor.extract(input.parsed);
     }
-    return governanceRuntime.extractCanonicalCostEvents(reparsed.request);
+    return input.governance.canonicalCostExtractor.extract(reparsed.request);
   } catch (transformErr) {
     logger.warn(
       { sourceId: input.source.id, err: String(transformErr) },
       "OTTL transform request failed — falling back to un-mutated extraction",
     );
-    return governanceRuntime.extractCanonicalCostEvents(input.parsed);
+    return input.governance.canonicalCostExtractor.extract(input.parsed);
   }
 }
 
-const secured = createServiceApp({ basePath: "/api/ingest" });
+type IngestContext = Context<{ Variables: AppContextVariables }>;
+
+const secured = createServiceApp<{ Variables: AppContextVariables }>({
+  basePath: "/api/ingest",
+});
 const ingestAuth = handlerManagedAuth({
   reason:
     "ingestion source bearer secret resolved in-handler via authIngestionSource",
@@ -337,7 +337,7 @@ const ingestAuth = handlerManagedAuth({
  * Resolve `Authorization: Bearer <secret>` against IngestionSource.
  * Returns the source on hit, null on miss / malformed / expired.
  */
-async function authIngestionSource(c: Context) {
+async function authIngestionSource(c: IngestContext) {
   const header = c.req.header("Authorization");
   if (!header) return null;
   const match = /^Bearer\s+(lw_is_[A-Za-z0-9_\-]+)$/.exec(header.trim());
@@ -355,7 +355,7 @@ async function authIngestionSource(c: Context) {
  *
  * Spec: specs/ai-gateway/governance/receiver-auth-rate-limit.feature
  */
-async function rateLimitGuard(c: Context): Promise<Response | null> {
+async function rateLimitGuard(c: IngestContext): Promise<Response | null> {
   const ip = extractClientIp(c.req.raw.headers);
   const decision = await checkIpRateLimit({ ip });
   if (decision.allowed) return null;
@@ -396,7 +396,7 @@ async function rateLimitGuard(c: Context): Promise<Response | null> {
 //   - receiver-shapes.feature (Lane-S)
 //   - architecture-invariants.feature (Lane-B)
 // ---------------------------------------------------------------------------
-secured.access(ingestAuth).post("/otel/:sourceId", async (c: Context) => {
+secured.access(ingestAuth).post("/otel/:sourceId", async (c: IngestContext) => {
   const limited = await rateLimitGuard(c);
   if (limited) return limited;
 
@@ -461,7 +461,7 @@ secured.access(ingestAuth).post("/otel/:sourceId", async (c: Context) => {
           >[0],
           null,
         );
-        const result = await getApp().traces.collection.handleOtlpTraceRequest(
+        const result = await c.var.langwatchApp.traces.collection.handleOtlpTraceRequest(
           govProject.id,
           parsed.request,
           DEFAULT_PII_REDACTION_LEVEL,
@@ -526,7 +526,7 @@ secured.access(ingestAuth).post("/otel/:sourceId", async (c: Context) => {
 //   - receiver-shapes.feature flat-event scenarios
 //   - architecture-invariants.feature unified-substrate scenarios
 // ---------------------------------------------------------------------------
-secured.access(ingestAuth).post("/webhook/:sourceId", async (c: Context) => {
+secured.access(ingestAuth).post("/webhook/:sourceId", async (c: IngestContext) => {
   const limited = await rateLimitGuard(c);
   if (limited) return limited;
 
@@ -567,7 +567,7 @@ secured.access(ingestAuth).post("/webhook/:sourceId", async (c: Context) => {
         source.organizationId,
       );
       const logRequest = buildWebhookLogRequest(raw, source);
-      await getApp().traces.logCollection.handleOtlpLogRequest({
+      await c.var.langwatchApp.traces.logCollection.handleOtlpLogRequest({
         tenantId: govProject.id,
         organizationId: source.organizationId,
         logRequest,
@@ -623,7 +623,7 @@ secured.access(ingestAuth).post("/webhook/:sourceId", async (c: Context) => {
 // ---------------------------------------------------------------------------
 secured
   .access(ingestAuth)
-  .post("/otel/:sourceId/v1/logs", async (c: Context) => {
+  .post("/otel/:sourceId/v1/logs", async (c: IngestContext) => {
     const limited = await rateLimitGuard(c);
     if (limited) return limited;
 
@@ -679,7 +679,7 @@ secured
             null,
           );
           try {
-            await getApp().traces.logCollection.handleOtlpLogRequest({
+            await c.var.langwatchApp.traces.logCollection.handleOtlpLogRequest({
               tenantId: govProject.id,
               organizationId: source.organizationId,
               logRequest: parsed.request,
@@ -704,11 +704,14 @@ secured
             parsed: parsed.request,
             rawBody: body,
             contentType,
+            governance: c.var.langwatchApp.governance,
           });
           costEventCount = events.length;
 
           const budgetCHRepo =
-            events.length > 0 ? getApp().gateway.budgets : undefined;
+            events.length > 0
+              ? c.var.langwatchApp.gateway.budgets
+              : undefined;
           if (events.length > 0 && budgetCHRepo) {
             const budgetRepo = new GatewayBudgetRepository(prisma);
             const changeEvents = new ChangeEventRepository(prisma);
@@ -896,7 +899,7 @@ secured
 
 secured
   .access(ingestAuth)
-  .post("/otel/:sourceId/v1/metrics", async (c: Context) => {
+  .post("/otel/:sourceId/v1/metrics", async (c: IngestContext) => {
     const limited = await rateLimitGuard(c);
     if (limited) return limited;
 
@@ -969,7 +972,7 @@ secured
               null,
             );
             const result =
-              await getApp().traces.metricCollection.handleOtlpMetricRequest({
+              await c.var.langwatchApp.traces.metricCollection.handleOtlpMetricRequest({
                 tenantId: govProject.id,
                 organizationId: source.organizationId,
                 metricRequest: parsed.request,

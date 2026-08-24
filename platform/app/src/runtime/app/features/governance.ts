@@ -11,11 +11,13 @@ import {
   type OtlpLogsRequest,
 } from "@langwatch/enterprise-governance-server";
 import type {
+  GovernanceOttlGateway,
   GovernanceOcsfExportService,
   GovernancePolicyService,
   GovernanceSetupStateService,
   IngestionTemplatesService,
 } from "@langwatch/enterprise-governance-contract";
+import { AppGovernanceOttlGateway } from "./governance/ottl-gateway.client";
 
 export type { CanonicalCostEvent };
 
@@ -46,11 +48,12 @@ class AppGovernanceSetupActivityPort extends GovernanceSetupActivityPort {
 
 export class AppGovernanceRuntime {
   private constructor(
-    private readonly canonicalCostExtractor: CanonicalCostExtractorService,
+    readonly canonicalCostExtractor: CanonicalCostExtractorService,
     private readonly policy: GovernancePolicyService,
     readonly ingestionTemplates: IngestionTemplatesService,
     readonly setupState: GovernanceSetupStateService,
     readonly ocsfExport: GovernanceOcsfExportService,
+    readonly ottlGateway: GovernanceOttlGateway,
   ) {}
 
   static create(
@@ -58,6 +61,12 @@ export class AppGovernanceRuntime {
     options?: {
       setupActivity?: GovernanceSetupActivity;
       ocsfEvents?: GovernanceOcsfEventsReaderPort;
+      ottl?: {
+        baseUrl?: string | null;
+        secret?: string | null;
+        request?: typeof fetch;
+        now?: () => number;
+      };
     },
   ): AppGovernanceRuntime {
     return new AppGovernanceRuntime(
@@ -74,6 +83,7 @@ export class AppGovernanceRuntime {
         database,
         events: options?.ocsfEvents,
       }).build(),
+      AppGovernanceOttlGateway.create(options?.ottl ?? {}),
     );
   }
 
