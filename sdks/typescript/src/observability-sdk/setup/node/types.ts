@@ -37,6 +37,17 @@ import { type DataCaptureOptions } from "../../features/data-capture/types";
  * };
  * ```
  */
+/**
+ * The value that disables the LangWatch integration.
+ *
+ * Prefer this over writing `"disabled"` by hand. A TypeScript caller is already
+ * protected by the union below, but the value often arrives from config, JSON or
+ * plain JavaScript, where a typo is not a compile error. See the guard in
+ * `getLangWatchConfig`, which is what stops a near-miss from silently enabling
+ * the exporter.
+ */
+export const LANGWATCH_DISABLED = "disabled" as const;
+
 export interface SetupObservabilityOptions {
   /**
    * LangWatch configuration for sending observability data to LangWatch.

@@ -1,7 +1,7 @@
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { SimpleLogRecordProcessor, BatchLogRecordProcessor, type LogRecordProcessor, ConsoleLogRecordExporter, LoggerProvider } from "@opentelemetry/sdk-logs";
 import { createMergedResource, getConcreteProvider, isConcreteProvider } from "../utils";
-import { type SetupObservabilityOptions, type ObservabilityHandle } from "./types";
+import { type SetupObservabilityOptions, type ObservabilityHandle, LANGWATCH_DISABLED } from "./types";
 import { trace } from "@opentelemetry/api";
 import {
   ConsoleSpanExporter,
@@ -24,9 +24,49 @@ const createNoOpHandle = (logger: Logger): ObservabilityHandle => ({
   },
 });
 
-const getLangWatchConfig = (options: SetupObservabilityOptions) => {
-  const isDisabled = options.langwatch === 'disabled';
-  const config = typeof options.langwatch === 'object' ? options.langwatch : {};
+/**
+ * Whether `langwatch` names the disable sentinel, an options object, or neither.
+ *
+ * The third case is why this exists. `langwatch: "disable"` used to satisfy
+ * neither branch of the old two-line resolution: it is not the sentinel, so it
+ * did not disable, and `typeof` said `string`, so it fell to `{}` and the
+ * exporter came up on the environment's API key. A caller who asked to send
+ * nothing sent everything, and nothing said so. TypeScript rejects that typo,
+ * but this value routinely arrives from config, JSON or plain JavaScript, where
+ * nothing does.
+ *
+ * `null` was the same shape of hole from the other side: `typeof null` is
+ * `"object"`, so it reached the property reads below and threw a TypeError
+ * naming neither the option nor the value.
+ *
+ * An unrecognised value is treated as disabled rather than guessed at. It is the
+ * only safe reading: every value that lands here is a caller who did not
+ * successfully ask for the exporter, and exporting anyway is the failure worth
+ * avoiding. It is reported at `error`, and setup's existing "disabled with no
+ * alternative exporter" guidance then explains what to do next.
+ */
+const resolveLangWatchOption = (
+  langwatch: SetupObservabilityOptions["langwatch"],
+  logger: Logger,
+): { disabled: boolean; config: Exclude<typeof langwatch, string | undefined> } => {
+  if (langwatch === void 0 || langwatch === LANGWATCH_DISABLED) {
+    return { disabled: langwatch === LANGWATCH_DISABLED, config: {} };
+  }
+
+  if (typeof langwatch === "object" && langwatch !== null) {
+    return { disabled: false, config: langwatch };
+  }
+
+  logger.error(
+    `Invalid \`langwatch\` option: ${JSON.stringify(langwatch)}.\n` +
+      `Expected an options object, or "${LANGWATCH_DISABLED}" to turn the integration off.\n` +
+      `Treating it as "${LANGWATCH_DISABLED}", because a value that is neither cannot be read as a request to export.`,
+  );
+  return { disabled: true, config: {} };
+};
+
+const getLangWatchConfig = (options: SetupObservabilityOptions, logger: Logger) => {
+  const { disabled: isDisabled, config } = resolveLangWatchOption(options.langwatch, logger);
 
   return {
     disabled: isDisabled,
@@ -289,7 +329,7 @@ function setupDedicatedProvider(
   options: SetupObservabilityOptions,
   logger: Logger,
 ): ObservabilityHandle {
-  const langwatch = getLangWatchConfig(options);
+  const langwatch = getLangWatchConfig(options, logger);
   const addedProcessors: SpanProcessor[] = [];
 
   const internalArray = (provider as any)?._activeSpanProcessor?._spanProcessors;
@@ -394,7 +434,7 @@ function attachToExistingProvider(
     }
   };
 
-  const langwatch = getLangWatchConfig(options);
+  const langwatch = getLangWatchConfig(options, logger);
   const addedProcessors: SpanProcessor[] = [];
 
   if (!langwatch.disabled) {
@@ -456,7 +496,7 @@ export function createAndStartNodeSdk(
   logger: Logger,
   resource: Resource,
 ): NodeSDK {
-  const langwatch = getLangWatchConfig(options);
+  const langwatch = getLangWatchConfig(options, logger);
 
   if (langwatch.disabled) {
     logger.warn("LangWatch integration disabled, using user-provided SpanProcessors and LogRecordProcessors");
