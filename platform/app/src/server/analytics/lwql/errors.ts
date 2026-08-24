@@ -123,13 +123,38 @@ export class LangWatchQLParameterMissingError extends HandledError {
 }
 
 /**
+ * The refusal sentence for exactly the names the request carried, agreeing in
+ * number so a single supplied name does not read as "values for period_start".
+ *
+ * Built from the supplied names rather than a fixed phrase because the same
+ * code covers the two window bounds and the granularity step, and naming the
+ * wrong one tells a caller to remove a parameter it never sent.
+ */
+function suppliedParameterSentence(supplied: readonly string[]): string {
+  if (supplied.length === 0) {
+    return "The request supplied values for parameters the surface sets itself.";
+  }
+  if (supplied.length === 1) {
+    return `The request supplied a value for ${supplied[0]}, which the surface sets itself.`;
+  }
+  const last = supplied[supplied.length - 1] as string;
+  const names = `${supplied.slice(0, -1).join(", ")} and ${last}`;
+  return `The request supplied values for ${names}, which the surface sets itself.`;
+}
+
+/**
  * The request carried a value for a parameter the surface owns.
  *
- * `period_start` and `period_end` are supplied by whatever is showing the chart
- * — the dashboard's period, the workbench's page period — and a caller that
- * sets one is pinning a window that will then ignore the surface it sits on.
- * Refused rather than overwritten, because silently discarding a value a caller
- * sent is how the two-charts-different-periods bug comes back wearing our name.
+ * `period_start`, `period_end` and `period_granularity_seconds` are supplied by
+ * whatever is showing the chart — the dashboard's period and step, the
+ * workbench's page period — and a caller that sets one is pinning something
+ * that will then ignore the surface it sits on. Refused rather than
+ * overwritten, because silently discarding a value a caller sent is how the
+ * two-charts-different-periods bug comes back wearing our name.
+ *
+ * The message names the parameters actually supplied rather than the
+ * time-window pair: a caller that sent only the granularity was previously
+ * told to remove parameters it had not sent.
  *
  * @see ./timeWindow.ts — the contract this enforces
  */
@@ -142,7 +167,7 @@ export class LangWatchQLReservedParameterSuppliedError extends HandledError {
   ) {
     super(
       "lwql_reserved_parameter_supplied",
-      "The request supplied values for time-window parameters the surface sets itself.",
+      suppliedParameterSentence(supplied),
       {
         httpStatus: 400,
         fault: "customer",
@@ -184,5 +209,145 @@ export class LangWatchQLReservedParameterTypeError extends HandledError {
       },
     );
     this.name = "LangWatchQLReservedParameterTypeError";
+  }
+}
+
+/**
+ * Which of the two granularity failures this is. They share a code because a
+ * caller acts on both the same way — fix the granularity declaration or the
+ * step behind it — but they are not the same fact, and a message claiming a
+ * type mismatch for a well-typed declaration carrying a fractional step sends
+ * the reader to the wrong line.
+ */
+export type LangWatchQLGranularityFault =
+  /** Declared as something other than `UInt32`. */
+  | "declared-type"
+  /** Declared correctly, but the step supplied is not an offered step. */
+  | "step-value";
+
+/**
+ * The granularity parameter was declared with a type other than `UInt32`, or
+ * the surface supplied a step that is not one of the offered granularity
+ * steps.
+ *
+ * A sibling of {@link LangWatchQLReservedParameterTypeError} -- from the
+ * caller's side both read as "you declared a surface-owned parameter with the
+ * wrong type" -- but it carries its own code, so the copy can name what this
+ * declaration must be (`UInt32`) instead of the window's date-time advice.
+ *
+ * Raised while validating rather than while running, so a chart is refused
+ * at *save* for the same reason it would be refused at render.
+ */
+export class LangWatchQLReservedGranularityTypeError extends HandledError {
+  declare readonly code: "lwql_granularity_parameter_type";
+
+  constructor({
+    mistyped,
+    fault = "declared-type",
+  }: {
+    /** The reserved names declared (or valued) wrongly. Sorted. */
+    mistyped: readonly string[];
+    /** Which failure this is; the declaration one when unstated. */
+    fault?: LangWatchQLGranularityFault;
+  }) {
+    super(
+      "lwql_granularity_parameter_type",
+      fault === "step-value"
+        ? "The datapoint granularity must be one of the offered steps: 1 second, 1 minute, or 1 hour."
+        : "The query declares period_granularity_seconds with a type that is not UInt32.",
+      {
+        httpStatus: 400,
+        fault: "customer",
+        meta: { parameters: mistyped, granularityFault: fault },
+        ...remediation("lwql_granularity_parameter_type"),
+      },
+    );
+    this.name = "LangWatchQLReservedGranularityTypeError";
+  }
+}
+
+/**
+ * The declared window at the requested datapoint granularity would produce
+ * more buckets than one governed run may return.
+ *
+ * The workbench and the REST route refuse here because their callers chose
+ * the step; the dashboard owns the range and auto-coarsens instead, arriving
+ * here only when even the coarsest offered step still overflows the ceiling.
+ *
+ * Remediation is arithmetic, not retrying: widen the step until the bucket
+ * count fits the ceiling, or narrow the window.
+ */
+export class LangWatchQLGranularityTooFineError extends HandledError {
+  declare readonly code: "lwql_granularity_too_fine";
+
+  constructor({
+    requestedGranularitySeconds,
+    windowSeconds,
+    maxBuckets,
+  }: {
+    requestedGranularitySeconds: number;
+    windowSeconds: number;
+    maxBuckets: number;
+  }) {
+    super(
+      "lwql_granularity_too_fine",
+      "The requested datapoint granularity produces more buckets than the selected period allows.",
+      {
+        httpStatus: 400,
+        fault: "customer",
+        meta: {
+          requestedGranularitySeconds,
+          windowSeconds,
+          maxBuckets,
+        },
+        ...remediation("lwql_granularity_too_fine"),
+      },
+    );
+    this.name = "LangWatchQLGranularityTooFineError";
+  }
+}
+
+/**
+ * A statement declared `period_granularity_seconds` without a usable period
+ * window for the bucket budget to be computed against -- either bound absent,
+ * or present but declared as something other than a date-time.
+ *
+ * Refused at *save*: without both bounds the surface cannot compute how many
+ * buckets a run would produce, so the budget contract would be uncomputable
+ * exactly when it matters most -- on the dashboard, where the range is the
+ * dashboard's own control. Declaring the two period parameters alongside is
+ * the fix, and the schema browser spells them.
+ *
+ * The two causes get different copy. Telling an author to declare
+ * `period_start` when it is on screen, declared `String`, sends them looking
+ * for a line that is already there.
+ */
+export class LangWatchQLGranularityRequiresTimeWindowError extends HandledError {
+  declare readonly code: "lwql_granularity_requires_window";
+
+  constructor({
+    absent = [],
+    mistyped = [],
+  }: {
+    /** Period bounds the statement does not declare at all. */
+    readonly absent?: readonly string[];
+    /** Period bounds declared, but not as a date-time. */
+    readonly mistyped?: readonly string[];
+  } = {}) {
+    super(
+      "lwql_granularity_requires_window",
+      mistyped.length > 0 && absent.length === 0
+        ? "A chart declaring period_granularity_seconds must declare period_start and period_end as DateTime."
+        : "A chart declaring period_granularity_seconds must also declare period_start and period_end.",
+      {
+        httpStatus: 400,
+        fault: "customer",
+        // Named consumer: the editor, which highlights the declarations to add
+        // or rewrite rather than making the author diff the two lists.
+        meta: { absent, mistyped },
+        ...remediation("lwql_granularity_requires_window"),
+      },
+    );
+    this.name = "LangWatchQLGranularityRequiresTimeWindowError";
   }
 }

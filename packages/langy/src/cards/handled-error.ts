@@ -247,30 +247,6 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
   // which calls it `network_error` and means it.
   if (isSystemError(record)) return null;
 
-  // Dialect 4: the canonical envelope, nested under `error`. Read first because
-  // it is unambiguous — dialects 1 and 3 both need `error` to be a STRING, so an
-  // object there naming a code can only be this one.
-  const canonical = asRecord(record.error);
-  if (
-    canonical &&
-    (typeof canonical.code === "string" || typeof canonical.type === "string")
-  ) {
-    const code =
-      typeof canonical.code === "string"
-        ? canonical.code
-        : (canonical.type as string);
-    return {
-      code,
-      message:
-        typeof canonical.message === "string" ? canonical.message : undefined,
-      meta: asRecord(canonical.meta) ?? {},
-      traceId:
-        typeof canonical.trace_id === "string" ? canonical.trace_id : undefined,
-      reasons: asReasons(asRecord(canonical.meta)?.reasons),
-      suggestions: asSuggestions(asRecord(canonical.meta)?.suggestions),
-    };
-  }
-
   // Dialect 2: the serialised HandledError, carried whole under `domainError`.
   const serialized = asRecord(record.domainError);
   if (
@@ -309,6 +285,43 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
           : typeof serialized.docUrl === "string"
             ? serialized.docUrl
             : undefined,
+    };
+  }
+
+  // Dialect 4: THE CANONICAL ONE, from the shared REST envelope
+  // (`app/api/shared/schemas.ts`) that the analytics-sql families and every
+  // new canonical-envelope route answer with:
+  // `{ error: { type, code, message, meta?, trace_id?, span_id? } }` — the
+  // whole failure NESTED under `error` as an object, so none of the flat
+  // readings below can see it. `code` is the discriminant, `type` the
+  // status-class alias the Go plane also emits; reasons ride inside
+  // `meta.reasons` and are lifted out. The Go plane's 402 additionally
+  // carries `tips` / `docs_url` at the same level.
+  const canonical = asRecord(record.error);
+  if (
+    canonical &&
+    !isSystemError(canonical) &&
+    (typeof canonical.code === "string" || typeof canonical.type === "string")
+  ) {
+    const code =
+      typeof canonical.code === "string"
+        ? canonical.code
+        : (canonical.type as string);
+    const { reasons: metaReasons, ...meta } = asRecord(canonical.meta) ?? {};
+    return {
+      code,
+      message:
+        typeof canonical.message === "string" && canonical.message !== code
+          ? canonical.message
+          : undefined,
+      meta,
+      traceId:
+        typeof canonical.trace_id === "string" ? canonical.trace_id : undefined,
+      reasons: asReasons(metaReasons),
+      suggestions:
+        asSuggestions(canonical.tips) ?? asSuggestions(canonical.suggestions),
+      docUrl:
+        typeof canonical.docs_url === "string" ? canonical.docs_url : undefined,
     };
   }
 

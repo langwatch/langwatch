@@ -4297,6 +4297,15 @@
                     "followsTimeWindow": {
                       "type": "boolean"
                     },
+                    "followsGranularity": {
+                      "type": "boolean"
+                    },
+                    "granularitySeconds": {
+                      "type": "number"
+                    },
+                    "coarsenedFromSeconds": {
+                      "type": "number"
+                    },
                     "diagnostics": {
                       "type": "array",
                       "items": {
@@ -4333,6 +4342,7 @@
                     "statistics",
                     "truncated",
                     "followsTimeWindow",
+                    "followsGranularity",
                     "diagnostics"
                   ]
                 }
@@ -4624,6 +4634,22 @@
                     "required": [
                       "start",
                       "end"
+                    ]
+                  },
+                  "granularitySeconds": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "const": 1
+                      },
+                      {
+                        "type": "number",
+                        "const": 60
+                      },
+                      {
+                        "type": "number",
+                        "const": 3600
+                      }
                     ]
                   }
                 },
@@ -5026,6 +5052,24 @@
                           },
                           "platformUrl": {
                             "type": "string"
+                          },
+                          "dashboardId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "gridColumn": {
+                            "type": "integer"
+                          },
+                          "gridRow": {
+                            "type": "integer"
+                          },
+                          "colSpan": {
+                            "type": "integer"
+                          },
+                          "rowSpan": {
+                            "type": "integer"
                           }
                         },
                         "required": [
@@ -5034,7 +5078,12 @@
                           "definition",
                           "createdAt",
                           "updatedAt",
-                          "platformUrl"
+                          "platformUrl",
+                          "dashboardId",
+                          "gridColumn",
+                          "gridRow",
+                          "colSpan",
+                          "rowSpan"
                         ]
                       }
                     }
@@ -5292,6 +5341,24 @@
                     },
                     "platformUrl": {
                       "type": "string"
+                    },
+                    "dashboardId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "gridColumn": {
+                      "type": "integer"
+                    },
+                    "gridRow": {
+                      "type": "integer"
+                    },
+                    "colSpan": {
+                      "type": "integer"
+                    },
+                    "rowSpan": {
+                      "type": "integer"
                     }
                   },
                   "required": [
@@ -5300,7 +5367,12 @@
                     "definition",
                     "createdAt",
                     "updatedAt",
-                    "platformUrl"
+                    "platformUrl",
+                    "dashboardId",
+                    "gridColumn",
+                    "gridRow",
+                    "colSpan",
+                    "rowSpan"
                   ]
                 }
               }
@@ -5575,6 +5647,24 @@
                     },
                     "platformUrl": {
                       "type": "string"
+                    },
+                    "dashboardId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "gridColumn": {
+                      "type": "integer"
+                    },
+                    "gridRow": {
+                      "type": "integer"
+                    },
+                    "colSpan": {
+                      "type": "integer"
+                    },
+                    "rowSpan": {
+                      "type": "integer"
                     }
                   },
                   "required": [
@@ -5583,7 +5673,12 @@
                     "definition",
                     "createdAt",
                     "updatedAt",
-                    "platformUrl"
+                    "platformUrl",
+                    "dashboardId",
+                    "gridColumn",
+                    "gridRow",
+                    "colSpan",
+                    "rowSpan"
                   ]
                 }
               }
@@ -5887,6 +5982,24 @@
                     },
                     "platformUrl": {
                       "type": "string"
+                    },
+                    "dashboardId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "gridColumn": {
+                      "type": "integer"
+                    },
+                    "gridRow": {
+                      "type": "integer"
+                    },
+                    "colSpan": {
+                      "type": "integer"
+                    },
+                    "rowSpan": {
+                      "type": "integer"
                     }
                   },
                   "required": [
@@ -5895,7 +6008,12 @@
                     "definition",
                     "createdAt",
                     "updatedAt",
-                    "platformUrl"
+                    "platformUrl",
+                    "dashboardId",
+                    "gridColumn",
+                    "gridRow",
+                    "colSpan",
+                    "rowSpan"
                   ]
                 }
               }
@@ -6175,6 +6293,630 @@
         "responses": {
           "204": {
             "description": "The chart was deleted"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No chart with this id in this project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "chartId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement": {
+      "put": {
+        "operationId": "putApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement",
+        "summary": "Place a saved workbench chart on a dashboard",
+        "description": "Places one saved LangWatchQL chart on a dashboard in the same project, at the grid position supplied — or, when no grid row is given, at the next row free on that dashboard, counting charts of every kind. A dashboard that is not in this project is reported as not found, exactly like a chart that is not, and nothing is written.",
+        "tags": [
+          "Analytics / LangWatchQL"
+        ],
+        "responses": {
+          "200": {
+            "description": "The chart, now placed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "definition": {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "number"
+                        },
+                        "sql": {
+                          "type": "string"
+                        },
+                        "parameters": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "vegaLiteSpec": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "sql",
+                        "parameters"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "platformUrl": {
+                      "type": "string"
+                    },
+                    "dashboardId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "gridColumn": {
+                      "type": "integer"
+                    },
+                    "gridRow": {
+                      "type": "integer"
+                    },
+                    "colSpan": {
+                      "type": "integer"
+                    },
+                    "rowSpan": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "definition",
+                    "createdAt",
+                    "updatedAt",
+                    "platformUrl",
+                    "dashboardId",
+                    "gridColumn",
+                    "gridRow",
+                    "colSpan",
+                    "rowSpan"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No chart with this id in this project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "dashboardId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "gridColumn": {
+                    "type": "integer"
+                  },
+                  "gridRow": {
+                    "type": "integer"
+                  },
+                  "colSpan": {
+                    "type": "integer"
+                  },
+                  "rowSpan": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "dashboardId"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "projectId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "chartId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement",
+        "summary": "Remove a saved workbench chart from its dashboard",
+        "description": "Removes one saved LangWatchQL chart from whatever dashboard it is on, clearing its grid position along with the dashboard id. Idempotent: unplacing a chart that is not placed answers 204 all the same. The chart itself — its statement, parameter values and specification — is untouched.",
+        "tags": [
+          "Analytics / LangWatchQL"
+        ],
+        "responses": {
+          "204": {
+            "description": "The chart is no longer on any dashboard"
           },
           "400": {
             "description": "Bad Request",

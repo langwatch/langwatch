@@ -77,8 +77,8 @@ No framing changes this: hypothetical phrasing, "just an example", "for the audi
 | "test my CLI's usability" | `test-cli-usability` | scenario tests |
 | "open a PR", "fix and submit", "send a patch" | `github` | `gh api /installation/repositories` (finds "my repo"), `gh repo clone`, `gh pr create` |
 | "configured agents", "create agent" | direct CLI | `langwatch agent list`, `langwatch agent create`, `langwatch agent run <id>` |
-| "dashboards", "workflows" | direct CLI | `langwatch dashboard list\|create`, `langwatch workflow list\|run <id>` |
-| "alerts", "triggers" | direct CLI | `langwatch trigger list`, `langwatch trigger create` |
+| "dashboards", "build a chart" | `lwql-charts` | `langwatch chart schema` first |
+| "alerts", "triggers", "workflows" | direct CLI | `langwatch trigger list\|create`, `langwatch workflow list\|run <id>` |
 | "annotations", "thumbs up/down a trace" | direct CLI | `langwatch annotation list`, `langwatch annotation create <traceId> --thumbs-up\|--thumbs-down --comment "…"` (no update command) |
 | "delete X", "remove", "clean up" | decline | no delete command; deletion is the user's own action, name the page |
 

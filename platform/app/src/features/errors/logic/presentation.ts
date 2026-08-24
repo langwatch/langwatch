@@ -356,14 +356,48 @@ const presentations = {
       "The query declares parameters that weren't given values. Supply one for each and try again.",
   },
   lwql_reserved_parameter_supplied: {
-    title: "The time window isn't yours to set",
-    describe: () =>
-      "period_start and period_end come from the period this page is showing. Remove them from your parameters and change the period instead.",
+    // One code covers three reserved names, so both halves of the copy are
+    // built from the ones actually supplied (`meta.parameters`, the same list
+    // the server's own sentence is built from). Naming the window pair
+    // unconditionally told a caller that sent only the granularity step to
+    // remove two parameters it had never sent.
+    title: "That setting isn't yours to set",
+    describe: (error) => {
+      const supplied = strList(error, "parameters");
+      if (supplied.length === 0) {
+        return "Some of these parameters come from the page showing this chart. Remove them from your parameters and change the page's settings instead.";
+      }
+      const plural = supplied.length > 1;
+      return `${listLabels(supplied)} ${plural ? "come" : "comes"} from the page showing this chart. Remove ${plural ? "them" : "it"} from your parameters and change the page's settings instead.`;
+    },
   },
   lwql_reserved_parameter_type: {
     title: "The time window has to be a date and time",
     describe: () =>
       "Declare period_start and period_end as DateTime, for example {period_start:DateTime}, and run the query again.",
+  },
+  // `LangWatchQLReservedGranularityTypeError` carries a `granularityFault` of
+  // either `"declared-type"` or `"step-value"`, but the three doors that can
+  // reach this code (REST, the ad-hoc tRPC query, run-by-chart-id) now reject
+  // an off-list `granularitySeconds` at their own zod schema before a request
+  // ever reaches the service's `"step-value"` backstop, so this code is only
+  // ever live for the declaration-type fault today. One message, not a
+  // `meta`-branched pair, for a discriminator whose other branch is
+  // unreachable from every current caller.
+  lwql_granularity_parameter_type: {
+    title: "The granularity has to be declared as UInt32",
+    describe: () =>
+      "Declare period_granularity_seconds as UInt32, for example {period_granularity_seconds:UInt32}, and run the query again.",
+  },
+  lwql_granularity_too_fine: {
+    title: "That granularity would return too many datapoints",
+    describe: () =>
+      "The bucket size you picked produces more datapoints than one query may return for this date range. Pick a bucket size that fits the range from the offered steps -- 1 second, 1 minute or 1 hour -- or narrow the range.",
+  },
+  lwql_granularity_requires_window: {
+    title: "Granularity needs the period parameters",
+    describe: () =>
+      "A query declaring period_granularity_seconds must also declare {period_start:DateTime} and {period_end:DateTime}, so the datapoint budget can be checked against the selected period.",
   },
   lwql_not_enabled: {
     title: "Custom SQL isn't switched on here",
@@ -374,6 +408,11 @@ const presentations = {
     title: "That chart id is already taken",
     describe: () =>
       "A saved chart with this id already exists in this project. Save again with a different id, or leave the id out to have one chosen for you.",
+  },
+  saved_workbench_chart_dashboard_not_found: {
+    title: "That dashboard isn't here",
+    describe: () =>
+      "It may have been deleted, or it belongs to another project. Check the list of dashboards and try placing the chart again.",
   },
   saved_workbench_chart_not_found: {
     title: "That saved chart isn't here",

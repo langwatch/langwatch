@@ -55554,6 +55554,162 @@ Write scenarios where the agent makes a mistake and must recover:
   </div>
 </div>
 
+<div className="lw-accordion">
+  <div className="lw-accordion-header" role="button" tabIndex={0} aria-expanded="false">
+    <span className="lw-accordion-title">Build a chart from a question and put it on my dashboard</span>
+    <svg className="lw-accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9L12 15L18 9" /></svg>
+  </div>
+  <div className="lw-accordion-body">
+    <div className="lw-accordion-commands">
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Install via CLI</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"npx skills add langwatch/skills/recipes/lwql-charts"} data-track="docs_copy_skill_install" data-track-title={"Build a chart from a question and put it on my dashboard"} data-track-skill={"langwatch/skills/recipes/lwql-charts"}>
+          <code>npx skills add langwatch/skills/recipes/lwql-charts</code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+      <div className="lw-accordion-cmd-col">
+        <div className="lw-accordion-cmd-label">Skill Usage</div>
+        <div className="lw-accordion-cmd-box" role="button" tabIndex={0} data-copy={"/lwql-charts"} data-track="docs_copy_slash_command" data-track-title={"Build a chart from a question and put it on my dashboard"} data-track-command={"/lwql-charts"}>
+          <code><span className="lw-slash-command">/lwql-charts</span></code>
+          <span className="lw-inline-copy-btn lw-copy-line-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+          <span className="lw-inline-copy-btn lw-copy-line-check" style={{ display: "none" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        </div>
+      </div>
+    </div>
+    <div className="lw-accordion-actions">
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-copy-source="prompt" data-track="docs_copy_prompt" data-track-title={"Build a chart from a question and put it on my dashboard"} data-track-skill={"langwatch/skills/recipes/lwql-charts"}>
+        <span className="lw-accordion-action-icon lw-copy-line-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg></span>
+        <span className="lw-accordion-action-icon lw-copy-line-check" style={{ display: "none" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17L4 12" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Copy Full Prompt</span>
+          <span className="lw-accordion-action-subtitle">Run skill without installing</span>
+        </span>
+        <div className="lw-prompt-source">
+
+````text
+Build a chart from a question and put it on my dashboard
+
+You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
+
+# Author a Chart and Place It on a Dashboard
+
+Turn a question ("how many traces per day?", "cost by model this week") into a saved chart that keeps updating on a dashboard. The loop is: **discover the schema → write and test-run the SQL → save the chart → place it**.
+
+## Prerequisites
+
+Use `langwatch docs <path>` to read documentation as Markdown. Some useful entry points:
+
+```bash
+langwatch docs                                    # Docs index
+langwatch docs integration/python/guide           # Python integration
+langwatch docs integration/typescript/guide       # TypeScript integration
+langwatch docs prompt-management/cli              # Prompts CLI
+langwatch scenario-docs                           # Scenario docs index
+```
+
+Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. List and get commands accept `--format json` for machine-readable output. Read the docs first instead of guessing SDK APIs or CLI flags.
+
+If no shell is available, fetch the same Markdown over plain HTTP. Append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
+
+If anything fails or confuses you while following this skill (broken commands, docs that do not match reality, errors you had to work around), ask the user for permission and run `npx --yes langwatch report --user-approved` with a `--title` and `--summary` (or `--session <transcript.jsonl>`) to send it to the LangWatch team, and it directly shapes what gets fixed. No login or API key needed. Nothing is sent without `--user-approved`, and `--dry-run` prints the exact payload without sending anything. The title, summary and transcript are scrubbed locally first, by pattern: secrets and API keys, plus email addresses, phone numbers, card numbers and public IPv4 addresses. Anything no pattern matches is sent as written, including a contact address passed with `--email`. With `--session`, always run `--dry-run` first and let the user read the payload, because a transcript carries content they never reviewed. `npx --yes langwatch report --help` explains the options.
+
+LangWatchQL analytics is switched per project. If any chart command answers with error code `lwql_not_enabled`, the feature is off for this project — tell the user, do not retry.
+
+## Step 1: Discover the schema before writing any SQL
+
+Never guess dataset or column names. The schema command lists every dataset your credentials may query, each column's type and description, and a runnable example query per dataset:
+
+```bash
+langwatch chart schema -f json
+```
+
+Read the datasets, their grain, their time column, and which columns are `available` to you. Saving validates the SQL against the analytics policy and the specification against the chart policy — it does not check that every column exists, so SQL naming a wrong column saves fine and only fails when the chart runs. Writing SQL against the schema you just read, then test-running the chart right after saving it (Step 3), is what catches a bad column before anyone sees it on a dashboard.
+
+## Step 2: Write the SQL, using the reserved period parameters
+
+A chart that should follow the dashboard's period selector declares the reserved bound parameters instead of hardcoding dates:
+
+- `{period_start:DateTime}` / `{period_end:DateTime}` — the surface's period, half-open `[start, end)`
+- `{period_granularity_seconds:UInt32}` — the surface's datapoint step, in seconds
+
+```sql
+SELECT
+  toStartOfInterval(OccurredAt, INTERVAL {period_granularity_seconds:UInt32} SECOND) AS bucket,
+  count() AS traces
+FROM analytics.traces
+WHERE OccurredAt >= {period_start:DateTime} AND OccurredAt < {period_end:DateTime}
+GROUP BY bucket
+ORDER BY bucket
+```
+
+Your own parameters (`{since:DateTime}`, `{model:String}`, …) get their values from `--param`; never pass a value for the reserved `period_*` names.
+
+## Step 3: Save the chart, then prove it runs
+
+```bash
+langwatch chart create \
+  --name "Traces per day" \
+  --sql-file query.sql \
+  --spec-file spec.json \
+  -f json
+```
+
+`spec.json` is a Vega-Lite specification reading from `{"data": {"name": "query_result"}}`, with fields named exactly after the SQL's output columns. The save validates the SQL against the analytics policy and the specification against the chart policy before writing anything — a refusal means fix the input, not retry. It does not check column names against the schema, which is why the very next command is always a run: a chart that saves but names a wrong column fails only at run time.
+
+See the numbers before placing it:
+
+```bash
+langwatch chart run <chart-id> \
+  --start 2026-08-01T00:00:00Z --end 2026-08-08T00:00:00Z \
+  --granularity 3600 -f json
+```
+
+`--start`/`--end` fill the reserved period parameters and `--granularity` the datapoint step, which only accepts the offered steps: `1` (second), `60` (minute), `3600` (hour). A chart whose SQL declares the reserved period parameters **requires** `--start` and `--end` on every run — there is no default window, and running without them is refused. Only a chart that declares none of them runs without the flags.
+
+## Step 4: Place it on a dashboard
+
+```bash
+langwatch dashboard list -f json          # find or create the target
+langwatch chart place <chart-id> --dashboard-id <dashboard-id> -f json
+```
+
+With no `--grid-row`, the platform allocates the next free row, so it never lands on top of an existing chart. `langwatch chart unplace <chart-id>` takes it off again without deleting it.
+
+## Managing saved charts
+
+```bash
+langwatch chart list -f json
+langwatch chart get <chart-id> -f json    # SQL, parameters, spec, placement
+langwatch chart update <chart-id> --sql-file query.sql
+langwatch chart delete <chart-id>
+```
+
+## Failure modes worth knowing
+
+- `lwql_not_enabled` — the project's LangWatchQL switch is off; stop and say so.
+- A save that succeeds but a run that fails naming a column — the SQL names one that does not exist; re-read the schema (Step 1) and fix the column, then update the chart.
+- `saved_workbench_chart_specification_refused` — the Vega-Lite specification breaks the chart policy; simplify it (one `query_result` data source, fields matching the SQL columns).
+- `saved_workbench_chart_dashboard_not_found` — the dashboard id is not in this project; list dashboards again.
+````
+
+        </div>
+      </div>
+      <div className="lw-accordion-action" role="button" tabIndex={0} data-download-url="https://raw.githubusercontent.com/langwatch/skills/main/recipes/lwql-charts/SKILL.md" data-download-name="SKILL.md" data-track="docs_download_skill" data-track-title={"Build a chart from a question and put it on my dashboard"} data-track-skill={"langwatch/skills/recipes/lwql-charts"}>
+        <span className="lw-accordion-action-icon"><svg width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15.25 3.75H2.75C1.64543 3.75 0.75 4.64543 0.75 5.75V12.25C0.75 13.3546 1.64543 14.25 2.75 14.25H15.25C16.3546 14.25 17.25 13.3546 17.25 12.25V5.75C17.25 4.64543 16.3546 3.75 15.25 3.75Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M8.75 11.25V6.75H8.356L6.25 9.5L4.144 6.75H3.75V11.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M11.5 9.5L13.25 11.25L15 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><path d="M13.25 11.25V6.75" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
+        <span className="lw-accordion-action-text">
+          <span className="lw-accordion-action-title">Download SKILL.md</span>
+          <span className="lw-accordion-action-subtitle">Manual installation</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
 {/* lw-generated:recipes:end */}
 
 <div className="lw-info-box">

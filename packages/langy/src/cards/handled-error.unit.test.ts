@@ -315,6 +315,64 @@ describe("parseHandledError, given dialect 4 (the canonical envelope)", () => {
  * `specs/features/domain-error-contract.feature` names the CLI as a consumer
  * that must be able to self-diagnose from these.
  */
+describe("parseHandledError, given dialect 4 (the canonical nested envelope)", () => {
+  it("reads code, sentence, trace and meta from under the `error` object", () => {
+    const parsed = parseHandledError({
+      status: 404,
+      body: {
+        error: {
+          type: "not_found",
+          code: "saved_workbench_chart_not_found",
+          message: "Saved chart not found.",
+          meta: { chart_id: "chart-1" },
+          trace_id: TRACE_ID,
+        },
+      },
+    });
+
+    expect(parsed).toMatchObject({
+      code: "saved_workbench_chart_not_found",
+      message: "Saved chart not found.",
+      httpStatus: 404,
+      meta: { chart_id: "chart-1" },
+      traceId: TRACE_ID,
+      isHandled: true,
+    });
+  });
+
+  it("lifts the reason chain out of `meta.reasons`", () => {
+    const parsed = parseHandledError({
+      status: 400,
+      body: {
+        error: {
+          type: "bad_request",
+          code: "validation_error",
+          message: "The request didn't match the expected shape.",
+          meta: {
+            fields: ["granularitySeconds"],
+            reasons: [{ code: "schema_failure" }],
+          },
+        },
+      },
+    });
+
+    expect(parsed.meta).toEqual({ fields: ["granularitySeconds"] });
+    expect(parsed.reasons).toEqual([{ kind: "schema_failure" }]);
+  });
+
+  it("does not read a nested transport failure as the platform speaking", () => {
+    const parsed = parseHandledError({
+      status: 0,
+      body: {
+        error: { code: "ECONNREFUSED", errno: -61, syscall: "connect" },
+      },
+    });
+
+    expect(parsed.isHandled).toBe(false);
+    expect(parsed.code).toBe("network_error");
+  });
+});
+
 describe("parseHandledError, given the platform's remediation channel", () => {
   it("reads `tips` and `docsUrl`, the names the platform actually emits", () => {
     const parsed = parseHandledError({

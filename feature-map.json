@@ -781,9 +781,23 @@
             "graph get",
             "graph create",
             "graph update",
-            "graph delete"
+            "graph delete",
+            "chart schema",
+            "chart list",
+            "chart get",
+            "chart create",
+            "chart update",
+            "chart delete",
+            "chart run",
+            "chart place",
+            "chart unplace"
           ],
-          "skill": null,
+          "hints": {
+            "chart create": "langwatch chart create --name \"Traces per day\" --sql-file query.sql --param since=2026-01-01 --spec-file spec.json",
+            "chart run": "langwatch chart run <chart-id> --start 2026-08-01T00:00:00Z --end 2026-08-08T00:00:00Z --granularity 3600",
+            "chart place": "langwatch chart place <chart-id> --dashboard-id <dashboard-id>"
+          },
+          "skill": "lwql-charts",
           "docs": null
         },
         "platform": {
