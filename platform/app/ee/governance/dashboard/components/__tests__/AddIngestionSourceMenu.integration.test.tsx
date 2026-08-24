@@ -63,7 +63,7 @@ describe("given the Add source menu", () => {
         "Claude Code (Anthropic OAuth)",
         "Anthropic Claude (Cowork)",
         "Workato",
-        "Microsoft Copilot Studio (Purview)",
+        "Microsoft 365 audit (Copilot Studio)",
         "OpenAI Enterprise Compliance",
         "Anthropic Claude Enterprise Compliance",
         "Anthropic Admin API (usage & cost)",
