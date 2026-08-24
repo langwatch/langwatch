@@ -16,11 +16,11 @@
  * serves nothing but a 404 for unknown version segments.
  */
 import { createService, type MountedRoute } from "@langwatch/api";
-
+import type { AuthzPermission } from "@langwatch/authz";
+import { appContextMiddleware } from "~/app/api/middleware/app-context";
 import { requireEnterprisePlanRest } from "~/app/api/middleware/enterprise-gate";
 import { requireOrgPermissionOrThrow } from "~/app/api/middleware/org-auth";
 import type { EnterpriseFeature } from "~/server/api/enterprise";
-import type { Permission } from "~/server/api/rbac";
 import {
   type AccessPolicy,
   credentialClassFor,
@@ -81,16 +81,22 @@ export function createManagementService({
   const service = createService({
     name,
     basePath,
+    middleware: [appContextMiddleware],
     auth: createOrgAuthMiddleware({ prisma, refusals: "throw" }),
+    // The framework mounts this for every endpoint that declares a
+    // `permission`, between auth and the endpoint's own middleware. The
+    // enforcement runs through the App-composed permissions service
+    // (`requireOrgPermissionOrThrow` → `getApp().permissions`), and because
+    // the framework owns the mounting, an endpoint's `middleware` array can
+    // no longer displace the check its declared policy promises.
+    permissionEnforcer: (permission) => requireOrgPermissionOrThrow(permission),
     onRouteMounted: (route) => registerMountedRoute({ route, family }),
   });
 
-  const guard = (permission: Permission) => ({
+  const guard = (permission: AuthzPermission) => ({
     meta: { policy: requires(permission) } satisfies ManagementEndpointMeta,
-    middleware: [
-      requireOrgPermissionOrThrow(permission),
-      requireEnterprisePlanRest(feature),
-    ],
+    permission,
+    middleware: [requireEnterprisePlanRest(feature)],
   });
 
   return { service, guard };
@@ -132,6 +138,20 @@ function registerMountedRoute({
       `Management endpoint ${route.method.toUpperCase()} ${route.path} ` +
         `declares no access policy; spread guard(permission) into its ` +
         `endpoint config`,
+    );
+  }
+  // The registry must never promise a check the pipeline does not mount: a
+  // permission policy in `meta` is only honest when the SAME permission is on
+  // `config.permission`, which is what the framework enforces from.
+  if (
+    meta.policy.kind === "permission" &&
+    route.config?.permission !== meta.policy.permission
+  ) {
+    throw new Error(
+      `Management endpoint ${route.method.toUpperCase()} ${route.path} ` +
+        `declares policy "${meta.policy.permission}" but enforces ` +
+        `"${route.config?.permission ?? "nothing"}"; both halves must come ` +
+        `from the same guard(permission)`,
     );
   }
   registerRoutePolicy({

@@ -306,6 +306,33 @@ Feature: AI Gateway virtual key creation
     And the budget row is kept with its spend history
 
   @integration
+  Scenario: Revoking a key retires a cap that targets only that key
+    Given a budget created on the budgets page that targets one key
+    When that key is revoked
+    Then the budget is retired too, because a revoked key can never spend again
+
+  @integration
+  Scenario: Revoking a key retires a per-end-user allowance anchored on it
+    Given a per-end-user budget anchored on a key
+    When that key is revoked
+    Then the allowance is retired, because no further end user can be attributed to it
+
+  @integration
+  Scenario: Revoking a key leaves a project budget standing
+    Given a project has a budget
+    And a key scoped to that project
+    When the key is revoked
+    Then the project budget still applies, because another key can be scoped there
+
+  @integration
+  Scenario: Clearing the drawer budget leaves an independently created cap alone
+    Given a key with a drawer budget
+    And a budget created on the budgets page that targets the same key
+    When the drawer budget field is cleared
+    Then only the drawer budget is retired
+    And the independently created cap still applies, because the key is still live
+
+  @integration
   Scenario: The drawer lists the budgets that already constrain this key
     Given the organization has a monthly budget
     And project "web-app" has a monthly budget
@@ -381,3 +408,50 @@ Feature: AI Gateway virtual key creation
     # The old implicit default was fallback-across-everything. Existing keys
     # are pinned to it so nothing changes under a customer; only new keys
     # get the safer default.
+
+  # ============================================================================
+  # When the key stops working
+  #
+  # A key handed to a contractor, a demo, or a test run has a natural end
+  # date, and the way that ends today is that somebody remembers to revoke
+  # it. The drawer asks for the date instead. "Never" stays the default,
+  # because most keys are not temporary and a form that expires things by
+  # accident is worse than one that never does.
+  # ============================================================================
+
+  @integration
+  Scenario: The drawer offers an expiration and defaults to never
+    When I choose to create a key
+    Then the expiration choice reads "Never"
+    And the key it creates has no expiration date
+
+  @integration
+  Scenario: Picking a period states the date the key stops working
+    When I pick an expiration of 7 days
+    Then the drawer shows me the resolved date in words
+    And the created key carries that date
+    # A period is easy to pick and impossible to check. The date is what
+    # the reader has to be able to repeat back.
+
+  @integration
+  Scenario: A custom date expires the key at the end of that day
+    When I pick a custom expiration date
+    Then the key works for the whole of that day and stops after it
+    # Picking "the 20th" and losing the key at midnight of the 19th is the
+    # single most common way a date field surprises somebody.
+
+  @integration
+  Scenario: An expiration date in the past is refused
+    When I try to create a key that expired before it was made
+    Then the key is refused, naming the expiration field
+    And the refusal tells me to pick a date in the future
+
+  @integration
+  Scenario: The expiration date is published on the key
+    Given a key created with an expiration date
+    When the key is read over the API
+    Then it carries the expiration date
+    And its status is still "active"
+    # Expiry is a date, not a status value: adding an "expired" status to
+    # the wire enum would break every client that switches on the three it
+    # already knows, for a fact each of them can read off the date.

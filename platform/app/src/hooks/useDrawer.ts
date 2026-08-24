@@ -470,16 +470,13 @@ export const useDrawer = () => {
         replaceCurrentInStack?: boolean;
       } = {},
     ) => {
-      // The Trace Explorer drawer is the default for every trace open, from
-      // every entry point — not only the call sites that go through
-      // useTraceDetailsDrawer. Only the legacy Traces page keeps the legacy
-      // drawer, so operators who deliberately navigated there get a coherent
-      // legacy view until the page is removed. See routeTraceDrawerForV2.
+      // The Trace Explorer drawer is where every trace open lands, from every
+      // entry point — not only the call sites that go through
+      // useTraceDetailsDrawer. See routeTraceDrawerForV2.
       const { drawer: effectiveDrawer, props: effectiveProps } =
         routeTraceDrawerForV2(
           drawer,
           props as Record<string, unknown> | undefined,
-          router.pathname === "/[project]/messages",
         );
 
       // Extract urlParams and merge with props

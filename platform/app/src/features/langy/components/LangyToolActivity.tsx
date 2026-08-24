@@ -34,7 +34,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
-import { parseCliJson, readCliErrorDocument } from "@langwatch/langy";
+import {
+  cliToolResultPayload,
+  cliToolResultSchema,
+  parseCliJson,
+  readCliErrorDocument,
+} from "@langwatch/langy";
 import type { UIMessage } from "ai";
 import { Braces, Check, ChevronRight, Layers3 } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
@@ -60,7 +65,11 @@ import {
   type LangyToolErrorPresentation,
   presentLangyToolError,
 } from "../logic/langyToolFailure";
-import { describeToolCall, effectiveToolName } from "../logic/langyToolLabel";
+import {
+  commandOf,
+  describeToolCall,
+  effectiveToolName,
+} from "../logic/langyToolLabel";
 import { useLangyStore } from "../stores/langyStore";
 import { LangyCapabilityPendingCard } from "./capabilities/LangyCapabilityPendingCard";
 import {
@@ -69,6 +78,7 @@ import {
   LangyCapabilityRenderer,
   toolResultForCapability,
 } from "./capabilities/LangyCapabilityRenderer";
+import { LangyInterruptedNote } from "./LangyInterruptedNote";
 import { LangyPlanLimitCard } from "./LangyPlanLimitCard";
 import { LangyToolErrorCard } from "./LangyToolErrorCard";
 import { langyThinkingShimmerStyles } from "./langyShimmer";
@@ -151,6 +161,13 @@ export type ActivityGroup = {
   calls: ToolCall[];
   /** @see Sequenced */
   order: number;
+  /**
+   * The part index of the group's LATEST call. `order` anchors the group where
+   * its first call ran; this says how recently it was active — which is what
+   * decides whether it is the turn's freshest settled work (see the held card
+   * in {@link LangyActivityParts}).
+   */
+  lastOrder: number;
 };
 
 export type FailedToolCall = {
@@ -601,6 +618,7 @@ function readActivityGroups(message: PartsView): ActivityGroup[] {
       existing.done = existing.done && done;
       existing.detail = described.detail ?? existing.detail;
       existing.calls.push(call);
+      existing.lastOrder = index;
     } else {
       order.push(key);
       byKey.set(key, {
@@ -610,6 +628,7 @@ function readActivityGroups(message: PartsView): ActivityGroup[] {
         done,
         calls: [call],
         order: index,
+        lastOrder: index,
       });
     }
   });
@@ -620,6 +639,7 @@ function readActivityGroups(message: PartsView): ActivityGroup[] {
 export function LangyToolActivity({
   message,
   reasoningTitles,
+  live = true,
 }: {
   message: UIMessage;
   /**
@@ -629,11 +649,14 @@ export function LangyToolActivity({
    * collapsed card, not a stack of loose bold lines above the answer.
    */
   reasoningTitles?: string[];
+  /** @see LangyActivityParts */
+  live?: boolean;
 }) {
   return (
     <LangyActivityParts
       parts={message.parts}
       reasoningTitles={reasoningTitles}
+      live={live}
     />
   );
 }
@@ -643,18 +666,27 @@ export function LangyToolActivity({
  * message (LangyToolActivity) and one plan step's attributed calls
  * (LangyPlanCard). Renders nothing when the parts carry no activity, so a bucket
  * with only prose collapses to nothing.
+ *
+ * `live` says whether the turn these parts belong to is still running. It is
+ * what tells an unfinished call apart from an INTERRUPTED one: a tool part is
+ * only ever closed by its own output, so a turn that the user stopped (or that
+ * died) leaves its open calls in the running state for good. On a settled turn
+ * those calls are drawn as interrupted, with no pulse and no shimmer, instead
+ * of a card that says "Searching traces…" for the rest of the conversation.
  */
 export function LangyActivityParts({
   parts,
   reasoningTitles = [],
-}: PartsView & { reasoningTitles?: string[] }) {
+  live = true,
+}: PartsView & { reasoningTitles?: string[]; live?: boolean }) {
   const [devMode] = useLangyDevMode();
   const turnProgress = useLangyStore((state) => state.turnProgress);
   const turnProgressSample = useLangyStore((state) => state.turnProgressSample);
+  const turnPhase = useLangyStore((state) => state.turnPhase);
   const view: PartsView = { parts };
   const groups = toActivityGroups(view);
   const runningGroups = groups.filter((group) => !group.done);
-  const completedGroups = groups.filter((group) => group.done);
+  const allCompletedGroups = groups.filter((group) => group.done);
   const capabilityCalls = toCapabilityCalls(view);
   const capabilityBatches = batchCapabilityCalls(capabilityCalls);
   const pending = toPendingCapabilities(view);
@@ -667,6 +699,30 @@ export function LangyActivityParts({
   ) {
     return null;
   }
+
+  // While the turn is streaming, the action that finished LAST holds its
+  // ground as a settled card instead of folding into the receipt the instant
+  // its output lands — the reader is watching the model think about what that
+  // call returned. It folds when anything takes its place: the next call
+  // starting (running or pending below), answer text streaming in after it, a
+  // failure or capability card landing after it, or the turn settling.
+  const heldGroup = (() => {
+    if (turnPhase === "idle") return null;
+    if (runningGroups.length > 0 || pending.length > 0) return null;
+    if (allCompletedGroups.length === 0) return null;
+    const latest = allCompletedGroups.reduce((left, right) =>
+      right.lastOrder > left.lastOrder ? right : left,
+    );
+    const supersededAt = Math.max(
+      lastAnswerTextIndex(view),
+      ...capabilityCalls.map((entry) => entry.order),
+      ...failures.map((failure) => failure.order),
+    );
+    return latest.lastOrder > supersededAt ? latest : null;
+  })();
+  const completedGroups = heldGroup
+    ? allCompletedGroups.filter((group) => group !== heldGroup)
+    : allCompletedGroups;
 
   // One ordered transcript, not four stacked piles keyed by kind. Every block
   // knows the part it came from, so the render is a stable sort on that: a
@@ -689,7 +745,11 @@ export function LangyActivityParts({
       order: group.order,
       node: (
         <VStack align="stretch" gap={2} role="list">
-          <RunningActivityCard group={group} devMode={devMode} />
+          <RunningActivityCard
+            group={group}
+            devMode={devMode}
+            interrupted={!live}
+          />
         </VStack>
       ),
     })),
@@ -716,6 +776,22 @@ export function LangyActivityParts({
           },
         ]
       : []),
+    ...(heldGroup
+      ? [
+          {
+            key: `held:${heldGroup.key}`,
+            order: heldGroup.lastOrder,
+            node: (
+              <VStack align="stretch" gap={2} role="list">
+                <LatestSettledActivityCard
+                  group={heldGroup}
+                  devMode={devMode}
+                />
+              </VStack>
+            ),
+          },
+        ]
+      : []),
     ...capabilityBatches.map((batch) => ({
       key: `capability:${batch.key}`,
       order: batch.order,
@@ -735,6 +811,7 @@ export function LangyActivityParts({
           progressSample={
             index === pending.length - 1 ? turnProgressSample : null
           }
+          interrupted={!live}
         />
       ),
     })),
@@ -904,52 +981,81 @@ function CompletedActivityRow({
   devMode: boolean;
 }) {
   const [jsonOpen, setJsonOpen] = useState(false);
+  const [resultOpen, setResultOpen] = useState(false);
+  // The receipt names what ran; the result is what the model actually read,
+  // and "why did it conclude that?" is unanswerable without it. Only rows
+  // with a recorded result open — an empty disclosure would promise
+  // something the record does not hold.
+  const callsWithResult = group.calls.filter(
+    (call) => toolResultText(call) !== null,
+  );
+  const canOpenResult = callsWithResult.length > 0;
+
+  // Spans, not the default paragraph: the disclosure below wraps these in a
+  // native <button>, which may hold phrasing content only.
+  const label = (
+    <Text
+      as="span"
+      display="block"
+      textStyle="xs"
+      color="fg"
+      fontWeight="520"
+      flex={1}
+      // Without this the label wraps to a second line and the row grows,
+      // while the detail beside it truncates — the two halves of one row
+      // disagreeing about how to run out of space.
+      minWidth={0}
+      truncate
+    >
+      {completedActivityLabel(group.label)}
+    </Text>
+  );
+  const detail = group.detail ? (
+    <Text
+      as="span"
+      display="block"
+      textStyle="2xs"
+      color="fg.subtle"
+      fontFamily="mono"
+      maxWidth="52%"
+      truncate
+    >
+      {group.detail}
+    </Text>
+  ) : null;
 
   return (
     <VStack align="stretch" gap={1} role="listitem">
       <HStack gap={2} paddingY={1.5}>
-        <Text
-          textStyle="xs"
-          color="fg"
-          fontWeight="520"
-          flex={1}
-          // Without this the label wraps to a second line and the row grows,
-          // while the detail beside it truncates — the two halves of one row
-          // disagreeing about how to run out of space.
-          minWidth={0}
-          truncate
-        >
-          {completedActivityLabel(group.label)}
-        </Text>
-        {group.detail ? (
-          <Text
-            textStyle="2xs"
-            color="fg.subtle"
-            fontFamily="mono"
-            maxWidth="52%"
-            truncate
+        {canOpenResult ? (
+          <ResultDisclosureButton
+            isExpanded={resultOpen}
+            onToggle={() => setResultOpen((value) => !value)}
           >
-            {group.detail}
-          </Text>
-        ) : null}
+            {label}
+            {/* The truncated command gives way to the full one below it. */}
+            {resultOpen ? null : detail}
+          </ResultDisclosureButton>
+        ) : (
+          <>
+            {label}
+            {detail}
+          </>
+        )}
         {devMode ? (
-          <Tooltip
-            content={jsonOpen ? "Hide raw data" : "Show raw data"}
-            showArrow
-          >
-            <IconButton
-              size="2xs"
-              variant="ghost"
-              color={jsonOpen ? "orange.solid" : "fg.subtle"}
-              aria-label={jsonOpen ? "Hide raw data" : "Show raw data"}
-              aria-expanded={jsonOpen}
-              onClick={() => setJsonOpen((value) => !value)}
-            >
-              <Braces size={12} />
-            </IconButton>
-          </Tooltip>
+          <RawDataToggle
+            isOpen={jsonOpen}
+            onToggle={() => setJsonOpen((value) => !value)}
+          />
         ) : null}
       </HStack>
+      {resultOpen ? (
+        <VStack align="stretch" gap={1.5} paddingBottom={1.5}>
+          {callsWithResult.map((call, index) => (
+            <OpenedToolCall key={call.toolCallId ?? index} call={call} />
+          ))}
+        </VStack>
+      ) : null}
       {devMode && jsonOpen ? (
         <VStack align="stretch" gap={1} paddingBottom={1.5}>
           {group.calls.map((call, index) => (
@@ -958,6 +1064,188 @@ function CompletedActivityRow({
         </VStack>
       ) : null}
     </VStack>
+  );
+}
+
+/**
+ * The label half of a finished row, made to open. The devMode raw-JSON toggle
+ * sits beside it as its own button, so the disclosure covers only this half —
+ * a button inside a button is not a thing.
+ */
+function ResultDisclosureButton({
+  isExpanded,
+  onToggle,
+  children,
+}: {
+  isExpanded: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <chakra.button
+      type="button"
+      display="flex"
+      alignItems="center"
+      gap={2}
+      flex={1}
+      minWidth={0}
+      textAlign="left"
+      cursor="pointer"
+      aria-expanded={isExpanded}
+      onClick={onToggle}
+      _focusVisible={{
+        outline: "2px solid",
+        outlineColor: "orange.solid",
+        outlineOffset: "2px",
+        borderRadius: "4px",
+      }}
+    >
+      {children}
+      <Box
+        as="span"
+        color="fg.subtle"
+        transition="transform 0.18s ease"
+        transform={isExpanded ? "rotate(90deg)" : undefined}
+        flexShrink={0}
+        display="flex"
+      >
+        <ChevronRight size={12} />
+      </Box>
+    </chakra.button>
+  );
+}
+
+/** Dev mode's raw-payload toggle for one finished row. */
+function RawDataToggle({
+  isOpen,
+  onToggle,
+}: {
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
+  const label = isOpen ? "Hide raw data" : "Show raw data";
+  return (
+    <Tooltip content={label} showArrow>
+      <IconButton
+        size="2xs"
+        variant="ghost"
+        color={isOpen ? "orange.solid" : "fg.subtle"}
+        aria-label={label}
+        aria-expanded={isOpen}
+        onClick={onToggle}
+      >
+        <Braces size={12} />
+      </IconButton>
+    </Tooltip>
+  );
+}
+
+/**
+ * What one finished call returned, as the model read it. A failed call's
+ * result IS its error text. Null when the record kept no result at all —
+ * the caller uses that to withhold the disclosure, not to render "nothing".
+ *
+ * The DATA, not the transport. A CLI result travels as a JSON string holding
+ * the `{ kind, payload }` envelope (see `cliToolResultSchema`), so printing
+ * `call.output` verbatim showed the reader `{"kind":"json","payload":[]}` on
+ * one unindented line: the envelope quoted at them, with the answer they came
+ * for as a fragment inside it. Unwrap to the payload and indent it.
+ *
+ * Only an output that is JSON *whole* is reformatted, which is why this parses
+ * strictly instead of reaching for `parseCliJson`. That reader lifts the first
+ * balanced document out of surrounding console noise, which is right for a card
+ * (it wants the document) and wrong here (the noise is part of what the model
+ * read). A shell call that logs a line and then prints JSON keeps both.
+ */
+function toolResultText(call: ToolCall): string | null {
+  if (call.errorText) return call.errorText;
+  const raw = call.output;
+  if (raw === undefined || raw === null) return null;
+  if (typeof raw !== "string") return renderResultValue(unwrapCliEnvelope(raw));
+  if (raw.trim().length === 0) return null;
+
+  const parsed = parseWholeJson(raw);
+  return parsed === undefined
+    ? raw
+    : renderResultValue(unwrapCliEnvelope(parsed.value));
+}
+
+/** The payload a CLI envelope carries, or the document when it is not one. */
+function unwrapCliEnvelope(document: unknown): unknown {
+  const envelope = cliToolResultSchema.safeParse(document);
+  return envelope.success ? cliToolResultPayload(envelope.data) : document;
+}
+
+/** A result value as text: a string as it stands, anything else indented. */
+function renderResultValue(value: unknown): string | null {
+  if (typeof value === "string") return value.trim().length > 0 ? value : null;
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+/** The value a string holds when the WHOLE string is JSON, else undefined. */
+function parseWholeJson(text: string): { value: unknown } | undefined {
+  try {
+    return { value: JSON.parse(text) as unknown };
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * One finished call, opened: what ran, and then what came back.
+ *
+ * The command is shown again here rather than left to the row's label, because
+ * a row groups calls by what they DID: two `langwatch trace search` calls that
+ * differ only in their flags share the single label "Searched traces", and the
+ * command is then the only thing that says which result belongs to which. That
+ * is not a corner case. Asking for one day and then for everything is how the
+ * agent answers a question about a time range.
+ */
+function OpenedToolCall({ call }: { call: ToolCall }) {
+  const command = commandOf(call.input);
+  return (
+    <VStack align="stretch" gap={1}>
+      {command ? (
+        <Text
+          textStyle="2xs"
+          fontFamily="mono"
+          color="fg.subtle"
+          wordBreak="break-all"
+        >
+          $ {command}
+        </Text>
+      ) : null}
+      <ToolResultBlock call={call} />
+    </VStack>
+  );
+}
+
+function ToolResultBlock({ call }: { call: ToolCall }) {
+  return (
+    <Box
+      as="pre"
+      textStyle="2xs"
+      fontFamily="mono"
+      color="fg.muted"
+      background="bg.muted"
+      borderWidth="1px"
+      borderStyle="solid"
+      borderColor="border.muted"
+      borderRadius="sm"
+      padding={2}
+      margin={0}
+      maxHeight="240px"
+      overflowY="auto"
+      overflowX="auto"
+      whiteSpace="pre-wrap"
+      wordBreak="break-word"
+    >
+      {toolResultText(call)}
+    </Box>
   );
 }
 
@@ -1266,22 +1554,53 @@ function groupCategory(group: ActivityGroup): string {
  * for a normal user, whichever tool it is. An unmapped tool is not a licence to
  * dump JSON in someone's chat; its name and its input are the honest answer.
  */
-function RunningActivityCard({
+/**
+ * The part index of the last streamed answer text — a settled action older than
+ * the answer's own words has been read past, so it has no claim to stay out of
+ * the receipt. Reasoning parts deliberately do NOT count: thinking after a call
+ * is exactly the window the held card exists for.
+ */
+function lastAnswerTextIndex(view: PartsView): number {
+  let last = -1;
+  view.parts.forEach((part, index) => {
+    const candidate = part as { type?: string; text?: string };
+    if (
+      candidate?.type === "text" &&
+      typeof candidate.text === "string" &&
+      candidate.text.trim().length > 0
+    ) {
+      last = index;
+    }
+  });
+  return last;
+}
+
+/**
+ * The action that just finished, still on the table.
+ *
+ * Rendered for the turn's latest settled activity group while the turn is live
+ * and nothing has taken its place — the reader is watching the model think
+ * about what this call returned, so the card holds its ground instead of
+ * folding into the receipt the instant the output lands. Same geometry as
+ * {@link RunningActivityCard}: a green check for the pulse, the past-tense
+ * label for the shimmer.
+ */
+function LatestSettledActivityCard({
   group,
   devMode,
 }: {
   group: ActivityGroup;
   devMode: boolean;
 }) {
-  const reduce = useReducedMotion();
-  // The raw payload has its OWN toggle. It used to ride a card-expansion state,
-  // which meant developer mode showed the JSON on every expanded card without
-  // the `{}` ever being clicked. Closed until asked, every time.
   const [jsonOpen, setJsonOpen] = useState(false);
+  const [resultOpen, setResultOpen] = useState(false);
   const detail = group.detail;
-  const shimmer = reduce
-    ? { ...langyThinkingShimmerStyles, animation: "none" }
-    : langyThinkingShimmerStyles;
+  // The same disclosure the receipt row carries: the reader is watching the
+  // model think about what this call returned, so what it returned has to be
+  // readable here too, not only after the card folds into the receipt.
+  const callsWithResult = group.calls.filter(
+    (call) => toolResultText(call) !== null,
+  );
 
   return (
     <VStack
@@ -1298,18 +1617,9 @@ function RunningActivityCard({
       paddingY="12px"
     >
       <HStack gap={1.5} align="center">
-        <Box
-          width="6px"
-          height="6px"
-          borderRadius="full"
-          background="orange.solid"
-          flexShrink={0}
-          css={
-            reduce
-              ? undefined
-              : { animation: `${dotPulse} 1.4s ease-in-out infinite` }
-          }
-        />
+        <Box color="green.fg" display="flex" flexShrink={0}>
+          <Check size={11} />
+        </Box>
         <Text
           textStyle="2xs"
           fontWeight="500"
@@ -1323,32 +1633,34 @@ function RunningActivityCard({
           {groupCategory(group)}
         </Text>
         {devMode ? (
-          <Tooltip
-            content={jsonOpen ? "Hide raw data" : "Show raw data"}
-            showArrow
-          >
-            <IconButton
-              size="2xs"
-              variant="ghost"
-              color={jsonOpen ? "orange.solid" : "fg.subtle"}
-              aria-label={jsonOpen ? "Hide raw data" : "Show raw data"}
-              aria-expanded={jsonOpen}
-              onClick={() => setJsonOpen((v) => !v)}
-            >
-              <Braces size={12} />
-            </IconButton>
-          </Tooltip>
+          <RawDataToggle
+            isOpen={jsonOpen}
+            onToggle={() => setJsonOpen((value) => !value)}
+          />
         ) : null}
       </HStack>
 
-      <Box textStyle="sm" fontWeight="640" lineHeight="1.3" css={shimmer}>
-        {`${group.label}…`}
-      </Box>
+      {callsWithResult.length > 0 ? (
+        <ResultDisclosureButton
+          isExpanded={resultOpen}
+          onToggle={() => setResultOpen((value) => !value)}
+        >
+          {/* The truncated command gives way to the full one below it. */}
+          <SettledActivityLabel
+            label={group.label}
+            detail={resultOpen ? undefined : detail}
+          />
+        </ResultDisclosureButton>
+      ) : (
+        <SettledActivityLabel label={group.label} detail={detail} />
+      )}
 
-      {detail ? (
-        <Text textStyle="2xs" fontFamily="mono" color="fg.subtle" truncate>
-          {detail}
-        </Text>
+      {resultOpen ? (
+        <VStack align="stretch" gap={1.5}>
+          {callsWithResult.map((call, index) => (
+            <OpenedToolCall key={call.toolCallId ?? index} call={call} />
+          ))}
+        </VStack>
       ) : null}
 
       {devMode && jsonOpen ? (
@@ -1359,6 +1671,191 @@ function RunningActivityCard({
         </VStack>
       ) : null}
     </VStack>
+  );
+}
+
+/**
+ * The held card's headline and its mono detail line, as one block.
+ *
+ * Spans throughout, because the disclosure wraps this in a native `<button>`,
+ * which may hold phrasing content only.
+ */
+function SettledActivityLabel({
+  label,
+  detail,
+}: {
+  label: string;
+  detail?: string;
+}) {
+  return (
+    <Box
+      as="span"
+      display="flex"
+      flexDirection="column"
+      alignItems="stretch"
+      gap={2}
+      flex={1}
+      minWidth={0}
+    >
+      <Box as="span" textStyle="sm" fontWeight="640" lineHeight="1.3">
+        {completedActivityLabel(label)}
+      </Box>
+      {detail ? (
+        <Text
+          as="span"
+          display="block"
+          textStyle="2xs"
+          fontFamily="mono"
+          color="fg.subtle"
+          truncate
+        >
+          {detail}
+        </Text>
+      ) : null}
+    </Box>
+  );
+}
+
+function RunningActivityCard({
+  group,
+  devMode,
+  interrupted = false,
+}: {
+  group: ActivityGroup;
+  devMode: boolean;
+  /**
+   * The turn ended while this call was still open — the user stopped it, or it
+   * died. The card keeps the work it named and drops every claim of activity:
+   * no pulse, no shimmer, no trailing ellipsis, and it says what happened.
+   */
+  interrupted?: boolean;
+}) {
+  const reduce = useReducedMotion();
+  // The raw payload has its OWN toggle. It used to ride a card-expansion state,
+  // which meant developer mode showed the JSON on every expanded card without
+  // the `{}` ever being clicked. Closed until asked, every time.
+  const [jsonOpen, setJsonOpen] = useState(false);
+  const detail = group.detail;
+  const shimmer =
+    reduce || interrupted
+      ? { ...langyThinkingShimmerStyles, animation: "none" }
+      : langyThinkingShimmerStyles;
+
+  return (
+    <VStack
+      align="stretch"
+      gap={2}
+      role="listitem"
+      borderWidth="1px"
+      borderStyle="solid"
+      borderColor="border.muted"
+      borderRadius="langyCard"
+      background="bg.subtle"
+      boxShadow="langyCard"
+      paddingX="15px"
+      paddingY="12px"
+    >
+      <RunningActivityHeader
+        category={groupCategory(group)}
+        live={!interrupted && !reduce}
+        muted={interrupted}
+        devMode={devMode}
+        jsonOpen={jsonOpen}
+        onToggleJson={() => setJsonOpen((v) => !v)}
+      />
+
+      <Box
+        textStyle="sm"
+        fontWeight="640"
+        lineHeight="1.3"
+        color={interrupted ? "fg.muted" : undefined}
+        css={interrupted ? undefined : shimmer}
+      >
+        {interrupted ? group.label : `${group.label}…`}
+      </Box>
+
+      {detail ? (
+        <Text textStyle="2xs" fontFamily="mono" color="fg.subtle" truncate>
+          {detail}
+        </Text>
+      ) : null}
+
+      {interrupted ? <LangyInterruptedNote /> : null}
+
+      {devMode && jsonOpen ? (
+        <VStack align="stretch" gap={1}>
+          {group.calls.map((call, index) => (
+            <RawCallJson key={call.toolCallId ?? index} call={call} />
+          ))}
+        </VStack>
+      ) : null}
+    </VStack>
+  );
+}
+
+/** The card's top row: the state dot, what kind of work it is, the raw toggle. */
+function RunningActivityHeader({
+  category,
+  live,
+  muted,
+  devMode,
+  jsonOpen,
+  onToggleJson,
+}: {
+  category: string;
+  /** The dot pulses. False for reduced motion and for an interrupted card. */
+  live: boolean;
+  /** The work is over, so the dot drops to a quiet grey. */
+  muted: boolean;
+  devMode: boolean;
+  jsonOpen: boolean;
+  onToggleJson: () => void;
+}) {
+  return (
+    <HStack gap={1.5} align="center">
+      <Box
+        width="6px"
+        height="6px"
+        borderRadius="full"
+        background={muted ? "fg.subtle" : "orange.solid"}
+        opacity={muted ? 0.6 : 1}
+        flexShrink={0}
+        css={
+          live
+            ? { animation: `${dotPulse} 1.4s ease-in-out infinite` }
+            : undefined
+        }
+      />
+      <Text
+        textStyle="2xs"
+        fontWeight="500"
+        letterSpacing="0.03em"
+        textTransform="uppercase"
+        color="fg.subtle"
+        truncate
+        flex={1}
+        minWidth={0}
+      >
+        {category}
+      </Text>
+      {devMode ? (
+        <Tooltip
+          content={jsonOpen ? "Hide raw data" : "Show raw data"}
+          showArrow
+        >
+          <IconButton
+            size="2xs"
+            variant="ghost"
+            color={jsonOpen ? "orange.solid" : "fg.subtle"}
+            aria-label={jsonOpen ? "Hide raw data" : "Show raw data"}
+            aria-expanded={jsonOpen}
+            onClick={onToggleJson}
+          >
+            <Braces size={12} />
+          </IconButton>
+        </Tooltip>
+      ) : null}
+    </HStack>
   );
 }
 

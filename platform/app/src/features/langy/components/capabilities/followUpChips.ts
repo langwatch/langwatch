@@ -107,10 +107,12 @@ const DESTINATION_BY_FEATURE: Record<
  * the offer. An evaluator's consumers (Experiments, Online Evaluations) open
  * on pages that neither show the evaluator nor pick it up, so "Open in
  * Experiments" under a just-created evaluator was navigation noise pretending
- * to be a next step. A CARRIED offer (a builder that takes the evaluator
+ * to be a next step. Prompts have the same consumers problem: Experiments and
+ * Scenarios cannot receive a specific prompt, so a prompt listing wore the
+ * same two bare chips. A CARRIED offer (a builder that takes the resource
  * along) would still be welcome — none exists today.
  */
-const PLAIN_INELIGIBLE_KINDS = new Set(["evaluators"]);
+const PLAIN_INELIGIBLE_KINDS = new Set(["evaluators", "prompts"]);
 
 /**
  * The follow-up chips a settled call earns: the offers `cliFollowUps` derives,

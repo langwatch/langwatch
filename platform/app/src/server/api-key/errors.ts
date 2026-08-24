@@ -83,6 +83,46 @@ export class ApiKeyPermissionDeniedError extends HandledError {
 }
 
 /**
+ * Thrown when the denied permission is one the platform never delegates to
+ * this class of credential, whatever role its owner holds (HTTP 403).
+ *
+ * The distinction from `ApiKeyPermissionDeniedError` is the only action the
+ * caller has. There, widening the key or asking an admin is exactly right;
+ * here that advice sends them to a door that does not open, and they wait for
+ * a grant nobody can give. Langy hit this with `triggers:create`: it read the
+ * generic refusal, offered to retry once the user "granted the permission",
+ * and the permission is one `READ_ONLY_FAMILIES` withholds from every session
+ * key that will ever exist.
+ *
+ * `subject` names the credential in the customer's own words ("Langy"), so the
+ * class stays generic while the sentence stays specific. The policy's own
+ * reason is written for a developer reading the rule and names internal
+ * constants, so it belongs in the log line, never in this message.
+ */
+export class ApiKeyPermissionNotDelegableError extends HandledError {
+  declare readonly code: "api_key_permission_not_delegable";
+
+  constructor(
+    permission: string,
+    options: {
+      subject: string;
+      meta?: Record<string, unknown>;
+    },
+  ) {
+    super(
+      "api_key_permission_not_delegable",
+      `${options.subject} is never granted ${permission}, whatever key or role you use. Make this change in LangWatch yourself.`,
+      {
+        meta: { permission, ...options.meta },
+        httpStatus: 403,
+        ...remediation("api_key_permission_not_delegable"),
+      },
+    );
+    this.name = "ApiKeyPermissionNotDelegableError";
+  }
+}
+
+/**
  * Thrown at API key creation time when a requested scope binding exceeds the
  * creator's ceiling — e.g., binding a role the creator does not hold on the
  * target scope. Surfaced to the user before the token is persisted.
@@ -117,6 +157,34 @@ export class ApiKeyReservedNameError extends HandledError {
       },
     );
     this.name = "ApiKeyReservedNameError";
+  }
+}
+
+/**
+ * Thrown when answering "which projects can this credential see" would have
+ * to walk more projects than the resolution is allowed to. The caller can act
+ * on it: narrow the key's bindings to the projects or teams it works with.
+ *
+ * `platform` fault: the credential is legitimate and the request is
+ * well-formed, so this is our limit showing, not the caller's mistake.
+ */
+export class ProjectVisibilityTooWideError extends HandledError {
+  declare readonly code: "project_visibility_too_wide";
+
+  constructor(
+    message: string,
+    options: {
+      meta?: Record<string, unknown>;
+      reasons?: readonly Error[];
+    } = {},
+  ) {
+    super("project_visibility_too_wide", message, {
+      httpStatus: 507,
+      fault: "platform",
+      ...remediation("project_visibility_too_wide"),
+      ...options,
+    });
+    this.name = "ProjectVisibilityTooWideError";
   }
 }
 

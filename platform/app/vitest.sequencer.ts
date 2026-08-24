@@ -1,6 +1,18 @@
-import { statSync } from "node:fs";
+import { join } from "node:path";
 
 import { BaseSequencer, type TestSpecification } from "vitest/node";
+
+import { recordShardSelection } from "./src/test-utils/shardFailureReporter";
+import {
+  createWeigher,
+  loadDurationManifest,
+} from "./src/test-utils/shardWeights";
+
+/** This file sits at the app root, which is what manifest paths are relative to. */
+const APP_ROOT = __dirname;
+
+/** Refreshed by the scheduled `shard-durations` job; absent is fine. */
+const DURATION_MANIFEST_FILE = "vitest.durations.json";
 
 /**
  * Splits a sharded run by weight instead of by file count.
@@ -18,14 +30,18 @@ import { BaseSequencer, type TestSpecification } from "vitest/node";
  * is the standard greedy approximation for multiway partitioning and gets the
  * legs close to even in one pass.
  *
- * WEIGHT IS FILE SIZE, WHICH IS A PROXY. Runtime would be the honest weight,
- * and vitest does cache per-file durations — but only from a previous run on
- * the same machine, and a CI runner is always cold, so on the one machine that
- * matters the cache is empty. Bytes are available before anything executes and
- * correlate well enough in practice: a 900-line suite with thirty cases really
- * does tend to cost more than a 40-line one. It cannot beat real timings on a
- * file that is short but slow (a long `waitFor`, a container boot), so this
- * narrows the spread rather than eliminating it.
+ * WEIGHT IS MEASURED DURATION, FALLING BACK TO FILE SIZE. It was bytes alone,
+ * which is a proxy, and the spread showed how loose a one: six integration
+ * shards of near-identical file counts ran 547, 573, 595, 649, 726 and 766
+ * seconds, so the matrix paid 766 while a runner sat idle for three and a half
+ * minutes. Bytes cannot see a file that is short but slow — a long `waitFor`, a
+ * service boot, a Go compile.
+ *
+ * Real timings come from a manifest committed to the repo (vitest.durations.json)
+ * and refreshed by a scheduled run; vitest's own duration cache is no use here
+ * because it only holds a previous run from the same machine, and a CI runner is
+ * always cold. Files the manifest does not know are still weighed by size,
+ * scaled onto the same footing. See src/test-utils/shardWeights.ts.
  *
  * Determinism matters more than the weighting here. Each shard runs in its own
  * process and computes this assignment independently, so all of them must
@@ -64,19 +80,25 @@ export default class WeightBalancedSequencer extends BaseSequencer {
     }
 
     // `--shard=N/M` counts from one.
-    return buckets[index - 1] ?? [];
+    const mine = buckets[index - 1] ?? [];
+    // The only place that knows how many files this shard was actually given.
+    // The reporter is handed the whole list before this runs, so without this
+    // the hard-floor would compare a shard's progress against the suite.
+    recordShardSelection(mine.length);
+    return mine;
   }
 }
 
 /**
- * A file that cannot be stat'd still has to land in exactly one shard, and
- * every shard has to agree on which. Returning a constant keeps it in the
- * ordering rather than dropping it from the run.
+ * Weights come from measured durations where they exist, and from file size
+ * where they do not. See src/test-utils/shardWeights.ts for why the manifest is
+ * a committed file rather than a cache, and what happens when it is absent.
+ *
+ * Built once at module load: every spec in a run is weighed against the same
+ * manifest and the same byte-to-millisecond scale, and the scale is derived by
+ * reading the manifest's own files, which is not work to repeat per file.
  */
-function weigh(moduleId: string): number {
-  try {
-    return statSync(moduleId).size;
-  } catch {
-    return 1;
-  }
-}
+const weigh = createWeigher({
+  manifest: loadDurationManifest(join(APP_ROOT, DURATION_MANIFEST_FILE)),
+  root: APP_ROOT,
+});

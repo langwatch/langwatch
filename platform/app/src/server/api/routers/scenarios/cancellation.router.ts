@@ -2,11 +2,9 @@
  * Router for cancelling scenario jobs and batch runs.
  *
  * Dispatches cancel_requested events via the event-sourcing pipeline.
- * The pipeline reactor broadcasts to all worker pods, and the worker
- * owning the scenario kills its child process.
- *
- * For queued jobs (not yet picked up), also dispatches finished(CANCELLED)
- * so they never execute.
+ * The simulationRunExecution process manager publishes the cancellation to
+ * all worker pods, and the worker owning the scenario kills its child
+ * process. Queued jobs are finished CANCELLED by the process manager itself.
  *
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
@@ -17,7 +15,6 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import type { CancellationServiceDeps } from "~/server/scenarios/cancellation";
 import { ScenarioCancellationService } from "~/server/scenarios/cancellation";
-import { checkProjectPermission } from "../../rbac";
 import { projectSchema } from "./schemas";
 
 const logger = createLogger("langwatch:api:scenarios:cancellation");
@@ -59,19 +56,6 @@ function getService(): ScenarioCancellationService {
           occurredAt,
         });
       },
-      dispatchFinishRun: async ({
-        tenantId,
-        scenarioRunId,
-        status,
-        occurredAt,
-      }) => {
-        await getApp().simulations.finishRun({
-          tenantId,
-          scenarioRunId,
-          status,
-          occurredAt,
-        });
-      },
     });
   }
   return _service;
@@ -80,7 +64,7 @@ function getService(): ScenarioCancellationService {
 export const cancellationRouter = createTRPCRouter({
   cancelJob: protectedProcedure
     .input(cancelJobSchema)
-    .use(checkProjectPermission("scenarios:manage"))
+    .permission("scenarios:manage")
     .mutation(async ({ input }) => {
       logger.info(
         {
@@ -96,7 +80,7 @@ export const cancellationRouter = createTRPCRouter({
 
   cancelBatchRun: protectedProcedure
     .input(cancelBatchRunSchema)
-    .use(checkProjectPermission("scenarios:manage"))
+    .permission("scenarios:manage")
     .mutation(async ({ input }) => {
       logger.info(
         {

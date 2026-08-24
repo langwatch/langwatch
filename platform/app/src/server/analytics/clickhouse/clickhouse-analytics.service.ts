@@ -11,7 +11,7 @@
 
 import { getLangWatchTracer } from "langwatch";
 import type { LegacyAnalyticsBackendRepository } from "~/server/app-layer/analytics/repositories/legacy-analytics-backend.clickhouse.repository";
-import { isClickHouseEnabled } from "../../clickhouse/clickhouseClient";
+import { tryGetApp } from "~/server/app-layer/app";
 import type { FilterField } from "../../filters/types";
 import type {
   FeedbacksResult,
@@ -67,7 +67,7 @@ export class ClickHouseAnalyticsService {
    * Check if the shared ClickHouse instance is configured (sync, for AnalyticsBackend interface).
    */
   isAvailable(): boolean {
-    return isClickHouseEnabled();
+    return tryGetApp()?.clickhouse.enabled ?? false;
   }
 
   /**

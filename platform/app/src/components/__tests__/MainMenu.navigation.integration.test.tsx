@@ -2,11 +2,14 @@
  * @vitest-environment jsdom
  *
  * @see specs/evaluations/experiments-online-evaluations-separation.feature
+ * @see specs/navigation/ops-navigation-v2.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+let mockHasOpsAccess = false;
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({ pathname: "/[project]" }),
@@ -26,7 +29,7 @@ vi.mock("~/hooks/useFeatureFlag", () => ({
 }));
 
 vi.mock("~/hooks/useOpsPermission", () => ({
-  useOpsPermission: () => ({ hasAccess: false }),
+  useOpsPermission: () => ({ hasAccess: mockHasOpsAccess }),
 }));
 
 vi.mock("~/hooks/usePublicEnv", () => ({
@@ -46,10 +49,6 @@ vi.mock("~/utils/api", () => ({
       isAdmin: { useQuery: () => ({ data: { isAdmin: false } }) },
     },
   },
-}));
-
-vi.mock("~/components/messages/HeaderButtons", () => ({
-  useTableView: () => ({ isTableView: false }),
 }));
 
 vi.mock("~/components/sidebar/CollapsibleMenuGroup", () => ({
@@ -90,9 +89,34 @@ const visibleLinkLabels = () =>
   screen.getAllByRole("link").map((link) => link.textContent);
 
 describe("<MainMenu /> navigation", () => {
+  beforeEach(() => {
+    mockHasOpsAccess = false;
+  });
+
   afterEach(() => {
     cleanup();
     localStorage.clear();
+  });
+
+  describe("when the reader has ops access and the pin flag is on", () => {
+    /** @scenario The current chrome keeps its ops section unchanged */
+    it("keeps the Ops section in the current chrome", () => {
+      // `useFeatureFlag` is mocked on, which is the pin the legacy Ops
+      // section reads. The new modes ignore it; this one must not.
+      mockHasOpsAccess = true;
+      render(<MainMenu />, { wrapper: Wrapper });
+
+      expect(screen.getByText("Ops")).toBeInTheDocument();
+      expect(visibleLinkLabels()).toEqual(
+        expect.arrayContaining([
+          "Dashboard",
+          "Event Sourcing",
+          "The Foundry",
+          "Feature Flags",
+          "Migrations",
+        ]),
+      );
+    });
   });
 
   /** @scenario Organize the existing destinations around the product lifecycle */
@@ -114,13 +138,23 @@ describe("<MainMenu /> navigation", () => {
       "Home",
       "Analytics",
       "Trace Explorer",
-      "Traces",
       "Online Evals",
       "Simulations",
       "Experiments",
       "Annotations",
       "Settings",
     ]);
+  });
+
+  /** @scenario "The sidebar no longer offers the legacy Traces page" */
+  it("offers Trace Explorer as the only traces destination", () => {
+    render(<MainMenu />, { wrapper: Wrapper });
+
+    const tracesLabels = visibleLinkLabels().filter((label) =>
+      /trace/i.test(label ?? ""),
+    );
+
+    expect(tracesLabels).toEqual(["Trace Explorer"]);
   });
 
   /** @scenario Use sensible section defaults without a saved preference */

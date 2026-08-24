@@ -14,9 +14,10 @@
  * derivation; the legacy `providerCredentialIds`/`providerChain`
  * fields are no longer surfaced.
  */
-import type { PrismaClient } from "@prisma/client";
+
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
 import { resolveApplicableBudgetsForDraftKey } from "~/server/gateway/applicableBudgets.service";
@@ -96,7 +97,12 @@ export const virtualKeysRouter = createTRPCRouter({
   // coarse org-wide virtualKeys:view check that a plain member lacks.
   list: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        organizationId:
+          "loadMembershipSet + isVisibleToMembership: only keys whose scopes intersect the caller's membership in this organization are returned",
+      }),
+    )
     .query(async ({ ctx, input }) => {
       const membership = await loadMembershipSet(
         ctx.prisma,
@@ -118,7 +124,12 @@ export const virtualKeysRouter = createTRPCRouter({
 
   get: protectedProcedure
     .input(idInput)
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        organizationId:
+          "requireVisibleVk: the key must exist in this organization and intersect the caller's membership set; a miss is NOT_FOUND",
+      }),
+    )
     .query(async ({ ctx, input }) => {
       // A key the caller can't see is indistinguishable from one that
       // doesn't exist — same NOT_FOUND, no existence leak.
@@ -145,7 +156,12 @@ export const virtualKeysRouter = createTRPCRouter({
    */
   spendThisMonth: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        organizationId:
+          "loadMembershipSet + isVisibleToMembership: spend is reported only for keys visible to the caller's membership in this organization",
+      }),
+    )
     .query(async ({ ctx, input }) => {
       // Without the ClickHouse spend source there is no number to report.
       // Failing loudly lets the column render "unavailable" instead of a
@@ -213,7 +229,12 @@ export const virtualKeysRouter = createTRPCRouter({
         principalUserId: z.string().nullable().optional(),
       }),
     )
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        organizationId:
+          "for an existing key, visibility of that key in this organization; for a draft, manage on every scope in it — both checked before any budget data is read",
+      }),
+    )
     .query(async ({ ctx, input }) => {
       // Authorization first, before any budget data is touched. This
       // resolver answers with budget names, limits, live spend and (for
@@ -313,15 +334,20 @@ export const virtualKeysRouter = createTRPCRouter({
         traceProjectId: z.string().nullable().optional(),
         routingPolicyId: z.string().nullable().optional(),
         routingMode: routingModeSchema.optional(),
+        /** When the key stops serving. Omit it and the key never expires. */
+        expiresAt: z.coerce.date().optional(),
         budget: virtualKeyBudgetInputSchema.nullable().optional(),
         config: virtualKeyConfigSchema.partial().optional(),
       }),
     )
     // Per-scope authz (manage on EVERY requested scope) is data-dependent,
-    // so it runs in the resolver; authorizeInResolver satisfies the
-    // builder's fail-closed permission gate without re-introducing the
-    // coarse org-wide check.
-    .use(authorizeInResolver)
+    // so it runs in the resolver rather than as a coarse org-wide check.
+    .use(
+      authorizeInResolver({
+        organizationId:
+          "assertActorCanManageAllScopes on every requested scope, and assertScopesBelongToOrg anchors each scope to this organization",
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       await assertActorCanManageAllScopes(
         { prisma: ctx.prisma, actor: sessionActor(ctx.session) },
@@ -371,6 +397,7 @@ export const virtualKeysRouter = createTRPCRouter({
         traceProjectId: input.traceProjectId ?? null,
         routingPolicyId: input.routingPolicyId ?? null,
         routingMode: input.routingMode,
+        expiresAt: input.expiresAt ?? null,
         budget: input.budget ?? null,
         config: input.config,
         actorUserId: ctx.session.user.id,
@@ -398,11 +425,18 @@ export const virtualKeysRouter = createTRPCRouter({
         traceProjectId: z.string().nullable().optional(),
         routingPolicyId: z.string().nullable().optional(),
         routingMode: routingModeSchema.optional(),
+        /** Omitted leaves it alone; null clears it; a date moves it. */
+        expiresAt: z.coerce.date().nullable().optional(),
         budget: virtualKeyBudgetInputSchema.nullable().optional(),
         config: virtualKeyConfigSchema.partial().optional(),
       }),
     )
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        organizationId:
+          "requireExistingVk anchors the key to this organization; virtualKeys:update on one of its scopes, plus manage on every new scope when re-scoping",
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
       const existing = await requireExistingVk(
@@ -483,6 +517,7 @@ export const virtualKeysRouter = createTRPCRouter({
         traceProjectId: input.traceProjectId,
         routingPolicyId: input.routingPolicyId,
         routingMode: input.routingMode,
+        expiresAt: input.expiresAt,
         budget: input.budget,
         config: input.config,
         actorUserId: ctx.session.user.id,
@@ -498,7 +533,12 @@ export const virtualKeysRouter = createTRPCRouter({
 
   rotate: protectedProcedure
     .input(idInput)
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        organizationId:
+          "requireExistingVk anchors the key to this organization; virtualKeys:rotate on one of its existing scopes",
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
       const existing = await requireExistingVk(
@@ -530,7 +570,12 @@ export const virtualKeysRouter = createTRPCRouter({
 
   revoke: protectedProcedure
     .input(idInput)
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        organizationId:
+          "requireExistingVk anchors the key to this organization; virtualKeys:delete on one of its existing scopes",
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
       const existing = await requireExistingVk(
@@ -559,7 +604,12 @@ export const virtualKeysRouter = createTRPCRouter({
 
   disable: protectedProcedure
     .input(idInput.extend({ reason: z.string().max(500).optional() }))
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        organizationId:
+          "requireExistingVk anchors the key to this organization; virtualKeys:update on one of its existing scopes",
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
       const existing = await requireExistingVk(
@@ -589,7 +639,12 @@ export const virtualKeysRouter = createTRPCRouter({
 
   enable: protectedProcedure
     .input(idInput)
-    .use(authorizeInResolver)
+    .use(
+      authorizeInResolver({
+        organizationId:
+          "requireExistingVk anchors the key to this organization; virtualKeys:update on one of its existing scopes",
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
       const existing = await requireExistingVk(

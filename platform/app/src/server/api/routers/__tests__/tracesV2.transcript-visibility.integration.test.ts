@@ -15,7 +15,7 @@
  * bare spelling hands a session-less caller the namespaced agents' content
  * whatever the policy says.
  */
-import type { Project } from "@prisma/client";
+
 import {
   afterAll,
   beforeAll,
@@ -25,6 +25,7 @@ import {
   it,
   vi,
 } from "vitest";
+import type { Project } from "~/generated/prisma/client";
 
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { getTestProject } from "../../../../utils/testUtils";
@@ -47,6 +48,8 @@ const { mockGetSpansByTraceId, mockGetLogsByTraceId } = vi.hoisted(() => ({
 }));
 
 vi.mock("~/server/app-layer/app", () => ({
+  // Consumers that degrade without Redis read through this one.
+  tryGetApp: () => null,
   getApp: () => ({
     traces: {
       spans: { getSpansByTraceId: mockGetSpansByTraceId },

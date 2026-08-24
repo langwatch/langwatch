@@ -97,3 +97,32 @@ export function ensureJsonSafe(value: unknown): JsonValue {
   walk({ value, path: "$", seen: new Set() });
   return value as JsonValue;
 }
+
+/**
+ * Structural equality over process state, which is JSON by contract.
+ *
+ * Key ORDER must not decide this: handlers build their result by spreading
+ * the previous state, and a spread that reaches the same values by a
+ * different insertion order is the same state. A serialise-and-compare would
+ * call those different and quietly write an instance row per event, which is
+ * the exact cost the transient path exists to avoid.
+ */
+export function isDeepJsonEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== typeof b || a === null || b === null) return false;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) {
+      return false;
+    }
+    return a.every((item, index) => isDeepJsonEqual(item, b[index]));
+  }
+  if (typeof a !== "object") return false;
+  const left = a as Record<string, unknown>;
+  const right = b as Record<string, unknown>;
+  const leftKeys = Object.keys(left);
+  if (leftKeys.length !== Object.keys(right).length) return false;
+  return leftKeys.every(
+    (key) =>
+      Object.hasOwn(right, key) && isDeepJsonEqual(left[key], right[key]),
+  );
+}

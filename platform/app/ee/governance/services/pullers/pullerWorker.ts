@@ -21,29 +21,30 @@
  *
  * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
  */
+import type { PulledUsageObservedEventData } from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/events";
 import { createLogger } from "@langwatch/observability";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
+import { featureFlagService } from "~/server/featureFlag";
 import {
   captureException,
   toError,
   withScope,
 } from "~/utils/posthogErrorCapture";
 import { decryptCredentials } from "../activity-monitor/ingestionCredentials";
-
 import {
   type GovernanceOcsfEventInput,
   OCSF_ACTIVITY,
   OCSF_SEVERITY,
 } from "../governanceOcsfEvents.clickhouse.repository";
 import { ensureHiddenGovernanceProject } from "../governanceProject.service";
-
 import {
   type NormalizedPullEvent,
   type PullResult,
   pullerAdapterRegistry,
   registerBuiltInPullers,
 } from "./index";
+import { buildPulledUsageRecord } from "./pulledUsageRecord";
 
 const logger = createLogger("langwatch:workers:ingestionPuller");
 
@@ -102,9 +103,28 @@ async function withDeadline<T>(
   }
 }
 
+/**
+ * The pulled-usage write surface, late-bound by the composition root exactly
+ * the way the ingestion-pull outcome commands are: it belongs to a different
+ * pipeline that is built after this worker is referenced.
+ *
+ * Optional. Without it the worker behaves as it always did — audit rows only,
+ * no cost records — which is what a deployment with the pipeline switched off
+ * should do.
+ */
+export interface PulledUsageDispatcher {
+  recordPulledUsage(
+    args: PulledUsageObservedEventData & {
+      tenantId: string;
+      occurredAt: number;
+    },
+  ): Promise<void>;
+}
+
 export async function runIngestionPull(params: {
   sourceId: string;
   cursor: string | null;
+  pulledUsage?: PulledUsageDispatcher;
 }): Promise<{ nextCursor: string | null; eventCount: number }> {
   registerBuiltInPullers();
 
@@ -192,42 +212,12 @@ export async function runIngestionPull(params: {
     );
   }
 
-  // Hand off events to the governance_ocsf_events sink. Each
-  // NormalizedPullEvent → one OCSF row keyed by (TenantId, EventId)
-  // for natural dedup on replay (outbox at-least-once + adapter
-  // at-least-once both collapse via the ReplacingMergeTree). Going
-  // direct-to-CH (rather than synthesizing a fake trace) is the right
-  // shape for pull-mode: each audit-log entry is a single event, not
-  // a multi-span trace.
-  //
-  // TenantId convention: every governance write path (the trace fold's
-  // reactor, the OCSF export service) keys on the org's hidden
-  // internal_governance Project ID. Pull events MUST follow the same
-  // convention or they're invisible to SIEM export reads. Resolve
-  // (and lazy-mint) that project once per job; the `governance_ocsf_events`
-  // CH client is also acquired per-project so per-org private CH
-  // clusters route correctly.
   if (result.events.length > 0) {
-    const govProject = await ensureHiddenGovernanceProject(
-      prisma,
-      source.organizationId,
-    );
-    const ocsfRepo = getApp().governance.ocsfEvents;
-    if (!ocsfRepo) {
-      throw new Error(
-        "ClickHouse client is not available — check ClickHouse connection configuration",
-      );
-    }
-    for (const evt of result.events) {
-      await ocsfRepo.insertEvent(
-        mapToOcsfRow({
-          event: evt,
-          tenantId: govProject.id,
-          ingestionSourceId: source.id,
-          sourceType: source.sourceType,
-        }),
-      );
-    }
+    await writePulledEvents({
+      events: result.events,
+      source,
+      pulledUsage: params.pulledUsage,
+    });
     logger.info(
       {
         ingestionSourceId,
@@ -252,6 +242,189 @@ export async function runIngestionPull(params: {
   return { nextCursor: result.cursor, eventCount: result.events.length };
 }
 
+/** The IngestionSource fields the two write paths below actually read. */
+type PullingSource = {
+  id: string;
+  sourceType: string;
+  organizationId: string;
+  teamId: string | null;
+};
+
+/**
+ * Writes one run's events: the OCSF audit row every pulled event has always
+ * produced, and — for the ones carrying priced usage — a cost record beside it.
+ *
+ * Each NormalizedPullEvent → one OCSF row keyed by (TenantId, EventId), so
+ * replays collapse on the ReplacingMergeTree (outbox at-least-once and adapter
+ * at-least-once both land on the same key). Going direct-to-CH rather than
+ * synthesizing a fake trace is the right shape for pull mode: an audit entry is
+ * a single event, not a multi-span trace.
+ *
+ * TenantId convention: every governance write path (the trace fold's subscriber,
+ * the OCSF export service) keys on the org's hidden internal_governance
+ * Project ID, and pull events MUST follow it or they are invisible to SIEM
+ * export reads. Resolved — and lazily minted — once per job; the ClickHouse
+ * client is acquired per project so per-org private clusters route correctly.
+ */
+async function writePulledEvents({
+  events,
+  source,
+  pulledUsage,
+}: {
+  events: NormalizedPullEvent[];
+  source: PullingSource;
+  pulledUsage?: PulledUsageDispatcher;
+}): Promise<void> {
+  const govProject = await ensureHiddenGovernanceProject(
+    prisma,
+    source.organizationId,
+  );
+  // ADR-088's stated gate for the new event + ledger write. Resolved ONCE per
+  // run rather than per item: the answer cannot change mid-batch, and a flag
+  // read per usage row would put a lookup on the money path for no decision.
+  // Off → the loop below writes audit rows only, exactly as it did before.
+  const costRecordingEnabled = await pulledUsageCostEnabled(
+    source.organizationId,
+  );
+  // Taken from the App rather than constructed here: #6622 made `getApp()` the
+  // only way this file may reach ClickHouse, enforced by the client-access
+  // boundary test. Constructing a repository inline would put this file back on
+  // that test's shrinking backlog.
+  const ocsfRepo = getApp().governance.ocsfEvents;
+  if (!ocsfRepo) {
+    throw new Error(
+      "ClickHouse client is not available — check ClickHouse connection configuration",
+    );
+  }
+  // One pull instant for the whole batch. `observedAt` is the restatement
+  // ordering field, so every record in one run has to share it: two records
+  // from the same pull disagreeing about when they were observed could order a
+  // corrected figure behind the one it corrects.
+  const observedAt = new Date();
+  for (const event of events) {
+    await ocsfRepo.insertEvent(
+      mapToOcsfRow({
+        event,
+        tenantId: govProject.id,
+        ingestionSourceId: source.id,
+        sourceType: source.sourceType,
+      }),
+    );
+    await recordPulledUsageFor({
+      event,
+      source,
+      govProjectId: govProject.id,
+      observedAt,
+      pulledUsage: costRecordingEnabled ? pulledUsage : undefined,
+    });
+  }
+}
+
+/**
+ * Whether this organization records pulled provider cost yet.
+ *
+ * Read through the layered service rather than the raw store, so the full
+ * layering applies (env force-on → operator row → PostHog rule → registry
+ * default). Keyed on the organization because pulled usage is attributed at
+ * org/team and has no project of its own until ADR-088's Decision 4 lands.
+ *
+ * A lookup that throws must not silently start writing money, and it must not
+ * silently stop either. Answering false on an error would do the second: the
+ * run completes, the cursor advances, and the whole window is filed at no cost
+ * with nothing left to retry it. So the error propagates and the run is
+ * retried, the one outcome that neither invents a price nor loses one.
+ */
+async function pulledUsageCostEnabled(
+  organizationId: string,
+): Promise<boolean> {
+  return await featureFlagService.isEnabled(
+    "release_pulled_usage_cost_enabled",
+    { distinctId: organizationId, organizationId },
+  );
+}
+
+/**
+ * Appends one `PulledUsageObserved` for an event that carries priced usage.
+ *
+ * The stream's tenant is the hidden governance project, following the same
+ * convention every other pull writer uses — that is where the aggregate LIVES.
+ * It is not where the money is attributed: the customer's organization and
+ * team ride the record itself, and a null project says unattributed rather
+ * than quietly naming the governance project (ADR-088 Decision 4).
+ *
+ * The two failures here are not the same failure, so they are not handled the
+ * same way.
+ *
+ * Mapping the item is deterministic: a row that cannot be built will never
+ * build, and throwing would re-pull the same window forever behind one
+ * malformed row — a poison pill that stops every later item too. That one is
+ * logged and swallowed. The OCSF audit row it was mapped from already landed,
+ * so the fact survives and only its price is missing.
+ *
+ * Appending the record is I/O, and its failure is usually transient. Swallowing
+ * that one would advance the cursor past a window whose cost was never written
+ * and would never be retried, losing real money to an outage that heals by
+ * itself. So it propagates, matching every other failure in this worker: the
+ * run fails, the cursor holds, and the effect retries the window.
+ *
+ * Retrying a partly-recorded window does not double-count. An unchanged
+ * observation writes no ledger row — `insertPulledUsageRows` drops it via
+ * `pulledRowsThatChanged` — and the OCSF rows collapse on `(TenantId, EventId)`.
+ */
+async function recordPulledUsageFor({
+  event,
+  source,
+  govProjectId,
+  observedAt,
+  pulledUsage,
+}: {
+  event: NormalizedPullEvent;
+  source: PullingSource;
+  govProjectId: string;
+  observedAt: Date;
+  pulledUsage?: PulledUsageDispatcher;
+}): Promise<void> {
+  if (!pulledUsage) return;
+
+  let record: ReturnType<typeof buildPulledUsageRecord>;
+  try {
+    record = buildPulledUsageRecord({
+      event,
+      source: {
+        ingestionSourceId: source.id,
+        sourceType: source.sourceType,
+        organizationId: source.organizationId,
+        teamId: source.teamId,
+      },
+      observedAt,
+    });
+  } catch (error) {
+    logger.error(
+      {
+        ingestionSourceId: source.id,
+        sourceEventId: event.source_event_id,
+        error,
+      },
+      "could not map a pulled item to a usage record; the audit row landed but this item has no price",
+    );
+    await withScope(async (scope) => {
+      scope.setTag?.("worker", "ingestionPuller");
+      scope.setExtra?.("ingestionSourceId", source.id);
+      captureException(toError(error));
+    });
+    return;
+  }
+
+  // Not a usage item — an ordinary audit event, and there was never a cost.
+  if (!record) return;
+
+  await pulledUsage.recordPulledUsage({
+    ...record,
+    tenantId: govProjectId,
+    occurredAt: record.occurredAtMs,
+  });
+}
+
 /**
  * Map a NormalizedPullEvent to a GovernanceOcsfEventInput row. Each
  * pull event becomes ONE OCSF row (ClassUid 6003 / API Activity, with
@@ -262,7 +435,7 @@ export async function runIngestionPull(params: {
  * EventId includes the source id so two same-type sources cannot collide.
  *
  * `tenantId` MUST be the hidden internal_governance Project ID for the
- * org — same key the trace-fold reactor and OCSF export service use.
+ * org — same key the trace-fold subscriber and OCSF export service use.
  * Resolved by the worker before this is called.
  */
 function mapToOcsfRow({

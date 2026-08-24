@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
-import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import {
@@ -455,11 +455,12 @@ export class RecordSpanCommand
    *
    * EXCEPTIONS — system-emitted attributes that ride in on OTLP from
    * trusted internal services (nlpgo, langevals, etc.) and MUST survive
-   * this strip because downstream reactors depend on them:
+   * this strip because downstream consumers depend on them — one is a
+   * subscriber and one is a fold:
    *
    *   - `langwatch.reserved.causality_depth` — stamped by nlpgo's
    *     `BaggageAttributeProcessor` on every span emitted during an
-   *     evaluator workflow run. The evaluationTrigger reactor reads
+   *     evaluator workflow run. The evaluationTrigger subscriber reads
    *     this on the inbound span_received event to block infinite
    *     loops (post-2026-05-11 incident). Stripping it here would
    *     silently disable the loop-prevention guard in production.

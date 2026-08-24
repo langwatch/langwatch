@@ -28,7 +28,7 @@ export function CacheRuleCreateDrawer({
   onCreated,
 }: Props) {
   const { organization } = useOrganizationTeamProject();
-  const utils = api.useContext();
+  const utils = api.useUtils();
 
   const createMutation = api.gatewayCacheRules.create.useMutation({
     onSuccess: async () => {

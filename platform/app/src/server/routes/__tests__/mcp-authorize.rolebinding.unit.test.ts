@@ -12,7 +12,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import type * as ServerRedis from "~/server/redis";
+import type * as AppLayerApp from "~/server/app-layer/app";
 import { app } from "../misc";
 
 const PROJECT_ID = "project_1";
@@ -49,7 +49,9 @@ const { mockPrisma, mockRedis, SESSION } = vi.hoisted(() => {
       // org-level MEMBER role. The MEMBER org role alone grants no project-level
       // permission, so authorization still hinges on the TEAM binding below.
       organizationUser: {
-        findFirst: vi.fn().mockResolvedValue({ role: "MEMBER" }),
+        findFirst: vi
+          .fn()
+          .mockResolvedValue({ role: "MEMBER", disabledAt: null }),
       },
       // checkPermissionFromBindings: user belongs to no groups …
       groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
@@ -92,11 +94,27 @@ vi.mock("~/server/auth", () => ({
 }));
 vi.mock("~/server/db", () => ({ prisma: mockPrisma }));
 // Partial mock: importing ../misc drags in the worker/collector graph, which
-// also reads `isBuildOrNoRedis` from this module — keep the real exports and
-// override only the connection the handler writes the auth code to.
-vi.mock("~/server/redis", async (importOriginal) => {
-  const actual = await importOriginal<typeof ServerRedis>();
-  return { ...actual, connection: mockRedis };
+// reaches other App members — keep the real exports and override only the
+// connection the handler writes the auth code to.
+vi.mock("~/server/app-layer/app", async (importOriginal) => {
+  const actual = await importOriginal<typeof AppLayerApp>();
+  const { permissionsServiceFor } = await import(
+    "~/server/app-layer/permissions/runtime"
+  );
+  const { prisma } = await import("~/server/db");
+  // misc.ts reads its connection through tryGetApp; getApp is overridden too
+  // so both accessors agree on the fake. The permission check runs the REAL
+  // walk over this file's prisma fixtures, exactly as it did before the App
+  // owned the service.
+  const app = {
+    redis: mockRedis,
+    permissions: permissionsServiceFor(prisma),
+  };
+  return {
+    ...actual,
+    getApp: () => app,
+    tryGetApp: () => app,
+  };
 });
 vi.mock("~/utils/encryption", () => ({
   encrypt: (text: string) => `encrypted:${text}`,

@@ -10,6 +10,7 @@ import { ChevronDown } from "lucide-react";
 import { type PropsWithChildren, useEffect, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
+import { useNavigationV2ShellActive } from "~/features/navigation/useNavigationV2ShellActive";
 import { useActivePlan } from "~/hooks/useActivePlan";
 import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
@@ -86,6 +87,11 @@ export default function SettingsLayout({
   children,
   isSubscription,
 }: PropsWithChildren<{ isSubscription?: boolean }>) {
+  // Inside a navigation-v2 shell the chrome itself carries the Settings
+  // title, the back entry and the regrouped settings menu
+  // (specs/navigation/settings-shell-v2.feature), so this layout only
+  // frames the content. Legacy mode keeps the full local navigation.
+  const isV2Shell = useNavigationV2ShellActive();
   const { hasPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
@@ -103,6 +109,23 @@ export default function SettingsLayout({
     { enabled: hasOpsAccess, retry: false, refetchOnWindowFocus: false },
   );
   const isAdminUser = adminStatus.data?.isAdmin ?? false;
+
+  if (isV2Shell) {
+    return (
+      <DashboardLayout>
+        <Container
+          maxWidth="1280px"
+          padding={4}
+          paddingBottom={16}
+          height="full"
+          overflowY="auto"
+          flex={1}
+        >
+          {children}
+        </Container>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout compactMenu>

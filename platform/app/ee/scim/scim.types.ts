@@ -36,8 +36,24 @@ export interface ScimError {
   detail: string;
 }
 
+/**
+ * RFC 7644 §3.5.2 spells the operation values in lowercase, but Microsoft
+ * Entra sends them capitalized — `"Replace"`, `"Add"`, `"Remove"` — the way
+ * Microsoft's own SCIM provisioning tutorial documents them. Normalising here
+ * keeps every `operation.op === "replace"` comparison downstream working
+ * against one spelling instead of spreading the tolerance across the services.
+ *
+ * Only strings are lowercased: a missing or non-string `op` falls through to
+ * the enum so it still fails as a bad value rather than as the string
+ * `"undefined"`.
+ */
+const scimPatchOpSchema = z.preprocess(
+  (value) => (typeof value === "string" ? value.toLowerCase() : value),
+  z.enum(["replace", "add", "remove"]),
+);
+
 export const scimPatchOperationSchema = z.object({
-  op: z.enum(["replace", "add", "remove"]),
+  op: scimPatchOpSchema,
   path: z.string().optional(),
   value: z.unknown().optional(),
 });

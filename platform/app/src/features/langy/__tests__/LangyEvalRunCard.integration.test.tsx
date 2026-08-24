@@ -1,5 +1,6 @@
 /**
  * @vitest-environment jsdom
+ * @vitest-environment-options { "url": "https://app.langwatch.ai/" }
  *
  * The scenario-run card's "Open in Simulations" link used to always point at
  * the simulations INDEX page, whatever run the card was actually showing —
@@ -12,7 +13,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }));
 vi.mock("~/utils/compat/next-router", () => ({
@@ -48,16 +49,13 @@ function renderCard(output: unknown) {
   );
 }
 
-beforeEach(() => {
-  // `CapabilityDeepLinkChip` compares a CLI result's `platformUrl` against
-  // `window.location.origin` (BASE_HOST isn't exposed to the client bundle)
-  // to decide whether the link belongs to this instance.
-  Object.defineProperty(window, "location", {
-    value: { origin: "https://app.langwatch.ai" },
-    writable: true,
-    configurable: true,
-  });
-});
+// `CapabilityDeepLinkChip` compares a CLI result's `platformUrl` against
+// `window.location.origin` (BASE_HOST isn't exposed to the client bundle) to
+// decide whether the link belongs to this instance. The origin comes from the
+// document's own URL, declared in the docblock above, rather than from a stand-in
+// object assigned over `window.location` — jsdom defines `location` as a
+// non-configurable accessor, so replacing it throws outright once the file runs
+// in a VM context, and a real URL is the more faithful fixture in any case.
 
 afterEach(() => {
   cleanup();

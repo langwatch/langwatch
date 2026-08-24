@@ -125,7 +125,7 @@ describe("buildReportTemplateContext", () => {
           sourceLabel: "Top 5 matching traces",
           scheduleLabel: "every Monday at 09:00 (UTC)",
         },
-        viewUrl: "https://app.langwatch.ai/acme/messages",
+        viewUrl: "https://app.langwatch.ai/acme/traces",
         occurredAt: new Date("2026-05-29T00:00:00.000Z"),
         project: { id: "proj_1", name: "Acme", slug: "acme" },
         baseHost: "https://app.langwatch.ai",

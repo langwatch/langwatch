@@ -1,16 +1,22 @@
-import type { ModelDefaultScopeType, PrismaClient } from "@prisma/client";
+import { ValidationError } from "@langwatch/handled-error";
+import type {
+  ModelDefaultScopeType,
+  PrismaClient,
+} from "~/generated/prisma/client";
+import {
+  probeOrganizationPermission,
+  probeProjectPermission,
+  probeTeamPermission,
+} from "~/server/app-layer/permissions/imperative";
 
 import type { Session } from "~/server/auth";
-import {
-  hasOrganizationPermission,
-  hasProjectPermission,
-  hasTeamPermission,
-} from "../api/rbac";
+import { isRootPrismaClient } from "../db";
 import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "./codexRefusalMessage";
 import {
   isModelAllowedAsRoleDefault,
   isModelAllowedForFeature,
 } from "./codexRestrictions";
+import { ModelDefaultScopeForbiddenError } from "./errors";
 import {
   allFeatures,
   featureByKey,
@@ -34,10 +40,6 @@ export type AuthCtx = {
   session: Session | null;
 };
 
-function repoFor(ctx: Ctx): ModelDefaultsRepository {
-  return new ModelDefaultsRepository(ctx.prisma);
-}
-
 /**
  * RBAC guard for the role/feature default writers. Each scope demands
  * a different permission so a project admin can't silently push a role
@@ -55,24 +57,33 @@ export async function assertCanWriteScope(
   }
   if (scopeType === "ORGANIZATION") {
     if (
-      !(await hasOrganizationPermission(
+      !(await probeOrganizationPermission(
         ctx as { prisma: PrismaClient; session: Session },
         scopeId,
         "organization:manage",
       ))
     ) {
-      throw new Error("Missing organization:manage permission");
+      throw new ModelDefaultScopeForbiddenError({
+        scopeType,
+        requiredPermission: "organization:manage",
+      });
     }
     return;
   }
   if (scopeType === "TEAM") {
-    if (!(await hasTeamPermission(ctx, scopeId, "team:manage"))) {
-      throw new Error("Missing team:manage permission");
+    if (!(await probeTeamPermission(ctx, scopeId, "team:manage"))) {
+      throw new ModelDefaultScopeForbiddenError({
+        scopeType,
+        requiredPermission: "team:manage",
+      });
     }
     return;
   }
-  if (!(await hasProjectPermission(ctx, scopeId, "project:update"))) {
-    throw new Error("Missing project:update permission");
+  if (!(await probeProjectPermission(ctx, scopeId, "project:update"))) {
+    throw new ModelDefaultScopeForbiddenError({
+      scopeType,
+      requiredPermission: "project:update",
+    });
   }
 }
 
@@ -121,7 +132,7 @@ function sanitizeConfig(raw: Record<string, unknown>): Record<string, string> {
       ? isModelAllowedAsRoleDefault(value, key as ModelRole)
       : isModelAllowedForFeature({ modelId: value, featureKey: key });
     if (!allowed) {
-      throw new Error(
+      throw new ValidationError(
         `"${value}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot be set for "${key}".`,
       );
     }
@@ -143,9 +154,94 @@ function dedupeScopes(scopes: ScopeAttachment[]): ScopeAttachment[] {
 }
 
 /**
+ * Transaction budget for every default-models write.
+ *
+ * These writes queue on an advisory lock, and the wait counts against
+ * the interactive-transaction timeout. Prisma's default is 5 seconds,
+ * which a write queued behind another one in the same organization can
+ * exceed, and it would then fail with P2028: an unknown error on a save
+ * that only needed to wait its turn. `timeout` therefore has to cover
+ * the lock queue, not just the statements. `maxWait` is the separate
+ * budget for getting a connection out of the pool.
+ */
+const WRITE_TX_BUDGET = { timeout: 20_000, maxWait: 10_000 } as const;
+
+/**
+ * Run `fn` inside a transaction when handed the root PrismaClient, or
+ * directly when the caller already opened one (e.g. `upsertKeyAtScope`
+ * calls back into `createConfig` from inside its own `$transaction`).
+ */
+async function withScopeTransaction<T>(
+  prisma: ModelDefaultsPrisma,
+  fn: (tx: ModelDefaultsPrisma) => Promise<T>,
+): Promise<T> {
+  if (isRootPrismaClient(prisma)) {
+    return prisma.$transaction(fn, WRITE_TX_BUDGET);
+  }
+  return fn(prisma);
+}
+
+/** Deterministic lock order so two concurrent multi-scope writes can
+ * never deadlock on each other's scope locks. Plain byte comparison,
+ * not `localeCompare`: a collation-sensitive order could differ between
+ * two processes and put the ordering back at risk. */
+function sortForLocking(scopes: ScopeAttachment[]): ScopeAttachment[] {
+  const key = (s: ScopeAttachment) => `${s.scopeType}::${s.scopeId}`;
+  return [...scopes].sort((a, b) =>
+    key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0,
+  );
+}
+
+/**
+ * Take the locks every default-models write needs, in the one order
+ * every path uses: the organization first, then the scopes in a stable
+ * order.
+ *
+ * The organization lock is what makes the order total. A scope lock
+ * only covers the scopes being attached, while claiming a scope also
+ * detaches (and sometimes deletes) whichever config held it, and that
+ * config may hold scopes this write never named. Every config a claim
+ * can reach is anchored to the same organization as the claimed scope
+ * (ADR-021), so locking the organization first covers all of them and
+ * no two writes can take row locks in opposite orders.
+ */
+async function lockForWrite(
+  repo: ModelDefaultsRepository,
+  params: { organizationId: string; scopes?: ScopeAttachment[] },
+): Promise<void> {
+  await repo.lockOrganization(params.organizationId);
+  for (const s of sortForLocking(params.scopes ?? [])) {
+    await repo.lockScope(s.scopeType, s.scopeId);
+  }
+}
+
+/**
+ * Enforce the one-config-per-scope invariant for a write that attaches
+ * `scopes` to the config identified by `exceptConfigId` (or a config
+ * about to be created): detach those scopes from whichever configs held
+ * them, and delete any config left with zero attachments. Callers hold
+ * the locks `lockForWrite` takes, inside a transaction.
+ */
+async function claimScopes(
+  repo: ModelDefaultsRepository,
+  scopes: ScopeAttachment[],
+  opts: { exceptConfigId?: string } = {},
+): Promise<void> {
+  const held = await repo.findAttachmentsForScopes(scopes, opts);
+  if (held.length === 0) return;
+  await repo.deleteAttachments(held.map((h) => h.id));
+  await repo.deleteConfigsWithoutScopes(
+    Array.from(new Set(held.map((h) => h.configId))),
+  );
+}
+
+/**
  * Create a new ModelDefaultConfig with its scope attachments. Empty
  * configs (no valid keys) are rejected — a config is meaningless
- * without at least one model assignment.
+ * without at least one model assignment. Each attached scope is claimed
+ * exclusively: a scope belongs to at most one config, so whichever
+ * config held it before loses that attachment (and is deleted when
+ * nothing else keeps it alive).
  */
 export async function createConfig(
   ctx: Ctx,
@@ -157,17 +253,26 @@ export async function createConfig(
 ): Promise<{ id: string }> {
   const config = sanitizeConfig(params.config);
   if (Object.keys(config).length === 0) {
-    throw new Error(
-      "ModelDefaultConfig must carry at least one role or feature key.",
+    throw new ValidationError(
+      "Pick at least one model. A default-models config with every key on inherit has no effect.",
     );
   }
   if (params.scopes.length === 0) {
-    throw new Error("ModelDefaultConfig must attach to at least one scope.");
+    throw new ValidationError(
+      "Pick at least one scope for this default-models config.",
+    );
   }
-  return repoFor(ctx).create({
-    config,
-    scopes: dedupeScopes(params.scopes),
-    authorId: params.authorId ?? null,
+  const scopes = dedupeScopes(params.scopes);
+  return withScopeTransaction(ctx.prisma, async (tx) => {
+    const repo = new ModelDefaultsRepository(tx);
+    const organizationId = await repo.organizationIdForScopes(scopes);
+    await lockForWrite(repo, { organizationId, scopes });
+    await claimScopes(repo, scopes);
+    return repo.create({
+      config,
+      scopes,
+      authorId: params.authorId ?? null,
+    });
   });
 }
 
@@ -187,9 +292,9 @@ export async function updateConfig(
     authorId?: string | null;
   },
 ): Promise<void> {
-  const repo = repoFor(ctx);
   const data: { config?: Record<string, string>; authorId?: string | null } =
     {};
+  let deletesTheConfig = false;
   if (params.config !== undefined) {
     const clean = sanitizeConfig(params.config);
     if (Object.keys(clean).length === 0) {
@@ -197,54 +302,98 @@ export async function updateConfig(
       // delete because an attached-but-empty config has no effect on
       // resolution but still occupies the same-scope tiebreak slot
       // (newest empty would mask older non-empty at the same scope).
-      await repo.delete(params.id);
-      return;
+      deletesTheConfig = true;
     }
     data.config = clean;
   }
   if (params.authorId !== undefined) data.authorId = params.authorId;
 
-  if (params.scopes === undefined) {
-    // No scope changes — just bump the JSON / authorId.
-    await repo.updateConfigPayload({ id: params.id, data });
-    return;
-  }
-
   // Replace-all semantics for scope attachments: empty array → delete
   // the config (an unattached config can never be hit by the
   // resolver). Otherwise compute the add/remove diff against the
-  // current set.
-  if (params.scopes.length === 0) {
-    await repo.delete(params.id);
+  // current set. Newly added scopes are claimed exclusively: whichever
+  // config held them before loses the attachment, same invariant as
+  // `createConfig`.
+  if (params.scopes !== undefined && params.scopes.length === 0) {
+    deletesTheConfig = true;
+  }
+
+  // Every branch runs under the config's organization lock, deletes
+  // included: a delete that skipped it could race a concurrent claim
+  // for the same config and fail on a row that claim had just
+  // collected.
+  if (deletesTheConfig || params.scopes === undefined) {
+    await withScopeTransaction(ctx.prisma, async (tx) => {
+      const txRepo = new ModelDefaultsRepository(tx);
+      const organizationId = await txRepo.findOrganizationIdForConfig(
+        params.id,
+      );
+      // Already gone: a concurrent save claimed its last scope and
+      // collected it. Both branches below are satisfied by that.
+      if (!organizationId) return;
+      await lockForWrite(txRepo, { organizationId });
+      if (deletesTheConfig) {
+        await txRepo.delete(params.id);
+        return;
+      }
+      // No scope changes — just bump the JSON / authorId.
+      await txRepo.updateConfigPayload({ id: params.id, data });
+    });
     return;
   }
-  const desired = new Map<string, ScopeAttachment>();
-  for (const s of params.scopes) {
-    desired.set(`${s.scopeType}::${s.scopeId}`, s);
-  }
-  const current = await repo.findScopesForConfig(params.id);
-  const currentByKey = new Map(
-    current.map((c) => [`${c.scopeType}::${c.scopeId}`, c]),
-  );
-  const toAdd = [...desired.values()].filter(
-    (s) => !currentByKey.has(`${s.scopeType}::${s.scopeId}`),
-  );
-  const toRemove = current.filter(
-    (c) => !desired.has(`${c.scopeType}::${c.scopeId}`),
-  );
-  await repo.updateConfigScopes({
-    id: params.id,
-    configPayload: data,
-    toAdd,
-    toRemoveIds: toRemove.map((c) => c.id),
+
+  const desiredScopes = dedupeScopes(params.scopes);
+  await withScopeTransaction(ctx.prisma, async (tx) => {
+    const txRepo = new ModelDefaultsRepository(tx);
+    // Resolved from the desired scopes rather than the config row: it
+    // is the same organization either way (ADR-021 keeps a config and
+    // its scopes in one org), and this way the lock is taken before the
+    // config is read instead of after.
+    const organizationId = await txRepo.organizationIdForScopes(desiredScopes);
+    await lockForWrite(txRepo, { organizationId, scopes: desiredScopes });
+    // Gone while we waited for the lock: a concurrent save claimed its
+    // last scope and collected it, and that save's config now owns the
+    // scopes this one wanted. Re-creating the row here would undo it.
+    if ((await txRepo.findOrganizationIdForConfig(params.id)) === null) return;
+    const desired = new Map<string, ScopeAttachment>();
+    for (const s of desiredScopes) {
+      desired.set(`${s.scopeType}::${s.scopeId}`, s);
+    }
+    const current = await txRepo.findScopesForConfig(params.id);
+    const currentByKey = new Map(
+      current.map((c) => [`${c.scopeType}::${c.scopeId}`, c]),
+    );
+    const toAdd = [...desired.values()].filter(
+      (s) => !currentByKey.has(`${s.scopeType}::${s.scopeId}`),
+    );
+    const toRemove = current.filter(
+      (c) => !desired.has(`${c.scopeType}::${c.scopeId}`),
+    );
+    await claimScopes(txRepo, toAdd, { exceptConfigId: params.id });
+    await txRepo.updateConfigScopes({
+      id: params.id,
+      configPayload: data,
+      toAdd,
+      toRemoveIds: toRemove.map((c) => c.id),
+    });
   });
 }
 
 /**
- * Delete a config. Scope attachments cascade via the FK.
+ * Delete a config. Scope attachments cascade via the FK. Runs under the
+ * organization lock so it orders against a concurrent claim for the
+ * same config rather than racing it.
  */
 export async function deleteConfig(ctx: Ctx, configId: string): Promise<void> {
-  await repoFor(ctx).delete(configId);
+  await withScopeTransaction(ctx.prisma, async (tx) => {
+    const repo = new ModelDefaultsRepository(tx);
+    const organizationId = await repo.findOrganizationIdForConfig(configId);
+    // Already gone: a concurrent save claimed its last scope and
+    // collected it, which is the outcome this call asked for.
+    if (!organizationId) return;
+    await lockForWrite(repo, { organizationId });
+    await repo.delete(configId);
+  });
 }
 
 /**
@@ -355,7 +504,18 @@ async function upsertKeyAtScope(
 ): Promise<void> {
   await (ctx.prisma as PrismaClient).$transaction(async (tx) => {
     const txRepo = new ModelDefaultsRepository(tx);
-    await txRepo.lockScope(params.scopeType, params.scopeId);
+    const scope = {
+      scopeType: params.scopeType,
+      scopeId: params.scopeId,
+    };
+    // Same organization-then-scope order every other write path uses.
+    // Taking only the scope lock here would let this path hold a scope
+    // lock while a claiming write held the organization lock and wanted
+    // that scope, which is a cycle.
+    await lockForWrite(txRepo, {
+      organizationId: await txRepo.organizationIdForScopes([scope]),
+      scopes: [scope],
+    });
 
     const attached = await txRepo.findConfigsAtScope(
       params.scopeType,
@@ -402,5 +562,5 @@ async function upsertKeyAtScope(
         authorId: params.authorId ?? null,
       },
     );
-  });
+  }, WRITE_TX_BUDGET);
 }

@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "lib": ["es2020"],
+    // Deliberately NO "types": ["node"]. This package is isomorphic: the
+    // frontend and the backend both import it, so a `node:*` import or a
+    // `Buffer` reference must not compile here. That is the whole boundary —
+    // enforced by the compiler rather than by a convention in a barrel.
+    "types": [],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitReturns": true,
+    "incremental": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/authz.tsbuildinfo",
+    "noEmit": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["src/**/*.ts"],
+  // The package ships its TypeScript sources (exports point at src/*.ts), so
+  // nothing is emitted from here. Tests are checked by tsconfig.test.json,
+  // which supplies the `vitest` module types this config has no need of.
+  "exclude": ["src/__tests__/**"]
+}

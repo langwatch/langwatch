@@ -1,6 +1,9 @@
+import type { LedgerActor } from "@langwatch/actor";
+import { DuplicateBindingError } from "@langwatch/authz-server";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
-import type { Team } from "@prisma/client";
 import { nanoid } from "nanoid";
+import type { Team, TeamUserRole } from "~/generated/prisma/client";
+import { UserNotInOrganizationError } from "~/server/role-bindings/errors";
 import { slugify } from "~/utils/slugify";
 import type {
   PaginatedResult,
@@ -281,5 +284,83 @@ export class TeamRestService {
     const team = await this.repo.archive({ id, organizationId });
     if (!team) throw new TeamNotFoundError(id);
     return team;
+  }
+
+  /**
+   * Put one member on a team. The membership IS the grant, so this is a
+   * ledger write, and the route that used to make it itself is now the thin
+   * thing it should have been.
+   */
+  async addMember({
+    id,
+    organizationId,
+    userId,
+    role,
+    actor,
+  }: {
+    id: string;
+    organizationId: string;
+    userId: string;
+    role: TeamUserRole;
+    actor: LedgerActor;
+  }): Promise<void> {
+    const team = await this.getById({ id, organizationId });
+    if (!team) throw new TeamNotFoundError(id);
+    // A personal team holds exactly its owner, which is why plan limits exempt
+    // it. A second member would contradict that, so the request is refused
+    // rather than the team quietly becoming something else.
+    if (team.isPersonal) {
+      throw new PersonalTeamProtectedError(PERSONAL_TEAM_MEMBERSHIP_REFUSAL);
+    }
+
+    const isInOrganization = await this.repo.isUserInOrganization({
+      userId,
+      organizationId,
+    });
+    if (!isInOrganization) throw new UserNotInOrganizationError(userId);
+
+    try {
+      await this.repo.grantMembership({
+        teamId: id,
+        organizationId,
+        userId,
+        role,
+        actor,
+      });
+    } catch (error) {
+      if (error instanceof DuplicateBindingError) {
+        throw new TeamMemberAlreadyAddedError(userId);
+      }
+      throw error;
+    }
+  }
+
+  async removeMember({
+    id,
+    organizationId,
+    userId,
+    actor,
+  }: {
+    id: string;
+    organizationId: string;
+    userId: string;
+    actor: LedgerActor;
+  }): Promise<void> {
+    const team = await this.getById({ id, organizationId });
+    if (!team) throw new TeamNotFoundError(id);
+    // The one member of a personal team is its owner, and nothing puts that
+    // binding back, so removal is refused rather than leaving the owner locked
+    // out of their own workspace.
+    if (team.isPersonal) {
+      throw new PersonalTeamProtectedError(PERSONAL_TEAM_MEMBERSHIP_REFUSAL);
+    }
+
+    const removed = await this.repo.revokeMembership({
+      teamId: id,
+      organizationId,
+      userId,
+      actor,
+    });
+    if (removed === 0) throw new TeamMembershipNotFoundError(userId);
   }
 }

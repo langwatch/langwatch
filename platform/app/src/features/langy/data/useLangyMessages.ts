@@ -1,4 +1,5 @@
 import type { LangyEventCursor } from "@langwatch/langy";
+import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -55,6 +56,13 @@ export interface LangyMessagesResult {
   eventCursor: LangyEventCursor | null;
   /** The turn in flight per the durable fold — what a refresh reattaches to. */
   currentTurnId: string | null;
+  /**
+   * The model the conversation's latest turn ran on, off the durable fold —
+   * null before any turn recorded one. The panel seeds the composer's picker
+   * from it on open, so a conversation keeps the model it was last used with
+   * across tabs and reloads.
+   */
+  lastModel: string | null;
   isLoading: boolean;
   isFetching: boolean;
   isError: boolean;
@@ -100,12 +108,8 @@ export function useLangyMessages(
       enabled: !!project?.id && !!conversationId,
       staleTime: 30_000,
       refetchOnWindowFocus: false,
-      keepPreviousData: true,
-      // Wrapped, not passed by reference: handing the helper straight to
-      // react-query lets its narrow `{ isTurnInFlight }` param type win the
-      // inference for the query's TData, collapsing `query.data` to that shape
-      // (CI typecheck caught it). The arrow keeps `data` contextually typed.
-      refetchInterval: (data) => langyMessagesPollInterval(data),
+      placeholderData: keepPreviousData,
+      refetchInterval: (query) => langyMessagesPollInterval(query.state.data),
     },
   );
 
@@ -126,6 +130,7 @@ export function useLangyMessages(
     shouldAskFeedback: query.data?.shouldAskFeedback ?? false,
     eventCursor: query.data?.eventCursor ?? null,
     currentTurnId: query.data?.currentTurnId ?? null,
+    lastModel: query.data?.lastModel ?? null,
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     isError: query.isError,

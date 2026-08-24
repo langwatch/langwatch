@@ -5,7 +5,7 @@ import {
   type WebhookMethod,
 } from "@langwatch/automations/providers/webhook";
 import { DispatchError } from "~/server/event-sourcing/queues/dispatchError";
-import { rateLimit } from "~/server/rateLimit";
+import { assertDispatchBudget } from "./dispatchBudget";
 import { sendHttpDestination } from "./httpDestination";
 import { signWebhookPayload, WEBHOOK_SIGNATURE_HEADER } from "./signature";
 import { assertWebhookUrlAllowed, webhookUrlValidator } from "./urlPolicy";
@@ -86,14 +86,6 @@ function buildWebhookHeaders({
     ...(testFire ? { "X-LangWatch-Test-Fire": "true" } : {}),
   };
 }
-
-/**
- * Per-project hourly cap on real webhook dispatches (ADR-040 §4) — a backstop
- * against an immediate-cadence trigger firing per-match turning our worker
- * fleet into an outbound flood. A safety limit, not a billing knob; promote to
- * an env var if a customer legitimately needs a higher ceiling.
- */
-export const WEBHOOK_DISPATCH_HOURLY_CAP = 1000;
 
 export interface WebhookSendInput {
   url: string;
@@ -176,23 +168,11 @@ export async function sendWebhook({
 }: WebhookSendInput): Promise<WebhookSendResult> {
   const label = contextLabel ?? `Webhook for trigger "${triggerName}"`;
   assertWebhookUrlAllowed({ url, label, allowInsecureLocal });
-  // Per-project dispatch cap (ADR-040 §4) — a real fire only; test fires ride
-  // the drawer's per-user limit. Over the cap throws RETRYABLE with a
-  // Retry-After to the window reset: a legitimate burst backs off and drains,
-  // a sustained flood dead-letters after the outbox's max attempts.
+  // The shared dispatch cap (ADR-040 §4) — a real fire only; test fires ride
+  // the drawer's per-user limit. It lives outside this sender because the
+  // queue transport must answer to the same cap without going through it.
   if (projectId && !testFire) {
-    const limit = await rateLimit({
-      key: `webhook-dispatch:${projectId}`,
-      windowSeconds: 3600,
-      max: WEBHOOK_DISPATCH_HOURLY_CAP,
-    });
-    if (!limit.allowed) {
-      throw new DispatchError({
-        message: `${label}: project webhook dispatch cap (${WEBHOOK_DISPATCH_HOURLY_CAP}/hour) reached — backing off.`,
-        retryable: true,
-        retryAfterMs: Math.max(0, limit.resetAt - Date.now()),
-      });
-    }
+    await assertDispatchBudget({ scopeId: projectId, label });
   }
   // Stable across retries when the caller supplies it (dispatch); a fresh id
   // for a test fire, which has no retries to dedupe.
@@ -220,10 +200,27 @@ export async function sendWebhook({
 const ERROR_SNIPPET_CHARS = 300;
 
 /**
- * ADR-040 §5 retry-vs-terminal classification. 2xx returns; 5xx / 429 / 408
- * throw retryable (the outbox backs off and re-attempts); any other status —
- * including 3xx, which the strict sender refuses to follow — throws terminal,
- * because retrying a misconfigured endpoint just spams it.
+ * ADR-040 §5 retry-vs-terminal classification, as a value rather than a
+ * throw. 2xx is success; 5xx / 429 / 408 are retryable (the outbox backs off
+ * and re-attempts); any other status — including 3xx, which the strict sender
+ * refuses to follow — is terminal, because retrying a misconfigured endpoint
+ * just spams it.
+ *
+ * The rule lives here once, and both the throwing assertion below and the
+ * HTTP destination read it, so a transport can never drift from the classic
+ * classification by restating it.
+ */
+export function classifyWebhookStatus(
+  status: number,
+): "success" | "retryable" | "terminal" {
+  if (status >= 200 && status < 300) return "success";
+  if (status >= 500 || status === 429 || status === 408) return "retryable";
+  return "terminal";
+}
+
+/**
+ * The throwing form of {@link classifyWebhookStatus}, for callers that want
+ * a classified DispatchError rather than a verdict.
  */
 export function assertWebhookDelivered({
   result,
@@ -233,9 +230,10 @@ export function assertWebhookDelivered({
   triggerName: string;
 }): void {
   const { status } = result;
-  if (status >= 200 && status < 300) return;
+  const verdict = classifyWebhookStatus(status);
+  if (verdict === "success") return;
   const snippet = result.body.slice(0, ERROR_SNIPPET_CHARS).trim();
-  const retryable = status >= 500 || status === 429 || status === 408;
+  const retryable = verdict === "retryable";
   throw new DispatchError({
     message:
       `Webhook for trigger "${triggerName}" received HTTP ${status}` +

@@ -74,6 +74,16 @@ Feature: Langy recognises its own CLI behind a shell tool call
       When the LangWatch CLI exits with an error
       Then the recorded tool result keeps the error text the CLI printed
 
+    # The CLI documents its --jq flag with the example ".traces[].traceId". The
+    # "[]" in that sentence parses as an empty array, so every usage text and
+    # every --help was recorded as the JSON document []. The agent read a
+    # rejected command as "no results" and reported that as a count.
+    @unit
+    Scenario: A rejected command is never read as an empty result
+      When the LangWatch CLI rejects a flag and prints its usage text
+      Then the recorded tool result is that text, not a fragment of JSON from inside it
+      And the same holds for a command that only printed its help
+
   # A failure the CLI described precisely — what went wrong, why, and what to do
   # about it — used to reach the panel as a bare sentence, because the envelope
   # kept only the message and threw the structure away. The card then had nothing

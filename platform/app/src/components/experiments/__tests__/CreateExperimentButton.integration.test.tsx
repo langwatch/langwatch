@@ -47,7 +47,7 @@ vi.mock("~/utils/compat/next-router", () => ({
 
 vi.mock("~/utils/api", () => ({
   api: {
-    useContext: () => ({
+    useUtils: () => ({
       experiments: { getAllForEvaluationsList: { invalidate: vi.fn() } },
     }),
     experiments: {

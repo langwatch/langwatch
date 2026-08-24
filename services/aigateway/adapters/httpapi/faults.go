@@ -69,8 +69,10 @@ func faultForCode(code herr.Code) Fault {
 	switch code {
 	case domain.ErrInvalidAPIKey, domain.ErrBudgetExceeded, domain.ErrRateLimited,
 		domain.ErrGuardrailBlocked, domain.ErrPolicyViolation, domain.ErrModelNotAllowed,
+		domain.ErrProviderNotBound, domain.ErrModelNotRecognized,
 		domain.ErrPayloadTooLarge, domain.ErrBadRequest, domain.ErrMissingModel, domain.ErrNotFound,
-		domain.ErrKeyRevoked, domain.ErrKeyDisabled, domain.ErrNoProviderConfigured,
+		domain.ErrKeyRevoked, domain.ErrKeyDisabled, domain.ErrKeyExpired,
+		domain.ErrNoProviderConfigured,
 		domain.ErrEndUserRequired,
 		// The customer's own OpenAI sign-in died and only they can restore it,
 		// so it is their fault in the only sense this attribution means: whose

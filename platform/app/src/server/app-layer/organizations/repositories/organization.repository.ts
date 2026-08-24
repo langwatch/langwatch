@@ -13,7 +13,7 @@ import type {
   TeamUser,
   TeamUserRole,
   User,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 import type { TeamRoleUpdateOrigin } from "../compute-effective-team-role-updates";
 
 export type TeamWithProjects = Team & {
@@ -271,6 +271,12 @@ export interface MemberTeamBinding {
 export interface DeleteMemberInput {
   organizationId: string;
   userId: string;
+  /**
+   * Who removed them, when a person did. A service credential acts as
+   * nobody, so this is null there and the revocation is attributed to the
+   * organization service itself.
+   */
+  actingUserId?: string | null;
 }
 
 /**

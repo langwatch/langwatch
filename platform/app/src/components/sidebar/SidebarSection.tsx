@@ -1,7 +1,8 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, VStack } from "@chakra-ui/react";
 import { ChevronRight } from "lucide-react";
 import type React from "react";
 
+import { SideMenuSectionLabel } from "./SideMenuSectionLabel";
 import { useSidebarSectionState } from "./useSidebarSectionState";
 
 export { getSidebarSectionStorageKey } from "./useSidebarSectionState";
@@ -78,16 +79,7 @@ const SidebarSectionToggle = ({
         color="gray.500"
         _hover={{ color: "nav.fg" }}
       >
-        {showExpanded && (
-          <Text
-            fontSize="11px"
-            fontWeight="medium"
-            textTransform="uppercase"
-            whiteSpace="nowrap"
-          >
-            {label}
-          </Text>
-        )}
+        {showExpanded && <SideMenuSectionLabel label={label} />}
         {!isExpanded && (
           <Box opacity={0.5} display="flex">
             <ChevronRight size={13} aria-hidden="true" />

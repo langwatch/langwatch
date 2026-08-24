@@ -50,17 +50,23 @@ export function nativePiiEntitiesForPolicy(
  * entirely; secrets still run when enabled (they are an independent concern).
  *
  * Pure and synchronous so it can run per string in the hot ingestion path.
+ *
+ * `isAttributeValue` marks the text as one attribute value, which lets the PII
+ * pass hold identifier-shaped values back from the recognizers that have only a
+ * shape to go on. Free text (bodies, status messages) leaves it off.
  */
 export function redactStringNative({
   text,
   policy,
   compiledSecretPatterns,
   compiledPiiExceptions,
+  isAttributeValue = false,
 }: {
   text: string;
   policy: ResolvedDataPrivacy;
   compiledSecretPatterns?: readonly RegExp[];
   compiledPiiExceptions?: readonly RegExp[];
+  isAttributeValue?: boolean;
 }): { text: string; redactedCount: number } {
   let result = text;
   let redactedCount = 0;
@@ -83,6 +89,7 @@ export function redactStringNative({
       text: result,
       entities: piiEntities === "all" ? undefined : piiEntities,
       exceptPatterns: compiledPiiExceptions,
+      isAttributeValue,
     });
     result = pii.text;
     redactedCount += pii.redactedCount;
@@ -126,7 +133,8 @@ const NAME_RULE_EXEMPT_ATTRIBUTES: ReadonlySet<string> = new Set([
  * the whole value is replaced regardless of its shape — the Sentry-style
  * field-name deny-list, minus {@link NAME_RULE_EXEMPT_ATTRIBUTES}. Otherwise
  * the value runs through the normal native passes (secrets value-scan +
- * essential PII).
+ * essential PII), marked as an attribute value so the PII pass can hold an
+ * identifier-shaped value back from the recognizers that go on shape alone.
  */
 export function redactAttributeNative({
   key,
@@ -154,6 +162,7 @@ export function redactAttributeNative({
     policy,
     compiledSecretPatterns,
     compiledPiiExceptions,
+    isAttributeValue: true,
   });
 }
 

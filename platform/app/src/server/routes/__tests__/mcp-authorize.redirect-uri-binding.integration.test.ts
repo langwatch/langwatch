@@ -17,7 +17,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type * as ServerRedis from "~/server/redis";
+import type * as AppLayerApp from "~/server/app-layer/app";
 import { app } from "../misc";
 
 const PROJECT_ID = "project_1";
@@ -34,7 +34,9 @@ const { mockPrisma, mockRedis, SESSION } = vi.hoisted(() => {
     },
     mockPrisma: {
       organizationUser: {
-        findFirst: vi.fn().mockResolvedValue({ role: "MEMBER" }),
+        findFirst: vi
+          .fn()
+          .mockResolvedValue({ role: "MEMBER", disabledAt: null }),
       },
       groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
       roleBinding: {
@@ -67,9 +69,26 @@ vi.mock("~/server/auth", () => ({
   getServerAuthSession: vi.fn().mockResolvedValue(SESSION),
 }));
 vi.mock("~/server/db", () => ({ prisma: mockPrisma }));
-vi.mock("~/server/redis", async (importOriginal) => {
-  const actual = await importOriginal<typeof ServerRedis>();
-  return { ...actual, connection: mockRedis };
+vi.mock("~/server/app-layer/app", async (importOriginal) => {
+  const actual = await importOriginal<typeof AppLayerApp>();
+  // misc.ts reads its connection through tryGetApp; getApp is overridden too
+  // so both accessors agree on the fake.
+  // The authorize route decides through the App's permissions (ADR-092);
+  // composing over this file's mocked ~/server/db keeps the roleBinding
+  // stubs in charge of every outcome.
+  const { permissionsServiceFor } = await import(
+    "~/server/app-layer/permissions/runtime"
+  );
+  const { prisma: dbForPermissions } = await import("~/server/db");
+  const fakeApp = () => ({
+    redis: mockRedis,
+    permissions: permissionsServiceFor(dbForPermissions),
+  });
+  return {
+    ...actual,
+    getApp: fakeApp,
+    tryGetApp: fakeApp,
+  };
 });
 vi.mock("~/utils/encryption", () => ({
   encrypt: (text: string) => `encrypted:${text}`,
@@ -113,7 +132,7 @@ function resetMocks() {
     ]);
   mockPrisma.organizationUser.findFirst
     .mockReset()
-    .mockResolvedValue({ role: "MEMBER" });
+    .mockResolvedValue({ role: "MEMBER", disabledAt: null });
 }
 
 describe("POST /api/mcp/authorize — redirect_uri binding", () => {

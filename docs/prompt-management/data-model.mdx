@@ -30,8 +30,7 @@ When you retrieve a prompt, you get all the configuration in a single response:
   "deletedAt": null,
   
   "prompt": "You are a helpful customer support agent...",
-  "model": "openai/gpt-4o-mini",
-  "temperature": 0.7,
+  "model": "openai/gpt-5-mini",
   "maxTokens": 1000,
   "messages": [
     { "role": "system", "content": "You are a helpful customer support agent..." },
@@ -117,15 +116,15 @@ Soft delete timestamp (null if not deleted)
 
 ### Model Configuration
 
-<ResponseField name="model" type="string" required>
-The LLM model to use (e.g., "openai/gpt-4o-mini"). Model names follow the litellm structure ("provider/model")
+<ResponseField name="model" type="string">
+The LLM model to use (e.g., "openai/gpt-5-mini"). Model names follow the litellm structure ("provider/model")
 </ResponseField>
 
-<ResponseField name="temperature" type="float" required>
-Fine-tune creativity vs. consistency (0.0 = deterministic, 2.0 = very creative)
+<ResponseField name="temperature" type="float">
+Fine-tune creativity vs. consistency (0.0 = deterministic, 2.0 = very creative). Not every model accepts it — the GPT-5 family rejects a custom temperature, so leave it unset for those.
 </ResponseField>
 
-<ResponseField name="maxTokens" type="integer" required>
+<ResponseField name="maxTokens" type="integer">
 Control response length and costs
 </ResponseField>
 
@@ -163,7 +162,7 @@ Please help them with: {{input}}
 - **Numbers**: `{{count}}`
 - **Booleans**: `{{is_premium}}`
 - **Lists**: `{{items}}`
-- **Objects**: `{{user_data}}` (will be converted to string)
+- **Objects**: `{{user_data}}` (converted to a string)
 
 ## Optimization Features
 

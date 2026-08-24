@@ -6,7 +6,7 @@ sidebarTitle: Messages
 
 The `/v1/messages` endpoint is Anthropic-native. Claude Code, the Anthropic Python/TypeScript SDK, and any agent built against Anthropic's Messages API works unchanged by pointing at the gateway.
 
-Beyond plain pass-through, the gateway preserves tool-call streaming deltas byte-for-byte (load-bearing for agentic CLIs) and forwards `cache_control` blocks identically (load-bearing for the 90% Anthropic cache discount).
+Beyond plain pass-through, the gateway preserves tool-call streaming deltas byte-for-byte, which agentic CLIs depend on, and forwards `cache_control` blocks identically, which keeps the 90% Anthropic cache discount.
 
 ## Request
 

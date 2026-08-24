@@ -14,6 +14,10 @@ import {
   LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
 } from "@langwatch/langy";
 import {
+  AUTHZ_GRANTS_COMMAND_TYPES,
+  AUTHZ_GRANTS_EVENT_TYPES,
+} from "../pipelines/authz-grants/schemas/constants";
+import {
   AUTOMATIONS_COMMAND_TYPES,
   AUTOMATIONS_EVENT_TYPES,
 } from "../pipelines/automations/schemas/constants";
@@ -76,6 +80,7 @@ const TEST_EVENT_TYPES = ["test.integration.event"] as const;
  * All event type identifiers defined in schemas.
  */
 export const EVENT_TYPE_IDENTIFIERS = [
+  ...AUTHZ_GRANTS_EVENT_TYPES,
   ...AUTOMATIONS_EVENT_TYPES,
   ...TRACE_PROCESSING_EVENT_TYPES,
   ...METRIC_PROCESSING_EVENT_TYPES,
@@ -97,6 +102,7 @@ export const EVENT_TYPE_IDENTIFIERS = [
  * All command type identifiers defined in schemas.
  */
 export const COMMAND_TYPE_IDENTIFIERS = [
+  ...AUTHZ_GRANTS_COMMAND_TYPES,
   ...AUTOMATIONS_COMMAND_TYPES,
   ...TRACE_PROCESSING_COMMAND_TYPES,
   ...METRIC_PROCESSING_COMMAND_TYPES,
@@ -126,6 +132,10 @@ const TEST_AGGREGATE_TYPE = "test_aggregate" as const;
  * via event handler in the trace-processing pipeline.
  */
 export const AGGREGATE_TYPE_IDENTIFIERS = [
+  // ADR-110: a grant is its own aggregate, and so is a role. There is no
+  // organization-keyed authorization aggregate.
+  "authz_grant",
+  "authz_role",
   "trigger",
   "trace",
   "metric",

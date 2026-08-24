@@ -14,14 +14,23 @@ class LitellmCompletion:
     exception: Optional[Exception] = None
     temperature: float = 0
 
-    def __init__(self, temperature: float = 0):
+    def __init__(
+        self,
+        temperature: float = 0,
+        extra_call_kwargs: Optional[dict] = None,
+    ):
         self.temperature = temperature
+        # Call arguments the evaluator pins for every call made through this
+        # client, e.g. the azure api_version that used to be set through the
+        # process environment.
+        self.extra_call_kwargs = extra_call_kwargs or {}
 
     def create(self, *args, **kwargs):
         try:
             if self.temperature:
                 kwargs["temperature"] = self.temperature
             kwargs["drop_params"] = True
+            kwargs.update(self.extra_call_kwargs)
             return litellm.completion(*args, **kwargs)
         except Exception as e:
             self.exception = e
@@ -36,6 +45,7 @@ class AsyncLitellmCompletion(LitellmCompletion):
 def model_to_langchain(
     model: str,
     temperature: float = 0,
+    extra_call_kwargs: Optional[dict] = None,
 ) -> BaseChatModel:
     if model.startswith("claude-"):
         model = model.replace("claude-", "anthropic/claude-")
@@ -47,16 +57,24 @@ def model_to_langchain(
         model=model,
         api_key="dummy",  # type: ignore
         temperature=temperature or 0,
-        client=LitellmCompletion(temperature=temperature),
-        async_client=AsyncLitellmCompletion(temperature=temperature),
+        client=LitellmCompletion(
+            temperature=temperature, extra_call_kwargs=extra_call_kwargs
+        ),
+        async_client=AsyncLitellmCompletion(
+            temperature=temperature, extra_call_kwargs=extra_call_kwargs
+        ),
     )
 
 
 class LitellmEmbeddings:
     exception: Optional[Exception] = None
 
+    def __init__(self, extra_call_kwargs: Optional[dict] = None):
+        self.extra_call_kwargs = extra_call_kwargs or {}
+
     def create(self, *args, **kwargs):
         try:
+            kwargs.update(self.extra_call_kwargs)
             result = litellm.embedding(*args, **kwargs)
             return result.model_dump()
         except Exception as e:
@@ -89,9 +107,12 @@ class LitellmEmbeddingsWrapper(OpenAIEmbeddings):
         return self.embed_query(question)
 
 
-def embeddings_model_to_langchain(embeddings_model: str):
+def embeddings_model_to_langchain(
+    embeddings_model: str,
+    extra_call_kwargs: Optional[dict] = None,
+):
     return LitellmEmbeddingsWrapper(
         model=embeddings_model,
         api_key="dummy",  # type: ignore
-        client=LitellmEmbeddings(),
+        client=LitellmEmbeddings(extra_call_kwargs=extra_call_kwargs),
     )

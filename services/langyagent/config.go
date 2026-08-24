@@ -61,11 +61,11 @@ type Config struct {
 	// presents on /chat. Required — the manager fails fast without it.
 	InternalSecret string `env:"LANGY_INTERNAL_SECRET" validate:"required"`
 
-	MaxWorkers         int    `env:"LANGY_MAX_WORKERS" validate:"gt=0"`
-	WorkerIdleMS       int64  `env:"LANGY_WORKER_IDLE_MS" validate:"gt=0"`
-	ReaperIntervalMS   int64  `env:"LANGY_REAPER_INTERVAL_MS" validate:"gt=0"`
+	MaxWorkers         int    `env:"LANGY_MAX_WORKERS"          validate:"gt=0"`
+	WorkerIdleMS       int64  `env:"LANGY_WORKER_IDLE_MS"       validate:"gt=0"`
+	ReaperIntervalMS   int64  `env:"LANGY_REAPER_INTERVAL_MS"   validate:"gt=0"`
 	ReadinessTimeoutMS int64  `env:"LANGY_READINESS_TIMEOUT_MS" validate:"gt=0"`
-	SessionsRoot       string `env:"SESSIONS_ROOT" validate:"required"`
+	SessionsRoot       string `env:"SESSIONS_ROOT"              validate:"required"`
 
 	// ShutdownHandoffDeadlineMS (ADR-048) is the wall-clock budget the manager
 	// gives each live worker to checkpoint on SIGTERM before the process-group
@@ -145,9 +145,15 @@ type Config struct {
 	UnsafeDevDisableIsolation bool `env:"LANGY_UNSAFE_DEV_DISABLE_ISOLATION"`
 
 	// OpenCodeBinaryPath is the opencode executable (resolved via PATH). Not
-	// env-configurable in the original; kept as a fixed default so behaviour is
+	// env-configurable in the original; kept as a fixed default so behavior is
 	// unchanged, but overridable in tests.
 	OpenCodeBinaryPath string
+
+	// PiWorkerBinaryPath is the langy-worker executable the pi harness spawns
+	// (resolved via PATH when bare). Env-overridable so a host-tier dev manager
+	// can point at a locally built binary (services/langyworker/out) without
+	// installing it on PATH.
+	PiWorkerBinaryPath string `env:"LANGY_PI_WORKER_BINARY_PATH"`
 }
 
 const (
@@ -186,6 +192,7 @@ func defaultConfig() Config {
 		SessionsRoot:              defaultSessionsRoot,
 		WorkspaceRoot:             defaultWorkspaceRoot,
 		OpenCodeBinaryPath:        "opencode",
+		PiWorkerBinaryPath:        "langy-worker",
 		ShutdownHandoffDeadlineMS: defaultShutdownHandoffDeadlineMS,
 		ShutdownDrainBudgetMS:     defaultShutdownDrainBudgetMS,
 		// ADR-076 rung 1a + SNI cross-check are the always-safe rungs; both

@@ -77,6 +77,18 @@ type FormValues = {
   columnTypes: DatasetColumns;
 };
 
+/** Columns a freshly created dataset starts with, matching the trace fields
+ *  a record carries by default. */
+export const DATASET_DEFAULT_COLUMNS: DatasetColumns = [
+  { name: "trace_id", type: "string" },
+  { name: "timestamp", type: "date" },
+  { name: "input", type: "string" },
+  { name: "output", type: "string" },
+  { name: "contexts", type: "list" },
+  { name: "total_cost", type: "number" },
+  { name: "annotations", type: "string" },
+];
+
 /**
  * This is a component that allows you to create a new dataset
  * or edit an existing one's columns.
@@ -88,15 +100,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
   const onClose = props.onClose ?? closeDrawer;
   const isOpen = props.open ?? true;
 
-  const initialColumns: DatasetColumns = [
-    { name: "trace_id", type: "string" },
-    { name: "timestamp", type: "date" },
-    { name: "input", type: "string" },
-    { name: "output", type: "string" },
-    { name: "contexts", type: "list" },
-    { name: "total_cost", type: "number" },
-    { name: "annotations", type: "string" },
-  ];
+  const initialColumns = DATASET_DEFAULT_COLUMNS;
 
   const {
     register,
@@ -182,7 +186,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!props.open]);
 
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
 
   const performUpsert = (data: DatasetRecordForm) => {
     upsertDataset.mutate(
@@ -221,9 +225,6 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
               ? `Successfully updated ${data.name} dataset`
               : `Successfully created ${data.name} dataset`,
             type: "success",
-            meta: {
-              closable: true,
-            },
           });
           reset();
           onClose();
@@ -400,7 +401,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
               colorPalette="blue"
               type="submit"
               minWidth="fit-content"
-              loading={upsertDataset.isLoading}
+              loading={upsertDataset.isPending}
             >
               {props.localOnly
                 ? "Apply"

@@ -85,6 +85,11 @@ export interface LangyWorkerPort {
      * change is a probe MISS and the worker re-warms rather than mirroring under
      * the tier it booted with. */
     mirrorTier?: string;
+    /** Which worker harness the turn wants (`release_langy_pi_harness`). Part
+     * of the worker signature, the manager collapses absent and "opencode",
+     * so a flag flip is a probe MISS and the worker re-warms on the other
+     * harness rather than serving the turn on the one it booted with. */
+    harness?: string;
   }): Promise<boolean>;
 
   /**
@@ -160,6 +165,7 @@ export function createLangyWorkerPort(config: {
       githubRepoScopeKey,
       egressAllowlist,
       mirrorTier,
+      harness,
     }) {
       try {
         // traceparent rides along (no span of its own — the probe is a single
@@ -185,6 +191,7 @@ export function createLangyWorkerPort(config: {
             ...(githubRepoScopeKey ? { githubRepoScopeKey } : {}),
             ...(egressAllowlist?.length ? { egressAllowlist } : {}),
             ...(mirrorTier ? { mirrorTier } : {}),
+            ...(harness ? { harness } : {}),
           }),
           signal: AbortSignal.timeout(AGENT_PROBE_TIMEOUT_MS),
         });

@@ -40,6 +40,9 @@ const translateMock = vi.fn(
 
 vi.mock("~/utils/api", () => ({
   api: {
+    // The toolbar reads the field's comments to decide whether to offer the
+    // comment action; none stored here.
+    useQueries: () => [],
     translate: {
       translate: {
         useMutation: () => ({
@@ -188,9 +191,14 @@ describe("IOViewer translate action", () => {
       });
 
       // The translated variant still parses as the same conversation, so
-      // the json format toggle survives translation instead of dropping
-      // out of the options.
-      expect(screen.getByText("json")).toBeInTheDocument();
+      // the JSON format option survives translation instead of dropping
+      // out of the format selector's menu.
+      await user.click(
+        screen.getByRole("button", { name: "Input view format" }),
+      );
+      expect(
+        await screen.findByRole("menuitem", { name: "JSON" }),
+      ).toBeInTheDocument();
     });
   });
 });

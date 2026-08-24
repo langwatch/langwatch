@@ -25,11 +25,12 @@
  * Usage:
  *   DATABASE_URL=postgres://... pnpm tsx scripts/report-duplicate-subscriptions.ts
  */
-import { type Prisma, PrismaClient } from "@prisma/client";
 import {
   compareBySubscriptionOrder,
   SubscriptionStatus,
 } from "../ee/billing/planTypes";
+import { type Prisma, PrismaClient } from "../src/generated/prisma/client";
+import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 
 const SUBSCRIPTION_SELECT = {
   id: true,
@@ -142,7 +143,9 @@ async function main(): Promise<void> {
   // A client of its own rather than the app's singleton: this runs against a
   // DATABASE_URL the operator points at, and must not pick up whatever the
   // surrounding environment had configured.
-  const prisma = new PrismaClient();
+  const prisma = new PrismaClient({
+    adapter: createPrismaPgAdapter(process.env.DATABASE_URL ?? ""),
+  });
   try {
     reportActive(
       await prisma.subscription.findMany({

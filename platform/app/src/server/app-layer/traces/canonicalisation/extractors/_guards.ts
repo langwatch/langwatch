@@ -4,6 +4,13 @@
 export const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 
+/**
+ * `Array.isArray` is typed `(arg: any): arg is any[]`, so it narrows an
+ * `unknown` value to `any[]` and silently drops element-level type safety.
+ * Use this instead when the narrowed elements should stay `unknown`.
+ */
+export const isUnknownArray = (v: unknown): v is unknown[] => Array.isArray(v);
+
 export const isNonEmptyString = (v: unknown): v is string =>
   typeof v === "string" && v.trim().length > 0;
 
@@ -76,5 +83,14 @@ export const safeJsonParse = (v: unknown): unknown => {
     return JSON.parse(s);
   } catch {
     return v;
+  }
+};
+
+export const safeStringify = (value: unknown): string | null => {
+  try {
+    const s = JSON.stringify(value);
+    return typeof s === "string" ? s : null;
+  } catch {
+    return null;
   }
 };

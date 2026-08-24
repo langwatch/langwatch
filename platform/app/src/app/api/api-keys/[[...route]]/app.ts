@@ -1,7 +1,7 @@
-import type { Organization } from "@prisma/client";
 import type { Context } from "hono";
 import { describeRoute } from "hono-openapi";
 import { z } from "zod";
+import type { Organization } from "~/generated/prisma/client";
 import { emitManagementAudit } from "~/server/api/management/audit";
 import { createOrgApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
@@ -21,6 +21,7 @@ import { permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import type { ApiKeyServiceMiddlewareVariables } from "../../middleware/api-key-service";
 import { apiKeyServiceMiddleware } from "../../middleware/api-key-service";
+import { appFromContext } from "../../middleware/app-context";
 import { handleApiKeyError } from "./error-handler";
 import {
   CREATE_API_KEY,
@@ -216,10 +217,11 @@ const resolveCallerCanReadAnyKey = async ({
     apiKeyId,
   });
   if (!callerIsAdmin) return false;
-  return service.hasOrgScopedPermission({
+  return appFromContext(c).permissions.hasApiKeyPermission({
     apiKeyId,
     userId: callerUserId,
     organizationId,
+    scope: { type: "org", id: organizationId },
     permission: "organization:manage",
   });
 };
@@ -346,10 +348,13 @@ secured
       const service = c.get("apiKeyService") as ApiKeyService;
 
       if (!userId) {
-        const canManage = await service.hasOrgScopedPermission({
+        const canManage = await appFromContext(
+          c,
+        ).permissions.hasApiKeyPermission({
           apiKeyId: c.get("apiKeyId") as string,
           userId: null,
           organizationId: organization.id,
+          scope: { type: "org", id: organization.id },
           permission: "organization:manage",
         });
         if (!canManage) {

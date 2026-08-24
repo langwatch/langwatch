@@ -1,0 +1,130 @@
+---
+title: Capturing Audio and Voice
+sidebarTitle: TypeScript/JS
+description: LangWatch captures the audio your TypeScript application sends to a model and plays it back on the trace.
+icon: square-js
+keywords: langwatch, typescript, javascript, audio, voice, realtime, speech, multimodal, tracing
+---
+
+Send the audio the way your model provider expects and keep the call inside a trace. There is no upload step and no extra API call: LangWatch reads the recording out of the messages at ingestion, stores it, and leaves a reference in its place.
+
+## Send the audio with the model call
+
+The examples below use `setupObservability()`. Read [Integration Guide](/integration/typescript/guide) first if you have not set that up yet.
+
+### Vercel AI SDK
+
+Put the recording in a `file` part inside the user message. `mediaType` is what tells LangWatch and the provider what the bytes are.
+
+```typescript
+import { readFileSync } from "node:fs";
+import { openai } from "@ai-sdk/openai";
+import { generateText } from "ai";
+import { setupObservability } from "langwatch/observability/node";
+
+setupObservability({ serviceName: "voice-service" });
+
+const data = readFileSync("call.wav").toString("base64");
+
+const { text } = await generateText({
+  model: openai.chat("gpt-audio-mini"),
+  messages: [
+    {
+      role: "user",
+      content: [
+        { type: "text", text: "What does the caller ask for?" },
+        { type: "file", data, mediaType: "audio/wav", filename: "call.wav" },
+      ],
+    },
+  ],
+  experimental_telemetry: { isEnabled: true },
+});
+
+console.log(text);
+```
+
+### OpenAI SDK
+
+Put the recording in an `input_audio` part, as raw base64 with a format.
+
+```typescript
+import { readFileSync } from "node:fs";
+import OpenAI from "openai";
+import { getLangWatchTracer } from "langwatch";
+import { setupObservability } from "langwatch/observability/node";
+
+setupObservability({ serviceName: "voice-service" });
+
+const tracer = getLangWatchTracer("voice-service");
+const client = new OpenAI();
+
+const transcribe = async (prompt: string, path: string): Promise<string> => {
+  return await tracer.withActiveSpan("TranscribeCall", async (span) => {
+    span.setType("llm");
+
+    const encoded = readFileSync(path).toString("base64");
+    const completion = await client.chat.completions.create({
+      model: "gpt-audio-mini",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: prompt },
+            { type: "input_audio", input_audio: { data: encoded, format: "wav" } },
+          ],
+        },
+      ],
+    });
+
+    return completion.choices[0]?.message.content ?? "";
+  });
+};
+
+await transcribe("What does the caller ask for?", "call.wav");
+```
+
+## Audio shapes LangWatch understands
+
+Send any of these and the recording is captured.
+
+| Source | Shape |
+|---|---|
+| OpenAI | `{ type: "input_audio", input_audio: { data: "<base64>", format: "wav" } }` |
+| Vercel AI SDK | `{ type: "file", mediaType: "audio/wav", data: "<base64>" }` |
+| OpenAI | `{ type: "file", file: { filename: "call.wav", file_data: "<base64>" } }` |
+| Google Gemini and Vertex | `{ inlineData: { mimeType: "audio/wav", data: "..." } }` |
+| AG-UI | `{ type: "audio", source: { type: "data", value: "...", mimeType: "audio/wav" } }` |
+
+An OpenAI Realtime session sends its turns in the same `input_audio` shape.
+
+The `format` field accepts `wav`, `mp3`, `flac`, `ogg` and `webm`. A raw format such as `pcm16` is accepted too, see the next section.
+
+When a message holds both a recording and text, LangWatch treats the text as the transcript of that recording and shows the two together.
+
+## What happens to the bytes
+
+LangWatch moves the recording out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
+
+Storage is addressed by SHA-256, so identical bytes are stored once. For example, a recording captured by a simulation and by the trace of the same call is one stored object, not two.
+
+Raw, header-less audio does not play in a browser on its own. LangWatch wraps `pcm16` and G.711 payloads into a WAV container when it stores them, so the reference plays everywhere without a conversion step of your own.
+
+## Where the audio appears
+
+Open the trace and the Summary tab shows a player under the input. The Conversation tab shows a player in the message it belongs to, next to the transcript. A turn that recorded no transcript still shows its player. The Trace tab shows the full message payload.
+
+## Testing voice agents
+
+You see what happened on a call once it has run. To drive a call on purpose and score it, use Scenario: it synthesizes a caller, speaks to your agent over its real transport, and scores the conversation with `scenario.run()`.
+
+<Frame caption="Voice agent testing in Scenario, with the simulated call, its per-turn audio and the judge verdict">
+  <img src="/images/scenario-voice.webp" alt="LangWatch voice agent testing" />
+</Frame>
+
+Scenario has adapters for Pipecat, Twilio, ElevenLabs, OpenAI Realtime and Gemini Live, and it can add background noise, phone-quality degradation and interruptions. See [Voice Agent Testing](/agent-simulations/voice-agents) for the setup.
+
+## Related
+
+- [Capturing Images](/integration/typescript/tutorials/capturing-images), for pictures and screenshots
+- [Capturing Documents](/integration/typescript/tutorials/capturing-documents), for PDF files and other attachments
+- [Voice Agent Testing](/agent-simulations/voice-agents), to run and score real-audio calls

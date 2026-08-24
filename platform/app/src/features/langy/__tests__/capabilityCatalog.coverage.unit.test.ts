@@ -51,8 +51,9 @@ const EXCLUDED_COMMANDS = new Set([
   // frame and deliberately renders NO card (see
   // specs/langy/langy-agent-driven-navigation.feature).
   "navigate",
-  "init-shell",
-  "request-increase",
+  // Local telemetry-wiring setup: writes agent config files on the user's
+  // machine (settings.json, config.toml, shell rc), not a platform resource.
+  "instrument",
   // Documentation fetchers: their output is prose for the agent, and the
   // docs helpers already render as clean activity lines.
   "docs",

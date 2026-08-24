@@ -358,7 +358,6 @@ export const AnnotationsTable = ({
           result.deleted === 1 ? "item" : "items"
         } removed`,
         type: "success",
-        meta: { closable: true },
       });
     },
     onError: (error) =>
@@ -860,7 +859,7 @@ export const AnnotationsTable = ({
           selectedTraceIds={selectedTraceIds}
           selectedQueueItemIds={selectedQueueItemIds}
           pageQueue={pageQueue}
-          isRemoving={deleteQueueItems.isLoading}
+          isRemoving={deleteQueueItems.isPending}
           onClear={() => setRowSelection({})}
           onAddToDataset={addTraceIdsToDataset}
           onRemoveFromQueue={removeFromQueue}

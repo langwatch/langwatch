@@ -1,6 +1,6 @@
-import { OrganizationUserRole } from "@prisma/client";
 import type { SubmitHandler } from "react-hook-form";
 import { showErrorToast } from "~/features/errors";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 import type { MembersForm } from "../components/AddMembersForm";
 import { toaster } from "../components/ui/toaster";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
@@ -45,7 +45,7 @@ export function useInviteActions({
   const membersEnforcement = useLicenseEnforcement("members");
   const membersLiteEnforcement = useLicenseEnforcement("membersLite");
   const openSeats = useUpgradeModalStore((s) => s.openSeats);
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   /** Invalidate license-limit cache so the next check uses fresh seat counts. */
   const invalidateLimits = () => {
@@ -111,7 +111,6 @@ export function useInviteActions({
             description,
             type: "success",
             duration: 2000,
-            meta: { closable: true },
           });
           onClose();
           refetchInvites();
@@ -151,7 +150,6 @@ export function useInviteActions({
             description: "An admin will review your invitation request.",
             type: "success",
             duration: 2000,
-            meta: { closable: true },
           });
           onClose();
           refetchInvites();
@@ -259,7 +257,6 @@ export function useInviteActions({
             description: "The invitation has been approved and sent.",
             type: "success",
             duration: 5000,
-            meta: { closable: true },
           });
           refetchInvites();
           invalidateLimits();
@@ -283,7 +280,6 @@ export function useInviteActions({
             description: "The invitation request has been rejected.",
             type: "success",
             duration: 5000,
-            meta: { closable: true },
           });
           refetchInvites();
           invalidateLimits();
@@ -307,7 +303,6 @@ export function useInviteActions({
             description: "The invite has been deleted.",
             type: "success",
             duration: 5000,
-            meta: { closable: true },
           });
           refetchInvites();
           invalidateLimits();
@@ -322,7 +317,7 @@ export function useInviteActions({
   };
 
   const isSubmitting =
-    createInvitesMutation.isLoading || createInviteRequestMutation.isLoading;
+    createInvitesMutation.isPending || createInviteRequestMutation.isPending;
 
   return {
     onSubmit,

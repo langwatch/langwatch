@@ -15,7 +15,7 @@ function buildDocumentedApp() {
     .version("2025-03-15", (v) => {
       v.get(
         "/",
-        {
+        { noPermission: { reason: "framework test endpoint" },
           output: z.array(z.object({ id: z.string() })),
           description: "Lists every thing in the project.",
           docs: {
@@ -30,7 +30,7 @@ function buildDocumentedApp() {
       );
       v.post(
         "/",
-        {
+        { noPermission: { reason: "framework test endpoint" },
           input: z.object({ name: z.string().min(1) }),
           output: z.object({ id: z.string() }),
           status: 201,
@@ -40,19 +40,19 @@ function buildDocumentedApp() {
       );
       v.get(
         "/hidden",
-        { output: z.object({ ok: z.boolean() }), docs: { hide: true } },
+        { noPermission: { reason: "framework test endpoint" }, output: z.object({ ok: z.boolean() }), docs: { hide: true } },
         async () => ({ ok: true }),
       );
       v.post(
         "/undocumented",
-        { input: z.object({ value: z.number() }) },
+        { noPermission: { reason: "framework test endpoint" }, input: z.object({ value: z.number() }) },
         async (c) => c.json({ accepted: true }),
       );
       // Registered after the static paths: overlapping routes stack in
       // registration order, so the param route must not shadow them.
       v.get(
         "/:id",
-        {
+        { noPermission: { reason: "framework test endpoint" },
           params: z.object({ id: z.string() }),
           query: z.object({ verbose: z.enum(["true", "false"]) }),
           output: z.object({ id: z.string() }),
@@ -62,7 +62,7 @@ function buildDocumentedApp() {
       );
     })
     .preview((v) => {
-      v.get("/beta", { output: z.object({ beta: z.boolean() }) }, async () => ({
+      v.get("/beta", { noPermission: { reason: "framework test endpoint" }, output: z.object({ beta: z.boolean() }) }, async () => ({
         beta: true,
       }));
     })
@@ -148,7 +148,7 @@ describe("OpenAPI documentation", () => {
         .version("2025-01-01", (v) => {
           v.get(
             "/old",
-            {
+            { noPermission: { reason: "framework test endpoint" },
               output: z.object({ ok: z.boolean() }),
               docs: { operationId: "getOld" },
             },

@@ -1,6 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
+import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
@@ -115,7 +114,7 @@ secured.access(requires("scenarios:create")).post(
     }
 
     // Broadcast START/END directly so the frontend gets them immediately
-    // (the reactor's debounced broadcast is too slow and causes CONTENT
+    // (the subscriber's debounced broadcast is too slow and causes CONTENT
     // deltas to be dropped). Works regardless of event-sourcing flag.
     if (
       event.type === ScenarioEventType.TEXT_MESSAGE_START ||

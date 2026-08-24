@@ -12,7 +12,6 @@ import {
   presenceCursorPayloadSchema,
   presenceLocationSchema,
 } from "~/server/app-layer/presence/types";
-import { checkProjectPermission } from "../rbac";
 
 const logger = createLogger("langwatch:api:presence");
 
@@ -32,7 +31,7 @@ export const presenceRouter = createTRPCRouter({
         location: presenceLocationSchema,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .mutation(async ({ input, ctx }) => {
       if (!(await getApp().presence.isEnabledForProject(input.projectId))) {
         return { ok: true as const };
@@ -54,7 +53,7 @@ export const presenceRouter = createTRPCRouter({
   /** Remove a session immediately and notify peers. */
   leave: protectedProcedure
     .input(sessionInput)
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .mutation(async ({ input, ctx }) => {
       if (!(await getApp().presence.isEnabledForProject(input.projectId))) {
         return { ok: true as const };
@@ -73,7 +72,7 @@ export const presenceRouter = createTRPCRouter({
    */
   onPresenceUpdate: protectedProcedure
     .input(projectInput)
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .subscription(async function* (opts) {
       const { projectId } = opts.input;
       const app = getApp();
@@ -94,7 +93,6 @@ export const presenceRouter = createTRPCRouter({
 
       try {
         for await (const eventArgs of on(emitter, "presence_updated", {
-          // @ts-expect-error - signal is not typed
           signal: opts.signal,
         })) {
           const payload = eventArgs[0] as { event: string; timestamp: number };
@@ -143,7 +141,7 @@ export const presenceRouter = createTRPCRouter({
         payload: presenceCursorPayloadSchema,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .mutation(async ({ input, ctx }) => {
       if (!(await getApp().presence.isEnabledForProject(input.projectId))) {
         return { ok: true as const };
@@ -175,7 +173,7 @@ export const presenceRouter = createTRPCRouter({
         sessionId: z.string().min(1),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .permission("traces:view")
     .subscription(async function* (opts) {
       const { projectId, anchor, sessionId } = opts.input;
 
@@ -187,7 +185,6 @@ export const presenceRouter = createTRPCRouter({
 
       try {
         for await (const eventArgs of on(emitter, "presence_cursor", {
-          // @ts-expect-error - signal is not typed
           signal: opts.signal,
         })) {
           const payload = eventArgs[0] as { event: string; timestamp: number };

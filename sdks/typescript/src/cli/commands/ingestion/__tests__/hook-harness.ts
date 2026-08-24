@@ -96,9 +96,13 @@ export interface RunHookOptions {
   readInput?: () => Promise<string>;
   env?: NodeJS.ProcessEnv;
   git?: Record<string, string>;
+  /** Full control over git answers, for runs where the directory matters. */
+  runGit?: GitRunner;
   fetchImpl?: typeof fetch;
   now?: number;
   tool?: string;
+  /** Claude's live session registry. Defaults to an empty per-test one. */
+  claudeRegistryDir?: string;
   readCliConfig?: Parameters<typeof hookCommand>[0]["readCliConfig"];
   /**
    * Run with no exporter variables at all, the way Claude Code hands its hooks
@@ -116,6 +120,8 @@ export interface HookHarness {
   exits: number[];
   /** This test's fingerprint directory. */
   readonly stateDir: string;
+  /** This test's claude session registry directory (not created). */
+  readonly claudeRegistryDir: string;
   /** A collector answering `status`, recording into `posted`. */
   collector(status?: number): typeof fetch;
   runHook(options?: RunHookOptions): Promise<void>;
@@ -172,15 +178,20 @@ export const installHookHarness = (): HookHarness => {
     get stateDir() {
       return stateDir;
     },
+    get claudeRegistryDir() {
+      return path.join(stateDir, "claude-sessions");
+    },
     collector,
     runHook: ({
       input = { session_id: SESSION_ID, cwd: "/repo/worktrees/review" },
       readInput,
       env = {},
       git = WORKTREE_GIT,
+      runGit,
       fetchImpl = collector(),
       now = NOW,
       tool = "claude-code",
+      claudeRegistryDir,
       readCliConfig = NO_CLI_CONFIG,
       shouldOmitExporterEnv = false,
     }: RunHookOptions = {}) =>
@@ -195,10 +206,13 @@ export const installHookHarness = (): HookHarness => {
             Promise.resolve(
               typeof input === "string" ? input : JSON.stringify(input),
             )),
-        runGit: gitRunner(git),
+        runGit: runGit ?? gitRunner(git),
         fetchImpl,
         now: () => now,
         stateDir,
+        // Empty by default, so no test ever reads the machine's real
+        // registry and finds a name it did not plant.
+        claudeRegistryDir: claudeRegistryDir ?? path.join(stateDir, "claude-sessions"),
         readCliConfig,
       }),
   };

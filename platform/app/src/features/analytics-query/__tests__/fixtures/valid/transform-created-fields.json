@@ -1,0 +1,56 @@
+{
+	"$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+	"data": {
+		"name": "query_result"
+	},
+	"transform": [
+		{
+			"calculate": "datum.total * 2",
+			"as": "doubled"
+		},
+		{
+			"timeUnit": "yearmonth",
+			"field": "bucket",
+			"as": "month"
+		},
+		{
+			"aggregate": [
+				{
+					"op": "sum",
+					"field": "doubled",
+					"as": "monthly"
+				}
+			],
+			"groupby": ["month", "model"]
+		},
+		{
+			"window": [
+				{
+					"op": "rank",
+					"as": "ranking"
+				}
+			],
+			"sort": [
+				{
+					"field": "monthly",
+					"order": "descending"
+				}
+			]
+		}
+	],
+	"mark": "bar",
+	"encoding": {
+		"x": {
+			"field": "month",
+			"type": "temporal"
+		},
+		"y": {
+			"field": "monthly",
+			"type": "quantitative"
+		},
+		"opacity": {
+			"field": "ranking",
+			"type": "quantitative"
+		}
+	}
+}

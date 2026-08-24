@@ -45,7 +45,7 @@ interface AddDatasetDrawerProps {
  * @param props - Component props
  */
 export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
-  const trpc = api.useContext();
+  const trpc = api.useUtils();
   const { project } = useOrganizationTeamProject();
   const createDatasetRecord = api.datasetRecord.create.useMutation();
   const editDataset = useDisclosure();
@@ -208,9 +208,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
               </Link>
             ),
             type: "success",
-            meta: {
-              closable: true,
-            },
           });
         },
         onError: () => {
@@ -219,9 +216,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
             description:
               "Please check if the rows were not already inserted in the dataset",
             type: "error",
-            meta: {
-              closable: true,
-            },
           });
         },
       },
@@ -346,7 +340,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
                 colorPalette="blue"
                 marginTop={6}
                 marginBottom={4}
-                loading={createDatasetRecord.isLoading}
+                loading={createDatasetRecord.isPending}
                 disabled={
                   !selectedDataset ||
                   !tracesWithSpans.data ||

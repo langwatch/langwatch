@@ -143,21 +143,21 @@ images:
   ## @param images.app.pullPolicy [string] App image pull policy.
   app:
     repository: langwatch/langwatch
-    tag: 3.12.0 # x-release-please-version
+    tag: 3.16.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langwatch_nlp.repository [string] NLP image repository (Go nlpgo binary, published as langwatch_nlp).
   ## @param images.langwatch_nlp.tag [string] NLP image tag.
   ## @param images.langwatch_nlp.pullPolicy [string] NLP image pull policy.
   langwatch_nlp:
     repository: langwatch/langwatch_nlp
-    tag: 3.12.0 # x-release-please-version
+    tag: 3.16.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langevals.repository [string] Langevals image repository.
   ## @param images.langevals.tag [string] Langevals image tag.
   ## @param images.langevals.pullPolicy [string] Langevals image pull policy.
   langevals:
     repository: langwatch/langevals
-    tag: 3.12.0 # x-release-please-version
+    tag: 3.16.0 # x-release-please-version
     pullPolicy: IfNotPresent
 
 # =============================================================================
@@ -469,12 +469,59 @@ app:
   ## @param app.storedObjects.localFilesystem.path [string, default: /var/lib/langwatch/objects] Mount point that the LocalFilesystemDriver writes under.
   ## @param app.storedObjects.localFilesystem.size [string, default: 10Gi] PVC size for the stored-objects volume.
   ## @param app.storedObjects.localFilesystem.storageClassName [string] PVC storageClassName (cluster default if empty).
+  ## @param app.storedObjects.localFilesystem.serializeUpgrades [default: true] Hold the workers at 0 replicas while the app rolls, so only one pod holds the shared RWO volume.
+  ## @param app.storedObjects.localFilesystem.serializeUpgradesImage [string, default: alpine/k8s:1.34.9] Image the upgrade hooks run. Needs sh and kubectl. A digest reference works too.
+  ## @param app.storedObjects.localFilesystem.serializeUpgradesPullSecrets [array] Pull secrets for that image. The hook Jobs use their own ServiceAccount, so secrets on the namespace default ServiceAccount do not reach them.
   storedObjects:
     localFilesystem:
       enabled: true
       path: /var/lib/langwatch/objects
       size: 10Gi
       storageClassName: ""
+
+      # The app and the workers mount the same ReadWriteOnce PVC in this mode,
+      # and a helm upgrade rolls both Deployments at once. On a cluster with
+      # more than one node the new pod of one Deployment can be scheduled on a
+      # fresh node while the old pod of the other still holds the volume
+      # attachment on the old node, and both wedge in ContainerCreating with a
+      # multi-attach error (issue #7191).
+      #
+      # With this on, a hook Job scales the workers to 0 and waits for their
+      # pods to go away before helm applies the new manifests, and a second
+      # hook Job holds them at 0 until the app rollout finishes and then scales
+      # them back to workers.replicaCount. The app rolls as the only holder of
+      # the volume, and the workers follow the NEW app pod. Both Jobs run on
+      # rollback as well as upgrade.
+      #
+      # One case the chart cannot cover: on a rollback helm runs the hooks
+      # stored in the TARGET revision, so rolling back to a chart version from
+      # before these Jobs existed runs no Jobs at all. Scale the workers
+      # Deployment to 0 by hand before such a downgrade, and back up after it.
+      #
+      # The hooks need a ServiceAccount token and a small Role (get on the app
+      # and the workers Deployments, patch on the workers' scale, read on the
+      # namespace's pods). Turn them off if you order the rollout yourself, if
+      # your cluster forbids that RBAC, or if you moved to app.dataplane (where
+      # they never render anyway, because no volume is shared).
+      serializeUpgrades: true
+      # Needs sh + kubectl. registry.k8s.io/kubectl is distroless and has no
+      # /bin/sh.
+      #
+      # The tag names the kubectl version. kubectl supports one minor version
+      # of skew either way, so change this to match your cluster if it is far
+      # from 1.34. The hook only calls `get deployment`, `patch
+      # deployment --subresource=scale` and `wait --for=delete pod`, which are
+      # long-stable, so a wider skew works in practice.
+      #
+      # Mirror the image into your own registry for an air-gapped install and
+      # point this at your copy. A digest works here too
+      # (`myregistry.example.com/alpine/k8s@sha256:...`) if you pin by digest.
+      serializeUpgradesImage: alpine/k8s:1.34.9
+      # Pull secrets for that image. The hook Jobs run under their own
+      # ServiceAccount, so secrets attached to the namespace's `default`
+      # ServiceAccount, which the rest of the release uses, do not reach them.
+      # Example: [{ name: my-registry }]
+      serializeUpgradesPullSecrets: []
 
   # Email notification configuration
   # Naming a provider is what turns email on, so there is one switch rather
@@ -1057,6 +1104,24 @@ langwatch_nlp:
   ## @param langwatch_nlp.service.type [string, default: ClusterIP] Service type.
   ## @param langwatch_nlp.service.port [default: 5561] Service port.
   service: { type: ClusterIP, port: 5561 }
+
+  # Where workflows are allowed to send HTTP requests. This is the service that
+  # runs HTTP agents and workflow HTTP nodes, so this is the setting that
+  # decides whether an agent can reach a service on your own network.
+  #
+  # Keep blockLocalHTTPCalls false for a self-hosted install whose agents are
+  # internal — the common case, and the default. Set it true for a
+  # multi-tenant deployment, where a workflow author is not necessarily
+  # someone you want reaching into the cluster, and list the internal hosts
+  # you do intend to reach in allowedProxyHosts.
+  #
+  # Cloud metadata endpoints are refused either way and cannot be allow-listed.
+  ## @extra langwatch_nlp.security Outbound request policy for workflow HTTP nodes.
+  ## @param langwatch_nlp.security.blockLocalHTTPCalls [default: false] Refuse workflow HTTP requests to private, loopback and link-local addresses. Keep false for self-hosted installs that call internal services; set true for multi-tenant deployments.
+  ## @param langwatch_nlp.security.allowedProxyHosts [array, default: []] Hostnames reachable even when blockLocalHTTPCalls is on. Matched literally, case-insensitive, port ignored. Cloud metadata is never allow-listed.
+  security:
+    blockLocalHTTPCalls: false
+    allowedProxyHosts: []
 
   # Resource requirements for the NLP service. The service is a lean static Go
   # binary (nlpgo) that only spawns a transient Python interpreter to sandbox

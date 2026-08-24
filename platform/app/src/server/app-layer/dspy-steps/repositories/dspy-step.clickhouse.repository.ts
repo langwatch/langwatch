@@ -208,7 +208,7 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
+      logger.warn(
         {
           tenantId: data.tenantId,
           runId: data.runId,
@@ -283,7 +283,7 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
+      logger.warn(
         { tenantId, experimentId, error: errorMessage },
         "Failed to get DSPy steps from ClickHouse",
       );
@@ -371,7 +371,7 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
+      logger.warn(
         { tenantId, experimentId, runId, stepIndex, error: errorMessage },
         "Failed to get DSPy step from ClickHouse",
       );
@@ -392,7 +392,7 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      logger.error(
+      logger.warn(
         { tenantId, experimentId, error: errorMessage },
         "Failed to delete DSPy steps from ClickHouse",
       );

@@ -160,18 +160,6 @@ Feature: Codex conversation capture without the LangWatch wrapper
     Then the harvest hook is installed without asking the user anything
 
   @unit
-  Scenario: Consent names the program that will run after every turn
-    Given a user being asked to keep codex capture on
-    When the question is put to them
-    Then it says a program runs after every completed turn, before they answer
-
-  @unit
-  Scenario: Consent says an existing turn-completion program will be started by ours
-    Given a user whose codex configuration already runs a program of their own after each turn
-    When the question is put to them
-    Then it says their program will be started by ours, before they answer
-
-  @unit
   Scenario: A configuration the harvest cannot be merged into says so
     Given a codex configuration binding a turn-completion program that cannot be moved
     When capture is enabled
@@ -221,6 +209,22 @@ Feature: Codex conversation capture without the LangWatch wrapper
     Given a codex trace whose recovered conversation and tool spans describe the same tool call
     When the session transcript is derived
     Then the call shown carries the duration and the failure the span recorded
+
+  @unit
+  Scenario: A prompt recovered from the transcript is not shown again as its redacted event
+    Given a codex trace whose recovered conversation and prompt event describe the same prompt
+    When the session transcript is derived
+    Then the prompt is shown once, with its text, and the text-less event stays only where nothing was recovered
+
+  @unit
+  Scenario: A redacted prompt with no recovered turn behind it is kept
+    Given a codex trace whose rollout recovery reached one of its two prompts
+    When the session transcript is derived
+    Then the recovered prompt is shown with its text, and the other prompt is
+      still shown as its redacted event, because that event is the only record
+      the prompt happened
+    # The two are told apart by the character count: codex reports the real
+    # length on the redacted event, so it matches the turn it belongs to.
 
   @unit
   Scenario: A prompt full of unclosed tags is read without stalling the server

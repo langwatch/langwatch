@@ -18,7 +18,7 @@ let mockTraceListResult = {
   totalHits: 0,
   isLoading: false,
   isFetching: false,
-  isPreviousData: false,
+  isPlaceholderData: false,
   isError: false,
   error: null as unknown,
   newIds: new Set<string>(),
@@ -36,7 +36,7 @@ let mockSessionGroupsResult = {
   nextCursor: null as unknown,
   isLoading: false,
   isFetching: false,
-  isPreviousData: false,
+  isPlaceholderData: false,
   isError: false,
   error: null as unknown,
 };
@@ -151,7 +151,7 @@ beforeEach(() => {
     totalHits: 0,
     isLoading: false,
     isFetching: false,
-    isPreviousData: false,
+    isPlaceholderData: false,
     isError: false,
     error: null,
     newIds: new Set(),
@@ -162,7 +162,7 @@ beforeEach(() => {
     nextCursor: null,
     isLoading: false,
     isFetching: false,
-    isPreviousData: false,
+    isPlaceholderData: false,
     isError: false,
     error: null,
   };
@@ -180,13 +180,13 @@ function renderTable() {
 
 describe("<TraceTable /> empty-state gating", () => {
   describe("given data is empty and no fetch is in flight", () => {
-    describe("when isFetching=false and isPreviousData=false", () => {
+    describe("when isFetching=false and isPlaceholderData=false", () => {
       it("renders EmptyFilterState (true empty)", () => {
         mockTraceListResult = {
           ...mockTraceListResult,
           data: [],
           isFetching: false,
-          isPreviousData: false,
+          isPlaceholderData: false,
         };
 
         renderTable();
@@ -204,7 +204,7 @@ describe("<TraceTable /> empty-state gating", () => {
           ...mockTraceListResult,
           data: [],
           isFetching: true,
-          isPreviousData: false,
+          isPlaceholderData: false,
         };
 
         renderTable();
@@ -216,13 +216,13 @@ describe("<TraceTable /> empty-state gating", () => {
       });
     });
 
-    describe("when isPreviousData=true (keepPreviousData held stale empty results)", () => {
+    describe("when isPlaceholderData=true (keepPreviousData held stale empty results)", () => {
       it("renders the lens body instead of EmptyFilterState", () => {
         mockTraceListResult = {
           ...mockTraceListResult,
           data: [],
           isFetching: false,
-          isPreviousData: true,
+          isPlaceholderData: true,
         };
 
         renderTable();
@@ -245,7 +245,7 @@ describe("<TraceTable /> empty-state gating", () => {
           ] as typeof mockTraceListResult.data,
           totalHits: 1,
           isFetching: false,
-          isPreviousData: false,
+          isPlaceholderData: false,
         };
 
         renderTable();
@@ -310,7 +310,7 @@ describe("<TraceTable /> failed-read gating", () => {
           screen.queryByTestId("empty-filter-state"),
         ).not.toBeInTheDocument();
         expect(
-          screen.getByText(/could not load your sessions/i),
+          screen.getByText(/could not load your conversations/i),
         ).toBeInTheDocument();
       });
 

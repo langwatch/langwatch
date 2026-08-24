@@ -63,7 +63,7 @@ describe("runWorkflowCommand()", () => {
       const fetchSpy = vi.spyOn(globalThis, "fetch");
 
       await expect(
-        runWorkflowCommand("wf_1", { input: "{not json" }),
+        runWorkflowCommand({ id: "wf_1", options: { input: "{not json" } }),
       ).rejects.toThrow(ProcessExitError);
 
       expect(fetchSpy).not.toHaveBeenCalled();
@@ -83,7 +83,7 @@ describe("runWorkflowCommand()", () => {
       );
 
       await expect(
-        runWorkflowCommand("wf_1", { input: '{"valid":true}' }),
+        runWorkflowCommand({ id: "wf_1", options: { input: '{"valid":true}' } }),
       ).rejects.toThrow(ProcessExitError);
 
       expect(reportCommandError).not.toHaveBeenCalled();
@@ -91,6 +91,75 @@ describe("runWorkflowCommand()", () => {
       const { error } = failSpinner.mock.calls[0]![0] as { error: Error };
       expect(error).toBeInstanceOf(SyntaxError);
       expect(error.message).not.toContain("--input");
+    });
+  });
+
+  const okResponse = (): Response =>
+    new Response(JSON.stringify({ output: "done" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+
+  const sentBody = (fetchSpy: ReturnType<typeof vi.spyOn>): unknown =>
+    JSON.parse(
+      (fetchSpy.mock.calls[0]![1] as { body: string }).body,
+    ) as unknown;
+
+  describe("when --param pairs are given", () => {
+    /** @scenario "The workflow run command merges param flags into its entry inputs" */
+    it("sends each name as an entry input holding the flag's value", async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(okResponse());
+
+      await runWorkflowCommand({
+        id: "wf_1",
+        options: {
+          param: ["region=eu-central", "seats=12", "beta=true"],
+        },
+      });
+
+      expect(sentBody(fetchSpy)).toEqual({
+        region: "eu-central",
+        seats: 12,
+        beta: true,
+      });
+    });
+
+    it("wins over the same key in --input, and leaves the rest of it alone", async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(okResponse());
+
+      await runWorkflowCommand({
+        id: "wf_1",
+        options: {
+          input: '{"region":"us-east","question":"what is 2 + 2?"}',
+          param: ["region=eu-central"],
+        },
+      });
+
+      expect(sentBody(fetchSpy)).toEqual({
+        region: "eu-central",
+        question: "what is 2 + 2?",
+      });
+    });
+  });
+
+  describe("when only --input is given", () => {
+    it("sends exactly the record it parsed, as it always did", async () => {
+      const fetchSpy = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(okResponse());
+
+      await runWorkflowCommand({
+        id: "wf_1",
+        options: {
+          input: '{"region":"us-east","seats":3}',
+        },
+      });
+
+      expect(sentBody(fetchSpy)).toEqual({ region: "us-east", seats: 3 });
     });
   });
 });

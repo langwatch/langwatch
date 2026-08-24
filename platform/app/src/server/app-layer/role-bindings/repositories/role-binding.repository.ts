@@ -5,7 +5,7 @@ import type {
   RoleBindingScopeType,
   TeamUserRole,
   User,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 
 // A direct (user, not group) TEAM-scoped binding, shaped to populate the
 // team-settings members list. Mirrors a legacy `TeamUser` row joined with its

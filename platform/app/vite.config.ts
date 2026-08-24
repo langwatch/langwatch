@@ -7,6 +7,7 @@ import { generate as generateSelfsigned } from "selfsigned";
 import { shikiManualChunk } from "./src/features/traces-v2/components/TraceDrawer/markdownView/shikiChunking";
 import { havenHmrGate } from "./vite/havenHmrGate";
 import { ASSET_URL_GLOBAL } from "./src/server/asset-base";
+import { ROOT_DISCOVERY_PROXY_PATTERN } from "./src/server/openapi/discovery-locations";
 
 // Load `.env` into the Vite config's process environment. Vite normally
 // only exposes `VITE_*` vars to client code — but this config itself
@@ -148,6 +149,18 @@ export default defineConfig(async (): Promise<UserConfig> => {
   plugins: [react(), patchObjectInspectBrowserStub(), havenHmrGate()],
   resolve: {
     alias: {
+      // The generated Prisma client's `client.ts` entry hard-imports the node
+      // runtime (`@prisma/client/runtime/client` → `node:url`), which vite
+      // externalizes — evaluating it in the browser throws and blanks every
+      // page. Frontend files import it for enums and types; the old
+      // `@prisma/client` package routed those through its `browser` package
+      // field, but the generated client is plain source with no package.json,
+      // so the browser bundle is pointed at the generated browser entry here.
+      // Must precede the bare "~" alias — vite matches aliases in order.
+      "~/generated/prisma/client": path.resolve(
+        __dirname,
+        "./src/generated/prisma/browser.ts",
+      ),
       // Path aliases (matching tsconfig paths)
       "~": path.resolve(__dirname, "./src"),
       "@app": path.resolve(__dirname, "./src/server/app-layer"),
@@ -324,6 +337,21 @@ export default defineConfig(async (): Promise<UserConfig> => {
       // the frontend owns the root, so they need an entry of their own or they
       // fall through to the SPA. Exact-match, same reasoning as /mcp below.
       "^/v1/(?:traces|logs|metrics)/?(?:\\?.*)?$": {
+        target: API_TARGET,
+        changeOrigin: true,
+        secure: false,
+      },
+      // Root-level API discovery — `/.well-known/openapi` and `/llms.txt`
+      // (src/server/routes/root-discovery.ts). Same split as the OTLP paths
+      // above: start.ts routes them in production, the frontend owns the root
+      // in dev. Left out, they fall to the SPA, which answers an agent's
+      // discovery request with the HTML shell and a 200.
+      //
+      // The pattern is DERIVED from the same list start.ts dispatches on, not
+      // written out again here: a path added there and missed here would work
+      // in production and return HTML in development, which is the shape of
+      // bug that only shows up where nobody is looking for it.
+      [ROOT_DISCOVERY_PROXY_PATTERN]: {
         target: API_TARGET,
         changeOrigin: true,
         secure: false,

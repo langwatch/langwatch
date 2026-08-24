@@ -1,5 +1,5 @@
 {
-  "directory.mdx": {
+  "skills/directory.mdx": {
     "core": [
       {
         "title": "Instrument my code with LangWatch",
@@ -32,6 +32,12 @@
         "promptFile": "scenarios.docs.txt"
       },
       {
+        "title": "Connect my agent to LangWatch simulations",
+        "skill": "langwatch/skills/connect-agent",
+        "slashCommand": "/connect-agent",
+        "promptFile": "connect-agent.docs.txt"
+      },
+      {
         "title": "Version my prompts with LangWatch",
         "skill": "langwatch/skills/prompts",
         "slashCommand": "/prompts",
@@ -44,7 +50,7 @@
         "promptFile": "datasets.docs.txt"
       },
       {
-        "boldPrefix": "⭐ All of the above:",
+        "boldPrefix": "\u2b50 All of the above:",
         "title": "Take my agent to the next level",
         "skill": "langwatch/skills/level-up",
         "slashCommand": "/level-up",
@@ -53,7 +59,7 @@
     ],
     "recipes": [
       {
-        "boldPrefix": "⭐",
+        "boldPrefix": "\u2b50",
         "title": "What should I do next to improve my agent?",
         "skill": "langwatch/skills/agent-improve",
         "slashCommand": "/agent-improve",
@@ -121,7 +127,7 @@
       }
     ]
   },
-  "pms-and-domain-experts.mdx": {
+  "skills/pms-and-domain-experts.mdx": {
     "platform": [
       {
         "title": "How is my agent performing?",
@@ -134,6 +140,17 @@
       {
         "title": "Set up evaluators for my agent",
         "promptFile": "evaluations.platform.txt"
+      }
+    ]
+  },
+  "agent-simulations/connect-your-agent.mdx": {
+    "connect-agent": [
+      {
+        "title": "Connect my agent to LangWatch simulations",
+        "skill": "langwatch/skills/connect-agent",
+        "slashCommand": "/connect-agent",
+        "promptFile": "connect-agent.docs.txt",
+        "static": true
       }
     ]
   }

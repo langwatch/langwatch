@@ -1,9 +1,9 @@
 import type { LangyConversationStateData } from "@langwatch/langy";
+import { describe, expect, it, vi } from "vitest";
 import {
   type LangyConversationProjection,
   LangyProjectionTitleSource,
-} from "@prisma/client";
-import { describe, expect, it, vi } from "vitest";
+} from "~/generated/prisma/client";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { Event } from "~/server/event-sourcing/domain/types";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
@@ -36,6 +36,7 @@ function row(overrides: Partial<Row> = {}): Row {
     LastActivityAt: 150,
     CurrentTurnId: null,
     LastError: null,
+    LastModel: null,
     PendingHandoffToken: null,
     PendingHandoffTurnId: null,
     RunToken: "run-token",

@@ -21,7 +21,10 @@ func (o *Orchestrator) Typecheck(ctx context.Context, lwDir string, extraArgs []
 		return fmt.Errorf("semaphore not wired")
 	}
 	slots := domain.TypecheckSlots(o.sys.TotalMemory(), runtime.NumCPU(), slotsOverride)
-	release, slot, err := o.sem.Acquire(ctx, "typecheck", slots)
+	// "checks" is the same semaphore `haven slot run` (and through it every
+	// delegated `pnpm typecheck` / `pnpm lint` on the machine) counts against:
+	// one counter for everything that saturates the cores, ADR-064 + ADR-095.
+	release, slot, err := o.sem.Acquire(ctx, "checks", slots)
 	if err != nil {
 		return err
 	}

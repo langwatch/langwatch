@@ -15,7 +15,7 @@ keywords:
 
 In this cookbook, we'll explore the differences between pure vector search and hybrid search approaches that combine vector embeddings with metadata filtering. We'll see how structured metadata can dramatically improve search relevance and precision beyond what vector similarity alone can achieve.
 
-When users search for products, documents, or other content, they often have specific attributes in mind. For example, a shopper might want "red dresses for summer occasions" or a researcher might need "papers on climate change published after 2020." Pure semantic search might miss these nuances, but metadata filtering allows you to combine the power of vector search with explicit attribute filtering.
+When users search for products, documents, or other content, they often have specific attributes in mind. For example, a shopper might want "red dresses for summer occasions" or a researcher might need "papers on climate change published after 2020." Pure semantic search might miss these nuances, but metadata filtering allows you to combine vector search with explicit attribute filtering.
 
 Like always, we'll focus on data-driven approaches to measure and improve retrieval performance.
 
@@ -165,7 +165,7 @@ df["searchable_text"].head()
 
 ## Ingest Data into LanceDB
 
-We'll use LanceDB to store our product data and embeddings. LanceDB makes it easy to experiment, as it provides both vector and hybrid search capabilities within one single API.
+We'll use LanceDB to store our product data and embeddings. LanceDB provides both vector and hybrid search capabilities within one single API.
 
 ```python
 import pyarrow as pa
@@ -307,7 +307,7 @@ comfort.",
 
 ## **Hybrid Search in LanceDB**
 
-LanceDB makes it easy to combine vector search with full-text search in a single query. Let's see how this works with a practical example:
+LanceDB combines vector search with full-text search in a single query. Let's see how this works with a practical example:
 
 ```python
 text_query = "dress for wedding guests"
@@ -484,7 +484,7 @@ Now we can run the experiments. The code does the following:
 
 1. Tests each search method with different numbers of results (k=3, 5, and 10)
 2. Aggregates the metrics by calculating the mean recall and MRR for each method
-3. Organizes the results in a DataFrame for easy comparison
+3. Organizes the results in a DataFrame for comparison
 
 ```python
 k_values = [3, 5, 10]

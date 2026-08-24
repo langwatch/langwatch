@@ -24,9 +24,9 @@ import {
 import {
   CODING_AGENT_CONTRIBUTION_KEYS,
   detectCodingAgent,
-  resolveConversationKey,
+  resolveSpanConversationKey,
 } from "../services/coding-agent-normalization";
-import { CODING_AGENT_SPAN_NAMES } from "../services/coding-agent-session.derivation";
+import { isCodingAgentSessionSpan } from "../services/coding-agent-session.derivation";
 
 const logger = createLogger(
   "langwatch:coding-agent-processing:span-facts-dispatch",
@@ -42,7 +42,7 @@ const logger = createLogger(
  *   - `enqueue.filter` runs the RAW span-name gate at the fan-out seam, so a
  *     span from any other trace never mints a job. Every span in the project
  *     flows past that predicate; one set lookup keeps an ordinary chat trace's
- *     cost at zero. Origin gating is exactly this predicate — no gate reactor
+ *     cost at zero. Origin gating is exactly this predicate — no gate subscriber
  *     (ADR-056 §3).
  *   - A `span_facts_lifted` job carries a bounded derivation: the facts, already
  *     lifted, on the job itself. The handler contributes them directly. Nothing
@@ -92,13 +92,25 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
     new CanonicalizeSpanAttributesService(),
   );
 
-  /** The raw-name gate — the enqueue filter, and the handler's inline guard. */
+  /**
+   * The raw-name gate — the enqueue filter, and the handler's inline guard.
+   * `isCodingAgentSessionSpan` is a set lookup for the whole firehose;
+   * only a bare DECLARED name (codex's `session_task.turn`) additionally
+   * asks the scope, so a foreign span reusing it never mints a session.
+   */
   const isCodingAgentSpan = (
     event: TraceProcessingEvent,
   ): event is SpanReceivedEvent => {
     if (!isSpanReceivedEvent(event)) return false;
     const rawName = (event.data.span as { name?: unknown } | undefined)?.name;
-    return typeof rawName === "string" && CODING_AGENT_SPAN_NAMES.has(rawName);
+    if (typeof rawName !== "string") return false;
+    const rawScope = (
+      event.data.instrumentationScope as { name?: unknown } | undefined
+    )?.name;
+    return isCodingAgentSessionSpan({
+      name: rawName,
+      scopeName: typeof rawScope === "string" ? rawScope : null,
+    });
   };
 
   return {
@@ -422,7 +434,26 @@ function liftContribution({
   tenantId: string;
   occurredAt: number;
 }): ContributeSpanFactsCommandData {
-  const sessionKey = resolveConversationKey(span.spanAttributes);
+  const agent = detectCodingAgent({
+    recordName: span.name,
+    scopeName: span.instrumentationScope.name,
+    // The agent registry (#6103) landed after this branch was cut. Cowork
+    // emits Claude Code's event vocabulary, so the resource service name is
+    // the only signal separating them — omit it and every Cowork session is
+    // misidentified as Claude Code.
+    serviceName:
+      typeof span.resourceAttributes["service.name"] === "string"
+        ? (span.resourceAttributes["service.name"] as string)
+        : null,
+  });
+  // Through the AGENT's own reading first: codex's turn span carries the
+  // turn id under the shared candidate key and the session under thread.id,
+  // so the shared order alone would split each turn into its own session.
+  const sessionKey = resolveSpanConversationKey({
+    agent,
+    name: span.name,
+    attrs: span.spanAttributes,
+  });
   const facts = liftSpanFacts(span.spanAttributes);
   const serviceVersion = span.resourceAttributes["service.version"];
   if (typeof serviceVersion === "string" && serviceVersion.length > 0) {
@@ -441,18 +472,7 @@ function liftContribution({
     tenantId,
     sessionId: sessionKey ?? span.traceId,
     sessionKeySource: sessionKey !== null ? "provider" : "trace_fallback",
-    agent: detectCodingAgent({
-      recordName: span.name,
-      scopeName: span.instrumentationScope.name,
-      // The agent registry (#6103) landed after this branch was cut. Cowork
-      // emits Claude Code's event vocabulary, so the resource service name is
-      // the only signal separating them — omit it and every Cowork session is
-      // misidentified as Claude Code.
-      serviceName:
-        typeof span.resourceAttributes["service.name"] === "string"
-          ? (span.resourceAttributes["service.name"] as string)
-          : null,
-    }),
+    agent,
     occurredAt,
     traceId: span.traceId,
     spanId: span.spanId,

@@ -1,5 +1,5 @@
-import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 
 import { MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
 import { createInnerTRPCContext } from "../../trpc";
@@ -18,18 +18,31 @@ const {
   mockHasSetupPermission: vi.fn(),
 }));
 
+// The declared permission seam resolves its service from the App.
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsMock } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return appPermissionsMock();
+});
+
 vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {
     ...actual,
-    hasProjectPermission: mockHasSetupPermission,
-    checkProjectPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
+    resolveProjectPermission: vi
+      .fn()
+      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
   };
+});
+
+// The router's imperative check goes through the app-layer facade.
+vi.mock("~/server/app-layer/permissions/imperative", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("~/server/app-layer/permissions/imperative")
+    >();
+  return { ...actual, probeProjectPermission: mockHasSetupPermission };
 });
 
 // Keep the module-level prisma (imported by modelProviders.utils) from

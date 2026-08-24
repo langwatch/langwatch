@@ -2,9 +2,9 @@ import type {
   ReportChart,
   ReportTraceRow,
 } from "@langwatch/automations/templating/templateContext";
-import type { Project, Trigger } from "@prisma/client";
-import { TriggerAction, TriggerKind } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
+import type { Project, Trigger } from "~/generated/prisma/client";
+import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
 import type { ScheduledJobFire } from "~/server/app-layer/scheduler/scheduler.types";
 import {
   dispatchScheduledReport,
@@ -25,7 +25,7 @@ const PROJECT: Project = {
 function makeTraceRow(overrides: Partial<ReportTraceRow> = {}): ReportTraceRow {
   return {
     traceId: "trace-abc",
-    url: "https://app.langwatch.ai/acme/messages/trace-abc",
+    url: "https://app.langwatch.ai/acme/traces/trace-abc",
     timestamp: "2026-07-13T08:00:00.000Z",
     input: "first input",
     output: "first output",
@@ -212,7 +212,7 @@ describe("dispatchScheduledReport", () => {
       expect(sendSlack).toHaveBeenCalledTimes(1);
       const payload = JSON.stringify(sendSlack.mock.calls[0]![0].payload);
       expect(payload).toContain("Weekly errors");
-      expect(payload).toContain("/acme/messages");
+      expect(payload).toContain("/acme/traces");
     });
   });
 

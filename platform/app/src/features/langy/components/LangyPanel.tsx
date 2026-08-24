@@ -83,8 +83,10 @@ import {
   useLangyTurnRecovery,
 } from "../hooks/useLangyTurnRecovery";
 import { useLangyTurnSignals } from "../hooks/useLangyTurnSignals";
+import { useLangyWarmWorker } from "../hooks/useLangyWarmWorker";
 import { useLingeringDodge } from "../hooks/useLingeringDodge";
 import { useScrolledFromTop } from "../hooks/useScrolledFromTop";
+import { syncLangyAfterDefaultModelWrite } from "../logic/codingDefaultSync";
 import { PANEL_ROOT_ATTR } from "../logic/composerMorphGeometry";
 import { shouldRehydrateEngineFromDurable } from "../logic/foreignTurnRehydration";
 import { resolveLangyActivityOwnership } from "../logic/langyActivityOwnership";
@@ -94,6 +96,7 @@ import {
 } from "../logic/langyChatTransport";
 import { langyChoicesTimeline } from "../logic/langyChoicesTimeline";
 import { mergeContextChips } from "../logic/langyContextChips";
+import { catchUpConversationFold } from "../logic/langyDurableCatchUp";
 import {
   explainLangyError,
   isStaleLangyHistoryRead,
@@ -105,6 +108,10 @@ import {
   PANEL_SUGGESTION_COUNT,
   selectLangySuggestions,
 } from "../logic/langyHomeSuggestions";
+import {
+  type MakeDefaultWritePlan,
+  makeDefaultOffer,
+} from "../logic/langyMakeDefaultOffer";
 import { navigateDedupKey, reserveNavigate } from "../logic/langyNavigateDedup";
 import {
   APP_HEADER_HEIGHT,
@@ -124,6 +131,12 @@ import {
   SIDEBAR_PEEK_NEAR_PX,
 } from "../logic/langyPeekDock";
 import { resolveLangyStopTarget } from "../logic/langyStopTarget";
+import {
+  currentTurnAssistant,
+  hasTokens,
+  runningTool,
+  settledTool,
+} from "../logic/langyThinkingLine";
 import { buildTimeTravelView } from "../logic/langyTimeTravel";
 import { deriveWaveActivity } from "../logic/langyWaveMotion";
 import { isInternalHref } from "../logic/spaLink";
@@ -147,6 +160,7 @@ import { LangyContextTargetLayer } from "./LangyContextTargetLayer";
 import { LangyDevDrawer } from "./LangyDevDrawer";
 import { LangyError } from "./LangyError";
 import { LangyExternalLinkDialog } from "./LangyExternalLinkDialog";
+import { LangyMakeDefaultDialog } from "./LangyMakeDefaultDialog";
 import { LangyMark, LangyMarkGradientDefs } from "./LangyMark";
 import { LangyRecoveringLine } from "./LangyRecoveringLine";
 import { LangyThinkingLine } from "./LangyThinkingLine";
@@ -447,7 +461,8 @@ function LangyPanel({
   /** Activating the peeking sliver — its click, its Enter/Space. */
   onOpen: () => void;
 }) {
-  const { organization, project } = useOrganizationTeamProject();
+  const { organization, team, project, hasOrgPermission, hasPermission } =
+    useOrganizationTeamProject();
   const projectId = project?.id;
   const organizationId = organization?.id;
   const utils = api.useUtils();
@@ -460,12 +475,18 @@ function LangyPanel({
   const modelOverride = useLangyStore((s) => s.modelOverride);
   const setModelOverride = useLangyStore((s) => s.setModelOverride);
   const activeConversationId = useLangyStore((s) => s.activeConversationId);
+  const interruptedConversationId = useLangyStore(
+    (s) => s.interruptedConversationId,
+  );
+  const pendingConversationId = useLangyStore((s) => s.pendingConversationId);
+  const warmedConversationId = useLangyStore((s) => s.warmedConversationId);
   const historyLoadConversationId = useLangyStore(
     (s) => s.historyLoadConversationId,
   );
   const selectConversation = useLangyStore((s) => s.selectConversation);
   const startNewConversation = useLangyStore((s) => s.startNewConversation);
   const consumeHistoryLoad = useLangyStore((s) => s.consumeHistoryLoad);
+  const requestComposerFocus = useLangyStore((s) => s.requestComposerFocus);
   // The command bar's "Ask Langy" hands a question over via the store; the panel
   // opens itself and auto-sends it (see the pendingPrompt effect below).
   const pendingPrompt = useLangyStore((s) => s.pendingPrompt);
@@ -727,8 +748,10 @@ function LangyPanel({
         },
         onSignal: (signal) => {
           const store = useLangyStore.getState();
-          if (signal.type === "status") store.setTurnStatus(signal.status);
-          else if (signal.type === "progress") {
+          if (signal.type === "status") {
+            if (signal.readiness) store.setTurnReadinessStatus(signal.status);
+            else store.setTurnStatus(signal.status);
+          } else if (signal.type === "progress") {
             if (signal.message?.trim()) {
               store.setTurnStatus(signal.message);
             }
@@ -875,6 +898,98 @@ function LangyPanel({
     }
   }, [langyModelsAllowed, modelOverride, setModelOverride]);
 
+  // ── "Make it the default?" — the ask that follows a model pick ──────────
+  // The pick took effect for this conversation the moment it happened; the
+  // dialog only offers to write it as the default at the scope the current
+  // default lives at, and only to someone who can manage that scope (see
+  // logic/langyMakeDefaultOffer).
+  const setRoleAssignment =
+    api.modelProvider.setRoleAssignmentForScope.useMutation();
+  const setFeatureOverride =
+    api.modelProvider.setFeatureOverrideForScope.useMutation();
+  const [makeDefaultPlan, setMakeDefaultPlan] =
+    useState<MakeDefaultWritePlan | null>(null);
+  // Declines are per model per panel session: refusing once must not nag on
+  // the next pick of the same model, and must not mute the ask forever.
+  const makeDefaultDeclinedRef = useRef<Set<string>>(new Set());
+
+  const offerMakeDefault = (picked: string) => {
+    if (makeDefaultDeclinedRef.current.has(picked)) return;
+    const plan = makeDefaultOffer({
+      picked,
+      resolvedDefault: resolvedDefaultQuery.data ?? null,
+      canManage: {
+        organization: hasOrgPermission("organization:manage"),
+        team: hasPermission("team:manage"),
+        project: hasPermission("project:update"),
+      },
+      scopeIds: {
+        organizationId: organizationId ?? null,
+        teamId: team?.id ?? null,
+        projectId: projectId ?? null,
+      },
+    });
+    if (plan) setMakeDefaultPlan(plan);
+  };
+
+  const confirmMakeDefault = () => {
+    if (!makeDefaultPlan || !projectId) return;
+    const plan = makeDefaultPlan;
+    // The dialog closes the moment the question is answered; the write runs
+    // behind it. Holding it open on a spinner made a yes/no feel like a form
+    // submit, and the pick is already live for this conversation either way —
+    // only a genuine write failure has anything to say, and it says it as a
+    // toast.
+    setMakeDefaultPlan(null);
+    // The dialog took the cursor for one question about the model. Answering
+    // it gives the cursor back to the message being written.
+    requestComposerFocus();
+    void (async () => {
+      try {
+        // The write mirrors what it replaces: a feature-level default moves via
+        // the feature override, a role-level one via the LANGY role.
+        if (plan.kind === "feature-override") {
+          await setFeatureOverride.mutateAsync({
+            scopeType: plan.scopeType,
+            scopeId: plan.scopeId,
+            featureKey: LANGY_GATE_FEATURE_KEY,
+            model: plan.model,
+          });
+        } else {
+          await setRoleAssignment.mutateAsync({
+            scopeType: plan.scopeType,
+            scopeId: plan.scopeId,
+            role: "LANGY",
+            model: plan.model,
+          });
+        }
+        await syncLangyAfterDefaultModelWrite({
+          utils,
+          projectId,
+          fallbackModel: plan.model,
+        });
+        toaster.create({
+          title: "Langy default updated",
+          type: "success",
+          duration: 2500,
+        });
+      } catch (error) {
+        showErrorToast({
+          error,
+          fallbackTitle: "Couldn't update the Langy default",
+        });
+      }
+    })();
+  };
+
+  const declineMakeDefault = () => {
+    if (makeDefaultPlan) {
+      makeDefaultDeclinedRef.current.add(makeDefaultPlan.model);
+    }
+    setMakeDefaultPlan(null);
+    requestComposerFocus();
+  };
+
   const {
     messages,
     sendMessage,
@@ -886,6 +1001,27 @@ function LangyPanel({
     resetEngine,
     clearError,
   } = useLangyChatEngine({ transport });
+
+  // Pre-warm the worker on panel open and on conversation change, so the first
+  // message finds it booted (specs/langy/langy-worker-prewarm.feature). The
+  // model is passed only after both model queries settle, the picker's value
+  // is what the turn will carry, and warming before the allowlist could snap
+  // it away would boot a worker the turn cannot reuse. Held while a turn is
+  // streaming: the worker is provably alive then, and a warm racing the turn
+  // (a mid-stream model switch re-arms one) has nothing to add. Fire-and-
+  // forget: the hook surfaces nothing.
+  const modelQueriesSettled =
+    !resolvedDefaultQuery.isLoading && !modelsAllowedQuery.isLoading;
+  useLangyWarmWorker({
+    projectId,
+    isOpen,
+    conversationId: activeConversationId,
+    pendingConversationId,
+    turnInFlight: status === "submitted" || status === "streaming",
+    model: modelQueriesSettled
+      ? modelOverride || langyDefaultModel || null
+      : null,
+  });
 
   // ── Server state (React Query, via the langy tRPC router) ─────────────────
   const {
@@ -913,7 +1049,32 @@ function LangyPanel({
     refetch: refetchHistory,
     eventCursor: snapshotEventCursor,
     currentTurnId: snapshotCurrentTurnId,
+    lastModel: conversationLastModel,
   } = useLangyMessages(activeConversationId);
+
+  // A conversation keeps the model it was last used with: when its history
+  // lands, the picker follows the model of its latest turn — unless the user
+  // already picked one since opening it, and never a model the allowlist
+  // refuses (the snap effect above owns that rule).
+  useEffect(() => {
+    if (!activeConversationId || !conversationLastModel) return;
+    if (
+      langyModelsAllowed &&
+      !langyModelsAllowed.includes(conversationLastModel)
+    ) {
+      return;
+    }
+    useLangyStore.getState().followConversationModel({
+      conversationId: activeConversationId,
+      model: conversationLastModel,
+      resolvedDefault: resolvedDefaultQuery.data?.model ?? null,
+    });
+  }, [
+    activeConversationId,
+    conversationLastModel,
+    langyModelsAllowed,
+    resolvedDefaultQuery.data?.model,
+  ]);
 
   /**
    * The conversation's own history failed to load.
@@ -1030,7 +1191,6 @@ function LangyPanel({
             : "This answer is still starting up — try stopping it again in a moment.",
         type: "info",
         duration: 5000,
-        meta: { closable: true },
       });
       return;
     }
@@ -1055,14 +1215,35 @@ function LangyPanel({
 
   // Seed the LOCAL turn projection from the snapshot (ADR-059): its cursor is
   // where the durable-tail fold starts, and an in-flight turn id is what a
-  // refreshed tab adopts (making Stop + live signals work again). The seed
-  // reducer never rewinds a fresher local fold, so refetches are harmless.
+  // refreshed tab adopts (making Stop + live signals work again).
+  //
+  // A fold that is already seeded is never jump-seeded again: a fresher
+  // polled cursor instead drives the SAME durable catch-up the freshness
+  // signal does — fetch the tail, fold the events. Jump-seeding skipped the
+  // events between the two cursors and reset the turn document, which is why
+  // a tab whose SSE connection died froze mid-turn while the turn kept
+  // running: the poll kept delivering fresher cursors and the seed kept
+  // discarding the work they pointed at. With the poll as a second catch-up
+  // driver, a dead live stream is a latency problem, not a frozen panel.
   useEffect(() => {
     if (!activeConversationId) return;
-    useLangyStore.getState().seedTurnProjection({
-      cursor: snapshotEventCursor,
-      currentTurnId: snapshotCurrentTurnId,
-    });
+    const store = useLangyStore.getState();
+    if (store.turnProjection.cursor === null) {
+      store.seedTurnProjection({
+        cursor: snapshotEventCursor,
+        currentTurnId: snapshotCurrentTurnId,
+      });
+    } else if (projectId && snapshotEventCursor) {
+      catchUpConversationFold({
+        utils,
+        projectId,
+        conversationId: activeConversationId,
+        targetCursor: snapshotEventCursor,
+      }).catch(() => {
+        // A failed catch-up is retried by the next poll or signal; the fold
+        // never moved, so there is nothing to repair.
+      });
+    }
     useLangyDevLog.getState().recordSnapshot({
       conversationId: activeConversationId,
       cursor: snapshotEventCursor,
@@ -1070,6 +1251,8 @@ function LangyPanel({
     });
   }, [
     activeConversationId,
+    projectId,
+    utils,
     snapshotEventCursor?.acceptedAt,
     snapshotEventCursor?.eventId,
     snapshotCurrentTurnId,
@@ -1384,6 +1567,9 @@ function LangyPanel({
   turnContextRef.current = {
     projectId: projectId ?? "",
     conversationId: activeConversationId,
+    // The id a panel-open warm minted, for the create path to adopt so the
+    // first turn reuses the worker the warm already booted.
+    pendingConversationId,
     ...(modelOverride ? { modelOverride } : {}),
     ...(allContextChips.length > 0
       ? {
@@ -1550,7 +1736,6 @@ function LangyPanel({
         description: "Failed to delete conversation.",
         type: "error",
         duration: 5000,
-        meta: { closable: true },
       });
     }
   };
@@ -1564,7 +1749,6 @@ function LangyPanel({
         description: "Failed to rename conversation.",
         type: "error",
         duration: 5000,
-        meta: { closable: true },
       });
       throw new Error("Failed to rename conversation");
     }
@@ -1582,7 +1766,6 @@ function LangyPanel({
           description: `No handler for '${proposal.kind}' on this page.`,
           type: "error",
           duration: 5000,
-          meta: { closable: true },
         });
         return;
       }
@@ -1595,7 +1778,6 @@ function LangyPanel({
           description: proposal.summary,
           type: "success",
           duration: 3000,
-          meta: { closable: true },
         });
       } catch (error) {
         showErrorToast({
@@ -1738,7 +1920,7 @@ function LangyPanel({
   //                 subscription closes the moment a silent worker stops pushing
   //                 frames, and because `reconnectToStream()` returns null,
   //                 useChat settles to "ready" and isBusy goes false LONG before
-  //                 the turn is actually over (the liveness reactor keeps
+  //                 the turn is actually over (the liveness subscriber keeps
   //                 re-driving for up to its whole grace budget, ~90s).
   //   serverTurnInFlight  the DURABLE truth off the fold — status `active`
   //                 (message sent, worker cold-starting) OR `running` (agent
@@ -1752,7 +1934,7 @@ function LangyPanel({
   //
   // OR them, and stop the moment anything terminal resolves (the branches below
   // own the error card / recovering line / connect card). The line we show is
-  // honest by construction: it escalates "Starting up…" → "taking longer…" →
+  // honest by construction: it escalates the startup steps → "taking longer…" →
   // "it may be stuck" and never fakes progress (see logic/langyThinkingLine.ts).
   const liveTurnInFlight =
     (isBusy || turnActive) &&
@@ -1902,6 +2084,7 @@ function LangyPanel({
     ? {
         ...turnSignals,
         status: timeTravel.signals.status,
+        statusIsReadiness: false,
         progress: timeTravel.signals.progress,
         progressSample: null,
         reasoning: timeTravel.signals.reasoning,
@@ -1909,10 +2092,6 @@ function LangyPanel({
         segment: null,
       }
     : turnSignals;
-  const hasTurnDetail =
-    !!displaySignals.status ||
-    displaySignals.progress !== null ||
-    (displaySignals.metrics?.length ?? 0) > 0;
 
   const latestAssistantMessage = [...messages]
     .reverse()
@@ -1942,10 +2121,30 @@ function LangyPanel({
   // conversation right now — the trigger for the seam's fibre glitter. Mirrors
   // exactly what makes StreamingStatusLine render its status orb, so the seam
   // shimmers in sympathy with that orb.
+  // A readiness status is a placeholder for silence, and it may NEVER render
+  // under an answer that is already on screen: a stream replay (reconnect,
+  // resumed turn) re-delivers it after text has streamed, and "Thinking…"
+  // below the visible reply reads as a contradiction. Suppress it the moment
+  // the current turn has provable output; statuses the agent reports mid-turn
+  // are untouched.
+  const currentTurnMessage = currentTurnAssistant(displayMessages);
+  const turnHasVisibleOutput =
+    !!runningTool(currentTurnMessage) ||
+    hasTokens(currentTurnMessage) ||
+    settledTool(currentTurnMessage) ||
+    !!displaySignals.reasoning;
+  const statusForDisplay =
+    displaySignals.statusIsReadiness && turnHasVisibleOutput
+      ? null
+      : displaySignals.status;
+  const hasTurnDetail =
+    !!statusForDisplay ||
+    displaySignals.progress !== null ||
+    (displaySignals.metrics?.length ?? 0) > 0;
   const activityOwnership = resolveLangyActivityOwnership({
     hasInlineProgressOwner,
     turnInFlight,
-    status: displaySignals.status,
+    status: statusForDisplay,
     progress: displaySignals.progress,
     progressSample: displaySignals.progressSample,
     metricsCount: displaySignals.metrics?.length ?? 0,
@@ -1999,8 +2198,8 @@ function LangyPanel({
 
   // The generated title for the open conversation, read off the recents list —
   // the SAME server state, kept fresh by the useLangyFreshness SSE coordinator,
-  // so the title-generation reactor's `conversation_title_generated` event
-  // lands here without a second fetch. Null until the reactor produces one: the
+  // so the title-generation subscriber's `conversation_title_generated` event
+  // lands here without a second fetch. Null until the subscriber produces one: the
   // header shows nothing that pretends to be a title in the meantime.
   const conversationTitle = useMemo(() => {
     if (!activeConversationId) return null;
@@ -2026,6 +2225,11 @@ function LangyPanel({
         panelHeightPx={panelHeightPx}
       />
       <LangyExternalLinkDialog {...externalLinkGuard.dialogProps} />
+      <LangyMakeDefaultDialog
+        plan={makeDefaultPlan}
+        onDecline={declineMakeDefault}
+        onConfirm={confirmMakeDefault}
+      />
       <MotionBox
         ref={panelRef}
         {...contextDropProps}
@@ -2654,6 +2858,13 @@ function LangyPanel({
                                   index === displayMessages.length - 1 &&
                                   message.role === "assistant"
                                 }
+                                interrupted={
+                                  interruptedConversationId != null &&
+                                  interruptedConversationId ===
+                                    activeConversationId &&
+                                  index === displayMessages.length - 1 &&
+                                  message.role === "assistant"
+                                }
                                 // Only ever on a turn that COMPLETED. We were asking
                                 // "How did Langy do?" above a timeout card — rating an
                                 // answer that never arrived. The failure IS the feedback;
@@ -2718,11 +2929,15 @@ function LangyPanel({
                             />
                           ) : null}
                           {turnInFlight ? (
-                            // Extra air above the working lines: the column's gap
-                            // alone left them hugging the cards of the streaming
-                            // answer, which read as part of the message rather than
-                            // the live edge below it.
-                            <VStack align="stretch" gap={2.5} marginTop={1.5}>
+                            // No extra air above the working lines. The answer
+                            // takes this exact slot when it arrives, so any
+                            // margin here is a jump the reader sees at the one
+                            // moment they are watching: the line sat 8px lower
+                            // than the first line of the reply that replaced it.
+                            // The row's own padding is zero for the same reason
+                            // (STATUS_LINE_ROW), which lands the two text boxes
+                            // on the same optical line.
+                            <VStack align="stretch" gap={2.5}>
                               {/* Reasoning is a SIGNAL, never a surface: the model's
                           thinking is not shown to the user, so it reaches the
                           line as a boolean that only changes its words
@@ -2746,6 +2961,17 @@ function LangyPanel({
                                 <LangyThinkingLine
                                   messages={displayMessages}
                                   hasLiveReasoning={!!displaySignals.reasoning}
+                                  // The panel-open warm proved this
+                                  // conversation's worker alive, so the first
+                                  // message reads "Thinking…" instead of the
+                                  // cold-boot ladder.
+                                  workerReady={
+                                    warmedConversationId != null &&
+                                    (warmedConversationId ===
+                                      activeConversationId ||
+                                      warmedConversationId ===
+                                        pendingConversationId)
+                                  }
                                 />
                               ) : null}
                             </VStack>
@@ -2883,6 +3109,9 @@ function LangyPanel({
                       // the panel on the sign-in it no longer needs.
                       setReconnectCodex(false);
                       setModelOverride(model);
+                      // The pick is done; this only ASKS whether it should also
+                      // become the default, when the picker can grant that.
+                      offerMakeDefault(model);
                     }}
                     onSend={send}
                     onStop={handleStop}

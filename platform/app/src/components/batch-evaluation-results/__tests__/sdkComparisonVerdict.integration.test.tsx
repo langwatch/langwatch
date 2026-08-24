@@ -300,20 +300,35 @@ describe("an n-way comparison logged by the code-first SDK", () => {
 
         const column = comparisonColumnOf(SDK_RUN);
 
-        expect(Object.keys(column.verdictsByRow)).toEqual(["0", "1", "2", "3"]);
+        expect(Object.keys(column.verdictsByRow)).toEqual([
+          "0",
+          "1",
+          "2",
+          "3",
+          "4",
+        ]);
       });
 
-      it("counts a skipped verdict as neither a tie nor a win for anyone", () => {
+      it("counts a row the judge could not settle as neither a tie nor a win for anyone", () => {
         const column = comparisonColumnOf(SDK_RUN);
         const verdicts = Object.values(column.verdictsByRow);
 
-        expect(column.verdictsByRow[4]).toBeUndefined();
-        // Counted, not resurrected: the row is reported as one the judge
-        // declined rather than silently dropped.
+        // Row 4 is carried, marked for what it is, and keeps the judge's
+        // account of why it reached nothing. That text is the most expensive
+        // on the page: an unsettled row is two judge calls and no answer.
+        expect(column.verdictsByRow[4]).toMatchObject({
+          winnerId: null,
+          isUnsettled: true,
+          reasoning: ROW_4_SKIP_REASON,
+        });
+        // Carried is not counted: it is still reported as a row without a
+        // verdict.
         expect(column.rowsWithoutVerdict).toBe(1);
-        // Exactly one row has no winner: row 3's tie. The skipped row did not
-        // add a second.
-        expect(verdicts.filter((v) => v.winnerId === null)).toHaveLength(1);
+        // Exactly one row is a tie: row 3. Row 4 shares its null winner and
+        // must not be read as a second one.
+        expect(
+          verdicts.filter((v) => v.winnerId === null && !v.isUnsettled),
+        ).toHaveLength(1);
         expect(verdicts.filter((v) => v.winnerId !== null)).toHaveLength(3);
       });
     });
@@ -346,16 +361,25 @@ describe("an n-way comparison logged by the code-first SDK", () => {
           screen.queryAllByTestId("comparison-winner-badge-gemini-flash"),
         ).toHaveLength(0);
 
-        // The tie reads as a tie, and the row the judge declined renders as an
-        // empty verdict rather than as a tie or a win.
+        // The tie reads as a tie, and the row the judge ran and could not
+        // settle reads as its own outcome rather than as a tie or a win.
         expect(
           screen.getAllByTestId("comparison-winner-badge-tie"),
         ).toHaveLength(1);
-        expect(screen.getAllByTestId("comparison-winner-none")).toHaveLength(1);
+        expect(
+          screen.getAllByTestId("comparison-winner-badge-no-verdict"),
+        ).toHaveLength(1);
+        // A bare dash is reserved for a row the judge never ran, and every row
+        // of this run was judged.
+        expect(screen.queryAllByTestId("comparison-winner-none")).toHaveLength(
+          0,
+        );
 
-        // "Why" is on the page, not one drill-down away.
+        // "Why" is on the page, not one drill-down away, and that includes the
+        // reason a row reached no verdict.
         expect(screen.getByText(ROW_0_REASONING)).toBeDefined();
         expect(screen.getByText(ROW_3_REASONING)).toBeDefined();
+        expect(screen.getByText(ROW_4_SKIP_REASON)).toBeDefined();
         // And "what was right" alongside it: the winning candidate's own
         // output, repeated into the Winner cell so the reader does not have to
         // scroll back across the target columns to find which answer won.

@@ -61,6 +61,21 @@ export function shellCommandOf(
 }
 
 /**
+ * The command an input carries, whatever the call is NAMED.
+ *
+ * A LangWatch call reaches the panel under two names: live it is still
+ * `bash("langwatch trace search …")`, and durably the server envelope has
+ * renamed it `langwatch.trace.search`. Only the name changes, and both keep the
+ * command in their input. Reading the input rather than the name is what keeps
+ * a replayed turn as specific as the live one: without it, a reopened
+ * conversation showed two `langwatch trace search` calls as two identical
+ * "Searched traces" rows, and which one returned nothing was unanswerable.
+ */
+export function commandOf(input: unknown): string | undefined {
+  return readString(input, COMMAND_KEYS);
+}
+
+/**
  * The name a tool frame should be TREATED as.
  *
  * A shell call running a LangWatch CLI command is not a shell call — it is that
@@ -233,7 +248,7 @@ export function describeToolCall({
   //    the running line and the settled card cannot disagree.
   const progress = resolveCapabilityProgress(effectiveToolName(name, input));
   if (progress) {
-    const command = shellCommandOf(name, input);
+    const command = commandOf(input);
     return {
       title: progress.headline,
       detail: command ? truncate(command) : undefined,

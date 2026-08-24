@@ -14,9 +14,9 @@ import type {
   ModelProvider,
   PrismaClient,
   VirtualKey,
-} from "@prisma/client";
+} from "~/generated/prisma/client";
 
-import { decrypt } from "../../utils/encryption";
+import { readCustomKeys } from "~/server/modelProviders/customKeys";
 import {
   type LangyMirrorTier,
   resolveLangyMirrorTier,
@@ -29,7 +29,15 @@ import {
   resolveApplicableBudgets,
 } from "./budgetResolution.service";
 import { GatewayCacheRuleService } from "./cacheRule.service";
-import { eligibleModelProvidersForVk, traceProjectFor } from "./scopeResolver";
+import { computeConfigETag } from "./configETag";
+import { withTierFallthrough } from "./modelTierFallthrough";
+import { declaredModelsForProvider } from "./providerModelCatalog";
+import {
+  eligibleModelProvidersForVk,
+  scopeReachableModelProvidersForVk,
+  traceProjectFor,
+} from "./scopeResolver";
+import { organizationSpendTenantIds } from "./spendTenants";
 import { parseVirtualKeyConfig } from "./virtualKey.config";
 import type { VirtualKeyWithScopes } from "./virtualKey.repository";
 
@@ -69,7 +77,38 @@ export type ProviderSlot = {
   base_url?: string;
   region?: string;
   deployment_map?: Record<string, string>;
+  /**
+   * The operator-chosen routing handle of this ModelProvider row. A caller
+   * writes it where a provider family goes ("eu/claude-sonnet-5") to reach
+   * THIS instance rather than whichever instance of the family the key's chain
+   * order reaches first. Absent when the operator set none.
+   */
+  handle?: string;
+  /**
+   * What this provider declares it serves, for ROUTING a bare model name to
+   * the provider that owns it. Absent when the row declares nothing, which the
+   * gateway reads as "this provider said nothing" rather than "this provider
+   * serves nothing". Authorization stays with `models_allowed`.
+   */
+  models?: string[];
   config: Record<string, unknown>;
+};
+
+/**
+ * A ModelProvider row the gateway will not dispatch to, named so a
+ * request-time block can say why. `type` is the provider kind (ModelProvider.provider),
+ * carried alongside the row id because the gateway matches a resolved request
+ * by provider kind and these rows are absent from `providers[]`.
+ */
+export type ProviderExclusionWire = {
+  id: string;
+  type: string;
+  /**
+   * The dropped row's routing handle, carried so a request naming it is told
+   * which of the key's settings dropped the provider instead of being told the
+   * operator's own handle means nothing.
+   */
+  handle?: string;
 };
 
 export type GatewayConfigPayload = {
@@ -92,10 +131,13 @@ export type GatewayConfigPayload = {
   team_id: string | null;
   principal_id: string | null;
   providers: ProviderSlot[];
+  /**
+   * `chain` is the ordered provider slots; `max_attempts` bounds the walk.
+   * Which failures walk it is decided by the gateway from the real upstream
+   * outcome, never per key.
+   */
   fallback: {
-    on: string[];
     chain: string[];
-    timeout_ms: number;
     max_attempts: number;
   };
   model_aliases: Record<string, string>;
@@ -116,6 +158,28 @@ export type GatewayConfigPayload = {
    * RoutingPolicy decides.
    */
   routing_mode: "none" | "fallback_all" | "policy";
+  /**
+   * Contract §4.2. Providers a request could resolve to but the gateway will
+   * NOT dispatch to, split by WHY, so a request-time block can name the
+   * reason instead of failing opaque. Each entry is a ModelProvider row id
+   * plus its provider type, the same `{id, type}` shape `providers[]` carries,
+   * because the gateway matches the provider a request resolved to by TYPE and
+   * these rows are absent from `providers[]`.
+   *
+   * routing_excluded_providers: reachable from the key's scope AND inside its
+   * provider access, but dropped by the routing policy (named by
+   * routing_policy_name). access_excluded_providers: reachable from scope but
+   * outside providers_allowed (empty when the key allows all providers). A
+   * provider in neither list and absent from `providers[]` is not reachable
+   * from the key's scope at all.
+   */
+  routing_excluded_providers: ProviderExclusionWire[];
+  access_excluded_providers: ProviderExclusionWire[];
+  /**
+   * Display name of the key's routing policy, used to name the routing-block
+   * reason. Null when the key is not on a routing policy.
+   */
+  routing_policy_name: string | null;
   cache: { mode: "respect" | "force" | "disable"; ttl_s: number };
   // Flat per-project guardrail catalog the VK is allowed to reference.
   // The Go dispatcher looks up entries by id from guardrail_attachments
@@ -201,6 +265,19 @@ export type GatewayConfigPayload = {
   // The gateway stamps them on customer spans as langwatch.labels (Trace
   // Explorer "Label" filter) and matches cache-rule vk_tags against them.
   vk_tags: string[];
+  /**
+   * The date the key stops serving, in unix seconds, and `null` for a key that
+   * never expires. Always present, because the gateway tells an explicit null
+   * ("this key has no date") apart from a field a control plane older than it
+   * never sent ("keep the date you already hold").
+   *
+   * The key's expiry also travels on the auth token as `vk_expires_at`, which
+   * is the mint-time floor. Carrying it here as well is what bounds how long
+   * the gateway can hold an out-of-date value: the ETag moves on every
+   * mutation, so a shortened or extended date reaches the gateway on its next
+   * config revalidation even while the change feed is unavailable.
+   */
+  expires_at: number | null;
 };
 
 export class GatewayConfigMaterialiser {
@@ -208,6 +285,62 @@ export class GatewayConfigMaterialiser {
     private readonly prisma: PrismaClient,
     private readonly chRepo: GatewayBudgetClickHouseRepository | null = null,
   ) {}
+
+  /**
+   * The providers this key dispatches to, plus the three wire fields that let
+   * the gateway name why a resolved provider was not used. An explicit allowlist
+   * narrows dispatch; absence means every scope-reachable provider, now and
+   * later, so the filter runs here rather than being frozen into stored scope
+   * rows. `eligibleProviders` is already routing-policy-applied, so the
+   * scope-reachable set minus dispatch is what the policy dropped, and the
+   * allowlist complement is what provider access dropped.
+   */
+  private async dispatchAndExclusions(
+    vk: VirtualKeyWithScopes,
+    eligibleProviders: ModelProvider[],
+    allowed: string[] | null,
+  ): Promise<{
+    providers: ModelProvider[];
+    exclusions: {
+      routing_excluded_providers: ProviderExclusionWire[];
+      access_excluded_providers: ProviderExclusionWire[];
+      routing_policy_name: string | null;
+    };
+  }> {
+    const providers = allowed
+      ? eligibleProviders.filter((mp) => allowed.includes(mp.id))
+      : eligibleProviders;
+    const scopeReachable = await scopeReachableModelProvidersForVk(
+      this.prisma,
+      vk,
+    );
+    const { routingExcluded, accessExcluded } = providerExclusions({
+      scopeReachable,
+      eligibleProviders,
+      allowed,
+    });
+    return {
+      providers,
+      exclusions: {
+        routing_excluded_providers: routingExcluded.map(providerExclusionWire),
+        access_excluded_providers: accessExcluded.map(providerExclusionWire),
+        routing_policy_name: vk.routingPolicy?.name ?? null,
+      },
+    };
+  }
+
+  /**
+   * The version token for the bundle this materialiser would build for `vk`.
+   *
+   * It lives beside `materialise` because it describes that output: the token
+   * has to move whenever the bundle would come back different, and the two
+   * drifting apart is what lets a 304 confirm a bundle that is no longer
+   * current. See `configETag.ts` for what it covers and what it leaves to the
+   * change feed.
+   */
+  async versionToken(vk: VirtualKeyWithScopes): Promise<string> {
+    return await computeConfigETag({ prisma: this.prisma, virtualKey: vk });
+  }
 
   async materialise(vk: VirtualKeyWithScopes): Promise<GatewayConfigPayload> {
     const eligibleProviders = await eligibleModelProvidersForVk(
@@ -219,14 +352,11 @@ export class GatewayConfigMaterialiser {
     const spendByBudgetId = await this.loadCurrentSpend(vk, budgets);
     const cacheRules = await this.applicableCacheRules(vk.organizationId);
     const config = parseVirtualKeyConfig(vk.config);
-    // An explicit allowlist narrows what the key can reach; absence means
-    // "all current and future providers in scope", which is why the filter
-    // runs here rather than being frozen into stored scope rows.
-    const providers = config.providersAllowed
-      ? eligibleProviders.filter((mp) =>
-          config.providersAllowed!.includes(mp.id),
-        )
-      : eligibleProviders;
+    const { providers, exclusions } = await this.dispatchAndExclusions(
+      vk,
+      eligibleProviders,
+      config.providersAllowed,
+    );
     const policySides = resolvePolicySideOfBundle(vk, config);
     const guardrailSides = await this.resolveGuardrailSideOfBundle(
       vk,
@@ -254,9 +384,7 @@ export class GatewayConfigMaterialiser {
           : "skip",
       providers: providers.map((mp, index) => buildProviderSlot(mp, index)),
       fallback: {
-        on: config.fallback.on,
         chain: providers.map((mp) => mp.id),
-        timeout_ms: config.fallback.timeoutMs,
         // routing_mode NONE means the request never leaves the provider
         // that serves the model, so the attempt budget is one. Pinning it
         // here makes no-fallback real for gateways that predate the
@@ -268,6 +396,7 @@ export class GatewayConfigMaterialiser {
       models_allowed: config.modelsAllowed,
       providers_allowed: config.providersAllowed,
       routing_mode: routingModeToWire(vk.routingMode),
+      ...exclusions,
       cache: { mode: config.cache.mode, ttl_s: config.cache.ttlS },
       guardrails: guardrailSides.guardrails,
       guardrail_attachments: guardrailSides.attachments,
@@ -283,6 +412,7 @@ export class GatewayConfigMaterialiser {
       cache_rules: cacheRules.map(cacheRuleToWire),
       metadata: config.metadata ?? {},
       vk_tags: config.metadata?.tags ?? [],
+      expires_at: expiresAtWire(vk.expiresAt),
     };
   }
 
@@ -357,11 +487,10 @@ export class GatewayConfigMaterialiser {
       return new Map();
     }
     try {
-      const orgProjects = await this.prisma.project.findMany({
-        where: { team: { organizationId: vk.organizationId } },
-        select: { id: true },
-      });
-      const tenantIds = orgProjects.map((p) => p.id);
+      const tenantIds = await organizationSpendTenantIds(
+        this.prisma,
+        vk.organizationId,
+      );
       if (tenantIds.length === 0) return new Map();
       // Read each budget's spend from its RESOLVED bucket, exactly. The
       // bundle enforces this key's buckets, so the figure must be the
@@ -417,19 +546,6 @@ export class GatewayConfigMaterialiser {
       },
     });
   }
-}
-
-function decryptCustomKeys(raw: unknown): Record<string, unknown> {
-  if (raw === null || raw === undefined) return {};
-  if (typeof raw === "object") return raw as Record<string, unknown>;
-  if (typeof raw === "string") {
-    try {
-      return JSON.parse(decrypt(raw)) as Record<string, unknown>;
-    } catch {
-      return {};
-    }
-  }
-  return {};
 }
 
 // Resolve the policy-side of the bundle (model aliases + policy rules)
@@ -510,7 +626,10 @@ function resolvePolicySideOfBundle(
         )
       : {};
   return {
-    modelAliases: aliases,
+    modelAliases: withTierFallthrough({
+      aliases,
+      defaultModel: rp.defaultModel,
+    }),
     policyRules: normalisePolicyRules(rp.policyRules),
   };
 }
@@ -556,7 +675,7 @@ function geminiCredentials(
 
 export function buildCredentials(mp: ModelProvider): Record<string, unknown> {
   const provider = mp.provider;
-  const customKeys = decryptCustomKeys(mp.customKeys);
+  const customKeys = readCustomKeys(mp.customKeys).keys;
   const pick = (k: string): string =>
     typeof customKeys[k] === "string" ? (customKeys[k] as string) : "";
 
@@ -639,7 +758,7 @@ export function buildCredentials(mp: ModelProvider): Record<string, unknown> {
 
 function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {
   const credentials = buildCredentials(mp);
-  const customKeys = decryptCustomKeys(mp.customKeys);
+  const customKeys = readCustomKeys(mp.customKeys).keys;
   // Providers whose base-URL override the gateway consumes (see mapProvider
   // in bifrost.go): "custom" and "openai" route it to Bifrost's VLLM
   // (OpenAI-compat) adapter; "anthropic" derives a per-endpoint custom
@@ -648,10 +767,15 @@ function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {
   // with an endpointKey resolve their endpoint elsewhere (Azure/Vertex via
   // credentials.endpoint), so emitting a per-slot base_url for them would
   // be a dead field. Scope the override to what's consumed.
+  // "elevenlabs" is on the list for the realtime session mint, which dials
+  // the vendor directly and must reach the residency host the customer
+  // chose: a signed URL minted against the default host is signed in the
+  // wrong region.
   const supportsBaseURLOverride =
     mp.provider === "custom" ||
     mp.provider === "openai" ||
-    mp.provider === "anthropic";
+    mp.provider === "anthropic" ||
+    mp.provider === "elevenlabs";
   const endpointKey = supportsBaseURLOverride
     ? modelProviders[mp.provider as keyof typeof modelProviders]?.endpointKey
     : undefined;
@@ -674,7 +798,26 @@ function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {
     ...(baseURL ? { base_url: baseURL } : {}),
     ...(region ? { region } : {}),
     ...(deploymentMap ? { deployment_map: deploymentMap } : {}),
+    ...routingWire({ mp }),
     config: buildProviderConfig(mp),
+  };
+}
+
+/**
+ * The routing half of a provider slot: the handle that addresses this exact
+ * instance, and the models it declares it serves. Both are absent rather than
+ * empty when there is nothing to say, which is what the gateway reads as "this
+ * provider said nothing" instead of "this provider serves nothing".
+ */
+function routingWire({
+  mp,
+}: {
+  mp: ModelProvider;
+}): Pick<ProviderSlot, "handle" | "models"> {
+  const models = declaredModelsForProvider(mp);
+  return {
+    ...(mp.routingHandle ? { handle: mp.routingHandle } : {}),
+    ...(models ? { models } : {}),
   };
 }
 
@@ -737,6 +880,50 @@ function routingModeToWire(
     case "POLICY":
       return "policy";
   }
+}
+
+function providerExclusionWire(mp: ModelProvider): ProviderExclusionWire {
+  return {
+    id: mp.id,
+    type: mp.provider,
+    ...(mp.routingHandle ? { handle: mp.routingHandle } : {}),
+  };
+}
+
+/**
+ * The key's expiration date as the gateway reads it: unix SECONDS, and null for
+ * a key that never expires. Seconds because the gateway decodes the field as a
+ * unix timestamp, the same unit the `vk_expires_at` token claim uses;
+ * milliseconds would put the date tens of thousands of years out and lift the
+ * expiry cap off the key.
+ */
+function expiresAtWire(expiresAt: Date | null): number | null {
+  return expiresAt ? Math.floor(expiresAt.getTime() / 1000) : null;
+}
+
+/**
+ * Splits the scope-reachable providers the dispatch chain drops into the two
+ * reasons the gateway names at request time: the routing policy dropped it
+ * (inside provider access, but not dispatchable), or provider access dropped it
+ * (outside the allowlist). A provider that dispatches is in neither list.
+ */
+function providerExclusions({
+  scopeReachable,
+  eligibleProviders,
+  allowed,
+}: {
+  scopeReachable: ModelProvider[];
+  eligibleProviders: ModelProvider[];
+  allowed: string[] | null;
+}): { routingExcluded: ModelProvider[]; accessExcluded: ModelProvider[] } {
+  const dispatchIds = new Set(eligibleProviders.map((mp) => mp.id));
+  const routingExcluded = scopeReachable.filter(
+    (mp) => (!allowed || allowed.includes(mp.id)) && !dispatchIds.has(mp.id),
+  );
+  const accessExcluded = allowed
+    ? scopeReachable.filter((mp) => !allowed.includes(mp.id))
+    : [];
+  return { routingExcluded, accessExcluded };
 }
 
 type BudgetWire = GatewayConfigPayload["budgets"][number];

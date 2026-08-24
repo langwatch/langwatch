@@ -11,8 +11,6 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { AnnotationScoreDataType } from "@prisma/client";
-
 import { useEffect, useState } from "react";
 import { Plus, X } from "react-feather";
 import { useForm } from "react-hook-form";
@@ -21,6 +19,7 @@ import {
   FormServerError,
   showErrorToast,
 } from "~/features/errors";
+import { AnnotationScoreDataType } from "~/generated/prisma/client";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { FullWidthFormControl } from "../FullWidthFormControl";
@@ -57,7 +56,7 @@ export const AddOrEditAnnotationScore = ({
     { enabled: !!annotationScoreId && !!project?.id },
   );
 
-  const queryClient = api.useContext();
+  const queryClient = api.useUtils();
 
   const form = useForm({
     disabled: Boolean(annotationScoreId && existingAnnotationScore.isLoading),
@@ -140,9 +139,6 @@ export const AddOrEditAnnotationScore = ({
           : "Error creating annotation score",
         description: "Please add at least one option",
         type: "error",
-        meta: {
-          closable: true,
-        },
       });
       return;
     }
@@ -161,9 +157,6 @@ export const AddOrEditAnnotationScore = ({
           : "Error creating annotation score",
         description: "Duplicate options are not allowed (case-insensitive)",
         type: "error",
-        meta: {
-          closable: true,
-        },
       });
       return;
     }
@@ -190,9 +183,6 @@ export const AddOrEditAnnotationScore = ({
               : "Annotation Score Created",
             description: `Successfully ${annotationScoreId ? "updated" : "created"} ${data.name} annotation score`,
             type: "success",
-            meta: {
-              closable: true,
-            },
           });
 
           onClose();
@@ -444,7 +434,7 @@ export const AddOrEditAnnotationScore = ({
               colorPalette="orange"
               type="submit"
               minWidth="fit-content"
-              loading={upsertAnnotationScore.isLoading}
+              loading={upsertAnnotationScore.isPending}
             >
               {annotationScoreId ? "Update Score Metric" : "Add Score Metric"}
             </Button>

@@ -52,6 +52,7 @@ import {
   langyRelayFrameSchema,
 } from "./langyRelayFrame";
 import type { LangyResourceLinkStore } from "./langyResourceLinks";
+import { LANGY_EMPTY_TURN_FALLBACK } from "./langyTokenBuffer";
 
 /** The CLI grammar the agent uses to say WHICH resource to open — never an
  * address. `langwatch navigate open <resourceId>`; the platform resolves
@@ -185,7 +186,11 @@ export interface LangyRelayBuffer {
     digest?: CliResultDigest;
     result?: CliToolResult;
   }): Promise<void>;
-  markEnd(a: { conversationId: string; turnId: string }): Promise<void>;
+  markEnd(a: {
+    conversationId: string;
+    turnId: string;
+    backstopSilentTurn?: boolean;
+  }): Promise<{ backstopped: boolean }>;
   markError(a: {
     conversationId: string;
     turnId: string;
@@ -585,19 +590,31 @@ export class LangyTurnRelay {
         return this.applyTool(projectId, at, frame);
       }
 
-      case "final":
-        await this.deps.buffer.markEnd(at);
+      case "final": {
+        // The one terminal that means the turn finished. Stop and handoff also
+        // end the stream, and neither may claim the turn wrote no reply.
+        //
+        // The durable message is built from the frame, the live stream from the
+        // deltas, so this is the one place that sees both. Whether the backstop
+        // fired decides both, or the fallback would show live and the turn
+        // would render blank again the moment history reloads.
+        const { backstopped } = await this.deps.buffer.markEnd({
+          ...at,
+          backstopSilentTurn: (frame.text ?? "").trim() === "",
+        });
+        const text = backstopped ? LANGY_EMPTY_TURN_FALLBACK : frame.text;
         await this.deps.conversations.ingestAgentTurnResult({
           projectId,
           conversationId,
           turnId,
           status: "completed",
-          ...(frame.text !== undefined ? { text: frame.text } : {}),
+          ...(text !== undefined ? { text } : {}),
           ...(frame.toolCalls !== undefined
             ? { toolCalls: frame.toolCalls }
             : {}),
         });
         return { status: "terminal" };
+      }
 
       case "error": {
         // The LIVE edge must carry the SAME classified, serialized domain error

@@ -26,7 +26,7 @@ autoscaling:
           averageValue: "150"
 ```
 
-- **Use CPU first.** It's free (no Prometheus dependency), correct in most deployments, and avoids feedback loops between the metric pipeline and the autoscaler.
+- **Use CPU first.** It's free (no Prometheus dependency) and avoids feedback loops between the metric pipeline and the autoscaler.
 - **Add `lw_gateway_rps` only if you run prometheus-adapter** and the gateway's `/metrics` endpoint is scraped. Without the adapter the HPA will silently ignore the custom metric line. Verify with `kubectl describe hpa langwatch-gateway`, `External metric ... not active` means the adapter isn't wired.
 - **3 replicas is a sane minimum** for production: the chart's PDB requires `minAvailable: 1`, so 3 replicas tolerates one rolling-deploy pod going down plus one ad-hoc node drain.
 

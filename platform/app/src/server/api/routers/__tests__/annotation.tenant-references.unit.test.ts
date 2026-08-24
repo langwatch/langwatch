@@ -1,7 +1,15 @@
-import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "../../trpc";
 import { annotationRouter, createOrUpdateQueueItems } from "../annotation";
+
+// The declared permission seam resolves its service from the App.
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsMock } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return appPermissionsMock();
+});
 
 vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
@@ -11,12 +19,9 @@ vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {
     ...actual,
-    checkProjectPermission:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
+    resolveProjectPermission: vi
+      .fn()
+      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
   };
 });
 

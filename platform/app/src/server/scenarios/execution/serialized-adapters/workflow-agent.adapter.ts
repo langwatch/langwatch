@@ -18,9 +18,11 @@
  *   the first value, then to a stringified result.
  */
 
+import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { randomBytes } from "crypto";
+import type { RunParameterValues } from "../../parameters";
 import { resolveFieldMappings } from "../resolve-field-mappings";
 import type { WorkflowAgentData } from "../types";
 
@@ -44,20 +46,31 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
    * credential, so it must not be sourced from litellm params (issue #6634).
    */
   private readonly projectApiKey: string;
+  /**
+   * The run's resolved parameter values. They reach the workflow twice, and
+   * both are needed: as entry inputs, which is how a published workflow wires
+   * a value on to its downstream nodes, and on the workflow itself as
+   * `params`, which is how a code node inside it reads `params.NAME` with the
+   * value's native type intact.
+   */
+  private readonly parameters: RunParameterValues;
 
   constructor({
     config,
     nlpServiceUrl,
     projectApiKey,
+    parameters,
   }: {
     config: WorkflowAgentData;
     nlpServiceUrl: string;
     projectApiKey: string;
+    parameters?: RunParameterValues;
   }) {
     super();
     this.config = config;
     this.nlpServiceUrl = nlpServiceUrl;
     this.projectApiKey = projectApiKey;
+    this.parameters = parameters ?? {};
     this.name = "SerializedWorkflowAgentAdapter";
   }
 
@@ -76,6 +89,51 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
    * Without scenarioMappings: first input gets the last user message, rest get "".
    */
   private resolveInputValues(agentInput: AgentInput): Record<string, string> {
+    // A declared input wins over a parameter of the same name. Spread the other
+    // way round and a parameter called `input` would quietly replace the
+    // conversation turn the target is supposed to answer, and the run would
+    // read as an agent that ignored the user.
+    return {
+      ...this.parametersAsEntryInputs(),
+      ...this.resolveMappedInputValues(agentInput),
+    };
+  }
+
+  /**
+   * The `params` namespace for one turn: the run's resolved values plus this
+   * turn's trace context, so a code node inside the workflow can forward
+   * `params.trace_id` or `params.traceparent` to whatever it calls. Captured
+   * per call, because every turn opens its own trace. `trace_id` and
+   * `traceparent` are reserved names: they win over a run parameter with the
+   * same name.
+   */
+  private turnParameters(): RunParameterValues {
+    const { headers, traceId } = injectTraceContextHeaders({ headers: {} });
+    const traceparent = headers.traceparent;
+    return {
+      ...this.parameters,
+      ...(traceId !== undefined && { trace_id: traceId }),
+      ...(traceparent !== undefined && { traceparent }),
+    };
+  }
+
+  /**
+   * The run's parameters as entry inputs. Entry inputs are strings on the
+   * wire, so a number or a boolean is coerced here; a code node that wants the
+   * native value reads it from `params.NAME` instead.
+   */
+  private parametersAsEntryInputs(): Record<string, string> {
+    return Object.fromEntries(
+      Object.entries(this.parameters).map(([name, value]) => [
+        name,
+        String(value),
+      ]),
+    );
+  }
+
+  private resolveMappedInputValues(
+    agentInput: AgentInput,
+  ): Record<string, string> {
     const declaredInputs =
       this.config.inputs.length > 0
         ? this.config.inputs
@@ -132,6 +190,7 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
       ...this.config.workflow,
       api_key: this.projectApiKey,
       secrets: { ...existingSecrets, ...this.config.secrets },
+      params: this.turnParameters(),
     };
 
     const event = {

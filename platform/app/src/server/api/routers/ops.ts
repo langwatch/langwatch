@@ -3,12 +3,13 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { checkOpsPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
-import { DASHBOARD_EVENT } from "~/server/app-layer/ops/metrics-collector";
+import { getApp, tryGetApp } from "~/server/app-layer/app";
+import { DASHBOARD_EVENT } from "~/server/app-layer/ops/snapshot/snapshot-reader";
 import {
   type DashboardData,
   OPS_BLOB_SORTS,
 } from "~/server/app-layer/ops/types";
+import { systemMigrationsService } from "~/server/app-layer/system-migrations/runtime";
 import {
   resolveHotDays,
   TABLE_TTL_CONFIG,
@@ -30,7 +31,7 @@ import {
   resolveEffectiveForListing,
 } from "~/server/featureFlag/rules";
 import { AnomalyStateStore } from "~/server/observability/anomalyState";
-import { connection } from "~/server/redis";
+import { grafanaConfigFromEnv } from "~/utils/grafanaLinks";
 
 const opsViewPermission = checkOpsPermission({ permission: "ops:view" });
 
@@ -46,19 +47,23 @@ const opsViewProbe = checkOpsPermission({
 const opsManagePermission = checkOpsPermission({ permission: "ops:manage" });
 
 /**
- * The extra gate on anything that can destroy a queue payload.
+ * The extra gate on an ops write whose damage nobody will notice in time.
  *
  * `ops:manage` already resolves through the admin allow-list, but it is not
  * enough on its own here for two reasons. It is inherited by an impersonation
  * session — `resolveOpsScope` deliberately falls back to the impersonator's own
  * grant — and "acting as" another user is the wrong posture for irreversible
  * infrastructure surgery, because the audit trail names the impersonated
- * account. And deleting a blob is unrecoverable and silent at the queue level:
- * the job that referenced it completes without its handler ever running, so
- * there is no failure for anyone to notice. A typed confirmation makes that a
- * deliberate act rather than a mis-click.
+ * account. And the damage is silent: deleting a blob completes the job that
+ * referenced it without its handler ever running, and pinning an organization
+ * back onto the legacy authorization path changes which tables answer every
+ * permission check for that tenant without failing anything. A typed
+ * confirmation makes either a deliberate act rather than a mis-click.
+ *
+ * A confirmation dialog in the ops UI is not this guard — every one of these
+ * procedures is callable directly.
  */
-function requireBlobStoreWriteAuth(
+function requireDestructiveOpsAuth(
   ctx: {
     session: { user: { impersonator?: { email?: string | null } | null } };
   },
@@ -68,7 +73,7 @@ function requireBlobStoreWriteAuth(
     throw new TRPCError({
       code: "FORBIDDEN",
       message:
-        "Blob store changes cannot be made from an impersonated session. Sign in directly to continue.",
+        "This action cannot be run from an impersonated session. Sign in directly to continue.",
     });
   }
   if (!confirm) {
@@ -114,8 +119,8 @@ export const opsRouter = createTRPCRouter({
 
   getDashboardSnapshot: protectedProcedure.use(opsViewPermission).query(() => {
     const ops = getApp().ops;
-    if (!ops?.metricsCollector) return null;
-    return ops.metricsCollector.getDashboardData();
+    if (!ops?.snapshotReader) return null;
+    return ops.snapshotReader.getDashboardData();
   }),
 
   /**
@@ -125,30 +130,63 @@ export const opsRouter = createTRPCRouter({
    * always-on polling; reach for `getDashboardSnapshot` only on the
    * ops route itself.
    */
-  getBadgeCounts: protectedProcedure.use(opsViewPermission).query(() => {
-    const ops = getApp().ops;
-    if (!ops?.metricsCollector) {
-      return { blockedCount: 0, dlqCount: 0 };
-    }
-    return ops.metricsCollector.getBadgeCounts();
-  }),
+  getBadgeCounts: protectedProcedure.use(opsViewPermission).query(
+    (): {
+      blockedCount: number;
+      dlqCount: number;
+      computedAt: Date | null;
+    } => {
+      const ops = getApp().ops;
+      if (!ops?.snapshotReader) {
+        // Same shape as the served path so no caller has to branch on whether
+        // the field exists — but `computedAt: null`, because these zeroes are
+        // "we cannot say" rather than "nothing is wrong". Stamping the current
+        // time would present unavailable data as a fresh all-clear.
+        return { blockedCount: 0, dlqCount: 0, computedAt: null };
+      }
+      return ops.snapshotReader.getBadgeCounts();
+    },
+  ),
 
   dashboardStream: protectedProcedure
     .use(opsViewPermission)
     .subscription(async function* (opts) {
-      const collector = getApp().ops?.metricsCollector;
-      if (!collector) return;
+      const reader = getApp().ops?.snapshotReader;
+      if (!reader) return;
 
       // Yield the current snapshot immediately so the client doesn't have
-      // to wait for the next broadcast tick before rendering.
-      yield collector.getDashboardData();
+      // to wait for the next broadcast tick before rendering. Null until a
+      // readable snapshot exists, which the page renders as its loading state.
+      const current = reader.getDashboardData();
+      if (current) yield current;
 
-      for await (const [data] of on(collector.getEmitter(), DASHBOARD_EVENT, {
-        // @ts-expect-error - signal is not typed
+      for await (const [data] of on(reader.getEmitter(), DASHBOARD_EVENT, {
         signal: opts.signal,
       })) {
         yield data as DashboardData;
       }
+    }),
+
+  /**
+   * One parked tenant's groups, read live rather than from the snapshot.
+   *
+   * A parking storm can hold hundreds of thousands of groups; carrying those
+   * in a snapshot every pod reads would recreate the size problem ADR-090
+   * removes. The tenant ROWS ship in the snapshot, their members do not.
+   */
+  listParkedGroups: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        queueName: z.string(),
+        tenantId: z.string(),
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(200).default(50),
+      }),
+    )
+    .query(async ({ input }) => {
+      const ops = requireOps();
+      return ops.queues.getParkedGroups(input);
     }),
 
   listQueues: protectedProcedure.use(opsViewPermission).query(async () => {
@@ -162,6 +200,77 @@ export const opsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const ops = requireOps();
       return ops.scheduler.listScheduledJobs({ limit: input.limit });
+    }),
+
+  /**
+   * Only the switched-off schedules, for the dashboard's "Switched off" panel.
+   * Its own read because `listScheduledJobs` sorts active first, so a client
+   * filtering that page would miss every paused row on a large fleet.
+   */
+  listPausedSchedules: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        limit: z.number().int().min(1).max(200).default(50),
+      }),
+    )
+    .query(async ({ input }) => {
+      const ops = requireOps();
+      return ops.scheduler.listPausedSchedules({ limit: input.limit });
+    }),
+
+  /** Recent scheduler operator actions, so the page explains its own history. */
+  listSchedulerActions: protectedProcedure
+    .use(opsViewPermission)
+    .input(z.object({ limit: z.number().int().min(1).max(100).default(20) }))
+    .query(async ({ input }) => {
+      const ops = requireOps();
+      return ops.scheduler.listRecentActions({ limit: input.limit });
+    }),
+
+  /**
+   * Pause or resume a schedule (ADR-091). Never touches an in-flight slot —
+   * the confirmation copy says so, because a pause that silently killed a live
+   * run would be a much larger promise than the one being made.
+   */
+  setScheduleActive: protectedProcedure
+    .use(opsManagePermission)
+    .input(z.object({ scheduleId: z.string(), active: z.boolean() }))
+    .mutation(async ({ input, ctx }) => {
+      const ops = requireOps();
+      return ops.scheduler.setActive({
+        scheduleId: input.scheduleId,
+        active: input.active,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
+  /** Release a slot whose worker stopped responding, so it can be claimed again. */
+  clearScheduleSlot: protectedProcedure
+    .use(opsManagePermission)
+    .input(z.object({ scheduleId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const ops = requireOps();
+      return ops.scheduler.clearStuckSlot({
+        scheduleId: input.scheduleId,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
+  /**
+   * Make a schedule due immediately. The loop claims and runs it through the
+   * ordinary path, so this inherits its exactly-once lease rather than
+   * bypassing it.
+   */
+  runScheduleNow: protectedProcedure
+    .use(opsManagePermission)
+    .input(z.object({ scheduleId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const ops = requireOps();
+      return ops.scheduler.runNow({
+        scheduleId: input.scheduleId,
+        actorUserId: ctx.session.user.id,
+      });
     }),
 
   listGroups: protectedProcedure
@@ -197,6 +306,20 @@ export const opsRouter = createTRPCRouter({
       }
       return group;
     }),
+
+  /**
+   * The Grafana deep-link config, so ops surfaces can build per-row Explore
+   * links client-side with the pure builders in `~/utils/grafanaLinks`. Null
+   * when no Grafana is configured — callers render no link rather than a dead
+   * one. Gated like every other ops read; Grafana itself is access-controlled,
+   * so the base URL is not a secret to an operator.
+   */
+  getGrafanaLinkConfig: protectedProcedure.use(opsViewPermission).query(() => {
+    const { baseUrl, tempoDatasourceUid, lokiDatasourceUid } =
+      grafanaConfigFromEnv();
+    if (!baseUrl) return null;
+    return { baseUrl, tempoDatasourceUid, lokiDatasourceUid };
+  }),
 
   getBlockedSummary: protectedProcedure
     .use(opsViewPermission)
@@ -401,6 +524,252 @@ export const opsRouter = createTRPCRouter({
         processKey: input.processKey,
         messageKeyPrefix: input.messageKeyPrefix,
         requestedBy: ctx.session.user.id,
+      });
+    }),
+
+  // ── Process-manager fleet (specs/ops/process-manager-visibility.feature) ──
+
+  /** One row per process name: registry identity + live trouble counts. */
+  listProcessFleet: protectedProcedure.use(opsViewPermission).query(() => {
+    return requireOps().managerExplorer.getFleetSummary();
+  }),
+
+  /**
+   * Retired messages across every process. Answers "what has permanently
+   * stopped", which `getProcessOutbox` could not: that one needs a full
+   * process ref, so it can only be reached by an operator who already knows
+   * where the failure is.
+   */
+  listDeadLetters: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        /** Omit for every process. */
+        processName: z.string().min(1).max(200).optional(),
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(100).default(25),
+      }),
+    )
+    .query(({ input }) => {
+      return requireOps().managerExplorer.getDeadLetters(input);
+    }),
+
+  /** Dead totals per process, for the navigation badge and dashboard card. */
+  listDeadLetterCounts: protectedProcedure.use(opsViewPermission).query(() => {
+    return requireOps().managerExplorer.getDeadLetterCounts();
+  }),
+
+  listProcessInstances: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        /** Omit to list instances across every process manager. */
+        processName: z.string().min(1).max(200).optional(),
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(100).default(25),
+        search: z.string().max(500).optional(),
+      }),
+    )
+    .query(async ({ input }) => {
+      return requireOps().managerExplorer.getInstances(input);
+    }),
+
+  /** The soonest-due process wakes, for the dashboard's timed-work table. */
+  listUpcomingWakes: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        limit: z.number().int().min(1).max(200).default(20),
+      }),
+    )
+    .query(async ({ input }) => {
+      return requireOps().managerExplorer.getUpcomingWakes(input);
+    }),
+
+  getProcessInstance: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        processName: z.string().min(1).max(200),
+        projectId: z.string().min(1).max(200),
+        processKey: z.string().min(1).max(500),
+      }),
+    )
+    .query(async ({ input }) => {
+      return requireOps().managerExplorer.getInstanceDetail({ ref: input });
+    }),
+
+  listProcessOutbox: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        processName: z.string().min(1).max(200),
+        projectId: z.string().min(1).max(200),
+        processKey: z.string().min(1).max(500),
+        page: z.number().int().min(1).default(1),
+        pageSize: z.number().int().min(1).max(100).default(20),
+      }),
+    )
+    .query(async ({ input }) => {
+      const { page, pageSize, ...ref } = input;
+      return requireOps().managerExplorer.getOutbox({ ref, page, pageSize });
+    }),
+
+  listProcessActions: protectedProcedure
+    .use(opsViewPermission)
+    .input(z.object({ limit: z.number().int().min(1).max(100).default(20) }))
+    .query(async ({ input }) => {
+      return requireOps().managerExplorer.listRecentActions(input);
+    }),
+
+  processWakeNow: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        processName: z.string().min(1).max(200),
+        projectId: z.string().min(1).max(200),
+        processKey: z.string().min(1).max(500),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return requireOps().managerExplorer.wakeNow({
+        ref: input,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
+  processRedriveDeadInstance: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        processName: z.string().min(1).max(200),
+        projectId: z.string().min(1).max(200),
+        processKey: z.string().min(1).max(500),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return requireOps().managerExplorer.redriveDeadInstance({
+        ref: input,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
+  processRedriveDeadMessage: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        processName: z.string().min(1).max(200),
+        projectId: z.string().min(1).max(200),
+        processKey: z.string().min(1).max(500),
+        messageId: z.string().min(1).max(64),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { messageId, ...ref } = input;
+      return requireOps().managerExplorer.redriveDeadMessage({
+        ref,
+        messageId,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
+  /** Mark one dead message never-to-be-sent — a mark, not a delete. */
+  processDiscardDeadMessage: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        processName: z.string().min(1).max(200),
+        projectId: z.string().min(1).max(200),
+        processKey: z.string().min(1).max(500),
+        messageId: z.string().min(1).max(64),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { messageId, ...ref } = input;
+      return requireOps().managerExplorer.discardDeadMessage({
+        ref,
+        messageId,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
+  /**
+   * Every dead letter back to pending — one process, or the fleet when
+   * `processName` is omitted (specs/ops/dead-letter-recovery.feature).
+   */
+  redriveDeadLetters: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        processName: z.string().min(1).max(200).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return requireOps().managerExplorer.redriveDeadLetters({
+        ...input,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
+  /**
+   * Every dead letter marked discarded; same scoping as the redrive.
+   *
+   * The fleet-wide form — no `processName` — crosses every tenant and cannot
+   * be undone, since no redrive path selects a discarded row. It therefore
+   * takes a typed confirmation, the same shape the blob-store delete uses:
+   * the destructive breadth has to be reached deliberately, not by omitting
+   * a field (best_practices/ops-dashboard.md).
+   */
+  discardDeadLetters: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z
+        .object({
+          processName: z.string().min(1).max(200).optional(),
+          confirm: z.literal("DISCARD ALL").optional(),
+        })
+        .refine((input) => !!input.processName || input.confirm !== undefined, {
+          message:
+            "Discarding every process's dead letters requires an explicit confirmation",
+          path: ["confirm"],
+        }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return requireOps().managerExplorer.discardDeadLetters({
+        ...(input.processName ? { processName: input.processName } : {}),
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
+  /** The message's failed attempts, oldest first — why a dead letter died. */
+  listOutboxAttempts: protectedProcedure
+    .use(opsViewPermission)
+    .input(
+      z.object({
+        outboxId: z.string().min(1).max(64),
+        projectId: z.string().min(1).max(200),
+      }),
+    )
+    .query(async ({ input }) => {
+      return requireOps().managerExplorer.getOutboxAttempts(input);
+    }),
+
+  processReleaseLapsedLease: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        processName: z.string().min(1).max(200),
+        projectId: z.string().min(1).max(200),
+        processKey: z.string().min(1).max(500),
+        messageId: z.string().min(1).max(64),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { messageId, ...ref } = input;
+      return requireOps().managerExplorer.releaseLapsedLease({
+        ref,
+        messageId,
+        actorUserId: ctx.session.user.id,
       });
     }),
 
@@ -618,6 +987,45 @@ export const opsRouter = createTRPCRouter({
       return ops.queues.replayAllFromDlq(input);
     }),
 
+  /**
+   * Redrive exactly the DLQ groups the operator's filter showed
+   * (specs/ops/dead-letter-recovery.feature) — explicit ids, so the
+   * confirmation and the act cover the same groups.
+   */
+  redriveManyFromDlq: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        queueName: z.string(),
+        groupIds: z.array(z.string().min(1).max(500)).min(1).max(2000),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return requireOps().queues.redriveManyFromDlq({
+        ...input,
+        requestedBy: ctx.session.user.id,
+      });
+    }),
+
+  /**
+   * Discard exactly the shown DLQ groups: their jobs never run again. The
+   * audit row is the retained mark — the Redis entries expire regardless.
+   */
+  discardManyFromDlq: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        queueName: z.string(),
+        groupIds: z.array(z.string().min(1).max(500)).min(1).max(2000),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      return requireOps().queues.discardManyFromDlq({
+        ...input,
+        requestedBy: ctx.session.user.id,
+      });
+    }),
+
   canaryRedrive: protectedProcedure
     .use(opsManagePermission)
     .input(
@@ -728,6 +1136,7 @@ export const opsRouter = createTRPCRouter({
    * fingerprint loops). Sorted with hard-tier first.
    */
   listAnomalies: protectedProcedure.use(opsViewPermission).query(async () => {
+    const connection = tryGetApp()?.redis ?? null;
     if (!connection) return { anomalies: [] };
     const store = new AnomalyStateStore(connection);
     const anomalies = await store.list();
@@ -752,6 +1161,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input }) => {
+      const connection = tryGetApp()?.redis ?? null;
       if (!connection) return { dismissed: false };
       const store = new AnomalyStateStore(connection);
       await store.clear(input.tenantId, input.kind);
@@ -921,7 +1331,26 @@ export const opsRouter = createTRPCRouter({
     .input(
       z.object({
         key: z.string().min(1).max(200),
-        rules: featureFlagRulesSchema.max(50),
+        // Write-time only — the read path's `parseRules` must keep accepting
+        // whatever is already stored, so this refinement lives here and not on
+        // the shared schema. A blank id can never match any context (matching
+        // is exact string equality), so a rule carrying one is a dead rule the
+        // operator believes is live.
+        rules: featureFlagRulesSchema
+          .max(50)
+          .refine(
+            (rules) =>
+              rules.every((rule) =>
+                [rule.match.projectId, rule.match.organizationId].every(
+                  (id) =>
+                    id === undefined || (id.length > 0 && id === id.trim()),
+                ),
+              ),
+            {
+              message:
+                "A targeting rule's project/organization id must not be blank or padded",
+            },
+          ),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -960,7 +1389,7 @@ export const opsRouter = createTRPCRouter({
   //
   // Reads are ops:view. Everything that can destroy a payload additionally
   // requires a non-impersonated session and a typed confirmation — see
-  // `requireBlobStoreWriteAuth`.
+  // `requireDestructiveOpsAuth`.
   // ---------------------------------------------------------------------------
 
   listBlobQueues: protectedProcedure.use(opsViewPermission).query(async () => {
@@ -1013,7 +1442,7 @@ export const opsRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       if (!input.dryRun) {
-        requireBlobStoreWriteAuth(ctx, input.confirm);
+        requireDestructiveOpsAuth(ctx, input.confirm);
       }
       return requireOps().blobStore.runCleanup({
         dryRun: input.dryRun,
@@ -1034,7 +1463,7 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      requireBlobStoreWriteAuth(ctx, input.confirm);
+      requireDestructiveOpsAuth(ctx, input.confirm);
       return requireOps().blobStore.deleteBlob({
         queueName: input.queueName,
         projectId: input.projectId,
@@ -1043,5 +1472,223 @@ export const opsRouter = createTRPCRouter({
         // carrying PII into the log stream.
         requestedBy: ctx.session.user.id,
       });
+    }),
+
+  /**
+   * The in-place system migrations (@langwatch/system-migrations), per
+   * migration: status rollup plus the tenants needing attention - held
+   * (`migrated`, parity disagreements in the report) and `parked` (errored,
+   * retried next pass). Finalized tenants are a count, not a listing.
+   */
+  listSystemMigrations: protectedProcedure
+    .use(opsViewPermission)
+    .query(() => systemMigrationsService.getOverview()),
+
+  /**
+   * The cloud rollout's enrollment listing: which organizations are enrolled
+   * for which migrations, with the names the operator recognizes. Carries
+   * `isSaaS` so the page can say honestly that a self-hosted installation
+   * has nothing to enroll.
+   */
+  listMigrationEnrollments: protectedProcedure
+    .use(opsViewPermission)
+    .query(({ ctx }) =>
+      systemMigrationsService.getEnrollments({
+        requestedBy: ctx.session.user.id,
+      }),
+    ),
+
+  /**
+   * The organization lookup behind the page's pickers: enroll, targeted run
+   * and rollback all act on an organization found by name or exact id.
+   */
+  searchMigrationOrganizations: protectedProcedure
+    .use(opsViewPermission)
+    .input(z.object({ query: z.string().max(200) }))
+    .query(({ input }) =>
+      systemMigrationsService.searchOrganizations({ query: input.query }),
+    ),
+
+  /**
+   * Enroll one organization for one registered migration. Takes effect on
+   * the next pass - enrollment is read fresh each time. The service refuses
+   * duplicates, unknown migrations, unknown organizations, and any
+   * enrollment on a self-hosted installation, each with a handled error the
+   * page renders.
+   */
+  enrollMigrationTenant: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        organizationId: z.string().min(1).max(200),
+        migrationName: z.string().min(1).max(200),
+        // Typed confirmation for the cutover migration, same reasoning as
+        // the rollback's: enrolling an organization for cutover is what lets
+        // the next pass flip which tables answer every permission check for
+        // it.
+        confirm: z.literal("ENROLL").optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // The preparation migrations are behavior-neutral (backfill and
+      // genesis change nothing about who decides); the cutover has the
+      // rollback's blast radius, so it takes the rollback's guard. Which is
+      // which comes from the migration's own declaration, so this gate and
+      // the page that asks for the confirmation cannot drift apart.
+      if (
+        systemMigrationsService.requiresOperatorConfirmation({
+          migrationName: input.migrationName,
+        })
+      ) {
+        requireDestructiveOpsAuth(ctx, input.confirm);
+      }
+      await systemMigrationsService.enroll({
+        organizationId: input.organizationId,
+        migrationName: input.migrationName,
+        actorUserId: ctx.session.user.id,
+      });
+      return { enrolled: true };
+    }),
+
+  /**
+   * Enroll a sampled cohort of organizations for one migration in a single
+   * action. The service draws the sample from organizations not yet
+   * enrolled, excluding enterprise plans and private-dataplane routes by
+   * data rather than by any list in code. The cutover keeps its typed
+   * confirmation: a cohort of cutovers is the same flip N times over.
+   *
+   * Either exclusion can be lifted for one draw, separately, so finishing a
+   * proven rollout does not mean enrolling the held-back organizations one
+   * id at a time. Both default to false here as well as in the service: an
+   * older client that sends neither field gets the safe pool.
+   */
+  enrollMigrationCohort: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        migrationName: z.string().min(1).max(200),
+        sampleSize: z.number().int().min(1).max(1000),
+        includeEnterprise: z.boolean().default(false),
+        includePrivateDataplane: z.boolean().default(false),
+        confirm: z.literal("ENROLL").optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (
+        systemMigrationsService.requiresOperatorConfirmation({
+          migrationName: input.migrationName,
+        })
+      ) {
+        requireDestructiveOpsAuth(ctx, input.confirm);
+      }
+      return systemMigrationsService.enrollCohort({
+        migrationName: input.migrationName,
+        sampleSize: input.sampleSize,
+        actorUserId: ctx.session.user.id,
+        includeEnterprise: input.includeEnterprise,
+        includePrivateDataplane: input.includePrivateDataplane,
+      });
+    }),
+
+  /**
+   * Withdraw an enrollment: later passes stop processing the organization
+   * for that migration. State already recorded stays exactly as it is -
+   * pausing the rollout is this action's whole job; undoing it is the
+   * rollback's.
+   */
+  withdrawMigrationTenant: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        organizationId: z.string().min(1).max(200),
+        migrationName: z.string().min(1).max(200),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await systemMigrationsService.withdraw({
+        organizationId: input.organizationId,
+        migrationName: input.migrationName,
+        actorUserId: ctx.session.user.id,
+      });
+      return { withdrawn: true };
+    }),
+
+  /**
+   * Run one migration for one organization now. Awaited: the operator asked
+   * about one organization and gets the status it ended the run in. The
+   * service refuses unknown migrations, unknown organizations, unenrolled
+   * organizations (cloud) and an organization whose claim another pass
+   * already holds, each with a handled error the page renders.
+   */
+  runSystemMigrationForOrganization: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        organizationId: z.string().min(1).max(200),
+        migrationName: z.string().min(1).max(200),
+        // Typed confirmation for the cutover migration - a targeted cutover
+        // run is exactly the flip the enrollment confirmation guards.
+        confirm: z.literal("RUN").optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (
+        systemMigrationsService.requiresOperatorConfirmation({
+          migrationName: input.migrationName,
+        })
+      ) {
+        requireDestructiveOpsAuth(ctx, input.confirm);
+      }
+      return systemMigrationsService.runForOrganization({
+        organizationId: input.organizationId,
+        migrationName: input.migrationName,
+        actorUserId: ctx.session.user.id,
+      });
+    }),
+
+  /**
+   * Kick a migration pass now instead of waiting for the next worker boot -
+   * the lever for processing a fresh enrollment right away or re-verifying
+   * held tenants after remediation. Fire-and-forget: per-organization claims
+   * already keep two passes off the same organization, so the worst case for
+   * a double click is a pass that finds everything claimed and does nothing.
+   */
+  runSystemMigrationPass: protectedProcedure
+    .use(opsManagePermission)
+    .mutation(() => {
+      systemMigrationsService.startPass();
+      return { started: true };
+    }),
+
+  /**
+   * The operator rollback: pin a migrated or finalized organization back
+   * onto its legacy path. Both are already live on the ledger; the service
+   * refuses anything else with a handled error. An already `rolled_back`
+   * organization RETRIES — calling this again re-applies the rollback's
+   * effects against the standing pin, which is how a rollback whose effect
+   * died halfway is finished. Rolled-back tenants are terminal for the
+   * runner — later passes leave them alone.
+   */
+  rollBackSystemMigrationTenant: protectedProcedure
+    .use(opsManagePermission)
+    .input(
+      z.object({
+        migrationName: z.string().min(1).max(200),
+        tenantId: z.string().min(1).max(200),
+        // Typed confirmation, same reasoning as `deleteBlob`.
+        confirm: z.literal("ROLL BACK").optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Same posture as the blob-store writes: this procedure is callable
+      // without the dialog, and it decides which tables answer every
+      // permission check for an entire organization.
+      requireDestructiveOpsAuth(ctx, input.confirm);
+      await systemMigrationsService.rollBack({
+        migrationName: input.migrationName,
+        tenantId: input.tenantId,
+        actorUserId: ctx.session.user.id,
+      });
+      return { rolledBack: true };
     }),
 });

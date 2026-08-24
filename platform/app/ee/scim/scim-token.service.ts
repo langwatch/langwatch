@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { PrismaClient } from "@prisma/client";
+
 import crypto from "crypto";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { getApp } from "~/server/app-layer/app";
 import type { PlanProvider } from "~/server/app-layer/subscription/plan-provider";

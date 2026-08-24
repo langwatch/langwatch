@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * tRPC router for /me/devices — Phase 8 Sessions/Devices dashboard.
+ * tRPC router for the devices inventory — Phase 8 Sessions/Devices dashboard.
  *
  * Three procedures:
  *   - list: list every active CLI session for the authenticated user
@@ -21,13 +21,12 @@ import { CliSessionInventoryService } from "@ee/governance/services/cliSessionIn
 import { CliTokenRevocationService } from "@ee/governance/services/cliTokenRevocation.service";
 import { z } from "zod";
 
-import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 export const personalSessionsRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .query(async ({ ctx }) => {
       const service = CliSessionInventoryService.create();
       const sessions = await service.listForUser({
@@ -51,7 +50,7 @@ export const personalSessionsRouter = createTRPCRouter({
         sessionStartedAtMs: z.number().int().nonnegative(),
       }),
     )
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .mutation(async ({ ctx, input }) => {
       const service = CliSessionInventoryService.create();
       const result = await service.revokeSession({
@@ -63,7 +62,7 @@ export const personalSessionsRouter = createTRPCRouter({
 
   revokeAll: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
+    .permission("organization:view")
     .mutation(async ({ ctx }) => {
       // Reuse the user-wide revoke from Phase 1B.5 — that path also
       // clears the per-user token index in one shot.

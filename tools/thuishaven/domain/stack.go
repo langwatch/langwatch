@@ -51,6 +51,18 @@ type Stack struct {
 	// responses, the Langy "view trace" link, and anywhere else a developer wants to
 	// jump straight to the failing trace.
 	ObservabilityGrafanaPort int `json:"observabilityGrafanaPort,omitempty"`
+	// ObservabilityPyroscopePort is the shared Pyroscope's loopback port while the
+	// stack is up, and 0 when it is not. Non-zero is what makes OverlayEnv name a
+	// profiling endpoint, so a worktree's processes profile themselves exactly when
+	// there is somewhere to push to — and pay nothing for the profiler otherwise.
+	ObservabilityPyroscopePort int `json:"observabilityPyroscopePort,omitempty"`
+	// ObservabilityGrafanaURL is the proxied browser address of the same Grafana
+	// (observability.langwatch.localhost) while the portless proxy is up, and ""
+	// when it is not. When set, OverlayEnv prefers it over the loopback port for
+	// GRAFANA_BASE_URL: the links it feeds are followed by a browser, and the
+	// stable hostname survives a Grafana port change and reads like every other
+	// haven surface.
+	ObservabilityGrafanaURL string `json:"observabilityGrafanaUrl,omitempty"`
 	// ObservabilityConsoleLevel, when set, is injected as LOG_CONSOLE_LEVEL while the
 	// stack is up — muting the console to this floor (default "warn") because the
 	// full info/debug stream is in Grafana. Empty is the opt-out: the console is left
@@ -80,7 +92,15 @@ type Stack struct {
 	// sandboxed. It decides whether the worker runs in colima or on the host and
 	// which callback URLs the overlay hands the control plane.
 	LangyTier LangyTier `json:"langyTier,omitempty"`
-	Services  []Service `json:"services"`
+	// PortlessDisabled marks a stack provisioned with PORTLESS=0: every service
+	// serves plain HTTP on its own loopback port instead of routing through the
+	// portless proxy. The zero value is false (portless enabled, the historical
+	// behavior), so a stack persisted before this field existed reads back as it
+	// always behaved. `up` compares it against the requested run so flipping
+	// PORTLESS between runs restarts the stack onto the requested mode instead of
+	// silently keeping the old one (see reconcileRunningStack).
+	PortlessDisabled bool      `json:"portlessDisabled,omitempty"`
+	Services         []Service `json:"services"`
 	// UpdatedAt is refreshed by the launcher's heartbeat; the daemon reaps a
 	// stack whose launcher has died or whose heartbeat has gone stale.
 	UpdatedAt time.Time `json:"updatedAt"`

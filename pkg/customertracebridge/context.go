@@ -162,3 +162,27 @@ func activeSpanFrom(ctx context.Context) trace.Span {
 	}
 	return nil
 }
+
+// CustomerTraceID is the trace the customer sees this request in, or empty
+// when no customer span is open.
+//
+// It reads the bridge's own span rather than the ambient OpenTelemetry one.
+// The two are not the same trace: the ambient span belongs to the gateway's
+// internal instrumentation, while this one is what reaches the customer's
+// project and what the traces explorer shows them. Anything that has to point
+// back at a request from outside the request, such as a voice session settled
+// minutes later, has to name this one.
+//
+// An all-zeros id is never returned. It would look like a join key and match
+// every other unrecorded request.
+func CustomerTraceID(ctx context.Context) string {
+	span := activeSpanFrom(ctx)
+	if span == nil {
+		return ""
+	}
+	sc := span.SpanContext()
+	if !sc.HasTraceID() {
+		return ""
+	}
+	return sc.TraceID().String()
+}

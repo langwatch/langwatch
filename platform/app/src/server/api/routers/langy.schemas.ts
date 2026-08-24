@@ -82,7 +82,7 @@ export type LangyMessageDto = z.infer<typeof langyMessageSchema>;
  *
  * Design note (perceived-latency optimization): rather than a pure id-only
  * "go refetch" signal, this carries the low-sensitivity OPERATIONAL spine
- * (status, counts, activity, running-flag) that the worker reactor already
+ * (status, counts, activity, running-flag) that the worker subscriber already
  * holds in the fold state — so the client applies it in place with
  * `setQueryData` and skips a ClickHouse round-trip. It deliberately omits
  * every content-derived field (title, messages): the broadcast is tenant-wide

@@ -17,6 +17,7 @@ const mockExtractCredentials = vi.fn();
 const mockWarn = vi.fn();
 
 vi.mock("~/server/app-layer/app", () => ({
+  tryGetApp: () => null,
   getApp: vi.fn(() => ({
     usage: { checkLimit: mockCheckLimit },
     planProvider: {
