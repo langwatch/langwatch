@@ -163,10 +163,20 @@ export const featureFlagRouter = createTRPCRouter({
       const userId = ctx.session.user.id;
       const targeting = await allowedTargeting(ctx, input);
 
+      // Both the ids asked for and the ids that survived, because they are
+      // different questions. Logging only the survivors makes a caller probing
+      // organizations they do not belong to look exactly like a caller who
+      // sent no targeting at all, which is the one shape worth being able to
+      // see. Dropped-but-legitimate is common enough that this stays at debug
+      // rather than warning: a client whose cached organization id has gone
+      // stale (seat revoked, organization switched) sends one on every flag
+      // check for as long as the cache lives.
       logger.debug(
         {
           userId,
           flag: input.flag,
+          requestedProjectId: input.projectId,
+          requestedOrganizationId: input.organizationId,
           projectId: targeting.projectId,
           organizationId: targeting.organizationId,
         },
