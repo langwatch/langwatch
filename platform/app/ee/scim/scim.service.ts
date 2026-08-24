@@ -51,8 +51,16 @@ export class ScimService {
 
   /**
    * The directory acts as itself, not as whoever happens to hold the SCIM
-   * token. When identity connections exist this becomes the connection id
-   * (ADR-092's identity-platform seam); the event shape already takes it.
+   * token — and it stays this ONE principal however many connections an
+   * organization has. An earlier note here said the id becomes the
+   * connection id once identity connections exist; that was wrong and D08
+   * dropped it. `SYSTEM_ACTORS` is a closed registry of named principals
+   * (see its own comment forbidding call sites inventing `system:...`
+   * strings) and a connection id is a per-customer value, so it can never be
+   * a member of it. Which connection pushed a change belongs on the SCIM
+   * event, which already carries `connectionId`. Cross-organization safety
+   * comes from the token's connection scope at the API boundary, never from
+   * this stamp. See specs/identity/scim-connection-sync.feature.
    */
   private static readonly ACTOR = {
     type: "system",

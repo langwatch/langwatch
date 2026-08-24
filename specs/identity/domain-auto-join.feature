@@ -19,6 +19,15 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
   # surprising approval on the audit page, and turning the setting off does
   # not leave a class of membership nobody can account for.
   #
+  # What resolved it is its OWN principal, not the one single sign-on
+  # auto-join already uses. The two look alike and are not: single sign-on
+  # auto-join admits somebody because an identity provider the organization
+  # configured asserted them, and domain auto-join admits them because their
+  # address ends in the right string and an administrator once said that was
+  # enough. Different evidence, different trust, different thing to argue
+  # with when a customer reads their audit page and asks how this person got
+  # in. Stamping both with one name would make that question unanswerable.
+  #
   # Three settings, one per organization: joining OFF, joining BY REQUEST
   # (the default for self-serve organizations), joining AUTOMATIC. Automatic
   # is never a default and never inferred - an administrator turns it on and
