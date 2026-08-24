@@ -1,16 +1,16 @@
 import { createLogger } from "@langwatch/observability";
+import {
+  type Suite,
+  SuiteExecutionError,
+  SuiteNotFoundError,
+  suiteTargetSchema,
+} from "@langwatch/suite-contract";
 import { describeRoute, resolver } from "hono-openapi";
-import { z } from "zod";
+import { z } from "zod/v4";
 import { badRequestSchema } from "~/app/api/shared/schemas";
-import type { SimulationSuite } from "~/generated/prisma/client";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import { getApp } from "~/server/app-layer/app";
-import { prisma } from "~/server/db";
-import { ProjectRepository } from "~/server/projects/project.repository";
-import { runParameterValuesSchema } from "~/server/scenarios/parameters";
-import { SuiteDomainError } from "~/server/suites/errors";
-import { SuiteService } from "~/server/suites/suite.service";
+import { runParameterValuesSchema } from "@langwatch/scenario-contract";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
@@ -18,11 +18,6 @@ import { platformUrl } from "../../shared/platform-url";
 patchZodOpenapi();
 
 const logger = createLogger("langwatch:api:suites");
-
-const suiteTargetSchema = z.object({
-  type: z.enum(["prompt", "http", "code", "workflow"]),
-  referenceId: z.string(),
-});
 
 const suiteResponseSchema = z.object({
   id: z.string(),
@@ -87,32 +82,19 @@ const suiteRunResultSchema = z.object({
   ),
 });
 
-function toSuiteResponse(suite: SimulationSuite) {
-  const targets = Array.isArray(suite.targets)
-    ? suite.targets
-    : typeof suite.targets === "string"
-      ? JSON.parse(suite.targets)
-      : [];
-
+function toSuiteResponse(suite: Suite) {
   return {
     id: suite.id,
     name: suite.name,
     slug: suite.slug,
     description: suite.description,
     scenarioIds: suite.scenarioIds,
-    targets,
+    targets: suite.targets,
     repeatCount: suite.repeatCount,
     labels: suite.labels,
     createdAt: suite.createdAt.toISOString(),
     updatedAt: suite.updatedAt.toISOString(),
   };
-}
-
-function createService() {
-  return SuiteService.create({
-    prisma,
-    suiteRunService: getApp().suiteRuns.runs,
-  });
 }
 
 const secured = createProjectApp({ basePath: "/api/suites" });
@@ -138,8 +120,7 @@ secured.access(requires("scenarios:view")).get(
     const project = c.get("project");
     logger.info({ projectId: project.id }, "Listing suites");
 
-    const service = createService();
-    const suites = await service.getAll({ projectId: project.id });
+    const suites = await c.app.suites.list({ projectId: project.id });
 
     return c.json(
       suites.map((s) => ({
@@ -181,10 +162,11 @@ secured.access(requires("scenarios:view")).get(
     const { id } = c.req.param();
     logger.info({ projectId: project.id, suiteId: id }, "Getting suite");
 
-    const service = createService();
-    const suite = await service.getById({ id, projectId: project.id });
-
-    if (!suite) {
+    let suite: Suite;
+    try {
+      suite = await c.app.suites.get({ id, projectId: project.id });
+    } catch (error) {
+      if (!(error instanceof SuiteNotFoundError)) throw error;
       return c.json({ error: "Suite not found" }, 404);
     }
 
@@ -227,28 +209,20 @@ secured.access(requires("scenarios:create")).post(
     const body = c.req.valid("json");
     logger.info({ projectId: project.id }, "Creating suite");
 
-    const service = createService();
-    try {
-      const suite = await service.create({
-        ...body,
-        projectId: project.id,
-      });
-      return c.json(
-        {
-          ...toSuiteResponse(suite),
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: `/simulations/run-plans/${suite.slug}`,
-          }),
-        },
-        201,
-      );
-    } catch (error) {
-      if (error instanceof SuiteDomainError) {
-        return c.json({ error: error.message }, 400);
-      }
-      throw error;
-    }
+    const suite = await c.app.suites.create({
+      ...body,
+      projectId: project.id,
+    });
+    return c.json(
+      {
+        ...toSuiteResponse(suite),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/simulations/run-plans/${suite.slug}`,
+        }),
+      },
+      201,
+    );
   },
 );
 
@@ -283,26 +257,24 @@ secured.access(requires("scenarios:update")).patch(
     const body = c.req.valid("json");
     logger.info({ projectId: project.id, suiteId: id }, "Updating suite");
 
-    const service = createService();
+    let suite: Suite;
     try {
-      const suite = await service.update({
+      suite = await c.app.suites.update({
         id,
         projectId: project.id,
-        data: body,
-      });
-      return c.json({
-        ...toSuiteResponse(suite),
-        platformUrl: platformUrl({
-          projectSlug: project.slug,
-          path: `/simulations/run-plans/${suite.slug}`,
-        }),
+        ...body,
       });
     } catch (error) {
-      if (error instanceof SuiteDomainError) {
-        return c.json({ error: error.message }, 400);
-      }
-      throw error;
+      if (!(error instanceof SuiteNotFoundError)) throw error;
+      return c.json({ error: "Suite not found" }, 404);
     }
+    return c.json({
+      ...toSuiteResponse(suite),
+      platformUrl: platformUrl({
+        projectSlug: project.slug,
+        path: `/simulations/run-plans/${suite.slug}`,
+      }),
+    });
   },
 );
 
@@ -336,9 +308,8 @@ secured.access(requires("scenarios:create")).post(
     const { id } = c.req.param();
     logger.info({ projectId: project.id, suiteId: id }, "Duplicating suite");
 
-    const service = createService();
     try {
-      const suite = await service.duplicate({ id, projectId: project.id });
+      const suite = await c.app.suites.duplicate({ id, projectId: project.id });
       return c.json(
         {
           ...toSuiteResponse(suite),
@@ -350,7 +321,7 @@ secured.access(requires("scenarios:create")).post(
         201,
       );
     } catch (error) {
-      if (error instanceof SuiteDomainError) {
+      if (error instanceof SuiteNotFoundError) {
         return c.json({ error: error.message }, 404);
       }
       throw error;
@@ -397,18 +368,8 @@ secured.access(requires("scenarios:create")).post(
     const body = c.req.valid("json");
     logger.info({ projectId: project.id, suiteId: id }, "Running suite");
 
-    const service = createService();
-    const suite = await service.getById({ id, projectId: project.id });
-
-    if (!suite) {
-      return c.json({ error: "Suite not found" }, 404);
-    }
-
-    const projectRepository = new ProjectRepository(prisma);
-    const organizationId = await projectRepository.getOrganizationId({
-      projectId: project.id,
-    });
-    if (!organizationId) {
+    const projectWithTeam = await c.app.projects.tryGetWithTeam(project.id);
+    if (!projectWithTeam) {
       return c.json({ error: "Organization not found for project" }, 404);
     }
 
@@ -416,10 +377,10 @@ secured.access(requires("scenarios:create")).post(
       const idempotencyKey =
         body.idempotencyKey ??
         `api-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      const result = await service.run({
-        suite,
+      const result = await c.app.suites.run({
+        id,
         projectId: project.id,
-        organizationId,
+        organizationId: projectWithTeam.team.organizationId,
         idempotencyKey,
         parameters: body.parameters,
       });
@@ -429,7 +390,10 @@ secured.access(requires("scenarios:create")).post(
         ...result,
       });
     } catch (error) {
-      if (error instanceof SuiteDomainError) {
+      if (error instanceof SuiteNotFoundError) {
+        return c.json({ error: error.message }, 404);
+      }
+      if (error instanceof SuiteExecutionError) {
         return c.json({ error: error.message }, 400);
       }
       throw error;
@@ -469,10 +433,10 @@ secured.access(requires("scenarios:manage")).delete(
     const { id } = c.req.param();
     logger.info({ projectId: project.id, suiteId: id }, "Archiving suite");
 
-    const service = createService();
-    const result = await service.archive({ id, projectId: project.id });
-
-    if (!result) {
+    try {
+      await c.app.suites.archive({ id, projectId: project.id });
+    } catch (error) {
+      if (!(error instanceof SuiteNotFoundError)) throw error;
       return c.json({ error: "Suite not found" }, 404);
     }
 

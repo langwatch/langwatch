@@ -2,4 +2,4 @@
 
 | ADR | Decision | Status |
 | --- | --- | --- |
-| [001](./001-suite-definition-service-boundary.md) | One canonical service owns suite definitions; execution remains a follow-up dependency extraction | Accepted |
+| [001](./001-suite-service-boundary.md) | One canonical service owns definitions, reference resolution, and run planning | Accepted |

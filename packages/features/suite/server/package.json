@@ -10,7 +10,10 @@
   "files": ["src"],
   "scripts": { "typecheck": "tsc --noEmit", "test": "vitest run", "test:unit": "vitest run" },
   "dependencies": {
+    "@langwatch/agent-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/suite-contract": "workspace:*"
   },
   "devDependencies": { "typescript": "^7.0.2", "vitest": "^4.1.9" }

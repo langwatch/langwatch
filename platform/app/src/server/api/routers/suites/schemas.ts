@@ -1,9 +1,8 @@
-import { z } from "zod";
-import { suiteTargetSchema } from "~/server/suites/types";
+import { z } from "zod/v4";
+import { suiteTargetSchema } from "@langwatch/suite-contract";
 
-export type { SuiteTarget } from "~/server/suites/types";
-// Re-export domain types so existing API-layer consumers don't break
-export { parseSuiteTargets, suiteTargetSchema } from "~/server/suites/types";
+export type { SuiteTarget } from "@langwatch/suite-contract";
+export { suiteTargetSchema } from "@langwatch/suite-contract";
 
 /**
  * Shared schemas for suite routers.

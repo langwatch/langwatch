@@ -309,7 +309,8 @@ describe("Feature: Suites REST API", () => {
         targets: [{ type: "http", referenceId: "agent_abc" }],
       });
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(409);
+      expect((await res.json()).error).toBe("suite_name_taken");
     });
   });
 

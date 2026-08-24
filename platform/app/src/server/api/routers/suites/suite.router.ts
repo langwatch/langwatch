@@ -5,14 +5,10 @@
  */
 
 import { TRPCError } from "@trpc/server";
-import { z } from "zod";
-import type { PrismaClient } from "~/generated/prisma/client";
+import { z } from "zod/v4";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
-import { ProjectRepository } from "~/server/projects/project.repository";
-import { runParameterValuesSchema } from "~/server/scenarios/parameters";
+import { runParameterValuesSchema } from "@langwatch/scenario-contract";
 import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
-import { SuiteService } from "~/server/suites/suite.service";
 import { extractSuiteId } from "~/server/suites/suite-set-id";
 import {
   createSuiteSchema,
@@ -21,83 +17,47 @@ import {
   updateSuiteSchema,
 } from "./schemas";
 
-function createSuiteService(prisma: PrismaClient) {
-  return SuiteService.create({
-    prisma,
-    suiteRunService: getApp().suiteRuns.runs,
-  });
-}
-
 export const suiteRouter = createTRPCRouter({
   create: protectedProcedure
     .input(createSuiteSchema)
     .permission("scenarios:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = createSuiteService(ctx.prisma);
-      return service.create(input);
+      return ctx.app.suites.create(input);
     }),
 
   getAll: protectedProcedure
     .input(projectSchema)
     .permission("scenarios:view")
     .query(async ({ ctx, input }) => {
-      const service = createSuiteService(ctx.prisma);
-      return service.getAll(input);
+      return ctx.app.suites.list(input);
     }),
 
   getById: protectedProcedure
     .input(projectSchema.extend({ id: z.string() }))
     .permission("scenarios:view")
     .query(async ({ ctx, input }) => {
-      const service = createSuiteService(ctx.prisma);
-      const suite = await service.getById(input);
-      if (!suite) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Suite not found",
-        });
-      }
-      return suite;
+      return ctx.app.suites.get(input);
     }),
 
   update: protectedProcedure
     .input(updateSuiteSchema)
     .permission("scenarios:manage")
     .mutation(async ({ ctx, input }) => {
-      const { id, projectId, ...data } = input;
-      const service = createSuiteService(ctx.prisma);
-      return service.update({ id, projectId, data });
+      return ctx.app.suites.update(input);
     }),
 
   duplicate: protectedProcedure
     .input(projectSchema.extend({ id: z.string() }))
     .permission("scenarios:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = createSuiteService(ctx.prisma);
-      // Validate source suite exists before checking limits — avoids masking NOT_FOUND with a limit error
-      const source = await service.getById(input);
-      if (!source) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Suite not found" });
-      }
-      // A SuiteDomainError is a HandledError — left to propagate so the tRPC
-      // handled-error middleware maps its code and status, instead of
-      // flattening every suite failure into one NOT_FOUND with prose.
-      return await service.duplicate(input);
+      return ctx.app.suites.duplicate(input);
     }),
 
   archive: protectedProcedure
     .input(projectSchema.extend({ id: z.string() }))
     .permission("scenarios:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = createSuiteService(ctx.prisma);
-      const result = await service.archive(input);
-      if (!result) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Suite not found",
-        });
-      }
-      return result;
+      return ctx.app.suites.archive(input);
     }),
 
   resolveArchivedNames: protectedProcedure
@@ -110,20 +70,16 @@ export const suiteRouter = createTRPCRouter({
     )
     .permission("scenarios:view")
     .query(async ({ ctx, input }) => {
-      const projectRepository = new ProjectRepository(ctx.prisma);
-      const organizationId = await projectRepository.getOrganizationId({
-        projectId: input.projectId,
-      });
-      if (!organizationId) {
+      const project = await ctx.app.projects.tryGetWithTeam(input.projectId);
+      if (!project) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Organization not found for project",
         });
       }
-      const service = createSuiteService(ctx.prisma);
-      return service.resolveArchivedNames({
+      return ctx.app.suites.resolveArchivedNames({
         ...input,
-        organizationId,
+        organizationId: project.team.organizationId,
       });
     }),
 
@@ -143,35 +99,23 @@ export const suiteRouter = createTRPCRouter({
     )
     .permission("scenarios:manage")
     .mutation(async ({ ctx, input }) => {
-      const service = createSuiteService(ctx.prisma);
-      const suite = await service.getById(input);
-      if (!suite) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Suite not found",
-        });
-      }
-
-      const projectRepository = new ProjectRepository(ctx.prisma);
-      const organizationId = await projectRepository.getOrganizationId({
-        projectId: input.projectId,
-      });
-      if (!organizationId) {
+      const project = await ctx.app.projects.tryGetWithTeam(input.projectId);
+      if (!project) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Organization not found for project",
         });
       }
 
-      // No catch: a SuiteDomainError is a HandledError, so the tRPC
+      // No catch: a Suite execution error is a HandledError, so the tRPC
       // handled-error middleware maps its code and status. Wrapping it in an
       // INTERNAL_SERVER_ERROR here would drop the `cause` the middleware keys
       // off, turning "every scenario is archived" — a customer-fault 422 the
       // UI has a specific recovery action for — into an opaque 500.
-      const result = await service.run({
-        suite,
+      const result = await ctx.app.suites.run({
+        id: input.id,
         projectId: input.projectId,
-        organizationId,
+        organizationId: project.team.organizationId,
         idempotencyKey: input.idempotencyKey,
         batchRunId: input.batchRunId,
         parameters: input.parameters,
@@ -191,13 +135,12 @@ export const suiteRouter = createTRPCRouter({
       }),
     )
     .permission("scenarios:view")
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
       const startDate = input.startDate ?? Date.now() - THIRTY_DAYS_MS;
       const endDate = input.endDate ?? Date.now();
 
-      const simulationRuns = getApp().simulations.runs;
-      const summaries = await simulationRuns.getInternalSuiteSummaries({
+      const summaries = await ctx.app.simulations.getInternalSuiteSummaries({
         projectId: input.projectId,
         startDate,
         endDate,

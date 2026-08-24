@@ -10,7 +10,7 @@
 import { Button, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Crosshair, FileText, Lock, Repeat } from "lucide-react";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
-import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
+import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import { Dialog } from "../ui/dialog";
 
 /** What a secret parameter with no value yet says under its field. */

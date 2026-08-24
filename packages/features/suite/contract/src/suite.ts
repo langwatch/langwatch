@@ -46,3 +46,43 @@ export const suiteSchema = z.object({
   updatedAt: z.date(),
 }).strict();
 export type Suite = z.infer<typeof suiteSchema>;
+
+export const suiteRunParametersSchema = z.record(
+  z.string().min(1),
+  z.union([z.string(), z.number(), z.boolean()]),
+);
+export type SuiteRunParameters = z.infer<typeof suiteRunParametersSchema>;
+
+export const suiteRunInputSchema = z.object({
+  id: z.string().min(1),
+  projectId: z.string().min(1),
+  organizationId: z.string().min(1),
+  idempotencyKey: z.string().min(1),
+  batchRunId: z.string().min(1).optional(),
+  parameters: suiteRunParametersSchema.optional(),
+}).strict();
+export type SuiteRunInput = z.infer<typeof suiteRunInputSchema>;
+
+export const suiteArchivedNamesInputSchema = z.object({
+  projectId: z.string().min(1),
+  organizationId: z.string().min(1),
+  scenarioIds: z.array(z.string().min(1)),
+  targets: z.array(suiteTargetSchema),
+}).strict();
+export type SuiteArchivedNamesInput = z.infer<typeof suiteArchivedNamesInputSchema>;
+
+export type SuiteRunResult = {
+  batchRunId: string;
+  setId: string;
+  jobCount: number;
+  skippedArchived: {
+    scenarios: string[];
+    targets: string[];
+  };
+  items: Array<{
+    scenarioRunId: string;
+    scenarioId: string;
+    target: SuiteTarget;
+    name: string | undefined;
+  }>;
+};

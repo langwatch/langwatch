@@ -15,7 +15,7 @@ import {
   parseScenarioParameterDefinitions,
   type RunParameterValues,
   type ScenarioParameterDefinition,
-} from "~/server/scenarios/parameters";
+} from "@langwatch/scenario-contract";
 import { parseSuiteTargets } from "~/server/suites/types";
 import { api } from "~/utils/api";
 import { KSUID_RESOURCES } from "~/utils/constants";
