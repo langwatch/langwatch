@@ -107,14 +107,18 @@ export function lintManifests(
       }
     }
 
-    if (pkg.kind === "contract") {
+    if (pkg.feature) {
       const zodVersion = manifestDependencies(pkg.manifest).zod;
-      if (!isZod4Range(zodVersion)) {
+      const requiresZod = pkg.kind === "contract";
+      if (
+        (requiresZod || zodVersion !== undefined) &&
+        !isZod4Range(zodVersion)
+      ) {
         violations.push({
           policy: "schema-runtime",
           file: pkg.manifestPath,
           specifier: "zod",
-          message: `Feature contracts must use Zod 4; found ${JSON.stringify(zodVersion)}.`,
+          message: `Governed feature packages must use Zod 4; found ${JSON.stringify(zodVersion)}.`,
           allowed: 'Declare "zod": "^4.4.3" and import schemas from "zod".',
         });
       }
@@ -193,10 +197,7 @@ export function lintManifests(
               : `Depend only on portable contracts and Enterprise ${pkg.enterpriseCompositionRole} or server installers.`,
         });
       }
-      if (
-        pkg.kind === "enterprise-root" &&
-        target.kind !== "contract"
-      ) {
+      if (pkg.kind === "enterprise-root" && target.kind !== "contract") {
         violations.push({
           policy: "enterprise-composition",
           file: pkg.manifestPath,

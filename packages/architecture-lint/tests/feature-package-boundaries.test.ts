@@ -209,6 +209,37 @@ describe("feature package boundary lint", () => {
     expect(policies()).toContain("schema-runtime");
   });
 
+  it("rejects Zod 3 in any governed feature manifest", () => {
+    featurePackage({
+      feature: "agents",
+      role: "server",
+      dependencies: { zod: "^3.25.76" },
+    });
+
+    expect(policies()).toContain("schema-runtime");
+  });
+
+  it.each(["zod/v3", "@hono/zod-validator", "hono-openapi/zod"])(
+    "rejects the feature source schema adapter %s",
+    (specifier) => {
+      featurePackage({
+        feature: "agents",
+        role: "contract",
+        source: `import { z } from ${JSON.stringify(specifier)}; export const schema = z.string();`,
+      });
+
+      const violations = lintWorkspace({ root, declarations: false });
+      expect(violations).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            policy: "schema-runtime",
+            specifier,
+          }),
+        ]),
+      );
+    },
+  );
+
   /** @scenario Every feature package owns a complete architecture record */
   it("rejects an incomplete feature boundary ADR", () => {
     featurePackage({ feature: "agents", role: "contract" });

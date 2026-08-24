@@ -1,4 +1,6 @@
+import { readFileSync } from "node:fs";
 import { relative, sep } from "node:path";
+import ts from "typescript";
 import { walkFiles } from "./files";
 import type { ArchitectureViolation, ClassifiedPackage } from "./types";
 
@@ -10,6 +12,11 @@ const SERVER_ONLY_CONTRACT_ARTIFACT =
   /\.(?:adapter|api|mapper|migration|port|projection|repository|store)\.ts$/;
 const CONTRACT_ARTIFACT_SUFFIX =
   /\.(?:commands|errors|events|queries|service)\.ts$/;
+const FORBIDDEN_SCHEMA_IMPORTS = new Set([
+  "zod/v3",
+  "@hono/zod-validator",
+  "hono-openapi/zod",
+]);
 
 const SERVER_PATTERNS = [
   /^index\.ts$/,
@@ -39,6 +46,32 @@ function violation(
   allowed: string,
 ): ArchitectureViolation {
   return { policy: "feature-source-layout", file, message, allowed };
+}
+
+function lintSchemaImports(pkg: ClassifiedPackage): ArchitectureViolation[] {
+  const violations: ArchitectureViolation[] = [];
+  const files = walkFiles(`${pkg.root}/src`, (path) =>
+    /\.[cm]?[jt]sx?$/.test(path),
+  );
+
+  for (const file of files) {
+    const source = readFileSync(file, "utf8");
+    for (const imported of ts.preProcessFile(source, true, true)
+      .importedFiles) {
+      if (!FORBIDDEN_SCHEMA_IMPORTS.has(imported.fileName)) continue;
+      const line = source.slice(0, imported.pos).split("\n").length;
+      violations.push({
+        policy: "schema-runtime",
+        file,
+        line,
+        specifier: imported.fileName,
+        message: `Governed feature source cannot import ${JSON.stringify(imported.fileName)}.`,
+        allowed:
+          'Declare "zod": "^4.4.3", import schemas from "zod", and pass them to transports through Standard Schema.',
+      });
+    }
+  }
+  return violations;
 }
 
 function lintContract(pkg: ClassifiedPackage): ArchitectureViolation[] {
@@ -140,6 +173,7 @@ export function lintFeatureLayouts(
   const violations: ArchitectureViolation[] = [];
   for (const pkg of packages) {
     if (pkg.layoutVersion !== 0) continue;
+    violations.push(...lintSchemaImports(pkg));
     if (pkg.kind === "contract") violations.push(...lintContract(pkg));
     if (pkg.kind === "server") violations.push(...lintServer(pkg));
   }
