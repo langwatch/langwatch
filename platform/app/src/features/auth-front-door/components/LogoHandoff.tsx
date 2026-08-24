@@ -11,8 +11,8 @@ import { beginEntrance, endEntrance } from "../logic/entrance";
  * It is the same mark, at the same size, in the same place it was already
  * being shown (`LoadingScreen` centres `FullLogo` at 155x38 scaled 1.2), so
  * the two screens read as one element moving rather than two elements
- * swapping. It lands on the card's own logo slot and cross-fades into it over
- * the last stretch, because the card's mark is the icon alone.
+ * swapping. It lands on the card's own logo slot — the same wordmark, smaller
+ * — and the closing cross-fade hands over to the card's own copy of it.
  *
  * FLIP, with three rules:
  *

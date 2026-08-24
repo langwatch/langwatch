@@ -1,20 +1,19 @@
-import {
-  Box,
-  Card,
-  Container,
-  Heading,
-  HStack,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Card, Container, Heading, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
-import { LogoIcon } from "../icons/LogoIcon";
+import "~/features/auth-front-door/authFrontDoor.css";
+import { FullLogo } from "../icons/FullLogo";
 
 /**
- * The card every unauthenticated screen is: logo, one heading, one column of
- * content. The same component on every installation and at every step, so a
- * person moving between them sees one surface rather than a series of pages
- * that happen to look alike.
+ * The card every unauthenticated screen is: the mark, one heading, one column
+ * of content, all centred. The same component on every installation and at
+ * every step, so a person moving between them sees one surface rather than a
+ * series of pages that happen to look alike.
+ *
+ * The shape is the design board's, value for value: a 14 pixel surface about
+ * 400 pixels wide, standing on a soft shadow, with the wordmark centred over a
+ * plain semibold heading. The serif display voice belongs to the value panel
+ * beside the card, never to the card itself.
  *
  * Responsive shape:
  *
@@ -24,10 +23,6 @@ import { LogoIcon } from "../icons/LogoIcon";
  *   - on anything larger it is a single centered card in a narrow column,
  *     because a log-in form is a short list of short fields and stretching it
  *     across a desktop makes each row a journey.
- *
- * Colors, borders and shadows come from the app's own tokens: this is the
- * product's front door, not a separate visual identity, so it follows the
- * theme (including its light and dark behavior) rather than pinning its own.
  */
 export function AuthCard({
   title,
@@ -38,45 +33,45 @@ export function AuthCard({
 }) {
   return (
     <Container
-      maxW={{ base: "100%", sm: "440px" }}
+      maxW={{ base: "100%", sm: "400px" }}
       paddingX={{ base: 0, sm: 2 }}
       // High enough on the page to be the first thing seen, low enough that a
       // phone keyboard opening under it does not push the fields off screen.
       marginY={{ base: 6, md: "8vh" }}
     >
       <Card.Root
+        className="lw-front-door-card"
         width="full"
         borderWidth={{ base: 0, sm: "1px" }}
         borderRadius={{ base: 0, sm: "14px" }}
-        boxShadow={{ base: "none", sm: "sm" }}
+        backgroundColor="bg.panel"
       >
-        <Card.Header paddingBottom={2}>
-          <HStack gap={4}>
+        <Card.Header paddingTop="28px" paddingX="26px" paddingBottom={0}>
+          <VStack gap="14px">
             {/* Named so the front door's entrance can measure it and land the
-                mark it inherited from the loading screen here. Nothing else
-                reads it, and nothing about the card changes for it. */}
-            <Box data-auth-card-logo display="flex" alignItems="center">
-              <LogoIcon width={30.69} height={42} />
+                mark it inherited from the loading screen here. The card's mark
+                is the same wordmark the loading screen shows, so the flight
+                ends on the very glyphs it started as. */}
+            <Box data-auth-card-logo display="flex" justifyContent="center">
+              <FullLogo width={112} height={27.5} />
             </Box>
             <Heading
-              size="lg"
+              size="md"
               as="h1"
-              // The site sets its headings in Sentient. The file is not in
-              // this repository yet, so this lands on a real serif stack in
-              // the same weight and tracking rather than on the body font.
-              fontFamily='"Sentient", ui-serif, Georgia, "Times New Roman", serif'
-              fontWeight={400}
-              letterSpacing="-0.03em"
+              fontWeight={600}
+              letterSpacing="-0.015em"
+              textAlign="center"
+              css={{ textWrap: "balance" }}
             >
               {title}
             </Heading>
-          </HStack>
+          </VStack>
         </Card.Header>
-        <Card.Body>
+        <Card.Body paddingX="26px" paddingTop="16px" paddingBottom="28px">
           {/* Named for the same reason: the rows rise in behind the mark, and
               the stagger is applied from the stylesheet rather than by giving
               every screen an animation prop to pass down. */}
-          <VStack width="full" align="stretch" gap={4} data-auth-card-body>
+          <VStack width="full" align="stretch" gap="13px" data-auth-card-body>
             {children}
           </VStack>
         </Card.Body>

@@ -4,6 +4,7 @@ import {
   HStack,
   IconButton,
   Input,
+  Text,
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,7 +12,6 @@ import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { HorizontalFormControl } from "~/components/HorizontalFormControl";
 import {
   applyHandledErrorToForm,
   FormServerError,
@@ -24,6 +24,7 @@ import { credentialSignInFailure } from "../logic/credentialSignIn";
 import { rememberLastUsedMethod } from "../logic/lastUsedMethod";
 import "../authFrontDoor.css";
 import { BRAND, SHAPE } from "../logic/brand";
+import { FIELD_FOCUS, FrontDoorField } from "./FrontDoorField";
 
 /**
  * The strength rule the server enforces, said in the words the field shows.
@@ -134,7 +135,7 @@ export function SignUpCredentialForm({
   return (
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
-      <VStack width="full" align="stretch" gap={3}>
+      <VStack width="full" align="stretch" gap="13px">
         <input
           type="hidden"
           name="email"
@@ -142,66 +143,68 @@ export function SignUpCredentialForm({
           autoComplete="username"
           readOnly
         />
-        <HorizontalFormControl
-          direction="vertical"
-          size="sm"
-          label="Name"
-          helper="Enter your name"
-          invalid={form.formState.errors.name?.message !== undefined}
-          error={form.formState.errors.name}
-        >
-          <Input
-            autoComplete="name"
-            borderRadius={SHAPE.field}
-            fontSize={{ base: "16px", md: "sm" }}
-            minHeight="44px"
-            {...form.register("name")}
-          />
-        </HorizontalFormControl>
-        <HorizontalFormControl
-          direction="vertical"
-          size="sm"
+        <FrontDoorField label="Name" error={form.formState.errors.name}>
+          {(id) => (
+            <Input
+              id={id}
+              autoComplete="name"
+              borderRadius={SHAPE.field}
+              fontSize={{ base: "16px", md: "14px" }}
+              minHeight="44px"
+              _focusVisible={FIELD_FOCUS}
+              {...form.register("name")}
+            />
+          )}
+        </FrontDoorField>
+        <FrontDoorField
           label="Password"
-          helper={`At least ${MINIMUM_PASSWORD_LENGTH} characters`}
-          invalid={form.formState.errors.password?.message !== undefined}
+          labelEnd={
+            <Text fontSize="12px" color="fg.muted">
+              At least {MINIMUM_PASSWORD_LENGTH} characters
+            </Text>
+          }
           error={form.formState.errors.password}
         >
-          <HStack width="full" gap={2}>
+          {(id) => (
+            <HStack width="full" gap={2}>
+              <Input
+                id={id}
+                type={isRevealed ? "text" : "password"}
+                fontSize={{ base: "16px", md: "14px" }}
+                minHeight="44px"
+                borderRadius={SHAPE.field}
+                autoComplete="new-password"
+                _focusVisible={FIELD_FOCUS}
+                {...form.register("password")}
+              />
+              <IconButton
+                variant="ghost"
+                size="sm"
+                aria-label={isRevealed ? "Hide password" : "Show password"}
+                onClick={() => setIsRevealed((revealed) => !revealed)}
+              >
+                {isRevealed ? <EyeOff size={16} /> : <Eye size={16} />}
+              </IconButton>
+            </HStack>
+          )}
+        </FrontDoorField>
+        <FrontDoorField
+          label="Confirm password"
+          error={form.formState.errors.confirmPassword}
+        >
+          {(id) => (
             <Input
-              type={isRevealed ? "text" : "password"}
-              fontSize={{ base: "16px", md: "sm" }}
+              id={id}
+              type="password"
+              fontSize={{ base: "16px", md: "14px" }}
               minHeight="44px"
               borderRadius={SHAPE.field}
               autoComplete="new-password"
-              {...form.register("password")}
+              _focusVisible={FIELD_FOCUS}
+              {...form.register("confirmPassword")}
             />
-            <IconButton
-              variant="ghost"
-              size="sm"
-              aria-label={isRevealed ? "Hide password" : "Show password"}
-              onClick={() => setIsRevealed((revealed) => !revealed)}
-            >
-              {isRevealed ? <EyeOff size={16} /> : <Eye size={16} />}
-            </IconButton>
-          </HStack>
-        </HorizontalFormControl>
-        <HorizontalFormControl
-          direction="vertical"
-          size="sm"
-          label="Confirm password"
-          helper="Type your password again"
-          invalid={form.formState.errors.confirmPassword?.message !== undefined}
-          error={form.formState.errors.confirmPassword}
-        >
-          <Input
-            type="password"
-            fontSize={{ base: "16px", md: "sm" }}
-            minHeight="44px"
-            borderRadius={SHAPE.field}
-            autoComplete="new-password"
-            {...form.register("confirmPassword")}
-          />
-        </HorizontalFormControl>
+          )}
+        </FrontDoorField>
         <FormServerError form={form} />
         {submitError ? (
           <Alert.Root
@@ -226,6 +229,7 @@ export function SignUpCredentialForm({
           width="full"
           minHeight="44px"
           marginTop={2}
+          fontWeight={600}
           borderRadius={SHAPE.action}
           backgroundColor={BRAND.action}
           color={BRAND.onAction}

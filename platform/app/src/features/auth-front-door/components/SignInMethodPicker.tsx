@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { signInMethodActionLabel } from "../logic/methodLabels";
 import { signInRoutingReasonCopy } from "../logic/routingReasonCopy";
 import "../authFrontDoor.css";
-import { BRAND, SHAPE } from "../logic/brand";
+import { BRAND, MONO_FONT, SHAPE } from "../logic/brand";
 import { SignInMethodIcon } from "./SignInMethodIcon";
 
 /**
@@ -89,18 +89,25 @@ export function FederatedMethodButton({
 }) {
   return (
     <Button
-      className="lw-front-door-primary"
       variant="outline"
       width="full"
       minHeight="44px"
+      position="relative"
+      fontWeight={600}
       borderRadius={SHAPE.action}
-      justifyContent="flex-start"
-      gap={3}
+      justifyContent="center"
+      gap="9px"
+      overflow="visible"
+      _hover={{ backgroundColor: "bg.subtle", borderColor: "fg.subtle" }}
       onClick={() => onChosen(method)}
     >
       <SignInMethodIcon method={method} />
       <Text>{signInMethodActionLabel(method)}</Text>
-      {isLastUsed ? <LastUsedBadge /> : null}
+      {isLastUsed ? (
+        <span className="lw-front-door-badge-float">
+          <LastUsedBadge />
+        </span>
+      ) : null}
     </Button>
   );
 }
@@ -108,9 +115,10 @@ export function FederatedMethodButton({
 export function LastUsedBadge() {
   return (
     <Badge
-      marginStart="auto"
       borderRadius="full"
-      paddingX={2}
+      paddingX="9px"
+      fontSize="10px"
+      fontWeight={500}
       backgroundColor={BRAND.tint}
       color={BRAND.ink}
       data-testid="last-used-method"
@@ -120,12 +128,19 @@ export function LastUsedBadge() {
   );
 }
 
-/** A thin "or" between the address step and the methods beside it. */
+/** A thin "or" between the address step and the methods beside it, said the
+ *  way the site says its small technical words: mono, spaced, quiet. */
 export function MethodDivider() {
   return (
-    <HStack width="full" gap={3} paddingY={1}>
+    <HStack width="full" gap="10px" paddingY={1}>
       <Divider />
-      <Text fontSize="13px" color="gray.500">
+      <Text
+        fontFamily={MONO_FONT}
+        fontSize="10px"
+        textTransform="uppercase"
+        letterSpacing="0.16em"
+        color="fg.muted"
+      >
         or
       </Text>
       <Divider />

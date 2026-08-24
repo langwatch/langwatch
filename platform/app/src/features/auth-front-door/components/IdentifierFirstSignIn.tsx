@@ -272,14 +272,26 @@ function SignUpLink({
   if (email) params.set("email", email);
   const query = params.toString();
 
+  // The question reads quiet and only the answer is the link, the way the
+  // board draws its footers. A label with no question is all link.
+  const splitAt = label.indexOf("? ");
+  const lead = splitAt === -1 ? "" : label.slice(0, splitAt + 2);
+  const linked = splitAt === -1 ? label : label.slice(splitAt + 2);
+
   return (
-    <Box asChild>
-      <Link
-        href={`/auth/signup${query ? `?${query}` : ""}`}
-        style={{ textDecoration: "underline" }}
+    <Text width="full" textAlign="center" fontSize="13px" color="fg.muted">
+      {lead}
+      <Box
+        asChild
+        color="fg"
+        fontWeight={600}
+        textDecoration="underline"
+        textUnderlineOffset="3px"
+        textDecorationColor="border"
+        _hover={{ textDecorationColor: "fg" }}
       >
-        {label}
-      </Link>
-    </Box>
+        <Link href={`/auth/signup${query ? `?${query}` : ""}`}>{linked}</Link>
+      </Box>
+    </Text>
   );
 }

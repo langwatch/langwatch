@@ -5,7 +5,6 @@ import {
   HStack,
   IconButton,
   Input,
-  Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -14,7 +13,6 @@ import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { HorizontalFormControl } from "~/components/HorizontalFormControl";
 import { api } from "~/utils/api";
 import Link from "~/utils/compat/next-link";
 import "../authFrontDoor.css";
@@ -24,6 +22,7 @@ import { attemptCredentialSignIn } from "../logic/attemptCredentialSignIn";
 import { BRAND, SHAPE } from "../logic/brand";
 import { describeRemainingWait } from "../logic/credentialSignIn";
 import { rememberLastUsedMethod } from "../logic/lastUsedMethod";
+import { FIELD_FOCUS, FrontDoorField } from "./FrontDoorField";
 
 const credentialSchema = z.object({
   password: z.string().min(1, { message: "Enter your password" }),
@@ -105,11 +104,35 @@ export function CredentialSignInForm({
   return (
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
-      <VStack width="full" align="stretch" gap={3}>
-        <HStack width="full">
-          <Text data-testid="routed-identifier">{email}</Text>
-          <Spacer />
-          <Button variant="plain" size="sm" onClick={onUseDifferentEmail}>
+      <VStack width="full" align="stretch" gap="13px">
+        {/* The address the password is for, held in a quiet pill the way the
+            board draws it: settled, not editable here, one link out. */}
+        <HStack
+          width="full"
+          justify="space-between"
+          backgroundColor="bg.subtle"
+          borderWidth="1px"
+          borderRadius="full"
+          paddingX="14px"
+          paddingY="7px"
+        >
+          <Text
+            fontSize="13px"
+            color="fg.muted"
+            truncate
+            data-testid="routed-identifier"
+          >
+            {email}
+          </Text>
+          <Button
+            variant="plain"
+            size="xs"
+            fontSize="12px"
+            textDecoration="underline"
+            textUnderlineOffset="2px"
+            flexShrink={0}
+            onClick={onUseDifferentEmail}
+          >
             Use a different email
           </Button>
         </HStack>
@@ -122,54 +145,51 @@ export function CredentialSignInForm({
           autoComplete="username"
           readOnly
         />
-        <HorizontalFormControl
-          direction="vertical"
-          size="sm"
-          label={
-            <HStack width="full" gap={3}>
-              <Text>Password</Text>
-              <Spacer />
-              <Box asChild>
-                <Link
-                  href="/auth/forgot-password"
-                  style={{ textDecoration: "underline", fontSize: "13px" }}
-                >
-                  Forgot password?
-                </Link>
-              </Box>
-            </HStack>
+        <FrontDoorField
+          label="Password"
+          labelEnd={
+            <Box asChild>
+              <Link
+                href="/auth/forgot-password"
+                style={{
+                  textDecoration: "underline",
+                  textUnderlineOffset: "2px",
+                  fontSize: "12px",
+                }}
+              >
+                Forgot password?
+              </Link>
+            </Box>
           }
-          helper="Enter your password"
-          invalid={form.formState.errors.password?.message !== undefined}
           error={form.formState.errors.password}
         >
-          <HStack width="full" gap={2}>
-            <Input
-              type={isRevealed ? "text" : "password"}
-              fontSize={{ base: "16px", md: "sm" }}
-              minHeight="44px"
-              borderRadius={SHAPE.field}
-              autoComplete="current-password"
-              _focusVisible={{
-                borderColor: BRAND.detail,
-                boxShadow: `0 0 0 1px ${BRAND.detail}`,
-              }}
-              {...form.register("password")}
-              ref={(node) => {
-                form.register("password").ref(node);
-                passwordField.current = node;
-              }}
-            />
-            <IconButton
-              variant="ghost"
-              size="sm"
-              aria-label={isRevealed ? "Hide password" : "Show password"}
-              onClick={() => setIsRevealed((revealed) => !revealed)}
-            >
-              {isRevealed ? <EyeOff size={16} /> : <Eye size={16} />}
-            </IconButton>
-          </HStack>
-        </HorizontalFormControl>
+          {(id) => (
+            <HStack width="full" gap={2}>
+              <Input
+                id={id}
+                type={isRevealed ? "text" : "password"}
+                fontSize={{ base: "16px", md: "14px" }}
+                minHeight="44px"
+                borderRadius={SHAPE.field}
+                autoComplete="current-password"
+                _focusVisible={FIELD_FOCUS}
+                {...form.register("password")}
+                ref={(node) => {
+                  form.register("password").ref(node);
+                  passwordField.current = node;
+                }}
+              />
+              <IconButton
+                variant="ghost"
+                size="sm"
+                aria-label={isRevealed ? "Hide password" : "Show password"}
+                onClick={() => setIsRevealed((revealed) => !revealed)}
+              >
+                {isRevealed ? <EyeOff size={16} /> : <Eye size={16} />}
+              </IconButton>
+            </HStack>
+          )}
+        </FrontDoorField>
         {submitError ? (
           <Alert.Root
             status="error"
@@ -197,6 +217,7 @@ export function CredentialSignInForm({
           type="submit"
           width="full"
           minHeight="44px"
+          fontWeight={600}
           borderRadius={SHAPE.action}
           backgroundColor={BRAND.action}
           color={BRAND.onAction}

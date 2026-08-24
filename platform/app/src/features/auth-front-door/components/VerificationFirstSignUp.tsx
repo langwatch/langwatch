@@ -380,11 +380,27 @@ function LogInLink({
   const href = `/auth/signin${
     callbackUrl ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ""
   }`;
+
+  // The question reads quiet and only the answer is the link, the way the
+  // board draws its footers. A label with no question is all link.
+  const splitAt = label.indexOf("? ");
+  const lead = splitAt === -1 ? "" : label.slice(0, splitAt + 2);
+  const linked = splitAt === -1 ? label : label.slice(splitAt + 2);
+
   return (
-    <Box asChild>
-      <Link href={href} style={{ textDecoration: "underline" }}>
-        {label}
-      </Link>
-    </Box>
+    <Text width="full" textAlign="center" fontSize="13px" color="fg.muted">
+      {lead}
+      <Box
+        asChild
+        color="fg"
+        fontWeight={600}
+        textDecoration="underline"
+        textUnderlineOffset="3px"
+        textDecorationColor="border"
+        _hover={{ textDecorationColor: "fg" }}
+      >
+        <Link href={href}>{linked}</Link>
+      </Box>
+    </Text>
   );
 }

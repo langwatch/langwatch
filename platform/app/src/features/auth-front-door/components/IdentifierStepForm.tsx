@@ -3,10 +3,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import type { ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { HorizontalFormControl } from "~/components/HorizontalFormControl";
 import "../authFrontDoor.css";
 import { useFocusWhenSettled } from "../hooks/useFocusWhenSettled";
 import { BRAND, SHAPE } from "../logic/brand";
+import { FIELD_FOCUS, FrontDoorField } from "./FrontDoorField";
 import { MethodDivider } from "./SignInMethodPicker";
 
 const identifierSchema = z.object({
@@ -59,44 +59,43 @@ export function IdentifierStepForm({
   });
 
   return (
-    <VStack width="full" align="stretch" gap={4}>
+    <VStack width="full" align="stretch" gap="13px">
       {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
-        <VStack width="full" align="stretch" gap={4}>
-          {intro ? <Text width="full">{intro}</Text> : null}
-          <HorizontalFormControl
-            direction="vertical"
-            size="sm"
-            label="Email"
-            helper="Enter your email"
-            invalid={form.formState.errors.email?.message !== undefined}
-            error={form.formState.errors.email}
-          >
-            <Input
-              type="email"
-              // 16px on a phone: anything smaller makes iOS zoom the page in
-              // when the field takes focus, and it never zooms back out.
-              fontSize={{ base: "16px", md: "sm" }}
-              minHeight="44px"
-              borderRadius={SHAPE.field}
-              autoComplete="username webauthn"
-              _focusVisible={{
-                borderColor: BRAND.detail,
-                boxShadow: `0 0 0 1px ${BRAND.detail}`,
-              }}
-              {...form.register("email")}
-              ref={(node) => {
-                form.register("email").ref(node);
-                addressField.current = node;
-              }}
-            />
-          </HorizontalFormControl>
-          <VStack width="full" align="stretch" gap={3} paddingTop={2}>
+        <VStack width="full" align="stretch" gap="13px">
+          {intro ? (
+            <Text width="full" fontSize="13px" color="fg.muted">
+              {intro}
+            </Text>
+          ) : null}
+          <FrontDoorField label="Email" error={form.formState.errors.email}>
+            {(id) => (
+              <Input
+                id={id}
+                type="email"
+                placeholder="you@company.com"
+                // 16px on a phone: anything smaller makes iOS zoom the page in
+                // when the field takes focus, and it never zooms back out.
+                fontSize={{ base: "16px", md: "14px" }}
+                minHeight="44px"
+                borderRadius={SHAPE.field}
+                autoComplete="username webauthn"
+                _focusVisible={FIELD_FOCUS}
+                {...form.register("email")}
+                ref={(node) => {
+                  form.register("email").ref(node);
+                  addressField.current = node;
+                }}
+              />
+            )}
+          </FrontDoorField>
+          <VStack width="full" align="stretch" gap="13px" paddingTop="2px">
             <Button
               className="lw-front-door-primary"
               type="submit"
               width="full"
               minHeight="44px"
+              fontWeight={600}
               borderRadius={SHAPE.action}
               backgroundColor={BRAND.action}
               color={BRAND.onAction}
