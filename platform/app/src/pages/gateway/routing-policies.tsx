@@ -228,13 +228,13 @@ function NoDefaultNotice({
   return (
     <Box
       borderWidth="1px"
-      borderColor="orange.300"
+      borderColor="orange.emphasized"
       borderRadius="md"
-      backgroundColor="orange.50"
+      backgroundColor="orange.subtle"
       padding={4}
     >
       <HStack alignItems="start" gap={3}>
-        <Box color="orange.600" paddingTop="2px">
+        <Box color="orange.fgMuted" paddingTop="2px">
           <Lightbulb size={18} />
         </Box>
         <VStack align="start" gap={1}>
@@ -258,7 +258,7 @@ function NoDefaultNotice({
             <Link
               href={docsUrl("/ai-gateway/governance/routing-policies")}
               isExternal
-              color="orange.700"
+              color="orange.fg"
               fontSize="xs"
               fontWeight="medium"
             >

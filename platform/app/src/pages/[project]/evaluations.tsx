@@ -139,7 +139,7 @@ export function ExperimentsPage() {
         </Box>
       ) : experiments.isError ? (
         <Box padding={6}>
-          <Text color="red.500">Error loading experiments</Text>
+          <Text color="red.solid">Error loading experiments</Text>
         </Box>
       ) : experiments.data?.experiments.length === 0 ? (
         <PageLayout.Container>
@@ -148,7 +148,6 @@ export function ExperimentsPage() {
               title="No experiments yet"
               description="Test prompts, models, and agents against a dataset before shipping changes."
               icon={<LuSquareCheckBig size={24} />}
-              color="green.500"
               docsInfo={
                 <Text>
                   To learn more about experiments, visit the{" "}
@@ -449,7 +448,7 @@ export function ExperimentsPage() {
                                       {hasPermission("workflows:delete") && (
                                         <Menu.Item
                                           value="delete"
-                                          color="red.500"
+                                          color="red.solid"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             handleDeleteExperiment(

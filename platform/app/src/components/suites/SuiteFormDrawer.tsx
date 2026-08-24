@@ -324,7 +324,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                   <Input
                     placeholder="e.g., Critical Path Run Plan"
                     {...form.register("name")}
-                    borderColor={errors.name ? "red.500" : undefined}
+                    borderColor={errors.name ? "red.emphasized" : undefined}
                   />
                   {errors.name && (
                     <Text fontSize="xs" color="red.fg">
@@ -485,7 +485,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                               valueAsNumber: true,
                             })}
                             borderColor={
-                              errors.repeatCount ? "red.500" : undefined
+                              errors.repeatCount ? "red.emphasized" : undefined
                             }
                           />
                           <Text fontSize="xs" color="fg.muted">

@@ -535,7 +535,9 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                             <Text
                               textStyle="xs"
                               fontFamily="mono"
-                              color={c.attempt > 0 ? "orange.500" : "fg.muted"}
+                              color={
+                                c.attempt > 0 ? "orange.solid" : "fg.muted"
+                              }
                             >
                               {c.attempt > 0 ? c.attempt : "—"}
                             </Text>
@@ -545,7 +547,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                               textStyle="xs"
                               color={
                                 c.state === "retrying"
-                                  ? "orange.500"
+                                  ? "orange.solid"
                                   : "fg.muted"
                               }
                             >
@@ -555,7 +557,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                           <Table.Cell>
                             <Text
                               textStyle="xs"
-                              color={overdue ? "orange.500" : "fg.muted"}
+                              color={overdue ? "orange.solid" : "fg.muted"}
                               fontWeight={overdue ? "medium" : undefined}
                             >
                               {formatTimeAgo(group.oldestJobMs)}
@@ -656,7 +658,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                                   </Menu.Item>
                                   <Menu.Item
                                     value="drain"
-                                    color="red.500"
+                                    color="red.solid"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setDrainTarget({

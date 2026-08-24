@@ -625,10 +625,15 @@ describe("the product sidebar", () => {
       const cap = screen
         .getByRole("button", { name: "Quick Search" })
         .querySelector("kbd");
-      // The hairline border is pinned on the shared chip style itself,
-      // which jsdom can read where a CSS variable it cannot resolve is
-      // out of reach: quietChipStyle.unit.test.ts.
-      expect(cap).toHaveStyle({ color: "var(--chakra-colors-gray-400)" });
+      // This renders against Chakra's defaultSystem, which emits a variable
+      // only for the tokens it defines itself. The grey is the app's own
+      // `fg.faint` now rather than the built-in `gray.400`, so there is no
+      // longer a variable here to read it back from — the grey is pinned on
+      // the constant instead, in shell/__tests__/quietChipStyle.unit.test.ts.
+      // The border width is a plain CSS length rather than a token, so it
+      // survives that and still shows the cap wearing the shared chip style
+      // rather than a bespoke one.
+      expect(cap).toHaveStyle({ borderWidth: "1px" });
     });
   });
 });

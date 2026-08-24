@@ -289,7 +289,7 @@ export function CustomDashboardsSection({
                     {dashboards.length > 1 && (
                       <Menu.Item
                         value="delete"
-                        color="red.600"
+                        color="red.fgMuted"
                         onClick={(e: React.MouseEvent) =>
                           handleDeleteDashboard(e, dashboard.id)
                         }

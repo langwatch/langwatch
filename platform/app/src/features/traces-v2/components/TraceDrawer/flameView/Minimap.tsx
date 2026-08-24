@@ -341,6 +341,7 @@ function HandleGrip() {
           width="2px"
           height="2px"
           borderRadius="full"
+          // Grip dots ride the blue.solid handle — white in both modes.
           bg="white"
           opacity={0.85}
         />

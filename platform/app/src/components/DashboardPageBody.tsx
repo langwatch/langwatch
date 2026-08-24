@@ -167,7 +167,7 @@ export const DashboardPageBody = ({
             status="warning"
             width="full"
             borderBottom="1px solid"
-            borderBottomColor="yellow.300"
+            borderBottomColor="yellow.emphasized"
             borderTopLeftRadius="2xl"
           >
             <Alert.Indicator />
@@ -197,8 +197,8 @@ export const DashboardPageBody = ({
             borderBottom="1px solid"
             borderBottomColor={
               usage.data.messageLimitInfo.status === "exceeded"
-                ? "red.300"
-                : "yellow.300"
+                ? "red.emphasized"
+                : "yellow.emphasized"
             }
           >
             <Alert.Indicator />
@@ -234,7 +234,7 @@ export const DashboardPageBody = ({
             status="warning"
             width="full"
             borderBottom="1px solid"
-            borderBottomColor="yellow.300"
+            borderBottomColor="yellow.emphasized"
           >
             <Alert.Indicator />
             <Alert.Content>
@@ -312,7 +312,7 @@ export const DashboardPageBody = ({
 
       {publicEnv.data?.DEMO_PROJECT_SLUG &&
         publicEnv.data.DEMO_PROJECT_SLUG === router.query.project && (
-          <HStack width="full" backgroundColor="orange.400" padding={1}>
+          <HStack width="full" backgroundColor="orange.solidMuted" padding={1}>
             <Spacer />
             <Text fontSize="sm">
               Viewing Demo Project - Go back to yours{" "}

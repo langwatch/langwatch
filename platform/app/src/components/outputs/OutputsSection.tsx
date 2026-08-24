@@ -391,7 +391,7 @@ const OutputRow = ({
           width="100px"
           fontFamily="mono"
           fontSize="13px"
-          borderColor={hasError ? "red.500" : undefined}
+          borderColor={hasError ? "red.emphasized" : undefined}
           data-testid={`output-name-input-${output.identifier}`}
         />
       ) : (

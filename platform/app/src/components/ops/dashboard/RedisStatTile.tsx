@@ -97,7 +97,7 @@ function RedisFigure({
       <Text
         textStyle="lg"
         fontWeight="semibold"
-        color={warning ? "red.500" : undefined}
+        color={warning ? "red.solid" : undefined}
         whiteSpace="nowrap"
         data-testid={testId}
       >

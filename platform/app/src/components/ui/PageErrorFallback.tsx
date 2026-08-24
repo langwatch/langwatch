@@ -101,7 +101,7 @@ export function PageErrorFallback({
               whiteSpace="pre-wrap"
               wordBreak="break-word"
               bg="bg.panel"
-              color="red.400"
+              color="red.solidMuted"
               borderRadius={0}
             >
               {stack ?? message}

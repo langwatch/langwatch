@@ -496,7 +496,7 @@ function SubscriptionDrawer({
                   Subscription ID: {subscription.id}
                 </Text>
                 {subscription.lastPaymentFailedDate && (
-                  <Text fontSize="xs" color="red.500">
+                  <Text fontSize="xs" color="red.solid">
                     Last payment failed:{" "}
                     {formatDate(subscription.lastPaymentFailedDate)}
                   </Text>

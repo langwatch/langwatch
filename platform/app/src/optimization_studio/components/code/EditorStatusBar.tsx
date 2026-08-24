@@ -116,9 +116,9 @@ export function EditorStatusBar({
       <Text
         color={
           errorCount > 0
-            ? "red.500"
+            ? "red.solid"
             : warningCount > 0
-              ? "orange.500"
+              ? "orange.solid"
               : undefined
         }
       >

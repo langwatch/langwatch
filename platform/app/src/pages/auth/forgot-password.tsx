@@ -118,7 +118,7 @@ function ForgotPasswordForm() {
           </Card.Header>
           <Card.Body>
             <VStack width="full">
-              <Text width="full" color="gray.600">
+              <Text width="full" color="fg.muted">
                 Enter the email for your account and we will send you a link to
                 reset your password.
               </Text>

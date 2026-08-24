@@ -209,7 +209,7 @@ func main() {
         Codex, Cursor, Aider).{" "}
         <Link
           href="https://langwatch.ai/docs/ai-gateway/quickstart"
-          color="orange.600"
+          color="orange.fgMuted"
           target="_blank"
           rel="noreferrer"
         >

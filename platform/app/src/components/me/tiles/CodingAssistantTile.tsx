@@ -152,7 +152,7 @@ function CommandRow({ command }: { command: string }) {
           as="span"
           fontFamily="mono"
           fontSize="sm"
-          color={{ base: "gray.300", _dark: "gray.600" }}
+          color={{ base: "fg.subtle", _dark: "fg.muted" }}
           userSelect="none"
           flexShrink={0}
           aria-hidden="true"

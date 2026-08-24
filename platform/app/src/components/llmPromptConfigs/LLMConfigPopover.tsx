@@ -274,12 +274,12 @@ export function LLMConfigPopover({
 
         {/* Error messages */}
         {errors?.temperature?.message && (
-          <Text color="red.500" fontSize="12px">
+          <Text color="red.solid" fontSize="12px">
             {errors.temperature.message}
           </Text>
         )}
         {errors?.maxTokens?.message && (
-          <Text color="red.500" fontSize="12px">
+          <Text color="red.solid" fontSize="12px">
             {errors.maxTokens.message}
           </Text>
         )}
@@ -323,7 +323,9 @@ export function LLMConfigPopover({
                   width="34px"
                   height="20px"
                   borderRadius="full"
-                  bg={isStructuredOutputsEnabled ? "blue.500" : "gray.300"}
+                  bg={
+                    isStructuredOutputsEnabled ? "blue.solid" : "bg.emphasized"
+                  }
                   padding="2px"
                   cursor="pointer"
                   transition="background 0.2s"
@@ -333,6 +335,9 @@ export function LLMConfigPopover({
                     width="16px"
                     height="16px"
                     borderRadius="full"
+                    // The track is blue when on and grey when off, in both color
+                    // modes, so the thumb cannot follow the mode without losing
+                    // contrast against one of them.
                     bg="white"
                     boxShadow="sm"
                     transition="all 0.2s"

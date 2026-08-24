@@ -79,9 +79,9 @@ function SliderControl({
         min={effectiveMin}
         max={effectiveMax}
         step={config.step}
-        borderColor="blue.200"
+        borderColor="blue.muted"
         _focus={{
-          borderColor: "blue.400",
+          borderColor: "blue.emphasized",
           boxShadow: "0 0 0 1px var(--chakra-colors-blue-400)",
         }}
       />

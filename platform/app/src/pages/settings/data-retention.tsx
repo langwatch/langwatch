@@ -473,7 +473,7 @@ function DataRetentionPage({
                                   </Menu.Item>
                                   <Menu.Item
                                     value="remove"
-                                    color="red.500"
+                                    color="red.solid"
                                     onClick={() => setRemoveTarget(group)}
                                   >
                                     <Trash2 size={14} /> Remove

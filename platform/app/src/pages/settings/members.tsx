@@ -600,7 +600,7 @@ function MemberRowActions({
         {canDelete && (
           <Menu.Item
             value="delete"
-            color="red.500"
+            color="red.solid"
             onClick={() => onDelete(member.userId)}
           >
             <Trash2 size={16} />

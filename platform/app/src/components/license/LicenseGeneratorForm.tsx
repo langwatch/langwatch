@@ -315,16 +315,16 @@ export const LicenseGeneratorForm = forwardRef<
     return (
       <VStack align="start" gap={4} width="full" paddingX={6} paddingY={4}>
         <Box
-          backgroundColor="green.50"
+          backgroundColor="green.subtle"
           padding={4}
           borderRadius="md"
           width="full"
         >
           <VStack align="start" gap={2}>
-            <Text fontSize="sm" fontWeight="medium" color="green.700">
+            <Text fontSize="sm" fontWeight="medium" color="green.fg">
               License generated and downloaded!
             </Text>
-            <Text fontSize="sm" color="green.600">
+            <Text fontSize="sm" color="green.fgMuted">
               The license file has been saved as{" "}
               <Text as="span" fontFamily="mono" fontWeight="medium">
                 {sanitizedName}.langwatch-license
@@ -423,10 +423,10 @@ export const LicenseGeneratorForm = forwardRef<
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                borderColor={isDragging ? "blue.500" : "border"}
-                backgroundColor={isDragging ? "blue.50" : "transparent"}
+                borderColor={isDragging ? "blue.emphasized" : "border"}
+                backgroundColor={isDragging ? "blue.subtle" : "transparent"}
                 transition="all 0.2s"
-                _hover={{ borderColor: "blue.300" }}
+                _hover={{ borderColor: "blue.emphasized" }}
               >
                 <VStack gap={2}>
                   <Upload size={24} color="#666" />

@@ -8,7 +8,7 @@
  *        specs/navigation/settings-shell-v2.feature
  */
 export const QUIET_SIDEBAR_CHIP = {
-  color: "gray.400",
+  color: "fg.faint",
   borderWidth: "1px",
   borderColor: "border",
   borderRadius: "sm",

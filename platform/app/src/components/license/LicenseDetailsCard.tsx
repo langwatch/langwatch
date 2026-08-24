@@ -57,13 +57,12 @@ function LicenseStateBadge({
 function LapsedLicenseNotice({ maxMembers }: { maxMembers: number }) {
   return (
     <Box
-      backgroundColor="orange.50"
+      backgroundColor="orange.subtle"
       padding={3}
       borderRadius="md"
       width="full"
-      _dark={{ backgroundColor: "orange.950" }}
     >
-      <Text fontSize="sm" color="orange.700" _dark={{ color: "orange.200" }}>
+      <Text fontSize="sm" color="orange.fg">
         Your license reached its end date. Nothing was switched off: everyone
         keeps their access and your {maxMembers}{" "}
         {maxMembers === 1 ? "seat" : "seats"} and enterprise capabilities stay
@@ -76,8 +75,13 @@ function LapsedLicenseNotice({ maxMembers }: { maxMembers: number }) {
 /** A license whose signature does not check out. Its numbers mean nothing. */
 function InvalidLicenseNotice() {
   return (
-    <Box backgroundColor="red.50" padding={3} borderRadius="md" width="full">
-      <Text fontSize="sm" color="red.600">
+    <Box
+      backgroundColor="red.subtle"
+      padding={3}
+      borderRadius="md"
+      width="full"
+    >
+      <Text fontSize="sm" color="red.fg">
         Your license is invalid. Please contact support or upload a valid
         license.
       </Text>
@@ -105,12 +109,12 @@ export function LicenseDetailsCard({
           </HStack>
 
           <Box
-            backgroundColor="red.50"
+            backgroundColor="red.subtle"
             padding={3}
             borderRadius="md"
             width="full"
           >
-            <Text fontSize="sm" color="red.600">
+            <Text fontSize="sm" color="red.fgMuted">
               Your license file is corrupted and cannot be read. Please upload a
               valid license or contact support.
             </Text>
@@ -188,7 +192,7 @@ export function LicenseDetailsCard({
             <Text
               fontSize="sm"
               fontWeight="medium"
-              color={isExpired ? "orange.600" : undefined}
+              color={isExpired ? "orange.fgMuted" : undefined}
             >
               {formatLicenseDate(status.expiresAt)}
             </Text>

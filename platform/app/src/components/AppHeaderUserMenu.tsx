@@ -140,7 +140,7 @@ export function AppHeaderUserMenu({
             name={user?.name ?? undefined}
             image={user?.image ?? undefined}
             size="xs"
-            backgroundColor="orange.400"
+            backgroundColor="orange.solidMuted"
             color="white"
             width="28px"
             height="28px"

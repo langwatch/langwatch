@@ -68,7 +68,10 @@ export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
               px={3}
               py={1.5}
               color="fg.muted"
-              _selected={{ color: "fg.default", borderColor: "orange.500" }}
+              _selected={{
+                color: "fg.default",
+                borderColor: "orange.emphasized",
+              }}
             >
               Editor
             </Tabs.Trigger>
@@ -78,7 +81,10 @@ export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
               px={3}
               py={1.5}
               color="fg.muted"
-              _selected={{ color: "fg.default", borderColor: "orange.500" }}
+              _selected={{
+                color: "fg.default",
+                borderColor: "orange.emphasized",
+              }}
             >
               Waterfall
             </Tabs.Trigger>
@@ -88,7 +94,10 @@ export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
               px={3}
               py={1.5}
               color="fg.muted"
-              _selected={{ color: "fg.default", borderColor: "orange.500" }}
+              _selected={{
+                color: "fg.default",
+                borderColor: "orange.emphasized",
+              }}
             >
               Graph
             </Tabs.Trigger>
@@ -98,7 +107,10 @@ export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
               px={3}
               py={1.5}
               color="fg.muted"
-              _selected={{ color: "fg.default", borderColor: "orange.500" }}
+              _selected={{
+                color: "fg.default",
+                borderColor: "orange.emphasized",
+              }}
             >
               JSON
             </Tabs.Trigger>

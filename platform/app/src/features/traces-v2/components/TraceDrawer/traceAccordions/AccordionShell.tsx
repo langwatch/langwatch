@@ -120,7 +120,7 @@ export function Section({
         bg="bg.surface"
         color="fg.muted"
         borderTopWidth={isFirst ? "0" : "1px"}
-        borderColor={{ base: "gray.200", _dark: "border.muted" }}
+        borderColor={{ base: "border", _dark: "border.muted" }}
         transition="background 120ms ease, color 120ms ease"
         _hover={{ bg: "bg.softHover", color: "fg" }}
         // Open state keeps the same white bg AND the same `fg.muted`
@@ -132,7 +132,7 @@ export function Section({
         // trigger reads as the open section's own header band.
         _open={{
           borderBottomWidth: "1px",
-          borderBottomColor: { base: "gray.200", _dark: "border.muted" },
+          borderBottomColor: "border",
         }}
         cursor="pointer"
         // Each trigger pins flush with the SpanTabBar (no per-section

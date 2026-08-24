@@ -210,7 +210,7 @@ export function RecentItemsSection({
       {error && (
         <HomeCard cursor="default" padding={6}>
           <VStack gap={2} width="full">
-            <Box color="red.500">
+            <Box color="red.solid">
               <LuCircleX size={24} />
             </Box>
             <Text fontSize="sm" color="fg.muted">
@@ -218,7 +218,7 @@ export function RecentItemsSection({
             </Text>
             <Text
               fontSize="xs"
-              color="blue.500"
+              color="blue.solid"
               cursor="pointer"
               _hover={{ textDecoration: "underline" }}
               onClick={() => void refetch()}

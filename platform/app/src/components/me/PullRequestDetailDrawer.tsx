@@ -112,8 +112,10 @@ export function PullRequestDetailDrawer({
               <Button
                 asChild
                 flexShrink={0}
-                bg={{ base: "gray.900", _dark: "gray.100" }}
-                color={{ base: "white", _dark: "gray.900" }}
+                // biome-ignore lint/plugin: inverted CTA — solid near-black in light mode, muted in dark. bg.inverted is the opposite pairing, and no other token carries this one.
+                bg={{ base: "gray.900", _dark: "bg.muted" }}
+                color={{ base: "white", _dark: "fg" }}
+                // biome-ignore lint/plugin: inverted CTA — the hover pair is a near-black surface in light and a light surface in dark, which is what the per-mode object already states; no semantic token carries that inversion.
                 _hover={{ bg: { base: "gray.800", _dark: "gray.200" } }}
               >
                 <a

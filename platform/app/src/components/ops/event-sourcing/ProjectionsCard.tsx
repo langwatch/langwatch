@@ -38,7 +38,7 @@ function ProjectionRow({ row }: { row: ProjectionHealthRow }) {
         <Text
           textStyle="xs"
           fontFamily="mono"
-          color={row.blocked > 0 ? "red.500" : "fg.muted"}
+          color={row.blocked > 0 ? "red.solid" : "fg.muted"}
         >
           {row.blocked}
         </Text>

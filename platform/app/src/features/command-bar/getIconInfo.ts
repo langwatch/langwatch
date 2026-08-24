@@ -1,3 +1,6 @@
+// biome-ignore-all lint/plugin: reads the command-bar's categorical palette — one canonical color per
+// command, identity rather than a themed surface
+
 import { Folder } from "lucide-react";
 import { type FeatureKey, featureIcons } from "~/utils/featureIcons";
 import { iconColors } from "./constants";

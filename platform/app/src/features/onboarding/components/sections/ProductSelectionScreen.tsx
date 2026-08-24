@@ -81,7 +81,7 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
           borderRadius="2xl"
           bg="bg.panel/80"
           border="1px solid"
-          borderColor={{ base: "orange.200", _dark: "orange.800" }}
+          borderColor={{ base: "orange.muted", _dark: "orange.emphasized" }}
           boxShadow="sm"
           backdropFilter="blur(20px) saturate(1.3)"
           px={6}
@@ -144,7 +144,7 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
                 },
               }}
             >
-              <Icon color="orange.500" boxSize={6}>
+              <Icon color="orange.solid" boxSize={6}>
                 <opt.icon strokeWidth={1.5} />
               </Icon>
             </Box>

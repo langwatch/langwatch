@@ -238,7 +238,12 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
           <Card.Body>
             <VStack align="stretch" gap={3}>
               <HStack gap={3}>
-                <Box p={2} bg="orange.100" borderRadius="md" color="orange.600">
+                <Box
+                  p={2}
+                  bg="orange.muted"
+                  borderRadius="md"
+                  color="orange.fg"
+                >
                   <Icon as={AlertTriangle} boxSize={4} />
                 </Box>
                 <Text fontWeight="semibold" fontSize="sm">
@@ -252,7 +257,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
                   href="/settings/model-providers"
                   target="_blank"
                   rel="noopener noreferrer"
-                  color="blue.500"
+                  color="blue.solid"
                   fontWeight="medium"
                 >
                   Configure model provider
@@ -379,7 +384,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
                   href="/settings/model-providers"
                   target="_blank"
                   rel="noopener noreferrer"
-                  color="blue.500"
+                  color="blue.solid"
                   fontWeight="medium"
                 >
                   Settings → Model Providers
@@ -397,7 +402,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
                   href="/settings/model-providers"
                   target="_blank"
                   rel="noopener noreferrer"
-                  color="blue.500"
+                  color="blue.solid"
                   fontWeight="medium"
                 >
                   Settings → Model Providers
@@ -410,10 +415,10 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
             <HStack
               gap={2}
               padding={2}
-              bg="green.50"
+              bg="green.subtle"
               borderRadius="md"
               fontSize="xs"
-              color="green.700"
+              color="green.fg"
             >
               <Icon as={Check} boxSize={3} />
               <Text>Generated! Review and edit the form on the left.</Text>

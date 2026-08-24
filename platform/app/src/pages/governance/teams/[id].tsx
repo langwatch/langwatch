@@ -83,11 +83,11 @@ function GovernanceTeamDetailPage() {
       <VStack align="stretch" gap={4} width="full" maxW="container.xl">
         <VStack align="start" gap={1}>
           <Text fontSize="xs" color="fg.muted">
-            <Link href="/governance" color="blue.600">
+            <Link href="/governance" color="blue.fgMuted">
               ← AI Governance
             </Link>{" "}
             ·{" "}
-            <Link href="/governance/teams" color="blue.600">
+            <Link href="/governance/teams" color="blue.fgMuted">
               All teams
             </Link>
           </Text>
@@ -163,7 +163,7 @@ function GovernanceTeamDetailPage() {
                 <>
                   <Link
                     href={`/${teamProjectSlug}/traces`}
-                    color="blue.600"
+                    color="blue.fgMuted"
                     fontSize="sm"
                     fontWeight="medium"
                   >
@@ -183,7 +183,7 @@ function GovernanceTeamDetailPage() {
               )}
               <Link
                 href="/governance"
-                color="blue.600"
+                color="blue.fgMuted"
                 fontSize="sm"
                 fontWeight="medium"
               >

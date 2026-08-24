@@ -221,7 +221,7 @@ export const NewWorkflowModal = ({
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 {...(isDragging
-                  ? { borderStyle: "dashed", borderColor: "blue.500" }
+                  ? { borderStyle: "dashed", borderColor: "blue.emphasized" }
                   : {})}
               >
                 <input

@@ -76,7 +76,11 @@ export const PreconditionsField = ({
     <HorizontalFormControl label={label} helper={helper}>
       <VStack align="start" gap={4}>
         {evaluator?.requiredFields.includes("contexts") && (
-          <Box borderLeft="4px solid" borderLeftColor="blue.400" width="full">
+          <Box
+            borderLeft="4px solid"
+            borderLeftColor="blue.emphasized"
+            width="full"
+          >
             <VStack
               borderLeftColor="reset"
               padding={3}
@@ -92,7 +96,11 @@ export const PreconditionsField = ({
           </Box>
         )}
         {evaluator?.requiredFields.includes("expected_output") && (
-          <Box borderLeft="4px solid" borderLeftColor="blue.400" width="full">
+          <Box
+            borderLeft="4px solid"
+            borderLeftColor="blue.emphasized"
+            width="full"
+          >
             <VStack
               borderLeftColor="reset"
               padding={3}
@@ -108,7 +116,11 @@ export const PreconditionsField = ({
           </Box>
         )}
         {evaluator?.requiredFields.includes("expected_contexts") && (
-          <Box borderLeft="4px solid" borderLeftColor="blue.400" width="full">
+          <Box
+            borderLeft="4px solid"
+            borderLeftColor="blue.emphasized"
+            width="full"
+          >
             <VStack
               borderLeftColor="reset"
               padding={3}
@@ -135,7 +147,7 @@ export const PreconditionsField = ({
             <Box
               key={field.id}
               borderLeft="4px solid"
-              borderLeftColor="blue.400"
+              borderLeftColor="blue.emphasized"
               width="full"
             >
               <VStack
@@ -234,7 +246,7 @@ export const PreconditionsField = ({
                 </HStack>
               </VStack>
               {(formState.errors.preconditions as any)?.[index]?.value && (
-                <Text color="red.500" fontSize="12px" paddingLeft={4}>
+                <Text color="red.solid" fontSize="12px" paddingLeft={4}>
                   {
                     (formState.errors.preconditions as any)?.[index]?.value
                       .message

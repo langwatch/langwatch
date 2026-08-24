@@ -156,7 +156,7 @@ function OnlineEvaluationsPage() {
         </Box>
       ) : monitors.isError ? (
         <Box padding={6}>
-          <Text color="red.500">Error loading online evaluations</Text>
+          <Text color="red.solid">Error loading online evaluations</Text>
         </Box>
       ) : rows.length === 0 ? (
         <PageLayout.Container>
@@ -165,7 +165,6 @@ function OnlineEvaluationsPage() {
               title="No online evaluations yet"
               description="Score live traces and threads as they arrive, or set up a synchronous guardrail that can block unsafe traffic."
               icon={<Activity size={24} />}
-              color="teal.500"
               docsInfo={
                 <Text>
                   Learn more in the{" "}

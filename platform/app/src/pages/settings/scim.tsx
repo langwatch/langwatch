@@ -120,7 +120,7 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
                 <CopyInput value={scimBaseUrl} label="SCIM Base URL" />
               </VStack>
 
-              <Text fontSize="sm" color="gray.500">
+              <Text fontSize="sm" color="fg.subtle">
                 Use this URL and a bearer token below to configure SCIM in your
                 identity provider.
               </Text>
@@ -152,7 +152,7 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
                 {tokens.data?.length === 0 && (
                   <Table.Row>
                     <Table.Cell colSpan={4}>
-                      <Text color="gray.500" textAlign="center" paddingY={4}>
+                      <Text color="fg.subtle" textAlign="center" paddingY={4}>
                         No SCIM tokens yet. Generate one to get started.
                       </Text>
                     </Table.Cell>
@@ -260,7 +260,7 @@ function ScimSettingsContent({ organizationId }: { organizationId: string }) {
           <Dialog.CloseTrigger />
           <Dialog.Body paddingBottom={6}>
             <VStack gap={4} align="start">
-              <Text color="orange.500" fontWeight="600">
+              <Text color="orange.solid" fontWeight="600">
                 Copy this token now. You won&apos;t be able to see it again.
               </Text>
               {newToken && <CopyInput value={newToken} label="SCIM Token" />}

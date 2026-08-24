@@ -94,18 +94,18 @@ function SeatsProrationPreview({
     <VStack gap={6} align="stretch" paddingY={2}>
       <HStack justify="space-between" paddingX={2}>
         <VStack align="start" gap={1}>
-          <Text fontSize="sm" color="gray.500">
+          <Text fontSize="sm" color="fg.subtle">
             Current seats
           </Text>
           <Text fontSize="2xl" fontWeight="bold">
             {currentSeats}
           </Text>
         </VStack>
-        <Text fontSize="xl" color="gray.400" alignSelf="center">
+        <Text fontSize="xl" color="fg.faint" alignSelf="center">
           →
         </Text>
         <VStack align="end" gap={1}>
-          <Text fontSize="sm" color="gray.500">
+          <Text fontSize="sm" color="fg.subtle">
             New total seats
           </Text>
           <Text fontSize="2xl" fontWeight="bold">
@@ -135,20 +135,20 @@ function SeatsProrationPreview({
               for, and the natural conclusion is that the number is wrong. */}
           {data.formattedCreditApplied && (
             <HStack justify="space-between" paddingX={2}>
-              <Text fontWeight="normal" fontSize="sm" color="gray.500">
+              <Text fontWeight="normal" fontSize="sm" color="fg.subtle">
                 Account credit applied
               </Text>
-              <Text fontWeight="normal" fontSize="sm" color="gray.500">
+              <Text fontWeight="normal" fontSize="sm" color="fg.subtle">
                 −{data.formattedCreditApplied}
               </Text>
             </HStack>
           )}
 
           <HStack justify="space-between" paddingX={2}>
-            <Text fontWeight="normal" fontSize="md" color="gray.500">
+            <Text fontWeight="normal" fontSize="md" color="fg.subtle">
               New billing amount
             </Text>
-            <Text fontWeight="normal" fontSize="md" color="gray.500">
+            <Text fontWeight="normal" fontSize="md" color="fg.subtle">
               {data.formattedRecurringTotal}
               {formatBillingPeriod(data.billingInterval)}
             </Text>

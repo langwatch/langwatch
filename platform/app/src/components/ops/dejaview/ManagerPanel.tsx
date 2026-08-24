@@ -67,7 +67,7 @@ export function ManagerPanel({
           {/* One `Text`, so the registry's sentence reads as one sentence. The
               old inline `error.message` rendered "Could not load process
               managers: clickhouse_unavailable" — a slug, since #5984. */}
-          <Text textStyle="xs" color="red.500">
+          <Text textStyle="xs" color="red.solid">
             {describeError({
               error: query.error,
               fallbackTitle: "Could not load process managers",

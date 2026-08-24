@@ -79,7 +79,7 @@ const STATUS_META: Record<
   string,
   { icon: typeof CircleCheck; label: string; color: string }
 > = {
-  active: { icon: CircleCheck, label: "Active", color: "green.500" },
+  active: { icon: CircleCheck, label: "Active", color: "green.solid" },
   awaiting_first_event: {
     icon: CircleDashed,
     label: "Awaiting first event",
@@ -131,7 +131,7 @@ function SourceDetailHeader({
         <HStack gap={2}>
           <Link
             href="/governance/ingestion-sources"
-            color="blue.600"
+            color="blue.fgMuted"
             fontSize="xs"
           >
             <HStack gap={1}>
@@ -607,7 +607,7 @@ function EmptyEventsHint({ source }: { source: Source }) {
         - different auth, same trace store. See{" "}
         <Link
           href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
-          color="blue.600"
+          color="blue.fgMuted"
         >
           Choosing the right OTel endpoint
         </Link>
@@ -658,7 +658,7 @@ function EmptyEventsHint({ source }: { source: Source }) {
             hint, the body shape didn&apos;t parse. See the{" "}
             <Link
               href="https://docs.langwatch.ai/ai-gateway/governance/ingestion-sources/otel-generic"
-              color="blue.600"
+              color="blue.fgMuted"
             >
               otel-generic docs
             </Link>{" "}

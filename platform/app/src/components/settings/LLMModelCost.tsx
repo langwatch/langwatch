@@ -37,7 +37,7 @@ function RateCell({
         justifyContent="space-between"
         paddingX={4}
         marginX={2}
-        color={isCustom ? "green.500" : undefined}
+        color={isCustom ? "green.solid" : undefined}
       >
         {rate?.toLocaleString("fullwide", {
           useGrouping: false,
@@ -129,7 +129,7 @@ export function LLMModelCost(props: { projectId?: string }) {
                 <Table.Cell>
                   <Text
                     truncate
-                    color={!!row.updatedAt ? "green.500" : undefined}
+                    color={!!row.updatedAt ? "green.solid" : undefined}
                   >
                     {row.model}
                   </Text>
@@ -143,7 +143,7 @@ export function LLMModelCost(props: { projectId?: string }) {
                   >
                     <Code
                       truncate
-                      color={!!row.updatedAt ? "green.500" : undefined}
+                      color={!!row.updatedAt ? "green.solid" : undefined}
                       height="32px"
                       lineHeight="22px"
                       borderRadius="6px"
@@ -242,7 +242,7 @@ function ActionsMenu({
         {id && (
           <Menu.Item
             value="delete"
-            color="red.600"
+            color="red.fgMuted"
             onClick={(event) => {
               event.stopPropagation();
 

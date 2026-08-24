@@ -111,6 +111,7 @@ export function HoverableBigText({
                 width="calc(100% + 16px)"
                 marginLeft="-8px"
                 marginTop="-4px"
+                // biome-ignore lint/plugin: the bar above is forced black in both color modes, so its label cannot follow the mode either.
                 color="yellow.400"
               >
                 click anywhere to expand

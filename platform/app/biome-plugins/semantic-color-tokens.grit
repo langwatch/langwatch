@@ -1,0 +1,89 @@
+language js
+
+// Color props must name a semantic token, never a raw palette shade.
+//
+// The palette is defined once, in src/pages/_app.tsx, as semantic tokens. Each
+// token carries a light value AND a dark value. A raw shade ("gray.500",
+// "red.700") carries one, so it reads correctly in whichever mode the author
+// had open and then fails in the other. That is not a style preference: dark
+// status text on a dark panel is unreadable.
+//
+// Every token below is the one whose LIGHT value is the shade it replaces, so
+// a fix is a swap and not a redesign — `red.fgMuted` IS `red.600` in light.
+// Where the app had no token at a shade, the token was added rather than the
+// shade folded into its neighbour: see fgMuted / solidMuted / fg.faint.
+//
+// Anchored on node kinds rather than matched as bare text. A top-level regex
+// makes GritQL test every node in every file, which took minutes over `./src`;
+// this is the same shape `no-raw-error-toast.grit` uses for the same reason.
+//
+// Opting out, where a surface really is fixed in both modes (a terminal, a CTA
+// over a mesh gradient that does not follow the mode):
+//
+//   // biome-ignore lint/plugin: terminal chrome, dark in both modes
+//
+// Whole files that DEFINE a palette, or whose colors are categorical identity
+// rather than a themed surface (featureIcons, the ANSI palettes), are excluded
+// via `overrides` in biome.jsonc.
+//
+// Spec: specs/ci/semantic-color-tokens.feature
+
+// Props Chakra resolves through the color token layer. `fill` and `stroke` are
+// here for Chakra's own SVG props; on a bare <path> or a recharts <Label> the
+// value is a raw CSS color and the site needs a suppression saying so.
+pattern color_prop() {
+	r"(?:color|bg|bgColor|background|backgroundColor|borderColor|borderTopColor|borderBottomColor|borderLeftColor|borderRightColor|outlineColor|fill|stroke)"
+}
+
+// A shade is the same shade whichever quote holds it. Matching only the double
+// one let `color='gray.500'` and the un-interpolated template form through, so
+// the class below carries all three (\x60 is the backtick, spelled in hex so it
+// does not close the GritQL snippet).
+pattern neutral_shade() {
+	r"[\s\S]*[\"'\x60]gray\.[0-9]{2,3}[\"'\x60][\s\S]*"
+}
+
+pattern hue_shade() {
+	r"[\s\S]*[\"'\x60](?:blue|green|red|orange|purple|teal|yellow|cyan|pink)\.[0-9]{2,3}[\"'\x60][\s\S]*"
+}
+
+pattern report_neutral($node) {
+	$node where {
+		register_diagnostic(
+			span = $node,
+			message = "Raw gray shade in a color prop — it is the same gray in both color modes. Use the neutral ladder: text 900/800 -> `fg`, 700/600 -> `fg.muted`, 500 -> `fg.subtle`, 400 -> `fg.faint`; surfaces 50 -> `bg.subtle`, 100 -> `bg.muted`, 200 -> `bg.emphasized`; borders 100 -> `border.muted`, 200 -> `border`, 300 -> `border.emphasized`. Each keeps the light value it replaces. If the surface is fixed in both modes, add `// biome-ignore lint/plugin: <reason>`.",
+			severity = "error"
+		)
+	}
+}
+
+pattern report_hue($node) {
+	$node where {
+		register_diagnostic(
+			span = $node,
+			message = "Raw palette shade in a color prop — it is the same color in both color modes, so status text goes dark-on-dark in dark mode. Use the hue's ladder: text 700 -> `.fg`, 600 -> `.fgMuted`; fills 500 -> `.solid`, 400 -> `.solidMuted`; surfaces 50 -> `.subtle`, 100/200 -> `.muted`; borders 300/400 -> `.emphasized`. Each keeps the light value it replaces (`red.fgMuted` IS `red.600` in light, and `red.300` in dark). If the surface is fixed in both modes, add `// biome-ignore lint/plugin: <reason>`.",
+			severity = "error"
+		)
+	}
+}
+
+or {
+	// `color="gray.500"`, and `bg={cond ? "blue.500" : …}` — both are one
+	// attribute node, so one pattern covers the literal and the expression.
+	jsx_attribute() as $attr where {
+		$attr <: r"(?:color|bg|bgColor|background|backgroundColor|borderColor|borderTopColor|borderBottomColor|borderLeftColor|borderRightColor|outlineColor|fill|stroke)=[\s\S]*",
+		or {
+			$attr <: neutral_shade() where { $attr <: report_neutral($attr) },
+			$attr <: hue_shade() where { $attr <: report_hue($attr) }
+		}
+	},
+	// `_hover={{ bg: "gray.50" }}`, `{ base: …, _dark: … }`, and the status
+	// maps held in plain objects — none of which is a JSX attribute.
+	`$key: $value` as $prop where {
+		$key <: color_prop(),
+		or {
+			$value <: neutral_shade() where { $prop <: report_neutral($prop) },
+			$value <: hue_shade() where { $prop <: report_hue($prop) }
+		}
+	}
+}

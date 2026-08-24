@@ -57,7 +57,7 @@ function DepartmentsPage() {
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
         <VStack align="start" gap={1}>
           <Text fontSize="xs" color="fg.muted">
-            <Link href="/governance" color="blue.600">
+            <Link href="/governance" color="blue.fgMuted">
               ← AI Governance
             </Link>{" "}
             · Departments
@@ -229,7 +229,7 @@ function AssignmentLink({
         _hover={{ backgroundColor: "bg.muted" }}
       >
         <VStack align="start" gap={0}>
-          <Text fontSize="sm" fontWeight="medium" color="blue.600">
+          <Text fontSize="sm" fontWeight="medium" color="blue.fgMuted">
             {title}
           </Text>
           <Text fontSize="xs" color="fg.muted" maxW="2xl">

@@ -141,9 +141,9 @@ export function EligibleModelProvidersPreview({
         align="stretch"
         gap={2}
         borderWidth="1px"
-        borderColor="orange.200"
+        borderColor="orange.muted"
         borderRadius="md"
-        background="orange.50"
+        background="orange.subtle"
         padding={3}
       >
         <Text fontSize="sm" fontWeight="medium">
@@ -175,16 +175,16 @@ export function EligibleModelProvidersPreview({
           <HStack
             key={mp.id}
             borderWidth="1px"
-            borderColor={isSelected ? "blue.400" : "border.subtle"}
+            borderColor={isSelected ? "blue.emphasized" : "border.subtle"}
             borderRadius="md"
             paddingX={2}
             paddingY={1.5}
             gap={2}
             cursor={interactive ? "pointer" : "default"}
-            background={isSelected ? "blue.50" : undefined}
+            background={isSelected ? "blue.subtle" : undefined}
             _hover={
               interactive
-                ? { background: isSelected ? "blue.50" : "bg.subtle" }
+                ? { background: isSelected ? "blue.subtle" : "bg.subtle" }
                 : undefined
             }
             onClick={
@@ -345,7 +345,7 @@ export function ConfigureModelProvidersLink({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      color="blue.600"
+      color="blue.fgMuted"
       fontSize="xs"
     >
       <HStack gap={1} alignItems="center">

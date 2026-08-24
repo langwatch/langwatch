@@ -1,3 +1,7 @@
+// biome-ignore-all lint/plugin: terminal chrome, deliberately dark in BOTH color modes — its
+// light-on-dark text is already correct, and a mode-flipping token
+// would invert it into dark-on-dark
+
 import { Box, Circle, Code, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";

@@ -52,7 +52,7 @@ export function SecretsIndicator({
           as="button"
           gap={1}
           fontSize="13px"
-          color="gray.400"
+          color="fg.faint"
           cursor="pointer"
           _hover={{ color: "white" }}
           paddingX={2}
@@ -107,7 +107,7 @@ export function SecretsIndicator({
                     target="_blank"
                     rel="noopener noreferrer"
                     fontSize="xs"
-                    color="blue.500"
+                    color="blue.solid"
                   >
                     Add secrets in Settings{" "}
                     <LuExternalLink

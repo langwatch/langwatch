@@ -65,11 +65,11 @@ function FleetRow({
         </Text>
       </Table.Cell>
       <CountCell value={row.instances} />
-      <CountCell value={row.overdueWakes} color="orange.500" />
+      <CountCell value={row.overdueWakes} color="orange.solid" />
       <CountCell value={row.pendingMessages} />
-      <CountCell value={row.overduePending} color="orange.500" />
-      <CountCell value={row.lapsedLeases} color="orange.500" />
-      <CountCell value={row.deadMessages} color="red.500" />
+      <CountCell value={row.overduePending} color="orange.solid" />
+      <CountCell value={row.lapsedLeases} color="orange.solid" />
+      <CountCell value={row.deadMessages} color="red.solid" />
     </Table.Row>
   );
 }

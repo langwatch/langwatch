@@ -243,7 +243,7 @@ export function ReplayProgressDrawer({
                   borderRadius="md"
                   bg="red.subtle"
                   borderWidth="1px"
-                  borderColor="red.200"
+                  borderColor="red.muted"
                 >
                   <Text
                     textStyle="xs"

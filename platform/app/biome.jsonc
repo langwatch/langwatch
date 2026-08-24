@@ -1,6 +1,14 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.5.1/schema.json",
 
+	// Analyzer plugins. `no-raw-error-toast.grit` shipped in #6010 but lost its
+	// registration in the ADR-076 restructure, so `pnpm lint:plugins` was
+	// running `--only=plugin` against an empty plugin list — green because it
+	// checked nothing.
+	"plugins": [
+		"./biome-plugins/no-raw-error-toast.grit",
+		"./biome-plugins/semantic-color-tokens.grit"
+	],
 	// Nested under /biome.jsonc, which is a marker rather than a ruleset -- see
 	// the comment there for why it has to exist. Everything below is still the
 	// whole of this project's configuration; `extends: "//"` inherits only the

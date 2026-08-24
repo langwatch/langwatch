@@ -374,7 +374,7 @@ export const VariableInsertMenu = ({
                         gap={2}
                         cursor="pointer"
                         borderRadius="4px"
-                        background={isHighlighted ? "blue.50" : undefined}
+                        background={isHighlighted ? "blue.subtle" : undefined}
                         onMouseMove={() => {
                           if (
                             isKeyboardNav ||
@@ -407,7 +407,7 @@ export const VariableInsertMenu = ({
                   borderRadius="4px"
                   background={
                     highlightedIndex === createOptionIndex
-                      ? "blue.50"
+                      ? "blue.subtle"
                       : undefined
                   }
                   onMouseMove={() => {
@@ -425,7 +425,7 @@ export const VariableInsertMenu = ({
                   onClick={() => onCreateVariable?.(normalizedQuery)}
                 >
                   <Plus size={12} color="var(--chakra-colors-blue-500)" />
-                  <Text fontSize="13px" color="blue.600">
+                  <Text fontSize="13px" color="blue.fgMuted">
                     Create variable "{`{{${normalizedQuery}}}`}"
                   </Text>
                 </HStack>

@@ -277,7 +277,9 @@ export function GroupDetailDialog({
                             <Button
                               size="xs"
                               variant="ghost"
-                              color={markedForRemoval ? "blue.500" : "fg.muted"}
+                              color={
+                                markedForRemoval ? "blue.solid" : "fg.muted"
+                              }
                               aria-label={
                                 markedForRemoval
                                   ? "Undo removal"
@@ -392,7 +394,9 @@ export function GroupDetailDialog({
                             <Button
                               size="xs"
                               variant="ghost"
-                              color={markedForRemoval ? "blue.500" : "fg.muted"}
+                              color={
+                                markedForRemoval ? "blue.solid" : "fg.muted"
+                              }
                               aria-label={
                                 markedForRemoval
                                   ? `Undo removal of ${m.name ?? m.email}`
@@ -413,7 +417,7 @@ export function GroupDetailDialog({
                           image={a.image}
                           size="xs"
                         />
-                        <Text flex={1} color="green.600">
+                        <Text flex={1} color="green.fgMuted">
                           {a.label}
                         </Text>
                         <Button

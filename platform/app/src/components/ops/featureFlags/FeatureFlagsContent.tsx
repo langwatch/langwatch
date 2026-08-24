@@ -361,7 +361,7 @@ function FlagRowView({
                 partialEnabled
                   ? {
                       "& [data-part='control'][data-state='checked']": {
-                        background: "green.500",
+                        background: "green.solid",
                       },
                     }
                   : undefined
@@ -380,7 +380,7 @@ function FlagRowView({
                   size="xs"
                   variant="ghost"
                   onClick={() => setRulesDialogOpen(true)}
-                  color="gray.500"
+                  color="fg.subtle"
                 >
                   <Settings2 size={14} />
                 </IconButton>
@@ -431,7 +431,7 @@ function FlagRowView({
                   variant="plain"
                   size="xs"
                   fontSize="xs"
-                  color="blue.500"
+                  color="blue.solid"
                   textDecoration="underline"
                   paddingX={0}
                   height="auto"

@@ -132,7 +132,7 @@ function AnnotationScorePage() {
               <Text>
                 To learn more about scores and how to use them, please visit our{" "}
                 <Link
-                  color="orange.400"
+                  color="orange.solidMuted"
                   href="https://docs.langwatch.ai/features/annotations#annotation-scoring"
                   isExternal
                 >
@@ -251,7 +251,7 @@ function AnnotationScorePage() {
                                     display="flex"
                                     alignItems="center"
                                     gap={2}
-                                    color="red.600"
+                                    color="red.fgMuted"
                                   >
                                     <Trash size={14} />
                                     Delete

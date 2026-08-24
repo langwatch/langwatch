@@ -326,11 +326,15 @@ describe("the settings shell in a new navigation mode", () => {
       expect(screen.getByRole("link", { name: "Groups" })).toBeInTheDocument();
       const pills = screen.getAllByText("ENT");
       expect(pills.length).toBeGreaterThanOrEqual(1);
-      // The hairline border is pinned on the shared chip style itself:
-      // shell/__tests__/quietChipStyle.unit.test.ts.
-      expect(pills[0]).toHaveStyle({
-        color: "var(--chakra-colors-gray-400)",
-      });
+      // This renders against Chakra's defaultSystem, which emits a variable
+      // only for the tokens it defines itself. The grey is the app's own
+      // `fg.faint` now rather than the built-in `gray.400`, so there is no
+      // longer a variable here to read it back from — the grey is pinned on
+      // the constant instead, in shell/__tests__/quietChipStyle.unit.test.ts.
+      // The border width is a plain CSS length rather than a token, so it
+      // survives that and still shows the pill wearing the shared chip style
+      // rather than a bespoke one.
+      expect(pills[0]).toHaveStyle({ borderWidth: "1px" });
     });
 
     /** @scenario "The settings groups fold, and start open" */

@@ -314,9 +314,9 @@ export function BatchRunsSidebar({
             // Use stable color from parent (based on position in full runs list)
             // Override with red for stopped runs, orange for interrupted
             const runColor = run.timestamps.stoppedAt
-              ? "red.400"
+              ? "red.solidMuted"
               : interrupted
-                ? "orange.400"
+                ? "orange.solidMuted"
                 : (runColors[run.runId] ??
                   getColorForString("colors", run.runId).color);
 
@@ -412,7 +412,7 @@ export function BatchRunsSidebar({
                       </Text>
                     )}
                     {!isFinished && (
-                      <Spinner size="xs" color="blue.500" flexShrink={0} />
+                      <Spinner size="xs" color="blue.solid" flexShrink={0} />
                     )}
                   </HStack>
 

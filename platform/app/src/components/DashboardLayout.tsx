@@ -576,7 +576,7 @@ export const LegacyDashboardLayout = ({
             right="-100px"
             bottom={0}
             w="400px"
-            background={user?.impersonator ? "blue.300" : "orange.300"}
+            background={user?.impersonator ? "blue.muted" : "orange.muted"}
             filter="blur(40px)"
             pointerEvents="none"
           ></Box>
@@ -626,7 +626,7 @@ export const LegacyDashboardLayout = ({
                 borderColor="orange.500/15"
               >
                 <Info size={12} color="var(--chakra-colors-orange-400)" />
-                <Text fontSize="xs" color="orange.400">
+                <Text fontSize="xs" color="orange.solidMuted">
                   Platform-wide - not scoped to a project
                 </Text>
               </HStack>
@@ -654,7 +654,7 @@ export const LegacyDashboardLayout = ({
             </HStack>
           ) : (
             <Text paddingLeft={2}>
-              <Link href="/auth/signin" color="orange.600" fontWeight="600">
+              <Link href="/auth/signin" color="orange.fgMuted" fontWeight="600">
                 Sign in
               </Link>{" "}
               to LangWatch to monitor your projects

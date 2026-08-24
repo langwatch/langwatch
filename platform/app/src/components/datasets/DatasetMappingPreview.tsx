@@ -188,23 +188,14 @@ export function DatasetMappingPreview({
               <Field.Label margin={0}>Mapping</Field.Label>
             </HStack>
           </Field.Root>
-          <HStack
-            bg="gray.100"
-            _dark={{ bg: "gray.800" }}
-            borderRadius="md"
-            padding="3px"
-            gap={0}
-          >
+          <HStack bg="bg.muted" borderRadius="md" padding="3px" gap={0}>
             <Box
               as="button"
               onClick={(e: React.MouseEvent) => {
                 e.preventDefault();
                 setIsThreadMapping(false);
               }}
-              bg={!isThreadMapping ? "white" : "transparent"}
-              _dark={{
-                bg: !isThreadMapping ? "gray.700" : "transparent",
-              }}
+              bg={!isThreadMapping ? "bg.panel" : "transparent"}
               color={!isThreadMapping ? "fg" : "fg.muted"}
               fontWeight={!isThreadMapping ? "medium" : "normal"}
               borderRadius="sm"
@@ -223,10 +214,7 @@ export function DatasetMappingPreview({
                 e.preventDefault();
                 setIsThreadMapping(true);
               }}
-              bg={isThreadMapping ? "white" : "transparent"}
-              _dark={{
-                bg: isThreadMapping ? "gray.700" : "transparent",
-              }}
+              bg={isThreadMapping ? "bg.panel" : "transparent"}
               color={isThreadMapping ? "fg" : "fg.muted"}
               fontWeight={isThreadMapping ? "medium" : "normal"}
               borderRadius="sm"

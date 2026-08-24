@@ -62,7 +62,7 @@ export const MetadataTag = ({
   const renderValue = (text: string) => {
     if (value.startsWith("http")) {
       return (
-        <HStack gap={1} color="blue.500">
+        <HStack gap={1} color="blue.solid">
           <UiLink href={value} target="_blank">
             {text}
           </UiLink>

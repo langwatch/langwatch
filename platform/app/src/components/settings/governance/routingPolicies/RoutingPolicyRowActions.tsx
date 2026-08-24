@@ -55,7 +55,7 @@ export function RoutingPolicyRowActions({
         )}
         <Menu.Item
           value="delete"
-          color="red.500"
+          color="red.solid"
           onClick={(event) => {
             event.stopPropagation();
             onDelete();

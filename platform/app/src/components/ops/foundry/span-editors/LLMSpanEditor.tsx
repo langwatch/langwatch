@@ -5,10 +5,10 @@ import { useTraceStore } from "../traceStore";
 import type { ChatMessage, LLMConfig, SpanConfig } from "../types";
 
 const ROLE_COLORS: Record<string, string> = {
-  system: "purple.500",
-  user: "green.400",
-  assistant: "blue.400",
-  tool: "yellow.400",
+  system: "purple.solid",
+  user: "green.solidMuted",
+  assistant: "blue.solidMuted",
+  tool: "yellow.solidMuted",
 };
 
 export function LLMSpanEditor({ span }: { span: SpanConfig }) {
@@ -36,7 +36,7 @@ export function LLMSpanEditor({ span }: { span: SpanConfig }) {
       bg="blue.500/5"
       p={4}
     >
-      <Text fontSize="sm" fontWeight="semibold" color="blue.400" mb={3}>
+      <Text fontSize="sm" fontWeight="semibold" color="blue.solidMuted" mb={3}>
         LLM Configuration
       </Text>
 
@@ -90,7 +90,7 @@ export function LLMSpanEditor({ span }: { span: SpanConfig }) {
             border="1px solid"
             borderColor="border"
             borderLeftWidth="2px"
-            borderLeftColor={ROLE_COLORS[msg.role] ?? "gray.500"}
+            borderLeftColor={ROLE_COLORS[msg.role] ?? "border.emphasized"}
             bg="bg.subtle"
             p={2}
           >
@@ -131,7 +131,7 @@ export function LLMSpanEditor({ span }: { span: SpanConfig }) {
               size="xs"
               variant="ghost"
               color="fg.muted"
-              _hover={{ color: "red.400" }}
+              _hover={{ color: "red.solidMuted" }}
               onClick={() =>
                 updateLLM({ messages: messages.filter((_, j) => j !== i) })
               }

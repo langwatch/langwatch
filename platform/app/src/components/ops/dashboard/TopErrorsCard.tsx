@@ -52,7 +52,7 @@ export function TopErrorsCard({
             {topErrors.slice(0, VISIBLE_ROWS).map((err) => (
               <Table.Row key={`${err.queueName}::${err.normalizedMessage}`}>
                 <Table.Cell>
-                  <Text color="red.500" fontWeight="medium">
+                  <Text color="red.solid" fontWeight="medium">
                     {err.count}
                   </Text>
                 </Table.Cell>

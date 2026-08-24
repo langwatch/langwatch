@@ -67,13 +67,13 @@ export function InstallPreview({
               bg="bg.panel/60"
               borderRadius="xl"
               border="1px solid"
-              borderColor="gray.200"
+              borderColor="border"
               backdropFilter="blur(20px) saturate(1.3)"
               boxShadow="0 2px 16px rgba(0,0,0,0.04)"
               overflow="hidden"
               meta={{ colorScheme: colorMode }}
             >
-              <CodeBlock.Header borderBottomWidth="1px" borderColor="gray.200">
+              <CodeBlock.Header borderBottomWidth="1px" borderColor="border">
                 <Tabs.List w="full" border="0" ms="-1">
                   {tabItems.map((t) => (
                     <Tabs.Trigger

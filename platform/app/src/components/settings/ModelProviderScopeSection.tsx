@@ -105,10 +105,10 @@ export function ProviderScopeSection({
       <VStack align="start" width="full" gap={2}>
         <SmallLabel>Scope</SmallLabel>
         <ProviderScopeChips scopes={storedScopes} />
-        <Text fontSize="xs" color="gray.600">
+        <Text fontSize="xs" color="fg.muted">
           {summariseSelection(storedScopes)}
         </Text>
-        <Text fontSize="xs" color="gray.500">
+        <Text fontSize="xs" color="fg.subtle">
           Scope is fixed after create. To change it, delete and recreate at the
           new scope.
         </Text>

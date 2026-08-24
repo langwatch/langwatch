@@ -37,7 +37,9 @@ export function RoleCard({
       borderWidth="1px"
       borderColor="border"
       _hover={
-        onViewPermissions ? { borderColor: "orange.400", shadow: "md" } : {}
+        onViewPermissions
+          ? { borderColor: "orange.emphasized", shadow: "md" }
+          : {}
       }
       transition="all 0.2s"
       display="flex"

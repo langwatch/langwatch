@@ -95,6 +95,17 @@ BASE_APP="$(app_dir "$BASE_TREE")"
 rm -f "$BASE_TREE/$BASE_APP"/biome.json "$BASE_TREE/$BASE_APP"/biome.jsonc
 cp "$REPO_ROOT/$HEAD_APP/biome.jsonc" "$BASE_TREE/$BASE_APP/biome.jsonc"
 
+# The head config's `plugins` entries are paths relative to it, so the analyzer
+# plugins have to travel with it. A PR that ADDS a plugin names a .grit file the
+# base tree does not have; biome then fails to load the config outright, writes
+# no rdjson, and the guard below reports "could not lint the merge base" for a
+# tree that is perfectly fine. Same reasoning as the config copy above and the
+# node_modules symlink below: both sides must resolve identically.
+if [ -d "$REPO_ROOT/$HEAD_APP/biome-plugins" ]; then
+  rm -rf "$BASE_TREE/$BASE_APP/biome-plugins"
+  cp -R "$REPO_ROOT/$HEAD_APP/biome-plugins" "$BASE_TREE/$BASE_APP/biome-plugins"
+fi
+
 # The app config is a NESTED config (`"root": false`, `"extends": "//"`), so the
 # repo-root config has to come across with it. A nested config whose root is
 # missing does not fail -- Biome silently falls back to its built-in defaults,

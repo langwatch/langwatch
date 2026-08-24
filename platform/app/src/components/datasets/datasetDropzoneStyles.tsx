@@ -23,7 +23,7 @@ export const dropzoneSurfaceProps = (isActive: boolean) => ({
   borderRadius: "xl",
   borderWidth: "2px",
   borderStyle: "dashed" as const,
-  borderColor: isActive ? "blue.400" : "border",
+  borderColor: isActive ? "blue.emphasized" : "border",
   bg: isActive ? "blue.500/10" : "transparent",
   padding: 10,
   textAlign: "center" as const,
@@ -34,7 +34,7 @@ export const dropzoneSurfaceProps = (isActive: boolean) => ({
   // transition animates the grow/shrink smoothly.
   "& .lw-dropzone-icon": isActive ? { transform: "scale(1.12)" } : {},
   _hover: {
-    borderColor: "blue.300",
+    borderColor: "blue.emphasized",
     bg: "blue.500/5",
     "& .lw-dropzone-icon": { transform: "scale(1.12)" },
   },
@@ -72,7 +72,7 @@ export function DropzonePrompt({ multiple = false }: { multiple?: boolean }) {
     <VStack gap={2}>
       <Box
         className="lw-dropzone-icon"
-        color="blue.400"
+        color="blue.solidMuted"
         transition="transform 0.2s ease"
         transformOrigin="center"
       >
@@ -80,7 +80,7 @@ export function DropzonePrompt({ multiple = false }: { multiple?: boolean }) {
       </Box>
       <Text fontSize="md" color="fg">
         {multiple ? "Drag and drop files, or " : "Drag and drop file, or "}
-        <Text as="span" color="blue.500" fontWeight="medium">
+        <Text as="span" color="blue.solid" fontWeight="medium">
           click to browse
         </Text>
       </Text>

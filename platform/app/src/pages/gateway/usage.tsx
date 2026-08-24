@@ -264,10 +264,12 @@ function GatewayUsagePage() {
                 borderRadius="md"
                 fontSize="xs"
                 fontWeight={days === p.days ? "semibold" : "normal"}
-                background={days === p.days ? "orange.100" : "transparent"}
-                color={days === p.days ? "orange.800" : "fg.muted"}
+                background={days === p.days ? "orange.muted" : "transparent"}
+                color={days === p.days ? "orange.fg" : "fg.muted"}
                 borderWidth="1px"
-                borderColor={days === p.days ? "orange.300" : "border.subtle"}
+                borderColor={
+                  days === p.days ? "orange.emphasized" : "border.subtle"
+                }
                 onClick={() => setDays(p.days)}
               >
                 {p.label}
@@ -530,7 +532,7 @@ function StatTile({
   const body = (
     <Stat.Root>
       <Stat.Label>{label}</Stat.Label>
-      <Stat.ValueText color={tone === "red" ? "red.600" : undefined}>
+      <Stat.ValueText color={tone === "red" ? "red.fgMuted" : undefined}>
         {value}
       </Stat.ValueText>
     </Stat.Root>

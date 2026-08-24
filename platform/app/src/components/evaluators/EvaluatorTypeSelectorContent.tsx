@@ -243,8 +243,8 @@ function EvaluatorCard({
       borderRadius="lg"
       border="1px solid"
       borderColor="border"
-      bg={disabled ? "gray.50" : "bg.panel"}
-      color={disabled ? "gray.400" : undefined}
+      bg={disabled ? "bg.subtle" : "bg.panel"}
+      color={disabled ? "fg.faint" : undefined}
       cursor={disabled ? "default" : "pointer"}
       textAlign="left"
       width="full"
@@ -263,7 +263,7 @@ function EvaluatorCard({
         </Text>
         <Text
           fontSize="xs"
-          color={disabled ? "gray.400" : "fg.muted"}
+          color={disabled ? "fg.faint" : "fg.muted"}
           lineClamp={2}
         >
           {description}
@@ -274,7 +274,7 @@ function EvaluatorCard({
             size="xs"
             height="auto"
             padding={0}
-            color="orange.600"
+            color="orange.fgMuted"
             fontSize="xs"
             fontWeight="500"
             onClick={(e) => {

@@ -36,7 +36,7 @@ function RailTile({
       cursor="pointer"
       backgroundColor={isActive ? "bg.panel" : "transparent"}
       boxShadow={isActive ? "0 1px 3px rgba(26, 26, 46, 0.09)" : undefined}
-      color={isActive ? "fg" : "gray.400"}
+      color={isActive ? "fg" : "fg.faint"}
       transition="all 0.15s ease-in-out"
       _hover={
         isActive

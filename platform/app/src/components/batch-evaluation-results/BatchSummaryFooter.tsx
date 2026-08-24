@@ -184,7 +184,7 @@ export function BatchSummaryFooter({
             <Box
               width="12px"
               height="12px"
-              background="red.500"
+              background="red.solid"
               borderRadius="full"
             />
             <Text>Stopped</Text>

@@ -79,7 +79,7 @@ function CapabilityCard({
       flex={1}
       borderRadius="xl"
       border="1px solid"
-      borderColor={{ base: "orange.200", _dark: "orange.800" }}
+      borderColor={{ base: "orange.muted", _dark: "orange.emphasized" }}
       bg="bg.panel/70"
       backdropFilter="blur(20px) saturate(1.3)"
       boxShadow="0 1px 3px rgba(0,0,0,0.04)"
@@ -98,7 +98,7 @@ function CapabilityCard({
           p={2.5}
           borderRadius="xl"
           bg={accentChipBg}
-          color="orange.500"
+          color="orange.solid"
           display="flex"
           alignItems="center"
           justifyContent="center"

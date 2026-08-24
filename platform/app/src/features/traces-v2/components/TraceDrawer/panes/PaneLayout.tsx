@@ -658,7 +658,7 @@ function PaneResizeBar({ orientation }: { orientation: DrawerLayout }) {
       // `drag` / `inactive`) on the parent handle div — gives the
       // user the same "this is grabbable" affordance as the waterfall
       // chart.
-      bg={{ base: "gray.200", _dark: "border.muted" }}
+      bg={{ base: "bg.emphasized", _dark: "border.muted" }}
       transition="background 100ms ease"
       css={{
         "[data-resize-handle-state='hover'] &, [data-resize-handle-state='drag'] &":

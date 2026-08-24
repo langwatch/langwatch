@@ -297,7 +297,7 @@ function InstallTile({
       {...({ type: "button" } as { type: "button" })}
       onClick={onClick}
       borderWidth="1px"
-      borderColor={installed ? "green.300" : "border.muted"}
+      borderColor={installed ? "green.emphasized" : "border.muted"}
       borderRadius="md"
       padding={3}
       textAlign="left"
@@ -377,7 +377,7 @@ function RawOtlpAdvancedTile() {
           </Text>
           <Link
             href="/me/configure#otlp"
-            color="orange.600"
+            color="orange.fgMuted"
             fontSize="xs"
             fontWeight="medium"
           >

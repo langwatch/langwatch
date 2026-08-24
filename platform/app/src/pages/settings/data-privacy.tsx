@@ -394,7 +394,7 @@ export function DataPrivacyPage({ projectId }: { projectId: string }) {
                                     </Menu.Item>
                                     <Menu.Item
                                       value="delete"
-                                      color="red.500"
+                                      color="red.solid"
                                       onClick={() => void removeRule(rule)}
                                     >
                                       Delete
@@ -941,7 +941,7 @@ export function PrivacyRuleDrawer({
                         placeholder="gen_ai.prompt.*"
                         value={row.pattern}
                         aria-label={`Attribute pattern ${index + 1}`}
-                        borderColor={error ? "red.500" : undefined}
+                        borderColor={error ? "red.emphasized" : undefined}
                         onChange={(e) =>
                           setCustomAttributes((prev) =>
                             prev.map((r, i) =>
@@ -1000,7 +1000,7 @@ export function PrivacyRuleDrawer({
                       </Button>
                     </HStack>
                     {error && (
-                      <Text fontSize="xs" color="red.500">
+                      <Text fontSize="xs" color="red.solid">
                         {error}
                       </Text>
                     )}
@@ -1159,7 +1159,7 @@ export function PrivacyRuleDrawer({
                             placeholder="00[0-9]{12}"
                             value={pattern}
                             aria-label={`PII exception pattern ${index + 1}`}
-                            borderColor={error ? "red.500" : undefined}
+                            borderColor={error ? "red.emphasized" : undefined}
                             onChange={(e) =>
                               setPiiExceptPatterns((prev) =>
                                 prev.map((p, i) =>
@@ -1184,7 +1184,7 @@ export function PrivacyRuleDrawer({
                           </Button>
                         </HStack>
                         {error && (
-                          <Text fontSize="xs" color="red.500">
+                          <Text fontSize="xs" color="red.solid">
                             {error}
                           </Text>
                         )}
@@ -1272,7 +1272,7 @@ export function PrivacyRuleDrawer({
                             placeholder="acme_live_[a-z0-9]+"
                             value={pattern}
                             aria-label={`Custom secret pattern ${index + 1}`}
-                            borderColor={error ? "red.500" : undefined}
+                            borderColor={error ? "red.emphasized" : undefined}
                             onChange={(e) =>
                               setSecretsPatterns((prev) =>
                                 prev.map((p, i) =>
@@ -1297,7 +1297,7 @@ export function PrivacyRuleDrawer({
                           </Button>
                         </HStack>
                         {error && (
-                          <Text fontSize="xs" color="red.500">
+                          <Text fontSize="xs" color="red.solid">
                             {error}
                           </Text>
                         )}

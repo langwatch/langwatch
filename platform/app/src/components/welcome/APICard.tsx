@@ -141,7 +141,7 @@ const APICard: React.FC = () => {
           <Alert.Root
             size="sm"
             borderStartWidth="3px"
-            borderStartColor="green.500"
+            borderStartColor="green.solid"
             colorPalette="green"
             title="Integration configured"
           >
@@ -156,7 +156,7 @@ const APICard: React.FC = () => {
           <Alert.Root
             size="sm"
             borderStartWidth="3px"
-            borderStartColor="orange.400"
+            borderStartColor="orange.solidMuted"
             colorPalette="orange"
             title="Waiting for first trace..."
           >

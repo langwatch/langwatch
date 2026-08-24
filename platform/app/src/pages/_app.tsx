@@ -1,3 +1,6 @@
+// biome-ignore-all lint/plugin: this file DEFINES the semantic tokens — they have to resolve to a
+// concrete palette shade somewhere, and this is that somewhere
+
 /**
  * Theme system definition for LangWatch.
  * This file only exports the Chakra UI `system` — the app shell (providers,
@@ -181,6 +184,22 @@ const appConfig = defineConfig({
               _dark: "{colors.orange.200}",
             },
           },
+          // Secondary status text. Collapsing .600 into fg (.700)
+          // darkened ~75 call sites in light mode; this keeps them.
+          fgMuted: {
+            value: {
+              _light: "{colors.orange.600}",
+              _dark: "{colors.orange.300}",
+            },
+          },
+          // A fill one step quieter than solid, for dots and icons
+          // that should not carry solid's full weight.
+          solidMuted: {
+            value: {
+              _light: "{colors.orange.400}",
+              _dark: "{colors.orange.500}",
+            },
+          },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         green: {
@@ -217,6 +236,22 @@ const appConfig = defineConfig({
               _dark: "{colors.green.200}",
             },
           },
+          // Secondary status text. Collapsing .600 into fg (.700)
+          // darkened ~75 call sites in light mode; this keeps them.
+          fgMuted: {
+            value: {
+              _light: "{colors.green.600}",
+              _dark: "{colors.green.300}",
+            },
+          },
+          // A fill one step quieter than solid, for dots and icons
+          // that should not carry solid's full weight.
+          solidMuted: {
+            value: {
+              _light: "{colors.green.400}",
+              _dark: "{colors.green.500}",
+            },
+          },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         blue: {
@@ -237,6 +272,22 @@ const appConfig = defineConfig({
           },
           fg: {
             value: { _light: "{colors.blue.700}", _dark: "{colors.blue.300}" },
+          },
+          // Secondary status text. Collapsing .600 into fg (.700)
+          // darkened ~75 call sites in light mode; this keeps them.
+          fgMuted: {
+            value: {
+              _light: "{colors.blue.600}",
+              _dark: "{colors.blue.300}",
+            },
+          },
+          // A fill one step quieter than solid, for dots and icons
+          // that should not carry solid's full weight.
+          solidMuted: {
+            value: {
+              _light: "{colors.blue.400}",
+              _dark: "{colors.blue.500}",
+            },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
@@ -277,6 +328,22 @@ const appConfig = defineConfig({
               _dark: "{colors.yellow.200}",
             },
           },
+          // Secondary status text. Collapsing .600 into fg (.700)
+          // darkened ~75 call sites in light mode; this keeps them.
+          fgMuted: {
+            value: {
+              _light: "{colors.yellow.600}",
+              _dark: "{colors.yellow.300}",
+            },
+          },
+          // A fill one step quieter than solid, for dots and icons
+          // that should not carry solid's full weight.
+          solidMuted: {
+            value: {
+              _light: "{colors.yellow.400}",
+              _dark: "{colors.yellow.500}",
+            },
+          },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         red: {
@@ -298,6 +365,22 @@ const appConfig = defineConfig({
           fg: {
             value: { _light: "{colors.red.700}", _dark: "{colors.red.200}" },
           },
+          // Secondary status text. Collapsing .600 into fg (.700)
+          // darkened ~75 call sites in light mode; this keeps them.
+          fgMuted: {
+            value: {
+              _light: "{colors.red.600}",
+              _dark: "{colors.red.300}",
+            },
+          },
+          // A fill one step quieter than solid, for dots and icons
+          // that should not carry solid's full weight.
+          solidMuted: {
+            value: {
+              _light: "{colors.red.400}",
+              _dark: "{colors.red.500}",
+            },
+          },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         pink: {
@@ -318,6 +401,22 @@ const appConfig = defineConfig({
           },
           fg: {
             value: { _light: "{colors.pink.700}", _dark: "{colors.pink.200}" },
+          },
+          // Secondary status text. Collapsing .600 into fg (.700)
+          // darkened ~75 call sites in light mode; this keeps them.
+          fgMuted: {
+            value: {
+              _light: "{colors.pink.600}",
+              _dark: "{colors.pink.300}",
+            },
+          },
+          // A fill one step quieter than solid, for dots and icons
+          // that should not carry solid's full weight.
+          solidMuted: {
+            value: {
+              _light: "{colors.pink.400}",
+              _dark: "{colors.pink.500}",
+            },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
@@ -358,6 +457,22 @@ const appConfig = defineConfig({
               _dark: "{colors.purple.200}",
             },
           },
+          // Secondary status text. Collapsing .600 into fg (.700)
+          // darkened ~75 call sites in light mode; this keeps them.
+          fgMuted: {
+            value: {
+              _light: "{colors.purple.600}",
+              _dark: "{colors.purple.300}",
+            },
+          },
+          // A fill one step quieter than solid, for dots and icons
+          // that should not carry solid's full weight.
+          solidMuted: {
+            value: {
+              _light: "{colors.purple.400}",
+              _dark: "{colors.purple.500}",
+            },
+          },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         teal: {
@@ -379,6 +494,22 @@ const appConfig = defineConfig({
           fg: {
             value: { _light: "{colors.teal.700}", _dark: "{colors.teal.200}" },
           },
+          // Secondary status text. Collapsing .600 into fg (.700)
+          // darkened ~75 call sites in light mode; this keeps them.
+          fgMuted: {
+            value: {
+              _light: "{colors.teal.600}",
+              _dark: "{colors.teal.300}",
+            },
+          },
+          // A fill one step quieter than solid, for dots and icons
+          // that should not carry solid's full weight.
+          solidMuted: {
+            value: {
+              _light: "{colors.teal.400}",
+              _dark: "{colors.teal.500}",
+            },
+          },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         cyan: {
@@ -399,6 +530,22 @@ const appConfig = defineConfig({
           },
           fg: {
             value: { _light: "{colors.cyan.700}", _dark: "{colors.cyan.200}" },
+          },
+          // Secondary status text. Collapsing .600 into fg (.700)
+          // darkened ~75 call sites in light mode; this keeps them.
+          fgMuted: {
+            value: {
+              _light: "{colors.cyan.600}",
+              _dark: "{colors.cyan.300}",
+            },
+          },
+          // A fill one step quieter than solid, for dots and icons
+          // that should not carry solid's full weight.
+          solidMuted: {
+            value: {
+              _light: "{colors.cyan.400}",
+              _dark: "{colors.cyan.500}",
+            },
           },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
@@ -508,6 +655,19 @@ const appConfig = defineConfig({
           },
           subtle: {
             value: { _light: "{colors.gray.500}", _dark: "{colors.gray.400}" },
+          },
+          // One step quieter than subtle. Without it, gray.400 had nowhere to
+          // go but fg.subtle (gray.500), darkening ~19 hint/placeholder sites.
+          //
+          // Dark deliberately matches fg.subtle rather than stepping down
+          // again: the sites this replaces held a raw gray.400, which on the
+          // dark panel measured 6.80:1. Carrying the "one step quieter" idea
+          // into dark (gray.500) drops that to 2.64:1 — below AA-large, and
+          // worse than the raw shade it replaced. The light ladder simply has
+          // more usable room than the dark one, so faint and subtle converge
+          // there.
+          faint: {
+            value: { _light: "{colors.gray.400}", _dark: "{colors.gray.400}" },
           },
           inverted: { value: { _light: "white", _dark: "{colors.gray.950}" } },
         },

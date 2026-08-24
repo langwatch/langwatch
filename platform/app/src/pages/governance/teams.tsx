@@ -124,7 +124,7 @@ function GovernanceTeamsListPage() {
         <HStack alignItems="end">
           <VStack align="start" gap={1}>
             <Text fontSize="xs" color="fg.muted">
-              <Link href="/governance" color="blue.600">
+              <Link href="/governance" color="blue.fgMuted">
                 ← AI Governance
               </Link>{" "}
               · All teams
@@ -292,9 +292,9 @@ function Row({ team }: { team: SpendByTeam }) {
   const trendColor = !team.hasPriorBaseline
     ? "fg.muted"
     : team.deltaPctVsPriorWindow > 25
-      ? "orange.500"
+      ? "orange.solid"
       : team.deltaPctVsPriorWindow < -25
-        ? "blue.500"
+        ? "blue.solid"
         : "fg.muted";
   const inner = (
     <HStack

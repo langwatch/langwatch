@@ -23,7 +23,7 @@ export const ImpersonationBanner = ({ user }: ImpersonationBannerProps) => {
       color="white"
       background="linear-gradient(135deg, #3182CE, #2B6CB0)"
       border="1px solid"
-      borderColor="blue.400"
+      borderColor="blue.emphasized"
       borderRadius="full"
       height="32px"
       paddingX={3}

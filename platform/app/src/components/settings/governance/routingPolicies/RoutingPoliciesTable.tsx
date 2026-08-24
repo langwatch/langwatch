@@ -132,7 +132,7 @@ export function RoutingPoliciesTable({
       {unplaced.length > 0 && (
         <Box
           borderWidth="1px"
-          borderColor="orange.300"
+          borderColor="orange.emphasized"
           borderRadius="md"
           padding={4}
         >
@@ -219,7 +219,7 @@ function PolicyRow({
   return (
     <HStack
       borderWidth="1px"
-      borderColor={policy.isDefault ? "blue.300" : "border.muted"}
+      borderColor={policy.isDefault ? "blue.emphasized" : "border.muted"}
       borderRadius="sm"
       padding={3}
       gap={3}

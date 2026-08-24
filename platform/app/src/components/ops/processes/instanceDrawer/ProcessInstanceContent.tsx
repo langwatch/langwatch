@@ -52,7 +52,7 @@ function InstanceStatusRow({
       <Field label="Next wake">
         <Text
           textStyle="sm"
-          color={wakeOverdue ? "orange.500" : undefined}
+          color={wakeOverdue ? "orange.solid" : undefined}
           fontWeight={wakeOverdue ? "medium" : undefined}
         >
           {describeNextWake(detail.nextWakeAt, now)}

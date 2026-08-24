@@ -298,7 +298,7 @@ function ContextRow({
       </Text>
       <Text
         fontFamily="mono"
-        color={tone === "red" ? "red.500" : "fg"}
+        color={tone === "red" ? "red.solid" : "fg"}
         fontWeight={tone === "red" ? "semibold" : "normal"}
       >
         {value}

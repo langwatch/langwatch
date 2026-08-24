@@ -58,7 +58,9 @@ export function ShellTopBar({
           right="-100px"
           bottom={0}
           w="400px"
-          background={user?.impersonator ? "blue.300" : "orange.300"}
+          background={
+            user?.impersonator ? "blue.emphasized" : "orange.emphasized"
+          }
           filter="blur(40px)"
           pointerEvents="none"
         ></Box>

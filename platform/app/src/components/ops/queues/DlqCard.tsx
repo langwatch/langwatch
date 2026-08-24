@@ -49,7 +49,7 @@ function ProcessOutboxDeadRow({
       borderBottom={hasQueueGroups ? "1px solid" : undefined}
       borderBottomColor="border"
     >
-      <Text textStyle="sm" fontWeight="medium" color="red.500">
+      <Text textStyle="sm" fontWeight="medium" color="red.solid">
         Process outbox — {total} dead message{total !== 1 ? "s" : ""}
       </Text>
       <Text textStyle="xs" color="fg.muted">
@@ -232,7 +232,7 @@ export function DlqRow({
       <Table.Cell>
         <Text
           textStyle="xs"
-          color="red.500"
+          color="red.solid"
           truncate
           maxWidth="220px"
           title={group.error ?? undefined}
@@ -399,7 +399,7 @@ function DlqCardHeader({
           a red process-outbox count. */}
       {groupCount > 0 && (
         <>
-          <Text textStyle="sm" fontWeight="medium" color="orange.500">
+          <Text textStyle="sm" fontWeight="medium" color="orange.solid">
             Dead Letter Queue — {isFiltering ? `${shownCount} of ` : ""}
             {groupCount} group{groupCount !== 1 ? "s" : ""}
           </Text>

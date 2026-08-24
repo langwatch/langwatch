@@ -42,7 +42,7 @@ export function AnomaliesCard() {
   if (!hasAny && !hasError) return null;
 
   return (
-    <Card.Root borderColor={hardCount > 0 ? "red.300" : undefined}>
+    <Card.Root borderColor={hardCount > 0 ? "red.emphasized" : undefined}>
       <Card.Body padding={0}>
         <HStack paddingX={4} paddingY={2.5}>
           <Text textStyle="sm" fontWeight="medium">
@@ -60,9 +60,9 @@ export function AnomaliesCard() {
           {query.isFetching && <Spinner size="xs" />}
         </HStack>
         {hasError && (
-          <Text paddingX={4} paddingBottom={3} color="red.500" textStyle="xs">
+          <Text paddingX={4} paddingBottom={3} color="red.solid" textStyle="xs">
             Could not load anomalies — Redis may be unavailable. Retrying every
-            30s. Do NOT interpret this as &ldquo;all clear&rdquo;.
+            30 seconds. Do NOT interpret this as &ldquo;all clear&rdquo;.
           </Text>
         )}
         {hasAny && (
@@ -102,7 +102,7 @@ export function AnomaliesCard() {
                     <Text textStyle="xs">{formatAge(a.triggeredAt)}</Text>
                   </Table.Cell>
                   <Table.Cell maxW="320px">
-                    <Text textStyle="xs" color="gray.600" lineClamp={2}>
+                    <Text textStyle="xs" color="fg.muted" lineClamp={2}>
                       {a.reason}
                     </Text>
                   </Table.Cell>

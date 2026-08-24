@@ -1,3 +1,5 @@
+// biome-ignore-all lint/plugin: a test asserting on raw palette values on purpose
+
 /**
  * Real-Chromium QA for the Zod-first evaluator catalog. The settings forms in
  * the app are driven by `evaluatorsSchema.shape[type].shape.settings` and the

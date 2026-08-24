@@ -257,8 +257,10 @@ function SortableColumnRow({
           value={col.name}
           aria-label={`Column ${index + 1} name`}
           aria-invalid={invalid || undefined}
-          borderColor={invalid ? "red.400" : undefined}
-          _focusVisible={invalid ? { borderColor: "red.400" } : undefined}
+          borderColor={invalid ? "red.emphasized" : undefined}
+          _focusVisible={
+            invalid ? { borderColor: "red.emphasized" } : undefined
+          }
           onChange={(e) => onName(e.target.value)}
         />
         <ColumnTypeSelect
@@ -277,14 +279,14 @@ function SortableColumnRow({
           flexShrink={0}
           cursor={onRemove ? "pointer" : "not-allowed"}
           opacity={onRemove ? 1 : 0.3}
-          _hover={onRemove ? { color: "red.500" } : undefined}
+          _hover={onRemove ? { color: "red.solid" } : undefined}
           onClick={onRemove}
         >
           <Trash2 size={16} />
         </chakra.button>
       </HStack>
       {invalid && (
-        <Text role="alert" fontSize="xs" color="red.500" paddingLeft={7}>
+        <Text role="alert" fontSize="xs" color="red.solid" paddingLeft={7}>
           {col.name.trim() === ""
             ? "Name is required"
             : "Column names must be unique"}
@@ -449,7 +451,7 @@ function RowTrailing({
           as="button"
           gap={1}
           fontSize="13px"
-          color="blue.600"
+          color="blue.fgMuted"
           cursor="pointer"
           aria-label={`Confirm columns for ${file.name}`}
           onClick={onToggle}
@@ -467,7 +469,7 @@ function RowTrailing({
     case "uploading":
       return (
         <HStack gap={1.5}>
-          <Spinner size="xs" color="blue.500" />
+          <Spinner size="xs" color="blue.solid" />
           <Text fontSize="13px" fontWeight="medium" css={RAINBOW_TEXT_CSS}>
             Uploading…
           </Text>
@@ -476,7 +478,7 @@ function RowTrailing({
     case "processing":
       return (
         <HStack gap={1.5}>
-          <Spinner size="xs" color="blue.500" />
+          <Spinner size="xs" color="blue.solid" />
           <Text fontSize="13px" fontWeight="medium" css={RAINBOW_TEXT_CSS}>
             Preparing…
           </Text>
@@ -484,7 +486,7 @@ function RowTrailing({
       );
     case "ready":
       return (
-        <HStack gap={1} color="green.600" fontSize="13px">
+        <HStack gap={1} color="green.fgMuted" fontSize="13px">
           <CheckCircle size={14} />
           <Text>Ready</Text>
         </HStack>
@@ -492,7 +494,7 @@ function RowTrailing({
     case "failed":
     case "rejected":
       return (
-        <Text fontSize="13px" color="red.500">
+        <Text fontSize="13px" color="red.solid">
           {file.rejectedReason === "unsupported"
             ? "Unsupported file"
             : file.rejectedReason === "too-large"
@@ -576,7 +578,7 @@ function BulkFileRow({
       borderRadius="lg"
       borderColor={
         file.status === "failed" || file.status === "rejected"
-          ? "red.300"
+          ? "red.emphasized"
           : "border"
       }
       bg="bg"
@@ -609,7 +611,7 @@ function BulkFileRow({
             aria-label="Cancel upload"
             color="fg.muted"
             display="flex"
-            _hover={{ color: "red.500" }}
+            _hover={{ color: "red.solid" }}
             onClick={onCancel}
           >
             <X size={16} />
@@ -620,7 +622,7 @@ function BulkFileRow({
             aria-label="Remove file"
             color="fg.muted"
             display="flex"
-            _hover={{ color: "red.500" }}
+            _hover={{ color: "red.solid" }}
             onClick={onRemove}
           >
             <X size={16} />
@@ -747,10 +749,10 @@ export function BulkUploadDrawer({
               >
                 <Text>{bulk.counts.total} files</Text>
                 {bulk.counts.ready > 0 && (
-                  <Text color="green.600">{bulk.counts.ready} ready</Text>
+                  <Text color="green.fgMuted">{bulk.counts.ready} ready</Text>
                 )}
                 {bulk.counts.preparing > 0 && (
-                  <Text color="blue.500">
+                  <Text color="blue.solid">
                     {bulk.counts.preparing} preparing
                   </Text>
                 )}
@@ -758,7 +760,7 @@ export function BulkUploadDrawer({
                   <Text>{bulk.counts.queued} queued</Text>
                 )}
                 {bulk.counts.failed > 0 && (
-                  <HStack gap={1} color="red.500">
+                  <HStack gap={1} color="red.solid">
                     <AlertTriangle size={13} />
                     <Text>{bulk.counts.failed} failed</Text>
                   </HStack>
@@ -792,7 +794,7 @@ export function BulkUploadDrawer({
                   variant="plain"
                   colorPalette="gray"
                   fontWeight="normal"
-                  color="blue.700"
+                  color="blue.fg"
                   paddingX={0}
                   onClick={onCreateFromScratch}
                 >

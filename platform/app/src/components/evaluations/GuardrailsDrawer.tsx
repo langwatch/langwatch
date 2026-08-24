@@ -286,12 +286,12 @@ EOF
                     />
                   </Box>
 
-                  <Text fontSize="sm" color="gray.600">
+                  <Text fontSize="sm" color="fg.muted">
                     Set the <code>LANGWATCH_API_KEY</code> environment variable
                     with your API key.{" "}
                     <Link
                       href={apiKeyLink}
-                      color="blue.500"
+                      color="blue.solid"
                       display="inline-flex"
                       alignItems="center"
                       gap={1}
@@ -299,11 +299,11 @@ EOF
                       Find your API key <ExternalLink size={12} />
                     </Link>
                   </Text>
-                  <Text fontSize="sm" color="gray.600">
+                  <Text fontSize="sm" color="fg.muted">
                     Learn more about running guardrails in our{" "}
                     <Link
                       href="https://langwatch.ai/docs/evaluations/guardrails/overview"
-                      color="blue.500"
+                      color="blue.solid"
                       display="inline-flex"
                       alignItems="center"
                       gap={1}
