@@ -4,7 +4,7 @@ import type { PublicAppConfig } from "./public-config";
 import { publicAppConfigSchema } from "./public-config";
 
 export type PublicAppConfigSource = Readonly<{
-  BASE_HOST: string;
+  BASE_HOST?: string;
   DEMO_PROJECT_SLUG?: string;
   NODE_ENV: "development" | "test" | "production";
   EMAIL_PROVIDER?: string;

@@ -229,6 +229,7 @@ export function createEnvConfig(source) {
       LW_VIRTUAL_KEY_PEPPER: gatewaySecretsSchema.LW_VIRTUAL_KEY_PEPPER,
       REDIS_URL: z.string().optional(),
       REDIS_CLUSTER_ENDPOINTS: z.string().optional(),
+      SKIP_REDIS: z.boolean().optional(),
       REDIS_DB_INDEX: z.preprocess(
         (value) => (value === "" ? undefined : value),
         z
@@ -249,6 +250,12 @@ export function createEnvConfig(source) {
       SENDGRID_API_KEY: z.string().optional(),
       LANGWATCH_NLP_SERVICE: optionalIfBuildTime(z.string().url()),
       LANGWATCH_ENDPOINT: optionalIfBuildTime(z.string().url()),
+      LANGWATCH_API_URL: z.string().url().optional(),
+      LANGY_WORKER_CALLBACK_URL: z.string().url().optional(),
+      LANGY_WORKER_GATEWAY_URL: z.string().url().optional(),
+      LANGY_MIRROR_PROJECT_ID: z.string().min(1).optional(),
+      LANGY_INTERNAL_SECRET: z.string().min(1).optional(),
+      LANGY_PROMPT_PROJECT_ID: z.string().min(1).optional(),
       LANGEVALS_ENDPOINT: z.string().optional(),
       // S3 staging for outbound langevals POSTs is opt-in: only relevant
       // when langevals is fronted by AWS Lambda (6 MB sync-invoke cap).
@@ -592,6 +599,9 @@ export function createEnvConfig(source) {
       API_TOKEN_JWT_SECRET: source.API_TOKEN_JWT_SECRET,
       REDIS_URL: source.REDIS_URL,
       REDIS_CLUSTER_ENDPOINTS: source.REDIS_CLUSTER_ENDPOINTS,
+      SKIP_REDIS:
+        source.SKIP_REDIS === "1" ||
+        source.SKIP_REDIS?.toLowerCase() === "true",
       REDIS_DB_INDEX: source.REDIS_DB_INDEX,
       GOOGLE_APPLICATION_CREDENTIALS:
         source.GOOGLE_APPLICATION_CREDENTIALS,
@@ -603,6 +613,12 @@ export function createEnvConfig(source) {
       SENDGRID_API_KEY: source.SENDGRID_API_KEY,
       LANGWATCH_NLP_SERVICE: source.LANGWATCH_NLP_SERVICE,
       LANGWATCH_ENDPOINT: source.LANGWATCH_ENDPOINT,
+      LANGWATCH_API_URL: source.LANGWATCH_API_URL,
+      LANGY_WORKER_CALLBACK_URL: source.LANGY_WORKER_CALLBACK_URL,
+      LANGY_WORKER_GATEWAY_URL: source.LANGY_WORKER_GATEWAY_URL,
+      LANGY_MIRROR_PROJECT_ID: source.LANGY_MIRROR_PROJECT_ID,
+      LANGY_INTERNAL_SECRET: source.LANGY_INTERNAL_SECRET,
+      LANGY_PROMPT_PROJECT_ID: source.LANGY_PROMPT_PROJECT_ID,
       LANGEVALS_ENDPOINT: source.LANGEVALS_ENDPOINT,
       LANGEVALS_STAGING_THRESHOLD_BYTES:
         source.LANGEVALS_STAGING_THRESHOLD_BYTES,

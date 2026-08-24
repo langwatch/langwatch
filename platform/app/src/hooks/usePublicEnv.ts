@@ -1,12 +1,42 @@
-import { api } from "../utils/api";
+import { api, type RouterOutputs } from "../utils/api";
 import { readPublicAppConfig } from "../runtime/public-config";
 
-export type UsePublicEnvOptions = {
-  /** Fetch identity/license-dependent values in addition to shell config. */
-  includeCapabilities?: boolean;
+export type PublicEnvironment = {
+  BASE_HOST: string;
+  DEMO_PROJECT_SLUG: string | undefined;
+  NODE_ENV: "development" | "test" | "production";
+  HAS_EMAIL_PROVIDER_KEY: boolean;
+  IS_SAAS: boolean;
+  GATEWAY_BASE_URL: string;
+  POSTHOG_KEY: string | undefined;
+  POSTHOG_HOST: string | undefined;
+  RUM_ENABLED: boolean;
+  RUM_SAMPLE_RATIO: number;
+  HAS_LANGWATCH_NLP_SERVICE: boolean;
+  HAS_LANGEVALS_ENDPOINT: boolean;
+  STRIPE_LICENSE_PAYMENT_LINK_URL: string | undefined;
 };
 
-export const usePublicEnv = (options: UsePublicEnvOptions = {}) => {
+type ViewerCapabilities = RouterOutputs["publicEnv"];
+type CapabilityQuery = ReturnType<typeof api.publicEnv.useQuery>;
+type CapabilityEnvironmentQuery = Omit<CapabilityQuery, "data"> & {
+  data: (PublicEnvironment & ViewerCapabilities) | undefined;
+};
+
+type StaticEnvironmentResult = {
+  data: PublicEnvironment;
+  isLoading: false;
+};
+
+export function usePublicEnv(options: {
+  includeCapabilities: true;
+}): CapabilityEnvironmentQuery;
+export function usePublicEnv(options?: {
+  includeCapabilities?: false;
+}): StaticEnvironmentResult;
+export function usePublicEnv(options: {
+  includeCapabilities?: boolean;
+} = {}): CapabilityEnvironmentQuery | StaticEnvironmentResult {
   const includeCapabilities = options.includeCapabilities ?? false;
   const capabilities = api.publicEnv.useQuery(
     {},
@@ -19,7 +49,7 @@ export const usePublicEnv = (options: UsePublicEnvOptions = {}) => {
   );
 
   const config = readPublicAppConfig();
-  const staticValues = {
+  const staticValues: PublicEnvironment = {
     BASE_HOST: config.appBaseUrl,
     DEMO_PROJECT_SLUG: config.demoProjectSlug,
     NODE_ENV: config.mode,
@@ -33,7 +63,7 @@ export const usePublicEnv = (options: UsePublicEnvOptions = {}) => {
     HAS_LANGWATCH_NLP_SERVICE: config.capabilities.nlp,
     HAS_LANGEVALS_ENDPOINT: config.capabilities.langevals,
     STRIPE_LICENSE_PAYMENT_LINK_URL: config.licensePaymentUrl,
-  } as const;
+  };
 
   if (!includeCapabilities) {
     return { data: staticValues, isLoading: false } as const;
@@ -45,4 +75,4 @@ export const usePublicEnv = (options: UsePublicEnvOptions = {}) => {
       ? { ...staticValues, ...capabilities.data }
       : undefined,
   };
-};
+}
