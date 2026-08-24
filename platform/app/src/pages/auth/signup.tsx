@@ -66,7 +66,10 @@ export default function SignUp() {
       <FrontDoorShell
         headline="See what your agents are actually doing."
         headlineAccent="actually"
-        tagline="Traces, evaluations and monitoring for every run. Free to start, no credit card."
+        // Names the thing they are seconds away from, rather than listing what
+        // the product has. "Traces, evaluations and monitoring" was a feature
+        // list read by somebody who has not agreed to want any of them yet.
+        tagline="You are a minute away from watching a simulated user push your agent until it breaks. Free to start, no credit card."
         trustStrip={<TrustyStrippers />}
       >
         <VerificationFirstSignUp />

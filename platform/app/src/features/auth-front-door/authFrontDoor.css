@@ -418,8 +418,14 @@
 	background: var(--chakra-colors-front-door-card-bg) !important;
 	border-color: var(--chakra-colors-front-door-card-border) !important;
 	box-shadow: var(--lw-front-door-card-shadow);
-	-webkit-backdrop-filter: blur(26px) saturate(1.5);
-	backdrop-filter: blur(26px) saturate(1.5);
+	/* Less blur and more saturation than before (26px / 1.5). A heavy blur
+	   over a thin surface averages the ground to a single flat tone, which is
+	   the opposite of the effect: what makes it read as glass is the ground's
+	   colour still being RECOGNISABLE through it, softened rather than erased.
+	   The brightness lift keeps the type off a muddy floor now that more of
+	   the ground is coming through. */
+	-webkit-backdrop-filter: blur(18px) saturate(1.9) brightness(1.04);
+	backdrop-filter: blur(18px) saturate(1.9) brightness(1.04);
 	transition:
 		box-shadow 420ms ease,
 		border-color 420ms ease;

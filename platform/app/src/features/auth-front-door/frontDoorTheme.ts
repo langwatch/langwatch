@@ -93,9 +93,17 @@ export const frontDoorThemeConfig = defineConfig({
           detail: mode(brand[500], orange300(0.75)),
           focusRing: mode(orange(0.22), orange300(0.22)),
           glow: mode(orange(0.28), orange300(0.22)),
-          /** The card is glass on both grounds: a pane over the ground rather
-           *  than a panel sitting on it. */
-          cardBg: mode(white(0.4), "rgba(10, 10, 12, 0.55)"),
+          /**
+           * The card is glass on both grounds: a pane over the ground rather
+           * than a panel sitting on it.
+           *
+           * Thinner than it was (0.4 / 0.55). At those alphas the blur was
+           * doing real work and none of it was visible — the ground's colour
+           * arrived so dilute that the card read as a flat panel that happened
+           * to have a soft edge. Glass is only glass if you can see what is
+           * behind it move.
+           */
+          cardBg: mode(white(0.3), "rgba(10, 10, 12, 0.42)"),
           cardBorder: mode(white(0.85), white(0.1)),
           /** Fields are the same idea, one step down. */
           fieldBg: mode(white(0.62), white(0.06)),
