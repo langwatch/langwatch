@@ -774,8 +774,9 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
     // can disable the seat between approve and exchange, and both branches
     // below hand out credentials the owner ceiling never reaches (a project
     // key has no owner; a device session mints keys of its own). Refused,
-    // the device code is consumed so the CLI stops polling for a session it
-    // will never get.
+    // the device code is consumed and the answer is the same fatal
+    // access_denied/410 the mint below already gives a removed member, so the
+    // CLI stops polling for a session it will never get.
     const activeMembership = await prisma.organizationUser.findFirst({
       where: {
         userId: user.id,
@@ -792,7 +793,7 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
           error: "access_denied",
           error_description: "Not an active member of the organization",
         },
-        403,
+        410,
       );
     }
 

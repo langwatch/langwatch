@@ -110,8 +110,8 @@ Feature: CLI login never lands a user on a personal project
       Given a device code approved while the caller was an active member
       And an admin has since disabled the caller's membership
       When the CLI exchanges that device code
-      Then the response is 403 and the project's API key is NOT returned
-      And the device code is consumed, so a further exchange reports it expired
+      Then the response is the fatal 410 "access_denied" and the project's API key is NOT returned
+      And the device code is consumed, so the CLI stops polling
 
     @unit @project-picker
     Scenario: the project picker lists the caller's personal project explicitly and omits internal-governance projects

@@ -528,7 +528,7 @@ describe("CLI login personal-project guards", () => {
 
     describe("when the seat is disabled between approval and exchange", () => {
       /** @scenario project-login exchange denies a member whose seat was disabled after approval */
-      it("returns forbidden, never the project's API key, and consumes the code", async () => {
+      it("answers the fatal access_denied, never the project's API key, and consumes the code", async () => {
         // Approval is not the last word: the code is exchanged later, and an
         // admin can switch the seat off in between. The handout is what must
         // re-derive membership.
@@ -560,13 +560,18 @@ describe("CLI login personal-project guards", () => {
             });
 
           const first = await exchange();
-          expect(first.status).toBe(403);
+          // 410 access_denied: the one answer the CLI already treats as
+          // fatal, and the same one a removed member gets from the mint.
+          expect(first.status).toBe(410);
           expect(await first.text()).not.toContain(SHARED_API_KEY);
 
-          // Consumed: a CLI still polling is told the code is gone, not
-          // left waiting on an approval that will never be honoured.
-          const second = await exchange();
-          expect(second.status).toBe(408);
+          // Consumed: the record is gone from Redis, so a CLI still polling
+          // is told the code expired rather than left waiting on an approval
+          // that will never be honoured. Asserted on the store, because an
+          // immediate second poll meets the exchange throttle (429) first.
+          expect(
+            await redisConnection!.get(`lwcli:device:${dc.device_code}`),
+          ).toBeNull();
         } finally {
           await prisma.organizationUser.updateMany({
             where: { userId: USER_ID, organizationId: ORG_ID },
