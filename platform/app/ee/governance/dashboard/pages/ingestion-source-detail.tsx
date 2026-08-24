@@ -130,7 +130,7 @@ function SourceDetailHeader({
       <VStack align="start" gap={1}>
         <HStack gap={2}>
           <Link
-            href="/governance/ingestion-sources"
+            href="/governance/inventory?tab=sources"
             color="blue.600"
             fontSize="xs"
           >
@@ -367,7 +367,7 @@ function useSourceDetailMutations({
   const archive = api.ingestionSources.archive.useMutation({
     onSuccess: () => {
       toaster.create({ title: "Source archived", type: "success" });
-      void router.push("/governance/ingestion-sources");
+      void router.push("/governance/inventory?tab=sources");
     },
     onError: (e) =>
       showErrorToast({
