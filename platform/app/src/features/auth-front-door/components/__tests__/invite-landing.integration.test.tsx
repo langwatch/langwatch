@@ -17,7 +17,11 @@ const {
   landingRef,
   routeMock,
   acceptMock,
+  acceptStateRef,
+  askMock,
+  askStateRef,
   signInMock,
+  signOutMock,
   sessionRef,
   hardRedirectMock,
 } = vi.hoisted(() => ({
@@ -30,7 +34,15 @@ const {
   },
   routeMock: vi.fn(),
   acceptMock: vi.fn(),
+  acceptStateRef: {
+    current: { error: null as unknown, isPending: false },
+  },
+  askMock: vi.fn(),
+  askStateRef: {
+    current: { error: null as unknown, isPending: false, isSuccess: false },
+  },
   signInMock: vi.fn(),
+  signOutMock: vi.fn(),
   sessionRef: { current: { data: null as unknown } },
   hardRedirectMock: vi.fn(),
 }));
@@ -46,13 +58,18 @@ vi.mock("~/utils/api", () => ({
           error: null,
         }),
       },
+      requestFreshInvite: {
+        useMutation: () => ({
+          mutate: askMock,
+          ...askStateRef.current,
+        }),
+      },
     },
     organization: {
       acceptInvite: {
         useMutation: () => ({
           mutate: acceptMock,
-          isPending: false,
-          error: null,
+          ...acceptStateRef.current,
         }),
       },
     },
@@ -64,6 +81,7 @@ vi.mock("~/utils/auth-client", async (importOriginal) => {
   return {
     ...actual,
     signIn: signInMock,
+    signOut: signOutMock,
     useSession: () => sessionRef.current,
   };
 });
@@ -96,8 +114,12 @@ const localPicker: RoutingDecision = {
   reasonCode: "no_domain_match",
 };
 
-const handled = (code: string, httpStatus: number) => ({
-  data: { error: { code, httpStatus, fault: "customer" } },
+const handled = (
+  code: string,
+  httpStatus: number,
+  meta: Record<string, unknown> = {},
+) => ({
+  data: { error: { code, httpStatus, fault: "customer", meta } },
 });
 
 const renderLanding = () =>
@@ -111,6 +133,8 @@ describe("given an invitation link", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionRef.current = { data: null };
+    acceptStateRef.current = { error: null, isPending: false };
+    askStateRef.current = { error: null, isPending: false, isSuccess: false };
     routeMock.mockResolvedValue(localPicker);
     landingRef.current = {
       data: {
@@ -196,20 +220,106 @@ describe("given an invitation link", () => {
   });
 
   describe("when the invitation has expired", () => {
-    /** @scenario An expired invite offers to ask for a new one */
-    it("points at the person who can send a fresh one", async () => {
+    const expiredLanding = () => {
       landingRef.current = {
         data: undefined,
         error: handled("invite_expired", 410),
         isLoading: false,
       };
+    };
+
+    /** @scenario The invitee can ask for a fresh invitation when theirs expired */
+    it("says so, and offers to ask for a fresh one", async () => {
+      expiredLanding();
 
       renderLanding();
 
       expect(
         await screen.findByText(/this invitation has expired/i),
       ).toBeTruthy();
-      expect(screen.getByText(/ask the person who invited you/i)).toBeTruthy();
+      expect(screen.getByTestId("invite-ask-again")).toBeTruthy();
+    });
+
+    /** @scenario The invitee can ask for a fresh invitation when theirs expired */
+    it("asks with the code they arrived on", async () => {
+      expiredLanding();
+      renderLanding();
+
+      await userEvent.click(await screen.findByTestId("invite-ask-again"));
+
+      expect(askMock).toHaveBeenCalledWith({ inviteCode: INVITE_CODE });
+    });
+
+    /** @scenario The invitee can ask for a fresh invitation when theirs expired */
+    it("confirms the ask landed without naming who was asked", async () => {
+      expiredLanding();
+      askStateRef.current = { error: null, isPending: false, isSuccess: true };
+
+      renderLanding();
+
+      const confirmation = await screen.findByTestId("invite-refresh-asked");
+      expect(confirmation.textContent).toMatch(/fresh invitation/i);
+      expect(screen.queryByTestId("invite-ask-again")).toBeNull();
+    });
+
+    /** @scenario Asking again is throttled per invitation */
+    it("says how long to wait when the ask was too soon", async () => {
+      expiredLanding();
+      askStateRef.current = {
+        error: handled("invite_throttled", 429, { retryAfterSeconds: 120 }),
+        isPending: false,
+        isSuccess: false,
+      };
+
+      renderLanding();
+
+      expect(await screen.findByText(/that was just sent/i)).toBeTruthy();
+      expect(screen.getByText(/2 minutes/i)).toBeTruthy();
+    });
+  });
+
+  describe("when the visitor is signed in as a different account", () => {
+    beforeEach(() => {
+      sessionRef.current = { data: { user: { id: "u1" } } };
+      acceptStateRef.current = {
+        error: handled("invite_wrong_account", 403, {
+          invitedHint: "s•••@acme.com",
+        }),
+        isPending: false,
+      };
+    });
+
+    /** @scenario The wrong account is told which account the invitation wants */
+    it("names the account it wants, masked, and never the whole address", async () => {
+      renderLanding();
+
+      expect(
+        await screen.findByText(/you're signed in as a different account/i),
+      ).toBeTruthy();
+      expect(screen.getByText(/s•••@acme\.com/)).toBeTruthy();
+    });
+
+    /** @scenario The wrong account is told which account the invitation wants */
+    it("offers the way out instead of a join that cannot succeed", async () => {
+      renderLanding();
+
+      expect(await screen.findByTestId("invite-switch-account")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /^Join Acme$/ })).toBeNull();
+    });
+
+    /** @scenario Signing out from the mismatch returns to the same invitation */
+    it("signs out and comes back to the same invitation", async () => {
+      signOutMock.mockResolvedValue(undefined);
+      renderLanding();
+
+      await userEvent.click(await screen.findByTestId("invite-switch-account"));
+
+      expect(signOutMock).toHaveBeenCalledWith({ redirect: false });
+      await vi.waitFor(() =>
+        expect(hardRedirectMock).toHaveBeenCalledWith(
+          `/invite/accept?inviteCode=${INVITE_CODE}`,
+        ),
+      );
     });
   });
 

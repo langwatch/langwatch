@@ -105,6 +105,58 @@ Feature: Resilient invitations - any verified method gets you in, and expiry is 
   # specs/licensing/enforcement-members.feature, which D11 aligns to the
   # new state model (delivery-plan amendment table).
 
+  # ── Signed in as somebody else ─────────────────────────────────────────
+
+  # An invitation names an address. Somebody already signed in as a
+  # different account is not refused for good - they are told which
+  # account to use, in terms that help them recognize it without handing
+  # the address to whoever is holding the link.
+
+  @integration
+  Scenario: The wrong account is told which account the invitation wants
+    Given "sam" is signed in as "sam@personal.example"
+    When "sam" opens the invite sent to "sam@acme.com"
+    Then the invitation is not accepted
+    And "sam" is told the invitation was sent to a different account
+    And "sam" is offered a way to sign out and continue as the invited one
+
+  @unit
+  Scenario: The hint recognizes the address without spelling it out
+    Given an invitation sent to "sam@acme.com"
+    When somebody signed in as another account is shown the mismatch
+    Then the hint keeps the domain and the first character
+    And the rest of the address is hidden
+
+  @integration
+  Scenario: Signing out from the mismatch returns to the same invitation
+    Given "sam" is signed in as the wrong account and sees the mismatch
+    When "sam" takes the offered way out
+    Then "sam" arrives at the front door with the invitation still in hand
+    And accepting as the invited account makes "sam" a member
+
+  # ── Asking again ───────────────────────────────────────────────────────
+
+  @integration
+  Scenario: The invitee can ask for a fresh invitation when theirs expired
+    Given the invite expired
+    When "sam" opens the invite link and asks for a new one
+    Then the admins who can invite are told "sam" is waiting
+    And "sam" is told the request reached them, without naming who they are
+
+  @unit
+  Scenario: Asking again is throttled per invitation
+    Given "sam" already asked for a fresh invitation
+    When "sam" asks again within the throttle window
+    Then the second ask is refused as too soon
+    And no second notification goes out
+
+  @unit
+  Scenario: Resending is throttled per invitation
+    Given "ana" resent the invitation
+    When "ana" resends the same invitation again within the throttle window
+    Then the resend is refused as too soon
+    And the invitation keeps the code the first resend minted
+
   # ── The support pain, replayed ─────────────────────────────────────────
 
   @integration

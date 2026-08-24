@@ -1171,12 +1171,31 @@ const presentations = {
   invite_expired: {
     title: "This invitation has expired",
     describe: () =>
-      "Ask the person who invited you for a new invitation — they can resend it in one click.",
+      "Ask for a fresh one and whoever invited you can send it in one click.",
   },
   invite_not_found: {
     title: "Invite not found",
     describe: () =>
       "It may have been revoked or already accepted. Reload to see the pending invites.",
+  },
+  invite_throttled: {
+    title: "That was just sent",
+    describe: (error) => {
+      const seconds = num(error, "retryAfterSeconds", 0);
+      const minutes = Math.ceil(seconds / 60);
+      return seconds > 0
+        ? `Check the inbox — including spam — and try again in ${minutes} ${minutes === 1 ? "minute" : "minutes"}.`
+        : "Check the inbox — including spam — before sending another.";
+    },
+  },
+  invite_wrong_account: {
+    title: "You're signed in as a different account",
+    describe: (error) => {
+      const hint = str(error, "invitedHint", "");
+      return hint
+        ? `This invitation was sent to ${hint}. Sign out and sign back in as that account to accept it.`
+        : "Sign out and sign back in as the account this invitation was sent to.";
+    },
   },
   team_not_in_organization: {
     title: "That team isn't in this organization",

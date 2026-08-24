@@ -526,9 +526,9 @@ describe("Organization Invites Integration", () => {
         });
 
         expect(result.invite.inviteCode).not.toBe(invite.inviteCode);
-        expect(
-          new Date(result.invite.expiration!).getTime(),
-        ).toBeGreaterThan(Date.now() + 13 * 24 * 60 * 60 * 1000);
+        expect(new Date(result.invite.expiration!).getTime()).toBeGreaterThan(
+          Date.now() + 13 * 24 * 60 * 60 * 1000,
+        );
         expect(mockSendInviteEmail).toHaveBeenCalledWith(
           expect.objectContaining({ inviteCode: result.invite.inviteCode }),
         );
@@ -816,5 +816,4 @@ describe("Organization Invites Integration", () => {
       });
     });
   });
-
 });

@@ -57,9 +57,7 @@ vi.mock("@ee/governance/services/personalWorkspace.service", () => ({
 // for the user's verified addresses. `null` = not on identifiers, keep the
 // legacy session-email comparison — the default here so the pre-identifier
 // tests exercise exactly the legacy branch.
-const verifiedEmailsOfMock = vi.hoisted(() =>
-  vi.fn().mockResolvedValue(null),
-);
+const verifiedEmailsOfMock = vi.hoisted(() => vi.fn().mockResolvedValue(null));
 vi.mock("~/server/app-layer/identity/runtime", () => ({
   identityEmail: () => ({ verifiedEmailsOf: verifiedEmailsOfMock }),
 }));

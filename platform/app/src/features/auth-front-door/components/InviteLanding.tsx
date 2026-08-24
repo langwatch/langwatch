@@ -1,9 +1,9 @@
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useRef } from "react";
 import { AuthCard } from "~/components/auth/AuthCard";
 import { HandledErrorAlert, readHandledError } from "~/features/errors";
 import { api } from "~/utils/api";
-import { signIn, useSession } from "~/utils/auth-client";
+import { signIn, signOut, useSession } from "~/utils/auth-client";
 import Link from "~/utils/compat/next-link";
 import { hardRedirect } from "~/utils/hardRedirect";
 import { useSignInRouting } from "../hooks/useSignInRouting";
@@ -30,13 +30,23 @@ export function InviteLanding({ inviteCode }: { inviteCode: string }) {
     { retry: false, refetchOnWindowFocus: false },
   );
 
-  if (landing.isLoading) return null;
-
   if (landing.error) {
-    return <InviteDeadEnd error={landing.error} />;
+    return <InviteDeadEnd error={landing.error} inviteCode={inviteCode} />;
   }
 
-  if (!landing.data) return null;
+  // A card that says it is working, never a blank page. This wait is a
+  // network round trip on somebody's first contact with us, and an empty
+  // white screen is how a slow connection reads as a broken link.
+  if (!landing.data) {
+    return (
+      <AuthCard title="Invitation">
+        <HStack gap={3} data-testid="invite-loading">
+          <Spinner size="sm" color="orange.500" />
+          <Text color="fg.muted">Looking up your invitation…</Text>
+        </HStack>
+      </AuthCard>
+    );
+  }
 
   return session ? (
     <ConfirmAndJoin
@@ -53,22 +63,22 @@ export function InviteLanding({ inviteCode }: { inviteCode: string }) {
 }
 
 /**
- * An expired invitation is recoverable, so it says so and names the way: the
- * registry copy for `invite_expired` asks the inviter for a fresh one.
- * Everything else is the quiet dead end, which describes nothing on purpose.
+ * An expired invitation is recoverable, so it gets the screen that recovers
+ * it. Everything else is the quiet dead end, which describes nothing on
+ * purpose — a refusal that explained itself would be a way to learn which
+ * organizations exist by guessing at codes.
  */
-function InviteDeadEnd({ error }: { error: unknown }) {
+function InviteDeadEnd({
+  error,
+  inviteCode,
+}: {
+  error: unknown;
+  inviteCode: string;
+}) {
   const code = readHandledError(error)?.code;
 
   if (code === "invite_expired") {
-    return (
-      <AuthCard title="Invitation">
-        <HandledErrorAlert
-          error={error}
-          fallbackTitle="This invitation has expired"
-        />
-      </AuthCard>
-    );
+    return <ExpiredInvite error={error} inviteCode={inviteCode} />;
   }
 
   return (
@@ -76,6 +86,60 @@ function InviteDeadEnd({ error }: { error: unknown }) {
       <Text data-testid="invite-dead-end">
         This invitation is no longer available.
       </Text>
+    </AuthCard>
+  );
+}
+
+/**
+ * An expired invitation, with the one thing its holder can actually do.
+ *
+ * They cannot mint themselves a new link — only an admin can, and that is
+ * what keeps expiry meaningful — so the button asks on their behalf and the
+ * screen then says so. It deliberately never names who was asked: who runs
+ * an organization is not something an expired link should teach.
+ */
+function ExpiredInvite({
+  error,
+  inviteCode,
+}: {
+  error: unknown;
+  inviteCode: string;
+}) {
+  const ask = api.frontDoor.requestFreshInvite.useMutation();
+
+  return (
+    <AuthCard title="Invitation">
+      <VStack width="full" align="stretch" gap={4}>
+        <HandledErrorAlert
+          error={error}
+          fallbackTitle="This invitation has expired"
+        />
+        {ask.isSuccess ? (
+          <Text data-testid="invite-refresh-asked" color="fg.muted">
+            We let the organization know. You will get a fresh invitation by
+            email once somebody there sends it.
+          </Text>
+        ) : (
+          <>
+            {ask.error ? (
+              <HandledErrorAlert
+                error={ask.error}
+                fallbackTitle="Couldn't ask for a new invitation"
+              />
+            ) : null}
+            <HStack>
+              <Button
+                colorPalette="orange"
+                loading={ask.isPending}
+                data-testid="invite-ask-again"
+                onClick={() => ask.mutate({ inviteCode })}
+              >
+                Ask for a new invitation
+              </Button>
+            </HStack>
+          </>
+        )}
+      </VStack>
     </AuthCard>
   );
 }
@@ -159,13 +223,21 @@ function ConfirmAndJoin({
     },
   });
 
+  // Signed in as somebody else is the one failure with a way out rather than
+  // a retry, so it replaces the join button instead of sitting above it:
+  // clicking Join again would fail the same way every time.
+  const wrongAccount =
+    readHandledError(accept.error)?.code === "invite_wrong_account";
+
   return (
     <AuthCard title={`Join ${organizationName}`}>
       <VStack width="full" align="stretch" gap={4}>
-        <Text data-testid="invite-confirm">
-          You have been invited to {organizationName}. Joining adds your account
-          to it.
-        </Text>
+        {wrongAccount ? null : (
+          <Text data-testid="invite-confirm">
+            You have been invited to {organizationName}. Joining adds your
+            account to it.
+          </Text>
+        )}
         {accept.error ? (
           <HandledErrorAlert
             error={accept.error}
@@ -173,13 +245,31 @@ function ConfirmAndJoin({
           />
         ) : null}
         <HStack>
-          <Button
-            colorPalette="orange"
-            loading={accept.isPending}
-            onClick={() => accept.mutate({ inviteCode })}
-          >
-            Join {organizationName}
-          </Button>
+          {wrongAccount ? (
+            <Button
+              colorPalette="orange"
+              data-testid="invite-switch-account"
+              onClick={() => {
+                // Sign out without the endpoint's own redirect, then come
+                // back here: the invitation is the thing they were doing,
+                // and logout's default lands on a bare sign-in page that has
+                // forgotten all about it.
+                void signOut({ redirect: false }).finally(() => {
+                  hardRedirect(inviteCallbackUrl(inviteCode));
+                });
+              }}
+            >
+              Sign out and use that account
+            </Button>
+          ) : (
+            <Button
+              colorPalette="orange"
+              loading={accept.isPending}
+              onClick={() => accept.mutate({ inviteCode })}
+            >
+              Join {organizationName}
+            </Button>
+          )}
         </HStack>
       </VStack>
     </AuthCard>

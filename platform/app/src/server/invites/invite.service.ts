@@ -79,8 +79,10 @@ import {
 } from "../license-enforcement/license-enforcement.repository";
 import { isViewOnlyCustomRole } from "../license-enforcement/member-classification";
 import { sendInviteEmail } from "../mailer/inviteEmail";
+import { sendInviteReRequestEmail } from "../mailer/inviteReRequestEmail";
 import { assertNoPersonalTeamScope } from "../role-bindings/personal-team-scope";
 import { buildInviteAcceptUrl } from "./invite-link";
+import { assertInviteSendAllowed } from "./invite-send-throttle";
 
 const logger = createLogger("langwatch:invites");
 
@@ -147,6 +149,32 @@ export function matchInviteToAcceptor({
     matches: hit !== undefined,
     viaIdentifierId: hit?.identifierId ?? null,
   };
+}
+
+/**
+ * The invited address as somebody signed in as the wrong account is allowed
+ * to see it: first character, then the domain — `s•••@acme.com`.
+ *
+ * Enough to recognize an address you already own, and not enough to learn
+ * one you do not. The domain survives whole because that is the half that
+ * makes the hint useful ("oh, my work account"), and the half a person
+ * holding a link for a colleague at that company already knows. The local
+ * part is what identifies the individual, so only its first character
+ * survives — and a single-character local part reveals nothing further by
+ * being shown, since the mask would be the whole of it either way.
+ *
+ * Anything that is not an address is masked whole rather than passed
+ * through: a value this function cannot parse is a value it cannot promise
+ * to have redacted.
+ */
+export function maskInvitedAddress(email: string): string {
+  const trimmed = email.trim();
+  const at = trimmed.lastIndexOf("@");
+  if (at <= 0 || at === trimmed.length - 1) return "•••";
+
+  const local = trimmed.slice(0, at);
+  const domain = trimmed.slice(at + 1);
+  return `${local[0]}•••@${domain}`;
 }
 
 /**
@@ -1164,6 +1192,71 @@ export class InviteService {
         expiration: freshExpiration,
       },
       emailNotSent,
+    };
+  }
+
+  /**
+   * The invitee, holding an expired link, asks for a fresh one (D11).
+   *
+   * The asymmetry with `resendInvite` is deliberate: this mints nothing.
+   * Only an admin can rotate a code, so all this does is tell the admins
+   * who can that somebody is waiting. A path that let the holder of a stale
+   * code mint a live one would make expiry decorative.
+   *
+   * The caller may be signed out and is identified by nothing but the code,
+   * so the answer says only that the ask went out. It names no admin: who
+   * runs an organization is not something an expired link should teach.
+   * Non-expired invitations answer like missing ones, which keeps this from
+   * being a way to probe a code's state.
+   */
+  async requestFreshInvite({
+    inviteCode,
+    membersSettingsUrl,
+  }: {
+    inviteCode: string;
+    membersSettingsUrl: string;
+  }): Promise<{ notifiedAdmins: number }> {
+    const existing = await this.prisma.organizationInvite.findUnique({
+      where: { inviteCode },
+      include: { organization: true },
+    });
+    if (existing?.status !== "PENDING" || !existing.organization) {
+      throw new InviteNotFoundError("Invitation not found");
+    }
+    if (resolveInviteDisplayStatus(existing) !== "EXPIRED") {
+      throw new InviteNotFoundError("Invitation not found");
+    }
+
+    // The same counter the admin's resend spends, keyed by the invitation's
+    // stable id rather than its code — the code rotates on every resend, so
+    // keying on it would hand out a fresh allowance with each new link.
+    // Spent here, after the code resolves, so the two routes to one inbox
+    // cannot be alternated to double the mail.
+    await assertInviteSendAllowed({ inviteId: existing.id });
+
+    const admins = await this.prisma.organizationUser.findMany({
+      where: { organizationId: existing.organizationId, role: "ADMIN" },
+      select: { user: { select: { email: true } } },
+    });
+    const adminEmails = admins
+      .map((admin) => admin.user.email)
+      .filter((email): email is string => Boolean(email));
+
+    // One failing address must not silence the rest: an organization whose
+    // first admin has a bouncing address still has the others to ask.
+    const results = await Promise.allSettled(
+      adminEmails.map((adminEmail) =>
+        sendInviteReRequestEmail({
+          adminEmail,
+          organizationName: existing.organization?.name ?? "",
+          invitedEmail: existing.email,
+          membersSettingsUrl,
+        }),
+      ),
+    );
+
+    return {
+      notifiedAdmins: results.filter((r) => r.status === "fulfilled").length,
     };
   }
 

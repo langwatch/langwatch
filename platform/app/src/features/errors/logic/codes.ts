@@ -131,6 +131,8 @@ export const APP_ERROR_CODES = [
   "invalid_experiment_configuration",
   "invite_expired",
   "invite_not_found",
+  "invite_throttled",
+  "invite_wrong_account",
   "langy_agent_at_capacity",
   "langy_agent_errored",
   "langy_agent_session_lost",

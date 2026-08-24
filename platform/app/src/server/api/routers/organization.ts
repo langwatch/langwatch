@@ -5,7 +5,6 @@ import { z } from "zod";
 import { fireTeamMemberInvitedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
 import { fireInviteAcceptedNurturingCalls } from "~/../ee/billing/nurturing/hooks/inviteAcceptance";
 import { env } from "~/env.mjs";
-import { identityEmail } from "~/server/app-layer/identity/runtime";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
@@ -13,6 +12,7 @@ import {
 } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
+import { identityEmail } from "~/server/app-layer/identity/runtime";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
 import { MemberSeatLimitReachedError } from "~/server/app-layer/organizations/errors";
 import { enrichTeamWithRoleBindings } from "~/server/app-layer/organizations/organization.service";
@@ -36,14 +36,17 @@ import {
   INVITE_NOT_READY_MESSAGE,
   InviteExpiredError,
   InviteNotFoundError,
+  InviteWrongAccountError,
   OrganizationNotFoundError,
 } from "../../invites/errors";
-import { buildInviteAcceptUrl } from "../../invites/invite-link";
 import {
   InviteService,
+  maskInvitedAddress,
   matchInviteToAcceptor,
   resolveInviteDisplayStatus,
 } from "../../invites/invite.service";
+import { buildInviteAcceptUrl } from "../../invites/invite-link";
+import { assertInviteSendAllowed } from "../../invites/invite-send-throttle";
 import { LimitExceededError } from "../../license-enforcement/errors";
 import { LicenseEnforcementRepository } from "../../license-enforcement/license-enforcement.repository";
 import {
@@ -691,6 +694,14 @@ export const organizationRouter = createTRPCRouter({
     .input(z.object({ inviteId: z.string(), organizationId: z.string() }))
     .permission("organization:manage")
     .mutation(async ({ input, ctx }) => {
+      // Throttled per INVITATION, because the thing being protected is the
+      // recipient's inbox rather than this server: an admin with three
+      // invitations out may resend all three, and none of the three gets
+      // mailed repeatedly. Checked before the resend so a refused attempt
+      // leaves the live code alone — rotation is the old link's revocation,
+      // and a throttled click must not quietly break the link already sent.
+      await assertInviteSendAllowed({ inviteId: input.inviteId });
+
       const inviteService = InviteService.create(ctx.prisma);
       const { invite, emailNotSent } = await inviteService.resendInvite({
         organizationId: input.organizationId,
@@ -784,11 +795,13 @@ export const organizationRouter = createTRPCRouter({
             userId: session.user.id,
           }),
         });
+      // Signed in as somebody else is a wrong turn, not a refusal: the screen
+      // names which account is wanted and offers the way back. The hint is
+      // masked because an invite code is a bearer token — the landing already
+      // declines to name the invited address, and a mismatch is not a hole to
+      // read it through.
       if (!inviteEmailMatches) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: `The invite was sent to ${invite.email}, but you are signed in as ${session.user.email}`,
-        });
+        throw new InviteWrongAccountError(maskInvitedAddress(invite.email));
       }
 
       // No transaction: the invite's grants are ledger commands, so the

@@ -8,7 +8,11 @@ import {
   InviteExpiredError,
   InviteNotFoundError,
 } from "~/server/invites/errors";
-import { resolveInviteDisplayStatus } from "~/server/invites/invite.service";
+import {
+  InviteService,
+  resolveInviteDisplayStatus,
+} from "~/server/invites/invite.service";
+import { buildMembersSettingsUrl } from "~/server/invites/invite-link";
 import { rateLimit } from "~/server/rateLimit";
 import { EmailAlreadyRegisteredError } from "~/server/users/errors";
 import { getClientIp } from "~/utils/getClientIp";
@@ -238,5 +242,50 @@ export const frontDoorRouter = createTRPCRouter({
         inviterName: invite.requestedByUser?.name ?? null,
         alreadyAccepted: status === "ACCEPTED",
       };
+    }),
+
+  /**
+   * "My invitation expired, send me another" (D11).
+   *
+   * The person asking is holding a stale code and may have no session at
+   * all, so this mints nothing: it tells the organization's admins that
+   * somebody is waiting, and they resend from the members table. Letting a
+   * stale code refresh itself would make the expiry decorative.
+   *
+   * Two limits, because they stop different things. The per-IP one stops a
+   * script walking codes; the per-invitation one stops any number of people
+   * turning one invitation into a way to mail somebody repeatedly, and it
+   * is the SAME counter the admin's resend spends, so the two routes to one
+   * inbox cannot be used to double up.
+   *
+   * The answer is the same shape whatever happened, and never says how many
+   * admins exist or who they are.
+   */
+  requestFreshInvite: publicProcedure
+    .input(z.object({ inviteCode: z.string().min(1) }))
+    .noPermission({
+      reason:
+        "asks the holder of an expired code's organization to send a new one; mints nothing, names nobody, and is throttled per code and per IP",
+    })
+    .mutation(async ({ ctx, input }) => {
+      const ip = getClientIp(ctx.req) ?? "unknown";
+      const limit = await rateLimit({
+        key: `frontDoor.requestFreshInvite:${ip}`,
+        windowSeconds: 60 * 60,
+        max: 20,
+      });
+      if (!limit.allowed) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: "Too many attempts. Please try again later.",
+        });
+      }
+
+      await InviteService.create(ctx.prisma).requestFreshInvite({
+        inviteCode: input.inviteCode,
+        membersSettingsUrl: buildMembersSettingsUrl(),
+      });
+
+      return { asked: true };
     }),
 });
