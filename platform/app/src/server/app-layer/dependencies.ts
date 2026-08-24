@@ -1,4 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { AgentService } from "@langwatch/agent-contract";
 import type { WebhookEventsClickHouseRepository } from "~/runtime/app/features/webhooks";
 import type {
   AuthzGrantsService,
@@ -6,11 +7,29 @@ import type {
 } from "@langwatch/authz-contract";
 import type { EventSourcing } from "@langwatch/eventing";
 import type { RedisConnection } from "@langwatch/redis-client";
+import type { PresenceService } from "@langwatch/presence-contract";
+import type { SecretService } from "@langwatch/secret-contract";
+import type { UserService } from "@langwatch/user-contract";
+import type { RoleService } from "@langwatch/role-contract";
+import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type { SystemMigration } from "@langwatch/system-migrations";
-import type { ManagedProviderService } from "@langwatch/enterprise-managed-providers-contract";
+import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
 import type {
+  GovernanceAiToolCatalogService,
+  GovernanceAdminWorkspaceViewAuditService,
+  GovernanceCliBootstrapService,
+  GovernanceCliSessionInventoryService,
+  GovernanceCliTokenRevocationService,
+  GovernanceIngestionKeyService,
   GovernanceOttlGateway,
+  GovernancePolicyService,
+  GovernanceIngestionSourceService,
+  GovernanceActivityMonitorService,
   GovernanceOcsfExportService,
+  GovernancePersonalVirtualKeyService,
+  GovernancePersonalUsageService,
+  GovernanceQuarantineFillService,
+  GovernanceRoutingPolicyService,
   GovernanceSetupStateService,
   IngestionTemplatesService,
 } from "@langwatch/enterprise-governance-contract";
@@ -27,28 +46,33 @@ import type { BillableEventsRepository } from "~/server/event-sourcing/registrat
 import type { AppCommands } from "~/server/event-sourcing/registration/pipelineRegistry";
 import type { FilterService } from "~/server/filters/filter.service";
 import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import type { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
+import type { GatewayBudgetService } from "~/server/gateway/budget.service";
 import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import type { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 import type { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
 import type { NotificationService, NurturingService } from "~/runtime/app/features/billing";
 import type { UsageLimitService } from "./billing/enterprise/usage-limit.service";
 import type { WebhookService } from "./billing/enterprise/webhook.service";
-import type { GovernanceKpisClickHouseRepository } from "../../../ee/governance/services/governanceKpis.clickhouse.repository";
-import type { GovernanceOcsfEventsClickHouseRepository } from "../../../ee/governance/services/governanceOcsfEvents.clickhouse.repository";
-import type { GovernanceTraceActivityClickHouseRepository } from "../../../ee/governance/services/governanceTraceActivity.clickhouse.repository";
-import type { PersonalUsageClickHouseRepository } from "../../../ee/governance/services/personalUsage.clickhouse.repository";
+import type { GovernanceKpisClickHouseRepository } from "~/runtime/app/features/governance/governance-kpis.clickhouse.repository";
+import type { GovernanceOcsfEventsClickHouseRepository } from "~/runtime/app/features/governance/governance-ocsf-events.clickhouse.repository";
+import type { GovernanceTraceActivityClickHouseRepository } from "~/runtime/app/features/governance/governance-trace-activity.clickhouse.repository";
 import type { ClickHouseClientResolver } from "../clickhouse/clickhouseClient";
 import type { StorageMeterService } from "../data-retention/metering/storageMeter.service";
 import type { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
 import type { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
 import type { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
 import type { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
-import type { ExperimentService } from "../experiments/experiment.service";
+import type { ExperimentService } from "@langwatch/experiment-contract";
+import type { ScenarioService } from "@langwatch/scenario-contract";
+import type { SuiteService } from "@langwatch/suite-contract";
+import type { SimulationService } from "@langwatch/simulation-contract";
+import type { DatasetService } from "@langwatch/dataset-contract";
+import type { EvaluationService as EvaluationCapability } from "@langwatch/evaluation-contract";
 import type { ScenarioRunExportService } from "../export/scenario-runs/scenario-run-export.service";
 import type { OpsExplainService } from "../ops/opsExplain.service";
 import type { TraceEditOverlayService } from "../traces/edit-overlay/traceEditOverlay.service";
-import type { EmailSuppressionService } from "./automations/emailSuppression.service";
-import type { TriggerService } from "./automations/trigger.service";
+import type { AutomationService } from "@langwatch/automation-contract";
 import type {
   TestFireResult,
   TestFireTriggerInput,
@@ -67,11 +91,7 @@ import type { GithubInstallationsService } from "./github/github-installations.s
 import type { GithubPullRequestMappingService } from "./github/github-pull-request-mapping.service";
 import type { GithubPullRequestStatusService } from "./github/github-pull-request-status.service";
 import type { GithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
-import type { LangyCredentialService } from "./langy/LangyCredentialService";
-import type { LangyConversationService } from "./langy/langy-conversation.service";
-import type { LangyFeedbackPromptService } from "./langy/langy-feedback-prompt.service";
-import type { LangyMessageService } from "./langy/langy-message.service";
-import type { LangyTurnService } from "./langy/langy-turn.service";
+import type { LangyService } from "@langwatch/langy-contract";
 import type { BlobStoreService } from "./ops/blob-store.service";
 import type { EventExplorerService } from "./ops/event-explorer.service";
 import type { ManagerExplorerService } from "./ops/manager-explorer.service";
@@ -81,11 +101,9 @@ import type { ReplayService } from "./ops/replay.service";
 import type { SchedulerOpsService } from "./ops/scheduler-ops.service";
 import type { OpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
 import type { OrganizationService } from "./organizations/organization.service";
-import type { PresenceService } from "./presence/presence.service";
-import type { ProjectService } from "./projects/project.service";
+import type { ProjectService } from "@langwatch/project-contract";
 import type { ShareService } from "./share/share.service";
 import type { SharedTracePayloadCache } from "./share/shared-trace-cache.service";
-import type { SimulationRunService } from "./simulations/simulation-run.service";
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import type { SuiteRunService } from "./suites/suite-run.service";
@@ -105,6 +123,11 @@ import type { TraceListService } from "./traces/trace-list.service";
 import type { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
 import type { TraceSummaryService } from "./traces/trace-summary.service";
 import type { UsageService } from "./usage/usage.service";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { PromptService } from "@langwatch/prompt-contract";
+import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { WorkflowService } from "@langwatch/workflow-contract";
+import type { MonitorService } from "@langwatch/monitor-contract";
 
 export interface DataRetentionDependencies {
   policy: DataRetentionPolicyService;
@@ -131,11 +154,28 @@ export interface OpsDependencies {
 
 export interface AppDependencies {
   config: AppConfig;
+  /** One process-owned Agent capability shared by every transport. */
+  agents: AgentService;
+  /** One process-owned Dataset capability shared by REST, tRPC, and workers. */
+  dataset: DatasetService;
+  /** One process-owned API-key capability; transports must reuse this instance. */
+  apiKeys: ApiKeyService;
 
   managedProviders: ManagedProviderService;
+  /** One process-owned Model Provider capability shared by all transports. */
+  modelProviders: ModelProviderService;
+  /** One process-owned Prompt capability shared by REST, tRPC and workers. */
+  prompts: PromptService;
+  /** One process-owned Evaluator capability shared by REST, tRPC and workers. */
+  evaluators: EvaluatorService;
+  /** One process-owned Workflow capability shared by REST, tRPC and workers. */
+  workflows: WorkflowService;
+  /** One process-owned Monitor capability shared by REST, tRPC and workers. */
+  monitors: MonitorService;
 
   broadcast: BroadcastService;
   presence: PresenceService;
+  secrets: SecretService;
 
   traces: {
     summary: TraceSummaryService;
@@ -151,6 +191,8 @@ export interface AppDependencies {
     editOverlay: TraceEditOverlayService;
   };
   evaluations: {
+    /** One process-owned Evaluation capability shared by transports and workers. */
+    service: EvaluationCapability;
     runs: EvaluationRunService;
     execution: EvaluationExecutionService;
     performance: MonitorPerformanceService;
@@ -170,16 +212,10 @@ export interface AppDependencies {
   analytics: {
     service: AnalyticsService;
   };
-  simulations: {
-    runs: SimulationRunService;
-    /**
-     * CSV export of run history. A sibling of `runs` rather than a method on
-     * it: the export sweeps with its own keyset pagination and serializers,
-     * and the API layer should reach it here instead of assembling one from
-     * `runs.repository`.
-     */
-    export: ScenarioRunExportService;
-  };
+  /** One process-owned Simulation capability for reads and execution. */
+  simulations: SimulationService;
+  /** API-specific CSV composition over the canonical Simulation service. */
+  simulationExports: ScenarioRunExportService;
   suiteRuns: {
     runs: SuiteRunService;
   };
@@ -212,6 +248,10 @@ export interface AppDependencies {
    * each construct their own, which is the duplication this replaces.
    */
   gateway: {
+    /** The one process-owned member budget read service. */
+    budgetOverview: BudgetOverviewService;
+    /** The one process-owned gateway budget decision service. */
+    budgetDecisions: GatewayBudgetService;
     budgets: GatewayBudgetClickHouseRepository | undefined;
     virtualKeySpend: GatewayVirtualKeySpendRepository | undefined;
     /** Reconciliation reads for the spend-events pull API and its tRPC
@@ -281,14 +321,20 @@ export interface AppDependencies {
    * ClickHouse.
    */
   governance: {
+    /** The process-owned Governance activity read service. */
+    activity: GovernanceActivityMonitorService;
     /** The process-owned template catalogue and authoring service. */
     ingestionTemplates: IngestionTemplatesService;
+    /** The process-owned ingestion-source lifecycle and secret service. */
+    ingestionSources: GovernanceIngestionSourceService;
     /** Process-owned Governance persona/setup detection. */
     setupState: GovernanceSetupStateService;
     /** Process-owned, cursor-paginated OCSF export. */
     ocsfExport: GovernanceOcsfExportService;
     /** Process-owned OTTL validation and transformation gateway. */
     ottlGateway: GovernanceOttlGateway;
+    /** Process-owned bundled-versus-billable source policy. */
+    policy: GovernancePolicyService;
     /** Canonical usage extraction shared by every Governance receiver. */
     canonicalCostExtractor: CanonicalCostExtractorService;
     ocsfEvents: GovernanceOcsfEventsClickHouseRepository | undefined;
@@ -300,7 +346,16 @@ export interface AppDependencies {
      *  current/baseline window comparison. */
     kpis: GovernanceKpisClickHouseRepository | undefined;
     /** The /me dashboard's spend/token/model rollups. */
-    personalUsage: PersonalUsageClickHouseRepository | undefined;
+    personalUsage: GovernancePersonalUsageService;
+    routingPolicies: GovernanceRoutingPolicyService;
+    personalVirtualKeys: GovernancePersonalVirtualKeyService;
+    aiTools: GovernanceAiToolCatalogService;
+    cliBootstrap: GovernanceCliBootstrapService;
+    cliSessions: GovernanceCliSessionInventoryService;
+    cliTokenRevocation: GovernanceCliTokenRevocationService;
+    adminWorkspaceViewAudit: GovernanceAdminWorkspaceViewAuditService;
+    quarantineFill: GovernanceQuarantineFillService;
+    ingestionKeys: GovernanceIngestionKeyService;
   };
   /** Billing-month usage rollups (billable_events + trace_summaries) behind
    *  `billableEventsQuery.ts`'s exported query functions. */
@@ -344,24 +399,22 @@ export interface AppDependencies {
     service: OpsExplainService;
   };
   /** ADR-046: Langy conversations as an event-sourced projection. */
-  langy: {
-    conversations: LangyConversationService;
-    turns: LangyTurnService;
-    messages: LangyMessageService;
-    credentials: LangyCredentialService;
-    feedbackPrompt: LangyFeedbackPromptService;
-  };
+  langy: LangyService;
   experiments: ExperimentService;
-  triggers: TriggerService;
+  scenarios: ScenarioService;
+  suites: SuiteService;
+  automation: AutomationService;
   /** Wraps `testFireTrigger(deps, input)` with the composition-time
    *  `{baseHost, notifier}` bag already bound — the router only needs
    *  to pass the per-call input. */
   triggerTemplates: {
     testFire: (input: TestFireTriggerInput) => Promise<TestFireResult>;
   };
-  emailSuppressions: EmailSuppressionService;
   organizations: OrganizationService;
   projects: ProjectService;
+  users: UserService;
+  /** The one process-owned custom-role capability. */
+  roles: RoleService;
   /**
    * ADR-092 decision 25 — the one permission-checking service. Every grant
    * check on every surface (tRPC declarations, Hono session and API-key

@@ -49,19 +49,27 @@ async function settleWithTimeout({
 
 export class App {
   readonly config: AppConfig;
+  readonly agents: AppDependencies["agents"];
+  readonly dataset: AppDependencies["dataset"];
+  readonly apiKeys: AppDependencies["apiKeys"];
   readonly managedProviders: AppDependencies["managedProviders"];
+  readonly modelProviders: AppDependencies["modelProviders"];
+  readonly prompts: AppDependencies["prompts"];
+  readonly evaluators: AppDependencies["evaluators"];
+  readonly workflows: AppDependencies["workflows"];
+  readonly monitors: AppDependencies["monitors"];
 
   readonly broadcast: AppDependencies["broadcast"];
   readonly presence: AppDependencies["presence"];
+  readonly secrets: AppDependencies["secrets"];
   readonly traces: AppDependencies["traces"] & AppCommands["traces"];
   readonly evaluations: AppDependencies["evaluations"] &
     AppCommands["evaluations"];
-  readonly experimentRuns: AppCommands["experimentRuns"];
   readonly dspySteps: AppDependencies["dspySteps"];
   /** The ADR-034 analytics read API. */
   readonly analytics: AppDependencies["analytics"];
-  readonly simulations: AppDependencies["simulations"] &
-    AppCommands["simulations"];
+  readonly simulations: AppDependencies["simulations"];
+  readonly simulationExports: AppDependencies["simulationExports"];
   readonly suiteRuns: AppDependencies["suiteRuns"] & AppCommands["suiteRuns"];
   readonly topicClustering: AppDependencies["topicClustering"] &
     AppCommands["topicClustering"];
@@ -87,11 +95,14 @@ export class App {
   readonly github: AppDependencies["github"];
   readonly langy: AppDependencies["langy"];
   readonly experiments: AppDependencies["experiments"];
-  readonly triggers: AppDependencies["triggers"];
+  readonly scenarios: AppDependencies["scenarios"];
+  readonly suites: AppDependencies["suites"];
+  readonly automation: AppDependencies["automation"];
   readonly triggerTemplates: AppDependencies["triggerTemplates"];
-  readonly emailSuppressions: AppDependencies["emailSuppressions"];
   readonly organizations: AppDependencies["organizations"];
   readonly projects: AppDependencies["projects"];
+  readonly users: AppDependencies["users"];
+  readonly roles: AppDependencies["roles"];
   readonly permissions: AppDependencies["permissions"];
   readonly authzGrants: AppDependencies["authzGrants"];
   readonly tokenizer: AppDependencies["tokenizer"];
@@ -129,13 +140,24 @@ export class App {
 
   constructor(deps: AppDependencies) {
     this.config = deps.config;
+    this.agents = deps.agents;
+    this.dataset = deps.dataset;
+    this.apiKeys = deps.apiKeys;
     this.managedProviders = deps.managedProviders;
+    this.modelProviders = deps.modelProviders;
+    this.prompts = deps.prompts;
+    this.evaluators = deps.evaluators;
+    this.workflows = deps.workflows;
+    this.monitors = deps.monitors;
     this.experiments = deps.experiments;
-    this.triggers = deps.triggers;
+    this.scenarios = deps.scenarios;
+    this.suites = deps.suites;
+    this.automation = deps.automation;
     this.triggerTemplates = deps.triggerTemplates;
-    this.emailSuppressions = deps.emailSuppressions;
     this.organizations = deps.organizations;
     this.projects = deps.projects;
+    this.users = deps.users;
+    this.roles = deps.roles;
     this.permissions = deps.permissions;
     this.authzGrants = deps.authzGrants;
     this.tokenizer = deps.tokenizer;
@@ -150,12 +172,13 @@ export class App {
     this.usageLimits = deps.usageLimits;
     this.broadcast = deps.broadcast;
     this.presence = deps.presence;
+    this.secrets = deps.secrets;
     this.traces = { ...deps.traces, ...deps.commands.traces };
     this.evaluations = { ...deps.evaluations, ...deps.commands.evaluations };
-    this.experimentRuns = deps.commands.experimentRuns;
     this.dspySteps = deps.dspySteps;
     this.analytics = deps.analytics;
-    this.simulations = { ...deps.simulations, ...deps.commands.simulations };
+    this.simulations = deps.simulations;
+    this.simulationExports = deps.simulationExports;
     this.suiteRuns = { ...deps.suiteRuns, ...deps.commands.suiteRuns };
     this.topicClustering = {
       ...deps.topicClustering,

@@ -19,6 +19,7 @@ import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
 import { describeRoute, resolver } from "hono-openapi";
+import type { Context } from "hono";
 import { nanoid } from "nanoid";
 import { OpenAI } from "openai";
 import type Stripe from "stripe";
@@ -62,8 +63,6 @@ import {
   recordTrackedEventSpan,
 } from "~/server/app-layer/events/track-event.service";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
-import { ProjectService } from "~/server/app-layer/projects/project.service";
-import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import {
@@ -89,7 +88,12 @@ import {
   type TrackEventRESTParamsValidator,
   trackEventRESTParamsValidatorSchema,
 } from "~/server/tracer/types";
-import { runWorkflow as runWorkflowFn } from "~/server/workflows/runWorkflow";
+import {
+  WorkflowNotFoundError,
+  WorkflowNotPublishedError,
+  WorkflowVersionNotFoundError,
+} from "@langwatch/workflow-contract";
+import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { encrypt } from "~/utils/encryption";
 import { getClientIpFromHonoContext } from "~/utils/getClientIp";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -120,10 +124,10 @@ const analyticsRequestSchema = sharedFiltersInputSchema
 
 const logger = createLogger("langwatch:misc");
 // Shared auth middlewares for every API-key-aware handler in this file.
-// `createUnifiedAuthMiddleware` runs the extractCredentials → TokenResolver
+// `createUnifiedAuthMiddleware` runs the extractCredentials → ApiKeyService
 // → setContext → late markUsed pipeline once; `requireApiKeyPermission`
 // enforces the per-route ceiling and returns 403 on denial.
-const authMiddleware = createUnifiedAuthMiddleware({ prisma });
+const authMiddleware = createUnifiedAuthMiddleware({});
 const requireAnalyticsView = requireApiKeyPermission({
   permission: "analytics:view",
 });
@@ -297,7 +301,7 @@ const RAG_SYSTEM_PROMPT =
   "You are a restaurant expert knowing the best around town.";
 
 // NOTE: /demo/hotel_bot is intentionally NOT migrated to the unified
-// extractCredentials + TokenResolver + enforceApiKeyCeiling pipeline. It is a
+// extractCredentials + ApiKeyService + enforceApiKeyCeiling pipeline. It is a
 // demo fixture that only forwards the caller's token onward to /api/collector,
 // which performs full API-key/legacy auth + ceiling enforcement itself. Adding a
 // second layer here would double-validate the same token and require a
@@ -502,7 +506,7 @@ secured.access(experimentsManageAuth).post(
 
     for (const param of params) {
       try {
-        await processDSPyStep(project, param);
+        await processDSPyStep(c.app.experiments, project, param);
       } catch (error) {
         if (error instanceof z.ZodError) {
           logger.error(
@@ -699,6 +703,7 @@ secured.access(experimentsManageAuth).post(
     let experiment;
     try {
       experiment = await findOrCreateExperiment({
+        experiments: c.app.experiments,
         project,
         // The body accepts either identifier and this handler used to forward
         // only the slug, so an id-only request passed validation and then hit
@@ -912,13 +917,7 @@ secured
     // TeamUser row, so the old `team.members.some` check rejected them with a
     // false 403. `project:view` is the baseline grant every team role (incl.
     // VIEWER) has, and probeProjectPermission also honors org-level access.
-    // ProjectService is constructed directly (not via getApp()) so this handler
-    // stays unit-testable without booting the app container — the same pattern
-    // used in presets.ts and the project-service middleware.
-    const projectService = new ProjectService(
-      new PrismaProjectRepository(prisma),
-    );
-    const project = await projectService.getById(projectId);
+    const project = await getApp().projects.tryGetById(projectId);
 
     if (
       !project ||
@@ -1430,16 +1429,14 @@ secured.access(triggersManageAuth).post(
     try {
       const validatedData = slackTriggerBodySchema.parse(body);
 
-      await prisma.trigger.create({
-        data: {
-          projectId: project.id,
-          action: TriggerAction.SEND_SLACK_MESSAGE,
-          name: validatedData.name,
-          message: validatedData.message,
-          filters: JSON.stringify(validatedData.filters),
-          actionParams: { slackWebhook: validatedData.slack_webhook },
-          alertType: validatedData.alert_type,
-        },
+      await c.app.automation.create({
+        projectId: project.id,
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+        name: validatedData.name,
+        message: validatedData.message,
+        filters: validatedData.filters,
+        actionParams: { slackWebhook: validatedData.slack_webhook },
+        alertType: validatedData.alert_type,
       });
 
       return c.json({ message: "Slack trigger created successfully" });
@@ -1500,7 +1497,7 @@ secured.access(workflowsManageAuth).post(
 );
 
 async function handleWorkflowRun(
-  c: any,
+  c: Context<{ Variables: UnifiedAuthVariables }>,
   workflowId: string,
   versionId: string | undefined,
 ) {
@@ -1511,9 +1508,9 @@ async function handleWorkflowRun(
 
   const project = c.get("project");
 
-  let body: Record<string, any>;
+  let body: Record<string, unknown>;
   try {
-    body = await c.req.json();
+    body = await c.req.json<Record<string, unknown>>();
   } catch {
     return c.json({ message: "Invalid body" }, 400);
   }
@@ -1522,7 +1519,32 @@ async function handleWorkflowRun(
   // already knows how to map HandledError subclasses (e.g. runWorkflow's
   // NotFoundError/ValidationError) to the right status code. Catching here
   // and hard-coding 500 was masking those as raw 500s regardless of type.
-  const result = await runWorkflowFn(workflowId, project.id, body, versionId);
+  let result: unknown;
+  try {
+    result = await c.app.workflows.run({
+      workflowId,
+      projectId: project.id,
+      inputs: body,
+      versionId,
+    });
+  } catch (error) {
+    if (error instanceof WorkflowNotFoundError) {
+      throw new NotFoundError("workflow_not_found", "Workflow", workflowId);
+    }
+    if (error instanceof WorkflowNotPublishedError) {
+      throw new ValidationError("Workflow not published", {
+        meta: { workflowId },
+      });
+    }
+    if (error instanceof WorkflowVersionNotFoundError) {
+      throw new NotFoundError(
+        "published_workflow_version_not_found",
+        "Published workflow version",
+        error.versionId,
+      );
+    }
+    throw error;
+  }
   return c.json(result);
 }
 
@@ -1613,10 +1635,15 @@ const extractLLMCallInfo =
     return call;
   };
 
-const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
+const processDSPyStep = async (
+  experiments: import("@langwatch/experiment-contract").ExperimentService,
+  project: Project,
+  param: DSPyStepRESTParams,
+) => {
   const { run_id, index, experiment_id, experiment_slug } = param;
 
   const experiment = await findOrCreateExperiment({
+    experiments,
     project,
     experiment_id,
     experiment_slug,
@@ -1631,15 +1658,13 @@ const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
 
   let totalSize = 0;
   const examples = param.examples.map((example) => ({
-    ...{
-      ...example,
-      trace: example.trace?.map((t) => {
-        if (t.input?.contexts && typeof t.input.contexts !== "string") {
-          t.input.contexts = JSON.stringify(t.input.contexts);
-        }
-        return t;
-      }),
-    },
+    ...example,
+    trace: example.trace?.map((t) => {
+      if (t.input?.contexts && typeof t.input.contexts !== "string") {
+        t.input.contexts = JSON.stringify(t.input.contexts);
+      }
+      return t;
+    }),
     hash: generateHash(example),
   }));
 
