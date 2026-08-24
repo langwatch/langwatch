@@ -115,30 +115,32 @@ describe("Langy prompt optimization: bootstrapping the missing pieces", () => {
     /** @scenario With nothing set up, Langy builds the experiment rather than asking the user to */
     it("recognises the loop from plain words and builds what is missing", async () => {
       const result = await runScenarioAndLog({
-        name: "plain-language complaint with nothing set up",
-        description:
-          "A shop owner who is not an engineer says the support chatbot answers badly. There is no experiment, no dataset and no evaluator, and the user names none of those words. Langy must recognise this as the prompt improvement loop, create what it needs, and keep the plan in the user's language.",
-        agents: [
-          makeLangyAdapter(),
-          scenario.userSimulatorAgent({ model }),
-          scenario.judgeAgent({
-            model,
-            criteria: [
-              "Langy treats this as improving the prompt's answers: it works toward measuring the current answers and making them better.",
-              "Langy creates the experiment and the data it needs itself, rather than telling the user to create one first.",
-              "Langy does not send the user away to instrument their code, add tracing, or connect an SDK before it can help.",
-              "Langy explains the plan in the user's words and never asks them to choose an evaluator type, a model, or a mapping.",
-              ...LANGY_CORE_RULE_CRITERIA,
-            ],
-          }),
-        ],
-        script: [
-          scenario.user(
-            "I run a small online shop and our support chatbot gives bad answers sometimes. I have nothing set up here yet. Can you help me make its answers better? I am not technical.",
-          ),
-          scenario.agent(),
-          scenario.judge(),
-        ],
+        config: {
+          name: "plain-language complaint with nothing set up",
+          description:
+            "A shop owner who is not an engineer says the support chatbot answers badly. There is no experiment, no dataset and no evaluator, and the user names none of those words. Langy must recognise this as the prompt improvement loop, create what it needs, and keep the plan in the user's language.",
+          agents: [
+            makeLangyAdapter(),
+            scenario.userSimulatorAgent({ model }),
+            scenario.judgeAgent({
+              model,
+              criteria: [
+                "Langy treats this as improving the prompt's answers: it works toward measuring the current answers and making them better.",
+                "Langy creates the experiment and the data it needs itself, rather than telling the user to create one first.",
+                "Langy does not send the user away to instrument their code, add tracing, or connect an SDK before it can help.",
+                "Langy explains the plan in the user's words and never asks them to choose an evaluator type, a model, or a mapping.",
+                ...LANGY_CORE_RULE_CRITERIA,
+              ],
+            }),
+          ],
+          script: [
+            scenario.user(
+              "I run a small online shop and our support chatbot gives bad answers sometimes. I have nothing set up here yet. Can you help me make its answers better? I am not technical.",
+            ),
+            scenario.agent(),
+            scenario.judge(),
+          ],
+        },
       });
       if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
       expect(result.success).toBe(true);

@@ -332,19 +332,21 @@ async function runOptimizeScenario({
   name: string;
   description: string;
   slug: string | undefined;
-  script: Parameters<typeof runScenarioAndLog>[0]["script"];
+  script: Parameters<typeof scenario.run>[0]["script"];
   criteria: string[];
 }) {
   return runScenarioAndLog({
-    name,
-    description: slug
-      ? `${description} The experiment's slug is "${slug}".`
-      : description,
-    agents: [
-      langy,
-      scenario.userSimulatorAgent({ model }),
-      scenario.judgeAgent({ model, criteria }),
-    ],
-    script,
+    config: {
+      name,
+      description: slug
+        ? `${description} The experiment's slug is "${slug}".`
+        : description,
+      agents: [
+        langy,
+        scenario.userSimulatorAgent({ model }),
+        scenario.judgeAgent({ model, criteria }),
+      ],
+      script,
+    },
   });
 }
