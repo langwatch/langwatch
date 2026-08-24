@@ -148,6 +148,15 @@ Feature: The identifier model - identity as an event-sourced pipeline
     Then the lock reads as this command's own and the identifier verifies
 
   @unit
+  Scenario: Two VERIFIED arrivals for one address: exactly one holds it
+    Given two users' identity providers call back with the same address
+    And neither user's projection yet carries the other's identifier
+    When both arrivals are handled
+    Then exactly one of them ends VERIFIED
+    And the other dead-ends, so no address has two proven holders
+    And replaying both emissions reaches the same two states
+
+  @unit
   Scenario: A VERIFIED arrival that loses the address lock dead-ends
     Given another user holds the address lock for "sam.j@acme.com"
     When an OAuth identifier arrives VERIFIED for "sam" with the same value

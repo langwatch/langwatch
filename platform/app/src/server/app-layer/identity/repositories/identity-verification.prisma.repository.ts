@@ -18,6 +18,15 @@ import type { PrismaClient } from "~/generated/prisma/client";
  * newer mint" a delete-then-insert rather than bookkeeping. The token column
  * carries the HASH of the emailed token — the raw token exists only in the
  * magic link.
+ *
+ * `identifier` carries no unique constraint (it is better-auth's legacy table,
+ * and the key it IS unique on is the whole `(identifier, token)` pair), so
+ * "replaces" is a convention this module keeps rather than one the database
+ * enforces: two mints racing each other both find nothing to replace and both
+ * insert. Reads take the newest, and CONSUMPTION reaps every generation it
+ * read — otherwise the older row becomes selectable again the moment the newer
+ * one is consumed, and a link a newer mint was supposed to invalidate still
+ * completes.
  */
 
 const IDENTITY_VERIFY_KEY_PREFIX = "identity-verify:";
@@ -66,8 +75,10 @@ export class PrismaIdentityVerificationRepository
     record: IdentityVerificationRecord,
   ): Promise<void> {
     const identifier = keyFor(record.identifierId);
-    // One transaction: a concurrent mint must never leave two records for
-    // the identifier, which the two reads below could otherwise pick apart.
+    // One transaction, so a mint is never observed as a gap between the
+    // delete and the insert. It does not make the pair atomic against a
+    // CONCURRENT mint — nothing here can, without a unique key — which is why
+    // `consume` reaps the generations it reads rather than trusting this.
     await this.prisma.$transaction([
       this.prisma.verificationToken.deleteMany({ where: { identifier } }),
       this.prisma.verificationToken.create({
@@ -110,20 +121,33 @@ export class PrismaIdentityVerificationRepository
     verificationId: string;
   }): Promise<boolean> {
     const identifier = keyFor(identifierId);
-    // The same newest-row rule `findByIdentifierId` reads by, so completion
-    // consumes the record it was checked against.
-    const row = await this.prisma.verificationToken.findFirst({
-      where: { identifier },
-      orderBy: { createdAt: "desc" },
+    return this.prisma.$transaction(async (tx) => {
+      const rows = await tx.verificationToken.findMany({
+        where: { identifier },
+        orderBy: { createdAt: "desc" },
+      });
+      // The same newest-row rule `findByIdentifierId` reads by, so completion
+      // is checked against the record it was offered.
+      const current = rows[0];
+      if (!current) return false;
+      const payload = parsePayload(current.token);
+      if (!payload || payload.verificationId !== verificationId) return false;
+      // Every row this read saw, not just the pair — and that is the whole
+      // point. `identifier` carries no unique constraint, so two mints racing
+      // each other both find nothing to replace and both insert; the newest
+      // answers every read until it is consumed, and then the OLDER one
+      // becomes selectable again, its token and PKCE proof intact. A record a
+      // newer mint superseded must never complete, so consuming the current
+      // generation reaps the generations behind it.
+      //
+      // Bounded to the ids this transaction read, so a mint that lands after
+      // it is a fresh generation rather than collateral.
+      const deleted = await tx.verificationToken.deleteMany({
+        where: { identifier, token: { in: rows.map((row) => row.token) } },
+      });
+      // Single-use is this count: two completions of the same generation both
+      // see the same rows, and exactly one deleteMany reports rows gone.
+      return deleted.count > 0;
     });
-    if (!row) return false;
-    const payload = parsePayload(row.token);
-    if (!payload || payload.verificationId !== verificationId) return false;
-    // Single-use is this delete: two concurrent completions race on the exact
-    // (identifier, token) pair and exactly one deleteMany reports a row gone.
-    const deleted = await this.prisma.verificationToken.deleteMany({
-      where: { identifier, token: row.token },
-    });
-    return deleted.count > 0;
   }
 }

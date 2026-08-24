@@ -126,6 +126,55 @@ describe("attachIdentifier guard", () => {
       expect(facts[0]!.data).toMatchObject({ state: "VERIFIED" });
     });
 
+    /** @scenario "Two VERIFIED arrivals for one address: exactly one holds it" */
+    it("lets exactly one of two concurrent arrivals end VERIFIED, live and on replay", async () => {
+      // Two IdP callbacks for one address, arriving through the same lock.
+      // Neither has a caller to refuse, so the loser resolves by dead-ending
+      // — but only ONE may hold the address, and which one must not depend on
+      // when the projection is read.
+      const heads = new InMemoryHeads();
+      const reservations = new InMemoryReservations();
+      const guards = new IdentityGuards(heads, users, reservations);
+      const other = "user_other";
+
+      const [mine, theirs] = [
+        await guards.attachIdentifier(attachData({ commandId: "idcmd_mine" })),
+        await guards.attachIdentifier(
+          attachData({
+            userId: other,
+            tenantId: other,
+            commandId: "idcmd_theirs",
+            accountId: "acc_2",
+            providerAccountId: "gid_456",
+            actor: { type: "user", id: other },
+          }),
+        ),
+      ];
+      heads.fold(USER, mine);
+      heads.fold(other, theirs);
+
+      const verifiedHolders = (state: InMemoryHeads) =>
+        [...state.heads.values()]
+          .flatMap((held) => Object.values(held.identifiers))
+          .filter((head) => head.state === "VERIFIED")
+          .map((head) => head.userId);
+
+      expect(verifiedHolders(heads)).toEqual([USER]);
+      expect(
+        Object.values(heads.heads.get(other)?.identifiers ?? {}).map(
+          (head) => head.state,
+        ),
+      ).toEqual(["DEAD_END"]);
+
+      // The same emissions, folded from scratch in the same order: the loser
+      // is the loser because the facts say so, not because of read timing.
+      const replayed = new InMemoryHeads();
+      replayed.fold(USER, mine);
+      replayed.fold(other, theirs);
+      expect(verifiedHolders(replayed)).toEqual([USER]);
+      expect(replayed.heads.get(other)).toEqual(heads.heads.get(other));
+    });
+
     /** @scenario "An email attach takes no address lock" */
     it("takes no lock for an ATTACHED arrival, so nobody can squat an address", async () => {
       const reservations = new InMemoryReservations();

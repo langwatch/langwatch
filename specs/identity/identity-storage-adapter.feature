@@ -295,6 +295,14 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And the customer-facing copy comes from the presentation registry, never the raw code
     And the verification proof is not consumed by the refusal
 
+  @integration
+  Scenario: A superseded verification link can never complete
+    Given two verification mints for one identifier raced and both records landed
+    When the newer link is completed
+    Then the older record is reaped with it
+    And the older link cannot complete afterwards
+    And the older link could not have completed before it either
+
   @unit
   Scenario: A verification that loses a uniqueness race reports the collision
     Given a finalized user "sam" completing verification for "shared@acme.com"
