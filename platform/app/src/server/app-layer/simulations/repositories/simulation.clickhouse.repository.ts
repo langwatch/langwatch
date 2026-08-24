@@ -10,6 +10,7 @@ import type {
   BatchHistoryItem,
   BatchSummary,
   ExternalSetSummary,
+  ScenarioLastResultSummary,
   ScenarioRunData,
   ScenarioSetData,
 } from "~/server/scenarios/scenario-event.types";
@@ -1236,6 +1237,81 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       failedCount: Number(row.FailCount),
       totalCount: Number(row.TotalCount),
       lastRunTimestamp: Number(row.LastRunAt),
+    }));
+  }
+
+  /**
+   * The latest run result per scenario inside the window, for the last-result
+   * cells of the test cases table.
+   *
+   * "Latest" is resolved with argMax over UpdatedAt across the scenario's
+   * deduped runs, matching how every other latest-wins read in this file
+   * picks a row. The dedup subquery keeps the ArchivedAt filter honest: an
+   * archived run's older versions still carry a NULL ArchivedAt, so the
+   * filter runs on deduped rows only (the getScenarioSetsData pattern).
+   */
+  async getLastResultSummaries({
+    projectId,
+    scenarioIds,
+    startDate,
+    endDate,
+  }: {
+    projectId: string;
+    scenarioIds?: string[];
+    startDate?: number;
+    endDate?: number;
+  }): Promise<ScenarioLastResultSummary[]> {
+    if (scenarioIds !== undefined && scenarioIds.length === 0) {
+      return [];
+    }
+    const dateFilter = buildDateFilter({ startDate, endDate });
+    const scenarioFilter =
+      scenarioIds !== undefined
+        ? "AND ScenarioId IN ({scenarioIds:Array(String)})"
+        : "";
+    const whereFilters = `TenantId = {tenantId:String} AND ScenarioId != '' ${scenarioFilter} ${dateFilter.whereClause}`;
+
+    const rows = await this.queryRows<{
+      ScenarioId: string;
+      LastStatus: string;
+      MetCriteriaCount: string;
+      UnmetCriteriaCount: string;
+      LastRunAt: string;
+      LastBatchRunId: string;
+      LastScenarioSetId: string;
+    }>(
+      `SELECT
+        ScenarioId,
+        argMax(Status, UpdatedAt)                                   AS LastStatus,
+        toString(argMax(length(MetCriteria), UpdatedAt))            AS MetCriteriaCount,
+        toString(argMax(length(UnmetCriteria), UpdatedAt))          AS UnmetCriteriaCount,
+        toString(toUnixTimestamp64Milli(max(ifNull(StartedAt, CreatedAt)))) AS LastRunAt,
+        argMax(BatchRunId, UpdatedAt)                               AS LastBatchRunId,
+        argMax(ScenarioSetId, UpdatedAt)                            AS LastScenarioSetId
+       FROM (
+         SELECT ScenarioId, Status, MetCriteria, UnmetCriteria, BatchRunId,
+                ScenarioSetId, StartedAt, CreatedAt, UpdatedAt, ArchivedAt
+         FROM ${TABLE_NAME}
+         WHERE ${whereFilters}
+           ${simulationRunDedupPredicate(whereFilters)}
+       )
+       WHERE ArchivedAt IS NULL
+       GROUP BY ScenarioId`,
+      {
+        tenantId: projectId,
+        ...(scenarioIds !== undefined ? { scenarioIds } : {}),
+        ...dateFilter.params,
+      },
+    );
+
+    return rows.map((row) => ({
+      scenarioId: row.ScenarioId,
+      status: mapStatus(row.LastStatus),
+      metCriteriaCount: Number(row.MetCriteriaCount),
+      unmetCriteriaCount: Number(row.UnmetCriteriaCount),
+      lastRunAt: Number(row.LastRunAt),
+      batchRunId: row.LastBatchRunId,
+      scenarioSetId: row.LastScenarioSetId,
     }));
   }
 

@@ -3177,7 +3177,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List all non-archived suites (run plans) for the project */
+        /** @description List all non-archived suites for the project. By default only custom run plans are returned; pass kind=folder for test suite folders. */
         get: operations["getApiSuites"];
         put?: never;
         /** @description Create a new suite (run plan) */
@@ -22219,6 +22219,8 @@ export interface operations {
                             /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                             secret?: boolean;
                         }[];
+                        /** @description The test suite (folder) this scenario is filed in, or null when unfiled. */
+                        folderId: string | null;
                         /** Format: uri */
                         platformUrl: string;
                     }[];
@@ -22299,6 +22301,8 @@ export interface operations {
                         /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                         secret?: boolean;
                     }[];
+                    /** @description The test suite (folder) to file this scenario in. It must name a non-archived folder of the same project. null unfiles the scenario. */
+                    folderId?: string | null;
                 };
             };
         };
@@ -22323,6 +22327,8 @@ export interface operations {
                             /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                             secret?: boolean;
                         }[];
+                        /** @description The test suite (folder) this scenario is filed in, or null when unfiled. */
+                        folderId: string | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -22409,6 +22415,8 @@ export interface operations {
                             /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                             secret?: boolean;
                         }[];
+                        /** @description The test suite (folder) this scenario is filed in, or null when unfiled. */
+                        folderId: string | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -22501,6 +22509,8 @@ export interface operations {
                         /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                         secret?: boolean;
                     }[];
+                    /** @description The test suite (folder) to file this scenario in. It must name a non-archived folder of the same project. null unfiles the scenario. */
+                    folderId?: string | null;
                 };
             };
         };
@@ -22525,6 +22535,8 @@ export interface operations {
                             /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                             secret?: boolean;
                         }[];
+                        /** @description The test suite (folder) this scenario is filed in, or null when unfiled. */
+                        folderId: string | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -23870,7 +23882,10 @@ export interface operations {
     };
     getApiSuites: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Which kind of suite to list. Defaults to custom, so callers that predate folders keep seeing exactly the run plans they always did. */
+                kind?: "custom" | "folder";
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -23887,6 +23902,11 @@ export interface operations {
                         id: string;
                         name: string;
                         slug: string;
+                        /**
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it.
+                         * @enum {string}
+                         */
+                        kind: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
                         targets: {
@@ -23964,9 +23984,17 @@ export interface operations {
             content: {
                 "application/json": {
                     name: string;
+                    /**
+                     * @description custom (the default) is a run plan and needs scenarioIds and targets; folder is a test suite that starts empty and gets scenarios by filing them into it.
+                     * @default custom
+                     * @enum {string}
+                     */
+                    kind?: "custom" | "folder";
                     description?: string;
-                    scenarioIds: string[];
-                    targets: {
+                    /** @default [] */
+                    scenarioIds?: string[];
+                    /** @default [] */
+                    targets?: {
                         /** @enum {string} */
                         type: "prompt" | "http" | "code" | "workflow";
                         referenceId: string;
@@ -23989,6 +24017,11 @@ export interface operations {
                         id: string;
                         name: string;
                         slug: string;
+                        /**
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it.
+                         * @enum {string}
+                         */
+                        kind: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
                         targets: {
@@ -24076,6 +24109,11 @@ export interface operations {
                         id: string;
                         name: string;
                         slug: string;
+                        /**
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it.
+                         * @enum {string}
+                         */
+                        kind: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
                         targets: {
@@ -24275,6 +24313,11 @@ export interface operations {
                         id: string;
                         name: string;
                         slug: string;
+                        /**
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it.
+                         * @enum {string}
+                         */
+                        kind: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
                         targets: {
@@ -24374,6 +24417,11 @@ export interface operations {
                         id: string;
                         name: string;
                         slug: string;
+                        /**
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it.
+                         * @enum {string}
+                         */
+                        kind: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
                         targets: {

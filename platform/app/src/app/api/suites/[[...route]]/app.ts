@@ -12,6 +12,7 @@ import { runParameterValuesSchema } from "~/server/scenarios/parameters";
 import { runNoteSchema } from "~/server/scenarios/run-note";
 import { SuiteDomainError } from "~/server/suites/errors";
 import { SuiteService } from "~/server/suites/suite.service";
+import { isSuiteKind } from "~/server/suites/types";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
@@ -29,6 +30,11 @@ const suiteResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
   slug: z.string(),
+  kind: z
+    .enum(["custom", "folder"])
+    .describe(
+      "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it.",
+    ),
   description: z.string().nullable(),
   scenarioIds: z.array(z.string()),
   targets: z.array(suiteTargetSchema),
@@ -42,13 +48,69 @@ const suiteResponseWithPlatformUrlSchema = suiteResponseSchema.extend({
   platformUrl: z.string().url(),
 });
 
-const createSuiteInputSchema = z.object({
-  name: z.string().min(1, "name is required"),
-  description: z.string().optional(),
-  scenarioIds: z.array(z.string()).min(1, "At least one scenario is required"),
-  targets: z.array(suiteTargetSchema).min(1, "At least one target is required"),
-  repeatCount: z.number().int().min(1).max(100).default(1),
-  labels: z.array(z.string()).default([]),
+/**
+ * One create schema for both kinds, with the guards conditional on kind: a
+ * body naming no kind is a custom run plan and keeps the historical
+ * at-least-one guards; a folder is created empty by definition, so member
+ * and target lists are refused rather than silently dropped.
+ */
+const createSuiteInputSchema = z
+  .object({
+    name: z.string().min(1, "name is required"),
+    kind: z
+      .enum(["custom", "folder"])
+      .default("custom")
+      .describe(
+        "custom (the default) is a run plan and needs scenarioIds and targets; folder is a test suite that starts empty and gets scenarios by filing them into it.",
+      ),
+    description: z.string().optional(),
+    scenarioIds: z.array(z.string()).default([]),
+    targets: z.array(suiteTargetSchema).default([]),
+    repeatCount: z.number().int().min(1).max(100).default(1),
+    labels: z.array(z.string()).default([]),
+  })
+  .superRefine((body, ctx) => {
+    if (body.kind === "folder") {
+      if (body.scenarioIds.length > 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["scenarioIds"],
+          message:
+            "A folder is created empty; file scenarios into it after creating it",
+        });
+      }
+      if (body.targets.length > 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["targets"],
+          message: "A folder gets its targets when a run is started",
+        });
+      }
+      return;
+    }
+    if (body.scenarioIds.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["scenarioIds"],
+        message: "At least one scenario is required",
+      });
+    }
+    if (body.targets.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["targets"],
+        message: "At least one target is required",
+      });
+    }
+  });
+
+const listSuitesQuerySchema = z.object({
+  kind: z
+    .enum(["custom", "folder"])
+    .optional()
+    .describe(
+      "Which kind of suite to list. Defaults to custom, so callers that predate folders keep seeing exactly the run plans they always did.",
+    ),
 });
 
 const updateSuiteInputSchema = z.object({
@@ -102,6 +164,7 @@ function toSuiteResponse(suite: SimulationSuite) {
     id: suite.id,
     name: suite.name,
     slug: suite.slug,
+    kind: isSuiteKind(suite.kind) ? suite.kind : "custom",
     description: suite.description,
     scenarioIds: suite.scenarioIds,
     targets,
@@ -125,7 +188,8 @@ const secured = createProjectApp({ basePath: "/api/suites" });
 secured.access(requires("scenarios:view")).get(
   "/",
   describeRoute({
-    description: "List all non-archived suites (run plans) for the project",
+    description:
+      "List all non-archived suites for the project. By default only custom run plans are returned; pass kind=folder for test suite folders.",
     responses: {
       ...baseResponses,
       200: {
@@ -138,12 +202,17 @@ secured.access(requires("scenarios:view")).get(
       },
     },
   }),
+  zValidator("query", listSuitesQuerySchema),
   async (c) => {
     const project = c.get("project");
-    logger.info({ projectId: project.id }, "Listing suites");
+    const { kind } = c.req.valid("query");
+    logger.info({ projectId: project.id, kind }, "Listing suites");
 
     const service = createService();
-    const suites = await service.getAll({ projectId: project.id });
+    const suites = await service.getAll({
+      projectId: project.id,
+      ...(kind !== undefined && { kinds: [kind] }),
+    });
 
     return c.json(
       suites.map((s) => ({
@@ -229,14 +298,25 @@ secured.access(requires("scenarios:create")).post(
   async (c) => {
     const project = c.get("project");
     const body = c.req.valid("json");
-    logger.info({ projectId: project.id }, "Creating suite");
+    logger.info({ projectId: project.id, kind: body.kind }, "Creating suite");
 
     const service = createService();
     try {
-      const suite = await service.create({
-        ...body,
-        projectId: project.id,
-      });
+      const suite =
+        body.kind === "folder"
+          ? await service.createFolder({
+              projectId: project.id,
+              name: body.name,
+            })
+          : await service.create({
+              name: body.name,
+              description: body.description,
+              scenarioIds: body.scenarioIds,
+              targets: body.targets,
+              repeatCount: body.repeatCount,
+              labels: body.labels,
+              projectId: project.id,
+            });
       return c.json(
         {
           ...toSuiteResponse(suite),

@@ -127,3 +127,19 @@ export type SuiteRunSummary = {
   totalCount: number;
   lastRunTimestamp: number | null;
 };
+
+/**
+ * The latest result of one scenario inside a date window, for the last-result
+ * cell of the test cases table. batchRunId and scenarioSetId address the run
+ * it came from so the cell can link to it.
+ */
+export type ScenarioLastResultSummary = {
+  scenarioId: string;
+  status: ScenarioRunStatus;
+  metCriteriaCount: number;
+  unmetCriteriaCount: number;
+  /** Unix ms of the latest run's start. */
+  lastRunAt: number;
+  batchRunId: string;
+  scenarioSetId: string;
+};

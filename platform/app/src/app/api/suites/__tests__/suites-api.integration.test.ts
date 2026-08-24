@@ -249,6 +249,94 @@ describe("Feature: Suites REST API", () => {
     });
   });
 
+  describe("GET /api/suites with folders in the project", () => {
+    async function createFolder(name: string) {
+      return prisma.simulationSuite.create({
+        data: {
+          id: `suite_${nanoid()}`,
+          projectId: testProjectId,
+          name,
+          slug: `${name.toLowerCase()}-${nanoid(6)}`,
+          kind: "folder",
+          scenarioIds: [],
+          targets: [],
+          labels: [],
+        },
+      });
+    }
+
+    describe("when no kind is named", () => {
+      /** @scenario "The v1 run plan list holds no folder rows" */
+      it("returns only custom run plans", async () => {
+        await createFolder("Refunds");
+        await createFolder("Checkout");
+        const plan = await createSuite({ name: "Nightly" });
+
+        const res = await helpers.api.get("/api/suites");
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.map((s: { id: string }) => s.id)).toEqual([plan.id]);
+        expect(body[0].kind).toBe("custom");
+      });
+    });
+
+    describe("when kind=folder is named", () => {
+      it("returns the folders only", async () => {
+        const folder = await createFolder("Refunds");
+        await createSuite({ name: "Nightly" });
+
+        const res = await helpers.api.get("/api/suites?kind=folder");
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.map((s: { id: string }) => s.id)).toEqual([folder.id]);
+        expect(body[0].kind).toBe("folder");
+      });
+    });
+  });
+
+  describe("POST /api/suites with a kind", () => {
+    describe("when the body names kind folder", () => {
+      /** @scenario "A new folder is created empty and appears in the rail" */
+      it("creates an empty folder without scenarios or targets", async () => {
+        const res = await helpers.api.post("/api/suites", {
+          name: "Refunds",
+          kind: "folder",
+        });
+
+        expect(res.status).toBe(201);
+        const body = await res.json();
+        expect(body.kind).toBe("folder");
+        expect(body.scenarioIds).toEqual([]);
+        expect(body.targets).toEqual([]);
+      });
+
+      it("refuses a folder body that carries scenarios or targets", async () => {
+        const res = await helpers.api.post("/api/suites", {
+          name: "Refunds",
+          kind: "folder",
+          scenarioIds: ["scen_1"],
+        });
+
+        expect(res.status).toBe(422);
+      });
+    });
+
+    describe("when the body names no kind", () => {
+      it("keeps requiring at least one scenario and one target", async () => {
+        const res = await helpers.api.post("/api/suites", {
+          name: "Empty plan",
+        });
+
+        expect(res.status).toBe(422);
+        const body = await res.json();
+        expect(body.fields).toContain("scenarioIds");
+        expect(body.fields).toContain("targets");
+      });
+    });
+  });
+
   describe("GET /api/suites/:id", () => {
     describe("when suite exists", () => {
       it("returns the suite with all fields", async () => {

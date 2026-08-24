@@ -47855,6 +47855,13 @@
                           ]
                         }
                       },
+                      "folderId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "The test suite (folder) this scenario is filed in, or null when unfiled."
+                      },
                       "platformUrl": {
                         "type": "string",
                         "format": "uri"
@@ -47867,6 +47874,7 @@
                       "criteria",
                       "labels",
                       "parameters",
+                      "folderId",
                       "platformUrl"
                     ]
                   }
@@ -48037,6 +48045,13 @@
                         ]
                       }
                     },
+                    "folderId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The test suite (folder) this scenario is filed in, or null when unfiled."
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -48049,6 +48064,7 @@
                     "criteria",
                     "labels",
                     "parameters",
+                    "folderId",
                     "platformUrl"
                   ]
                 }
@@ -48209,6 +48225,13 @@
                     },
                     "maxItems": 20,
                     "description": "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text."
+                  },
+                  "folderId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The test suite (folder) to file this scenario in. It must name a non-archived folder of the same project. null unfiles the scenario."
                   }
                 },
                 "required": [
@@ -48299,6 +48322,13 @@
                         ]
                       }
                     },
+                    "folderId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The test suite (folder) this scenario is filed in, or null when unfiled."
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -48311,6 +48341,7 @@
                     "criteria",
                     "labels",
                     "parameters",
+                    "folderId",
                     "platformUrl"
                   ]
                 }
@@ -48511,6 +48542,13 @@
                         ]
                       }
                     },
+                    "folderId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The test suite (folder) this scenario is filed in, or null when unfiled."
+                    },
                     "platformUrl": {
                       "type": "string",
                       "format": "uri"
@@ -48523,6 +48561,7 @@
                     "criteria",
                     "labels",
                     "parameters",
+                    "folderId",
                     "platformUrl"
                   ]
                 }
@@ -48702,6 +48741,13 @@
                     },
                     "maxItems": 20,
                     "description": "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text."
+                  },
+                  "folderId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The test suite (folder) to file this scenario in. It must name a non-archived folder of the same project. null unfiles the scenario."
                   }
                 }
               }
@@ -51040,7 +51086,7 @@
     "/api/suites": {
       "get": {
         "operationId": "getApiSuites",
-        "description": "List all non-archived suites (run plans) for the project",
+        "description": "List all non-archived suites for the project. By default only custom run plans are returned; pass kind=folder for test suite folders.",
         "responses": {
           "200": {
             "description": "Success",
@@ -51059,6 +51105,14 @@
                       },
                       "slug": {
                         "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "custom",
+                          "folder"
+                        ],
+                        "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
                       },
                       "description": {
                         "type": [
@@ -51120,6 +51174,7 @@
                       "id",
                       "name",
                       "slug",
+                      "kind",
                       "description",
                       "scenarioIds",
                       "targets",
@@ -51219,6 +51274,20 @@
             }
           }
         },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "custom",
+                "folder"
+              ]
+            },
+            "description": "Which kind of suite to list. Defaults to custom, so callers that predate folders keep seeing exactly the run plans they always did."
+          }
+        ],
         "security": [
           {
             "project_api_key": []
@@ -51244,6 +51313,14 @@
                     },
                     "slug": {
                       "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "custom",
+                        "folder"
+                      ],
+                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
                     },
                     "description": {
                       "type": [
@@ -51305,6 +51382,7 @@
                     "id",
                     "name",
                     "slug",
+                    "kind",
                     "description",
                     "scenarioIds",
                     "targets",
@@ -51414,6 +51492,15 @@
                     "type": "string",
                     "minLength": 1
                   },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "custom",
+                      "folder"
+                    ],
+                    "default": "custom",
+                    "description": "custom (the default) is a run plan and needs scenarioIds and targets; folder is a test suite that starts empty and gets scenarios by filing them into it."
+                  },
                   "description": {
                     "type": "string"
                   },
@@ -51422,7 +51509,7 @@
                     "items": {
                       "type": "string"
                     },
-                    "minItems": 1
+                    "default": []
                   },
                   "targets": {
                     "type": "array",
@@ -51447,7 +51534,7 @@
                         "referenceId"
                       ]
                     },
-                    "minItems": 1
+                    "default": []
                   },
                   "repeatCount": {
                     "type": "integer",
@@ -51464,9 +51551,7 @@
                   }
                 },
                 "required": [
-                  "name",
-                  "scenarioIds",
-                  "targets"
+                  "name"
                 ]
               }
             }
@@ -51499,6 +51584,14 @@
                     },
                     "slug": {
                       "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "custom",
+                        "folder"
+                      ],
+                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
                     },
                     "description": {
                       "type": [
@@ -51560,6 +51653,7 @@
                     "id",
                     "name",
                     "slug",
+                    "kind",
                     "description",
                     "scenarioIds",
                     "targets",
@@ -51715,6 +51809,14 @@
                     "slug": {
                       "type": "string"
                     },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "custom",
+                        "folder"
+                      ],
+                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
+                    },
                     "description": {
                       "type": [
                         "string",
@@ -51775,6 +51877,7 @@
                     "id",
                     "name",
                     "slug",
+                    "kind",
                     "description",
                     "scenarioIds",
                     "targets",
@@ -52145,6 +52248,14 @@
                     "slug": {
                       "type": "string"
                     },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "custom",
+                        "folder"
+                      ],
+                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
+                    },
                     "description": {
                       "type": [
                         "string",
@@ -52205,6 +52316,7 @@
                     "id",
                     "name",
                     "slug",
+                    "kind",
                     "description",
                     "scenarioIds",
                     "targets",

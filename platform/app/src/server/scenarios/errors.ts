@@ -20,6 +20,22 @@ export class ScenarioNotFoundError extends Error {
 }
 
 /**
+ * Thrown when a scenario is filed into something that is not an active folder
+ * of the same project: a custom run plan, an archived folder, another
+ * project's folder, or an id that names nothing.
+ */
+export class ScenarioFolderNotFoundError extends HandledError {
+  declare readonly code: "scenario_folder_not_found";
+
+  constructor() {
+    super("scenario_folder_not_found", "Test suite folder not found", {
+      httpStatus: 404,
+    });
+    this.name = "ScenarioFolderNotFoundError";
+  }
+}
+
+/**
  * A run's target agent points at a `langwatch agent dev` tunnel that no
  * longer answers: the developer's session ended without restoring the URL.
  *

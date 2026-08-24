@@ -8,6 +8,21 @@
 import { z } from "zod";
 import { FieldMappingSchema } from "../scenarios/field-mapping";
 
+/**
+ * The kinds of SimulationSuite.
+ *
+ * "custom" is a hand-assembled run plan; "folder" is a suite that groups
+ * scenarios through Scenario.folderId. A string column plus this const union,
+ * not a Prisma enum: adding a kind must not need a database migration.
+ */
+export const SUITE_KINDS = ["folder", "custom"] as const;
+export type SuiteKind = (typeof SUITE_KINDS)[number];
+
+/** Type guard: narrows a stored string to SuiteKind. */
+export function isSuiteKind(value: string): value is SuiteKind {
+  return (SUITE_KINDS as readonly string[]).includes(value);
+}
+
 const suiteTargetFields = z.object({
   type: z.enum(["prompt", "http", "code", "workflow"]),
   referenceId: z.string(),

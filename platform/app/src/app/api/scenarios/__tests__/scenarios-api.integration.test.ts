@@ -87,7 +87,10 @@ describe("Scenarios API", () => {
   });
 
   afterEach(async () => {
-    await cleanupTestRows(prisma, [["scenario", { projectId: testProjectId }]]);
+    await cleanupTestRows(prisma, [
+      ["scenario", { projectId: testProjectId }],
+      ["simulationSuite", { projectId: testProjectId }],
+    ]);
 
     await prisma.project.delete({
       where: { id: testProjectId },
@@ -271,6 +274,83 @@ describe("Scenarios API", () => {
         expect(res.status).toBe(400);
         const body = await res.json();
         expect(body).toHaveProperty("error");
+      });
+    });
+  });
+
+  describe("folderId over the public scenarios endpoint", () => {
+    async function createFolder(name: string) {
+      return prisma.simulationSuite.create({
+        data: {
+          id: `suite_${nanoid()}`,
+          projectId: testProjectId,
+          name,
+          slug: `${name.toLowerCase()}-${nanoid(6)}`,
+          kind: "folder",
+          scenarioIds: [],
+          targets: [],
+          labels: [],
+        },
+      });
+    }
+
+    describe("when a scenario is created with a folderId", () => {
+      it("files it there and reports folderId on the response", async () => {
+        const folder = await createFolder("Refunds");
+
+        const res = await helpers.api.post("/api/scenarios", {
+          name: "Refund case",
+          situation: "A customer wants a refund",
+          folderId: folder.id,
+        });
+
+        expect(res.status).toBe(201);
+        const body = await res.json();
+        expect(body.folderId).toBe(folder.id);
+
+        const stored = await prisma.simulationSuite.findFirst({
+          where: { id: folder.id, projectId: testProjectId },
+        });
+        expect(stored?.scenarioIds).toEqual([body.id]);
+      });
+    });
+
+    describe("when a scenario is updated with folderId null", () => {
+      it("unfiles it", async () => {
+        const folder = await createFolder("Refunds");
+        const created = await helpers.api.post("/api/scenarios", {
+          name: "Refund case",
+          situation: "s",
+          folderId: folder.id,
+        });
+        const { id } = await created.json();
+
+        const res = await helpers.api.put(`/api/scenarios/${id}`, {
+          folderId: null,
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.folderId).toBeNull();
+
+        const stored = await prisma.simulationSuite.findFirst({
+          where: { id: folder.id, projectId: testProjectId },
+        });
+        expect(stored?.scenarioIds).toEqual([]);
+      });
+    });
+
+    describe("when the folderId names no active folder", () => {
+      it("refuses with scenario_folder_not_found", async () => {
+        const res = await helpers.api.post("/api/scenarios", {
+          name: "Refund case",
+          situation: "s",
+          folderId: "suite_missing",
+        });
+
+        expect(res.status).toBe(404);
+        const body = await res.json();
+        expect(body.error).toBe("scenario_folder_not_found");
       });
     });
   });

@@ -28,6 +28,12 @@ const scenarioResponseSchema = z.object({
   criteria: z.array(z.string()),
   labels: z.array(z.string()),
   parameters: z.array(scenarioParameterDefinitionSchema),
+  folderId: z
+    .string()
+    .nullable()
+    .describe(
+      "The test suite (folder) this scenario is filed in, or null when unfiled.",
+    ),
 });
 
 const scenarioResponseWithPlatformUrlSchema = scenarioResponseSchema.extend({
@@ -37,6 +43,9 @@ const scenarioResponseWithPlatformUrlSchema = scenarioResponseSchema.extend({
 const parametersDescription =
   "The parameters this scenario declares by name, each with an optional description and default. A run supplies values for these names, readable from the scenario's own text as params.NAME. A parameter marked secret carries no default: its value is supplied per run, encrypted, delivered to the target as secrets.NAME, and never readable from the scenario's own text.";
 
+const folderIdDescription =
+  "The test suite (folder) to file this scenario in. It must name a non-archived folder of the same project. null unfiles the scenario.";
+
 const createScenarioSchema = z.object({
   name: z.string().min(1, "name is required"),
   situation: z.string(),
@@ -45,6 +54,7 @@ const createScenarioSchema = z.object({
   parameters: scenarioParameterDefinitionsSchema
     .optional()
     .describe(parametersDescription),
+  folderId: z.string().nullish().describe(folderIdDescription),
 });
 
 const updateScenarioSchema = z.object({
@@ -55,6 +65,7 @@ const updateScenarioSchema = z.object({
   parameters: scenarioParameterDefinitionsSchema
     .optional()
     .describe(parametersDescription),
+  folderId: z.string().nullish().describe(folderIdDescription),
 });
 
 function toScenarioResponse(scenario: Scenario) {
@@ -65,6 +76,7 @@ function toScenarioResponse(scenario: Scenario) {
     criteria: scenario.criteria,
     labels: scenario.labels,
     parameters: parseScenarioParameterDefinitions(scenario.parameters),
+    folderId: scenario.folderId,
   };
 }
 
@@ -215,6 +227,7 @@ function registerCreateScenarioRoute(
         criteria: body.criteria,
         labels: body.labels,
         ...(body.parameters !== undefined && { parameters: body.parameters }),
+        ...(body.folderId !== undefined && { folderId: body.folderId }),
       });
 
       return c.json(
@@ -283,6 +296,7 @@ function registerUpdateScenarioRoute(
         ...(body.criteria !== undefined && { criteria: body.criteria }),
         ...(body.labels !== undefined && { labels: body.labels }),
         ...(body.parameters !== undefined && { parameters: body.parameters }),
+        ...(body.folderId !== undefined && { folderId: body.folderId }),
       });
 
       return c.json({

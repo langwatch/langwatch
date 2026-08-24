@@ -3,6 +3,7 @@ import type {
   BatchRunDataResult,
   BatchSummary,
   ExternalSetSummary,
+  ScenarioLastResultSummary,
   ScenarioRunData,
   ScenarioSetData,
 } from "~/server/scenarios/scenario-event.types";
@@ -111,6 +112,17 @@ export interface SimulationRepository {
     startDate?: number;
     endDate?: number;
   }): Promise<ExternalSetSummary[]>;
+
+  /**
+   * The latest run result per scenario inside the window. A scenario with no
+   * run in the window is simply absent from the result.
+   */
+  getLastResultSummaries(params: {
+    projectId: string;
+    scenarioIds?: string[];
+    startDate?: number;
+    endDate?: number;
+  }): Promise<ScenarioLastResultSummary[]>;
 
   getRunDataForAllSuites(params: {
     projectId: string;
@@ -226,6 +238,10 @@ export class NullSimulationRepository implements SimulationRepository {
   }
 
   async getInternalSuiteSummaries(): Promise<ExternalSetSummary[]> {
+    return [];
+  }
+
+  async getLastResultSummaries(): Promise<ScenarioLastResultSummary[]> {
     return [];
   }
 

@@ -115,6 +115,26 @@ export class AllTargetsArchivedError extends SuiteDomainError {
   }
 }
 
+/**
+ * Thrown when a run is requested for a suite that has no target at all.
+ *
+ * Distinct from {@link AllTargetsArchivedError}: that one says the targets the
+ * suite had are gone, this one says none were ever chosen. A folder starts
+ * with no targets and gets them from the run dialog, so this is the expected
+ * first-run state, not a broken reference.
+ */
+export class SuiteTargetsRequiredError extends SuiteDomainError {
+  declare readonly code: "suite_targets_required";
+
+  constructor() {
+    super("This suite has no target to run against. Choose one, then run.", {
+      code: "suite_targets_required",
+      httpStatus: 422,
+    });
+    this.name = "SuiteTargetsRequiredError";
+  }
+}
+
 /** Thrown when a suite name is already in use within the project */
 export class SuiteNameTakenError extends SuiteDomainError {
   declare readonly code: "suite_name_taken";

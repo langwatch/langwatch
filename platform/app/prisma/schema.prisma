@@ -2307,6 +2307,13 @@ model Scenario {
   judgeModel      String?
   maxTurns        Int?
   minTurns        Int?
+  // The folder (a SimulationSuite with kind "folder") this scenario is filed
+  // in, or null for an unfiled scenario. This column is the source of truth
+  // for folder membership; the folder's scenarioIds is a denormalized copy
+  // kept in step by reconcileFolderMembership (server/suites/folder-membership.ts).
+  // See specs/suites/folder-membership-invariant.feature.
+  folderId        String?
+  folder          SimulationSuite? @relation("FolderScenarios", fields: [folderId], references: [id], onDelete: SetNull)
   lastUpdatedById String?
   lastUpdatedBy   User?     @relation(fields: [lastUpdatedById], references: [id])
   archivedAt      DateTime?
@@ -2314,6 +2321,7 @@ model Scenario {
   updatedAt       DateTime  @default(now()) @updatedAt
 
   @@index([projectId])
+  @@index([projectId, folderId])
 }
 
 model SimulationSuite {
@@ -2333,12 +2341,19 @@ model SimulationSuite {
   // specs/suites/suite-model-selection.feature.
   simulatorModel String?
   judgeModel     String?
+  // "folder" | "custom" (see SUITE_KINDS in server/suites/types.ts). A folder
+  // is a suite that groups scenarios through Scenario.folderId; a custom suite
+  // is a hand-assembled run plan. String rather than a Prisma enum so a new
+  // kind needs no database migration.
+  kind            String     @default("custom")
+  folderScenarios Scenario[] @relation("FolderScenarios")
   archivedAt     DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @default(now()) @updatedAt
 
   @@unique([projectId, slug])
   @@index([projectId])
+  @@index([projectId, kind])
 }
 
 model Subscription {

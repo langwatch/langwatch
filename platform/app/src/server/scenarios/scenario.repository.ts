@@ -27,10 +27,20 @@ export type ScenarioRunConfig = {
   parameters: Prisma.JsonValue;
 };
 
+/**
+ * The client a repository write runs on: the repository's own PrismaClient by
+ * default, or the caller's transaction client when the write must land with
+ * other writes (folder membership reconciliation) or not at all.
+ */
+type ScenarioWriteClient = Pick<Prisma.TransactionClient, "scenario">;
+
 export class ScenarioRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async create(input: CreateScenarioInput): Promise<Scenario> {
+  async create(
+    input: CreateScenarioInput,
+    tx?: ScenarioWriteClient,
+  ): Promise<Scenario> {
     return tracer.withActiveSpan(
       "ScenarioRepository.create",
       {
@@ -47,7 +57,7 @@ export class ScenarioRepository {
           { projectId: input.projectId, operation: "INSERT" },
           "Inserting scenario",
         );
-        const result = await this.prisma.scenario.create({
+        const result = await (tx ?? this.prisma).scenario.create({
           data: {
             id: generate(KSUID_RESOURCES.SCENARIO).toString(),
             ...input,
@@ -139,13 +149,53 @@ export class ScenarioRepository {
   }
 
   /**
+   * All scenarios filed in a folder, archived ones included, oldest first.
+   *
+   * The run path reads membership from here rather than from the folder's
+   * denormalized scenarioIds: that cache holds only active members, and a run
+   * reports the archived ones as skipped.
+   */
+  async findManyByFolder(input: {
+    projectId: string;
+    folderId: string;
+  }): Promise<{ id: string; archivedAt: Date | null }[]> {
+    return this.prisma.scenario.findMany({
+      where: { projectId: input.projectId, folderId: input.folderId },
+      select: { id: true, archivedAt: true },
+      orderBy: { createdAt: "asc" },
+    });
+  }
+
+  /**
+   * Archives every active scenario filed in the folder, in the caller's
+   * transaction. Scenarios keep their folderId so the archived folder reads
+   * back with the membership it had. Already-archived scenarios are left
+   * untouched, original archive time included.
+   */
+  async archiveManyByFolder(input: {
+    projectId: string;
+    folderId: string;
+    tx: ScenarioWriteClient;
+  }): Promise<number> {
+    const result = await input.tx.scenario.updateMany({
+      where: {
+        projectId: input.projectId,
+        folderId: input.folderId,
+        archivedAt: null,
+      },
+      data: { archivedAt: new Date() },
+    });
+    return result.count;
+  }
+
+  /**
    * Find multiple scenarios by IDs regardless of archived status.
-   * Returns only id and archivedAt for lightweight classification.
+   * Returns id, archivedAt and folderId for lightweight classification.
    */
   async findManyIncludingArchived(input: {
     ids: string[];
     projectId: string;
-  }): Promise<{ id: string; archivedAt: Date | null }[]> {
+  }): Promise<{ id: string; archivedAt: Date | null; folderId: string | null }[]> {
     return tracer.withActiveSpan(
       "ScenarioRepository.findManyIncludingArchived",
       {
@@ -171,7 +221,7 @@ export class ScenarioRepository {
             id: { in: input.ids },
             projectId: input.projectId,
           },
-          select: { id: true, archivedAt: true },
+          select: { id: true, archivedAt: true, folderId: true },
         });
         span.setAttribute("result.count", results.length);
         return results;
@@ -252,6 +302,7 @@ export class ScenarioRepository {
     id: string,
     projectId: string,
     data: UpdateScenarioInput,
+    tx?: ScenarioWriteClient,
   ): Promise<Scenario> {
     return tracer.withActiveSpan(
       "ScenarioRepository.update",
@@ -270,7 +321,7 @@ export class ScenarioRepository {
           { projectId, scenarioId: id, operation: "UPDATE" },
           "Updating scenario",
         );
-        return this.prisma.scenario.update({
+        return (tx ?? this.prisma).scenario.update({
           where: { id, projectId },
           data,
         });
@@ -285,9 +336,11 @@ export class ScenarioRepository {
   async archive({
     id,
     projectId,
+    tx,
   }: {
     id: string;
     projectId: string;
+    tx?: ScenarioWriteClient;
   }): Promise<Scenario | null> {
     return tracer.withActiveSpan(
       "ScenarioRepository.archive",
@@ -306,7 +359,8 @@ export class ScenarioRepository {
           { projectId, scenarioId: id, operation: "UPDATE" },
           "Archiving scenario",
         );
-        const scenario = await this.prisma.scenario.findFirst({
+        const db = tx ?? this.prisma;
+        const scenario = await db.scenario.findFirst({
           where: { id, projectId },
         });
         if (!scenario) {
@@ -314,7 +368,7 @@ export class ScenarioRepository {
           return null;
         }
         // Idempotent: if already archived, preserve the original timestamp
-        const result = await this.prisma.scenario.update({
+        const result = await db.scenario.update({
           where: { id, projectId },
           data: { archivedAt: scenario.archivedAt ?? new Date() },
         });
