@@ -106,6 +106,7 @@ model User {
   promptTagsUpdated             PromptTag[]              @relation("promptTagUpdatedBy")
   groupMemberships              GroupMembership[]
   roleBindings                  RoleBinding[]
+  scimExternalIds               ScimExternalId[]
   apiKeys                       ApiKey[]
   gatewayBudgetsCreated         GatewayBudget[]          @relation("GatewayBudgetCreatedBy")
   principalVirtualKeys          VirtualKey[]             @relation("PrincipalScopedVirtualKeys")
@@ -447,6 +448,17 @@ model ScimToken {
   id             String       @id @default(nanoid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// D08: the SSO connection this token was issued for, and its ENTIRE write
+  /// authority — a token minted for one connection can never touch another
+  /// connection's people. No relation, matching `SsoConnection` itself: that
+  /// projection carries no foreign keys, so neither may a row pointing at it.
+  ///
+  /// Nullable only for the tokens that predate the column. They were minted
+  /// when "which organization" was the whole answer, so they keep the
+  /// organization-wide authority they were sold with; the backfill points
+  /// each at its organization's first connection where there is one. Minting
+  /// a NEW token without a connection is refused (`scim_connection_required`).
+  connectionId   String?
   hashedToken    String
   description    String?
   createdAt      DateTime     @default(now())
@@ -454,6 +466,75 @@ model ScimToken {
 
   @@index([organizationId])
   @@index([hashedToken])
+  @@index([connectionId])
+}
+
+/// D08 — who the directory means, per connection.
+///
+/// The identity provider's own identifier for a person, which is what
+/// survives their email changing: an address is not identity, people change
+/// theirs, and the same person carries different identifiers on two different
+/// connections. So the PAIR is the key and `externalId` alone never is.
+///
+/// No relation to `SsoConnection` (that projection carries no foreign keys);
+/// the `User` relation is real, so a deleted user takes their directory
+/// identities with them rather than stranding a mapping that resolves to
+/// nobody.
+model ScimExternalId {
+  id           String   @id @default(nanoid())
+  connectionId String
+  externalId   String
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  @@unique([connectionId, externalId])
+  @@index([userId])
+  @@index([connectionId])
+}
+
+/// D08 — one connection's directory sync, as the `scim-sync` pipeline's fold
+/// writes it.
+///
+/// Pure event truth: every column is fold-written, rows are never deleted,
+/// and REVOKED is a tombstone rather than an absence — a dead letter that
+/// vanished when a connection was torn down would be a removal nobody could
+/// check afterwards.
+///
+/// No relation to Organization or SsoConnection, matching `SsoConnection`
+/// itself: a projection is rebuilt from events, and a foreign key would make
+/// a replay depend on relational state the log does not carry.
+model ScimSyncState {
+  /// The aggregate: the connection's id, which IS its sync's id.
+  id                String    @id
+  connectionId      String
+  organizationId    String
+  /// TOKEN_ISSUED | SYNCING | ERROR | REVOKED
+  state             String
+  lastPushedAt      DateTime?
+  /// The failure standing right now: { op, errorCode, attempts, retiredAtMs,
+  /// userId, occurredAtMs }. A reason CODE and ids — never a token, never a
+  /// secret, never an internal hostname.
+  lastFailure       Json?
+  /// Every failure retired without ever being applied, newest last. The dead
+  /// letters an administrator has to see; retiring never drops one.
+  deadLetters       Json      @default("[]")
+  /// revoke | teardown, once the sync has ended.
+  revokedCause      String?
+  occurredAt        DateTime
+  lastEventId       String
+  acceptedAt        DateTime
+  projectionVersion String
+  /// Event-derived, not database-managed: `@default(now())` / `@updatedAt`
+  /// would make a replayed row differ from the row it rebuilds, which is
+  /// exactly the parity this projection has to keep.
+  createdAt         DateTime
+  updatedAt         DateTime
+
+  @@index([organizationId])
+  @@index([state])
+  @@index([connectionId])
 }
 
 enum PlanTypes {
@@ -2529,22 +2610,31 @@ model InvoiceItem {
 // ============================================================================
 
 model Group {
-  id             String            @id @default(nanoid())
-  organizationId String
-  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  name           String
-  slug           String
+  id               String            @id @default(nanoid())
+  organizationId   String
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name             String
+  slug             String
   // SCIM provenance - null for manually created groups
-  externalId     String? // IdP-side group ID (SCIM externalId)
-  scimSource     String? // e.g. "azure-ad", "okta"
-  members        GroupMembership[]
-  roleBindings   RoleBinding[]     @relation("GroupBindings")
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @default(now()) @updatedAt
+  externalId       String? // IdP-side group ID (SCIM externalId)
+  scimSource       String? // e.g. "azure-ad", "okta"
+  /// D08: which SSO connection provisioned this group. Null for manually
+  /// created groups and for the SCIM groups that predate connection scoping.
+  scimConnectionId String?
+  members          GroupMembership[]
+  roleBindings     RoleBinding[]     @relation("GroupBindings")
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @default(now()) @updatedAt
 
   @@unique([organizationId, slug])
   @@unique([organizationId, externalId])
+  /// D08: a directory's identifier for a group is its CONNECTION's, so two
+  /// connections in one organization each carry their own "engineering". The
+  /// organization-scoped uniqueness above stays as the legacy safety net for
+  /// the rows that carry no connection.
+  @@unique([scimConnectionId, externalId])
   @@index([organizationId])
+  @@index([scimConnectionId])
 }
 
 model GroupMembership {

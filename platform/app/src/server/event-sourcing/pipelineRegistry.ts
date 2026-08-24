@@ -19,12 +19,14 @@ import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/
 import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/webhookDelivery.process";
 import type {
   IdentityHeadsRepository,
+  ScimSyncReadRepository,
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
 } from "@langwatch/identity-server";
 import {
   IdentityGuards,
+  ScimSyncGuards,
   SsoConnectionGuards,
 } from "@langwatch/identity-server";
 import type {
@@ -187,6 +189,8 @@ import type { SimulationRunStateRepository } from "./pipelines/simulation-proces
 import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
 import type { SimulationProcessingEvent } from "./pipelines/simulation-processing/schemas/events";
+import { createScimSyncPipeline } from "./pipelines/scim-sync/pipeline";
+import type { ScimSyncFoldState } from "./pipelines/scim-sync/projections/scimSyncState.foldProjection";
 import { createSsoConnectionPipeline } from "./pipelines/sso-connections/pipeline";
 import type { ConnectionTeardownPort } from "./pipelines/sso-connections/process-manager/connectionTeardown.process";
 import type { SsoConnectionFoldState } from "./pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
@@ -381,6 +385,10 @@ export interface PipelineRepositories {
   ssoBreakGlassBindings: SsoBreakGlassBindingRepository;
   /** How the teardown grace wake dispatches its completion command. */
   ssoConnectionTeardown: ConnectionTeardownPort;
+  /** The directory-sync pipeline's `ScimSyncState` head + cursor (D08). */
+  scimSyncProjection: StateProjectionStore<ScimSyncFoldState>;
+  /** Postgres reads the directory-sync guards run against (D08). */
+  scimSyncReads: ScimSyncReadRepository;
 }
 
 export interface PipelineRegistryDeps {
@@ -704,6 +712,22 @@ export class PipelineRegistry {
           stranding: this.deps.repositories.ssoConnectionStranding,
         }),
         teardown: this.deps.repositories.ssoConnectionTeardown,
+      }),
+    );
+    // The directory-sync pipeline (D08). Ships dark: `SCIM_V2_GRANTS`
+    // defaults off, so no SCIM request path dispatches these commands and
+    // the previous write path is unchanged — a deploy changes nothing on its
+    // own. Its projection is what makes a failed apply visible with the
+    // connection, the operation and a reason code, so it is registered
+    // whether the flag is on or not: a history nobody writes to costs
+    // nothing, and one that only exists once the flag flips would have no
+    // past to show on the day it mattered.
+    this.deps.eventSourcing.register(
+      createScimSyncPipeline({
+        scimSyncProjectionStore: this.deps.repositories.scimSyncProjection,
+        scimSyncGuards: new ScimSyncGuards({
+          syncs: this.deps.repositories.scimSyncReads,
+        }),
       }),
     );
 

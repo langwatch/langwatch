@@ -104,6 +104,13 @@ export {
   type SignInCallbackLinkingDeps,
 } from "./signin-callback-linking.service";
 export {
+  SCIM_APPLY_MAX_ATTEMPTS,
+  ScimSyncGuards,
+} from "./scim-sync-guards";
+export { newScimSyncCommandId } from "./scim-sync-id";
+export type { ScimSyncLedger } from "./scim-sync-ledger";
+export type { ScimSyncReadRepository } from "./scim-sync.repository";
+export {
   type LegacySsoOrganizationRepository,
   type SsoConnectionGrandfatherDeps,
   type SsoConnectionGrandfatherOutcome,

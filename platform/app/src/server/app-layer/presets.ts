@@ -225,6 +225,7 @@ import { NullGithubPullRequestsRepository } from "./github/repositories/github-p
 import { LocalDoorBreakGlassBinding } from "./identity/break-glass-binding";
 import { PrismaIdentityHeadsRepository } from "./identity/repositories/identity-heads.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./identity/repositories/identity-projection.prisma.repository";
+import { PrismaScimSyncProjectionRepository } from "./identity/repositories/scim-sync-projection.prisma.repository";
 import { PrismaSsoConnectionProjectionRepository } from "./identity/repositories/sso-connection-projection.prisma.repository";
 import {
   PrismaSsoConnectionReadRepository,
@@ -799,6 +800,9 @@ export function initializeDefaultApp(options?: {
     prisma,
   );
   const langyTurnAdmission = new PrismaLangyTurnAdmissionRepository(prisma);
+  const scimSyncProjectionRepository = new PrismaScimSyncProjectionRepository(
+    prisma,
+  );
   const langyMessageRepository = new PrismaLangyMessageRepository(prisma);
   const langyAgentUrl = process.env.OPENCODE_AGENT_URL;
   const langyInternalSecret = process.env.LANGY_INTERNAL_SECRET;
@@ -905,6 +909,12 @@ export function initializeDefaultApp(options?: {
     ssoConnectionStranding: new PrismaSsoConnectionStrandingRepository(prisma),
     ssoBreakGlassBindings: new LocalDoorBreakGlassBinding(),
     ssoConnectionTeardown: new SsoConnectionTeardownDispatcher(),
+    // One repository, two roles (D08): the fold's store and the guards' read
+    // are the same `ScimSyncState` rows, so composing them separately would
+    // be two objects that must agree about a JSON column and eventually
+    // would not.
+    scimSyncProjection: scimSyncProjectionRepository,
+    scimSyncReads: scimSyncProjectionRepository,
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,
     ),

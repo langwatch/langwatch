@@ -1356,6 +1356,27 @@ const presentations = {
     describe: () =>
       "It may already be revoked. Reload to see the current tokens.",
   },
+  scim_connection_required: {
+    // The connection is the token's whole authority, so this is a field the
+    // caller left out rather than a policy refusal — say which field.
+    title: "Choose a connection for this token",
+    describe: () =>
+      "A directory token works against one single sign-on connection. Pick the connection your identity provider syncs from.",
+  },
+  scim_connection_not_found: {
+    // Reads the same for a connection that never existed and one belonging to
+    // somebody else, on purpose: the copy must not confirm the second.
+    title: "Connection not found",
+    describe: () =>
+      "That single sign-on connection isn't one of this organization's. Reload to see the current connections.",
+  },
+  scim_write_outside_connection: {
+    // The identity provider is pointed at the wrong connection. Nothing about
+    // the person is wrong, so the fix is in the provider's configuration.
+    title: "That person belongs to another connection",
+    describe: () =>
+      "Each directory token only manages the people its own connection provisioned. Use the token issued for the connection this person came from.",
+  },
   insufficient_permissions: {
     // Names the permission when the server sent one, for the same reason
     // `project_permission_denied` does: "ask an admin for access" is an

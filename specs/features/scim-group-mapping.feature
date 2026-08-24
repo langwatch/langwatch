@@ -197,7 +197,7 @@ Feature: SCIM Group Mapping
   # is therefore re-entry, not undo; specs/identity/scim-connection-sync.feature
   # carries what a return does and does not restore.
 
-  @integration @unimplemented
+  @integration
   Scenario: Deprovisioned user's org membership and role bindings are cleaned up
     Given user "user-1" is a member of the organization
     And user "user-1" has GroupMembership records for groups "abc-123" and "def-456"
@@ -207,14 +207,14 @@ Feature: SCIM Group Mapping
     And the removal is proved to have left nothing resolving for "user-1" in the organization
     And a permission check for "user-1" in the organization answers no, everywhere
 
-  @integration @unimplemented
+  @integration
   Scenario: Deactivating a user deprovisions them with the same proof
     Given user "user-1" is a member of the organization with access through group "abc-123"
     When Entra pushes user "user-1" as inactive
     Then the removal is proved to have left nothing resolving for "user-1" in the organization
     And "user-1"'s next permission check answers no
 
-  @unit @unimplemented
+  @unit
   Scenario: A deprovision that cannot prove itself empty fails loudly
     Given a deprovision of "user-1" whose proof still finds access resolving for them
     When the deprovision is applied

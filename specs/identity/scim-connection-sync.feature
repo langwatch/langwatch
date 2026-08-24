@@ -73,12 +73,12 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     Then the token names "okta-primary" as the connection it was issued for
     And pushes authenticated with it are attributed to that connection
 
-  @unit @unimplemented
+  @unit
   Scenario: A token cannot exist without a connection to belong to
     When a directory token is minted without naming a connection
     Then the request is refused with code scim_connection_required and status 422
 
-  @unit @unimplemented
+  @unit
   Scenario: A token cannot be issued against another organization's connection
     Given a connection belonging to a different organization
     When a directory token is minted for it
@@ -102,28 +102,28 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
 
   # ── Who the directory means ────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: A person keeps their place when their address changes
     Given a person provisioned through "okta-primary"
     When the directory pushes them again with a new email address and the same directory identifier
     Then the same LangWatch account is updated
     And no second account is created
 
-  @unit @unimplemented
+  @unit
   Scenario: The same person on two connections is two directory identities, one account
     Given a person is provisioned through "okta-primary"
     When "entra-contractors" pushes the same person under its own directory identifier
     Then both directory identities resolve to the one LangWatch account
     And neither connection's identifier overwrites the other's
 
-  @unit @unimplemented
+  @unit
   Scenario: The same directory identifier on two connections is two different people
     Given "okta-primary" and "entra-contractors" both push the directory identifier "u-1"
     When both pushes are applied
     Then each resolves within its own connection
     And neither push resolves to the other's person
 
-  @unit @unimplemented
+  @unit
   Scenario: A push naming a person no connection knows provisions within that connection only
     When "okta-primary" pushes an unknown directory identifier
     Then the person is created and recorded under "okta-primary"
@@ -146,7 +146,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     And the grant is stamped as directory-sourced
     And no membership row was written outside that path
 
-  @unit @unimplemented
+  @unit
   Scenario: Membership is no longer a fixed role written beside the grant
     When "okta-primary" pushes a new person into "acme"
     Then the role they hold is the one the directory's mapping asserts
@@ -159,7 +159,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     Then every one of them names the event that caused it
     And none of them is a row nothing in the history accounts for
 
-  @unit @unimplemented
+  @unit
   Scenario: The fact records which connection pushed it, and one directory actor
     When "okta-primary" pushes a membership change
     Then the sync's history names "okta-primary" as the connection that pushed it
@@ -186,7 +186,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
   # customer's reason for doing it is usually that somebody left under a
   # cloud. "We deleted some rows" is not an answer. The postcondition is.
 
-  @integration @unimplemented
+  @integration
   Scenario: Deprovisioning leaves no effective permission anywhere
     Given a person in "acme" holding organization membership, group memberships and direct role bindings
     When "okta-primary" deprovisions them
@@ -224,7 +224,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     And access an administrator had given them by hand before they left stays gone
       until an administrator gives it again
 
-  @unit @unimplemented
+  @unit
   Scenario: A removal that cannot prove itself empty fails loudly
     Given a removal whose proof still finds something resolving for the person
     When the removal is applied
@@ -233,7 +233,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     And the failure names what was still resolving
     And it is surfaced as a dead letter rather than being retried into silence
 
-  @unit @unimplemented
+  @unit
   Scenario: The proof runs on every path a directory can remove somebody by
     Given a person in "acme" holding access
     When they are removed by deletion, and when they are removed by being pushed inactive
@@ -243,7 +243,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
   # That a removal denies before the push returns, queue or no queue, is
   # specs/features/scim-group-mapping.feature's and is unchanged by D08.
 
-  @unit @unimplemented
+  @unit
   Scenario: A removal decision needing a person is surfaced, not guessed at
     Given the person being removed owns credentials or a personal team
     When the removal is applied
@@ -259,7 +259,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     And the failure is visible with the connection, the operation and a reason code
     And "entra-contractors" is unaffected
 
-  @unit @unimplemented
+  @unit
   Scenario: A retryable failure backs off and recovers on its own
     Given "okta-primary" is in ERROR after a retryable failure
     When the retry succeeds
@@ -281,7 +281,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     And they are not left marked inactive while still holding access
     And the state the directory asked for is never reported as reached
 
-  @unit @unimplemented
+  @unit
   Scenario: The failure surface says nothing a customer should not read
     When any directory failure is shown
     Then it names the connection, the operation and a reason code
@@ -289,7 +289,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
 
   # ── The flag ───────────────────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: With the flag off the previous write path answers exactly as before
     Given the directory grants flag is off
     When "okta-primary" pushes people into "acme"

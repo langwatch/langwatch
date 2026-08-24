@@ -466,7 +466,6 @@ const LEGACY_INERT: string[] = [
   "specs/identity/org-admin-identity-surface.feature",
   "specs/identity/passkeys.feature",
   "specs/identity/platform-ops-identity-lookup.feature",
-  "specs/identity/scim-connection-sync.feature",
   "specs/identity/sso-onboarding-tiers.feature",
   "specs/langy/langy-agent-service-conventions.feature",
   "specs/langy/langy-baseline.feature",

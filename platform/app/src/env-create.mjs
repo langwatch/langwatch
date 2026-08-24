@@ -311,6 +311,15 @@ export function createEnvConfig() {
         .enum(["off", "shadow", "enforce"])
         .optional()
         .default("off"),
+      // D08: whether a SCIM push writes membership through the grants
+      // service. Two-valued, because there is no useful middle: `off` keeps
+      // the previous write path — the hand-written OrganizationUser row with
+      // its unconditional MEMBER role — and `on` routes every membership
+      // consequence, including a deprovision and its empty proof, through
+      // GrantsService. Connection scoping and the directory-sync history are
+      // on either way; what this decides is who writes the membership.
+      // Rollback is this value.
+      SCIM_V2_GRANTS: z.enum(["off", "on"]).optional().default("off"),
       // ADR-031: per-trigger hourly hard cap on dispatched trigger emails.
       // Counts dispatches (one digest of N traces = 1), not traces or
       // recipients. Only ever bites immediate-cadence triggers; digest
@@ -638,6 +647,7 @@ export function createEnvConfig() {
       LANGWATCH_LICENSE_KEY: process.env.LANGWATCH_LICENSE_KEY,
       IDENTITY_ROUTER_V2: process.env.IDENTITY_ROUTER_V2,
       SSOCONN_ROUTING: process.env.SSOCONN_ROUTING,
+      SCIM_V2_GRANTS: process.env.SCIM_V2_GRANTS,
       TRIGGER_EMAIL_HOURLY_CAP: process.env.TRIGGER_EMAIL_HOURLY_CAP,
       TRIGGER_EMAIL_TENANT_DAILY_CAP:
         process.env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
