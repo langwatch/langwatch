@@ -85,6 +85,9 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/auth/verify-email")),
   },
   { path: "/auth/error", ...page(() => import("./pages/auth/error")) },
+  // Join before create (ADR-117 §6): a new account passes through here on its
+  // way to making an organization. Renders nothing until D12 fills it.
+  { path: "/auth/join", ...page(() => import("./pages/auth/join")) },
 
   // Top-level pages
   { path: "/", ...page(() => import("./pages/index")) },

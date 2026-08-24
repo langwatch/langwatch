@@ -1,0 +1,157 @@
+/*
+ * The front door's surface: the brand's own orange, the website's mesh band,
+ * and three small pieces of motion.
+ *
+ * Both colour modes are declared here, keyed off the `.dark` class the app's
+ * colour-mode provider puts on the document, so the toggle moves these screens
+ * with everything else and no component holds a light-only value. The brand
+ * accent is the same orange in both modes; what changes around it is the
+ * ground it sits on and the tint it is read against.
+ *
+ * Every animation lives inside a no-preference query rather than being
+ * switched off by one, so somebody who has asked for less motion gets a
+ * completely static page rather than one that stops moving after it starts.
+ *
+ * CSS only, on purpose: an auth screen is the one page that has to paint on a
+ * cold cache, and none of this is worth a JavaScript animation library.
+ */
+
+:root {
+	--lw-front-door-action: #f56b1a;
+	--lw-front-door-action-hover: #d65209;
+	--lw-front-door-ink: #a83e05;
+	--lw-front-door-tint: #fdece0;
+	--lw-front-door-on-action: #ffffff;
+	--lw-front-door-hairline: rgba(20, 20, 23, 0.12);
+	--lw-front-door-mesh-opacity: 0.5;
+}
+
+.dark {
+	/* The accent holds; the deeper cuts do not survive a dark ground, so the
+	   hover and the text-on-tint move to the website's lighter cut. */
+	--lw-front-door-action: #f56b1a;
+	--lw-front-door-action-hover: #ff8a3d;
+	--lw-front-door-ink: #ffb27a;
+	--lw-front-door-tint: rgba(245, 107, 26, 0.18);
+	--lw-front-door-on-action: #141417;
+	--lw-front-door-hairline: rgba(239, 238, 233, 0.14);
+	/* The same band, far quieter: at full strength it is a light-mode wash
+	   sitting on top of a dark page. */
+	--lw-front-door-mesh-opacity: 0.16;
+}
+
+/*
+ * The mesh band, in its cheap static form: one drifting diagonal wash, with a
+ * soft radial over the middle so the card never sits on top of colour.
+ */
+.lw-front-door-ambient {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	overflow: hidden;
+	z-index: 0;
+	contain: layout paint;
+	background:
+		radial-gradient(
+			ellipse 60% 45% at 50% 38%,
+			rgba(255, 255, 255, 0.92) 0%,
+			rgba(255, 255, 255, 0.65) 45%,
+			transparent 75%
+		),
+		linear-gradient(135deg, #ffffff 0%, #ffaf6e 32%, #cddcf9 64%, #ffffff 100%);
+	opacity: var(--lw-front-door-mesh-opacity);
+	background-size:
+		100% 100%,
+		180% 180%;
+	background-position:
+		center,
+		0% 50%;
+}
+
+.dark .lw-front-door-ambient {
+	/* No white veil on a dark ground: the band carries itself at low opacity. */
+	background: linear-gradient(
+		135deg,
+		transparent 0%,
+		#ffaf6e 32%,
+		#cddcf9 64%,
+		transparent 100%
+	);
+	background-size: 180% 180%;
+	background-position: 0% 50%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.lw-front-door-ambient {
+		animation: lw-front-door-drift 24s ease-in-out infinite alternate;
+	}
+}
+
+@keyframes lw-front-door-drift {
+	from {
+		background-position:
+			center,
+			0% 50%;
+	}
+	to {
+		background-position:
+			center,
+			100% 50%;
+	}
+}
+
+/* The press: the button gives a little, and springs back. */
+.lw-front-door-primary {
+	transition:
+		transform 120ms ease,
+		box-shadow 120ms ease;
+}
+
+.lw-front-door-primary:active {
+	transform: scale(0.985);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.lw-front-door-primary {
+		transition: none;
+	}
+	.lw-front-door-primary:active {
+		transform: none;
+	}
+}
+
+/* The hairline either side of the word "or". */
+.lw-front-door-hairline {
+	flex: 1;
+	height: 1px;
+	background: var(--lw-front-door-hairline);
+}
+
+/* One ring, once, where something just worked. */
+.lw-front-door-pulse {
+	position: relative;
+	display: inline-flex;
+	width: 8px;
+	height: 8px;
+	border-radius: 9999px;
+	background: var(--lw-front-door-action);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.lw-front-door-pulse::after {
+		content: "";
+		position: absolute;
+		inset: 0;
+		border-radius: 9999px;
+		animation: lw-front-door-boom 0.7s ease-out 1;
+	}
+}
+
+@keyframes lw-front-door-boom {
+	from {
+		box-shadow: 0 0 0 0 rgba(245, 107, 26, 0.35);
+	}
+	to {
+		box-shadow: 0 0 0 14px rgba(245, 107, 26, 0);
+	}
+}

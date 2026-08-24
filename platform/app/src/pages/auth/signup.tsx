@@ -13,6 +13,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import {
+  FrontDoorShell,
+  useIdentityFrontDoor,
+  VerificationFirstSignUp,
+} from "~/features/auth-front-door";
 import { HandledErrorAlert, readHandledError } from "~/features/errors";
 import { signIn, useSession } from "~/utils/auth-client";
 import { useSearchParams } from "~/utils/compat/next-navigation";
@@ -43,7 +48,30 @@ const SIGN_UP_FALLBACK =
 const RECOVERY_FALLBACK =
   "That email already has an account. Sign in with it instead.";
 
+/**
+ * Which sign-up screen this deployment has (ADR-117 §7). The legacy screen
+ * below is untouched and answers whenever the front door is not enforced.
+ */
 export default function SignUp() {
+  const frontDoor = useIdentityFrontDoor();
+
+  if (!frontDoor.isResolved) return null;
+  if (frontDoor.enabled) {
+    return (
+      // The pitch is the hosted product's, and it lives OUTSIDE the card: the
+      // card itself is the same on every installation. The trust strip is a
+      // slot with nothing true to put in it yet, so it stays empty rather than
+      // carrying a logo nobody agreed to.
+      <FrontDoorShell headline="Your first trace is just a sign-up away.">
+        <VerificationFirstSignUp />
+      </FrontDoorShell>
+    );
+  }
+
+  return <LegacySignUp />;
+}
+
+function LegacySignUp() {
   const { data: session } = useSession();
   const publicEnv = usePublicEnv();
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
