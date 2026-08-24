@@ -278,6 +278,78 @@ export class JoinRequestAlreadyPendingError extends JoinRequestRefusedError {
       reasons: [new Error(detail)],
     });
     this.name = "JoinRequestAlreadyPendingError";
+  }
+}
+
+/**
+ * Asking, or looking organizations up, faster than the installation allows —
+ * and the cool-down after a rejection, which is the same refusal on purpose:
+ * a rejected person who could tell "you were rejected" from "you are going
+ * too fast" has been told the rejection the silent-ish ending exists to keep
+ * quiet.
+ *
+ * `retryAfterSeconds` comes off the limiter's own answer, so the screen says
+ * how long is left rather than guessing.
+ */
+export class JoinRequestThrottledError extends JoinRequestRefusedError {
+  constructor(retryAfterSeconds: number) {
+    super("join_request_throttled", "join_request_throttled", {
+      httpStatus: 429,
+      fault: "customer",
+      meta: { retryAfterSeconds },
+    });
+    this.name = "JoinRequestThrottledError";
+  }
+}
+
+/**
+ * Automatic joining was turned on for a domain nobody has proved: a consumer
+ * mail provider, or a company domain only one member holds a verified address
+ * on. The copy says company domains only and does not list the deny-list —
+ * publishing it turns the refusal into a way to enumerate it.
+ */
+export class JoinAutoDomainUnprovenError extends JoinRequestRefusedError {
+  constructor(detail: string) {
+    super("join_auto_domain_unproven", "join_auto_domain_unproven", {
+      httpStatus: 422,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "JoinAutoDomainUnprovenError";
+  }
+}
+
+/** An organization whose identity provider already admits people cannot also
+ *  admit them by domain: the connection's own provisioning is the way in. */
+export class JoinAutoConnectionAdmitsError extends JoinRequestRefusedError {
+  constructor(detail: string) {
+    super("join_auto_connection_admits", "join_auto_connection_admits", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "JoinAutoConnectionAdmitsError";
+  }
+}
+
+/**
+ * The licence asymmetry, refused. Automatic joining is federation — the
+ * deployment decides who counts as a colleague and admits them with nobody in
+ * the loop — so the gate that has always held single sign-on holds this too.
+ * Asking to join is NOT gated and never reaches here.
+ */
+export class JoinAutoNotLicensedError extends JoinRequestRefusedError {
+  constructor(detail: string) {
+    super("join_auto_not_licensed", "join_auto_not_licensed", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "JoinAutoNotLicensedError";
+  }
+}
+
+/**
  * A two-step verification refusal (D06). Handled for the usual reason: each
  * names a cause the person can act on, and the words they read live in the
  * app's presentation registry keyed by code.
@@ -302,23 +374,6 @@ export class IdentityMfaCodeInvalidError extends MfaCommandRefusedError {
 }
 
 /**
- * Asking, or looking organizations up, faster than the installation allows —
- * and the cool-down after a rejection, which is the same refusal on purpose:
- * a rejected person who could tell "you were rejected" from "you are going
- * too fast" has been told the rejection the silent-ish ending exists to keep
- * quiet.
- *
- * `retryAfterSeconds` comes off the limiter's own answer, so the screen says
- * how long is left rather than guessing.
- */
-export class JoinRequestThrottledError extends JoinRequestRefusedError {
-  constructor(retryAfterSeconds: number) {
-    super("join_request_throttled", "join_request_throttled", {
-      httpStatus: 429,
-      fault: "customer",
-      meta: { retryAfterSeconds },
-    });
-    this.name = "JoinRequestThrottledError";
  * The setup was started and never finished inside its window. Separable from
  * an invalid code because the remediation differs — start again, rather than
  * read the code more carefully — and because leaking that an UNCONFIRMED
@@ -366,27 +421,6 @@ export class IdentityMfaBackupCodesExhaustedError extends MfaCommandRefusedError
 }
 
 /**
- * Automatic joining was turned on for a domain nobody has proved: a consumer
- * mail provider, or a company domain only one member holds a verified address
- * on. The copy says company domains only and does not list the deny-list —
- * publishing it turns the refusal into a way to enumerate it.
- */
-export class JoinAutoDomainUnprovenError extends JoinRequestRefusedError {
-  constructor(detail: string) {
-    super("join_auto_domain_unproven", "join_auto_domain_unproven", {
-      httpStatus: 422,
-      fault: "customer",
-      reasons: [new Error(detail)],
-    });
-    this.name = "JoinAutoDomainUnprovenError";
-  }
-}
-
-/** An organization whose identity provider already admits people cannot also
- *  admit them by domain: the connection's own provisioning is the way in. */
-export class JoinAutoConnectionAdmitsError extends JoinRequestRefusedError {
-  constructor(detail: string) {
-    super("join_auto_connection_admits", "join_auto_connection_admits", {
  * Turning it off is refused while an organization the person belongs to
  * requires it. The detail names which organizations for the log; the copy
  * tells the person to leave the organization or ask an administrator, which
@@ -470,25 +504,11 @@ export class IdentityDetachStrandsUserError extends IdentityCommandRefusedError 
       fault: "customer",
       reasons: [new Error(detail)],
     });
-    this.name = "JoinAutoConnectionAdmitsError";
     this.name = "IdentityDetachStrandsUserError";
   }
 }
 
 /**
- * The licence asymmetry, refused. Automatic joining is federation — the
- * deployment decides who counts as a colleague and admits them with nobody in
- * the loop — so the gate that has always held single sign-on holds this too.
- * Asking to join is NOT gated and never reaches here.
- */
-export class JoinAutoNotLicensedError extends JoinRequestRefusedError {
-  constructor(detail: string) {
-    super("join_auto_not_licensed", "join_auto_not_licensed", {
-      httpStatus: 403,
-      fault: "customer",
-      reasons: [new Error(detail)],
-    });
-    this.name = "JoinAutoNotLicensedError";
  * An operator tried to impersonate into an organization that requires a
  * second factor without having set one up themselves. The requirement is
  * about the ACTOR, not the subject: borrowing somebody's access is a higher
