@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
@@ -114,8 +115,17 @@ func TestUpstreamReasonIsBoundedAndNotRepeated(t *testing.T) {
 	t.Run("when the body is longer than the cap", func(t *testing.T) {
 		long := strings.Repeat("x", upstreamReasonLimit*4)
 		reason := upstreamReason([]byte(`{"detail":"` + long + `"}`))
-		assert.Len(t, reason, upstreamReasonLimit+len("..."),
+		assert.Len(t, reason, upstreamReasonLimit,
 			"an unknown body must not put a request payload on the log line")
+		assert.True(t, strings.HasSuffix(reason, "..."), "a cut reason says it was cut")
+	})
+
+	t.Run("when the cut lands inside a multi-byte character", func(t *testing.T) {
+		long := strings.Repeat("é", upstreamReasonLimit*4)
+		reason := upstreamReason([]byte(`{"detail":"` + long + `"}`))
+		assert.LessOrEqual(t, len(reason), upstreamReasonLimit,
+			"the cap counts bytes, so a half-written character cannot push past it")
+		assert.True(t, utf8.ValidString(reason), "a cut reason stays valid UTF-8")
 	})
 
 	t.Run("when our message already states the reason", func(t *testing.T) {

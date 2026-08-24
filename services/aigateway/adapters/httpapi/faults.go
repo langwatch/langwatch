@@ -162,7 +162,8 @@ func cappedReason(text string) string {
 	if len(text) <= upstreamReasonLimit {
 		return text
 	}
-	return strings.ToValidUTF8(text[:upstreamReasonLimit], "") + "..."
+	const ellipsis = "..."
+	return strings.ToValidUTF8(text[:upstreamReasonLimit-len(ellipsis)], "") + ellipsis
 }
 
 func firstLine(body []byte) string {
