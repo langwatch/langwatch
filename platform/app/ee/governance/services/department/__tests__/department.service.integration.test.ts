@@ -15,8 +15,8 @@ import {
 } from "../../../../../src/server/event-sourcing/__tests__/integration/testContainers";
 import {
   DepartmentAssignmentTargetNotFoundError,
-  DepartmentService,
-} from "../department.service";
+} from "@langwatch/enterprise-governance-contract";
+import { PostgresDepartmentAdapter } from "@langwatch/enterprise-governance-server";
 
 describe("DepartmentService", () => {
   const ns = `dept-${nanoid(8)}`;
@@ -26,7 +26,8 @@ describe("DepartmentService", () => {
   const PROJECT_ID = `proj-${ns}`;
   const ROBIN = `usr-robin-${ns}`;
 
-  const service = () => DepartmentService.create(prisma);
+  const service = () =>
+    PostgresDepartmentAdapter.create({ database: prisma }).build();
 
   beforeAll(async () => {
     await startTestContainers();

@@ -6,6 +6,7 @@ import {
   validateThresholdConfig,
 } from "../src/anomaly-rule";
 import { isGovernanceOriginTrace } from "../src/governance-attributes";
+import { departmentSchema } from "../src/department";
 import {
   getStarterTemplate,
   isOttlEnabledSourceType,
@@ -121,6 +122,18 @@ describe("governance backend contract", () => {
       isGovernanceOriginTrace({ "langwatch.origin.kind": "ingestion_source" }),
     ).toBe(true);
     expect(isGovernanceOriginTrace(undefined)).toBe(false);
+  });
+
+  it("keeps department records portable", () => {
+    expect(
+      departmentSchema.safeParse({
+        id: "department",
+        name: "Engineering",
+        organizationId: "organization",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }).success,
+    ).toBe(true);
   });
 
   it("only enables OTTL for generic OTLP sources", () => {

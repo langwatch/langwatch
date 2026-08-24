@@ -74,6 +74,13 @@ Feature: Enterprise governance package boundary
     Then the feature passes a structured source filter to the spend capability
     And ClickHouse query syntax remains inside the application adapter
 
+  Scenario: Department assignments are organization scoped
+    Given a department belongs to one organization
+    When an administrator assigns a user, team or project to it
+    Then Governance verifies the department and target belong to that organization
+    And a missing target is not reported as a successful assignment
+    And the department remains an accounting dimension rather than an access grant
+
   Scenario: Contracts are transport independent
     Given a browser imports the governance contract root
     Then no server, Eventing, application, environment, or generated database module loads

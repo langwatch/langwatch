@@ -56,6 +56,9 @@ Governance also owns alert fan-out, bounded retries, signing and delivery
 outcomes. The application injects its SSRF-safe HTTP adapter.
 Spend-spike orchestration consumes structured spend filters through a narrow
 port; ClickHouse query syntax remains inside the application adapter.
+Departments are Governance accounting dimensions, not access grants. Their
+CRUD and assignment invariants live in the feature server; tRPC only applies
+authentication and permission checks.
 
 ## Persistence
 

@@ -11,20 +11,24 @@
 import {
   DepartmentAssignmentTargetNotFoundError,
   DepartmentNotFoundError,
-  DepartmentService,
-} from "@ee/governance/services/department/department.service";
+} from "@langwatch/enterprise-governance-contract";
+import { PostgresDepartmentAdapter } from "@langwatch/enterprise-governance-server";
 import { HandledError } from "@langwatch/handled-error";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
+function createDepartmentService(database: object) {
+  return PostgresDepartmentAdapter.create({ database }).build();
+}
+
 export const departmentsRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
     .permission("governance:view")
     .query(async ({ ctx, input }) => {
-      return await DepartmentService.create(ctx.prisma).getAll({
+      return await createDepartmentService(ctx.prisma).getAll({
         organizationId: input.organizationId,
       });
     }),
@@ -33,7 +37,7 @@ export const departmentsRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("governance:view")
     .query(async ({ ctx, input }) => {
-      return await DepartmentService.create(ctx.prisma).getAssignments({
+      return await createDepartmentService(ctx.prisma).getAssignments({
         organizationId: input.organizationId,
       });
     }),
@@ -47,7 +51,7 @@ export const departmentsRouter = createTRPCRouter({
     )
     .permission("governance:manage")
     .mutation(async ({ ctx, input }) => {
-      return await DepartmentService.create(ctx.prisma).create({
+      return await createDepartmentService(ctx.prisma).create({
         organizationId: input.organizationId,
         name: input.name,
       });
@@ -64,7 +68,7 @@ export const departmentsRouter = createTRPCRouter({
     .permission("governance:manage")
     .mutation(async ({ ctx, input }) => {
       try {
-        return await DepartmentService.create(ctx.prisma).rename({
+        return await createDepartmentService(ctx.prisma).rename({
           id: input.id,
           organizationId: input.organizationId,
           name: input.name,
@@ -79,7 +83,7 @@ export const departmentsRouter = createTRPCRouter({
     .permission("governance:manage")
     .mutation(async ({ ctx, input }) => {
       try {
-        await DepartmentService.create(ctx.prisma).archive({
+        await createDepartmentService(ctx.prisma).archive({
           id: input.id,
           organizationId: input.organizationId,
         });
@@ -100,7 +104,7 @@ export const departmentsRouter = createTRPCRouter({
     .permission("governance:manage")
     .mutation(async ({ ctx, input }) => {
       try {
-        await DepartmentService.create(ctx.prisma).assignUser(input);
+        await createDepartmentService(ctx.prisma).assignUser(input);
         return { ok: true };
       } catch (err) {
         throw mapError(err);
@@ -118,7 +122,7 @@ export const departmentsRouter = createTRPCRouter({
     .permission("governance:manage")
     .mutation(async ({ ctx, input }) => {
       try {
-        await DepartmentService.create(ctx.prisma).assignTeam(input);
+        await createDepartmentService(ctx.prisma).assignTeam(input);
         return { ok: true };
       } catch (err) {
         throw mapError(err);
@@ -136,7 +140,7 @@ export const departmentsRouter = createTRPCRouter({
     .permission("governance:manage")
     .mutation(async ({ ctx, input }) => {
       try {
-        await DepartmentService.create(ctx.prisma).assignProject(input);
+        await createDepartmentService(ctx.prisma).assignProject(input);
         return { ok: true };
       } catch (err) {
         throw mapError(err);
