@@ -1,67 +1,276 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Evaluator } from "@langwatch/evaluator-contract";
-import { EvaluatorNotFoundError } from "@langwatch/evaluator-contract";
-import { EvaluatorService } from "../src/services/evaluator.service";
+import {
+  EvaluatorNotFoundError,
+  standardEvaluatorOutputFields,
+  type Evaluator,
+} from "@langwatch/evaluator-contract";
+import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { EvaluatorRepository } from "../src/repositories/evaluator.repository";
+import { EvaluatorService } from "../src/services/evaluator.service";
 
-const evaluator: Evaluator = {
-  id: "e1", projectId: "p1", name: "Exact", slug: "exact",
-  type: "evaluator", config: { evaluatorType: "langevals/exact_match" },
-  workflowId: null, copiedFromEvaluatorId: null, archivedAt: null,
-  createdAt: new Date(), updatedAt: new Date(),
+const baseEvaluator: Evaluator = {
+  id: "e1",
+  projectId: "p1",
+  name: "Exact",
+  slug: "exact",
+  type: "evaluator",
+  config: { evaluatorType: "langevals/exact_match" },
+  workflowId: null,
+  copiedFromEvaluatorId: null,
+  archivedAt: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
 };
 
-function repository(overrides: Partial<EvaluatorRepository> = {}): EvaluatorRepository {
+function evaluator(overrides: Partial<Evaluator> = {}): Evaluator {
+  return { ...baseEvaluator, ...overrides };
+}
+
+function repository(
+  overrides: Partial<EvaluatorRepository> = {},
+): EvaluatorRepository {
   return {
-    tryFindById: vi.fn().mockResolvedValue(evaluator),
-    tryFindByIdOnly: vi.fn().mockResolvedValue(evaluator),
-    tryFindBySlug: vi.fn().mockResolvedValue(evaluator),
-    tryFindByWorkflow: vi.fn().mockResolvedValue(evaluator),
-    findAll: vi.fn().mockResolvedValue([evaluator]),
-    create: vi.fn().mockResolvedValue(evaluator),
-    update: vi.fn().mockResolvedValue(evaluator),
-    archive: vi.fn().mockResolvedValue(evaluator),
+    tryFindById: vi.fn().mockResolvedValue(baseEvaluator),
+    tryFindByIdOnly: vi.fn().mockResolvedValue(baseEvaluator),
+    tryFindBySlug: vi.fn().mockResolvedValue(baseEvaluator),
+    tryFindByWorkflow: vi.fn().mockResolvedValue(baseEvaluator),
+    findAll: vi.fn().mockResolvedValue([baseEvaluator]),
+    create: vi.fn().mockResolvedValue(baseEvaluator),
+    update: vi.fn().mockResolvedValue(baseEvaluator),
+    archive: vi.fn().mockResolvedValue(baseEvaluator),
     findCopies: vi.fn().mockResolvedValue([]),
     updateNameAndConfig: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   } as EvaluatorRepository;
 }
 
+function workflows(
+  overrides: Partial<
+    Pick<WorkflowService, "assertInProject" | "getFields">
+  > = {},
+): Pick<WorkflowService, "assertInProject" | "getFields"> {
+  return {
+    assertInProject: vi.fn().mockResolvedValue(undefined),
+    getFields: vi.fn().mockResolvedValue({
+      workflowId: "w1",
+      workflowName: "Workflow",
+      fields: [],
+      outputFields: [],
+    }),
+    ...overrides,
+  };
+}
+
+function service(options: {
+  repository?: EvaluatorRepository;
+  workflows?: Pick<WorkflowService, "assertInProject" | "getFields">;
+} = {}): EvaluatorService {
+  return EvaluatorService.create({
+    repository: options.repository ?? repository(),
+    workflows: options.workflows ?? workflows(),
+  });
+}
+
 describe("EvaluatorService", () => {
   it("keeps nullable lookup and throwing lookup distinct", async () => {
-    const repo = repository({ tryFindById: vi.fn().mockResolvedValue(null) });
-    const service = EvaluatorService.create({ repository: repo, workflows: { assertInProject: vi.fn(), getFields: vi.fn() } });
-    await expect(service.tryGetById({ id: "missing", projectId: "p1" })).resolves.toBeNull();
-    await expect(service.getById({ id: "missing", projectId: "p1" })).rejects.toBeInstanceOf(EvaluatorNotFoundError);
-  });
-
-  it("enriches built-in definitions through the shared service", async () => {
-    const service = EvaluatorService.create({ repository: repository(), workflows: { assertInProject: vi.fn(), getFields: vi.fn() } });
-    const result = await service.getByIdWithFields({ id: "e1", projectId: "p1" });
-    expect(result.id).toBe("e1");
-    expect(result.outputFields.length).toBeGreaterThan(0);
-  });
-
-  it("keeps workflow entry and end fields separate", async () => {
-    const workflowEvaluator: Evaluator = {
-      ...evaluator,
-      type: "workflow",
-      workflowId: "w1",
-    };
-    const service = EvaluatorService.create({
-      repository: repository({ tryFindById: vi.fn().mockResolvedValue(workflowEvaluator) }),
-      workflows: {
-        assertInProject: vi.fn(),
-        getFields: vi.fn().mockResolvedValue({
-          workflowId: "w1",
-          workflowName: "Workflow",
-          fields: [{ identifier: "input", type: "str" }],
-          outputFields: [{ identifier: "result", type: "float" }],
-        }),
-      },
+    const missing = repository({
+      tryFindById: vi.fn().mockResolvedValue(null),
     });
-    const result = await service.getByIdWithFields({ id: "e1", projectId: "p1" });
+    const evaluators = service({ repository: missing });
+
+    await expect(
+      evaluators.tryGetById({ id: "missing", projectId: "p1" }),
+    ).resolves.toBeNull();
+    await expect(
+      evaluators.getById({ id: "missing", projectId: "p1" }),
+    ).rejects.toBeInstanceOf(EvaluatorNotFoundError);
+  });
+
+  it("never adds the legacy sticky details output", () => {
+    expect(standardEvaluatorOutputFields).toEqual([
+      { identifier: "passed", type: "bool" },
+      { identifier: "score", type: "float" },
+      { identifier: "label", type: "str" },
+    ]);
+    expect(standardEvaluatorOutputFields).not.toContainEqual(
+      expect.objectContaining({ identifier: "details" }),
+    );
+  });
+
+  it.each([
+    {
+      evaluatorType: "langevals/exact_match",
+      fields: [
+        { identifier: "output", type: "str", optional: true },
+        { identifier: "expected_output", type: "str", optional: true },
+      ],
+      outputFields: [{ identifier: "passed", type: "bool" }],
+    },
+    {
+      evaluatorType: "langevals/llm_boolean",
+      fields: [
+        { identifier: "input", type: "str", optional: true },
+        { identifier: "output", type: "str", optional: true },
+        { identifier: "contexts", type: "list", optional: true },
+      ],
+      outputFields: [{ identifier: "passed", type: "bool" }],
+    },
+    {
+      evaluatorType: "ragas/response_relevancy",
+      fields: [
+        { identifier: "input", type: "str" },
+        { identifier: "output", type: "str" },
+      ],
+      outputFields: [{ identifier: "score", type: "float" }],
+    },
+    {
+      evaluatorType: "presidio/pii_detection",
+      fields: [
+        { identifier: "input", type: "str", optional: true },
+        { identifier: "output", type: "str", optional: true },
+      ],
+      outputFields: [
+        { identifier: "score", type: "float" },
+        { identifier: "passed", type: "bool" },
+      ],
+    },
+  ])(
+    "derives $evaluatorType fields from the canonical definition",
+    async ({ evaluatorType, fields, outputFields }) => {
+      const evaluators = service({
+        repository: repository({
+          tryFindById: vi
+            .fn()
+            .mockResolvedValue(evaluator({ config: { evaluatorType } })),
+        }),
+      });
+
+      const result = await evaluators.getByIdWithFields({
+        id: "e1",
+        projectId: "p1",
+      });
+
+      expect(result.fields).toEqual(fields);
+      expect(result.outputFields).toEqual(outputFields);
+      expect(result.outputFields).not.toContainEqual(
+        expect.objectContaining({ identifier: "details" }),
+      );
+    },
+  );
+
+  it("uses empty inputs and standard outputs for an unknown evaluator", async () => {
+    const evaluators = service({
+      repository: repository({
+        tryFindById: vi.fn().mockResolvedValue(
+          evaluator({ config: { evaluatorType: "unknown/evaluator" } }),
+        ),
+      }),
+    });
+
+    const result = await evaluators.getByIdWithFields({
+      id: "e1",
+      projectId: "p1",
+    });
+
+    expect(result.fields).toEqual([]);
+    expect(result.outputFields).toEqual(standardEvaluatorOutputFields);
+  });
+
+  it("uses configured code inputs and outputs", async () => {
+    const evaluators = service({
+      repository: repository({
+        tryFindById: vi.fn().mockResolvedValue(
+          evaluator({
+            type: "code",
+            config: {
+              code: "def evaluate(): return True",
+              inputs: [{ identifier: "input", type: "str" }],
+              outputs: [{ identifier: "passed", type: "bool" }],
+            },
+          }),
+        ),
+      }),
+    });
+
+    const result = await evaluators.getByIdWithFields({
+      id: "e1",
+      projectId: "p1",
+    });
+
     expect(result.fields).toEqual([{ identifier: "input", type: "str" }]);
-    expect(result.outputFields).toEqual([{ identifier: "result", type: "float" }]);
+    expect(result.outputFields).toEqual([
+      { identifier: "passed", type: "bool" },
+    ]);
+  });
+
+  it("gets workflow fields through the canonical workflow service", async () => {
+    const getFields = vi.fn().mockResolvedValue({
+      workflowId: "w1",
+      workflowName: "Workflow",
+      workflowIcon: "sparkles",
+      fields: [{ identifier: "input", type: "str" }],
+      outputFields: [{ identifier: "result", type: "float" }],
+    });
+    const evaluators = service({
+      repository: repository({
+        tryFindById: vi.fn().mockResolvedValue(
+          evaluator({ type: "workflow", workflowId: "w1" }),
+        ),
+      }),
+      workflows: workflows({ getFields }),
+    });
+
+    const result = await evaluators.getByIdWithFields({
+      id: "e1",
+      projectId: "p1",
+    });
+
+    expect(getFields).toHaveBeenCalledWith({
+      workflowId: "w1",
+      projectId: "p1",
+    });
+    expect(result.fields).toEqual([{ identifier: "input", type: "str" }]);
+    expect(result.outputFields).toEqual([
+      { identifier: "result", type: "float" },
+    ]);
+    expect(result.workflowName).toBe("Workflow");
+    expect(result.workflowIcon).toBe("sparkles");
+  });
+
+  it("falls back to standard outputs when a workflow declares none", async () => {
+    const evaluators = service({
+      repository: repository({
+        tryFindById: vi.fn().mockResolvedValue(
+          evaluator({ type: "workflow", workflowId: "w1" }),
+        ),
+      }),
+    });
+
+    const result = await evaluators.getByIdWithFields({
+      id: "e1",
+      projectId: "p1",
+    });
+
+    expect(result.fields).toEqual([]);
+    expect(result.outputFields).toEqual(standardEvaluatorOutputFields);
+  });
+
+  it("enriches every evaluator returned by the repository", async () => {
+    const evaluators = service({
+      repository: repository({
+        findAll: vi.fn().mockResolvedValue([
+          evaluator(),
+          evaluator({
+            id: "e2",
+            config: { evaluatorType: "langevals/llm_boolean" },
+          }),
+        ]),
+      }),
+    });
+
+    const result = await evaluators.getAllWithFields({ projectId: "p1" });
+
+    expect(result).toHaveLength(2);
+    expect(result.every((item) => item.fields.length > 0)).toBe(true);
   });
 });

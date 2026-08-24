@@ -12,7 +12,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
+import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { EvaluatorListDrawer } from "../EvaluatorListDrawer";
 
 const {

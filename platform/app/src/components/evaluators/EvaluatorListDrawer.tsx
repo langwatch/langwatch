@@ -28,7 +28,7 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "~/server/evaluations/evaluators";
-import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
+import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { api } from "~/utils/api";
 import { ConfirmDialog } from "../gateway/ConfirmDialog";
 import { Menu } from "../ui/menu";

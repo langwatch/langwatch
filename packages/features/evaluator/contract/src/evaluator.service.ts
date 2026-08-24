@@ -45,6 +45,7 @@ export abstract class EvaluatorService {
   abstract getWorkflowFields(input: { id: string; projectId: string }): Promise<{
     evaluatorId: string; evaluatorType: string; workflowId?: string; workflowName?: string;
     workflowIcon?: string; fields: EvaluatorField[];
+    outputFields: EvaluatorField[];
   }>;
   abstract getCopies(input: { evaluatorId: string; projectId: string }): Promise<EvaluatorCopy[]>;
   abstract pushToCopies(input: { projectId: string; evaluatorId: string; copyIds?: string[]; allowedProjectIds?: string[] }): Promise<{ pushedTo: number; selectedCopies: number }>;

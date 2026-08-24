@@ -5,7 +5,7 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "~/server/evaluations/evaluators";
-import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
+import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import type { NodeWithOptionalPosition } from "~/types";
 import type { Component, Field } from "../types/dsl";
 import { useWorkflowStore } from "./useWorkflowStore";

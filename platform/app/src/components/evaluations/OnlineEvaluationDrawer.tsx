@@ -52,7 +52,7 @@ import type {
   CheckPreconditionFields,
   CheckPreconditionRule,
 } from "~/server/evaluations/types";
-import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
+import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import type {
   MappingState,
   TRACE_MAPPINGS,

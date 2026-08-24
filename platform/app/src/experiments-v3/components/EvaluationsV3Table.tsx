@@ -36,9 +36,9 @@ import type {
   HttpComponentConfig,
 } from "~/optimization_studio/types/dsl";
 import type { AgentWithFields } from "~/server/agents/agent-fields";
-import type { DatasetColumnType } from "~/server/datasets/types";
+import type { DatasetColumnType } from "@langwatch/dataset-contract";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
-import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
+import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { api } from "~/utils/api";
 import { DRAWER_WIDTH } from "../constants";
 import { resolveTargetNameFromCache } from "../hooks/resolveTargetName";
