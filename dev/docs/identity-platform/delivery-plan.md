@@ -73,7 +73,7 @@ Parallel tracks; staff in any order capacity allows.
 | # | Needs | What ships | Impact when it lands |
 |---|---|---|---|
 | D05 | D04 + authz checklist (hard) | Self-serve SSO onboarding (register → verify domain → activate) plus both identity surfaces: platform-ops lookup and the org-admin panel | Enterprise onboarding drops to one LangWatch action (an approval click); DB surgery as a support tool ends |
-| D06 | D03 | TOTP MFA + backup codes, org-level `mfaRequired`, sessions that carry `amr` (one forced re-login) | Orgs can finally require MFA; impersonation and step-up become provable |
+| D06 | D03 | TOTP MFA + backup codes, org-level `mfaRequired`, sessions that carry `amr` (no forced re-login) | Orgs can finally require MFA; impersonation and step-up become provable |
 | D07 | D03 | Passkeys via WebAuthn, including no-email discoverable sign-in | The fastest sign-in method, and the phishing-resistant one |
 | D08 | D05 + authz checklist (hard) | SCIM tokens scoped per connection; SCIM writes membership only through `grants.*` | Cross-org SCIM writes become impossible; deprovisioning gets a provable postcondition |
 | D12 | D03/D13 + D05 | Join requests + domain auto-join: sign up with a work email → see your company's org → request (admin approves) or walk straight in where the org allows it | "I signed up and my company was invisible" is over; the join-before-create flow is what starves orphaned organizations |
@@ -101,7 +101,7 @@ Parallel tracks; staff in any order capacity allows.
 | D03 | `IDENTITY_ROUTER_V2` (shadow → enforce) | Zero unexplained shadow mismatches over bake; sign-in success ≥ baseline | Flag off | **Highest** |
 | D04 | `SSOCONN_ROUTING` (shadow → enforce) | Routing parity silent vs `ssoDomain` strings; string writes stopped | Flag off, strings still dual-written | Medium |
 | D05 | `SELF_SERVE_SSO` (per-org) | New enterprise customer onboards with exactly one LangWatch action (approval click); ops surface resolves a real support case | Per-org flag off | Medium |
-| D06 | `MFA_ENROLLMENT_OPEN` + deploy-time session revoke | Enroll → challenge → backup-code → disable round-trips; org policy enforced; lockout verified | Flag off; session kill is irreversible (comms!) | **One-way door** |
+| D06 | `MFA_ENROLLMENT_OPEN` | Enroll → challenge → backup-code → disable round-trips; org policy enforced at mint and step-up; lockout verified; the new session columns land observably inert while no org requires anything | Flag off. Columns are additive and nullable, so nothing is irreversible | Medium |
 | D07 | `PASSKEYS_ENABLED` | Register / sign-in / no-email sign-in / delete round-trips, platform + cross-platform authenticators | Flag off | Low |
 | D08 | `SCIM_V2_GRANTS` | Push/group/deactivate round-trip; token scoping enforced; offboard postcondition asserted in integration test | Legacy write path behind flag | Medium |
 | D09 | per-customer | Per customer: all active users linked, quiet grace, shim hits at zero, teardown event. Program: zero ACTIVE legacy connections | Both-connections-active grace IS the rollback | Customer-facing |
@@ -180,16 +180,16 @@ Plain design docs, written before the code they cover:
 
 1. **Identity platform + identifiers** (D01) — **written: [ADR-101](../adr/101-identity-pipeline-and-identifiers.md)** (revised 2026-08-20; re-based on ADR-110 2026-08-23). The identity adapter (R10) with its per-user write gate; the truth split — a new pure event-truth Postgres `Identifier` projection, `Account` stays 100% row-truth protocol — which leaves **ADR-022 and ADR-015 unamended** (the earlier column-truth carve-out and replay column scoping are deleted from the program); the ADR-110-shaped rollout re-tenanted to users (org enrollment expanding to members, per-user `finalized` latch, calling-path apply as the one recorded divergence). Carries the payload rule (the email rides in the event where the fact is about one; HMAC-keyed hashes; secrets never) and erasure-as-event-plus-log-wipe (R11).
 3. **Sign-in router, screens + SSO self-service** (D03/D13–D05) — **spiked for review: [ADR-117](../adr/117-identifier-first-front-door.md)** (2026-08-24). Identifier-first routing, auto-link rules, the first-party screen set; explicitly amends ADR-027 (`027-license-gated-sso.md`; the number is collided) — hook → per-method router policy with the hook kept as enforcement backstop; carries over the constants table and the route-table canary; answers Open Q11 (startup semantics kept), Q9 (reset follows the identifier) and Q12 (no-oracle scoped to sign-in). The SAML engine choice is the spike's named debt, due at D04 implementation.
-4. **MFA + session shape** (D06) — `amr` semantics incl. the passkey/`phw` decision (Open Q4); the forced re-login.
+4. **MFA + session shape** (D06/D07) — `amr` semantics; **Open Q4 answered 2026-08-24: a passkey (`["phw"]`) satisfies `mfaRequired`**, reasoning in `D07-passkeys.md`; and why there is **no** fleet-wide forced re-login (the columns are nullable, the policy is per-org, and the only deploy-time revoke is the legacy impersonating sessions).
 
-Gherkin specs to write fresh (no existing coverage): join-request lifecycle including domain auto-join and the join-before-create sign-up path (D12/D13), org-admin surface panels (D05), ops lookup actions (D05), MFA enrollment/step-up (D06), connection self-service lifecycle (D05). Use `/write-spec` per deliverable. **Written 2026-08-24 (Wave 2, `@unimplemented` until bound):** `specs/identity/signin-router.feature` (D03), `specs/identity/signin-signup-screens.feature` (D13), `specs/identity/sso-connection-lifecycle.feature` (D04), `specs/identity/resilient-invitations.feature` (D11).
+Gherkin specs to write fresh (no existing coverage): join-request lifecycle including domain auto-join and the join-before-create sign-up path (D12/D13), org-admin surface panels (D05), ops lookup actions (D05), MFA enrollment/step-up (D06), connection self-service lifecycle (D05). Use `/write-spec` per deliverable. **Written 2026-08-24 (Wave 2, `@unimplemented` until bound):** `specs/identity/signin-router.feature` (D03), `specs/identity/signin-signup-screens.feature` (D13), `specs/identity/sso-connection-lifecycle.feature` (D04), `specs/identity/resilient-invitations.feature` (D11), `specs/identity/mfa-and-session-shape.feature` (D06, 51 scenarios), `specs/identity/passkeys.feature` (D07, 32 scenarios).
 
 # Spec-amendment table (existing corpus)
 
 | Existing spec | Action | Deliverable |
 |---|---|---|
 | `specs/auth/phase-1-better-auth-config.feature` | Retire `NEXTAUTH_PROVIDER` matrix (:19-45), `ssoProvider` matching (:51-73), `pendingSsoSetup` (:112-117); keep better-auth/bcrypt anchors | D03 |
-| 〃 `:119-137` (legacy `Session.impersonating`) | Retire; replace with `{actor, subject}` scenarios | D06 |
+| 〃 `:150-168` (legacy `Session.impersonating`, and `:166`'s "only genericOAuth is present in the plugins array") | Retire both; replace with `{actor, subject}` scenarios. Registering the `twoFactor` plugin (D06) and the passkey plugin (D07) each break the `:166` assertion | D06, D07 |
 | `specs/auth/auth-signin-flows.feature` | Port credentials/Google flows to the router + the new screens; Auth0 flow retired at D10 (legacy callback kept working by the shim, R9, until then) | D03/D13, D09/D10 |
 | `specs/auth/sso-oidc-providers.feature` | Port Cognito/OneLogin from `NEXTAUTH_PROVIDER` mounting (:24, :32) to the self-hosted default method set; discovery-document configuration survives | D03 |
 | `specs/auth/sign-in-failure-messages.feature` | Anchor — failure copy (wrong password, rate-limit wait, origin mismatch) survives on the new screens | D13 |
@@ -204,7 +204,7 @@ Gherkin specs to write fresh (no existing coverage): join-request lifecycle incl
 | `specs/features/scim-group-mapping.feature` | Amend deprovisioning to grants-offboard framing (20/24 scenarios `@unimplemented` — cheap now) | D08 |
 | `specs/groups/groups-rest-api.feature` | Keep provenance anchors (SCIM-managed guards survive) | D08 |
 | `specs/organizations/scim-tokens-rest-api.feature` | REST mint/revoke gains connection scoping (create names a connection); secret-shown-once and no-secrets-in-list anchors survive | D08 |
-| `specs/ai-gateway/governance/sessions-and-devices.feature` | Session inventory gains `identifierId`/`amr`; `maxSessionDurationDays` × forced re-login interplay | D06 |
+| `specs/ai-gateway/governance/sessions-and-devices.feature` | Session inventory gains the sign-in method and whether a second factor was proven. `maxSessionDurationDays` is the **precedent** D06 follows, not a conflict: tightening a policy revokes the sessions that no longer satisfy it, and turning `mfaRequired` on is the same move | D06 |
 | `specs/auth/impersonation-banner.feature`, `specs/ops/dejaview-impersonation-access.feature`, `specs/features/backoffice-user-impersonation-reason.feature` | Anchors — survive; mechanism swaps underneath | D06 |
 | `specs/features/user-deactivation.feature:134-143` | Stale "NextAuth signIn callback" wording sweep; behavior anchor survives | D03 |
 | `specs/event-sourcing/pipeline-model.feature` | Doctrine anchor for D01 — no change | D01 |
@@ -212,7 +212,7 @@ Gherkin specs to write fresh (no existing coverage): join-request lifecycle incl
 
 # Flag inventory
 
-`IDENTITY_ROUTER_V2` (D03 + D13 — router and screens flip together) · `SSOCONN_ROUTING` (D04) · `SELF_SERVE_SSO` per-org (D05) · `MFA_ENROLLMENT_OPEN` (D06) · `PASSKEYS_ENABLED` (D07) · `SCIM_V2_GRANTS` (D08) · invite changes additive (D11) · `JOIN_REQUESTS` (D12) · deploy-time session revoke (D06, one-way).
+`IDENTITY_ROUTER_V2` (D03 + D13 — router and screens flip together) · `SSOCONN_ROUTING` (D04) · `SELF_SERVE_SSO` per-org (D05) · `MFA_ENROLLMENT_OPEN` (D06) · `PASSKEYS_ENABLED` (D07) · `SCIM_V2_GRANTS` (D08) · invite changes additive (D11) · `JOIN_REQUESTS` (D12).
 
 House discipline: dashboards before flags flip. Metrics pack per deliverable: routing decisions by outcome, link proposals auto vs confirmed, ceremony success rates, SCIM dead-letters, Redis-loss seam drops/fail-opens, join-request funnel (incl. auto-joins), invite resend/expiry rates, sign-up funnel + orphaned-organization creation rate, per-customer migration progress + shim hits, sign-in success vs baseline.
 
@@ -224,7 +224,7 @@ House discipline: dashboards before flags flip. Metrics pack per deliverable: ro
 | New front door tanks sign-up conversion | D13 | Sign-up funnel dashboard live before the flip; completion ≥ baseline in the exit gate; flag off restores legacy screens |
 | Domain auto-join admits the wrong person | D12 | Org opt-in only; verified email required; public email domains excluded outright; every auto-join is an audited event admins are notified of |
 | Replay touches protocol secrets | D01 | Structurally impossible: `Account` is not a projection and never enters replay; `Identifier` carries no secrets and replays whole-row (ADR-101 §3); replay-parity test in exit gate |
-| Session revoke-all strands users mid-work | D06 | Comms + precedent (better-auth cutover); schedule low-traffic window |
+| Session revoke-all strands users mid-work | D06 | **Removed as a risk (2026-08-24): there is no revoke-all.** The session columns land nullable and unread; sessions that cannot prove a second factor are stepped up or revoked per org, at the moment an admin turns `mfaRequired` on. The only deploy-time revoke is sessions holding the legacy `impersonating` payload — operators only, one click to resume |
 | Customer IdP apps pin legacy Auth0 callback URI | D09 | Resolved (R9): temporary shim with per-org usage metric through grace; removed at D10 |
 | Auth0 retirement stalls on stragglers | D09/D10 | By design: per-tenant, no deadline; D10 is an exit criterion, not a milestone; nudge/escalation ladder in the wizard |
 | Authz API drift while we build against it | D05/D08 | Precondition checklist is a contract; any authz API change is a breaking change to this program |
