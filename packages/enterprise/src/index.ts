@@ -1,7 +1,27 @@
+import { ADMIN_FEATURE_ID } from "@langwatch/enterprise-admin-contract";
+import { AUDIT_LOG_FEATURE_ID } from "@langwatch/enterprise-audit-log-contract";
+import { BILLING_FEATURE_ID } from "@langwatch/enterprise-billing-contract";
+import { GOVERNANCE_FEATURE_ID } from "@langwatch/enterprise-governance-contract";
 import { LICENSING_FEATURE_ID } from "@langwatch/enterprise-licensing-contract";
-import { z } from "zod/v4";
+import { MANAGED_PROVIDERS_FEATURE_ID } from "@langwatch/enterprise-managed-providers-contract";
+import { SAAS_FEATURE_ID } from "@langwatch/enterprise-saas-contract";
+import { SCIM_FEATURE_ID } from "@langwatch/enterprise-scim-contract";
+import { SSO_FEATURE_ID } from "@langwatch/enterprise-sso-contract";
+import { WEBHOOKS_FEATURE_ID } from "@langwatch/enterprise-webhooks-contract";
+import { z } from "zod";
 
-export const enterpriseFeatureIdSchema = z.literal(LICENSING_FEATURE_ID);
+export const enterpriseFeatureIdSchema = z.enum([
+  LICENSING_FEATURE_ID,
+  SSO_FEATURE_ID,
+  SCIM_FEATURE_ID,
+  ADMIN_FEATURE_ID,
+  AUDIT_LOG_FEATURE_ID,
+  BILLING_FEATURE_ID,
+  GOVERNANCE_FEATURE_ID,
+  MANAGED_PROVIDERS_FEATURE_ID,
+  SAAS_FEATURE_ID,
+  WEBHOOKS_FEATURE_ID,
+]);
 export type EnterpriseFeatureId = z.infer<typeof enterpriseFeatureIdSchema>;
 
 export const enterpriseFeatureDescriptorSchema = z.object({
@@ -20,6 +40,64 @@ const LICENSING_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
   serverPackage: "@langwatch/enterprise-licensing-server",
 });
 
+const SSO_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
+  id: SSO_FEATURE_ID,
+  contractPackage: "@langwatch/enterprise-sso-contract",
+  serverPackage: "@langwatch/enterprise-sso-server",
+});
+
+const SCIM_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
+  id: SCIM_FEATURE_ID,
+  contractPackage: "@langwatch/enterprise-scim-contract",
+  serverPackage: "@langwatch/enterprise-scim-server",
+});
+
+const ADMIN_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
+  id: ADMIN_FEATURE_ID,
+  contractPackage: "@langwatch/enterprise-admin-contract",
+  serverPackage: "@langwatch/enterprise-admin-server",
+  webPackage: "@langwatch/enterprise-admin-web",
+});
+
+const AUDIT_LOG_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
+  id: AUDIT_LOG_FEATURE_ID,
+  contractPackage: "@langwatch/enterprise-audit-log-contract",
+  serverPackage: "@langwatch/enterprise-audit-log-server",
+});
+
+const BILLING_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
+  id: BILLING_FEATURE_ID,
+  contractPackage: "@langwatch/enterprise-billing-contract",
+  serverPackage: "@langwatch/enterprise-billing-server",
+  webPackage: "@langwatch/enterprise-billing-web",
+});
+
+const GOVERNANCE_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
+  id: GOVERNANCE_FEATURE_ID,
+  contractPackage: "@langwatch/enterprise-governance-contract",
+  serverPackage: "@langwatch/enterprise-governance-server",
+  webPackage: "@langwatch/enterprise-governance-web",
+});
+
+const MANAGED_PROVIDERS_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
+  id: MANAGED_PROVIDERS_FEATURE_ID,
+  contractPackage: "@langwatch/enterprise-managed-providers-contract",
+  serverPackage: "@langwatch/enterprise-managed-providers-server",
+  webPackage: "@langwatch/enterprise-managed-providers-web",
+});
+
+const SAAS_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
+  id: SAAS_FEATURE_ID,
+  contractPackage: "@langwatch/enterprise-saas-contract",
+  webPackage: "@langwatch/enterprise-saas-web",
+});
+
+const WEBHOOKS_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
+  id: WEBHOOKS_FEATURE_ID,
+  contractPackage: "@langwatch/enterprise-webhooks-contract",
+  serverPackage: "@langwatch/enterprise-webhooks-server",
+});
+
 /** Portable feature discovery. Runtime installers belong to composition packages. */
 export class EnterpriseCatalogue {
   private constructor(
@@ -27,7 +105,18 @@ export class EnterpriseCatalogue {
   ) {}
 
   static create(): EnterpriseCatalogue {
-    return new EnterpriseCatalogue([LICENSING_DESCRIPTOR]);
+    return new EnterpriseCatalogue([
+      LICENSING_DESCRIPTOR,
+      SSO_DESCRIPTOR,
+      SCIM_DESCRIPTOR,
+      ADMIN_DESCRIPTOR,
+      AUDIT_LOG_DESCRIPTOR,
+      BILLING_DESCRIPTOR,
+      GOVERNANCE_DESCRIPTOR,
+      MANAGED_PROVIDERS_DESCRIPTOR,
+      SAAS_DESCRIPTOR,
+      WEBHOOKS_DESCRIPTOR,
+    ]);
   }
 
   list(): readonly EnterpriseFeatureDescriptor[] {

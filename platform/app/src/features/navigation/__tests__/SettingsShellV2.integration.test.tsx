@@ -230,10 +230,10 @@ vi.mock("~/components/governance/AdminViewingAsBanner", () => ({
 vi.mock("~/components/WorkspaceSwitcher", () => ({
   WorkspaceSwitcher: () => <div data-testid="workspace-switcher" />,
 }));
-vi.mock("../../../../ee/admin/ImpersonationBanner", () => ({
+vi.mock("@langwatch/enterprise-admin-web", () => ({
   ImpersonationBanner: () => null,
 }));
-vi.mock("../../../../ee/admin/ImpersonationSwitchBackMenuItem", () => ({
+vi.mock("~/features/enterprise/admin/ImpersonationSwitchBackMenuItem", () => ({
   ImpersonationSwitchBackMenuItem: () => null,
 }));
 vi.mock("~/components/sidebar/PresenceMenuItem", () => ({

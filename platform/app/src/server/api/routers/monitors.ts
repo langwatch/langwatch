@@ -178,7 +178,7 @@ export const monitorsRouter = createTRPCRouter({
         name: z.string(),
         checkType: z.string(),
         preconditions: validatedPreconditionsSchema,
-        settings: z.object({}).passthrough(),
+        settings: z.record(z.string(), z.json()),
         mappings: z.object({}).passthrough().optional(),
         sample: z.number().min(0).max(1),
         executionMode: z.enum([
@@ -364,7 +364,7 @@ export const monitorsRouter = createTRPCRouter({
         name: z.string(),
         checkType: z.string(),
         preconditions: validatedPreconditionsSchema,
-        settings: z.object({}).passthrough(),
+        settings: z.record(z.string(), z.json()),
         mappings: z.object({}).passthrough(),
         sample: z.number().min(0).max(1),
         enabled: z.boolean().optional(),

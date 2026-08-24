@@ -36,7 +36,7 @@ interface CreateNextContextOptions {
   res: any;
 }
 
-import { auditLog } from "@ee/audit-log/auditLog";
+import { auditLog } from "~/runtime/app/features/audit-log";
 import type {
   AuthzPermission,
   DeclarationError,

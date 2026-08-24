@@ -18,7 +18,7 @@ const denied = new Set<string>();
 // A denied query flows through auditLogTRPCErrors, whose real implementation
 // writes prisma.auditLog — no database in a unit test, and its crash would
 // replace the denial this file asserts on.
-vi.mock("@ee/audit-log/auditLog", () => ({
+vi.mock("~/runtime/app/features/audit-log", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 

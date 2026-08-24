@@ -172,12 +172,10 @@ describe("the repo is a single pnpm workspace", () => {
 			const bundle = join(repoRoot, "sdks/typescript/dist/index.mjs");
 			if (!existsSync(bundle)) return; // dist is a build artefact, not tracked
 
-			// The link above is only survivable because of this. The app pins zod
-			// 3 and collapses every copy onto it (`resolve.dedupe: ["zod"]`, which
-			// it needs because zod 3 instanceof-checks its own classes). Left
-			// external, the SDK's zod-4 calls (`.loose()`, `z.core`) land on that
-			// v3 object and throw `z.object(...).loose is not a function` at first
-			// import — taking the whole app down, not just the SDK path.
+			// The link above is only survivable because of this. Left external, a
+			// consumer-selected incompatible Zod runtime could replace the SDK's
+			// tested runtime and fail at first import, taking down the app rather
+			// than only the SDK path.
 			const source = readFileSync(bundle, "utf8");
 			const externalZodImports = source.match(/from\s*["']zod(?:\/[^"']*)?["']/g);
 

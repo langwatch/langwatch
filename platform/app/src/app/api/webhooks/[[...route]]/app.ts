@@ -1,19 +1,19 @@
+import { createEnterpriseWebhookEndpointService } from "~/server/webhooks/enterpriseWebhookEndpointService";
 import { randomUUID } from "node:crypto";
 import {
   assertWebhookEndpointsEntitled,
   WebhookEndpointsNotEntitledError,
-} from "@ee/webhooks/entitlement";
-import { WEBHOOK_EVENT_TYPES } from "@ee/webhooks/eventRegistry";
+} from "~/runtime/app/features/webhooks";
+import { WEBHOOK_EVENT_TYPES } from "@langwatch/enterprise-webhooks-contract";
 import {
   type SqsDestinationInput,
-  WebhookEndpointService,
   type WebhookEndpointView,
-} from "@ee/webhooks/webhookEndpoint.service";
+} from "~/runtime/app/features/webhooks";
 import {
   WebhookEventNotFoundError,
   WebhookEventsService,
-} from "@ee/webhooks/webhookEvents.service";
-import { WebhookHealthService } from "@ee/webhooks/webhookHealth.service";
+} from "~/runtime/app/features/webhooks";
+import { WebhookHealthService } from "~/runtime/app/features/webhooks";
 import { createLogger } from "@langwatch/observability";
 import type { Context, Next } from "hono";
 import { describeRoute, resolver } from "hono-openapi";
@@ -48,8 +48,8 @@ import { handleWebhookApiError } from "./error-handler";
 
 patchZodOpenapi();
 
-const endpoints = new WebhookEndpointService({ prisma });
-const health = new WebhookHealthService({
+const endpoints = createEnterpriseWebhookEndpointService({ prisma });
+const health = WebhookHealthService.create({
   endpoints,
   processStore: new PrismaProcessStore(prisma),
 });

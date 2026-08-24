@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
+import { afterPromptCreated } from "~/server/app-layer/billing/nurturing/promptCreation";
 import { PromptScope } from "~/generated/prisma/client";
 import { nodeDatasetSchema } from "~/optimization_studio/types/dsl";
 import {

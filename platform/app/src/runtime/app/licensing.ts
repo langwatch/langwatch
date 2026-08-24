@@ -19,6 +19,8 @@ import {
 import { prisma } from "~/server/db";
 import { LicenseEnforcementRepository } from "~/server/license-enforcement/license-enforcement.repository";
 
+export * from "@langwatch/enterprise-licensing-server";
+
 class PrismaLicenseRepository extends LicenseRepository {
   private readonly counts: LicenseEnforcementRepository;
 

@@ -1,4 +1,4 @@
-import { isAdmin } from "@ee/admin/isAdmin";
+import { isAdmin } from "~/runtime/app/features/admin";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { TRPCError } from "@trpc/server";
 import { env } from "~/env.mjs";

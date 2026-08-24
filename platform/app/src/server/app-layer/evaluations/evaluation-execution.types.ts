@@ -8,8 +8,8 @@ export const executeForTraceParamsSchema = z.object({
   projectId: z.string(),
   traceId: z.string(),
   evaluatorType: z.string(),
-  settings: z.record(z.unknown()).nullable(),
-  mappings: z.record(z.unknown()).nullable(),
+  settings: z.record(z.string(), z.unknown()).nullable(),
+  mappings: z.record(z.string(), z.unknown()).nullable(),
   level: z.enum(["trace", "thread"]).optional(),
   workflowId: z.string().nullable().optional(),
 });
@@ -37,7 +37,7 @@ export const evaluationExecutionResultSchema = z.object({
   errorDetails: z.string().optional(),
   cost: evaluationCostSchema.optional(),
   evaluationThreadId: z.string().optional(),
-  inputs: z.record(z.any()).optional(),
+  inputs: z.record(z.string(), z.any()).optional(),
 });
 
 export type EvaluationExecutionResult = z.infer<

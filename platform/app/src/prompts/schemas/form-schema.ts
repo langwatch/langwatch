@@ -31,7 +31,7 @@ const llmSchema = z.object({
   // Reasoning parameter (canonical/unified field)
   reasoning: latestConfigVersionSchema.shape.configData.shape.reasoning,
   verbosity: latestConfigVersionSchema.shape.configData.shape.verbosity,
-  litellmParams: z.record(z.string()).optional(),
+  litellmParams: z.record(z.string(), z.string()).optional(),
 });
 
 // Base schema with static validation using fallback limits
@@ -46,7 +46,9 @@ const baseFormSchema = z.object({
   handle: handleSchema.nullable(),
   scope: scopeSchema,
   version: z.object({
-    parameters: runtimeParametersSchema,
+    // The form always provides this field. Keep the reusable API schema's
+    // default at its transport boundaries without widening the form input.
+    parameters: runtimeParametersSchema.removeDefault(),
     configData: z.object({
       messages:
         latestConfigVersionSchema.shape.configData.shape.messages.removeDefault(),

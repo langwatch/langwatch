@@ -9,7 +9,7 @@
  * `scim_token_not_found`, which a provisioning tool treats as already done.
  */
 
-import { ScimTokenService } from "@ee/scim/scim-token.service";
+import { createScimTokenService } from "~/runtime/app/features/scim";
 import type { EndpointVariables, ServiceContext } from "@langwatch/api";
 import type { Context } from "hono";
 import { z } from "zod";
@@ -17,7 +17,6 @@ import type { Organization } from "~/generated/prisma/client";
 import { emitManagementAudit } from "~/server/api/management/audit";
 import { createManagementService } from "~/server/api/management/managed-service";
 import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
-import { prisma } from "~/server/db";
 
 const { service, guard } = createManagementService({
   name: "scim-tokens",
@@ -27,7 +26,9 @@ const { service, guard } = createManagementService({
 
 /** The handler context: the framework's variables plus the family's provider. */
 type ScimTokensContext = ServiceContext<
-  EndpointVariables & { scimTokens: ScimTokenService }
+  EndpointVariables & {
+    scimTokens: ReturnType<typeof createScimTokenService>;
+  }
 >;
 
 const tokenSummarySchema = z.object({
@@ -99,7 +100,7 @@ const revokeTokenHandler = async (c: ScimTokensContext) => {
 
 export const app = service
   .provide({
-    scimTokens: () => ScimTokenService.create(prisma),
+    scimTokens: () => createScimTokenService(),
   })
   .registerRoute("get", "/", MANAGEMENT_API_VERSION, listTokensHandler, (b) =>
     guard("organization:manage")(b)

@@ -31,7 +31,7 @@ export const CommandSchema = z.object({
   /**
    * Optional metadata about the command, such as correlation IDs or trace context.
    */
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 /**

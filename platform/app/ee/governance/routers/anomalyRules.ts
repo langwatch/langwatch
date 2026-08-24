@@ -58,12 +58,8 @@ const enterpriseGate = requireEnterprisePlan(
  * re-throw below and the boundary serialises it with its own `meta`.
  * Anything else re-throws unchanged so genuine internal errors stay visible.
  *
- * `isZodLikeError`, not `instanceof z.ZodError`: the two schemas this gate
- * catches are on different zod majors — `thresholdConfig.schema.ts` is on
- * `zod/v4`, `destinationConfig.schema.ts` still on v3 — and each major throws
- * its own `ZodError` class. An `instanceof` against either one silently stops
- * recognising the other's failures, which then leave here as unnamed 500s
- * instead of the 422 the admin can act on.
+ * `isZodLikeError`, not `instanceof z.ZodError`, keeps this boundary coupled to
+ * the portable error shape rather than a particular installed runtime instance.
  */
 function translateConfigValidationError(
   err: unknown,

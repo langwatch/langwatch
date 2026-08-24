@@ -17,7 +17,7 @@ import {
   partsFromPullCron,
   pullCadenceCronError,
   summarizePullCadence,
-} from "../pullCadence";
+} from "@langwatch/enterprise-governance-web";
 
 /** Derived from the real defaults so an adapter added with a schedule the
  *  picker cannot speak fails here the day it lands. */

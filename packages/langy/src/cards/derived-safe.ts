@@ -64,7 +64,7 @@
  * it. Renaming it is a prompt-and-data change, not a type change, so it is not
  * bundled into this one.
  */
-import * as z from "zod/v4";
+import * as z from "zod";
 
 import {
   CARD_SHAPE,

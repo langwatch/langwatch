@@ -1,5 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
+import type { WebhookEventsClickHouseRepository } from "~/runtime/app/features/webhooks";
 import type {
   AuthzGrantsService,
   AuthzService,
@@ -7,6 +7,12 @@ import type {
 import type { EventSourcing } from "@langwatch/eventing";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { SystemMigration } from "@langwatch/system-migrations";
+import type { ManagedProviderService } from "@langwatch/enterprise-managed-providers-contract";
+import type {
+  BillableEventsRepository as BillingEventsReadRepository,
+  BillableEventsQueryService,
+  CustomerService,
+} from "~/runtime/app/features/billing";
 import type Stripe from "stripe";
 import type { AnalyticsService } from "~/server/app-layer/analytics/analytics.service";
 import type { InstanceUsageStatsRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
@@ -17,11 +23,9 @@ import type { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.
 import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import type { GatewayVirtualKeySpendRepository } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 import type { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/repositories/stored-object-owner.clickhouse.repository";
-import type { NotificationService } from "../../../ee/billing/notifications/notification.service";
-import type { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
-import type { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
-import type { BillableEventsClickHouseRepository } from "../../../ee/billing/services/billableEvents.clickhouse.repository";
-import type { WebhookService } from "../../../ee/billing/services/webhookService";
+import type { NotificationService, NurturingService } from "~/runtime/app/features/billing";
+import type { UsageLimitService } from "./billing/enterprise/usage-limit.service";
+import type { WebhookService } from "./billing/enterprise/webhook.service";
 import type { GovernanceKpisClickHouseRepository } from "../../../ee/governance/services/governanceKpis.clickhouse.repository";
 import type { GovernanceOcsfEventsClickHouseRepository } from "../../../ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import type { GovernanceTraceActivityClickHouseRepository } from "../../../ee/governance/services/governanceTraceActivity.clickhouse.repository";
@@ -120,6 +124,8 @@ export interface OpsDependencies {
 
 export interface AppDependencies {
   config: AppConfig;
+
+  managedProviders: ManagedProviderService;
 
   broadcast: BroadcastService;
   presence: PresenceService;
@@ -281,7 +287,8 @@ export interface AppDependencies {
   };
   /** Billing-month usage rollups (billable_events + trace_summaries) behind
    *  `billableEventsQuery.ts`'s exported query functions. */
-  billableEvents: BillableEventsClickHouseRepository | undefined;
+  billableEvents: BillingEventsReadRepository | undefined;
+  billingQueries: BillableEventsQueryService;
   /** ADR-056: read side of the coding-agent session aggregate. */
   codingAgents: {
     sessions: CodingAgentSessionService;
@@ -352,6 +359,8 @@ export interface AppDependencies {
   usage: UsageService;
   planProvider: PlanProvider;
   subscription?: SubscriptionService;
+  /** Only present in SaaS — owns Stripe customer lookup and creation. */
+  billingCustomer?: CustomerService;
   /** Only present in SaaS — dispatches Stripe webhook events. */
   webhookService?: WebhookService;
   /** Only present in SaaS — Stripe client used by the webhook transport to

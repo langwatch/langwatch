@@ -8,7 +8,7 @@ import { generateText } from "ai";
 import { createPatch } from "diff";
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { fireWorkflowCreatedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
+import { fireWorkflowCreatedNurturing } from "~/server/app-layer/billing/nurturing/featureAdoption";
 import type {
   Prisma,
   PrismaClient,

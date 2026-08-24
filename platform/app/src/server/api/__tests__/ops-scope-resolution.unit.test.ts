@@ -13,7 +13,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 // Pre-stub the admin lookup so the test isn't coupled to ADMIN_EMAILS env.
-vi.mock("../../../../ee/admin/isAdmin", () => ({
+vi.mock("~/runtime/app/features/admin", () => ({
   isAdmin: ({ email }: { email: string | null | undefined }) =>
     email === "admin@langwatch.ai",
 }));

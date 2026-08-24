@@ -20,7 +20,7 @@
     "@opentelemetry/context-async-hooks": "^2.0.1",
     "@opentelemetry/sdk-node": "^0.217.0",
     "cli-markdown": "^3.5.1",
-    "zod": "^3.22.4",
+    "zod": "^4.4.3",
     "langwatch": "file:../../"
   },
   "devDependencies": {

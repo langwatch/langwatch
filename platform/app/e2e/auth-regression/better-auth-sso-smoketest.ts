@@ -82,7 +82,9 @@ async function main() {
   const { afterUserCreate, beforeAccountCreate } = await import(
     "../../src/server/better-auth/hooks"
   );
-  const { __resetSsoGateForTests } = await import("../../ee/sso/sso-gate");
+  const { __resetSsoGateForTests } = await import(
+    "../../src/runtime/app/features/sso"
+  );
   const { env: appEnv } = await import("../../src/env.mjs");
 
   // ─────────────────────────────────────────────────────────────────

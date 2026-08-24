@@ -16,7 +16,7 @@ import { createInnerTRPCContext } from "../../trpc";
 
 wireDefaultTestApp();
 
-vi.mock("~/../ee/billing/nurturing/hooks/promptCreation", () => ({
+vi.mock("~/server/app-layer/billing/nurturing/promptCreation", () => ({
   afterPromptCreated: vi.fn(),
 }));
 

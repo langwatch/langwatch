@@ -114,8 +114,14 @@ Feature: Feature package boundary lint
   @unit @architecture
   Scenario: Feature services are classes
     Given a feature server service module
-    When it declares a standalone service factory or a service class without static create
+    When it exports a standalone service factory or a service class without static create
     Then Oxlint rejects the service module
+
+  @unit @architecture
+  Scenario: Feature classes may use private pure helpers
+    Given a feature service class uses a private pure module-local function
+    When Oxlint checks the service module
+    Then it accepts the helper as an implementation detail
 
   @unit @architecture
   Scenario: Feature server control flow remains explicit

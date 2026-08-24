@@ -1,6 +1,9 @@
 import merge from "lodash-es/merge";
 import { z } from "zod";
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === "object" && !Array.isArray(value);
+
 /**
  * Attempts to salvage valid parts of data that fails complete schema validation.
  *
@@ -128,7 +131,7 @@ export function salvageValidData<T extends z.ZodObject<any>>(
           }
 
           // Now try to salvage with whatever defaults we have
-          if (nestedDefaultValue !== undefined) {
+          if (isRecord(nestedDefaultValue)) {
             salvaged[key] = salvageValidData(
               objectSchema,
               value,

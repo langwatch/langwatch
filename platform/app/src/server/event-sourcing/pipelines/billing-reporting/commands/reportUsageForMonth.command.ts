@@ -7,8 +7,10 @@ import {
   toError,
   withScope,
 } from "~/utils/posthogErrorCapture";
-import type { queryBillableEventsTotal as QueryBillableEventsTotalFn } from "../../../../../../ee/billing/services/billableEventsQuery";
-import type { UsageReportingService } from "../../../../../../ee/billing/services/usageReportingService";
+import type {
+  BillableEventsQueryService,
+  UsageReportingService,
+} from "~/runtime/app/features/billing";
 import type { BillingCheckpointService } from "../../../../app-layer/billing/billingCheckpoint.service";
 import type { OrganizationService } from "../../../../app-layer/organizations/organization.service";
 import type { ReportUsageForMonthCommandData } from "../schemas/commands";
@@ -42,7 +44,7 @@ export interface ReportUsageForMonthCommandDeps {
   organizations: OrganizationService;
   billingCheckpoints: BillingCheckpointService;
   getUsageReportingService: () => UsageReportingService | undefined;
-  queryBillableEventsTotal: typeof QueryBillableEventsTotalFn;
+  queryBillableEventsTotal: BillableEventsQueryService["queryBillableEventsTotal"];
   selfDispatch: (data: ReportUsageForMonthCommandData) => Promise<void>;
 }
 

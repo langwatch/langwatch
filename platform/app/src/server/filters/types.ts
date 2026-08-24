@@ -48,7 +48,7 @@ export type TriggerFilterValue = z.infer<typeof filterValueSchema>;
 export type TriggerFilters = Partial<Record<FilterField, TriggerFilterValue>>;
 
 // Schema for validating trigger filter JSON structure — rejects unknown fields
-export const triggerFiltersSchema = z.record(
+export const triggerFiltersSchema = z.partialRecord(
   filterFieldsEnum,
   filterValueSchema,
 );

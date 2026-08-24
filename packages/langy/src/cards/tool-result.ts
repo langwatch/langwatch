@@ -6,7 +6,7 @@
  * log, Redis live edge and browser can carry the same typed value without each
  * layer guessing whether `{ value: "..." }` is traces, analytics, or neither.
  */
-import * as z from "zod/v4";
+import * as z from "zod";
 import {
   dashboardCardSchema,
   datasetCardSchema,

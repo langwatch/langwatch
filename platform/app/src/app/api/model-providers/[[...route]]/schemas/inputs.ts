@@ -3,7 +3,7 @@ import { customModelEntrySchema } from "~/server/modelProviders/customModel.sche
 
 export const updateModelProviderInputSchema = z.object({
   enabled: z.boolean(),
-  customKeys: z.record(z.unknown()).optional(),
+  customKeys: z.record(z.string(), z.unknown()).optional(),
   customModels: z
     .union([z.array(customModelEntrySchema), z.array(z.string())])
     .optional(),

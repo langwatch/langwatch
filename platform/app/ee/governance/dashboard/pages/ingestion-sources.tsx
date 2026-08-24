@@ -31,7 +31,7 @@ import {
   composerCadenceError,
   PULL_ADAPTER_FOR_SOURCE,
   PULL_SCHEDULE_DEFAULTS,
-} from "@ee/governance/dashboard/logic/pullCadence";
+} from "@langwatch/enterprise-governance-web";
 import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "@ee/governance/services/activity-monitor/ingestionSource.constants";
 import { isOttlEnabledSourceType } from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
 import {

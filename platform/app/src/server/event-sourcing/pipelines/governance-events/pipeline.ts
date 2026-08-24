@@ -2,7 +2,7 @@ import {
   GOVERNANCE_EVENTS_PROCESS_NAME,
   governanceEventsDeliveryPM,
 } from "@ee/governance/process-manager/governanceEventsDelivery.process";
-import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/webhookDelivery.process";
+import type { WebhookDeliveryProcessDeps } from "~/runtime/app/features/webhooks";
 import {
   defineAggregate,
   defineEvents,

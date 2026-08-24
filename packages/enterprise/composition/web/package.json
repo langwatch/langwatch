@@ -20,9 +20,11 @@
   },
   "dependencies": {
     "@langwatch/enterprise": "workspace:*",
+    "@langwatch/enterprise-admin-web": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*"
   },
   "devDependencies": {
+    "@types/react": "^19.2.14",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
   }

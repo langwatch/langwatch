@@ -13,7 +13,7 @@ export const apiResponseEvaluatorSchema = z.object({
   name: z.string(),
   slug: z.string().nullable(),
   type: z.string(),
-  config: z.record(z.any()).nullable(),
+  config: z.record(z.string(), z.any()).nullable(),
   workflowId: z.string().nullable(),
   copiedFromEvaluatorId: z.string().nullable(),
   createdAt: z.date(),
@@ -30,7 +30,7 @@ const validEvaluatorTypes = new Set(Object.keys(AVAILABLE_EVALUATORS));
 
 export const createEvaluatorInputSchema = z.object({
   name: z.string().min(1).max(255),
-  config: z.record(z.unknown()).superRefine((config, ctx) => {
+  config: z.record(z.string(), z.unknown()).superRefine((config, ctx) => {
     const evaluatorType = config.evaluatorType;
     if (typeof evaluatorType !== "string" || evaluatorType.length === 0) {
       ctx.addIssue({
@@ -61,5 +61,5 @@ export const createEvaluatorInputSchema = z.object({
 
 export const updateEvaluatorInputSchema = z.object({
   name: z.string().min(1).max(255).optional(),
-  config: z.record(z.unknown()).optional(),
+  config: z.record(z.string(), z.unknown()).optional(),
 });

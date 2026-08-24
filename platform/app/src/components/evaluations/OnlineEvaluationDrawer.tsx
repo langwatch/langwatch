@@ -21,6 +21,7 @@ import {
   useState,
 } from "react";
 import { useForm } from "react-hook-form";
+import { z } from "zod";
 import { LuListTree } from "react-icons/lu";
 import {
   DEFAULT_PRECONDITION,
@@ -63,6 +64,8 @@ import { SmallLabel } from "../SmallLabel";
 import { Tooltip } from "../ui/tooltip";
 import { EvaluatorSelectionBox } from "./EvaluatorSelectionBox";
 import { StepRadio } from "./StepButton";
+
+const evaluatorSettingsSchema = z.record(z.string(), z.json());
 import { deserializeMappingStateToUI } from "./utils/deserializeMappingStateToUI";
 import { serializeMappingsToMappingState } from "./utils/serializeMappingsToMappingState";
 
@@ -973,7 +976,9 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       : selectedEvaluator.type === "code"
         ? `code/${selectedEvaluator.id}`
         : (evaluatorConfig?.evaluatorType ?? "langevals/basic");
-    const settings = evaluatorConfig?.settings ?? {};
+    const settings = evaluatorSettingsSchema.parse(
+      evaluatorConfig?.settings ?? {},
+    );
 
     // Convert UIFieldMapping to MappingState format
     const mappingState = serializeMappingsToMappingState(mappings);

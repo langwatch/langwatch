@@ -9,7 +9,7 @@
  * so it is recorded as `apikey:<id>`, still one stable string per credential,
  * so an audit reader can group a provisioning run's writes.
  */
-import { auditLog } from "@ee/audit-log/auditLog";
+import { auditLog } from "~/runtime/app/features/audit-log";
 import type { Context } from "hono";
 import { captureException } from "~/utils/posthogErrorCapture";
 

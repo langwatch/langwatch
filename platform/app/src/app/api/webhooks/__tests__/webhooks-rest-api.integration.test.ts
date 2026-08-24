@@ -1,5 +1,6 @@
+import { createEnterpriseWebhookEndpointService } from "~/server/webhooks/enterpriseWebhookEndpointService";
 import { createServer, type Server } from "node:http";
-import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
+import { WebhookEventsClickHouseRepository } from "~/runtime/app/features/webhooks";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import {
@@ -54,7 +55,7 @@ vi.mock("~/server/app-layer/app", async () => {
         }),
       },
       gateway: {
-        webhookEvents: new WebhookEventsClickHouseRepository(
+        webhookEvents: WebhookEventsClickHouseRepository.create(
           async (tenantId) => {
             const client = await getClickHouseClientForTenant(tenantId);
             if (!client) throw new Error("ClickHouse is not configured");
@@ -199,14 +200,23 @@ describe("Feature: Webhook endpoints REST API", () => {
     /** @scenario An unexpected server failure answers the canonical error envelope naming nothing internal */
     it("answers an unexpected server failure with it, naming nothing internal", async () => {
       planHasWebhookEndpoints = true;
-      const { WebhookEndpointService } = await import(
-        "@ee/webhooks/webhookEndpoint.service"
+      const endpointFactory = await import(
+        "~/server/webhooks/enterpriseWebhookEndpointService"
       );
+      const realService = createEnterpriseWebhookEndpointService({ prisma });
+      const failingService = new Proxy(realService, {
+        get(target, property, receiver) {
+          if (property === "getAll") {
+            return async () => {
+              throw new Error('relation "WebhookEndpoint" does not exist');
+            };
+          }
+          return Reflect.get(target, property, receiver);
+        },
+      });
       const boom = vi
-        .spyOn(WebhookEndpointService.prototype, "getAll")
-        .mockRejectedValueOnce(
-          new Error('relation "WebhookEndpoint" does not exist'),
-        );
+        .spyOn(endpointFactory, "createEnterpriseWebhookEndpointService")
+        .mockReturnValueOnce(failingService);
       try {
         const res = await app.request("/api/webhooks/v1/endpoints", {
           headers: headers(),
@@ -1122,10 +1132,7 @@ describe("Feature: Webhook endpoints REST API", () => {
       expect(data.url).toBe("https://example.com/hooks/default-kind");
       expect(data.sqs).toBeNull();
 
-      const { WebhookEndpointService } = await import(
-        "@ee/webhooks/webhookEndpoint.service"
-      );
-      const destination = await new WebhookEndpointService({
+      const destination = await createEnterpriseWebhookEndpointService({
         prisma,
       }).getDestinationConfig({
         organizationId: organization.id,

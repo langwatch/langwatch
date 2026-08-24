@@ -26,7 +26,7 @@ const normalizedAttributesValueSchema = z.union([
   z.array(normalizedAttributeScalarSchema),
 ]);
 
-const normalizedAttributesSchema = z.record(z.unknown());
+const normalizedAttributesSchema = z.record(z.string(), z.unknown());
 
 const normalizedSpanKindSchema = z.nativeEnum(NormalizedSpanKind);
 const normalizedStatusCodeSchema = z.nativeEnum(NormalizedStatusCode);

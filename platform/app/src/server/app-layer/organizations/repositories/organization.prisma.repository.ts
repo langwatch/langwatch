@@ -27,7 +27,7 @@ import {
   ORGANIZATION_TO_TEAM_ROLE_MAP,
   type TeamRoleValue,
 } from "~/utils/memberRoleConstraints";
-import { GROWTH_SEAT_PLAN_TYPES } from "../../../../../ee/billing/utils/growthSeatEvent";
+import { GROWTH_SEAT_PLAN_TYPES } from "@langwatch/enterprise-billing-contract";
 import { isCustomRole } from "../../../api/enterprise";
 import { revokeAllSessionsForUser } from "../../../better-auth/revokeSessions";
 import { CustomRoleNotAssignableError } from "../../../role-bindings/errors";

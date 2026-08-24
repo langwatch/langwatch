@@ -37,7 +37,7 @@
  * the same JSON needs everything else. Parsing must never be lossy, and a CLI
  * that grows a field must never break a card.
  */
-import * as z from "zod/v4";
+import * as z from "zod";
 import {
   collectionSchema,
   hitsPaginationSchema,

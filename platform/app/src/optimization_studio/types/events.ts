@@ -3,7 +3,7 @@ import { type BaseComponent, type Workflow, workflowJsonSchema } from "./dsl";
 import { OPTIMIZERS, optimizerParamsSchema } from "./optimizers";
 
 export const studioClientEventSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("is_alive"), payload: z.record(z.never()) }),
+  z.object({ type: z.literal("is_alive"), payload: z.record(z.string(), z.never()) }),
   z.object({
     type: z.literal("execute_component"),
     payload: z.object({

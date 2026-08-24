@@ -5,23 +5,32 @@
  * Feature lists and currency helpers used by SubscriptionPage and PlansComparisonPage.
  */
 
-import { Currency } from "~/generated/prisma/client";
-import { formatNumber } from "~/utils/formatNumber";
-import { UNLIMITED_MESSAGES } from "../../../ee/billing/planLimits";
-import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
-
-export { isAnnualTieredPlan } from "../../../ee/billing/planTypes";
-export type { Currency } from "../../../ee/billing/pricing";
-export {
+import {
+  Currency,
   formatPrice,
-  getAnnualDiscountPercent,
-  getGrowthSeatPriceCents,
-} from "../../../ee/billing/pricing";
-export type { BillingInterval } from "../../../ee/billing/utils/growthSeatEvent";
-export {
+  isAnnualTieredPlan,
   parseGrowthSeatPlanType,
   resolveGrowthSeatPlanType,
-} from "../../../ee/billing/utils/growthSeatEvent";
+  UNLIMITED_MESSAGES,
+  type BillingInterval,
+  type Currency as CurrencyType,
+} from "@langwatch/enterprise-billing-contract";
+import { BillingPricingService } from "@langwatch/enterprise-billing-web";
+import { formatNumber } from "~/utils/formatNumber";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
+
+export { formatPrice, isAnnualTieredPlan, parseGrowthSeatPlanType, resolveGrowthSeatPlanType };
+export type { BillingInterval, CurrencyType as Currency };
+
+const pricingService = BillingPricingService.create(
+  import.meta.env.MODE === "production" ? "live" : "test",
+);
+
+export const getGrowthSeatPriceCents = () =>
+  pricingService.getGrowthSeatPriceCents();
+
+export const getAnnualDiscountPercent = (currency: CurrencyType) =>
+  pricingService.getAnnualDiscountPercent(currency);
 
 export const currencySymbol: Record<Currency, string> = {
   [Currency.EUR]: "\u20AC",

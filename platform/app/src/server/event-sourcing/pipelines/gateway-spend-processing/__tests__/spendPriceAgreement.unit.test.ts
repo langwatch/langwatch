@@ -47,7 +47,7 @@ import { gatewayDebitsPM } from "@ee/governance/process-manager/gatewayDebits.pr
 import {
   deliverPayloadToRow,
   webhookDeliveryPM,
-} from "@ee/webhooks/process-manager/webhookDelivery.process";
+} from "~/runtime/app/features/webhooks";
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import { createTenantId, EventUtils } from "@langwatch/eventing";
 import {

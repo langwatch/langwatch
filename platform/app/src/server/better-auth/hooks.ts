@@ -1,5 +1,5 @@
-import { extractEmailDomain, isSsoProviderMatch } from "@ee/sso/matching";
-import { platformSSOAllowed } from "@ee/sso/sso-gate";
+import { extractEmailDomain, isSsoProviderMatch } from "@langwatch/enterprise-sso-contract";
+import { platformSSOAllowed } from "~/runtime/app/features/sso";
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
@@ -15,7 +15,7 @@ import { getApp } from "~/server/app-layer/app";
 import { InviteService } from "~/server/invites/invite.service";
 import { trackServerEvent } from "~/server/posthog";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { fireSsoAutoAddNurturingCalls } from "../../../ee/billing/nurturing/hooks/ssoAutoAdd";
+import { fireSsoAutoAddNurturingCalls } from "../app-layer/billing/nurturing/ssoAutoAdd";
 import { captureException } from "../../utils/posthogErrorCapture";
 
 const logger = createLogger("langwatch:better-auth:hooks");

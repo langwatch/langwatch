@@ -22,7 +22,7 @@ import {
   pullCadenceCronError,
   recommendedPullSchedule,
   summarizePullCadence,
-} from "../logic/pullCadence";
+} from "@langwatch/enterprise-governance-web";
 import type { SourceType } from "./ingestionSourceCatalog";
 
 /** One flat select collapses frequency + minute interval: "every 15

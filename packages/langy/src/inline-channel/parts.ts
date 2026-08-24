@@ -16,7 +16,7 @@
  *                          text ("Chose: X"). The UI binds by blockId; the
  *                          model just reads the words.
  */
-import * as z from "zod/v4";
+import * as z from "zod";
 
 import { langyChoiceSelectionSchema } from "./choices";
 import {

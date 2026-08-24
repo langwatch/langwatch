@@ -5,8 +5,8 @@ import { z } from "zod";
 import {
   fireIntegrationMethodNurturing,
   mapProductSelectionToIntegrationMethod,
-} from "~/../ee/billing/nurturing/hooks/productInterest";
-import { fireSignupNurturingCalls } from "~/../ee/billing/nurturing/hooks/signupIdentification";
+} from "~/server/app-layer/billing/nurturing/productInterest";
+import { fireSignupNurturingCalls } from "~/server/app-layer/billing/nurturing/signupIdentification";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";

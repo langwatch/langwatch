@@ -2,7 +2,7 @@
 
 The contract-sealed service framework for LangWatch API services: RPC-first endpoint registration, explicit version namespaces, input/output validation, OpenAPI documentation, capability ports, SSE streaming, and error formatting.
 
-Built on top of [Hono](https://hono.dev) and [hono-openapi](https://github.com/rhinobase/hono-openapi). Its schema boundary is [Standard Schema](https://standardschema.dev/): new feature contracts use Zod 4, while existing application routes can migrate from Zod 3 independently.
+Built on top of [Hono](https://hono.dev) and [hono-openapi](https://github.com/rhinobase/hono-openapi). Its schema boundary is [Standard Schema](https://standardschema.dev/), and LangWatch-authored schemas use Zod 4.
 
 The lasting decisions live in [adrs/](./adrs) — [001 RPC-first fluent registration](./adrs/001-rpc-first-fluent-registration.md), [002 explicit version namespaces](./adrs/002-explicit-version-namespaces.md), [003 endpoint capabilities are ports](./adrs/003-endpoint-capabilities-are-ports.md) — and the behavioural contracts in [specs/](./specs). This README is usage; rationale stays there.
 

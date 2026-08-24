@@ -5,7 +5,7 @@ import {
   type NavigationMode,
   useNavigationModeStore,
 } from "~/features/navigation/navigationModeStore";
-import { ImpersonationSwitchBackMenuItem } from "../../ee/admin/ImpersonationSwitchBackMenuItem";
+import { ImpersonationSwitchBackMenuItem } from "~/features/enterprise/admin/ImpersonationSwitchBackMenuItem";
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";

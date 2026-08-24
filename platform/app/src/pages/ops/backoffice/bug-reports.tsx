@@ -1,4 +1,4 @@
-import BugReportsView from "../../../../ee/admin/backoffice/resources/BugReportsView";
+import BugReportsView from "~/features/enterprise/admin/backoffice/resources/BugReportsView";
 import BackofficeShell from "./_shell";
 
 export default function BackofficeBugReportsPage() {

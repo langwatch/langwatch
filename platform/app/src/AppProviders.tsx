@@ -6,7 +6,7 @@ import { AnalyticsProvider } from "react-contextual-analytics";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { createAppAnalyticsClient } from "~/utils/analyticsClient";
 import { SessionProvider } from "~/utils/auth-client";
-import { ExtraFooterComponents } from "../ee/saas/ExtraFooterComponents";
+import { EnterpriseSaasFooter } from "./components/enterprise/EnterpriseSaasFooter";
 import { GraphicsQualityProvider } from "./components/GraphicsQualityProvider";
 import { ColorModeProvider } from "./components/ui/color-mode";
 import { Toaster } from "./components/ui/toaster";
@@ -81,7 +81,7 @@ export function InnerProviders({ children }: { children: ReactNode }) {
         </AnalyticsProvider>
         <Toaster />
       </CommandBarProvider>
-      <ExtraFooterComponents />
+      <EnterpriseSaasFooter />
     </>
   );
 }

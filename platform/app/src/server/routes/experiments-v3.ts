@@ -58,7 +58,7 @@ import { ExperimentRunService } from "~/server/experiments-v3/services/experimen
 import { trackServerEvent } from "~/server/posthog";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import { fireExperimentRanNurturing } from "../../../ee/billing/nurturing/hooks/featureAdoption";
+import { fireExperimentRanNurturing } from "../app-layer/billing/nurturing/featureAdoption";
 import {
   handledErrorEnvelopeSchema,
   listRunsResponseSchema,
@@ -550,7 +550,7 @@ secured.access(apiKeyAuthRun).post(
     );
     if (!parseResult.success) {
       logger.error(
-        { slug, errors: parseResult.error.errors },
+        { slug, errors: parseResult.error.issues },
         "Invalid workbenchState",
       );
       // The stored workbench state no longer matches its schema. The customer
@@ -580,7 +580,7 @@ secured.access(apiKeyAuthRun).post(
     if (!inputsParse.success) {
       return c.json(
         {
-          error: inputsParse.error.errors[0]?.message ?? "Invalid request body",
+          error: inputsParse.error.issues[0]?.message ?? "Invalid request body",
         },
         { status: 400 },
       );

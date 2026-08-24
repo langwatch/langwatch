@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { EESubscriptionService } from "../../../../../ee/billing/services/subscription.service";
+import type { EESubscriptionService } from "../../billing/enterprise/subscription.service";
 import {
   NullSubscriptionRepository,
   type SubscriptionRepository,

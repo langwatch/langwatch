@@ -2,11 +2,7 @@
  * Scenario event schemas
  * Extends the AG-UI base event schema to add scenario-specific fields.
  */
-import {
-  EventType,
-  MessageSchema,
-  MessagesSnapshotEventSchema,
-} from "@ag-ui/core";
+import { EventType } from "@ag-ui/core";
 import { z } from "zod";
 import { chatMessageSchema } from "~/server/tracer/types";
 import {
@@ -160,24 +156,73 @@ const scenarioAudioMessageSchema = z.object({
 });
 
 /**
+ * Keep AG-UI's third-party validator runtime out of the application's Zod 4
+ * schema graph and
+ * describe the small message boundary we consume here instead. The richer
+ * LangWatch message schema below remains the primary validator; this branch
+ * covers AG-UI-only roles such as `activity` and `reasoning`.
+ */
+const agUiMessageSchema = z.looseObject({
+  id: z.string(),
+  role: z.enum([
+    "developer",
+    "system",
+    "assistant",
+    "user",
+    "tool",
+    "activity",
+    "reasoning",
+  ]),
+  content: z.unknown().optional(),
+  toolCalls: z
+    .array(
+      z.looseObject({
+        id: z.string().optional(),
+        function: z
+          .looseObject({
+            name: z.string().optional(),
+            arguments: z.string().optional(),
+          })
+          .optional(),
+      }),
+    )
+    .optional(),
+  tool_calls: z
+    .array(
+      z.looseObject({
+        id: z.string().optional(),
+        function: z
+          .looseObject({
+            name: z.string().optional(),
+            arguments: z.string().optional(),
+          })
+          .optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
  * Scenario Message Snapshot Event Schema
  * Captures the conversation state at a specific point during scenario execution.
  * Includes searchable_content and payload for full message functionality.
  */
-export const scenarioMessageSnapshotSchema = MessagesSnapshotEventSchema.merge(
-  baseScenarioEventSchema.extend({
-    type: z.literal(ScenarioEventType.MESSAGE_SNAPSHOT),
-    messages: z.array(
-      z.intersection(
-        z.union([MessageSchema, chatMessageSchema, scenarioAudioMessageSchema]),
-        z.object({
-          id: z.string().optional(),
-          trace_id: z.string().optional(),
-        }),
-      ),
+export const scenarioMessageSnapshotSchema = baseScenarioEventSchema.extend({
+  type: z.literal(ScenarioEventType.MESSAGE_SNAPSHOT),
+  messages: z.array(
+    z.intersection(
+      z.union([
+        agUiMessageSchema,
+        chatMessageSchema,
+        scenarioAudioMessageSchema,
+      ]),
+      z.object({
+        id: z.string().optional(),
+        trace_id: z.string().optional(),
+      }),
     ),
-  }),
-);
+  ),
+});
 
 /**
  * Scenario Text Message Start Event Schema
@@ -199,7 +244,7 @@ export const scenarioTextMessageEndSchema = baseScenarioEventSchema.extend({
   messageId: z.string(),
   role: z.string(),
   content: z.string().optional(),
-  message: z.record(z.unknown()).optional(),
+  message: z.record(z.string(), z.unknown()).optional(),
   traceId: z.string().optional(),
   messageIndex: z.number().optional(),
 });

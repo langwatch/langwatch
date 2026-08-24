@@ -11,16 +11,12 @@
  * Splitting the two schemas keeps the security boundary crisp: the envelope is
  * verified as bytes BEFORE its payload is trusted or parsed.
  */
-// zod/v4, not the default v3 entrypoint: `cliToolResultSchema` below is authored
-// against zod/v4, and a v4 schema embedded in a v3 `z.object()` blows up at parse
-// time (`keyValidator._parse is not a function`) rather than at construction.
-
 import {
   type HerrEnvelope,
   handledErrorFromHerr,
 } from "@langwatch/handled-error";
 import { cliToolResultSchema } from "@langwatch/langy";
-import * as z from "zod/v4";
+import * as z from "zod";
 
 /**
  * The signed envelope — mirrors frameauth's construction. `payload` is the exact

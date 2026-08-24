@@ -1097,7 +1097,7 @@ export const automationRouter = createTRPCRouter({
         if (!perActionParsed.success) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: `Invalid actionParams for ${input.action}: ${perActionParsed.error.errors[0]?.message ?? "validation failed"}`,
+            message: `Invalid actionParams for ${input.action}: ${perActionParsed.error.issues[0]?.message ?? "validation failed"}`,
           });
         }
         // Persist the PARSED params, not the wire object: Zod strips keys the

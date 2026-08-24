@@ -19,15 +19,16 @@ vi.mock("~/server/app-layer/app", () => {
       },
       allInstances: async () => [],
     },
+    billingQueries: {
+      queryBillableEventsTotalUniq: mockQueryBillableEventsTotalUniq,
+      queryBillableEventsByProjectApprox:
+        mockQueryBillableEventsByProjectApprox,
+    },
   });
   return { getApp: app, tryGetApp: app };
 });
 
-vi.mock("../../../../ee/billing/services/billableEventsQuery", () => ({
-  queryBillableEventsTotalUniq: (...args: unknown[]) =>
-    mockQueryBillableEventsTotalUniq(...args),
-  queryBillableEventsByProjectApprox: (...args: unknown[]) =>
-    mockQueryBillableEventsByProjectApprox(...args),
+vi.mock("~/runtime/app/features/billing", () => ({
   getBillingMonth: () => mockGetBillingMonth(),
 }));
 

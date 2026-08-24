@@ -85,7 +85,7 @@ vi.mock("../../../rbac", () => ({
 }));
 
 // Mock audit log to avoid database calls
-vi.mock("@ee/audit-log/auditLog", () => ({
+vi.mock("~/runtime/app/features/audit-log", () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
 

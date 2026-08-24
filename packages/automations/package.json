@@ -29,7 +29,7 @@
 		"liquidjs": "^10.27.1",
 		"marked": "^18.0.5",
 		"sanitize-html": "^2.17.5",
-		"zod": "^3.25.76"
+		"zod": "^4.4.3"
 	},
 	"devDependencies": {
 		"@types/node": "^26.0.1",

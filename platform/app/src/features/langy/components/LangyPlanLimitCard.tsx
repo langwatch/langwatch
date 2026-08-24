@@ -29,7 +29,7 @@ import { useLangyStore } from "../stores/langyStore";
  *
  * WHO gets the CTA is the point. Changing a plan is `organization:manage` — the
  * permission the subscription mutations themselves check
- * (`ee/billing/subscriptionRouter.ts`) — so anyone else is told plainly whom to
+ * (`server/api/routers/subscription.enterprise.ts`) — so anyone else is told plainly whom to
  * ask instead. Handing them a button into a page that will refuse them is a
  * dead end dressed up as a way forward.
  */

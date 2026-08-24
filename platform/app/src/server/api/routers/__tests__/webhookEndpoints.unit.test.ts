@@ -21,7 +21,7 @@ const ORG_ID = "org_1";
 // resolves to no module mocks nothing and throws nothing: the real audit
 // log then runs, and this file passes anywhere a Postgres happens to be
 // listening on 5432 while failing in CI, where none is.
-vi.mock("@ee/audit-log/auditLog", () => ({
+vi.mock("~/runtime/app/features/audit-log", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 

@@ -22,7 +22,6 @@ import {
   type WorkflowAgentConfig,
   workflowAgentConfigSchema,
 } from "@langwatch/agents-contract";
-import type { StandardSchemaV1 } from "@standard-schema/spec";
 import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 
@@ -32,48 +31,6 @@ import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
 import { datasetColumnTypeSchema } from "../../server/datasets/types";
 import type { ChatMessage } from "../../server/tracer/types";
-
-/**
- * Adapts the feature contracts' Zod 4 / Standard Schema validators to the
- * app's remaining Zod 3 schema graph. Parsed values (including defaults and
- * transforms) come from the feature-owned schema; this adapter is only the
- * temporary compatibility boundary for legacy app composition.
- */
-const asLegacyZodSchema = <Input, Output>(
-  schema: StandardSchemaV1<Input, Output>,
-): z.ZodType<Output> =>
-  z.any().transform((value, context) => {
-    const result = schema["~standard"].validate(value);
-    if (result instanceof Promise) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Asynchronous feature schemas cannot be composed in Zod 3",
-      });
-      return z.NEVER;
-    }
-
-    if (result.issues) {
-      for (const issue of result.issues) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: issue.message,
-          path: issue.path
-            ?.map((segment) =>
-              typeof segment === "object" && segment !== null
-                ? segment.key
-                : segment,
-            )
-            .filter(
-              (segment): segment is string | number =>
-                typeof segment === "string" || typeof segment === "number",
-            ),
-        });
-      }
-      return z.NEVER;
-    }
-
-    return result.value;
-  }) as z.ZodType<Output>;
 
 export const FIELD_TYPES = AGENT_FIELD_TYPES;
 export type Field = AgentField;
@@ -182,7 +139,7 @@ export type BaseComponent = {
   execution_state?: ExecutionState;
 };
 
-export const llmConfigSchema = asLegacyZodSchema(agentLlmConfigSchema);
+export const llmConfigSchema = agentLlmConfigSchema;
 
 export type LLMConfig = z.infer<typeof llmConfigSchema>;
 
@@ -293,7 +250,7 @@ export const nodeDatasetSchema = z.object({
   name: z.string().optional(),
   inline: z
     .object({
-      records: z.record(z.array(z.any())),
+      records: z.record(z.string(), z.array(z.any())),
       columnTypes: z.array(
         z.object({
           id: z.string().optional(),
@@ -456,23 +413,19 @@ export type ServerWorkflow = Omit<Workflow, "workflow_id"> & {
 };
 
 // Agent authoring contracts are owned by packages/features/agents/contract.
-// These names remain as compatibility aliases for the Studio graph while its
+// These names remain as aliases for the Studio graph while its
 // broader workflow vocabulary stays app-owned.
-export const fieldSchema = asLegacyZodSchema(agentFieldSchema);
-export const baseComponentSchema = asLegacyZodSchema(baseAgentConfigSchema);
-export const chatMessageSchema = asLegacyZodSchema(agentChatMessageSchema);
-export const signatureComponentSchema = asLegacyZodSchema(
-  signatureAgentConfigSchema,
-);
-export const codeParameterSchema = asLegacyZodSchema(agentCodeParameterSchema);
-export const codeComponentSchema = asLegacyZodSchema(codeAgentConfigSchema);
-export const customComponentSchema = asLegacyZodSchema(
-  workflowAgentConfigSchema,
-);
-export const httpHeaderSchema = asLegacyZodSchema(agentHttpHeaderSchema);
-export const httpAuthSchema = asLegacyZodSchema(agentHttpAuthSchema);
+export const fieldSchema = agentFieldSchema;
+export const baseComponentSchema = baseAgentConfigSchema;
+export const chatMessageSchema = agentChatMessageSchema;
+export const signatureComponentSchema = signatureAgentConfigSchema;
+export const codeParameterSchema = agentCodeParameterSchema;
+export const codeComponentSchema = codeAgentConfigSchema;
+export const customComponentSchema = workflowAgentConfigSchema;
+export const httpHeaderSchema = agentHttpHeaderSchema;
+export const httpAuthSchema = agentHttpAuthSchema;
 export const HTTP_METHODS = AGENT_HTTP_METHODS;
-export const httpComponentSchema = asLegacyZodSchema(httpAgentConfigSchema);
+export const httpComponentSchema = httpAgentConfigSchema;
 
 export type HttpMethod = AgentHttpMethod;
 export type HttpAuthType = AgentHttpAuthType;

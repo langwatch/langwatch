@@ -8,9 +8,9 @@
  * otherwise, passing `schemaType: "input"` for request bodies only. So requests
  * and responses were read in opposite directions, deliberately.
  *
- * v1 converts through Standard Schema, and zod 3 exposes no input/output split
- * across that boundary, so `@standard-community/standard-openapi` reads every
- * schema as its input. Requests are unaffected — that was already the reading
+ * v1 converts through Standard Schema and
+ * `@standard-community/standard-openapi` reads every schema as its input.
+ * Requests are unaffected — that was already the reading
  * they got. Responses lose the distinction:
  *
  *     z.object({ tags: z.array(z.string()).default([]) })

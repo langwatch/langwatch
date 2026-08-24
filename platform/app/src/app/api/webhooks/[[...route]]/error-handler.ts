@@ -13,7 +13,7 @@ const logger = createLogger("langwatch:api:webhooks:errors");
  * (`~/app/api/shared/canonical-error`).
  *
  * The surface's two domain failures carry their own codes because they are
- * `HandledError`s (`@ee/webhooks/webhookEndpoint.service`), so the shared
+ * `HandledError`s (`~/runtime/app/features/webhooks`), so the shared
  * mapper names them without this boundary knowing they exist. That matters
  * beyond tidiness: the codes registry guard only sees codes declared on
  * handled errors, so a code named by hand here would be one nothing checks

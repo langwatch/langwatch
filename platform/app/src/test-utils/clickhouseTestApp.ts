@@ -1,10 +1,10 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import { BillableEventsClickHouseRepository } from "@ee/billing/services/billableEvents.clickhouse.repository";
+import { ClickHouseBillingAdapter } from "~/runtime/app/features/billing";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/services/governanceTraceActivity.clickhouse.repository";
 import { PersonalUsageClickHouseRepository } from "@ee/governance/services/personalUsage.clickhouse.repository";
-import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
+import { WebhookEventsClickHouseRepository } from "~/runtime/app/features/webhooks";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
@@ -94,7 +94,7 @@ export function installClickHouseTestApp({
       budgets: new GatewayBudgetClickHouseRepository(required),
       virtualKeySpend: new GatewayVirtualKeySpendRepository(required),
       spendEvents: new GatewaySpendEventsRepository(required),
-      webhookEvents: new WebhookEventsClickHouseRepository(required),
+      webhookEvents: WebhookEventsClickHouseRepository.create(required),
     },
     governance: {
       ocsfEvents: new GovernanceOcsfEventsClickHouseRepository(required),
@@ -102,10 +102,10 @@ export function installClickHouseTestApp({
       kpis: new GovernanceKpisClickHouseRepository(required),
       personalUsage: new PersonalUsageClickHouseRepository(required),
     },
-    billableEvents: new BillableEventsClickHouseRepository(
-      required,
-      requiredOrg,
-    ),
+    billableEvents: ClickHouseBillingAdapter.create({
+      resolveClient: required,
+      resolveOrganizationClient: requiredOrg,
+    }).build(),
   });
 }
 

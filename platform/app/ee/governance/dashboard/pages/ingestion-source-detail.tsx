@@ -58,7 +58,7 @@ import {
   type SourceEventsPager,
   useSourceEventsPager,
 } from "../components/useSourceEventsPager";
-import type { PageRequest } from "../logic/eventsPager";
+import type { PageRequest } from "@langwatch/enterprise-governance-web";
 
 /**
  * Per-source detail page - health metrics + a cursor-walked table of every

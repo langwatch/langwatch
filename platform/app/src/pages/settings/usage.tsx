@@ -17,7 +17,7 @@ import {
   usePlanManagementUrl,
 } from "~/hooks/usePlanManagementUrl";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
-import { PlanTypes } from "../../../ee/billing/planTypes";
+import { PlanTypes } from "@langwatch/enterprise-billing-contract";
 import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
 import {
   mapLicenseStatusToLimits,

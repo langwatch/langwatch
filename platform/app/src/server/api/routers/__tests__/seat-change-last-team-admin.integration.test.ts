@@ -41,7 +41,7 @@ import {
   type SeatChangeFixture,
 } from "./seatChangeLastTeamAdminFixture";
 
-vi.mock("@ee/audit-log/auditLog", () => ({
+vi.mock("~/runtime/app/features/audit-log", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 

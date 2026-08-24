@@ -1,8 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import isEqual from "lodash-es/isEqual";
 import { useEffect, useMemo, useRef } from "react";
-import { type DeepPartial, type Resolver, useForm } from "react-hook-form";
-import type { z } from "zod";
+import { type DeepPartial, useForm } from "react-hook-form";
 import { useModelLimits } from "~/hooks/useModelLimits";
 import {
   formSchema,
@@ -45,10 +44,7 @@ export const usePromptConfigForm = ({
   // Store schema in ref so resolver can access it.
   // Uses the save-time schema so the system-prompt-required refinement
   // (#3196) fires when methods.trigger() is called from the Save handler.
-  // Typed as `ZodTypeAny` because the schema can be either a `ZodObject`
-  // (limit-refined) or a `ZodEffects` wrapper; the resolver only calls
-  // `.parse`/`.safeParse`, which both shapes support.
-  const schemaRef = useRef<z.ZodTypeAny>(formSchemaForSave);
+  const schemaRef = useRef(formSchemaForSave);
   /**
    * Parse initial values once with schema defaults applied.
    * Memoized to avoid re-parsing on every render.
@@ -67,11 +63,9 @@ export const usePromptConfigForm = ({
     defaultValues: parsedInitialValues,
     resolver: (data, context, options) => {
       // Use ref to get current schema (updated by useEffect). The schema
-      // validates PromptConfigFormValues, so narrow the inferred resolver type
-      // to match rather than widening the call site with `any`.
-      const resolver = zodResolver(
-        schemaRef.current,
-      ) as Resolver<PromptConfigFormValues>;
+      // validates PromptConfigFormValues while preserving the schema's exact
+      // Zod 4 input and output types.
+      const resolver = zodResolver(schemaRef.current);
       return resolver(data, context, options);
     },
   });

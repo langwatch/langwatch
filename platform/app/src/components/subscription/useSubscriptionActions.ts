@@ -2,7 +2,7 @@ import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import type { MemberType } from "~/server/license-enforcement/member-classification";
 import { api } from "~/utils/api";
-import { isGrowthSeatEventPlan } from "../../../ee/billing/utils/growthSeatEvent";
+import { isGrowthSeatEventPlan } from "@langwatch/enterprise-billing-contract";
 import { useUpgradeModalStore } from "../../stores/upgradeModalStore";
 import {
   type BillingInterval,

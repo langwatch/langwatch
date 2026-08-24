@@ -1,3 +1,4 @@
+import { createEnterpriseWebhookEndpointService } from "~/server/webhooks/enterpriseWebhookEndpointService";
 /**
  * tRPC router for Org Settings > Webhooks. Session-auth sibling of the
  * org-key REST surface at /api/webhooks/v1: same service, same RBAC
@@ -11,14 +12,13 @@
 import {
   assertWebhookEndpointsEntitled,
   WebhookEndpointsNotEntitledError,
-} from "@ee/webhooks/entitlement";
-import { WEBHOOK_EVENT_TYPES } from "@ee/webhooks/eventRegistry";
+} from "~/runtime/app/features/webhooks";
+import { WEBHOOK_EVENT_TYPES } from "@langwatch/enterprise-webhooks-contract";
 import {
   WebhookEndpointNotFoundError,
-  WebhookEndpointService,
   WebhookEndpointValidationError,
-} from "@ee/webhooks/webhookEndpoint.service";
-import { WebhookHealthService } from "@ee/webhooks/webhookHealth.service";
+} from "~/runtime/app/features/webhooks";
+import { WebhookHealthService } from "~/runtime/app/features/webhooks";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -52,26 +52,19 @@ const sqsDestinationInput = z.object({
  * active plan must carry `webhookEndpointsEnabled`. Runs after the RBAC check so
  * membership is already established.
  */
-const requireWebhooksPlan = async ({
-  input,
-  next,
-}: {
-  input: { organizationId: string };
-  next: () => any;
-}) => {
+const assertWebhooksPlan = async (organizationId: string): Promise<void> => {
   try {
-    await assertWebhookEndpointsEntitled(input.organizationId);
+    await assertWebhookEndpointsEntitled(organizationId);
   } catch (error) {
     if (error instanceof WebhookEndpointsNotEntitledError) {
       throw new TRPCError({ code: "FORBIDDEN", message: error.message });
     }
     throw error;
   }
-  return next();
 };
 
 function service(prisma: PrismaClient) {
-  return new WebhookEndpointService({ prisma });
+  return createEnterpriseWebhookEndpointService({ prisma });
 }
 
 /** Map service errors onto tRPC codes so the UI gets actionable messages. */
@@ -94,13 +87,19 @@ export const webhookEndpointsRouter = createTRPCRouter({
   eventTypes: protectedProcedure
     .input(orgInput)
     .permission("webhookEndpoints:view")
-    .use(requireWebhooksPlan)
+    .use(async ({ input, next }) => {
+      await assertWebhooksPlan(input.organizationId);
+      return next();
+    })
     .query(() => WEBHOOK_EVENT_TYPES),
 
   list: protectedProcedure
     .input(orgInput)
     .permission("webhookEndpoints:view")
-    .use(requireWebhooksPlan)
+    .use(async ({ input, next }) => {
+      await assertWebhooksPlan(input.organizationId);
+      return next();
+    })
     .query(({ ctx, input }) =>
       service(ctx.prisma).getAll({ organizationId: input.organizationId }),
     ),
@@ -115,7 +114,10 @@ export const webhookEndpointsRouter = createTRPCRouter({
       }),
     )
     .permission("webhookEndpoints:view")
-    .use(requireWebhooksPlan)
+    .use(async ({ input, next }) => {
+      await assertWebhooksPlan(input.organizationId);
+      return next();
+    })
     .query(({ ctx, input }) =>
       translating(() =>
         service(ctx.prisma).getDeliveries({
@@ -140,7 +142,10 @@ export const webhookEndpointsRouter = createTRPCRouter({
       }),
     )
     .permission("webhookEndpoints:manage")
-    .use(requireWebhooksPlan)
+    .use(async ({ input, next }) => {
+      await assertWebhooksPlan(input.organizationId);
+      return next();
+    })
     .mutation(({ ctx, input }) =>
       translating(() =>
         service(ctx.prisma).create({
@@ -159,10 +164,13 @@ export const webhookEndpointsRouter = createTRPCRouter({
   health: protectedProcedure
     .input(endpointInput)
     .permission("webhookEndpoints:view")
-    .use(requireWebhooksPlan)
+    .use(async ({ input, next }) => {
+      await assertWebhooksPlan(input.organizationId);
+      return next();
+    })
     .query(({ ctx, input }) =>
       translating(() =>
-        new WebhookHealthService({
+        WebhookHealthService.create({
           endpoints: service(ctx.prisma),
           processStore: new PrismaProcessStore(ctx.prisma),
         }).health({
@@ -189,7 +197,10 @@ export const webhookEndpointsRouter = createTRPCRouter({
       }),
     )
     .permission("webhookEndpoints:manage")
-    .use(requireWebhooksPlan)
+    .use(async ({ input, next }) => {
+      await assertWebhooksPlan(input.organizationId);
+      return next();
+    })
     .mutation(({ ctx, input }) =>
       translating(() =>
         service(ctx.prisma).update({
@@ -209,7 +220,10 @@ export const webhookEndpointsRouter = createTRPCRouter({
   rollSecret: protectedProcedure
     .input(endpointInput)
     .permission("webhookEndpoints:manage")
-    .use(requireWebhooksPlan)
+    .use(async ({ input, next }) => {
+      await assertWebhooksPlan(input.organizationId);
+      return next();
+    })
     .mutation(({ ctx, input }) =>
       translating(() =>
         service(ctx.prisma).rollSecret({
@@ -222,7 +236,10 @@ export const webhookEndpointsRouter = createTRPCRouter({
   enable: protectedProcedure
     .input(endpointInput)
     .permission("webhookEndpoints:manage")
-    .use(requireWebhooksPlan)
+    .use(async ({ input, next }) => {
+      await assertWebhooksPlan(input.organizationId);
+      return next();
+    })
     .mutation(({ ctx, input }) =>
       translating(() =>
         service(ctx.prisma).enable({
@@ -235,7 +252,10 @@ export const webhookEndpointsRouter = createTRPCRouter({
   disable: protectedProcedure
     .input(endpointInput)
     .permission("webhookEndpoints:manage")
-    .use(requireWebhooksPlan)
+    .use(async ({ input, next }) => {
+      await assertWebhooksPlan(input.organizationId);
+      return next();
+    })
     .mutation(({ ctx, input }) =>
       translating(() =>
         service(ctx.prisma).disable({
@@ -248,7 +268,10 @@ export const webhookEndpointsRouter = createTRPCRouter({
   archive: protectedProcedure
     .input(endpointInput)
     .permission("webhookEndpoints:manage")
-    .use(requireWebhooksPlan)
+    .use(async ({ input, next }) => {
+      await assertWebhooksPlan(input.organizationId);
+      return next();
+    })
     .mutation(({ ctx, input }) =>
       translating(() =>
         service(ctx.prisma).archive({

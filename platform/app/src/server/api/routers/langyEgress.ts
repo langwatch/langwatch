@@ -26,7 +26,7 @@
  * and the explicit refusal keeps it that way if that ever changes.
  */
 
-import { auditLog } from "@ee/audit-log/auditLog";
+import { auditLog } from "~/runtime/app/features/audit-log";
 import { z } from "zod";
 import {
   LangyCredentialService,

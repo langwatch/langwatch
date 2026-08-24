@@ -41,12 +41,13 @@ import {
   type CommandSchema,
   createTenantId,
   defineAggregate,
+  defineCommandSchema,
   defineEvents,
   definePipeline,
   type Event,
   EventUtils,
 } from "@langwatch/eventing";
-import { createLogger } from "@langwatch/observability";
+import type { ZodSchema } from "zod";
 import { EventingAuthzAuditAdapter } from "./eventing.authz-audit.adapter";
 import { AuthzGrantProjection } from "../projections/authz-grant.projection";
 import type { GrantProjectionWriteStore } from "../projections/authz-grant.projection";
@@ -108,60 +109,13 @@ export type AuthzGrantsEvent =
   | RolePermissionsChangedEvent
   | RoleDeletedEvent;
 
-/**
- * Eventing currently exposes a Zod 3 nominal return type for command schemas,
- * while the portable feature contract intentionally owns Zod 4 schemas. This
- * narrow adapter keeps runtime validation in the contract without copying any
- * field or invariant into the server package.
- */
-interface PortableSchema<Output> {
-  safeParse(input: unknown):
-    | { success: true; data: Output }
-    | {
-        success: false;
-        error: {
-          issues: readonly {
-            path: readonly PropertyKey[];
-            code: string;
-            message: string;
-          }[];
-        };
-      };
-}
-
-const commandSchemaLogger = createLogger(
-  "langwatch:event-sourcing:command-schema",
-);
-
 class AuthzEventingCommandMapper {
   static schema<Payload, const Type extends string>(
     type: Type,
-    schema: PortableSchema<Payload>,
+    schema: ZodSchema<Payload>,
     description: string,
   ): CommandSchema<Payload, Type> {
-    return {
-      type,
-      description,
-      validate(payload: unknown) {
-        const result = schema.safeParse(payload);
-        if (!result.success) {
-          commandSchemaLogger.error(
-            {
-              commandType: type,
-              zodIssues: result.error.issues.map((issue) => ({
-                path: issue.path.map(String).join("."),
-                code: issue.code,
-                message: issue.message,
-              })),
-            },
-            "Command payload validation failed",
-          );
-        }
-        return result as unknown as ReturnType<
-          CommandSchema<Payload, Type>["validate"]
-        >;
-      },
-    };
+    return defineCommandSchema(type, schema, description);
   }
 
   static idempotencyKey(commandId: string): string {

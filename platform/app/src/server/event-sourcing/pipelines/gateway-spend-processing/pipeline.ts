@@ -7,7 +7,7 @@ import {
   WEBHOOK_DELIVERY_PROCESS_NAME,
   type WebhookDeliveryProcessDeps,
   webhookDeliveryPM,
-} from "@ee/webhooks/process-manager/webhookDelivery.process";
+} from "~/runtime/app/features/webhooks";
 import {
   defineAggregate,
   defineEvents,

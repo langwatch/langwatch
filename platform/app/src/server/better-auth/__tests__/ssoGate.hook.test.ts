@@ -9,7 +9,7 @@ vi.mock("~/server/db", () => ({ prisma: {} }));
 // The gate itself is unit-tested in `ee/sso/__tests__/sso-gate.test.ts`.
 // This file tests ONLY the hook's orchestration: which paths get refused in
 // which gate state, per ADR-027 Decision 4 / Constants table.
-vi.mock("@ee/sso/sso-gate", () => ({
+vi.mock("~/runtime/app/features/sso", () => ({
   platformSSOAllowed: vi.fn(),
   resolveAuthProvider: vi.fn(),
 }));
@@ -34,7 +34,10 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => loggerMock,
 }));
 
-import { platformSSOAllowed, resolveAuthProvider } from "@ee/sso/sso-gate";
+import {
+  platformSSOAllowed,
+  resolveAuthProvider,
+} from "~/runtime/app/features/sso";
 import { env } from "~/env.mjs";
 import { auth } from "../index";
 

@@ -4,7 +4,7 @@ import { PersonalUsageService } from "@ee/governance/services/personalUsage.serv
 import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { RoutingPolicyService } from "@ee/governance/services/routingPolicy.service";
-import { resolveAuthProvider } from "@ee/sso/sso-gate";
+import { resolveAuthProvider } from "~/runtime/app/features/sso";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
@@ -28,7 +28,7 @@ import { UserAvatarService } from "~/server/user-avatar/avatar.service";
 import { EmailAlreadyRegisteredError } from "~/server/users/errors";
 import { UserService } from "~/server/users/user.service";
 import { getClientIp } from "~/utils/getClientIp";
-import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
+import { isAdmin as checkIsAdmin } from "~/runtime/app/features/admin";
 import { env } from "../../../env.mjs";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 

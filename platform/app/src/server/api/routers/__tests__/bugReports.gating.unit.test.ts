@@ -21,7 +21,7 @@ vi.mock("~/server/app-layer/bug-reports/bug-report.service", () => ({
   getBugReportById: vi.fn(),
 }));
 
-vi.mock("@ee/audit-log/auditLog", () => ({
+vi.mock("~/runtime/app/features/audit-log", () => ({
   auditLog: mockAuditLog,
 }));
 

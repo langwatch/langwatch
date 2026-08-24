@@ -51,21 +51,21 @@ export class InvalidRuntimeConfigError extends Error {
   }
 }
 
-export type RuntimeConfigOptions<Schema extends z.AnyZodObject> = {
+export type RuntimeConfigOptions<Value extends Record<string, unknown>> = {
   name: string;
-  schema: Schema;
+  schema: z.ZodType<Value>;
   source: Readonly<Record<string, unknown>>;
 };
 
 export class RuntimeConfig<Value extends Record<string, unknown>> {
-  static create<Schema extends z.AnyZodObject>(
-    options: RuntimeConfigOptions<Schema>,
-  ): RuntimeConfig<z.output<Schema>> {
+  static create<Value extends Record<string, unknown>>(
+    options: RuntimeConfigOptions<Value>,
+  ): RuntimeConfig<Value> {
     const result = options.schema.safeParse(options.source);
     if (!result.success) {
       throw new InvalidRuntimeConfigError(options.name, result.error);
     }
-    return new RuntimeConfig(result.data);
+    return new RuntimeConfig<Value>(result.data);
   }
 
   private constructor(readonly value: Readonly<Value>) {

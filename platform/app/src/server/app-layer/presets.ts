@@ -1,13 +1,37 @@
+import {
+  createEnterpriseWebhookEndpointService,
+  installEnterpriseWebhookEntitlement,
+} from "~/server/webhooks/enterpriseWebhookEndpointService";
 import type { ClickHouseClient } from "@clickhouse/client";
-import { BillableEventsClickHouseRepository } from "@ee/billing/services/billableEvents.clickhouse.repository";
+import {
+  BillingPriceCatalogue,
+  getStripeEnvironmentFromNodeEnv,
+} from "@langwatch/enterprise-billing-contract";
+import {
+  BillableEventsQueryService,
+  ClickHouseBillingAdapter,
+  CustomerService,
+  NotificationService,
+  NurturingService,
+  PostgresBillingAdapter,
+  SaaSPlanProviderService,
+  SeatEventSubscriptionService,
+  StripeClientAdapter,
+  StripeCustomerCurrencyService,
+  StripeErrorAdapter,
+  StripeUsageReportingService,
+  SubscriptionItemCalculatorService,
+} from "~/runtime/app/features/billing";
 import { createNoopEnterprisePipelineCommands } from "@ee/event-sourcing/pipelineSet";
 import { resolveSourceNonBillable } from "@ee/governance/services/costAttributionPolicy.service";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/services/governanceTraceActivity.clickhouse.repository";
 import { PersonalUsageClickHouseRepository } from "@ee/governance/services/personalUsage.clickhouse.repository";
-import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
-import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
+import {
+  WebhookEventsClickHouseRepository,
+  type WebhookDeliveryProcessDeps,
+} from "~/runtime/app/features/webhooks";
 import {
   bindProcessFleetMetricsSource,
   createEventingGroupQueueFactory,
@@ -16,6 +40,7 @@ import {
   InMemoryProcessStore,
   RedisReplayMarkerChecker,
 } from "@langwatch/eventing";
+import { AppAuditLogRuntime } from "~/runtime/app/features/audit-log";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { RedisConnectionService } from "@langwatch/redis-client";
@@ -88,6 +113,8 @@ import { LANGY_CHAT_FEATURE_KEY } from "~/server/modelProviders/codexRestriction
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { OpsExplainService } from "~/server/ops/opsExplain.service";
 import { getPostHogInstance } from "~/server/posthog";
+import { pruneExpiredIdempotencyReceipts } from "~/server/webhooks/deliveryLog";
+import { webhookDestinationFor } from "~/server/webhooks/destinations";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
@@ -95,22 +122,17 @@ import { StoredObjectOwnerClickHouseRepository } from "~/server/stored-objects/r
 import { createStorageRegistry } from "~/server/stored-objects/stored-objects-factory";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { getSaaSPlanProvider } from "../../../ee/billing";
-import { NotificationService } from "../../../ee/billing/notifications/notification.service";
-import { NotificationRepository } from "../../../ee/billing/notifications/repositories/notification.repository";
-import { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
-import { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
-import { handleLicensePurchase } from "../../../ee/billing/services/licensePurchaseHandler";
-import { createSeatEventSubscriptionFns } from "../../../ee/billing/services/seatEventSubscription";
-import { EESubscriptionService } from "../../../ee/billing/services/subscription.service";
-import * as subscriptionItemCalculator from "../../../ee/billing/services/subscriptionItemCalculator";
-import { StripeUsageReportingService } from "../../../ee/billing/services/usageReportingService";
+import { UsageLimitService } from "./billing/enterprise/usage-limit.service";
+import { LicensePurchaseService } from "./billing/enterprise/license-purchase.service";
+import {
+  AppBillingErrorReporter,
+  AppUsageLimitEmailAdapter,
+} from "./billing/enterprise/billing-runtime.adapter";
+import { EESubscriptionService } from "./billing/enterprise/subscription.service";
 import {
   EEWebhookService,
   type WebhookService,
-} from "../../../ee/billing/services/webhookService";
-import { createStripeClient } from "../../../ee/billing/stripe/stripeClient";
-import { meters } from "../../../ee/billing/stripe/stripePriceCatalog";
+} from "./billing/enterprise/webhook.service";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { StorageMeterService } from "../data-retention/metering/storageMeter.service";
 import { PinnedTraceRepository } from "../data-retention/pinning/pinnedTrace.repository";
@@ -144,6 +166,7 @@ import { InviteService } from "../invites/invite.service";
 import { resolveOrganizationId } from "../organizations/resolveOrganizationId";
 import { OrganizationRepository } from "../repositories/organization.repository";
 import { getLicenseHandler } from "~/runtime/app/licensing";
+import { sendLicenseEmail } from "~/server/mailer/licenseEmail";
 import { TraceEditOverlayService } from "../traces/edit-overlay/traceEditOverlay.service";
 import { EventUsageService } from "../traces/event-usage.service";
 import { TraceService } from "../traces/trace.service";
@@ -201,6 +224,7 @@ import type {
   DataRetentionDependencies,
 } from "./dependencies";
 import { DspyStepService } from "./dspy-steps/dspy-step.service";
+import { ManagedProvidersAppAdapter } from "./enterprise/managed-providers.adapter";
 import { DspyStepClickHouseRepository } from "./dspy-steps/repositories/dspy-step.clickhouse.repository";
 import { NullDspyStepRepository } from "./dspy-steps/repositories/dspy-step.repository";
 import { PrismaEvaluationCostRecorder } from "./evaluations/evaluation-cost.recorder";
@@ -395,6 +419,7 @@ export function initializeDefaultApp(options?: {
   if (globalForApp.__langwatch_app) return globalForApp.__langwatch_app;
 
   const prisma = globalPrisma;
+  AppAuditLogRuntime.install({ prisma });
   const config = createAppConfigFromEnv({ processRole: options?.processRole });
 
   const clickhouseEnabled = !!config.clickhouseUrl || isClickHouseEnabled();
@@ -650,17 +675,29 @@ export function initializeDefaultApp(options?: {
     orgRepo,
   );
 
+  const billingCatalogue = BillingPriceCatalogue.create(
+    getStripeEnvironmentFromNodeEnv(process.env.NODE_ENV),
+  );
+  const billingPersistence = PostgresBillingAdapter.create(prisma).build();
+  const billingSubscriptions = billingPersistence.subscriptions;
+  const saasPlanProvider = SaaSPlanProviderService.create({
+    subscriptions: billingSubscriptions,
+    isSaas: config.isSaas ?? false,
+    adminEmails: env.ADMIN_EMAILS,
+  });
+
   const planProvider = config.isSaas
     ? PlanProviderService.create(
         createCompositePlanProvider({
           saasPlanProvider: {
             getActivePlan: ({ organizationId, user }) =>
-              getSaaSPlanProvider().getActivePlan(organizationId, user),
+              saasPlanProvider.getActivePlan(organizationId, user),
           },
           licensePlanProvider: {
             getActivePlan: ({ organizationId }) =>
               getLicenseHandler().getActivePlan(organizationId),
           },
+          adminEmails: env.ADMIN_EMAILS,
         }),
       )
     : PlanProviderService.create(
@@ -677,29 +714,48 @@ export function initializeDefaultApp(options?: {
       );
 
   let subscription: SubscriptionService | undefined;
+  let billingCustomer: CustomerService | undefined;
   let usageReportingService: StripeUsageReportingService | undefined;
   let webhookService: WebhookService | undefined;
-  let stripeClient: ReturnType<typeof createStripeClient> | undefined;
+  let stripeClient: StripeClientAdapter["client"] | undefined;
   if (config.isSaas) {
-    stripeClient = createStripeClient();
-    usageReportingService = new StripeUsageReportingService({
+    stripeClient = StripeClientAdapter.create({
+      secretKey: env.STRIPE_SECRET_KEY,
+    }).client;
+    usageReportingService = StripeUsageReportingService.create({
       stripe: stripeClient,
-      meterId: meters.BILLABLE_EVENTS,
+      meterId: billingCatalogue.meters.BILLABLE_EVENTS,
     });
-    const seatEventFns = createSeatEventSubscriptionFns({
+    const stripeErrors = StripeErrorAdapter.create();
+    const customerCurrency = StripeCustomerCurrencyService.create(stripeErrors);
+    const seatEventService = SeatEventSubscriptionService.create({
       stripe: stripeClient,
-      db: prisma,
+      database: prisma,
+      prices: billingCatalogue.prices,
+      customerCurrency,
+    });
+    const itemCalculator = SubscriptionItemCalculatorService.create(
+      billingCatalogue.prices,
+    );
+    billingCustomer = CustomerService.create({
+      stripe: stripeClient,
+      organizations: billingPersistence.organizations,
     });
     subscription = EESubscriptionService.create({
       stripe: stripeClient,
       db: prisma,
-      itemCalculator: subscriptionItemCalculator,
-      seatEventFns,
+      itemCalculator,
+      seatEventFns: seatEventService,
+    });
+    const licensePurchaseService = LicensePurchaseService.create({
+      sendLicenseEmail,
+      notifyLicensePurchase: (input) =>
+        getApp().notifications.sendSlackLicensePurchase(input),
     });
     webhookService = EEWebhookService.create({
       db: prisma,
       stripe: stripeClient,
-      itemCalculator: subscriptionItemCalculator,
+      itemCalculator,
       // Pass planProvider explicitly — InviteService.create defaults to
       // getApp().planProvider, but we're still inside initializeDefaultApp
       // so the App singleton isn't available yet.
@@ -707,7 +763,7 @@ export function initializeDefaultApp(options?: {
         planProvider,
         authzGrants: authzFeature.grants,
       }),
-      licensePurchaseHandler: { handle: handleLicensePurchase },
+      licensePurchaseHandler: licensePurchaseService,
       licensePaymentLinkId: env.STRIPE_LICENSE_PAYMENT_LINK_ID,
       licensePrivateKey: env.LANGWATCH_LICENSE_PRIVATE_KEY,
       getPostHog: () => getPostHogInstance(),
@@ -741,12 +797,14 @@ export function initializeDefaultApp(options?: {
       : new TiktokenClient(),
   );
 
+  const billingErrorReporter = AppBillingErrorReporter.create();
   const nurturing = config.customerIoApiKey
     ? NurturingService.create({
         config: {
           customerIoApiKey: config.customerIoApiKey,
           customerIoRegion: config.customerIoRegion,
         },
+        errorReporter: billingErrorReporter,
       })
     : undefined;
 
@@ -927,16 +985,25 @@ export function initializeDefaultApp(options?: {
   // The webhook delivery process manager scans the spend table, so it
   // shares the same ClickHouse gate. Registration is global; the per-org
   // enterprise flag is enforced inside the scan (and at the REST surface).
-  const webhookEndpointService = new WebhookEndpointService({ prisma });
-  const webhookDelivery = clickhouseEnabled
+  const webhookEndpointService = createEnterpriseWebhookEndpointService({
+    prisma,
+  });
+  installEnterpriseWebhookEntitlement((organizationId) =>
+    planProvider.getActivePlan({ organizationId }),
+  );
+  const webhookDelivery: WebhookDeliveryProcessDeps | undefined =
+    clickhouseEnabled
     ? {
         processStore: repositories.processStore,
         endpoints: webhookEndpointService,
-        prisma,
+        pruneExpiredIdempotencyReceipts: (now: Date) =>
+          pruneExpiredIdempotencyReceipts({ prisma, now }),
+        dispatch: ({ destination, ...input }) =>
+          webhookDestinationFor(destination).send(input),
         getPlan: (organizationId: string) =>
           planProvider.getActivePlan({ organizationId }),
       }
-    : undefined;
+      : undefined;
 
   // The gateway's ClickHouse-backed repositories, built once and handed out
   // on the App. Every surface - tRPC routers, the REST apps, the CLI auth
@@ -950,7 +1017,7 @@ export function initializeDefaultApp(options?: {
     ? new GatewayVirtualKeySpendRepository(resolveClickHouseClient)
     : undefined;
   const gatewayWebhookEventsRepository = clickhouseEnabled
-    ? new WebhookEventsClickHouseRepository(resolveClickHouseClient)
+    ? WebhookEventsClickHouseRepository.create(resolveClickHouseClient)
     : undefined;
 
   // Gateway budget debits ride the spend pipeline and share its ClickHouse
@@ -1002,11 +1069,14 @@ export function initializeDefaultApp(options?: {
   // Billing-month usage rollups (billable_events + trace_summaries),
   // read by the billing pipeline and the usage-limit services.
   const billableEventsRepository = clickhouseEnabled
-    ? new BillableEventsClickHouseRepository(
-        resolveClickHouseClient,
-        getClickHouseClientForOrganization,
-      )
-    : undefined;
+    ? ClickHouseBillingAdapter.create({
+        resolveClient: resolveClickHouseClient,
+        resolveOrganizationClient: getClickHouseClientForOrganization,
+      }).build()
+    : null;
+  const billingQueries = BillableEventsQueryService.create(
+    billableEventsRepository,
+  );
 
   const eventStore = clickhouseEnabled
     ? new EventStoreClickHouse(
@@ -1723,14 +1793,18 @@ export function initializeDefaultApp(options?: {
       hubspotReachedLimitFormId: config.hubspotReachedLimitFormId,
       hubspotFormId: config.hubspotFormId,
     },
+    errorReporter: billingErrorReporter,
+    usageLimitEmail: AppUsageLimitEmailAdapter.create(),
   });
-  const notificationRepository = new NotificationRepository(prisma);
+  const notificationRepository = billingPersistence.notifications;
   const usageLimits = UsageLimitService.create({
     notificationRepository,
     organizationService: organizations,
     usageService: usage,
     notificationService: notifications,
     planProvider,
+    isSaas: config.isSaas,
+    baseHost: config.baseHost ?? env.BASE_HOST,
   });
 
   const queueRepo = redis
@@ -1797,6 +1871,11 @@ export function initializeDefaultApp(options?: {
       redis && snapshotRepo ? getOpsSnapshotReader(snapshotRepo) : null,
   };
 
+  const managedProviders = ManagedProvidersAppAdapter.create({
+    prisma,
+    environment: process.env,
+  }).service;
+
   return initializeApp({
     config,
     broadcast,
@@ -1854,7 +1933,8 @@ export function initializeDefaultApp(options?: {
       kpis: governanceKpisRepository,
       personalUsage: personalUsageRepository,
     },
-    billableEvents: billableEventsRepository,
+    billableEvents: billableEventsRepository ?? undefined,
+    billingQueries,
     codingAgents: {
       sessions: codingAgentSessions,
       sessionsList: codingAgentSessionsList,
@@ -1910,9 +1990,11 @@ export function initializeDefaultApp(options?: {
     usage,
     planProvider,
     subscription,
+    billingCustomer,
     webhookService,
     stripeClient,
     notifications,
+    managedProviders,
     nurturing,
     usageLimits,
     retentionPolicyCache,
@@ -1930,6 +2012,7 @@ export function initializeDefaultApp(options?: {
 /** Tests — noop commands, null-backed services. */
 export function createTestApp(overrides?: Partial<AppDependencies>): App {
   const testPrisma = globalPrisma;
+  AppAuditLogRuntime.install({ prisma: testPrisma });
   const testRetentionPolicyRepo = new DataRetentionPolicyRepository(testPrisma);
   const testRetentionPolicyCache = new RetentionPolicyCache(
     testRetentionPolicyRepo,
@@ -2033,8 +2116,14 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     pullRequests: new NullGithubPullRequestLookup(),
     resolveOrganizationId: async () => undefined,
   });
+  const managedProviders = ManagedProvidersAppAdapter.create({
+    prisma: testPrisma,
+    environment: {},
+  }).service;
+
   return new App({
     config,
+    managedProviders,
     broadcast: testBroadcast,
     presence: new PresenceService(
       new InMemoryPresenceRepository(),
@@ -2205,6 +2294,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       personalUsage: undefined,
     },
     billableEvents: undefined,
+    billingQueries: BillableEventsQueryService.create(null),
     codingAgents: {
       sessions: testCodingAgentSessions,
       sessionsList: testCodingAgentSessionsList,
@@ -2302,6 +2392,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       getActivePlan: async () => FREE_PLAN,
     }),
     subscription: undefined,
+    billingCustomer: undefined,
     notifications: NotificationService.createNull(),
     nurturing: undefined,
     usageLimits: UsageLimitService.createNull(),

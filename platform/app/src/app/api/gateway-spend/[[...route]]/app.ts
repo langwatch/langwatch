@@ -1,19 +1,17 @@
+import { createEnterpriseWebhookEndpointService } from "~/server/webhooks/enterpriseWebhookEndpointService";
 import {
   assertWebhookEndpointsEntitled,
   WebhookEndpointsNotEntitledError,
-} from "@ee/webhooks/entitlement";
-import { spendRowToEnvelope } from "@ee/webhooks/envelope";
-import { eventMatches } from "@ee/webhooks/eventRegistry";
+} from "~/runtime/app/features/webhooks";
+import { spendRowToEnvelope } from "~/runtime/app/features/webhooks";
+import { eventMatches } from "@langwatch/enterprise-webhooks-contract";
 import {
   appendReplayToEndpointStream,
   type SendBatchPayload,
   type WebhookDeliveryProcessDeps,
-} from "@ee/webhooks/process-manager/webhookDelivery.process";
-import {
-  WebhookEndpointService,
-  type WebhookEndpointView,
-} from "@ee/webhooks/webhookEndpoint.service";
-import { WebhookEventsService } from "@ee/webhooks/webhookEvents.service";
+} from "~/runtime/app/features/webhooks";
+import { type WebhookEndpointView } from "~/runtime/app/features/webhooks";
+import { WebhookEventsService } from "~/runtime/app/features/webhooks";
 import type { Context, Next } from "hono";
 import { describeRoute, resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
@@ -25,6 +23,8 @@ import { getApp } from "~/server/app-layer/app";
 import { ClickHouseUnavailableError } from "~/server/app-layer/traces/errors";
 import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/adapters/postgres/prismaProcessStore";
+import { pruneExpiredIdempotencyReceipts } from "~/server/webhooks/deliveryLog";
+import { webhookDestinationFor } from "~/server/webhooks/destinations";
 import { applicableEndUserCaps } from "~/server/gateway/endUserCaps.service";
 import {
   decodeSpendEventsCursor,
@@ -178,7 +178,7 @@ const spendSummaryRowSchema = z.object({
    *  only be grouped one way. Read `group` to tell two dimensions apart. */
   key: z.string(),
   /** Every grouping dimension by name, e.g. `{ "model": "gpt-5-mini" }`. */
-  group: z.record(z.string()),
+  group: z.record(z.string(), z.string()),
   /** Start of the time bucket in the requested timezone, null when unbucketed. */
   bucket_start: z.string().nullable(),
   event_count: z.number().int(),
@@ -738,7 +738,7 @@ secured.access(requires("gatewaySpend:manage")).post(
     const organization = c.get("organization") as Organization;
     const body = c.req.valid("json");
 
-    const endpoints = new WebhookEndpointService({ prisma });
+    const endpoints = createEnterpriseWebhookEndpointService({ prisma });
     const endpoint = await endpoints.getDeliverable({
       organizationId: organization.id,
       endpointId: body.endpoint_id,
@@ -760,7 +760,10 @@ secured.access(requires("gatewaySpend:manage")).post(
     const deliveryDeps: WebhookDeliveryProcessDeps = {
       processStore: new PrismaProcessStore(prisma),
       endpoints,
-      prisma,
+      pruneExpiredIdempotencyReceipts: (now) =>
+        pruneExpiredIdempotencyReceipts({ prisma, now }),
+      dispatch: ({ destination, ...input }) =>
+        webhookDestinationFor(destination).send(input),
       getPlan: (organizationId) =>
         getApp().planProvider.getActivePlan({ organizationId }),
     };

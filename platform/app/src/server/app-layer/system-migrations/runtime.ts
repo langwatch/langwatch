@@ -6,7 +6,7 @@
  *
  * Server-only - this graph reaches Prisma, Redis and the EE audit writer.
  */
-import { auditLog } from "@ee/audit-log/auditLog";
+import { auditLog } from "~/runtime/app/features/audit-log";
 import { createLogger } from "@langwatch/observability";
 import {
   type MigrationPassSummary,

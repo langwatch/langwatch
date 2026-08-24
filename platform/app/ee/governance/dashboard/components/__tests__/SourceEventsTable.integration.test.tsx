@@ -17,7 +17,7 @@ import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { PageRequest } from "../../logic/eventsPager";
+import type { PageRequest } from "@langwatch/enterprise-governance-web";
 import {
   type SourceEventRowData,
   SourceEventsTable,

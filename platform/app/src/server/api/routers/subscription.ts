@@ -1,5 +1,5 @@
 import { env } from "~/env.mjs";
-import { createSubscriptionRouter } from "../../../../ee/billing";
+import { createSubscriptionRouter } from "./subscription.enterprise";
 import { createTRPCRouter } from "../trpc";
 
 type SubscriptionRouter = ReturnType<typeof createSubscriptionRouter>;

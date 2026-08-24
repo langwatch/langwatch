@@ -18,7 +18,7 @@
  */
 
 import { gatewayDebitsPM } from "@ee/governance/process-manager/gatewayDebits.process";
-import { webhookDeliveryPM } from "@ee/webhooks/process-manager/webhookDelivery.process";
+import { webhookDeliveryPM } from "~/runtime/app/features/webhooks";
 import { describe, expect, it, vi } from "vitest";
 import {
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
@@ -186,7 +186,8 @@ describe("transient process message keys", () => {
         webhookDeliveryPM({
           processStore: {} as never,
           endpoints: {} as never,
-          prisma: {} as never,
+          pruneExpiredIdempotencyReceipts: async () => undefined,
+          dispatch: async () => ({ verdict: "success", status: null }),
           getPlan: (async () => ({})) as never,
         }) as unknown as (pm: unknown) => unknown,
       );

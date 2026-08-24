@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PricingModel } from "~/generated/prisma/client";
 import { TtlCache } from "~/server/utils/ttlCache";
-import { UNLIMITED_MESSAGES } from "../../../../../ee/billing/planLimits";
+import { UNLIMITED_MESSAGES } from "@langwatch/enterprise-billing-contract";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { USAGE_UNKNOWN } from "../../../traces/usage-count";

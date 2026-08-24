@@ -199,10 +199,10 @@ vi.mock("../SavedViewsBar", () => ({ SavedViewsBar: () => null }));
 vi.mock("../governance/AdminViewingAsBanner", () => ({
   AdminViewingAsBanner: () => null,
 }));
-vi.mock("../../../ee/admin/ImpersonationBanner", () => ({
+vi.mock("@langwatch/enterprise-admin-web", () => ({
   ImpersonationBanner: () => null,
 }));
-vi.mock("../../../ee/admin/ImpersonationSwitchBackMenuItem", () => ({
+vi.mock("~/features/enterprise/admin/ImpersonationSwitchBackMenuItem", () => ({
   ImpersonationSwitchBackMenuItem: () => null,
 }));
 vi.mock("../sidebar/PresenceMenuItem", () => ({

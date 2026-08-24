@@ -16,7 +16,7 @@ export const traceMappingEntrySchema = z.object({
 });
 
 export const datasetMappingSchema = z.object({
-  mapping: z.record(traceMappingEntrySchema),
+  mapping: z.record(z.string(), traceMappingEntrySchema),
   // The dispatcher reads `expansions` unconditionally; default to an empty
   // list so a producer that omits it never trips the array access.
   expansions: z.array(z.string()).default([]),

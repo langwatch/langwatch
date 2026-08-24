@@ -35,8 +35,8 @@ const triggerResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
   action: triggerActionEnum,
-  actionParams: z.record(z.unknown()),
-  filters: z.record(z.unknown()),
+  actionParams: z.record(z.string(), z.unknown()),
+  filters: z.record(z.string(), z.unknown()),
   active: z.boolean(),
   message: z.string().nullable(),
   alertType: alertTypeEnum.nullable(),
@@ -51,12 +51,12 @@ const triggerResponseWithPlatformUrlSchema = triggerResponseSchema.extend({
 const createTriggerSchema = z.object({
   name: z.string().min(1, "name is required"),
   action: triggerActionEnum,
-  actionParams: z.record(z.unknown()).default({}),
+  actionParams: z.record(z.string(), z.unknown()).default({}),
   // No default. An omitted condition used to become `{}`, which matches every
   // trace forever, so the easiest possible create call produced the most
   // expensive possible automation. Omitting it is now the same as sending an
   // empty one, and both are refused below with a typed 422.
-  filters: z.record(z.unknown()).optional(),
+  filters: z.record(z.string(), z.unknown()).optional(),
   message: z.string().optional(),
   alertType: alertTypeEnum.optional(),
 });
@@ -66,8 +66,8 @@ const updateTriggerSchema = z.object({
   active: z.boolean().optional(),
   message: z.string().nullable().optional(),
   alertType: alertTypeEnum.nullable().optional(),
-  filters: z.record(z.unknown()).optional(),
-  actionParams: z.record(z.unknown()).optional(),
+  filters: z.record(z.string(), z.unknown()).optional(),
+  actionParams: z.record(z.string(), z.unknown()).optional(),
 });
 
 function toTriggerResponse(trigger: Trigger) {

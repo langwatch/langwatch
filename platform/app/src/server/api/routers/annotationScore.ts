@@ -17,7 +17,7 @@ export const annotationScoreRouter = createTRPCRouter({
           "CATEGORICAL",
         ]),
         description: z.string().optional().nullable(),
-        options: z.object({}).optional().nullable(),
+        options: z.array(z.string()).optional().nullable(),
         category: z.array(z.string()).optional().nullable(),
         categoryExplanation: z.array(z.string()).optional().nullable(),
         radioCheckboxOptions: z.array(z.string()),

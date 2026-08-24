@@ -16,7 +16,7 @@ import {
   isGovernanceOcsfTrace,
 } from "@ee/governance/subscribers/governanceOcsfEventsSync.subscriber";
 import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
-import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/webhookDelivery.process";
+import type { WebhookDeliveryProcessDeps } from "~/runtime/app/features/webhooks";
 import type {
   AppendStore,
   EventSourcing,
@@ -56,8 +56,7 @@ import { getDatasetStorage } from "~/server/datasets/dataset-storage";
 import { featureFlagService } from "~/server/featureFlag";
 import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
-import { queryBillableEventsTotal } from "../../../../ee/billing/services/billableEventsQuery";
-import type { UsageReportingService } from "../../../../ee/billing/services/usageReportingService";
+import type { UsageReportingService } from "~/runtime/app/features/billing";
 import type { TriggerService } from "../../app-layer/automations/trigger.service";
 import type { BillingCheckpointService } from "../../app-layer/billing/billingCheckpoint.service";
 import type { BroadcastService } from "../../app-layer/broadcast/broadcast.service";
@@ -1551,7 +1550,8 @@ export class PipelineRegistry {
       organizations: this.deps.organizations,
       billingCheckpoints: this.deps.billingCheckpoints,
       getUsageReportingService: () => this.deps.usageReportingService,
-      queryBillableEventsTotal,
+      queryBillableEventsTotal: (input) =>
+        getApp().billingQueries.queryBillableEventsTotal(input),
       selfDispatch: (data) => {
         const pipeline = this.deps.eventSourcing.getPipeline(
           BILLING_REPORTING_PIPELINE_NAME,

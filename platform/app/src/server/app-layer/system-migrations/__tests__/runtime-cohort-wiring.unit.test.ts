@@ -34,7 +34,7 @@ const stubs = vi.hoisted(() => {
 
 vi.mock("~/server/db", () => ({ prisma: stubs.prisma }));
 vi.mock("~/env.mjs", () => ({ env: { IS_SAAS: true } }));
-vi.mock("@ee/audit-log/auditLog", () => ({ auditLog: vi.fn() }));
+vi.mock("~/runtime/app/features/audit-log", () => ({ auditLog: vi.fn() }));
 vi.mock("../../app", () => ({ tryGetApp: () => null }));
 vi.mock("../../../clickhouse/clickhouseClient", () => ({
   getPrivateClickHouseUrls: () =>

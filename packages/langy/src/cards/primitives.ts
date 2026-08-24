@@ -12,13 +12,9 @@
  * trip with its unknown fields intact — the card shows a summary, but the agent
  * reading the JSON may well want the rest.
  *
- * NOTE ON THE ZOD IMPORT: this package is consumed by the CLI (zod 4) and by the
- * app (zod 3.25). Both ship the v4 implementation on the `zod/v4` subpath, which
- * is the only specifier that resolves to the same schema runtime in both — so it
- * is the one this package imports, and the one it must keep importing until the
- * app's zod major catches up.
+ * This package and its consumers share the repository-wide Zod 4 contract.
  */
-import * as z from "zod/v4";
+import * as z from "zod";
 
 /** How the traces API counts: total hits for the query, regardless of page size. */
 export const hitsPaginationSchema = z.looseObject({

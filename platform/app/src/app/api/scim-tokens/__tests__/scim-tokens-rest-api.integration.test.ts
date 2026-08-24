@@ -9,7 +9,7 @@
  * minted value before and after revocation.
  */
 import crypto from "node:crypto";
-import { app as scimApp } from "@ee/scim/routes";
+import { app as scimApp } from "~/server/enterprise/scim/routes";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { globalForApp, resetApp } from "~/server/app-layer/app";

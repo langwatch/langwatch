@@ -6,8 +6,7 @@ import { BasicTracerProvider } from "@opentelemetry/sdk-trace-base";
 import { StackContextManager } from "@opentelemetry/sdk-trace-web";
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it } from "vitest";
-import { ZodError } from "zod";
-import { z as z4 } from "zod/v4";
+import { z } from "zod";
 import { errorFormatter } from "../trpc";
 
 function format(error: TRPCError) {
@@ -212,16 +211,8 @@ describe("tRPC error response boundary", () => {
         // There is no sidecar `zodError` field any more: a ZodError is promoted
         // to the shared ValidationError so it travels the one handled-error
         // channel, and its issues ride in meta like every other domain fact.
-        const cause = new ZodError([
-          {
-            code: "too_small",
-            minimum: 1,
-            type: "string",
-            inclusive: true,
-            path: ["name"],
-            message: "String must contain at least 1 character(s)",
-          },
-        ]);
+        const parsed = z.object({ name: z.string().min(1) }).safeParse({});
+        const cause = parsed.error;
         const error = new TRPCError({
           code: "BAD_REQUEST",
           message: cause.message,
@@ -238,29 +229,6 @@ describe("tRPC error response boundary", () => {
       });
     });
 
-    describe("when the schema was authored against the other zod major", () => {
-      /** @scenario "Validation failures travel that channel whichever zod threw them" */
-      it("promotes it the same, rather than letting it pass as an unknown 500", () => {
-        // Parsed for real, not hand-built: the defect being pinned is that a
-        // v4 `ZodError` is not `instanceof` the v3 class this boundary used to
-        // import, and only the object zod itself throws carries that. A
-        // literal shaped like an error would pass a broken gate.
-        const parsed = z4.object({ name: z4.string().min(1) }).safeParse({});
-        const cause = parsed.error;
-        const error = new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: cause!.message,
-          cause,
-        });
-
-        const formatted = format(error);
-
-        expect(formatted.data.error).toMatchObject({
-          code: "validation_error",
-          meta: { fieldErrors: { name: expect.any(Array) } },
-        });
-      });
-    });
   });
 
   describe("given a user-actionable 4xx", () => {

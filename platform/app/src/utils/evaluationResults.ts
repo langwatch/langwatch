@@ -50,7 +50,7 @@ const serializedReasonSchema: z.ZodType<{
     fault: z.enum(["customer", "platform", "provider"]).optional(),
     traceId: z.string().optional(),
     spanId: z.string().optional(),
-    meta: z.record(z.unknown()).optional(),
+    meta: z.record(z.string(), z.unknown()).optional(),
     tips: z.array(z.string()).optional(),
     docsUrl: z.string().optional(),
     reasons: z.array(serializedReasonSchema).optional(),
@@ -61,7 +61,7 @@ const serializedHandledErrorSchema = z
   .object({
     code: z.string().optional(),
     kind: z.string().optional(),
-    meta: z.record(z.unknown()).optional(),
+    meta: z.record(z.string(), z.unknown()).optional(),
     traceId: z.string().optional(),
     spanId: z.string().optional(),
     traceUrl: z.string().optional(),

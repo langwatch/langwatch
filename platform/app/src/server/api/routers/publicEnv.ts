@@ -1,5 +1,5 @@
 import { resolveGatewayBaseUrl } from "@ee/governance/services/gatewayUrl";
-import { resolveAuthProvider } from "@ee/sso/sso-gate";
+import { resolveAuthProvider } from "~/runtime/app/features/sso";
 import { RUM_DEFAULT_SAMPLE_RATIO } from "@langwatch/react-rum/constants";
 import { z } from "zod";
 import { env } from "../../../env.mjs";

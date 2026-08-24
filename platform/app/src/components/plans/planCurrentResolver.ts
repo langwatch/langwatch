@@ -1,4 +1,4 @@
-import { isGrowthSeatEventPlan } from "../../../ee/billing/utils/growthSeatEvent";
+import { isGrowthSeatEventPlan } from "@langwatch/enterprise-billing-contract";
 
 export type ComparisonPlanId = "free" | "growth" | "enterprise";
 

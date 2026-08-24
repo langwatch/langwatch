@@ -1,0 +1,31 @@
+{
+  "name": "@langwatch/enterprise-sso-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Enterprise SSO gate, Better Auth provider adapters, and Postgres license scan.",
+  "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": ["src"],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/enterprise-sso-contract": "workspace:*",
+    "better-auth": "^1.6.23"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}

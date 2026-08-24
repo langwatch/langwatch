@@ -139,6 +139,11 @@ tester.run("feature-module-classes", plugin.rules["feature-module-classes"], {
       code: "export function createAgentApi() { return {}; }",
       errors: [{ messageId: "concrete" }, { messageId: "standalone" }],
     },
+    {
+      filename: "packages/features/agents/server/src/api/internal/agent.api.ts",
+      code: "class AgentApi { static create() { return new AgentApi(); } }",
+      errors: [{ messageId: "concrete" }],
+    },
   ],
 });
 
@@ -146,7 +151,7 @@ tester.run("service-classes", plugin.rules["service-classes"], {
   valid: [
     {
       filename: "packages/features/agents/server/src/services/agent.service.ts",
-      code: "export class AgentService { static create() { return new AgentService(); } private constructor() {} }",
+      code: "function normalise() { return true; } export class AgentService { static create() { normalise(); return new AgentService(); } private constructor() {} }",
     },
   ],
   invalid: [

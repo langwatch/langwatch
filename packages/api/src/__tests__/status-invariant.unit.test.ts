@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { z, type ZodType } from "zod";
-import { z as z4 } from "zod/v4";
+import { z } from "zod";
 
 import { createTestService as createService } from "./test-service.js";
 
@@ -150,72 +149,6 @@ describe("endpoint success status", () => {
       expect((await app.request("/api/test/2025-03-15/nothing")).status).toBe(
         204,
       );
-    });
-  });
-
-  /**
-   * The two zod majors spell the internal type tag differently — v3 has
-   * `_def.typeName: "ZodVoid"`, v4 has `_def.type: "void"` and no `typeName` —
-   * and `isNoBodySchema` reads it directly, because no probe can separate
-   * `z.void()` from `z.object({...}).optional()`.
-   *
-   * Reading only v3's spelling did not degrade gracefully: a v4 `z.void()` fell
-   * through to the ambiguity check and was REFUSED at registration, so the
-   * service failed to build with a message about accepting undefined as well as
-   * a value — describing something that had not happened.
-   *
-   * `zod@3.25.76` ships the v4 engine at `zod/v4`, so this is testable today
-   * against the real thing rather than a hand-made shape. Nothing in the repo
-   * authors v4 schemas yet; the point is that the framework is not what breaks
-   * when the first family does.
-   */
-  describe("given a no-body output schema built with the zod v4 engine", () => {
-    it("recognises z.void() rather than refusing it as ambiguous", async () => {
-      const app = buildTestService()
-        .registerRoute(
-          "get",
-          "/v4-void",
-          "2025-03-15",
-          async () => undefined,
-          (b) => b.withOutput(z4.void() as unknown as ZodType),
-        )
-        .build();
-
-      const res = await app.request("/api/test/2025-03-15/v4-void");
-
-      expect(res.status).toBe(204);
-      expect(await res.text()).toBe("");
-    });
-
-    it("recognises z.undefined() the same way", () => {
-      expect(() =>
-        buildTestService().registerRoute(
-          "get",
-          "/v4-nothing",
-          "2025-03-15",
-          async () => undefined,
-          (b) => b.withOutput(z4.undefined() as unknown as ZodType),
-        ),
-      ).not.toThrow();
-    });
-
-    /**
-     * The other half of the rule has to keep biting across the version
-     * boundary too: a v4 schema that genuinely admits both is still refused.
-     */
-    it("still refuses a v4 schema that accepts undefined and a value", () => {
-      expect(() =>
-        buildTestService().registerRoute(
-          "get",
-          "/v4-maybe",
-          "2025-03-15",
-          async () => undefined,
-          (b) =>
-            b.withOutput(
-              z4.object({ id: z4.string() }).optional() as unknown as ZodType,
-            ),
-        ),
-      ).toThrow(/accepts undefined as well as a value/);
     });
   });
 

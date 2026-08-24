@@ -3,7 +3,7 @@ import { env } from "~/env.mjs";
 import type { PrismaClient, Project } from "~/generated/prisma/client";
 import type { Session } from "~/server/auth";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
-import { isManagedProvider } from "../../../ee/managed-providers/managedBedrockConfig";
+import { getApp } from "../app-layer/app";
 import { MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 import { getSchemaShape } from "../../utils/modelProviderHelpers";
 import { rateLimit } from "../rateLimit";
@@ -545,7 +545,10 @@ export class ModelProviderService {
     const bedrockAlreadyShown =
       savedProviderKeys.has("bedrock") ||
       systemRows.some((r) => r.provider === "bedrock");
-    if (!bedrockAlreadyShown && isManagedProvider(organizationId, "bedrock")) {
+    if (
+      !bedrockAlreadyShown &&
+      getApp().managedProviders.isManagedProvider(organizationId, "bedrock")
+    ) {
       const defaultProvider = this.buildDefaultProvidersFromEnvShape(
         "bedrock",
         oldestProject,

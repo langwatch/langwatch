@@ -54,7 +54,7 @@ vi.mock("~/utils/encryption", () => ({
 }));
 
 // The global mutation middleware writes an audit row; not what this suite is about.
-vi.mock("@ee/audit-log/auditLog", () => ({ auditLog: vi.fn() }));
+vi.mock("~/runtime/app/features/audit-log", () => ({ auditLog: vi.fn() }));
 
 import { secretsRouter } from "../secrets";
 

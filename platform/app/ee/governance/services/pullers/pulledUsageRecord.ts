@@ -53,7 +53,7 @@ const pulledUsageHintSchema = z
     costStatus: z
       .enum([PULLED_USAGE_COST_STATUS.EXACT, PULLED_USAGE_COST_STATUS.ESTIMATE])
       .optional(),
-    dimensions: z.record(z.string()).refine((d) => Object.keys(d).length > 0, {
+    dimensions: z.record(z.string(), z.string()).refine((d) => Object.keys(d).length > 0, {
       message: "a pulled usage hint must name at least one dimension to key on",
     }),
     /**

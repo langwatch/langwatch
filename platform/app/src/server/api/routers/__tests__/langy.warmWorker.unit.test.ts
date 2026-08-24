@@ -46,7 +46,7 @@ vi.mock("~/server/app-layer/app", () => ({
   }),
 }));
 
-vi.mock("@ee/audit-log/auditLog", () => ({ auditLog }));
+vi.mock("~/runtime/app/features/audit-log", () => ({ auditLog }));
 
 vi.mock("~/server/posthog", () => ({ trackServerEvent: vi.fn() }));
 

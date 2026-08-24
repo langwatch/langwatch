@@ -100,7 +100,7 @@ export const NewWorkflowModal = ({
           if (!result.success) {
             // Schema complaints about the file the user picked, not a server
             // failure: the offending field and why is what they need to fix it.
-            const problems = result.error.errors
+            const problems = result.error.issues
               .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
               .join("\n");
             toaster.create({

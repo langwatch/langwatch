@@ -2,7 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
-import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
+import { afterPromptCreated } from "~/server/app-layer/billing/nurturing/promptCreation";
 import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
 import {
   commitMessageSchema,

@@ -155,7 +155,7 @@ const AnthropicToolUseBlock = z.object({
   type: z.literal("tool_use"),
   id: z.string(),
   name: z.string(),
-  input: z.record(z.unknown()),
+  input: z.record(z.string(), z.unknown()),
 });
 
 const AnthropicToolResultBlock = z.object({
@@ -200,14 +200,14 @@ const GeminiInlineDataPart = z.object({
 const GeminiFunctionCallPart = z.object({
   function_call: z.object({
     name: z.string(),
-    args: z.record(z.unknown()).optional(),
+    args: z.record(z.string(), z.unknown()).optional(),
   }),
 });
 
 const GeminiFunctionResponsePart = z.object({
   function_response: z.object({
     name: z.string(),
-    response: z.record(z.unknown()),
+    response: z.record(z.string(), z.unknown()),
   }),
 });
 
@@ -238,7 +238,7 @@ export const CohereMessage = z.object({
     .array(
       z.object({
         name: z.string(),
-        parameters: z.record(z.unknown()),
+        parameters: z.record(z.string(), z.unknown()),
       }),
     )
     .optional(),
@@ -247,9 +247,9 @@ export const CohereMessage = z.object({
       z.object({
         call: z.object({
           name: z.string(),
-          parameters: z.record(z.unknown()),
+          parameters: z.record(z.string(), z.unknown()),
         }),
-        outputs: z.array(z.record(z.unknown())),
+        outputs: z.array(z.record(z.string(), z.unknown())),
       }),
     )
     .optional(),

@@ -19,7 +19,7 @@ import {
 } from "~/server/app-layer/permissions/errors";
 import type { Session } from "~/server/auth";
 import { type Resource, Resources } from "~/utils/rbacVocabulary";
-import { isAdmin } from "../../../ee/admin/isAdmin";
+import { isAdmin } from "~/runtime/app/features/admin";
 import { CUSTOM_ROLE_KIND } from "../role/role-kind";
 
 // ============================================================================

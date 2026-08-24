@@ -1,9 +1,10 @@
 Feature: Enterprise package catalogue
 
-  Scenario: Discover an installed Enterprise feature contract
+  Scenario: Discover every installed Enterprise feature contract
     Given the portable Enterprise catalogue is created
-    When a caller asks for the licensing feature
-    Then the catalogue identifies its portable contract and server package
+    When a caller lists its features
+    Then the catalogue identifies every installed contract package
+    And each available server or web package is named without importing it
 
   Scenario: Import the catalogue without runtime registration
     When an application imports the Enterprise catalogue

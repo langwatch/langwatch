@@ -398,7 +398,7 @@ export const seriesInput = z.object({
     }),
   ),
   filters: z.optional(
-    z.record(
+    z.partialRecord(
       filterFieldsEnum,
       z.union([
         z.array(z.string()),

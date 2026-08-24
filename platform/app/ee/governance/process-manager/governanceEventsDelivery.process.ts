@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { eventMatches } from "@ee/webhooks/eventRegistry";
+import { eventMatches } from "@langwatch/enterprise-webhooks-contract";
 import {
-  runWebhookSendBatch,
   sendBatchSchema,
+  WebhookDeliveryService,
   WEBHOOK_RETRY_LADDER_MS,
   WEBHOOK_SEND_MAX_ATTEMPTS,
   type WebhookDeliveryProcessDeps,
-  webhookRetryDelayMs,
-} from "@ee/webhooks/process-manager/webhookDelivery.process";
+} from "@langwatch/enterprise-webhooks-server";
 import type {
   IntentContext,
   JsonValue,
@@ -65,7 +64,7 @@ const deliverGovernanceSchema = z.object({
     type: z.string(),
     created: z.string(),
     schema_version: z.literal("1"),
-    data: z.record(z.unknown()),
+    data: z.record(z.string(), z.unknown()),
   }),
 });
 type DeliverGovernancePayload = z.infer<typeof deliverGovernanceSchema>;
@@ -156,7 +155,11 @@ export function governanceEventsDeliveryPM(
         deliverGovernanceSchema,
         runDeliverGovernance(deps),
       )
-      .intent("sendBatch", sendBatchSchema, runWebhookSendBatch(deps))
+      .intent(
+        "sendBatch",
+        sendBatchSchema,
+        WebhookDeliveryService.create(deps).runWebhookSendBatch(),
+      )
       .on(GOVERNANCE_VK_LIFECYCLE_EVENT_TYPE, (state, data, ctx) => {
         const lifecycle = data as RecordVkLifecycleCommandData;
         const envelope = vkLifecycleToEnvelope(lifecycle);
@@ -190,7 +193,7 @@ export function governanceEventsDeliveryPM(
       .toPayload((event) => event.data as unknown as JsonValue)
       .outbox({
         maxAttempts: WEBHOOK_SEND_MAX_ATTEMPTS,
-        retryDelayMs: webhookRetryDelayMs,
+        retryDelayMs: (input) => WebhookDeliveryService.retryDelayMs(input),
         concurrency: 4,
         batchSize: 8,
         leaseDurationMs: 120_000,

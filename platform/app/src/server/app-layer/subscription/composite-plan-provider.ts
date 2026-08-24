@@ -1,4 +1,3 @@
-import { isAdmin } from "../../../../ee/billing/planProvider";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import type { PlanProvider, PlanProviderUser } from "./plan-provider";
 
@@ -15,10 +14,17 @@ import type { PlanProvider, PlanProviderUser } from "./plan-provider";
 export function createCompositePlanProvider({
   licensePlanProvider,
   saasPlanProvider,
+  adminEmails,
 }: {
   licensePlanProvider: PlanProvider;
   saasPlanProvider: PlanProvider;
+  adminEmails?: string | readonly string[];
 }): PlanProvider {
+  const administrators = new Set(
+    typeof adminEmails === "string"
+      ? adminEmails.split(",").map((value) => value.trim())
+      : (adminEmails ?? []),
+  );
   return {
     async getActivePlan({ organizationId, user }) {
       // 1. Try license override
@@ -46,12 +52,19 @@ export function createCompositePlanProvider({
       // 3. Recompute overrideAddingLimitations from user context (not plan source)
       return {
         ...selectedPlan,
-        overrideAddingLimitations: computeOverrideAddingLimitations(user),
+        overrideAddingLimitations: computeOverrideAddingLimitations(
+          user,
+          administrators,
+        ),
       };
     },
   };
 }
 
-function computeOverrideAddingLimitations(user?: PlanProviderUser): boolean {
-  return !!user?.impersonator && isAdmin(user.impersonator);
+function computeOverrideAddingLimitations(
+  user: PlanProviderUser | undefined,
+  administrators: ReadonlySet<string>,
+): boolean {
+  const email = user?.impersonator?.email;
+  return !!email && administrators.has(email);
 }

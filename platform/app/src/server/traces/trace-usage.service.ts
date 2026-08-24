@@ -3,10 +3,8 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { OrganizationRepository } from "~/server/repositories/organization.repository";
 import { TtlCache } from "~/server/utils/ttlCache";
-import {
-  getBillingMonth,
-  queryTraceSummariesTotalUniq,
-} from "../../../ee/billing/services/billableEventsQuery";
+import { getBillingMonth } from "~/runtime/app/features/billing";
+import { getApp } from "~/server/app-layer/app";
 import {
   type ProjectUsageCounts,
   USAGE_UNKNOWN,
@@ -54,7 +52,7 @@ export class TraceUsageService {
       { organizationId, projectIds },
       "getCurrentMonthCount: querying trace_summaries",
     );
-    const total = await queryTraceSummariesTotalUniq({
+    const total = await getApp().billingQueries.queryTraceSummariesTotalUniq({
       projectIds,
       billingMonth,
     });
@@ -107,7 +105,7 @@ export class TraceUsageService {
         projectId,
         // null means ClickHouse is unavailable, so this project's count is
         // unknown rather than zero.
-        count: await queryTraceSummariesTotalUniq({
+        count: await getApp().billingQueries.queryTraceSummariesTotalUniq({
           projectIds: [projectId],
           billingMonth,
         }),

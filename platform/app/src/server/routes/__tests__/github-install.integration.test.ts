@@ -79,7 +79,7 @@ vi.mock("~/server/app-layer", () => ({
     },
   }),
 }));
-vi.mock("@ee/audit-log/auditLog", () => ({
+vi.mock("~/runtime/app/features/audit-log", () => ({
   auditLog: (...args: unknown[]) => auditLog(...args),
 }));
 vi.mock("~/server/featureFlag", () => ({

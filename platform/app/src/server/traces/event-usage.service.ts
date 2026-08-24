@@ -1,10 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { tryGetApp } from "~/server/app-layer/app";
-import {
-  getBillingMonth,
-  queryBillableEventsByProjectApprox,
-  queryBillableEventsTotalUniq,
-} from "../../../ee/billing/services/billableEventsQuery";
+import { getBillingMonth } from "~/runtime/app/features/billing";
 import {
   type ProjectUsageCounts,
   USAGE_UNKNOWN,
@@ -36,7 +32,7 @@ export class EventUsageService {
     }
 
     const billingMonth = getBillingMonth();
-    const count = await queryBillableEventsTotalUniq({
+    const count = await tryGetApp()!.billingQueries.queryBillableEventsTotalUniq({
       organizationId,
       billingMonth,
     });
@@ -76,7 +72,7 @@ export class EventUsageService {
     }
 
     const billingMonth = getBillingMonth();
-    const counts = await queryBillableEventsByProjectApprox({
+    const counts = await tryGetApp()!.billingQueries.queryBillableEventsByProjectApprox({
       organizationId,
       billingMonth,
     });

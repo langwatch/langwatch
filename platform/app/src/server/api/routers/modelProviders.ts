@@ -1,4 +1,4 @@
-import { auditLog } from "@ee/audit-log/auditLog";
+import { auditLog } from "~/runtime/app/features/audit-log";
 import { declareAuthzMiddleware } from "@langwatch/authz-contract";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -8,7 +8,7 @@ import {
   type ScopeAssignment,
   scopeAssignmentSchema,
 } from "~/server/scopes/scope.types";
-import { isManagedProvider } from "../../../../ee/managed-providers/managedBedrockConfig";
+import { getApp } from "../../app-layer/app";
 import { CodexAccountService } from "../../modelProviders/codexAccount.service";
 import { CODEX_DEFAULT_MODEL } from "../../modelProviders/codexRestrictions";
 import { customModelUpdateInputSchema } from "../../modelProviders/customModel.schema";
@@ -307,7 +307,7 @@ export const modelProviderRouter = createTRPCRouter({
         .object({
           ...tenantAnchorSchema,
           provider: z.string(),
-          customKeys: z.record(z.string()),
+          customKeys: z.record(z.string(), z.string()),
           // The scopes the credential is being set up for. Required on the
           // no-project path, where they are what the probe is authorized
           // against — see checkProviderValidationPermission.
@@ -536,7 +536,10 @@ export const modelProviderRouter = createTRPCRouter({
     .permission("organization:view")
     .query(({ input }) => {
       return {
-        managed: isManagedProvider(input.organizationId, input.provider),
+        managed: getApp().managedProviders.isManagedProvider(
+          input.organizationId,
+          input.provider,
+        ),
       };
     }),
 
@@ -710,7 +713,7 @@ export const modelProviderRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string().optional(),
-        config: z.record(z.string()),
+        config: z.record(z.string(), z.string()),
         scopes: z
           .array(
             z.object({

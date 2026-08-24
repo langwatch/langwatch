@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { UNLIMITED_MESSAGES } from "../../../../ee/billing/planLimits";
+import { UNLIMITED_MESSAGES } from "@langwatch/enterprise-billing-contract";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import type { OrganizationRepository } from "../../repositories/organization.repository";
 import type { EventUsageService } from "../../traces/event-usage.service";

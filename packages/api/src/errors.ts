@@ -147,9 +147,8 @@ function formatError({ err }: { err: unknown }): {
   }
 
   // 2. ZodError -- promoted to a ValidationError so it travels the same path.
-  //    Matched by shape, so a route whose schema is on `zod/v4` is promoted
-  //    the same as one still on v3; an `instanceof` would see only one major
-  //    and drop the other's rejections through to the unknown-error 500 below.
+  //    Matched by shape so portable contracts do not depend on the identity of
+  //    the particular Zod runtime instance that created the error.
   if (isZodLikeError(err)) {
     return handledErrorToResponse({
       err: validationErrorFromZod(err),

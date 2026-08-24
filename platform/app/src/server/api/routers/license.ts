@@ -1,4 +1,7 @@
-import { authProviderIsMounted, platformSSOAllowed } from "@ee/sso/sso-gate";
+import {
+  authProviderIsMounted,
+  platformSSOAllowed,
+} from "~/runtime/app/features/sso";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";

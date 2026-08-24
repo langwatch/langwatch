@@ -1333,7 +1333,7 @@ secured
 // POST /api/trigger/slack
 // =============================================
 const filterSchema = z
-  .record(
+  .partialRecord(
     filterFieldsEnum,
     z.union([
       z.array(z.string()),
@@ -1446,7 +1446,7 @@ secured.access(triggersManageAuth).post(
     } catch (error) {
       if (error instanceof z.ZodError) {
         return c.json(
-          { message: "Invalid request data", errors: error.errors },
+          { message: "Invalid request data", errors: error.issues },
           400,
         );
       }

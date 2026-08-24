@@ -73,11 +73,15 @@ function classifyFile(filename, cwd) {
   );
   if (feature) {
     const enterprise = Boolean(feature[1]);
+    const packageRelative = feature[4];
+    if (!/^(src|tests)\//.test(packageRelative)) {
+      return { role: "other", workspacePath: normalized };
+    }
     return {
       enterprise,
       feature: feature[2],
       layoutVersion: featureLayoutVersion(cwd, enterprise, feature[2]),
-      relative: feature[4],
+      relative: packageRelative,
       role: feature[3],
       workspacePath: normalized,
     };
@@ -374,16 +378,25 @@ const serviceClassesRule = {
         const classes = [];
         for (const statement of node.body) {
           let declaration = statement;
+          const exported =
+            statement.type === "ExportNamedDeclaration" ||
+            statement.type === "ExportDefaultDeclaration";
           if (
             statement.type === "ExportNamedDeclaration" &&
             statement.declaration
           ) {
             declaration = statement.declaration;
           }
-          if (declaration.type === "FunctionDeclaration") {
+          if (
+            statement.type === "ExportDefaultDeclaration" &&
+            statement.declaration
+          ) {
+            declaration = statement.declaration;
+          }
+          if (exported && declaration.type === "FunctionDeclaration") {
             context.report({ node: declaration, messageId: "standalone" });
           }
-          if (declaration.type === "VariableDeclaration") {
+          if (exported && declaration.type === "VariableDeclaration") {
             for (const item of declaration.declarations) {
               if (
                 item.init?.type === "ArrowFunctionExpression" ||
@@ -394,6 +407,7 @@ const serviceClassesRule = {
             }
           }
           if (
+            exported &&
             declaration.type === "ClassDeclaration" &&
             declaration.id?.name.endsWith("Service")
           ) {
@@ -426,12 +440,25 @@ function declaredClasses(program) {
   const functions = [];
   for (const statement of program.body) {
     let declaration = statement;
+    const exported =
+      statement.type === "ExportNamedDeclaration" ||
+      statement.type === "ExportDefaultDeclaration";
     if (statement.type === "ExportNamedDeclaration" && statement.declaration) {
       declaration = statement.declaration;
     }
-    if (declaration.type === "ClassDeclaration") classes.push(declaration);
-    if (declaration.type === "FunctionDeclaration") functions.push(declaration);
-    if (declaration.type === "VariableDeclaration") {
+    if (
+      statement.type === "ExportDefaultDeclaration" &&
+      statement.declaration
+    ) {
+      declaration = statement.declaration;
+    }
+    if (exported && declaration.type === "ClassDeclaration") {
+      classes.push(declaration);
+    }
+    if (exported && declaration.type === "FunctionDeclaration") {
+      functions.push(declaration);
+    }
+    if (exported && declaration.type === "VariableDeclaration") {
       for (const item of declaration.declarations) {
         if (
           item.init?.type === "ArrowFunctionExpression" ||

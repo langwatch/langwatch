@@ -24,7 +24,7 @@
  * unusually rides a one-line `ref` hint on its `CARDS_BY_RESOURCE` row rather
  * than a bespoke extractor.
  */
-import * as z from "zod/v4";
+import * as z from "zod";
 import { parseCliJson } from "./cliJson.js";
 import { resolveTotal, type Pagination } from "./primitives.js";
 import { CARDS_BY_RESOURCE, cardKindFor } from "./registry.js";

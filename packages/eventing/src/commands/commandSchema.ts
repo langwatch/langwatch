@@ -20,7 +20,7 @@ export interface CommandSchema<Payload, Type extends CommandType> {
    */
   readonly validate: (
     payload: unknown,
-  ) => z.SafeParseReturnType<unknown, Payload>;
+  ) => z.ZodSafeParseResult<Payload>;
   /**
    * Optional description of the command for documentation.
    */
@@ -53,7 +53,7 @@ export function defineCommandSchema<
 ): CommandSchema<z.infer<Schema>, Type> {
   return {
     type,
-    validate: (payload: unknown): z.SafeParseReturnType<unknown, Schema> => {
+    validate: (payload: unknown): z.ZodSafeParseResult<z.output<Schema>> => {
       const result = schema.safeParse(payload);
       if (!result.success) {
         logger.error(

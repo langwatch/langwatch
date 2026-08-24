@@ -1,8 +1,12 @@
 import {
   buildGenericOAuthConfigs,
   buildSocialProviders,
-} from "@ee/sso/providers";
-import { platformSSOAllowed, resolveAuthProvider } from "@ee/sso/sso-gate";
+} from "~/runtime/app/features/sso";
+import {
+  platformSSOAllowed,
+  resolveAuthProvider,
+  ssoConfiguration,
+} from "~/runtime/app/features/sso";
 import {
   isCredentialMutationPath,
   isEmailAuthPath,
@@ -11,7 +15,7 @@ import {
   isPasswordResetPath,
   normalizedRequestPathname,
   requestPathname,
-} from "@ee/sso/ssoPathGate";
+} from "@langwatch/enterprise-sso-contract";
 import { createLogger } from "@langwatch/observability";
 import { RedisConfigService } from "@langwatch/redis-client";
 import { compare, hash } from "bcrypt";
@@ -22,8 +26,8 @@ import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { env } from "~/env.mjs";
 import { tryGetApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
-import { fireActivityTrackingNurturing } from "../../../ee/billing/nurturing/hooks/activityTracking";
-import { ensureUserSyncedToCio } from "../../../ee/billing/nurturing/hooks/userSync";
+import { fireActivityTrackingNurturing } from "../app-layer/billing/nurturing/activityTracking";
+import { ensureUserSyncedToCio } from "../app-layer/billing/nurturing/userSync";
 import { sendResetPasswordEmail } from "../mailer/resetPasswordEmail";
 import {
   afterAccountCreate,
@@ -59,8 +63,8 @@ export const isEmailPasswordEnabled = (
   e: Pick<typeof env, "NEXTAUTH_PROVIDER" | "IS_SAAS">,
 ): boolean => e.NEXTAUTH_PROVIDER === "email" || !e.IS_SAAS;
 
-const socialProviders = buildSocialProviders(env);
-const genericOAuthConfigs = buildGenericOAuthConfigs(env);
+const socialProviders = buildSocialProviders(ssoConfiguration);
+const genericOAuthConfigs = buildGenericOAuthConfigs(ssoConfiguration);
 
 // NOTE: BetterAuth's admin plugin is intentionally NOT used. It expects
 // `User.role` and `User.banned` columns which our schema doesn't have, and

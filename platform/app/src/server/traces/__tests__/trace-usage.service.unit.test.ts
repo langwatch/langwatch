@@ -7,9 +7,17 @@ const { mockQueryTraceSummariesTotalUniq } = vi.hoisted(() => ({
   mockQueryTraceSummariesTotalUniq: vi.fn(),
 }));
 
-vi.mock("../../../../ee/billing/services/billableEventsQuery", () => ({
-  queryTraceSummariesTotalUniq: mockQueryTraceSummariesTotalUniq,
+vi.mock("~/runtime/app/features/billing", () => ({
   getBillingMonth: vi.fn(() => "2026-02"),
+}));
+
+vi.mock("~/server/app-layer/app", () => ({
+  tryGetApp: () => null,
+  getApp: () => ({
+    billingQueries: {
+      queryTraceSummariesTotalUniq: mockQueryTraceSummariesTotalUniq,
+    },
+  }),
 }));
 
 describe("TraceUsageService", () => {

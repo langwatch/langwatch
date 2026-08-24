@@ -234,8 +234,10 @@ const ArrayField = <T extends EvaluatorTypes>({
       ? Object.fromEntries(
           Object.entries(arraySchema.element.shape).flatMap(([key, value]) => {
             if (value instanceof z.ZodUnion && value.options.length > 0) {
-              const defaultValue = value.options[0].value;
-              return [[key, defaultValue]];
+              const firstOption = value.options[0];
+              if (firstOption instanceof z.ZodLiteral) {
+                return [[key, firstOption.value]];
+              }
             }
 
             return [];
@@ -368,8 +370,10 @@ const DynamicZodForm = ({
     const fieldKey = fieldName.split(".").toReversed()[0] ?? "";
 
     if (fieldSchema_ instanceof z.ZodDefault) {
+      const innerSchema = fieldSchema_.unwrap();
+      if (!(innerSchema instanceof z.ZodType)) return null;
       return renderField(
-        fieldSchema_._def.innerType,
+        innerSchema,
         fieldName,
         evaluator,
         isTopLevel,
@@ -432,11 +436,23 @@ const DynamicZodForm = ({
       (fieldSchema_ instanceof z.ZodString &&
         (fieldName === "model" || fieldName === "embeddings_model"))
     ) {
-      const options =
+      const isSelectLiteral = (
+        value: z.util.Literal,
+      ): value is string | number =>
+        typeof value === "string" || typeof value === "number";
+      const options: Array<{ value: string | number }> =
         fieldSchema_ instanceof z.ZodUnion
-          ? fieldSchema_.options
+          ? fieldSchema_.options.flatMap((option) =>
+              option instanceof z.ZodLiteral
+                ? [...option.values]
+                    .filter(isSelectLiteral)
+                    .map((value) => ({ value }))
+                : [],
+            )
           : fieldSchema_ instanceof z.ZodLiteral
-            ? [{ value: fieldSchema_.value }]
+            ? [...fieldSchema_.values]
+                .filter(isSelectLiteral)
+                .map((value) => ({ value }))
             : allModelOptions.map((option) => ({ value: option }));
       if (
         (fieldName === "model" || fieldName === "embeddings_model") &&
@@ -444,8 +460,8 @@ const DynamicZodForm = ({
       ) {
         const selectorOptions =
           fieldName === "model"
-            ? options.map((option: { value: string }) => option.value)
-            : options.map((option: { value: string }) => option.value);
+            ? options.map((option) => String(option.value))
+            : options.map((option) => String(option.value));
 
         return (
           <Controller
@@ -493,7 +509,7 @@ const DynamicZodForm = ({
                 {fieldSchema instanceof z.ZodOptional && (
                   <option value=""></option>
                 )}
-                {options.map((option: { value: string }, index: number) => (
+                {options.map((option, index) => (
                   <option key={index} value={option.value}>
                     {option.value}
                   </option>
@@ -577,7 +593,7 @@ const DynamicZodForm = ({
   };
 
   const renderSchema = <T extends EvaluatorTypes>(
-    schema: ZodType<Evaluators[T]["settings"]>,
+    schema: ZodType,
     basePath = "",
   ) => {
     if (schema instanceof z.ZodObject) {

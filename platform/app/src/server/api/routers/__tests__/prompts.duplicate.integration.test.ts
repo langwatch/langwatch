@@ -16,7 +16,7 @@ import { createInnerTRPCContext } from "../../trpc";
 wireDefaultTestApp();
 
 // Fire-and-forget billing hook; it is not what these tests are about.
-vi.mock("~/../ee/billing/nurturing/hooks/promptCreation", () => ({
+vi.mock("~/server/app-layer/billing/nurturing/promptCreation", () => ({
   afterPromptCreated: vi.fn(),
 }));
 

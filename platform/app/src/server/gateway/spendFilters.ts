@@ -130,8 +130,8 @@ export const MAX_FILTER_VALUES = 100;
  * commoner half of the traffic.
  */
 function repeatable(
-  inner: z.ZodType<string, z.ZodTypeDef, string>,
-): z.ZodType<string[], z.ZodTypeDef, string | string[]> {
+  inner: z.ZodType<string, string>,
+): z.ZodType<string[], string | string[]> {
   return z
     .union([inner, z.array(inner).max(MAX_FILTER_VALUES)])
     .transform((value): string[] => (Array.isArray(value) ? value : [value]));
@@ -306,7 +306,7 @@ export const spendFiltersSchema = z.object({
   // The whole vocabulary, because this schema backs an EVENTS read. A rollup
   // caller narrows with {@link spendSummaryStatusFilter} instead.
   status: spendStatusFilter.optional(),
-}) satisfies z.ZodType<SpendFilters, z.ZodTypeDef, unknown>;
+}) satisfies z.ZodType<SpendFilters>;
 
 const IN_COLUMNS: ReadonlyArray<readonly [keyof SpendFilters, string]> = [
   ["virtualKeyIds", "VirtualKeyId"],

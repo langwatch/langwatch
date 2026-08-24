@@ -18,7 +18,7 @@ import {
   paginationView,
   SERVER_MAX_LIMIT,
   stallSkipRequest,
-} from "../eventsPager";
+} from "@langwatch/enterprise-governance-web";
 
 const iso = (ms: number) => new Date(ms).toISOString();
 

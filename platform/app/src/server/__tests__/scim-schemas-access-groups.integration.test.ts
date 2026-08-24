@@ -7,7 +7,7 @@
  * Teams. The /Schemas discovery copy is what an IdP administrator reads
  * when wiring provisioning, so it must name the right resource.
  */
-import { app } from "@ee/scim/routes";
+import { app } from "~/server/enterprise/scim/routes";
 import { describe, expect, it } from "vitest";
 
 describe("Feature: SCIM API reference", () => {

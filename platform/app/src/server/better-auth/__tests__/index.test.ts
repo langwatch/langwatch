@@ -144,19 +144,29 @@ describe("better-auth config", () => {
       // exercise auth0 mode without re-initializing the module under a
       // different NEXTAUTH_PROVIDER (which would need vi.resetModules()).
       const { isEmailPasswordEnabled } = await import("../index");
-      const { buildGenericOAuthConfigs } = await import("@ee/sso/providers");
-      const e = {
-        NEXTAUTH_PROVIDER: "auth0",
-        IS_SAAS: true,
-        AUTH0_CLIENT_ID: "auth0-client-id",
-        AUTH0_CLIENT_SECRET: "auth0-client-secret",
-        AUTH0_ISSUER: "tenant.us.auth0.com",
-        OKTA_CLIENT_ID: undefined,
-        OKTA_CLIENT_SECRET: undefined,
-        OKTA_ISSUER: undefined,
-        NEXTAUTH_URL: "http://localhost:3000",
+      const { buildGenericOAuthConfigs } = await import(
+        "~/runtime/app/features/sso"
+      );
+      const configuration = {
+        provider: "auth0",
+        baseUrl: "http://localhost:3000",
+        auth0ClientId: "auth0-client-id",
+        auth0ClientSecret: "auth0-client-secret",
+        auth0Issuer: "tenant.us.auth0.com",
+        oktaClientId: undefined,
+        oktaClientSecret: undefined,
+        oktaIssuer: undefined,
+        cognitoClientId: undefined,
+        cognitoClientSecret: undefined,
+        cognitoIssuer: undefined,
+        oneLoginClientId: undefined,
+        oneLoginClientSecret: undefined,
+        oneLoginIssuer: undefined,
+        oidcClientId: undefined,
+        oidcClientSecret: undefined,
+        oidcIssuer: undefined,
       };
-      const configs = buildGenericOAuthConfigs(e);
+      const configs = buildGenericOAuthConfigs(configuration);
       const providerIds = configs.map(
         (c) => (c as { providerId?: string }).providerId,
       );
@@ -173,7 +183,9 @@ describe("better-auth config", () => {
         "http://localhost:3000/api/auth/callback/auth0",
       );
       // SSO-only enforcement on SaaS: no email/password bypass of the IdP.
-      expect(isEmailPasswordEnabled(e)).toBe(false);
+      expect(
+        isEmailPasswordEnabled({ NEXTAUTH_PROVIDER: "auth0", IS_SAAS: true }),
+      ).toBe(false);
     });
 
     /** @scenario Self-hosted that never had a license hides SSO and offers email sign-in */
@@ -193,18 +205,20 @@ describe("better-auth config", () => {
   describe("when NEXTAUTH_PROVIDER selects google", () => {
     /** @scenario Google mode */
     it("includes google in the socialProviders map", async () => {
-      const { buildSocialProviders } = await import("@ee/sso/providers");
+      const { buildSocialProviders } = await import(
+        "~/runtime/app/features/sso"
+      );
       const socialProviders = buildSocialProviders({
-        NEXTAUTH_PROVIDER: "google",
-        GOOGLE_CLIENT_ID: "google-client-id",
-        GOOGLE_CLIENT_SECRET: "google-client-secret",
-        GITHUB_CLIENT_ID: undefined,
-        GITHUB_CLIENT_SECRET: undefined,
-        GITLAB_CLIENT_ID: undefined,
-        GITLAB_CLIENT_SECRET: undefined,
-        AZURE_AD_CLIENT_ID: undefined,
-        AZURE_AD_CLIENT_SECRET: undefined,
-        AZURE_AD_TENANT_ID: undefined,
+        provider: "google",
+        googleClientId: "google-client-id",
+        googleClientSecret: "google-client-secret",
+        githubClientId: undefined,
+        githubClientSecret: undefined,
+        gitlabClientId: undefined,
+        gitlabClientSecret: undefined,
+        azureAdClientId: undefined,
+        azureAdClientSecret: undefined,
+        azureAdTenantId: undefined,
       });
       expect(socialProviders.google).toBeDefined();
       // Credentials must be threaded through from env, not just present.
@@ -230,47 +244,49 @@ describe("better-auth config", () => {
         .map(([k]) => k);
 
     const noSocialEnv = {
-      GOOGLE_CLIENT_ID: undefined,
-      GOOGLE_CLIENT_SECRET: undefined,
-      GITHUB_CLIENT_ID: undefined,
-      GITHUB_CLIENT_SECRET: undefined,
-      GITLAB_CLIENT_ID: undefined,
-      GITLAB_CLIENT_SECRET: undefined,
-      AZURE_AD_CLIENT_ID: undefined,
-      AZURE_AD_CLIENT_SECRET: undefined,
-      AZURE_AD_TENANT_ID: undefined,
+      googleClientId: undefined,
+      googleClientSecret: undefined,
+      githubClientId: undefined,
+      githubClientSecret: undefined,
+      gitlabClientId: undefined,
+      gitlabClientSecret: undefined,
+      azureAdClientId: undefined,
+      azureAdClientSecret: undefined,
+      azureAdTenantId: undefined,
     };
 
     it.each([
       [
         "google",
         "google",
-        { GOOGLE_CLIENT_ID: "id", GOOGLE_CLIENT_SECRET: "secret" },
+        { googleClientId: "id", googleClientSecret: "secret" },
       ],
       [
         "github",
         "github",
-        { GITHUB_CLIENT_ID: "id", GITHUB_CLIENT_SECRET: "secret" },
+        { githubClientId: "id", githubClientSecret: "secret" },
       ],
       [
         "gitlab",
         "gitlab",
-        { GITLAB_CLIENT_ID: "id", GITLAB_CLIENT_SECRET: "secret" },
+        { gitlabClientId: "id", gitlabClientSecret: "secret" },
       ],
       [
         "microsoft",
         "azure-ad",
         {
-          AZURE_AD_CLIENT_ID: "id",
-          AZURE_AD_CLIENT_SECRET: "secret",
-          AZURE_AD_TENANT_ID: "tenant",
+          azureAdClientId: "id",
+          azureAdClientSecret: "secret",
+          azureAdTenantId: "tenant",
         },
       ],
     ])("social provider %s never overwrites profile info on sign-in", async (_label, provider, creds) => {
-      const { buildSocialProviders } = await import("@ee/sso/providers");
+      const { buildSocialProviders } = await import(
+        "~/runtime/app/features/sso"
+      );
       const providers = buildSocialProviders({
         ...noSocialEnv,
-        NEXTAUTH_PROVIDER: provider,
+        provider,
         ...creds,
       } as Parameters<typeof buildSocialProviders>[0]);
       const built = Object.values(providers);
@@ -279,16 +295,27 @@ describe("better-auth config", () => {
     });
 
     it("generic-oauth (auth0/okta) never overwrites profile info on sign-in", async () => {
-      const { buildGenericOAuthConfigs } = await import("@ee/sso/providers");
+      const { buildGenericOAuthConfigs } = await import(
+        "~/runtime/app/features/sso"
+      );
       const configs = buildGenericOAuthConfigs({
-        NEXTAUTH_PROVIDER: "auth0",
-        AUTH0_CLIENT_ID: "id",
-        AUTH0_CLIENT_SECRET: "secret",
-        AUTH0_ISSUER: "tenant.us.auth0.com",
-        OKTA_CLIENT_ID: undefined,
-        OKTA_CLIENT_SECRET: undefined,
-        OKTA_ISSUER: undefined,
-        NEXTAUTH_URL: "http://localhost:3000",
+        provider: "auth0",
+        baseUrl: "http://localhost:3000",
+        auth0ClientId: "id",
+        auth0ClientSecret: "secret",
+        auth0Issuer: "tenant.us.auth0.com",
+        oktaClientId: undefined,
+        oktaClientSecret: undefined,
+        oktaIssuer: undefined,
+        cognitoClientId: undefined,
+        cognitoClientSecret: undefined,
+        cognitoIssuer: undefined,
+        oneLoginClientId: undefined,
+        oneLoginClientSecret: undefined,
+        oneLoginIssuer: undefined,
+        oidcClientId: undefined,
+        oidcClientSecret: undefined,
+        oidcIssuer: undefined,
       });
       expect(configs.length).toBeGreaterThan(0);
       for (const config of configs) {

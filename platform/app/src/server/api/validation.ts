@@ -207,11 +207,11 @@ function fieldOf(issue: ZodIssue): string {
  * As structured data they cost nothing to carry and can be listed by a UI.
  */
 function expectationOf(issue: ZodIssue): Record<string, unknown> {
-  if (issue.code === "invalid_enum_value") {
-    return { expected: issue.options, received: issue.received };
+  if (issue.code === "invalid_value") {
+    return { expected: [...issue.values] };
   }
   if (issue.code === "invalid_type") {
-    return { expected: issue.expected, received: issue.received };
+    return { expected: issue.expected };
   }
   if (issue.code === UNRECOGNIZED_KEYS) {
     return { unrecognized: issue.keys };

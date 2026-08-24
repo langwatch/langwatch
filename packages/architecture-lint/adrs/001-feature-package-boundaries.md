@@ -182,8 +182,9 @@ The `langwatch/package-boundaries` rule enforces role-safe imports, sealed
 subpaths, relative package containment, Prisma adapter containment, composition
 root ownership and the prohibition on reading environment variables inside
 feature packages. The `langwatch/service-classes` rule requires service modules
-to export service classes with a static `create` method and rejects standalone
-service factories. `langwatch/no-conditional-spread` and Oxlint's
+to export service classes with a static `create` method and rejects exported
+standalone service factories. Private, pure module-local helpers remain valid
+implementation details. `langwatch/no-conditional-spread` and Oxlint's
 `no-nested-ternary` keep control flow explicit in feature server code.
 
 The plugin operates on production source. Tests may import their test runner

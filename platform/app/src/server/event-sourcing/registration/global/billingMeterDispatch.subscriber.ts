@@ -4,7 +4,7 @@ import { resolveOrganizationId } from "~/server/organizations/resolveOrganizatio
 import {
   getBillingMonth,
   getPreviousBillingMonth,
-} from "../../../../../ee/billing/services/billableEventsQuery";
+} from "~/runtime/app/features/billing";
 import type { ReportUsageForMonthCommandData } from "../../pipelines/billing-reporting/schemas/commands";
 
 const logger = createLogger("langwatch:billing:meterDispatch");

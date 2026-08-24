@@ -89,7 +89,7 @@ vi.mock("~/server/app-layer", () => ({
 vi.mock("~/server/featureFlag", () => ({
   featureFlagService: { isEnabled: vi.fn() },
 }));
-vi.mock("@ee/audit-log/auditLog", () => ({ auditLog: vi.fn() }));
+vi.mock("~/runtime/app/features/audit-log", () => ({ auditLog: vi.fn() }));
 
 import { featureFlagService } from "~/server/featureFlag";
 import { githubRouter } from "../github";

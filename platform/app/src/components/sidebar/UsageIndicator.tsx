@@ -1,7 +1,7 @@
 import { Box, HStack, Progress, Text, VStack } from "@chakra-ui/react";
 import { Info } from "lucide-react";
 import { PricingModel } from "~/generated/prisma/client";
-import { UNLIMITED_MESSAGES } from "../../../ee/billing/planLimits";
+import { UNLIMITED_MESSAGES } from "@langwatch/enterprise-billing-contract";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import type { UsageUnit } from "../../server/app-layer/usage/usage-meter-policy";

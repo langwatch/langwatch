@@ -28,7 +28,7 @@
 import {
   compareBySubscriptionOrder,
   SubscriptionStatus,
-} from "../ee/billing/planTypes";
+} from "@langwatch/enterprise-billing-contract";
 import { type Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 

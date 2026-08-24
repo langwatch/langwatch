@@ -86,9 +86,8 @@ const finalToolCallSchema = z.object({
   output: z.string().optional(),
   isError: z.boolean().optional(),
   /** Canonical typed result; optional only for older workers during rollout. */
-  // cliToolResultSchema is intentionally built on the zod/v4 compatibility
-  // runtime shared by the CLI and app. Keep that runtime out of this zod/v3
-  // object graph and bridge it at the value boundary instead.
+  // Keep the CLI result's own validator as the single source of truth and
+  // preserve this route's existing error path at the value boundary.
   result: z
     .custom<CliToolResult>(
       (value) => cliToolResultSchema.safeParse(value).success,

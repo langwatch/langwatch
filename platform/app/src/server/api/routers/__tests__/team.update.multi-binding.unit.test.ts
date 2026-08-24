@@ -11,7 +11,7 @@ import { teamRouter } from "../team";
 
 // Mutations audit through the global prisma, not ctx.prisma — unmocked, the
 // middleware reaches for a real database this unit environment does not have.
-vi.mock("@ee/audit-log/auditLog", () => ({
+vi.mock("~/runtime/app/features/audit-log", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 

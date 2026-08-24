@@ -1,4 +1,4 @@
-import { buildManagedBedrockLitellmParams } from "../../../../ee/managed-providers/managedBedrockConfig";
+import { getApp } from "../../app-layer/app";
 import { getSchemaShape } from "../../../utils/modelProviderHelpers";
 import { prisma } from "../../db";
 import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "../../modelProviders/codexRefusalMessage";
@@ -478,7 +478,7 @@ export const prepareLitellmParams = async ({
     }
   }
 
-  return await buildManagedBedrockLitellmParams({
+  return await getApp().managedProviders.buildLitellmParameters({
     params,
     projectId,
     model,

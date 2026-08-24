@@ -88,7 +88,7 @@ export const sharedFiltersInputSchema = z.object({
   endDate: z.number().positive(),
   query: z.string().optional(),
   filters: z
-    .record(
+    .partialRecord(
       filterFieldsEnum,
       z.union([
         z.array(z.string()),

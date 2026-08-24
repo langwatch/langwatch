@@ -8,7 +8,7 @@
  * - src/pages/api/auth/validate.ts  (API-key validation)
  */
 
-import { resolveAuthProvider } from "@ee/sso/sso-gate";
+import { resolveAuthProvider } from "~/runtime/app/features/sso";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";

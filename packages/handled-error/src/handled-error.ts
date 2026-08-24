@@ -415,7 +415,7 @@ export class NotFoundError extends HandledError {
   }
 }
 
-/** One zod issue, in the shape both v3 and v4 agree on. */
+/** The part of a Zod 4 issue consumed at this portable boundary. */
 export interface ZodLikeIssue {
   code: string;
   path: PropertyKey[];
@@ -423,10 +423,9 @@ export interface ZodLikeIssue {
 }
 
 /**
- * Structural stand-in for zod's `ZodError`. The package is consumed by the app
- * (zod 3.x classic), mcp-server (zod 4) and SDKs — importing `ZodError` from
- * any single zod version makes the other versions' errors unassignable. Any
- * error with zod's `flatten()` shape qualifies.
+ * Structural stand-in for Zod's `ZodError`. Keeping this package independent
+ * of the concrete schema runtime prevents a validation library from leaking
+ * through the handled-error contract.
  */
 export interface ZodLikeError {
   name: string;
@@ -439,26 +438,8 @@ export interface ZodLikeError {
 }
 
 /**
- * Is this a zod error, whichever zod threw it?
- *
- * `err instanceof ZodError` answers "did the zod *I* imported throw this",
- * which is a different question the moment a repo runs two zod entrypoints —
- * and this one does: most schemas are authored against the default (v3)
- * export, a growing set against `zod/v4`. The two ship separate `ZodError`
- * classes, so a v4 error fails `instanceof` a v3 `ZodError` and vice versa.
- *
- * That is not a cosmetic mismatch. Every validation boundary is an
- * `instanceof` gate deciding whether a failure is the *caller's* fault, so a
- * missed gate does not merely lose formatting: the error stops being a 422
- * `validation_error` the customer can act on and becomes an unnamed 500,
- * logged against the platform's error budget. Moving one leaf schema to
- * `zod/v4` is enough to do it, with nothing at the seam to say so — the
- * schema and the gate that catches it are usually different files, and
- * typecheck sees no disagreement between them.
- *
- * So the gates ask about shape instead of identity. `name` plus `issues`
- * plus `flatten` is the intersection both versions satisfy and the whole of
- * what the consumers here read.
+ * Is this a Zod error without coupling the boundary to one runtime instance?
+ * `name`, `issues`, and `flatten` are the complete shape consumers read.
  */
 export function isZodLikeError(err: unknown): err is ZodLikeError {
   if (typeof err !== "object" || err === null) return false;

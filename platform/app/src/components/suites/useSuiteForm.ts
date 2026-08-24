@@ -32,7 +32,7 @@ export const suiteFormSchema = z.object({
   selectedTargets: z
     .array(suiteTargetSchema)
     .min(1, "At least one target is required"),
-  repeatCount: z.coerce
+  repeatCount: z
     .number()
     .int()
     .min(1, `Repeat count must be between 1 and ${MAX_REPEAT_COUNT}`)

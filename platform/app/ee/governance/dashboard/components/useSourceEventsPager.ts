@@ -8,7 +8,7 @@ import {
   type PagerRow,
   paginationView,
   stallSkipRequest,
-} from "../logic/eventsPager";
+} from "@langwatch/enterprise-governance-web";
 
 /**
  * Cursor walk over `eventsForSource`, shaped for the pagination bar.

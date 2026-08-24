@@ -98,6 +98,8 @@
     "release:dry-run": "bash dev/scripts/pack-npm.sh && tar -tzf langwatch-server-*.tgz | head -50"
   },
   "devDependencies": {
+    "@0xdeafcafe/tslsp-cli": "0.6.0",
+    "@typescript/native-preview": "7.0.0-dev.20260506.1",
     "oxlint": "^1.78.0",
     "typescript": "^7.0.2"
   }

@@ -20,11 +20,11 @@ vi.mock("~/env.mjs", () => ({
   },
 }));
 
-vi.mock("@ee/sso/sso-gate", () => ({
+vi.mock("~/runtime/app/features/sso", () => ({
   resolveAuthProvider: vi.fn(),
 }));
 
-import { resolveAuthProvider } from "@ee/sso/sso-gate";
+import { resolveAuthProvider } from "~/runtime/app/features/sso";
 import { createInnerTRPCContext, createTRPCRouter } from "../../trpc";
 import { publicEnvRouter } from "../publicEnv";
 

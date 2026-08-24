@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../../../../ee/billing/utils/growthSeatEvent", () => ({
+vi.mock("@langwatch/enterprise-billing-contract", async (importOriginal) => ({
+  ...(await importOriginal()),
   isGrowthSeatEventPlan: (planType: string) =>
     planType.startsWith("GROWTH_SEAT_"),
 }));

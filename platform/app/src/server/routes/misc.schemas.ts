@@ -16,10 +16,6 @@
 
 import type { DescribeRouteOptions } from "hono-openapi";
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-
-patchZodOpenapi();
 
 /** The schema slot of a `describeRoute` request body, on hono-openapi's terms. */
 type RequestBodySchema = NonNullable<
@@ -42,9 +38,9 @@ type RequestBodySchema = NonNullable<
  * fragment is merged into a document whose components live elsewhere.
  */
 export const requestBodySchema = (schema: z.ZodTypeAny): RequestBodySchema =>
-  zodToJsonSchema(schema, {
-    $refStrategy: "none",
-    target: "openApi3",
+  z.toJSONSchema(schema, {
+    target: "openapi-3.0",
+    reused: "inline",
   }) as RequestBodySchema;
 
 /**

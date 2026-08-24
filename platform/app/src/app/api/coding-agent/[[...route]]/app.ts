@@ -1,4 +1,4 @@
-import { auditLog } from "@ee/audit-log/auditLog";
+import { auditLog } from "~/runtime/app/features/audit-log";
 import { ValidationError } from "@langwatch/handled-error";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";

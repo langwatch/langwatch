@@ -15,7 +15,7 @@
 
 import { Readable } from "node:stream";
 import { createGzip } from "node:zlib";
-import { auditLog } from "@ee/audit-log/auditLog";
+import { auditLog } from "~/runtime/app/features/audit-log";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";

@@ -4,13 +4,13 @@ export function toError(value: unknown): Error {
 
 export function mapValidationIssues(
   issues: ReadonlyArray<{
-    path: ReadonlyArray<string | number>;
+    path: ReadonlyArray<PropertyKey>;
     code: string;
     message: string;
   }>,
 ): Array<{ path: string; code: string; message: string }> {
   return issues.map((issue) => ({
-    path: issue.path.join("."),
+    path: issue.path.map(String).join("."),
     code: issue.code,
     message: issue.message,
   }));

@@ -6,11 +6,11 @@ vi.mock("../../../../env.mjs", () => ({
   env: { NEXTAUTH_PROVIDER: "email" },
 }));
 
-vi.mock("@ee/audit-log/auditLog", () => ({
+vi.mock("~/runtime/app/features/audit-log", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock("../../../../../ee/admin/isAdmin", () => ({
+vi.mock("~/runtime/app/features/admin", () => ({
   isAdmin: vi.fn(
     ({ email }: { email: string }) => email === "admin@example.com",
   ),

@@ -59,12 +59,14 @@ function extractToolCalls(
     return [];
   }
 
-  return message.toolCalls.map((toolCall) => {
+  return message.toolCalls.flatMap((toolCall) => {
+    const name = toolCall.function?.name;
+    if (!name) return [];
     const actionExecutionMessage: ActionExecutionMessage & {
       traceId?: string;
     } = new ActionExecutionMessage({
-      id: `${message.id}-tool-${toolCall.function?.name}`,
-      name: toolCall.function?.name,
+      id: `${message.id}-tool-${name}`,
+      name,
       arguments: safeJsonParseOrStringFallback(
         toolCall.function?.arguments ?? "{}",
       ),
@@ -72,7 +74,7 @@ function extractToolCalls(
 
     actionExecutionMessage.traceId = message.trace_id;
 
-    return actionExecutionMessage;
+    return [actionExecutionMessage];
   });
 }
 

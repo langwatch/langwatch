@@ -23,7 +23,7 @@
  * Spec: specs/integrations/github-connection.feature.
  */
 
-import { auditLog } from "@ee/audit-log/auditLog";
+import { auditLog } from "~/runtime/app/features/audit-log";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { PermissionMiddleware } from "~/server/api/rbac";

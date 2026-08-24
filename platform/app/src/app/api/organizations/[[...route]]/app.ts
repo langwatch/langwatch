@@ -19,7 +19,7 @@
  * the returned key does everything else through the management APIs.
  */
 import { timingSafeEqual } from "node:crypto";
-import { auditLog } from "@ee/audit-log/auditLog";
+import { auditLog } from "~/runtime/app/features/audit-log";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import type { Context, Next } from "hono";
 import { describeRoute } from "hono-openapi";

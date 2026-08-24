@@ -21,7 +21,7 @@ const modelConfigSchema = z
     reasoning: z.boolean().optional(),
     contextWindow: z.number().int().positive().optional(),
     maxTokens: z.number().int().positive().optional(),
-    compat: z.record(z.unknown()).optional(),
+    compat: z.record(z.string(), z.unknown()).optional(),
   })
   .passthrough();
 

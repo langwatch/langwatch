@@ -167,7 +167,7 @@ const sharedTraceEventSchema = z.object({
   spanId: z.string(),
   timestamp: z.number(),
   name: z.string(),
-  attributes: z.record(z.string()),
+  attributes: z.record(z.string(), z.string()),
 });
 
 /**

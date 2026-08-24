@@ -164,6 +164,9 @@ A service:
 - exposes construction through `static create`; and
 - keeps behaviour on the class instead of using standalone service factories.
 
+Private, pure module-local helpers may support the class. They are implementation
+details, not an alternative public behaviour surface.
+
 Do not create a thin service that forwards most behaviour to parallel
 `lifecycle`, `manager`, or `composition` objects. Those responsibilities belong
 on the service or on one of the specific artifact types below.
@@ -247,13 +250,14 @@ worker surfaces. A version-0 feature has no catch-all `composition`,
 
 ## Classes and functions
 
-Services, repositories, stores, adapters, projections, APIs, and migrations are
-classes. Concrete runtime classes expose `static create`; repository and store
-ports are abstract classes.
+Exported services, repositories, stores, adapters, projections, APIs, and
+migrations are classes. Concrete runtime classes expose `static create`;
+repository and store ports are abstract classes. Exported free functions must
+not act as behaviour objects or factories for these roles.
 
-Pure value transformations, schemas, mappers, and test builders may be
-functions. A function should not act as a hidden service, store, projection, or
-registration system.
+Pure value transformations, schemas, mappers, test builders, and private
+module-local helpers may be functions. A function should not act as a hidden
+service, store, projection, or registration system.
 
 ## Exports and dependencies
 

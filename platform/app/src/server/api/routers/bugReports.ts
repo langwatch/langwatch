@@ -1,11 +1,11 @@
-import { auditLog } from "@ee/audit-log/auditLog";
+import { auditLog } from "~/runtime/app/features/audit-log";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
   getAllBugReports,
   getBugReportById,
 } from "~/server/app-layer/bug-reports/bug-report.service";
-import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
+import { isAdmin as checkIsAdmin } from "~/runtime/app/features/admin";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**

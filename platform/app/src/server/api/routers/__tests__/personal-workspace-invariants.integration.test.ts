@@ -67,7 +67,7 @@ import { createInnerTRPCContext } from "../../trpc";
 
 wireDefaultTestApp();
 
-vi.mock("@ee/audit-log/auditLog", () => ({
+vi.mock("~/runtime/app/features/audit-log", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 

@@ -31,7 +31,8 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/observability": "workspace:*",
-    "@langwatch/system-migrations": "workspace:*"
+    "@langwatch/system-migrations": "workspace:*",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^26",

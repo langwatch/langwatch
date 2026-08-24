@@ -1,3 +1,4 @@
+import { createEnterpriseWebhookEndpointService } from "~/server/webhooks/enterpriseWebhookEndpointService";
 /**
  * Integration tests for the billing reconciliation REST surface against real
  * Postgres and ClickHouse: cursor-stable pagination, org fencing, end-user
@@ -5,7 +6,7 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
+import { WebhookEventsClickHouseRepository } from "~/runtime/app/features/webhooks";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -69,7 +70,7 @@ vi.mock("~/server/app-layer/app", async () => {
         spendEvents: new GatewaySpendEventsRepository(
           resolveTestClickHouseClient,
         ),
-        webhookEvents: new WebhookEventsClickHouseRepository(
+        webhookEvents: WebhookEventsClickHouseRepository.create(
           resolveTestClickHouseClient,
         ),
       },
@@ -574,15 +575,12 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
 
   /** @scenario Replay re-delivers a window's envelopes to one endpoint through the delivery path */
   it("replays a window to one endpoint with unchanged envelope ids", async () => {
-    const { WebhookEndpointService } = await import(
-      "@ee/webhooks/webhookEndpoint.service"
-    );
     const { WEBHOOK_DELIVERY_PROCESS_NAME } = await import(
-      "@ee/webhooks/process-manager/webhookDelivery.process"
+      "~/runtime/app/features/webhooks"
     );
     const previous = process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS;
     process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS = "1";
-    const endpoints = new WebhookEndpointService({ prisma });
+    const endpoints = createEnterpriseWebhookEndpointService({ prisma });
     let endpointId = "";
     const ns2 = `${ns}-replay`;
     try {
@@ -693,15 +691,12 @@ describe("Feature: Gateway spend reconciliation REST surface", () => {
 
   /** @scenario An over-limit replay queues nothing */
   it("refuses an over-limit window before queuing a single envelope", async () => {
-    const { WebhookEndpointService } = await import(
-      "@ee/webhooks/webhookEndpoint.service"
-    );
     const { WebhookEventsService } = await import(
-      "@ee/webhooks/webhookEvents.service"
+      "~/runtime/app/features/webhooks"
     );
     const previous = process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS;
     process.env.WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS = "1";
-    const endpoints = new WebhookEndpointService({ prisma });
+    const endpoints = createEnterpriseWebhookEndpointService({ prisma });
     const emitted = vi.spyOn(
       WebhookEventsService.prototype,
       "getEmittedEvents",

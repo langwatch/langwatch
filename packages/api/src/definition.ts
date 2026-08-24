@@ -372,27 +372,12 @@ export function assertStatusInvariant({
  * cannot tell `z.undefined()` from `z.object({ id: z.string() }).optional()`,
  * since both reject every probe a caller could think to try — `{}` included.
  *
- * BOTH ZOD MAJORS, because they name the tag differently and the failure is
- * silent. v3 carries `_def.typeName: "ZodVoid"`; v4 carries `_def.type: "void"`
- * and no `typeName` at all. Reading only v3's spelling meant a v4 `z.void()`
- * output was not recognised as no-body, fell through to the ambiguity check,
- * accepted `undefined` and parsed it to `undefined` — and was refused at
- * registration. The service would fail to build, and the message would talk
- * about a schema accepting undefined as well as a value, which is not what
- * happened and sends the reader somewhere else entirely.
- *
- * New feature contracts author Zod 4 schemas while legacy app routes still
- * use Zod 3. `status-invariant.unit.test.ts` pins both spellings, so a future
- * Zod change fails there rather than reclassifying every no-body endpoint.
+ * Zod 4 exposes the exact type tag as `_def.type`. Reading the tag is necessary
+ * because probing cannot distinguish `z.void()` from an optional value schema:
+ * both accept `undefined`, but only the former declares a bodyless endpoint.
  */
 export function isNoBodySchema(output: ApiSchema): boolean {
-  const def = (output as { _def?: { typeName?: string; type?: string } })
-    ._def as { typeName?: string; type?: string } | undefined;
+  const def = (output as { _def?: { type?: string } })._def;
 
-  return (
-    def?.typeName === "ZodUndefined" ||
-    def?.typeName === "ZodVoid" ||
-    def?.type === "undefined" ||
-    def?.type === "void"
-  );
+  return def?.type === "undefined" || def?.type === "void";
 }

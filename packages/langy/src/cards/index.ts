@@ -24,9 +24,7 @@
  *     "dataset not found" stays a fact the UI can act on instead of decaying
  *     into a sentence.
  *
- * Consumed by `typescript-sdk` (the CLI, zod 4) and by the app (zod 3.25) —
- * via the `zod/v4` subpath, which is the one schema runtime both ship. See the
- * note in `primitives.ts` before changing that import.
+ * Consumed by `typescript-sdk` and the app through the same Zod 4 contract.
  *
  * The CLI imports this directory through `@langwatch/langy/cards` rather than
  * the package root: the root barrel also carries the event-sourcing contracts,

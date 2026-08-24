@@ -80,7 +80,7 @@ const parametersSchema = z
     if (count > MAX_PARAMETERS) {
       ctx.addIssue({
         code: z.ZodIssueCode.too_big,
-        type: "set",
+        origin: "object",
         maximum: MAX_PARAMETERS,
         inclusive: true,
       });

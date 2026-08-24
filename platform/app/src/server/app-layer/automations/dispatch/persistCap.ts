@@ -1,4 +1,4 @@
-import { PlanTypes } from "@ee/billing/planTypes";
+import { PlanTypes } from "@langwatch/enterprise-billing-contract";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { createLogger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";

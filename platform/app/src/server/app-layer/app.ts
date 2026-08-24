@@ -49,6 +49,7 @@ async function settleWithTimeout({
 
 export class App {
   readonly config: AppConfig;
+  readonly managedProviders: AppDependencies["managedProviders"];
 
   readonly broadcast: AppDependencies["broadcast"];
   readonly presence: AppDependencies["presence"];
@@ -79,6 +80,7 @@ export class App {
   readonly usageStats: AppDependencies["usageStats"];
   readonly governance: AppDependencies["governance"];
   readonly billableEvents: AppDependencies["billableEvents"];
+  readonly billingQueries: AppDependencies["billingQueries"];
   readonly commands: AppCommands;
   readonly storedObjects: AppDependencies["storedObjects"];
   readonly opsExplain: AppDependencies["opsExplain"];
@@ -96,6 +98,7 @@ export class App {
   readonly usage: AppDependencies["usage"];
   readonly planProvider: AppDependencies["planProvider"];
   readonly subscription?: AppDependencies["subscription"];
+  readonly billingCustomer?: AppDependencies["billingCustomer"];
   readonly webhookService?: AppDependencies["webhookService"];
   readonly stripeClient?: AppDependencies["stripeClient"];
   readonly notifications: AppDependencies["notifications"];
@@ -126,6 +129,7 @@ export class App {
 
   constructor(deps: AppDependencies) {
     this.config = deps.config;
+    this.managedProviders = deps.managedProviders;
     this.experiments = deps.experiments;
     this.triggers = deps.triggers;
     this.triggerTemplates = deps.triggerTemplates;
@@ -138,6 +142,7 @@ export class App {
     this.usage = deps.usage;
     this.planProvider = deps.planProvider;
     this.subscription = deps.subscription;
+    this.billingCustomer = deps.billingCustomer;
     this.webhookService = deps.webhookService;
     this.stripeClient = deps.stripeClient;
     this.notifications = deps.notifications;
@@ -168,6 +173,7 @@ export class App {
     this.usageStats = deps.usageStats;
     this.governance = deps.governance;
     this.billableEvents = deps.billableEvents;
+    this.billingQueries = deps.billingQueries;
     this.commands = deps.commands;
     this.storedObjects = deps.storedObjects;
     this.opsExplain = deps.opsExplain;

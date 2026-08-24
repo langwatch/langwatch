@@ -25,7 +25,7 @@
  * Spec: specs/integrations/github-connection.feature.
  */
 
-import { auditLog } from "@ee/audit-log/auditLog";
+import { auditLog } from "~/runtime/app/features/audit-log";
 import { createLogger } from "@langwatch/observability";
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { z } from "zod";

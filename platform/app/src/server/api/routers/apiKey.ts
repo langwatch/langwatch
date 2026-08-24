@@ -1,4 +1,4 @@
-import { auditLog } from "@ee/audit-log/auditLog";
+import { auditLog } from "~/runtime/app/features/audit-log";
 import { HandledError } from "@langwatch/handled-error";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
