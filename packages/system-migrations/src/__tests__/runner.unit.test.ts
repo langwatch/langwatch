@@ -13,6 +13,18 @@ class FakeStateRepository implements SystemMigrationStateRepository {
     return `${migrationName}::${tenantId}`;
   }
 
+  async hasFinalizedTenant({
+    migrationName,
+  }: {
+    migrationName: string;
+  }): Promise<boolean> {
+    return [...this.records.values()].some(
+      (record) =>
+        record.migrationName === migrationName &&
+        record.status === "finalized",
+    );
+  }
+
   async findRecord({
     migrationName,
     tenantId,

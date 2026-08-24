@@ -72,6 +72,43 @@ async function readUserOnIdentityWrites({
   }
 }
 
+/**
+ * The pre-rollout short-circuit. The per-user read is cheap but the READ fork
+ * asks it on every authenticated request, so before any operator has enrolled
+ * anybody it is one indexed lookup per active user per TTL to learn something
+ * a single row already settles: whether ANY user has finalized at all.
+ *
+ * Same cache primitive, one constant subject — so it is one read per pod per
+ * TTL, coalesced across concurrent requests, and it self-disables the moment
+ * the first organization is enrolled. Both directions take effect within the
+ * TTL, which is the same bound the per-user gate already documents.
+ */
+const anyoneGate = perSubjectCachedFlag({
+  name: "identity-identifier-anyone-finalized",
+  ttlMs: IDENTITY_WRITE_GATE_TTL_MS,
+  maxEntries: 1,
+});
+
+async function readAnyoneOnIdentityWrites(
+  state: SystemMigrationStateRepository,
+): Promise<boolean> {
+  try {
+    return await state.hasFinalizedTenant({
+      migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
+    });
+  } catch (error) {
+    // Fail safe in the SAME direction as the per-user read: unreadable means
+    // closed. Counted on the same counter — from an operator's point of view
+    // it is the same failure with the same consequence.
+    logger.warn(
+      { error, ttlMs: IDENTITY_WRITE_GATE_TTL_MS },
+      "could not read whether any user has finalized the identifier backfill; the gate stays closed until the cache expires",
+    );
+    identityWriteGateReadFailuresTotal.inc();
+    return false;
+  }
+}
+
 /** Whether THIS user's domain-significant ceremonies emit identity events. */
 export async function isUserOnIdentityWrites({
   userId,
@@ -80,13 +117,19 @@ export async function isUserOnIdentityWrites({
   userId: string;
   state: SystemMigrationStateRepository;
 }): Promise<boolean> {
+  const anyone = await anyoneGate.get({
+    subject: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
+    read: () => readAnyoneOnIdentityWrites(state),
+  });
+  if (!anyone) return false;
   return gate.get({
     subject: userId,
     read: () => readUserOnIdentityWrites({ userId, state }),
   });
 }
 
-/** The cache, dropped — for tests that latch a user mid-suite. */
+/** The caches, dropped — for tests that latch a user mid-suite. */
 export function resetIdentityWriteGateForTests(): void {
   gate.resetForTesting();
+  anyoneGate.resetForTesting();
 }

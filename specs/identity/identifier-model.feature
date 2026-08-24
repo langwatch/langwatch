@@ -243,6 +243,14 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And attaching an address can therefore never redirect "sam"'s mail
 
   @unit
+  Scenario: The gate costs nothing before anyone is enrolled
+    Given no user has finalized the identifier backfill
+    When any number of users are checked against the gate
+    Then one read per pod settles it for all of them
+    And no per-user migration row is read at all
+    And the short-circuit disables itself once the first user finalizes
+
+  @unit
   Scenario: An unmigrated user keeps the legacy email column
     Given "sam"'s identifier backfill has not finalized
     When anything reads "sam"'s user email

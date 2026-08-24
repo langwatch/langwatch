@@ -30,6 +30,10 @@ function stateWithStatus(
     ),
     upsertRecord: vi.fn(async () => undefined),
     upsertRecordUnlessRolledBack: vi.fn(async () => true),
+    // The global short-circuit's read. A suite that stubs a per-user status
+    // is by definition past the "has anyone finalized" question, so the
+    // default answers yes and each test still proves its own fork.
+    hasFinalizedTenant: vi.fn(async () => true),
   };
 }
 
@@ -38,6 +42,35 @@ afterEach(() => {
 });
 
 describe("identifier write gate", () => {
+  describe("when nobody has finalized the migration yet", () => {
+    /** @scenario "The gate costs nothing before anyone is enrolled" */
+    it("answers closed without reading the user's own row at all", async () => {
+      const state = stateWithStatus("finalized");
+      (state.hasFinalizedTenant as ReturnType<typeof vi.fn>).mockResolvedValue(
+        false,
+      );
+
+      await expect(
+        isUserOnIdentityWrites({ userId: USER, state }),
+      ).resolves.toBe(false);
+      // The whole point of the short-circuit: no per-user read is issued.
+      expect(state.findRecord).not.toHaveBeenCalled();
+    });
+
+    it("reads once per pod, not once per user", async () => {
+      const state = stateWithStatus("finalized");
+      (state.hasFinalizedTenant as ReturnType<typeof vi.fn>).mockResolvedValue(
+        false,
+      );
+
+      await isUserOnIdentityWrites({ userId: "user_a", state });
+      await isUserOnIdentityWrites({ userId: "user_b", state });
+      await isUserOnIdentityWrites({ userId: "user_c", state });
+
+      expect(state.hasFinalizedTenant).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("when no backfill row exists for the user", () => {
     it("answers closed — the gate ships closed for everyone", async () => {
       const state = stateWithStatus(null);
