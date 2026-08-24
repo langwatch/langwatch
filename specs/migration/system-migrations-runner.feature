@@ -287,6 +287,14 @@ Feature: Running system migrations across organizations
     Then the action is refused
 
   @unit
+  Scenario: One contended member does not discard a user-rooted run's outcome
+    Given a user-rooted migration whose tenants are "org_acme"'s members
+    And one member is claimed by another pass while the rest finalize
+    When an operator targets "org_acme"
+    Then the run reports the organization rather than refusing outright
+    And the contended member keeps the organization on the operator's list
+
+  @unit
   Scenario: A targeted run that only waited says so, rather than reporting a held organization
     Given a targeted run that spent its time waiting on a claim
     When the run reports
