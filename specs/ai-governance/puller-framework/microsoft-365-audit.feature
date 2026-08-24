@@ -151,15 +151,21 @@ Feature: microsoft_365_audit ingestion source (Office 365 Management Activity AP
     Then neither the log output nor the error message contains the token
     And neither contains the client secret
 
+  # The codes below are why the numbers are carried at all: a wrong secret, an
+  # app missing from the tenant, a tenant that does not exist and a scope whose
+  # resource principal was never provisioned all answer with the same status,
+  # and only the number distinguishes them. That mapping is Azure's, not ours —
+  # it is recorded here as the motivation and is deliberately NOT asserted
+  # below, because no test of ours can observe what a code means to Azure.
+  # Unverified against the live endpoint: our probe obtained a token
+  # successfully, so none of these four refusals has actually been seen.
   @unit
   Scenario: A token-endpoint refusal is raised as TokenAcquisitionError
     Given the token endpoint refuses the client credentials
     When the adapter tries to obtain a token
     Then the failure is raised as a token acquisition error carrying the status
-    And it carries the numeric codes the endpoint sent, so that a wrong secret,
-      an app missing from the tenant, a tenant that does not exist and an
-      unprovisioned resource principal are told apart rather than all reading
-      as the same refusal
+    And it carries whatever numeric codes the endpoint sent, unchanged
+    And a refusal that sent no codes yields an empty list rather than failing
     And the refusal text is not carried on the error
     And a failure that is not a refusal keeps the type it already had
 

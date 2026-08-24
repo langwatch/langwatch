@@ -259,6 +259,7 @@ describe("given the token endpoint refuses the credentials", () => {
       expect((failure as Error).message).not.toContain("AADSTS7000215");
     });
 
+    /** @scenario "A token-endpoint refusal is raised as TokenAcquisitionError" */
     it("carries the numeric AADSTS codes, which name the mistake the status cannot", async () => {
       // Four different setup mistakes all answer 400 here — wrong secret,
       // wrong app id, wrong tenant, and a scope whose resource principal was
@@ -299,6 +300,7 @@ describe("given the token endpoint refuses the credentials", () => {
       expect((failure as Error).message).not.toContain("app not found");
     });
 
+    /** @scenario "A token-endpoint refusal is raised as TokenAcquisitionError" */
     it("reports no codes rather than guessing when the body carries none", async () => {
       responseQueue = [{ status: 400, body: { error: "invalid_request" } }];
 
