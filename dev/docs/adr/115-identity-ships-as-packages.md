@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-24
 
-**Status:** Proposed
+**Status:** Accepted (2026-08-24)
 
 **Builds on:** ADR-101 (the identity pipeline and identifiers — every
 decision there stands; this ADR changes where the code lives, not what it
