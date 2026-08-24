@@ -32,16 +32,14 @@ interface InvitesTableProps {
  * REVOKED are all visible, with expiry dates — an expired invitation is a
  * resendable state, not a row that silently vanished.
  */
-const STATUS_BADGES: Record<
-  string,
-  { label: string; colorPalette?: string }
-> = {
-  PENDING: { label: "Invited" },
-  EXPIRED: { label: "Expired", colorPalette: "orange" },
-  REVOKED: { label: "Revoked", colorPalette: "gray" },
-  ACCEPTED: { label: "Accepted", colorPalette: "green" },
-  PAYMENT_PENDING: { label: "Awaiting payment", colorPalette: "orange" },
-};
+const STATUS_BADGES: Record<string, { label: string; colorPalette?: string }> =
+  {
+    PENDING: { label: "Invited" },
+    EXPIRED: { label: "Expired", colorPalette: "orange" },
+    REVOKED: { label: "Revoked", colorPalette: "gray" },
+    ACCEPTED: { label: "Accepted", colorPalette: "green" },
+    PAYMENT_PENDING: { label: "Awaiting payment", colorPalette: "orange" },
+  };
 
 export function InvitesTable({
   invites,

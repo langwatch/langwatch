@@ -1,10 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import { InviteNotFoundError } from "../errors";
-import {
-  InviteService,
-  resolveInviteDisplayStatus,
-} from "../invite.service";
+import { InviteService, resolveInviteDisplayStatus } from "../invite.service";
 
 /**
  * D11 — resilient invitations (specs/identity/resilient-invitations.feature).
