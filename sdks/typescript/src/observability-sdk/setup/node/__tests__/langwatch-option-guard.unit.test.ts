@@ -168,6 +168,60 @@ describe("given a value that is neither the sentinel nor an options object", () 
   });
 });
 
+describe("given a value that cannot even be inspected", () => {
+  const revoked = () => {
+    const { proxy, revoke } = Proxy.revocable({}, {});
+    revoke();
+    return proxy;
+  };
+
+  it("constructs no exporter, because a value that throws on every question is not a configuration", () => {
+    setup(revoked());
+    expect(exporterWasConstructed()).toBe(false);
+  });
+
+  it("does not throw, so the guard disables setup rather than taking it down", () => {
+    expect(() => setup(revoked())).not.toThrow();
+  });
+
+  it("is still reported, naming it as an object", () => {
+    setup(revoked());
+    const reported = logger.error.mock.calls.map(([message]) => String(message)).join("\n");
+    expect(reported).toContain("Invalid `langwatch` option");
+    expect(reported).toContain("an object");
+  });
+});
+
+describe("given an object whose type name the caller controls", () => {
+  it("reports the runtime's type, not the caller's string, which could be a key", () => {
+    const tampered = new Date(0);
+    (tampered as unknown as { constructor: unknown }).constructor = {
+      name: "sk-lw-from-the-environment",
+    };
+    setup(tampered);
+
+    const reported = logger.error.mock.calls.map(([message]) => String(message)).join("\n");
+    expect(reported).toContain("a Date");
+    expect(reported).not.toContain("sk-lw-from-the-environment");
+  });
+
+  it("ignores a forged toStringTag for the same reason", () => {
+    // Not a plain object literal: that would be accepted as options and would
+    // report nothing, so the assertion would pass without testing anything.
+    class Tagged {
+      get [Symbol.toStringTag](): string {
+        return "sk-lw-from-the-environment";
+      }
+    }
+    setup(new Tagged());
+
+    const reported = logger.error.mock.calls.map(([message]) => String(message)).join("\n");
+    expect(reported).toContain("Invalid `langwatch` option");
+    expect(reported).toContain("an object");
+    expect(reported).not.toContain("sk-lw-from-the-environment");
+  });
+});
+
 describe("given an array carrying an option key", () => {
   it("is still rejected, because an array is never a configuration record", () => {
     setup(Object.assign([] as unknown[], { apiKey: "sk-lw-explicit" }));

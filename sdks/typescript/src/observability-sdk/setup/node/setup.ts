@@ -43,11 +43,44 @@ const LANGWATCH_OPTION_KEYS = ["apiKey", "endpoint", "processorType"] as const;
  *
  * An empty `{}` stays valid: it is the documented way to say "configure me from
  * the environment", so emptiness on its own cannot be the signal.
+ *
+ * Every question asked here throws on a revoked proxy, including
+ * `Array.isArray`. A throw would escape the resolver and take down setup rather
+ * than disable it, so the answer for a value that cannot even be inspected is
+ * the same as for one that can: it is not a configuration.
  */
 const isLangWatchOptions = (value: object): boolean => {
-  const prototype = Object.getPrototypeOf(value) as unknown;
-  if (prototype === Object.prototype || prototype === null) return true;
-  return LANGWATCH_OPTION_KEYS.some((key) => key in value);
+  try {
+    if (Array.isArray(value)) return false;
+    const prototype = Object.getPrototypeOf(value) as unknown;
+    if (prototype === Object.prototype || prototype === null) return true;
+    return LANGWATCH_OPTION_KEYS.some((key) => key in value);
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Names a rejected object by a type the runtime owns.
+ *
+ * Not by `constructor.name`, and not by `Object.prototype.toString`. Both read
+ * a string the caller supplies: `date.constructor = { name: "sk-live-..." }`
+ * and `{ [Symbol.toStringTag]: "sk-live-..." }` each put that string straight
+ * into the report. `instanceof` asks the global constructor instead, so a
+ * tampered `Date` is still reported as a Date and nothing the caller wrote is
+ * echoed. Anything not on this list is just "an object".
+ */
+const describeObject = (value: object): string => {
+  if (value instanceof Date) return "a Date";
+  if (value instanceof Map) return "a Map";
+  if (value instanceof Set) return "a Set";
+  if (value instanceof RegExp) return "a RegExp";
+  if (value instanceof String) return "a String";
+  if (value instanceof Number) return "a Number";
+  if (value instanceof Boolean) return "a Boolean";
+  if (value instanceof Promise) return "a Promise";
+  if (value instanceof Error) return "an Error";
+  return "an object";
 };
 
 /**
@@ -59,17 +92,15 @@ const isLangWatchOptions = (value: object): boolean => {
  * credential leak. The kind is enough to act on, because the message names the
  * one string the option accepts right beside it.
  *
- * Reading `constructor` can throw on a proxy, and this runs on the path that
- * exists to explain a problem, so it must not become one.
+ * This runs on the path that exists to explain a problem, so it must not become
+ * one. `typeof` is the only question here that a revoked proxy answers.
  */
 const describeRejectedValue = (value: unknown): string => {
   if (value === null) return "null";
-  if (Array.isArray(value)) return "an array";
   if (typeof value !== "object") return `a ${typeof value}`;
 
   try {
-    const name = (value as { constructor?: { name?: string } }).constructor?.name;
-    return name && name !== "Object" ? `a ${name}` : "an object";
+    return Array.isArray(value) ? "an array" : describeObject(value);
   } catch {
     return "an object";
   }
@@ -108,12 +139,7 @@ const resolveLangWatchOption = (
     return { disabled: langwatch === LANGWATCH_DISABLED, config: {} };
   }
 
-  if (
-    typeof langwatch === "object" &&
-    langwatch !== null &&
-    !Array.isArray(langwatch) &&
-    isLangWatchOptions(langwatch)
-  ) {
+  if (typeof langwatch === "object" && langwatch !== null && isLangWatchOptions(langwatch)) {
     return { disabled: false, config: langwatch };
   }
 
