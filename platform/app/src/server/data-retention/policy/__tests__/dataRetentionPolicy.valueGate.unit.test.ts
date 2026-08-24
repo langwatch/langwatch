@@ -1,4 +1,4 @@
-import type { PlanInfo } from "@ee/licensing/planInfo";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

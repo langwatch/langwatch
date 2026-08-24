@@ -47,7 +47,7 @@ const MP_ANTHROPIC_ID = `mp-rmm-anthropic-${suffix}`;
 
 const MIGRATION_FILE = join(
   process.cwd(),
-  "prisma/migrations/20260728120001_budgets_provider_filter_group_scope_routing_mode/migration.sql",
+  "../../packages/prisma-client/prisma/migrations/20260728120001_budgets_provider_filter_group_scope_routing_mode/migration.sql",
 );
 
 /**

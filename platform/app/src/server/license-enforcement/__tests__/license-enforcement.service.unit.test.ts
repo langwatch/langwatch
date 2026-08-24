@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { PlanInfo } from "../../../../ee/licensing/planInfo";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import type { PlanProvider } from "../../app-layer/subscription/plan-provider";
 import { LimitExceededError } from "../errors";
 import type { ILicenseEnforcementRepository } from "../license-enforcement.repository";

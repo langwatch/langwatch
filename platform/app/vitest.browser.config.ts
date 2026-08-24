@@ -36,7 +36,7 @@ export default defineConfig({
       // matching alias in vite.config.ts (client.ts pulls the node runtime).
       "~/generated/prisma/client": join(
         __dirname,
-        "./src/generated/prisma/browser.ts",
+        "../../packages/prisma-client/src/generated/browser.ts",
       ),
       "~/": join(__dirname, "./src/"),
       "@ee/": join(__dirname, "./ee/"),

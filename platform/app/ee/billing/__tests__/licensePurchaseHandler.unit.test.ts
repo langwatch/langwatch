@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../licensing/licenseGenerationService", () => ({
-  generateLicenseKey: vi.fn().mockReturnValue({
+const { mockGenerateLicenseKey } = vi.hoisted(() => ({
+  mockGenerateLicenseKey: vi.fn().mockReturnValue({
     licenseKey: "test-license-key-base64",
     licenseData: {
       licenseId: "lic-test-123",
@@ -13,6 +13,13 @@ vi.mock("../../licensing/licenseGenerationService", () => ({
       plan: { type: "GROWTH", name: "Growth", maxMembers: 5 },
     },
   }),
+}));
+
+vi.mock("@langwatch/enterprise-licensing-server", () => ({
+  LicenseGenerationService: {
+    create: () => ({ generate: mockGenerateLicenseKey }),
+  },
+  NodeLicenseCryptographyAdapter: { create: () => ({}) },
 }));
 
 vi.mock("../../../src/server/mailer/licenseEmail", () => ({
@@ -32,10 +39,8 @@ vi.mock("../../../src/server/app-layer/app", () => ({
 }));
 
 import { sendLicenseEmail } from "../../../src/server/mailer/licenseEmail";
-import { generateLicenseKey } from "../../licensing/licenseGenerationService";
 import { handleLicensePurchase } from "../services/licensePurchaseHandler";
 
-const mockGenerateLicenseKey = generateLicenseKey as ReturnType<typeof vi.fn>;
 const mockSendLicenseEmail = sendLicenseEmail as ReturnType<typeof vi.fn>;
 
 const createMockStripe = () => ({

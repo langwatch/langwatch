@@ -1,11 +1,14 @@
-import { applyPlanTypeEntitlements } from "../../../../ee/licensing/planEntitlements";
+import { applyPlanTypeEntitlements } from "@langwatch/enterprise-licensing-contract";
 import type {
   PlanInfo,
   PlanProvider,
   PlanProviderUser,
 } from "@langwatch/entitlements-contract";
 
-export type { PlanProvider, PlanProviderUser } from "@langwatch/entitlements-contract";
+export type {
+  PlanProvider,
+  PlanProviderUser,
+} from "@langwatch/entitlements-contract";
 export type PlanResolver = (organizationId: string) => Promise<PlanInfo>;
 
 /**

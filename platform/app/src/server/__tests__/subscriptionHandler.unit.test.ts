@@ -4,19 +4,7 @@ vi.mock("../db", () => ({
   prisma: {} as unknown,
 }));
 
-vi.mock("../../../ee/licensing/server", () => {
-  const handlerInstances: object[] = [];
-  return {
-    createLicenseHandler: vi.fn(() => {
-      const instance = { __id: handlerInstances.length };
-      handlerInstances.push(instance);
-      return instance;
-    }),
-  };
-});
-
-import { createLicenseHandler } from "../../../ee/licensing/server";
-import { getLicenseHandler } from "../subscriptionHandler";
+import { getLicenseHandler } from "~/runtime/app/licensing";
 
 describe("getLicenseHandler", () => {
   /** @scenario getLicenseHandler returns same instance */
@@ -25,6 +13,5 @@ describe("getLicenseHandler", () => {
     const second = getLicenseHandler();
 
     expect(first).toBe(second);
-    expect(createLicenseHandler).toHaveBeenCalledTimes(1);
   });
 });

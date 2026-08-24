@@ -1,7 +1,7 @@
 import {
   ENTERPRISE_TEMPLATE,
   PRO_TEMPLATE,
-} from "../../../ee/licensing/planTemplates";
+} from "@langwatch/enterprise-licensing-contract";
 
 export type PlanType = "PRO" | "ENTERPRISE" | "CUSTOM";
 

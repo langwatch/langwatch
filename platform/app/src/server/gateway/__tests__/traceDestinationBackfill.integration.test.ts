@@ -52,7 +52,7 @@ const USER_ID = `usr-tdb-${suffix}`;
 
 const MIGRATION_FILE = join(
   process.cwd(),
-  "prisma/migrations/20260809120000_virtual_key_stored_trace_destination/migration.sql",
+  "../../packages/prisma-client/prisma/migrations/20260809120000_virtual_key_stored_trace_destination/migration.sql",
 );
 
 /**

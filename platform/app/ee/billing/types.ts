@@ -2,7 +2,7 @@ import type { z } from "zod";
 import type { UsageUnit } from "../../src/server/app-layer/usage/usage-meter-policy";
 import type { LimitType } from "../../src/server/license-enforcement/types";
 import type { signUpDataSchema } from "../../src/server/schemas/sign-up-data.schema";
-import type { PlanInfo } from "../licensing/planInfo";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import type { PlanTypes } from "./planTypes";
 
 export type BillingPlanProvider = {

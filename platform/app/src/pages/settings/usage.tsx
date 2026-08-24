@@ -18,7 +18,7 @@ import {
 } from "~/hooks/usePlanManagementUrl";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { PlanTypes } from "../../../ee/billing/planTypes";
-import { UNLIMITED_PLAN } from "../../../ee/licensing/constants";
+import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
 import {
   mapLicenseStatusToLimits,
   mapUsageToLimits,

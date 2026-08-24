@@ -50,7 +50,7 @@ import { encrypt } from "~/utils/encryption";
 import {
   RoleBindingScopeType,
   TeamUserRole,
-} from "../../../src/generated/prisma/client";
+} from "@langwatch/prisma-client/generated";
 
 export interface SeedPersonasArgs {
   email: string;

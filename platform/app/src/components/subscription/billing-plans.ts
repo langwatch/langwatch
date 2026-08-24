@@ -8,7 +8,7 @@
 import { Currency } from "~/generated/prisma/client";
 import { formatNumber } from "~/utils/formatNumber";
 import { UNLIMITED_MESSAGES } from "../../../ee/billing/planLimits";
-import type { PlanInfo } from "../../../ee/licensing/planInfo";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 
 export { isAnnualTieredPlan } from "../../../ee/billing/planTypes";
 export type { Currency } from "../../../ee/billing/pricing";

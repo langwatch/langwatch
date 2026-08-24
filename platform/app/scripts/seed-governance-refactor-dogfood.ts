@@ -53,7 +53,7 @@
  * full-matrix dogfood lane.
  */
 import { randomBytes } from "node:crypto";
-import { Prisma, PrismaClient } from "../src/generated/prisma/client";
+import { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { nextResetAt } from "../src/server/gateway/budgetWindow";
 import {
   hashVirtualKeySecret,

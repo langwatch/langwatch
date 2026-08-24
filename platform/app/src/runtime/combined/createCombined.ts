@@ -1,5 +1,5 @@
+import { ResourceScope } from "@langwatch/runtime-composition";
 import type { AppRuntime } from "../app";
-import { ResourceScope } from "../shared/resource-scope";
 import type { WorkerRuntime } from "../worker";
 
 export type CombinedRuntime = {

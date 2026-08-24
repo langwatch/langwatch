@@ -21,7 +21,7 @@
  *     npx tsx scripts/better-auth-sso-smoketest.ts
  */
 
-import { PrismaClient } from "../../src/generated/prisma/client";
+import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createPrismaPgAdapter } from "../../src/server/prismaPgAdapter";
 import { assertLocalhostDatabaseUrl } from "./_smoketest-guard";
 
@@ -54,11 +54,12 @@ async function main() {
     privateKeyEncoding: { type: "pkcs8", format: "pem" },
   });
   process.env.LANGWATCH_LICENSE_PUBLIC_KEY = publicKey;
-  const { signLicense, encodeLicenseKey } = await import(
-    "../../ee/licensing/signing"
+  const { NodeLicenseCryptographyAdapter } = await import(
+    "@langwatch/enterprise-licensing-server"
   );
-  process.env.LANGWATCH_LICENSE_KEY = encodeLicenseKey(
-    signLicense(
+  const licenseCryptography = NodeLicenseCryptographyAdapter.create();
+  process.env.LANGWATCH_LICENSE_KEY = licenseCryptography.encodeLicenseKey(
+    licenseCryptography.signLicense(
       {
         licenseId: "lic_sso_smoke",
         version: 1,

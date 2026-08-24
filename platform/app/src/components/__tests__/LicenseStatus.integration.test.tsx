@@ -12,7 +12,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { LicenseStatus as LicenseStatusPayload } from "../../../ee/licensing/client";
+import type { LicenseStatus as LicenseStatusPayload } from "@langwatch/enterprise-licensing-contract";
 import { LicenseStatus } from "../LicenseStatus";
 
 const { statusResult } = vi.hoisted(() => ({

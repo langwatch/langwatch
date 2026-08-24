@@ -67,12 +67,12 @@ import { hash as hashPassword } from "bcrypt";
 import { parse as parseDotenv } from "dotenv";
 import fs from "fs";
 import path from "path";
-import { ENTERPRISE_LICENSE_KEY } from "../ee/licensing/__tests__/fixtures/testLicenses";
+import { ENTERPRISE_LICENSE_KEY } from "@langwatch/enterprise-licensing-server/testing";
 import {
   PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-} from "../src/generated/prisma/client";
+} from "@langwatch/prisma-client/generated";
 import {
   API_KEY_PREFIX,
   hashSecret,

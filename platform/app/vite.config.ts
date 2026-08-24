@@ -159,7 +159,7 @@ export default defineConfig(async (): Promise<UserConfig> => {
       // Must precede the bare "~" alias — vite matches aliases in order.
       "~/generated/prisma/client": path.resolve(
         __dirname,
-        "./src/generated/prisma/browser.ts",
+        "../../packages/prisma-client/src/generated/browser.ts",
       ),
       // Path aliases (matching tsconfig paths)
       "~": path.resolve(__dirname, "./src"),

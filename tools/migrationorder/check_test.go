@@ -105,8 +105,8 @@ func TestCheck(t *testing.T) {
 				Entry: "20260702090000_mine",
 				Problem: "is numbered below 20260708150000, the newest migration on main, " +
 					"so it runs out of order or not at all",
-				Fix: "git mv platform/app/prisma/migrations/20260702090000_mine " +
-					"platform/app/prisma/migrations/20260708150001_mine",
+				Fix: "git mv packages/prisma-client/prisma/migrations/20260702090000_mine " +
+					"packages/prisma-client/prisma/migrations/20260708150001_mine",
 			}},
 		},
 		{
@@ -123,15 +123,15 @@ func TestCheck(t *testing.T) {
 					Set:     "Prisma",
 					Entry:   "20260201000000_one",
 					Problem: "shares key 20260201000000 with another migration in this branch",
-					Fix: "git mv platform/app/prisma/migrations/20260201000000_one " +
-						"platform/app/prisma/migrations/20260201000001_one",
+					Fix: "git mv packages/prisma-client/prisma/migrations/20260201000000_one " +
+						"packages/prisma-client/prisma/migrations/20260201000001_one",
 				},
 				{
 					Set:     "Prisma",
 					Entry:   "20260201000000_two",
 					Problem: "shares key 20260201000000 with another migration in this branch",
-					Fix: "git mv platform/app/prisma/migrations/20260201000000_two " +
-						"platform/app/prisma/migrations/20260201000002_two",
+					Fix: "git mv packages/prisma-client/prisma/migrations/20260201000000_two " +
+						"packages/prisma-client/prisma/migrations/20260201000002_two",
 				},
 			},
 		},

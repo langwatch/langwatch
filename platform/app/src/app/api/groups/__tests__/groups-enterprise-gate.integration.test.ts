@@ -30,7 +30,7 @@ import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { ENTERPRISE_TEST_PLAN } from "~/test-utils/managementApiOrg";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { FREE_PLAN } from "../../../../../ee/licensing/constants";
+import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { app } from "../[[...route]]/app";
 
 describe("Feature: Group endpoints behind the Enterprise gate", () => {

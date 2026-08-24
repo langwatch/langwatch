@@ -1,4 +1,4 @@
-import { floorAtOssBaseline } from "../../../../ee/licensing/ossBaselineFloor";
+import { floorAtOssBaseline } from "@langwatch/enterprise-licensing-contract";
 import type { PlanProvider } from "./plan-provider";
 
 /**

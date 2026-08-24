@@ -51,7 +51,7 @@ jobs:
             // `package.json` stay with their language, because those express
             // intent rather than churn.
             const CATEGORIES = [
-              ["Migrations",     p => /^platform\/app\/(prisma|scripts|elastic)\/migrations\//.test(p)],
+              ["Migrations",     p => /^packages\/prisma-client\/prisma\/migrations\//.test(p) || /^platform\/app\/(scripts|elastic)\/migrations\//.test(p)],
               ["Specs",          p => p.startsWith("specs/")],
               ["Tests",          p => /(^|\/)__tests__\//.test(p)
                                    || /\.(test|spec)\.[cm]?[jt]sx?$/.test(p)

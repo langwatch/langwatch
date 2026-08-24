@@ -26,7 +26,7 @@ import {
 import { useDrawer } from "~/hooks/useDrawer";
 import { useMemberDisableAction } from "~/hooks/useMemberDisableAction";
 import { captureException } from "~/utils/posthogErrorCapture";
-import type { PlanInfo } from "../../../ee/licensing/planInfo";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { CopyInput } from "../../components/CopyInput";
 import { InvitesTable } from "../../components/members/InvitesTable";
 import SettingsLayout from "../../components/SettingsLayout";

@@ -51,7 +51,7 @@ import {
 } from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { PersonalWorkspaceService } from "../../../../../ee/governance/services/personalWorkspace.service";
-import { FREE_PLAN } from "../../../../../ee/licensing/constants";
+import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "../../../../test-utils/wireDefaultTestApp";
 import { globalForApp, resetApp } from "../../../app-layer/app";

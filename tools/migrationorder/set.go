@@ -32,8 +32,8 @@ type Set struct {
 var Sets = []Set{
 	{
 		Name:                "Prisma",
-		Directory:           "platform/app/prisma/migrations",
-		PreviousDirectories: []string{"langwatch/prisma/migrations"},
+		Directory:           "packages/prisma-client/prisma/migrations",
+		PreviousDirectories: []string{"platform/app/prisma/migrations", "langwatch/prisma/migrations"},
 		Key:                 regexp.MustCompile(`^(\d{14})_`),
 		Format:              "YYYYMMDDHHMMSS_name",
 		// A literal key rather than a $(date) expansion: free keys count up from

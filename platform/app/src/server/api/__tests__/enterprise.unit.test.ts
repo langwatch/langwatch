@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { FREE_PLAN } from "../../../../ee/licensing/constants";
-import type { PlanInfo } from "../../../../ee/licensing/planInfo";
+import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import {
   assertEnterprisePlan,
   assertEnterprisePlanType,

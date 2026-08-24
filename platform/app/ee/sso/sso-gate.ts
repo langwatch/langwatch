@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { createLogger } from "@langwatch/observability";
+import { DEFAULT_LICENSE_PUBLIC_KEY } from "@langwatch/enterprise-licensing-contract";
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
-import {
-  isExpired,
-  parseLicenseKey,
-  verifySignature,
-} from "../licensing/validation";
+import { NodeLicenseCryptographyAdapter } from "@langwatch/enterprise-licensing-server";
 import { buildGenericOAuthConfigs, buildSocialProviders } from "./providers";
 import {
   type ISsoLicenseRepository,
@@ -14,6 +11,9 @@ import {
 } from "./sso-license.repository";
 
 const logger = createLogger("langwatch:sso:gate");
+const licenseCryptography = NodeLicenseCryptographyAdapter.create({
+  publicKey: env.LANGWATCH_LICENSE_PUBLIC_KEY ?? DEFAULT_LICENSE_PUBLIC_KEY,
+});
 
 /**
  * ADR-027: Single source of truth for the license-gated SSO decision.
@@ -75,7 +75,7 @@ function inspectCandidateLicense(
   licenseKey: string,
   context: { source: "instance" | "organization"; organizationId?: string },
 ): { expiresAt: string; organizationName: string } | null {
-  const parsed = parseLicenseKey(licenseKey);
+  const parsed = licenseCryptography.parseLicenseKey(licenseKey);
   if (!parsed) {
     logger.warn(
       { ...context },
@@ -84,7 +84,7 @@ function inspectCandidateLicense(
     return null;
   }
 
-  const signatureOk = verifySignature(parsed);
+  const signatureOk = licenseCryptography.verifySignature(parsed);
   logger.info(
     { ...context, signatureOk },
     signatureOk
@@ -109,7 +109,7 @@ function warnIfExpired(
   license: { expiresAt: string; organizationName: string },
   context: { source: "instance" | "organization"; organizationId?: string },
 ): void {
-  if (isExpired(license.expiresAt)) {
+  if (licenseCryptography.isExpired(license.expiresAt)) {
     logger.warn(
       {
         ...context,

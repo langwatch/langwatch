@@ -1,6 +1,6 @@
 import type { PrismaClient, Subscription } from "~/generated/prisma/client";
 import { env } from "../../src/env.mjs";
-import type { PlanInfo } from "../licensing/planInfo";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { getFreePlanLimits, PLAN_LIMITS } from "./planLimits";
 import { ACTIVE_SUBSCRIPTION_ORDER_BY, SubscriptionStatus } from "./planTypes";
 

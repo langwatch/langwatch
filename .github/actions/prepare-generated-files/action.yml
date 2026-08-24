@@ -33,10 +33,9 @@ runs:
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         # Everything `start:prepare:files` writes. The Prisma client is NOT in
-        # node_modules: this schema sets `output = "../src/generated/prisma"`,
-        # and the app imports it as `~/generated/prisma/client`.
+        # node_modules: @langwatch/prisma-client owns its generated source.
         path: |
-          platform/app/src/generated/prisma
+          packages/prisma-client/src/generated
           platform/app/src/server/evaluations/evaluators.generated.ts
           platform/app/src/tasks.generated.ts
           platform/app/src/shared/langy/langySkills.generated.json
@@ -45,8 +44,9 @@ runs:
         key: >-
           ${{ runner.os }}-prepared-files-${{ hashFiles(
             'pnpm-lock.yaml',
-            'platform/app/prisma/schema.prisma',
-            'platform/app/prisma/schema/**',
+            'packages/prisma-client/prisma/schema.prisma',
+            'packages/prisma-client/prisma/schema/**',
+            'packages/prisma-client/package.json',
             'platform/app/package.json',
             'platform/app/scripts/generate-task-registry.mjs',
             'platform/app/scripts/generate-langy-skills.ts',

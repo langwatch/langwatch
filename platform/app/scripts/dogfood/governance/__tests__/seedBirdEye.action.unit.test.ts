@@ -2,7 +2,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type {
   Organization,
   PrismaClient,
-} from "../../../../src/generated/prisma/client";
+} from "@langwatch/prisma-client/generated";
 import { DemoOrgScope } from "../_lib/scopeGuard";
 import type { SeedActionContext } from "../_lib/seedRunner";
 

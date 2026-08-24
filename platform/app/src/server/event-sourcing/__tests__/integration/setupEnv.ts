@@ -13,7 +13,7 @@
  * any application code (like redis.ts) is loaded.
  */
 
-import { TEST_PUBLIC_KEY } from "../../../../../ee/licensing/__tests__/fixtures/testKeys";
+import { TEST_PUBLIC_KEY } from "~/runtime/app/testing.licensing";
 import { assertSerialWorkerSlot } from "../../../../test-utils/integrationFileConcurrency";
 
 // This module runs once per worker, which is where a second worker becomes

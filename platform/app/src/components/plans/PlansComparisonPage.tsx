@@ -16,7 +16,7 @@ import { useState } from "react";
 import { Link } from "~/components/ui/link";
 import { Currency as PrismaCurrency } from "~/generated/prisma/client";
 import { api } from "~/utils/api";
-import { CONTACT_SALES_URL } from "../../../ee/licensing/constants";
+import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";
 import {
   type BillingInterval,
   type Currency,

@@ -33,8 +33,8 @@ import {
 } from "~/server/app-layer/subscription/plan-provider";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-import { FREE_PLAN } from "../../../../../ee/licensing/constants";
-import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
+import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { prisma } from "../../../db";
 import { ENTERPRISE_FEATURE_ERRORS } from "../../enterprise";
 import { appRouter } from "../../root";

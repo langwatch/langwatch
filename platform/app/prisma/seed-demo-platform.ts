@@ -2,7 +2,7 @@ import {
   ExperimentType,
   type Prisma,
   type PrismaClient,
-} from "../src/generated/prisma/client";
+} from "@langwatch/prisma-client/generated";
 import {
   DEMO_HTTP_AGENT_CONFIG,
   DEMO_PLATFORM_IDS,

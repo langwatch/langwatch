@@ -111,7 +111,7 @@ import {
 } from "../../../ee/billing/services/webhookService";
 import { createStripeClient } from "../../../ee/billing/stripe/stripeClient";
 import { meters } from "../../../ee/billing/stripe/stripePriceCatalog";
-import { FREE_PLAN } from "../../../ee/licensing/constants";
+import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { StorageMeterService } from "../data-retention/metering/storageMeter.service";
 import { PinnedTraceRepository } from "../data-retention/pinning/pinnedTrace.repository";
 import { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
@@ -143,7 +143,7 @@ import { ScenarioRunExportService } from "../export/scenario-runs/scenario-run-e
 import { InviteService } from "../invites/invite.service";
 import { resolveOrganizationId } from "../organizations/resolveOrganizationId";
 import { OrganizationRepository } from "../repositories/organization.repository";
-import { getLicenseHandler } from "../subscriptionHandler";
+import { getLicenseHandler } from "~/runtime/app/licensing";
 import { TraceEditOverlayService } from "../traces/edit-overlay/traceEditOverlay.service";
 import { EventUsageService } from "../traces/event-usage.service";
 import { TraceService } from "../traces/trace.service";

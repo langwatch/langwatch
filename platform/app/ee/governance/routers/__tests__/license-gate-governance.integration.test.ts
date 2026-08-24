@@ -25,8 +25,8 @@
 
 import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "@ee/governance/services/activity-monitor/ingestionSource.constants";
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
-import { FREE_PLAN } from "@ee/licensing/constants";
-import type { PlanInfo } from "@ee/licensing/planInfo";
+import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {

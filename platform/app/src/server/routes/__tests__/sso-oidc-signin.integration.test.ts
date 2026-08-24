@@ -94,11 +94,12 @@ const licenseThisDeployment = async (): Promise<void> => {
   // Set before the app graph evaluates: the verifying key is read at import.
   process.env.LANGWATCH_LICENSE_PUBLIC_KEY = publicKey;
 
-  const { signLicense, encodeLicenseKey } = await import(
-    "@ee/licensing/signing"
+  const { NodeLicenseCryptographyAdapter } = await import(
+    "~/runtime/app/testing.licensing"
   );
-  process.env.LANGWATCH_LICENSE_KEY = encodeLicenseKey(
-    signLicense(
+  const licenseCryptography = NodeLicenseCryptographyAdapter.create();
+  process.env.LANGWATCH_LICENSE_KEY = licenseCryptography.encodeLicenseKey(
+    licenseCryptography.signLicense(
       {
         licenseId: "lic_sso_oidc_integration",
         version: 1,

@@ -5,16 +5,17 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getLicenseHandler } from "~/server/subscriptionHandler";
-import type { LicenseData } from "../../../../ee/licensing";
-import { getPlanTemplate, type LicenseStatus } from "../../../../ee/licensing";
-import { licenseValidationError } from "../../../../ee/licensing/errors";
-import { buildMintedPlan } from "../../../../ee/licensing/mintedPlan";
 import {
-  encodeLicenseKey,
-  generateLicenseId,
-  signLicense,
-} from "../../../../ee/licensing/signing";
+  getLicenseCryptography,
+  getLicenseHandler,
+} from "~/runtime/app/licensing";
+import {
+  buildMintedPlan,
+  getPlanTemplate,
+  licenseValidationError,
+  type LicenseData,
+  type LicenseStatus,
+} from "@langwatch/enterprise-licensing-contract";
 
 const logger = createLogger("langwatch:api:licenseRouter");
 
@@ -192,8 +193,9 @@ export const licenseRouter = createTRPCRouter({
       const planTypeValue = template?.type ?? planType;
 
       // Build the license data
+      const licenseCryptography = getLicenseCryptography();
       const licenseData: LicenseData = {
-        licenseId: generateLicenseId(),
+        licenseId: licenseCryptography.generateLicenseId(),
         version: 1,
         organizationName,
         email,
@@ -213,10 +215,13 @@ export const licenseRouter = createTRPCRouter({
 
       try {
         // Sign the license
-        const signedLicense = signLicense(licenseData, privateKey);
+        const signedLicense = licenseCryptography.signLicense(
+          licenseData,
+          privateKey,
+        );
 
         // Encode as base64
-        const licenseKey = encodeLicenseKey(signedLicense);
+        const licenseKey = licenseCryptography.encodeLicenseKey(signedLicense);
 
         return { licenseKey };
       } catch (error) {

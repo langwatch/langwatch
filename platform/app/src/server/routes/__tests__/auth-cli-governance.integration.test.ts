@@ -32,8 +32,8 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { FREE_PLAN } from "../../../../ee/licensing/constants";
-import type { PlanInfo } from "../../../../ee/licensing/planInfo";
+import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { app } from "../auth-cli";
 
 // Phase 4b-6 added a 402 license gate on every /api/auth/cli/governance/*

@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PricingModel } from "~/generated/prisma/client";
 import { TtlCache } from "~/server/utils/ttlCache";
-import { FREE_PLAN } from "../../../../../ee/licensing/constants";
-import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
+import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import type { OrganizationService } from "../../organizations/organization.service";
 import type { PlanResolver } from "../../subscription/plan-provider";
 import { UsageService } from "../usage.service";

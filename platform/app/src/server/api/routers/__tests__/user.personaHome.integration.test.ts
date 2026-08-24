@@ -20,8 +20,8 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { FREE_PLAN } from "../../../../../ee/licensing/constants";
-import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
+import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { globalForApp, resetApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
 import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";

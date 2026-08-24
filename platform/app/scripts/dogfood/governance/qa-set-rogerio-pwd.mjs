@@ -1,5 +1,5 @@
 import bcrypt from "bcrypt";
-import { PrismaClient } from "../../../src/generated/prisma/client";
+import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createPrismaPgAdapter } from "../../../src/server/prismaPgAdapter";
 
 const prisma = new PrismaClient({

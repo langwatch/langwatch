@@ -28,7 +28,7 @@
  */
 
 import { hash } from "bcrypt";
-import { PrismaClient } from "../../src/generated/prisma/client";
+import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createPrismaPgAdapter } from "../../src/server/prismaPgAdapter";
 import { assertLocalhostDatabaseUrl } from "./_smoketest-guard";
 

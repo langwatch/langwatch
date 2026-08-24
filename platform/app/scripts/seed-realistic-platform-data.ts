@@ -9,7 +9,7 @@
 
 import { DEMO_PLATFORM_IDS } from "../prisma/demo-platform-ids";
 import { seedDemoPlatform } from "../prisma/seed-demo-platform";
-import { PrismaClient } from "../src/generated/prisma/client";
+import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { resetApp } from "../src/server/app-layer/app";
 import { initializeDefaultApp } from "../src/server/app-layer/presets";
 import { getClickHouseClientForTenant } from "../src/server/clickhouse/clickhouseClient";

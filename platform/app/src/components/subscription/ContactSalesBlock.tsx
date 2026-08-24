@@ -4,7 +4,7 @@
 import { Button, Card, Flex, HStack, SimpleGrid, Text } from "@chakra-ui/react";
 import { Check } from "lucide-react";
 import { Link } from "~/components/ui/link";
-import { CONTACT_SALES_URL } from "../../../ee/licensing/constants";
+import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";
 import { ENTERPRISE_PLAN_FEATURES } from "./billing-plans";
 
 export function ContactSalesBlock() {

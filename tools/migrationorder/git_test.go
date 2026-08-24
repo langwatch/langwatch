@@ -147,12 +147,12 @@ func TestTopLevelEntries(t *testing.T) {
 		{
 			name: "prisma directories dedupe to one entry and the lock file is dropped",
 			paths: []string{
-				"platform/app/prisma/migrations/20260102000000_new/migration.sql",
-				"platform/app/prisma/migrations/20260102000000_new/README.md",
-				"platform/app/prisma/migrations/20260101000000_old/migration.sql",
-				"platform/app/prisma/migrations/migration_lock.toml",
+				"packages/prisma-client/prisma/migrations/20260102000000_new/migration.sql",
+				"packages/prisma-client/prisma/migrations/20260102000000_new/README.md",
+				"packages/prisma-client/prisma/migrations/20260101000000_old/migration.sql",
+				"packages/prisma-client/prisma/migrations/migration_lock.toml",
 			},
-			directory: "platform/app/prisma/migrations",
+			directory: "packages/prisma-client/prisma/migrations",
 			want:      []string{"20260101000000_old", "20260102000000_new"},
 		},
 		{
@@ -167,10 +167,10 @@ func TestTopLevelEntries(t *testing.T) {
 		{
 			name: "paths outside the directory are ignored, prefix-alikes included",
 			paths: []string{
-				"platform/app/prisma/migrations_archive/20260101000000_old/migration.sql",
-				"platform/app/prisma/schema.prisma",
+				"packages/prisma-client/prisma/migrations_archive/20260101000000_old/migration.sql",
+				"packages/prisma-client/prisma/schema.prisma",
 			},
-			directory: "platform/app/prisma/migrations",
+			directory: "packages/prisma-client/prisma/migrations",
 			want:      nil,
 		},
 	}

@@ -40,18 +40,21 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => loggerMock,
 }));
 
-vi.mock("../../licensing/validation", () => ({
-  parseLicenseKey: vi.fn(),
-  verifySignature: vi.fn(),
-  isExpired: vi.fn(),
+const { licenseCryptographyMock } = vi.hoisted(() => ({
+  licenseCryptographyMock: {
+    parseLicenseKey: vi.fn(),
+    verifySignature: vi.fn(),
+    isExpired: vi.fn(),
+  },
+}));
+
+vi.mock("@langwatch/enterprise-licensing-server", () => ({
+  NodeLicenseCryptographyAdapter: {
+    create: () => licenseCryptographyMock,
+  },
 }));
 
 import { env } from "~/env.mjs";
-import {
-  isExpired,
-  parseLicenseKey,
-  verifySignature,
-} from "../../licensing/validation";
 import { PLAIN_OIDC_PROVIDERS } from "../providers";
 import {
   __resetSsoGateForTests,
@@ -139,9 +142,9 @@ describe("platformSSOAllowed", () => {
   describe("given at least one organization holds a genuine license", () => {
     /** @scenario Self-hosted with a genuine org license keeps SSO working with zero action */
     it("allows SSO", async () => {
-      vi.mocked(parseLicenseKey).mockReturnValue(genuineLicense());
-      vi.mocked(verifySignature).mockReturnValue(true);
-      vi.mocked(isExpired).mockReturnValue(false);
+      licenseCryptographyMock.parseLicenseKey.mockReturnValue(genuineLicense());
+      licenseCryptographyMock.verifySignature.mockReturnValue(true);
+      licenseCryptographyMock.isExpired.mockReturnValue(false);
       __setSsoLicenseRepositoryForTests(
         repoWithOrgs([{ id: "org_1", license: "encoded" }]),
       );
@@ -155,11 +158,11 @@ describe("platformSSOAllowed", () => {
   describe("given the only organization license is genuine but past its expiry date", () => {
     /** @scenario An expired but genuine license still keeps SSO working */
     it("still allows SSO and logs a renewal reminder naming the expired license", async () => {
-      vi.mocked(parseLicenseKey).mockReturnValue(
+      licenseCryptographyMock.parseLicenseKey.mockReturnValue(
         genuineLicense({ expiresAt: "2000-01-01T00:00:00Z" }),
       );
-      vi.mocked(verifySignature).mockReturnValue(true);
-      vi.mocked(isExpired).mockReturnValue(true);
+      licenseCryptographyMock.verifySignature.mockReturnValue(true);
+      licenseCryptographyMock.isExpired.mockReturnValue(true);
       __setSsoLicenseRepositoryForTests(
         repoWithOrgs([{ id: "org_1", license: "encoded" }]),
       );
@@ -181,8 +184,8 @@ describe("platformSSOAllowed", () => {
   describe("given the only stored license fails signature verification", () => {
     /** @scenario A tampered license does not enable SSO */
     it("denies SSO and logs which license was inspected and why it was rejected", async () => {
-      vi.mocked(parseLicenseKey).mockReturnValue(genuineLicense());
-      vi.mocked(verifySignature).mockReturnValue(false);
+      licenseCryptographyMock.parseLicenseKey.mockReturnValue(genuineLicense());
+      licenseCryptographyMock.verifySignature.mockReturnValue(false);
       __setSsoLicenseRepositoryForTests(
         repoWithOrgs([{ id: "org_1", license: "encoded" }]),
       );
@@ -229,9 +232,9 @@ describe("platformSSOAllowed", () => {
     /** @scenario An SSO-only deployment recovers by setting the instance license key */
     it("allows SSO without needing the licensing store to succeed", async () => {
       envMock.LANGWATCH_LICENSE_KEY = "encoded-instance-key";
-      vi.mocked(parseLicenseKey).mockReturnValue(genuineLicense());
-      vi.mocked(verifySignature).mockReturnValue(true);
-      vi.mocked(isExpired).mockReturnValue(false);
+      licenseCryptographyMock.parseLicenseKey.mockReturnValue(genuineLicense());
+      licenseCryptographyMock.verifySignature.mockReturnValue(true);
+      licenseCryptographyMock.isExpired.mockReturnValue(false);
       const repository = repoWithOrgs([]);
       __setSsoLicenseRepositoryForTests(repository);
 
@@ -250,9 +253,9 @@ describe("platformSSOAllowed", () => {
         .mockRejectedValueOnce(new Error("connection refused"))
         .mockResolvedValueOnce([{ id: "org_1", license: "encoded" }]);
       __setSsoLicenseRepositoryForTests({ findOrganizationsWithLicense });
-      vi.mocked(parseLicenseKey).mockReturnValue(genuineLicense());
-      vi.mocked(verifySignature).mockReturnValue(true);
-      vi.mocked(isExpired).mockReturnValue(false);
+      licenseCryptographyMock.parseLicenseKey.mockReturnValue(genuineLicense());
+      licenseCryptographyMock.verifySignature.mockReturnValue(true);
+      licenseCryptographyMock.isExpired.mockReturnValue(false);
 
       const firstAttempt = await platformSSOAllowed();
       expect(firstAttempt).toBe(false);
@@ -274,9 +277,11 @@ describe("platformSSOAllowed", () => {
           .mockReturnValueOnce(new Promise(() => {}))
           .mockResolvedValueOnce([{ id: "org_1", license: "encoded" }]);
         __setSsoLicenseRepositoryForTests({ findOrganizationsWithLicense });
-        vi.mocked(parseLicenseKey).mockReturnValue(genuineLicense());
-        vi.mocked(verifySignature).mockReturnValue(true);
-        vi.mocked(isExpired).mockReturnValue(false);
+        licenseCryptographyMock.parseLicenseKey.mockReturnValue(
+          genuineLicense(),
+        );
+        licenseCryptographyMock.verifySignature.mockReturnValue(true);
+        licenseCryptographyMock.isExpired.mockReturnValue(false);
 
         const firstAttempt = platformSSOAllowed();
         await vi.advanceTimersByTimeAsync(5_000);
@@ -303,9 +308,9 @@ describe("platformSSOAllowed", () => {
         }),
       );
       __setSsoLicenseRepositoryForTests({ findOrganizationsWithLicense });
-      vi.mocked(parseLicenseKey).mockReturnValue(genuineLicense());
-      vi.mocked(verifySignature).mockReturnValue(true);
-      vi.mocked(isExpired).mockReturnValue(false);
+      licenseCryptographyMock.parseLicenseKey.mockReturnValue(genuineLicense());
+      licenseCryptographyMock.verifySignature.mockReturnValue(true);
+      licenseCryptographyMock.isExpired.mockReturnValue(false);
 
       // Both callers enter before the scan promise settles.
       const first = platformSSOAllowed();
@@ -330,9 +335,9 @@ describe("platformSSOAllowed", () => {
       const firstAttempt = await platformSSOAllowed();
       expect(firstAttempt).toBe(false);
 
-      vi.mocked(parseLicenseKey).mockReturnValue(genuineLicense());
-      vi.mocked(verifySignature).mockReturnValue(true);
-      vi.mocked(isExpired).mockReturnValue(false);
+      licenseCryptographyMock.parseLicenseKey.mockReturnValue(genuineLicense());
+      licenseCryptographyMock.verifySignature.mockReturnValue(true);
+      licenseCryptographyMock.isExpired.mockReturnValue(false);
 
       const secondAttemptSameProcess = await platformSSOAllowed();
       expect(secondAttemptSameProcess).toBe(false);
@@ -350,11 +355,11 @@ describe("platformSSOAllowed", () => {
   describe("given two organizations where only the first holds a genuine license", () => {
     /** @scenario One organization's genuine license enables SSO for the whole deployment */
     it("allows SSO for the whole deployment", async () => {
-      vi.mocked(parseLicenseKey).mockImplementation((key) =>
+      licenseCryptographyMock.parseLicenseKey.mockImplementation((key) =>
         key === "org1-license" ? genuineLicense() : null,
       );
-      vi.mocked(verifySignature).mockReturnValue(true);
-      vi.mocked(isExpired).mockReturnValue(false);
+      licenseCryptographyMock.verifySignature.mockReturnValue(true);
+      licenseCryptographyMock.isExpired.mockReturnValue(false);
       __setSsoLicenseRepositoryForTests(
         repoWithOrgs([
           { id: "org_1", license: "org1-license" },
@@ -372,9 +377,9 @@ describe("platformSSOAllowed", () => {
 describe("resolveAuthProvider", () => {
   /** A genuinely licensed self-hosted deployment, so the gate says yes. */
   const allowTheGate = () => {
-    vi.mocked(parseLicenseKey).mockReturnValue(genuineLicense());
-    vi.mocked(verifySignature).mockReturnValue(true);
-    vi.mocked(isExpired).mockReturnValue(false);
+    licenseCryptographyMock.parseLicenseKey.mockReturnValue(genuineLicense());
+    licenseCryptographyMock.verifySignature.mockReturnValue(true);
+    licenseCryptographyMock.isExpired.mockReturnValue(false);
     __setSsoLicenseRepositoryForTests(
       repoWithOrgs([{ id: "org_1", license: "encoded" }]),
     );

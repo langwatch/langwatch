@@ -1,5 +1,5 @@
-import { FREE_VISIBILITY_DAYS } from "../licensing/constants";
-import type { PlanInfo } from "../licensing/planInfo";
+import { FREE_VISIBILITY_DAYS } from "@langwatch/enterprise-licensing-contract";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { type PlanTypes as PlanType, PlanTypes } from "./planTypes";
 import { GROWTH_SEAT_PLAN_TYPES } from "./utils/growthSeatEvent";
 
@@ -141,7 +141,7 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
     name: "Enterprise",
     maxMembers: 1000,
     maxMessagesPerMonth: 1_000_000,
-    // Stated here as well as in the tier map (`ee/licensing/planEntitlements`),
+    // Stated here as well as in the licensing contract's tier map,
     // and deliberately not in PAID_FEATURES, which every paid plan shares.
     // The preset is what this plan sells; the tier map is the net that catches
     // a contract resolved some other way, such as a license signed before the

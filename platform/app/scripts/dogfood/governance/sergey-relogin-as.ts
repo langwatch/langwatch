@@ -16,7 +16,7 @@ import { setTimeout as wait } from "node:timers/promises";
 import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
 import { RedisConnectionService } from "@langwatch/redis-client";
 import { approveDeviceCode } from "~/server/routes/auth-cli";
-import { PrismaClient } from "../../../src/generated/prisma/client";
+import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createPrismaPgAdapter } from "../../../src/server/prismaPgAdapter";
 
 interface Args {

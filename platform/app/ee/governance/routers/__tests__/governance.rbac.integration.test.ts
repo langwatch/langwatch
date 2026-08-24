@@ -30,8 +30,8 @@
  *   - personalVirtualKeys.*  — self-service, all members can mint
  */
 
-import { FREE_PLAN } from "@ee/licensing/constants";
-import type { PlanInfo } from "@ee/licensing/planInfo";
+import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {

@@ -11,8 +11,8 @@
  * provider, so a test can move the organization between FREE and Enterprise
  * (or shrink its seats) per scenario.
  */
-import { FREE_PLAN } from "@ee/licensing/constants";
-import type { PlanInfo } from "@ee/licensing/planInfo";
+import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import {

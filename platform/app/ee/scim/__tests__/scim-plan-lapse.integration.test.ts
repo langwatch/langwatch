@@ -22,7 +22,7 @@ import {
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { ENTERPRISE_TEST_PLAN } from "~/test-utils/managementApiOrg";
-import { FREE_PLAN } from "../../licensing/constants";
+import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { app } from "../routes";
 import { ScimTokenService } from "../scim-token.service";
 

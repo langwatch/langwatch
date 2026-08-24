@@ -26,7 +26,7 @@ import type {
   PrismaClient,
   Project,
   Team,
-} from "../../../../src/generated/prisma/client";
+} from "@langwatch/prisma-client/generated";
 
 const ENV_VAR = "DEMO_ORG_IDS";
 const ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;

@@ -1,5 +1,5 @@
 import { isAdmin } from "../../../../ee/billing/planProvider";
-import type { PlanInfo } from "../../../../ee/licensing/planInfo";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import type { PlanProvider, PlanProviderUser } from "./plan-provider";
 
 /**

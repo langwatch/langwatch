@@ -15,6 +15,10 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      "~/generated/prisma/client": join(
+        __dirname,
+        "../../packages/prisma-client/src/generated/client.ts",
+      ),
       "~/": join(__dirname, "./src/"),
     },
   },

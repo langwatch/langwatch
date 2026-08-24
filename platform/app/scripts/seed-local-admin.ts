@@ -24,7 +24,7 @@ import { nanoid } from "nanoid";
 import {
   RoleBindingScopeType,
   TeamUserRole,
-} from "../src/generated/prisma/client";
+} from "@langwatch/prisma-client/generated";
 import { prisma } from "../src/server/db";
 import { LOCAL_DEV_ENTERPRISE_LICENSE_KEY } from "./localDevLicense";
 

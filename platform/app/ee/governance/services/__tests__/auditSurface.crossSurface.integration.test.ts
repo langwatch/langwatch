@@ -48,7 +48,7 @@ import {
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
 
-import { FREE_PLAN } from "../../../licensing/constants";
+import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 
 const SHARED_INPUT = {
   sourceType: "internal_uniform",

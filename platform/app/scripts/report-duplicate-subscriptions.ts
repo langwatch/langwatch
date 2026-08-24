@@ -29,7 +29,7 @@ import {
   compareBySubscriptionOrder,
   SubscriptionStatus,
 } from "../ee/billing/planTypes";
-import { type Prisma, PrismaClient } from "../src/generated/prisma/client";
+import { type Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 
 const SUBSCRIPTION_SELECT = {

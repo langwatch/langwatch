@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { PlanInfo } from "../../../../ee/licensing/planInfo";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import {
   mapLicenseStatusToLimits,
   mapUsageToLimits,

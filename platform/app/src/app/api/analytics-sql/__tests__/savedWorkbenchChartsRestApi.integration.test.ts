@@ -61,7 +61,7 @@ import {
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
 import { getFeatureFlagStore } from "~/server/featureFlag";
-import { FREE_PLAN } from "../../../../../ee/licensing/constants";
+import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { app } from "../[[...route]]/app";
 
 /** Names a LangWatchQL dataset every deployment publishes, and reads nothing gated. */

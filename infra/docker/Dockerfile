@@ -112,11 +112,10 @@ RUN CI=true pnpm install --frozen-lockfile --prod --ignore-scripts --filter "@la
 # `prune` takes no --filter, which is why the install above is filtered and
 # this is not. That is fine here: the members outside the app's closure have
 # no node_modules in this image at all, so there is nothing for prune to get
-# wrong. No post-prune `prisma generate` anymore: Prisma 7's generator emits
-# into platform/app/src/generated/prisma (first-party source, inlined into the
-# dist bundles by the build above), not into node_modules, so prune cannot
-# drop it. The runtime stage still needs the `prisma` CLI (a prod dep) for
-# `migrate deploy` at boot.
+# wrong. No post-prune `prisma generate` anymore: @langwatch/prisma-client owns
+# generated first-party source that the build above inlines into the dist
+# bundles, so prune cannot drop it. The runtime stage still needs the `prisma`
+# CLI (a prod dep) for `migrate deploy` at boot.
 RUN CI=true pnpm prune --prod
 
 # ── Stage 2: runtime ───────────────────────────────────────────────

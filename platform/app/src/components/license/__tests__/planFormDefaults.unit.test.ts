@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ENTERPRISE_TEMPLATE,
   PRO_TEMPLATE,
-} from "../../../../ee/licensing/planTemplates";
+} from "@langwatch/enterprise-licensing-contract";
 import {
   getPlanDefaults,
   PLAN_DEFAULTS,

@@ -46,7 +46,7 @@ Feature: PR impact map comment
     Then the file is attributed to the earliest matching rule
 
   Scenario: Migration files are attributed to Migrations, not to the application
-    Given a pull request changes "platform/app/prisma/migrations/0001_init/migration.sql"
+    Given a pull request changes "packages/prisma-client/prisma/migrations/0001_init/migration.sql"
     When the impact map is built
     Then the file is attributed to "Migrations"
 

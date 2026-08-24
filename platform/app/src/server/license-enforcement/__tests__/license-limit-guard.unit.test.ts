@@ -1,14 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { EXPIRED_LICENSE_KEY } from "../../../../ee/licensing/__tests__/fixtures/testLicenses";
-import { floorAtOssBaseline } from "../../../../ee/licensing/ossBaselineFloor";
-import { mapToPlanInfo } from "../../../../ee/licensing/planMapping";
-import { parseLicenseKey } from "../../../../ee/licensing/validation";
+import {
+  EXPIRED_LICENSE_KEY,
+  NodeLicenseCryptographyAdapter,
+} from "~/runtime/app/testing.licensing";
+import { floorAtOssBaseline } from "@langwatch/enterprise-licensing-contract";
+import { mapToPlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { LimitExceededError } from "../errors";
 import type { ILicenseEnforcementRepository } from "../license-enforcement.repository";
 import {
   assertMemberTypeLimitNotExceeded,
   type MemberTypeLimits,
 } from "../license-limit-guard";
+
+const licenseCryptography = NodeLicenseCryptographyAdapter.create();
 
 const { mockNotifyResourceLimitReached, mockCaptureException } = vi.hoisted(
   () => ({
@@ -308,7 +312,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
       // it: the signed payload mapped to a plan, then floored at the
       // open-source baseline. Seats are the one thing the floor leaves alone,
       // so they are still what arms this guard.
-      const lapsed = parseLicenseKey(EXPIRED_LICENSE_KEY);
+      const lapsed = licenseCryptography.parseLicenseKey(EXPIRED_LICENSE_KEY);
       if (!lapsed) throw new Error("Expected the expired fixture to parse");
       const plan = floorAtOssBaseline(mapToPlanInfo(lapsed.data));
       const mockRepo = createMockRepo(plan.maxMembers);
@@ -327,7 +331,7 @@ describe("assertMemberTypeLimitNotExceeded", () => {
     });
 
     it("still allows a full member while a seat is free", async () => {
-      const lapsed = parseLicenseKey(EXPIRED_LICENSE_KEY);
+      const lapsed = licenseCryptography.parseLicenseKey(EXPIRED_LICENSE_KEY);
       if (!lapsed) throw new Error("Expected the expired fixture to parse");
       const plan = floorAtOssBaseline(mapToPlanInfo(lapsed.data));
       const mockRepo = createMockRepo(plan.maxMembers - 1);

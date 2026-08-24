@@ -1,4 +1,4 @@
-import type { LicenseStatus } from "../../../ee/licensing/client";
+import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
 
 /** License status with metadata fields (excludes corrupted/no-license states) */
 export type LicenseStatusWithMetadata = Extract<

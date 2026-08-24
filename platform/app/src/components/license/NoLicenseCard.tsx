@@ -16,7 +16,7 @@ import { usePublicEnv } from "~/hooks/usePublicEnv";
 import {
   CONTACT_SALES_URL,
   DEFAULT_LICENSE_PURCHASE_URL,
-} from "../../../ee/licensing/constants";
+} from "@langwatch/enterprise-licensing-contract";
 import { formatFileSize } from "./licenseStatusUtils";
 
 type ActivationMethod = "file" | "key";

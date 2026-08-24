@@ -24,7 +24,7 @@ import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { nanoid } from "nanoid";
 import { chromium } from "playwright";
-import { ExperimentType, PrismaClient } from "../src/generated/prisma/client";
+import { ExperimentType, PrismaClient } from "@langwatch/prisma-client/generated";
 import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:5571";

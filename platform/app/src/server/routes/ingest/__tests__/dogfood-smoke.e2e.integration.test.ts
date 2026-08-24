@@ -50,8 +50,8 @@ import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
-import { FREE_PLAN } from "../../../../../ee/licensing/constants";
-import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
+import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 
 import { app as ingestApp } from "../ingestionRoutes";
 

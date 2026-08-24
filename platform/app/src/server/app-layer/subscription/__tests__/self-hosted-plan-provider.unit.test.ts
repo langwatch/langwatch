@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { UNLIMITED_PLAN } from "../../../../../ee/licensing/constants";
-import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
+import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { createSelfHostedPlanProvider } from "../self-hosted-plan-provider";
 
 const ORGANIZATION_ID = "org-123";

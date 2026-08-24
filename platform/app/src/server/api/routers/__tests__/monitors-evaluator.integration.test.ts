@@ -12,7 +12,7 @@ import { EvaluationExecutionMode } from "~/generated/prisma/client";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
-import { UNLIMITED_PLAN } from "../../../../../ee/licensing/constants";
+import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";

@@ -133,7 +133,17 @@ export const metricsMiddleware = promBundle({
   },
 });
 
-export const startApp = async (dir = resolveAppPackageRoot()) => {
+export type StartAppOptions = {
+  /** Root used only for process-owned development files such as TLS certs. */
+  processRoot?: string;
+  /** Built UI artifact supplied by image or self-host composition. */
+  uiArtifactPath?: string;
+};
+
+export const startApp = async (options: StartAppOptions = {}) => {
+  const processRoot = options.processRoot ?? resolveAppPackageRoot();
+  const uiArtifactPath =
+    options.uiArtifactPath ?? path.join(processRoot, "dist/client");
   const dev = process.env.NODE_ENV !== "production";
   const hostname = "0.0.0.0";
 
@@ -232,7 +242,10 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
   });
 
   // In production, resolve the built client assets directory
-  const clientDistDir = dev ? null : path.join(dir, "dist/client");
+  // The API consumes the UI as an artifact. The default preserves today's
+  // combined package layout; apps/api can inject the staged apps/ui output
+  // without importing browser source.
+  const clientDistDir = dev ? null : uiArtifactPath;
 
   // ADR-086: getAssetBase() throws here at boot when the base is misconfigured
   // — fail fast rather than serve broken asset URLs.
@@ -353,7 +366,7 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
     | ReturnType<typeof createServer>
     | ReturnType<typeof createSecureServer>;
   if (useHttp2) {
-    const { cert, key } = await loadDevHttpsCredentials(dir);
+    const { cert, key } = await loadDevHttpsCredentials(processRoot);
     // Node's http2 compat-API hands us the same IncomingMessage /
     // ServerResponse shapes the http server uses, so the handler
     // body doesn't need to know which transport it's on.

@@ -4,7 +4,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
 import dotenv from "dotenv";
 import { afterAll, afterEach, vi } from "vitest";
-import { TEST_PUBLIC_KEY } from "./ee/licensing/__tests__/fixtures/testKeys";
+import { TEST_PUBLIC_KEY } from "@langwatch/enterprise-licensing-server/testing";
 
 dotenv.config({ path: ".env" });
 

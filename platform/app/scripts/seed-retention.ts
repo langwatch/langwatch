@@ -12,7 +12,7 @@
  * still outlives their near-now data.
  */
 
-import { PrismaClient } from "../src/generated/prisma/client";
+import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 import { applySeedRetention, seededRetentionDays } from "./seed-lib/retention";
 

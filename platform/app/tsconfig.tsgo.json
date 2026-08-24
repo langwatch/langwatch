@@ -21,6 +21,7 @@
 		"noUncheckedIndexedAccess": true,
 		"verbatimModuleSyntax": true,
 		"paths": {
+			"~/generated/prisma/client": ["../../packages/prisma-client/src/generated/client.ts"],
 			"~/*": ["./src/*"],
 			"@ee/*": ["./ee/*"],
 			"@app/*": ["./src/server/app-layer/*"],

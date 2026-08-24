@@ -11,7 +11,7 @@
  * dressed up as "buy a plan".
  */
 
-import { FREE_PLAN } from "@ee/licensing/constants";
+import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { app as organizationApp } from "~/app/api/organization/[[...route]]/app";
@@ -110,9 +110,12 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
     it("refuses the organization API with 402, naming the feature and the way up", async () => {
       mockGetActivePlan.mockResolvedValue({ ...FREE_PLAN });
 
-      const response = await organizationApp.request(`/api/organization/${MANAGEMENT_API_VERSION}/`, {
-        headers: authHeaders(),
-      });
+      const response = await organizationApp.request(
+        `/api/organization/${MANAGEMENT_API_VERSION}/`,
+        {
+          headers: authHeaders(),
+        },
+      );
 
       expect(response.status).toBe(402);
       const body = await response.json();
@@ -122,9 +125,12 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
       expect(body.docsUrl).toBeTruthy();
 
       mockGetActivePlan.mockResolvedValue(ENTERPRISE_TEST_PLAN);
-      const entitled = await organizationApp.request(`/api/organization/${MANAGEMENT_API_VERSION}/`, {
-        headers: authHeaders(),
-      });
+      const entitled = await organizationApp.request(
+        `/api/organization/${MANAGEMENT_API_VERSION}/`,
+        {
+          headers: authHeaders(),
+        },
+      );
       expect(entitled.status).toBe(200);
     });
 
@@ -132,9 +138,12 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
     it("refuses the roles API with 402", async () => {
       mockGetActivePlan.mockResolvedValue({ ...FREE_PLAN });
 
-      const response = await rolesApp.request(`/api/roles/${MANAGEMENT_API_VERSION}/`, {
-        headers: authHeaders(),
-      });
+      const response = await rolesApp.request(
+        `/api/roles/${MANAGEMENT_API_VERSION}/`,
+        {
+          headers: authHeaders(),
+        },
+      );
 
       expect(response.status).toBe(402);
       expect((await response.json()).code).toBe("enterprise_plan_required");
@@ -144,9 +153,12 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
     it("refuses the role bindings API with 402", async () => {
       mockGetActivePlan.mockResolvedValue({ ...FREE_PLAN });
 
-      const response = await roleBindingsApp.request(`/api/role-bindings/${MANAGEMENT_API_VERSION}/`, {
-        headers: authHeaders(),
-      });
+      const response = await roleBindingsApp.request(
+        `/api/role-bindings/${MANAGEMENT_API_VERSION}/`,
+        {
+          headers: authHeaders(),
+        },
+      );
 
       expect(response.status).toBe(402);
       expect((await response.json()).code).toBe("enterprise_plan_required");
@@ -156,9 +168,12 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
     it("refuses the SCIM tokens API with 402", async () => {
       mockGetActivePlan.mockResolvedValue({ ...FREE_PLAN });
 
-      const response = await scimTokensApp.request(`/api/scim-tokens/${MANAGEMENT_API_VERSION}/`, {
-        headers: authHeaders(),
-      });
+      const response = await scimTokensApp.request(
+        `/api/scim-tokens/${MANAGEMENT_API_VERSION}/`,
+        {
+          headers: authHeaders(),
+        },
+      );
 
       expect(response.status).toBe(402);
       expect((await response.json()).code).toBe("enterprise_plan_required");
@@ -169,12 +184,15 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
     it("answers 403 insufficient_permissions before the plan gate can answer 402", async () => {
       mockGetActivePlan.mockResolvedValue({ ...FREE_PLAN });
 
-      const response = await rolesApp.request(`/api/roles/${MANAGEMENT_API_VERSION}/`, {
-        headers: {
-          Authorization: `Bearer ${viewOnlyToken}`,
-          "Content-Type": "application/json",
+      const response = await rolesApp.request(
+        `/api/roles/${MANAGEMENT_API_VERSION}/`,
+        {
+          headers: {
+            Authorization: `Bearer ${viewOnlyToken}`,
+            "Content-Type": "application/json",
+          },
         },
-      });
+      );
 
       expect(response.status).toBe(403);
       const body = await response.json();
@@ -189,7 +207,9 @@ describe("Feature: Management APIs require an Enterprise plan", () => {
     it("still answers 401 before the gate", async () => {
       mockGetActivePlan.mockResolvedValue({ ...FREE_PLAN });
 
-      const response = await organizationApp.request(`/api/organization/${MANAGEMENT_API_VERSION}/`);
+      const response = await organizationApp.request(
+        `/api/organization/${MANAGEMENT_API_VERSION}/`,
+      );
 
       expect(response.status).toBe(401);
       expect((await response.json()).code).toBe("missing_credentials");

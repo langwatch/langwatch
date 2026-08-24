@@ -35,7 +35,7 @@
 
 import { createClient } from "@clickhouse/client";
 import { randomBytes } from "crypto";
-import { TeamUserRole } from "../../../src/generated/prisma/client";
+import { TeamUserRole } from "@langwatch/prisma-client/generated";
 
 import { prisma } from "../../../src/server/db";
 

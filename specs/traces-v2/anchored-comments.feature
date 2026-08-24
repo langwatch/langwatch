@@ -1,7 +1,7 @@
 # Anchored comments: saying something about one part of a trace
 #
 # Implementation:
-#   platform/app/prisma/schema.prisma                                                            (which part of the trace an annotation is about)
+#   packages/prisma-client/prisma/schema.prisma                                                  (which part of the trace an annotation is about)
 #   platform/app/src/server/api/routers/annotation.ts                                            (anchored writes, anchored reads, suggestion hand-off)
 #   platform/app/src/server/traces/edit-overlay/traceEditOverlay.service.ts                       (a field suggestion merged into the correction)
 #   platform/app/src/server/traces/clickhouse-trace.service.ts                                   (trace-level annotation reads for lists and datasets)

@@ -38,7 +38,7 @@ import {
   type MemberType,
 } from "~/server/license-enforcement/member-classification";
 import { api } from "~/utils/api";
-import { CONTACT_SALES_URL } from "../../../ee/licensing/constants";
+import { CONTACT_SALES_URL } from "@langwatch/enterprise-licensing-contract";
 import {
   type BillingInterval,
   buildEnterprisePlanFeatures,

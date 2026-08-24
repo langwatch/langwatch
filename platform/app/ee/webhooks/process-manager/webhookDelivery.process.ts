@@ -31,7 +31,7 @@ import { nanoUsdToDecimalString } from "~/server/gateway/wireMoney";
 import { pruneExpiredIdempotencyReceipts } from "~/server/webhooks/deliveryLog";
 import { webhookDestinationFor } from "~/server/webhooks/destinations";
 import type { WebhookDispatchResult } from "~/server/webhooks/destinations/types";
-import type { PlanInfo } from "../../licensing/planInfo";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { spendRowToEnvelope } from "../envelope";
 import { eventMatches } from "../eventRegistry";
 import type {

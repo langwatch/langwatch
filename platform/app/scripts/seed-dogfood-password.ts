@@ -19,7 +19,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
   type User,
-} from "../src/generated/prisma/client";
+} from "@langwatch/prisma-client/generated";
 import { prisma } from "../src/server/db";
 
 type OwnerMemberships = {

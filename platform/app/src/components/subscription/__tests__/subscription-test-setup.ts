@@ -12,7 +12,7 @@
  * because it requires JSX, which needs a .tsx extension.
  */
 import { vi } from "vitest";
-import type { PlanInfo } from "../../../../ee/licensing/planInfo";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import type { DisplayInvoice } from "../../../server/app-layer/subscription/subscription.service";
 
 // ---------------------------------------------------------------------------

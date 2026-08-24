@@ -5,9 +5,11 @@ import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
 export default defineConfig({
-  schema: "prisma/schema.prisma",
+  // Transitional monolith composition only. The canonical schema and
+  // migration history are owned by @langwatch/prisma-client.
+  schema: "../../packages/prisma-client/prisma/schema.prisma",
   migrations: {
-    path: "prisma/migrations",
+    path: "../../packages/prisma-client/prisma/migrations",
     seed: "tsx prisma/seed.ts",
   },
   // `env("DATABASE_URL")` resolves eagerly at config load, which would make

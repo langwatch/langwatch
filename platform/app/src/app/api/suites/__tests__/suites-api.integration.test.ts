@@ -22,7 +22,7 @@ import { prisma } from "~/server/db";
 import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
 import type { StartSuiteRunCommandData } from "~/server/event-sourcing/pipelines/suite-run-processing/schemas/commands";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-import { FREE_PLAN } from "../../../../../ee/licensing/constants";
+import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { app } from "../[[...route]]/app";
 
 describe("Feature: Suites REST API", () => {

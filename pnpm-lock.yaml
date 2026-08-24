@@ -348,6 +348,102 @@ importers:
         specifier: ^4.1.9
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
+  packages/enterprise:
+    dependencies:
+      "@langwatch/enterprise-licensing-contract":
+        specifier: workspace:*
+        version: link:features/licensing/contract
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/enterprise/composition/api:
+    dependencies:
+      "@langwatch/enterprise":
+        specifier: workspace:*
+        version: link:../..
+      "@langwatch/enterprise-licensing-contract":
+        specifier: workspace:*
+        version: link:../../features/licensing/contract
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/enterprise/composition/web:
+    dependencies:
+      "@langwatch/enterprise":
+        specifier: workspace:*
+        version: link:../..
+      "@langwatch/enterprise-licensing-contract":
+        specifier: workspace:*
+        version: link:../../features/licensing/contract
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/enterprise/composition/worker:
+    dependencies:
+      "@langwatch/enterprise":
+        specifier: workspace:*
+        version: link:../..
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/enterprise/features/licensing/contract:
+    dependencies:
+      "@langwatch/entitlements-contract":
+        specifier: workspace:*
+        version: link:../../../../features/entitlements/contract
+      "@langwatch/handled-error":
+        specifier: workspace:*
+        version: link:../../../../handled-error
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/enterprise/features/licensing/server:
+    dependencies:
+      "@langwatch/enterprise-licensing-contract":
+        specifier: workspace:*
+        version: link:../contract
+    devDependencies:
+      "@types/node":
+        specifier: ^24.0.0
+        version: 24.13.3
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@24.13.3)(typescript@7.0.2))(vite@8.1.2(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
   packages/eventing:
     dependencies:
       "@langwatch/group-queue":
@@ -680,6 +776,34 @@ importers:
         specifier: ^4.1.9
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
+  packages/prisma-client:
+    dependencies:
+      "@prisma/adapter-pg":
+        specifier: 7.9.1
+        version: 7.9.1
+      "@prisma/client":
+        specifier: 7.9.1
+        version: 7.9.1(prisma@7.9.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2)
+      pg:
+        specifier: ^8.22.0
+        version: 8.22.0
+    devDependencies:
+      "@types/node":
+        specifier: ^26.0.1
+        version: 26.2.0
+      "@types/pg":
+        specifier: ^8.20.3
+        version: 8.20.4
+      prisma:
+        specifier: 7.9.1
+        version: 7.9.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2)
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
   packages/react-rum:
     dependencies:
       "@opentelemetry/api":
@@ -743,6 +867,15 @@ importers:
       ioredis:
         specifier: 5.10.1
         version: 5.10.1
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/runtime-composition:
     devDependencies:
       typescript:
         specifier: ^7.0.2
@@ -920,6 +1053,12 @@ importers:
       "@langwatch/design-system":
         specifier: workspace:*
         version: link:../../packages/design-system
+      "@langwatch/enterprise-licensing-contract":
+        specifier: workspace:*
+        version: link:../../packages/enterprise/features/licensing/contract
+      "@langwatch/enterprise-licensing-server":
+        specifier: workspace:*
+        version: link:../../packages/enterprise/features/licensing/server
       "@langwatch/entitlements-contract":
         specifier: workspace:*
         version: link:../../packages/features/entitlements/contract
@@ -947,6 +1086,9 @@ importers:
       "@langwatch/observability":
         specifier: workspace:*
         version: link:../../packages/observability
+      "@langwatch/prisma-client":
+        specifier: workspace:*
+        version: link:../../packages/prisma-client
       "@langwatch/react-rum":
         specifier: workspace:*
         version: link:../../packages/react-rum
@@ -956,6 +1098,9 @@ importers:
       "@langwatch/redis-client":
         specifier: workspace:*
         version: link:../../packages/redis-client
+      "@langwatch/runtime-composition":
+        specifier: workspace:*
+        version: link:../../packages/runtime-composition
       "@langwatch/scenario":
         specifier: file:vendor/langwatch-scenario-1.3.0.tgz
         version: file:platform/app/vendor/langwatch-scenario-1.3.0.tgz(@aws-sdk/credential-provider-node@3.972.79)(@cfworker/json-schema@4.1.1)(ai@6.0.217(zod@3.25.76))(bufferutil@4.1.0)(encoding@0.1.13)(vitest@4.1.10)
@@ -24375,7 +24520,7 @@ snapshots:
 
   "@types/d3-interpolate@3.0.1":
     dependencies:
-      "@types/d3-color": 3.1.0
+      "@types/d3-color": 3.1.3
 
   "@types/d3-interpolate@3.0.4":
     dependencies:
@@ -24393,7 +24538,7 @@ snapshots:
 
   "@types/d3-scale@4.0.2":
     dependencies:
-      "@types/d3-time": 3.0.0
+      "@types/d3-time": 3.0.4
 
   "@types/d3-scale@4.0.9":
     dependencies:
@@ -28020,7 +28165,7 @@ snapshots:
       isstream: 0.1.2
       jsonwebtoken: 9.0.3
       mime-types: 2.1.35
-      retry-axios: 2.6.0(axios@1.19.0(debug@4.4.3))
+      retry-axios: 2.6.0(axios@1.19.0)
       tough-cookie: 4.1.4
     transitivePeerDependencies:
       - supports-color
@@ -31071,7 +31216,7 @@ snapshots:
 
   ret@0.5.0: {}
 
-  retry-axios@2.6.0(axios@1.19.0(debug@4.4.3)):
+  retry-axios@2.6.0(axios@1.19.0):
     dependencies:
       axios: 1.19.0(debug@4.4.3)
 

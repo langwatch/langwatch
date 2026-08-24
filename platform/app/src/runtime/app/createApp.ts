@@ -1,11 +1,15 @@
+import {
+  type CapabilityRegistry,
+  type FeatureDefinition,
+  FeatureRuntimeBuilder,
+  ResourceScope,
+} from "@langwatch/runtime-composition";
 import type { App } from "~/server/app-layer/app";
-import { buildFeatureRuntime, type FeatureDefinition } from "../shared/feature";
-import { ResourceScope } from "../shared/resource-scope";
 import { appFeatures } from "./features";
 
 export type AppRuntime = {
   kind: "app";
-  services: Awaited<ReturnType<typeof buildFeatureRuntime>>["registry"];
+  services: CapabilityRegistry;
   legacy: App;
   start(): Promise<void>;
   close(options?: { terminating?: boolean }): Promise<void>;
@@ -22,12 +26,10 @@ export async function createApp({
   resources?: ResourceScope;
   ownsResources?: boolean;
 }): Promise<AppRuntime> {
-  const built = await buildFeatureRuntime({
-    features,
+  const built = await FeatureRuntimeBuilder.create<Record<string, never>>({
     infrastructure: {},
-    target: "app",
     resources,
-  });
+  }).build({ features, target: "app" });
   const legacy = initializeLegacy();
   let closed = false;
   return {

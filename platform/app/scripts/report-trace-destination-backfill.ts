@@ -35,7 +35,7 @@
  * Usage:
  *   DATABASE_URL=postgres://... pnpm tsx scripts/report-trace-destination-backfill.ts
  */
-import { PrismaClient } from "../src/generated/prisma/client";
+import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 
 type Resolution =

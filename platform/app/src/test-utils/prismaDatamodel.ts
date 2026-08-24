@@ -8,13 +8,17 @@ export interface PrismaDatamodelModel {
 
 /**
  * Prisma 7's generated client no longer exposes `Prisma.dmmf`, so the tenancy
- * partition tests read the datamodel straight from `prisma/schema.prisma`:
+ * partition tests read the datamodel straight from the canonical
+ * `@langwatch/prisma-client` schema:
  * every `model` block's field names, relation fields included, exactly as
  * `dmmf.datamodel.models[].fields` used to report them.
  */
 export function parsePrismaDatamodel(): PrismaDatamodelModel[] {
   const schema = readFileSync(
-    resolve(process.cwd(), "prisma/schema.prisma"),
+    resolve(
+      process.cwd(),
+      "../../packages/prisma-client/prisma/schema.prisma",
+    ),
     "utf8",
   );
   const models: PrismaDatamodelModel[] = [];

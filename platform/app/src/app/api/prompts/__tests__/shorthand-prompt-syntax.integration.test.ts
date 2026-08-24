@@ -11,7 +11,7 @@ import {
 import { prisma } from "~/server/db";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-import { FREE_PLAN } from "../../../../../ee/licensing/constants";
+import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { app } from "../[[...route]]/app";
 
 /**

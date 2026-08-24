@@ -1,0 +1,27 @@
+import type { PlanInfo } from "@langwatch/entitlements-contract";
+import type {
+  GenerateLicenseInput,
+  GenerateLicenseOutput,
+} from "./license.commands";
+import type {
+  LicenseStatus,
+  RemoveLicenseResult,
+  StoreLicenseResult,
+} from "./license";
+
+/** Application-facing capability supplied by the Enterprise license source. */
+export abstract class LicensingService {
+  abstract getActivePlan(organizationId: string): Promise<PlanInfo>;
+  abstract getSelfHostedPlan(organizationId: string): Promise<PlanInfo>;
+  abstract validateAndStoreLicense(
+    organizationId: string,
+    licenseKey: string,
+  ): Promise<StoreLicenseResult>;
+  abstract getLicenseStatus(organizationId: string): Promise<LicenseStatus>;
+  abstract removeLicense(organizationId: string): Promise<RemoveLicenseResult>;
+}
+
+/** Issuer-side capability; the private key is always supplied explicitly. */
+export abstract class LicenseGenerationCapability {
+  abstract generate(input: GenerateLicenseInput): GenerateLicenseOutput;
+}

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   Organization,
   PrismaClient,
-} from "../../../../src/generated/prisma/client";
+} from "@langwatch/prisma-client/generated";
 import { DemoOrgScope } from "../_lib/scopeGuard";
 import {
   formatReport,

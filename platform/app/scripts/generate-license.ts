@@ -42,8 +42,11 @@
  */
 
 import { prisma as defaultPrisma } from "~/server/db";
-import { generateLicenseKey } from "../ee/licensing/licenseGenerationService";
-import type { PrismaClient } from "../src/generated/prisma/client";
+import {
+  LicenseGenerationService,
+  NodeLicenseCryptographyAdapter,
+} from "@langwatch/enterprise-licensing-server";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 interface ApplyLicenseInput {
   prisma: PrismaClient;
@@ -86,7 +89,9 @@ export async function applyLicenseToOrg(
   const email = input.email ?? `${org.slug}@local.test`;
   const maxMembers = input.maxMembers ?? 50;
 
-  const { licenseKey, licenseData } = generateLicenseKey({
+  const { licenseKey, licenseData } = LicenseGenerationService.create(
+    NodeLicenseCryptographyAdapter.create(),
+  ).generate({
     organizationName: org.name,
     email,
     planType: input.planType,

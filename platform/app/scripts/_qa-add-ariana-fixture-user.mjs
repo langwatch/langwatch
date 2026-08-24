@@ -18,7 +18,7 @@
  *   node scripts/_qa-add-ariana-fixture-user.mjs
  */
 
-import { PrismaClient } from "../src/generated/prisma/client";
+import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createPrismaPgAdapter } from "../src/server/prismaPgAdapter";
 
 const prisma = new PrismaClient({

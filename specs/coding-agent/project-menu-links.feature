@@ -1,7 +1,7 @@
 # Project menu links for coding-agent activity
 #
 # Implementation:
-#   platform/app/prisma/schema.prisma                                                                              (Project.lastCodingAgentSessionAt / lastCodingAgentPullRequestAt)
+#   packages/prisma-client/prisma/schema.prisma                                                                    (Project.lastCodingAgentSessionAt / lastCodingAgentPullRequestAt)
 #   platform/app/src/server/app-layer/projects/project.service.ts                                                  (the throttled touch methods)
 #   platform/app/src/server/app-layer/projects/repositories/project.prisma.repository.ts                           (the staleness-guarded write)
 #   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSessionSeen.touch.ts (the fold-commit stamp)

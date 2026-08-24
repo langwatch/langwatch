@@ -21,49 +21,29 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-import {
-  ENTERPRISE_TEMPLATE,
-  LicenseHandler,
-  parseLicenseKey,
-  verifySignature,
-} from "../../../../../ee/licensing";
-import {
-  canonicalPemKey,
-  mangledPemPastes,
-} from "../../../../../ee/licensing/__tests__/fixtures/mangledPemPastes";
-import {
-  TEST_PRIVATE_KEY,
-  TEST_PUBLIC_KEY,
-} from "../../../../../ee/licensing/__tests__/fixtures/testKeys";
+import { ENTERPRISE_TEMPLATE } from "@langwatch/enterprise-licensing-contract";
 import {
   BASE_LICENSE,
   ENTERPRISE_LICENSE,
   ENTERPRISE_LICENSE_KEY,
   EXPIRED_LICENSE_KEY,
   GARBAGE_DATA,
+  NodeLicenseCryptographyAdapter,
+  TEST_PRIVATE_KEY,
+  TEST_PUBLIC_KEY,
   VALID_LICENSE_KEY,
-} from "../../../../../ee/licensing/__tests__/fixtures/testLicenses";
+  canonicalPemKey,
+  mangledPemPastes,
+} from "~/runtime/app/testing.licensing";
 import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import { prisma } from "../../../db";
-import { LicenseEnforcementRepository } from "../../../license-enforcement/license-enforcement.repository";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
 wireDefaultTestApp();
 
-// Mock getLicenseHandler to use test public key
-vi.mock("../../../subscriptionHandler", async (importOriginal) => {
-  const original =
-    await importOriginal<typeof import("../../../subscriptionHandler")>();
-  return {
-    ...original,
-    getLicenseHandler: () =>
-      new LicenseHandler({
-        prisma,
-        publicKey: TEST_PUBLIC_KEY,
-        repository: new LicenseEnforcementRepository(prisma),
-      }),
-  };
+const licenseCryptography = NodeLicenseCryptographyAdapter.create({
+  publicKey: TEST_PUBLIC_KEY,
 });
 
 describe("License Router Integration", () => {
@@ -432,10 +412,15 @@ describe("License Router Integration", () => {
     it("generates license that can be parsed and verified", async () => {
       const result = await adminCaller.license.generate(getValidInput());
 
-      const parsedLicense = parseLicenseKey(result.licenseKey);
+      const parsedLicense = licenseCryptography.parseLicenseKey(
+        result.licenseKey,
+      );
       expect(parsedLicense).not.toBeNull();
       if (parsedLicense) {
-        const isValid = verifySignature(parsedLicense, TEST_PUBLIC_KEY);
+        const isValid = licenseCryptography.verifySignature(
+          parsedLicense,
+          TEST_PUBLIC_KEY,
+        );
         expect(isValid).toBe(true);
       }
     });
@@ -443,7 +428,9 @@ describe("License Router Integration", () => {
     it("includes correct organization name and email in license", async () => {
       const result = await adminCaller.license.generate(getValidInput());
 
-      const parsedLicense = parseLicenseKey(result.licenseKey);
+      const parsedLicense = licenseCryptography.parseLicenseKey(
+        result.licenseKey,
+      );
       expect(parsedLicense?.data.organizationName).toBe("Test Corp");
       expect(parsedLicense?.data.email).toBe("admin@test.corp");
     });
@@ -451,7 +438,9 @@ describe("License Router Integration", () => {
     it("includes correct plan limits in license", async () => {
       const result = await adminCaller.license.generate(getValidInput());
 
-      const parsedLicense = parseLicenseKey(result.licenseKey);
+      const parsedLicense = licenseCryptography.parseLicenseKey(
+        result.licenseKey,
+      );
       expect(parsedLicense?.data.plan.maxMembers).toBe(10);
       expect(parsedLicense?.data.plan.maxMembersLite).toBe(5);
       expect(parsedLicense?.data.plan.maxMessagesPerMonth).toBe(100000);
@@ -461,8 +450,8 @@ describe("License Router Integration", () => {
       const result1 = await adminCaller.license.generate(getValidInput());
       const result2 = await adminCaller.license.generate(getValidInput());
 
-      const license1 = parseLicenseKey(result1.licenseKey);
-      const license2 = parseLicenseKey(result2.licenseKey);
+      const license1 = licenseCryptography.parseLicenseKey(result1.licenseKey);
+      const license2 = licenseCryptography.parseLicenseKey(result2.licenseKey);
 
       expect(license1?.data.licenseId).not.toBe(license2?.data.licenseId);
     });
@@ -473,7 +462,9 @@ describe("License Router Integration", () => {
         planType: "PRO",
       });
 
-      const parsedLicense = parseLicenseKey(result.licenseKey);
+      const parsedLicense = licenseCryptography.parseLicenseKey(
+        result.licenseKey,
+      );
       expect(parsedLicense?.data.plan.type).toBe("PRO");
       expect(parsedLicense?.data.plan.name).toBe("Pro");
     });
@@ -491,7 +482,9 @@ describe("License Router Integration", () => {
         },
       });
 
-      const parsedLicense = parseLicenseKey(result.licenseKey);
+      const parsedLicense = licenseCryptography.parseLicenseKey(
+        result.licenseKey,
+      );
       expect(parsedLicense?.data.plan.type).toBe("ENTERPRISE");
       expect(parsedLicense?.data.plan.name).toBe("Enterprise");
     });
@@ -506,9 +499,16 @@ describe("License Router Integration", () => {
             privateKey,
           });
 
-          const parsedLicense = parseLicenseKey(result.licenseKey);
+          const parsedLicense = licenseCryptography.parseLicenseKey(
+            result.licenseKey,
+          );
           expect(parsedLicense).not.toBeNull();
-          expect(verifySignature(parsedLicense!, TEST_PUBLIC_KEY)).toBe(true);
+          expect(
+            licenseCryptography.verifySignature(
+              parsedLicense!,
+              TEST_PUBLIC_KEY,
+            ),
+          ).toBe(true);
         });
       }
 
@@ -518,9 +518,13 @@ describe("License Router Integration", () => {
           privateKey: `${TEST_PUBLIC_KEY}${TEST_PRIVATE_KEY}`,
         });
 
-        const parsedLicense = parseLicenseKey(result.licenseKey);
+        const parsedLicense = licenseCryptography.parseLicenseKey(
+          result.licenseKey,
+        );
         expect(parsedLicense).not.toBeNull();
-        expect(verifySignature(parsedLicense!, TEST_PUBLIC_KEY)).toBe(true);
+        expect(
+          licenseCryptography.verifySignature(parsedLicense!, TEST_PUBLIC_KEY),
+        ).toBe(true);
       });
     });
 
@@ -578,7 +582,9 @@ describe("License Router Integration", () => {
     it("includes usageUnit in generated license", async () => {
       const result = await adminCaller.license.generate(getValidInput());
 
-      const parsedLicense = parseLicenseKey(result.licenseKey);
+      const parsedLicense = licenseCryptography.parseLicenseKey(
+        result.licenseKey,
+      );
       expect(parsedLicense?.data.plan.usageUnit).toBe("traces");
     });
 
@@ -590,7 +596,9 @@ describe("License Router Integration", () => {
 
       const result = await adminCaller.license.generate(input);
 
-      const parsedLicense = parseLicenseKey(result.licenseKey);
+      const parsedLicense = licenseCryptography.parseLicenseKey(
+        result.licenseKey,
+      );
       expect(parsedLicense?.data.plan.usageUnit).toBe("events");
     });
 

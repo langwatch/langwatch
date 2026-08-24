@@ -1,11 +1,15 @@
+import {
+  type CapabilityRegistry,
+  type FeatureDefinition,
+  FeatureRuntimeBuilder,
+  ResourceScope,
+} from "@langwatch/runtime-composition";
 import type { App } from "~/server/app-layer/app";
 import type { WorkerHandle } from "~/server/workers/startWorkers";
-import { buildFeatureRuntime, type FeatureDefinition } from "../shared/feature";
-import { ResourceScope } from "../shared/resource-scope";
 
 export type WorkerRuntime = {
   kind: "worker";
-  services: Awaited<ReturnType<typeof buildFeatureRuntime>>["registry"];
+  services: CapabilityRegistry;
   legacy: App;
   start(): Promise<void>;
   close(): Promise<void>;
@@ -24,12 +28,10 @@ export async function createWorker({
   resources?: ResourceScope;
   ownsResources?: boolean;
 }): Promise<WorkerRuntime> {
-  const built = await buildFeatureRuntime({
-    features,
+  const built = await FeatureRuntimeBuilder.create<Record<string, never>>({
     infrastructure: {},
-    target: "worker",
     resources,
-  });
+  }).build({ features, target: "worker" });
   const legacy = initializeLegacy();
   let handle: WorkerHandle | undefined;
   let closed = false;

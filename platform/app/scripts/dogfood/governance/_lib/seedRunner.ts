@@ -21,7 +21,7 @@
 import type {
   Organization,
   PrismaClient,
-} from "../../../../src/generated/prisma/client";
+} from "@langwatch/prisma-client/generated";
 import type { DemoOrgScope } from "./scopeGuard";
 
 export type SeedActionOutcome =

@@ -21,7 +21,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { FREE_PLAN } from "../../../../../ee/licensing/constants";
+import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import { globalForApp, resetApp } from "../../../app-layer/app";
 import { OrganizationService } from "../../../app-layer/organizations/organization.service";

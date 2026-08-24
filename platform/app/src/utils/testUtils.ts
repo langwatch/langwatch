@@ -10,7 +10,7 @@ import {
   type User,
 } from "~/generated/prisma/client";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
-import { ENTERPRISE_LICENSE_KEY } from "../../ee/licensing/__tests__/fixtures/testLicenses";
+import { ENTERPRISE_LICENSE_KEY } from "~/runtime/app/testing.licensing";
 import { prisma } from "../server/db";
 
 async function ignoreUniqueViolation<T>(

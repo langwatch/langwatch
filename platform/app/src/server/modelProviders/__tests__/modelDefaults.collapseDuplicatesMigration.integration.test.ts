@@ -30,7 +30,7 @@ import { prisma } from "../../db";
 
 const MIGRATION_FILE = join(
   process.cwd(),
-  "prisma/migrations/20260814120000_collapse_duplicate_model_default_scopes/migration.sql",
+  "../../packages/prisma-client/prisma/migrations/20260814120000_collapse_duplicate_model_default_scopes/migration.sql",
 );
 
 /** The replay seeds, collapses and asserts inside one transaction,

@@ -27,7 +27,7 @@ import {
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { TtlCache } from "~/server/utils/ttlCache";
-import { FREE_VISIBILITY_DAYS } from "../../../ee/licensing/constants";
+import { FREE_VISIBILITY_DAYS } from "@langwatch/enterprise-licensing-contract";
 import type { CategoryVisibility, Protections } from "../traces/protections";
 import { isDemoProject } from "./rbac";
 

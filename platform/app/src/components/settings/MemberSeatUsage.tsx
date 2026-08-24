@@ -1,6 +1,6 @@
 import { SimpleGrid } from "@chakra-ui/react";
 
-import type { PlanInfo } from "../../../ee/licensing/planInfo";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { LIMIT_TYPE_DISPLAY_LABELS } from "../../server/license-enforcement/constants";
 import { api } from "../../utils/api";
 import { ResourceLimitRow } from "../license/ResourceLimitRow";

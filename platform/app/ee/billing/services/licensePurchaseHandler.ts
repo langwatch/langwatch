@@ -2,7 +2,10 @@ import { createLogger } from "@langwatch/observability";
 import type Stripe from "stripe";
 import { getApp } from "../../../src/server/app-layer/app";
 import { sendLicenseEmail } from "../../../src/server/mailer/licenseEmail";
-import { generateLicenseKey } from "../../licensing/licenseGenerationService";
+import {
+  LicenseGenerationService,
+  NodeLicenseCryptographyAdapter,
+} from "@langwatch/enterprise-licensing-server";
 
 const logger = createLogger("langwatch:billing:licensePurchaseHandler");
 
@@ -30,7 +33,9 @@ export async function handleLicensePurchase({
   );
   const quantity = lineItems.data[0]?.quantity ?? 1;
 
-  const { licenseKey, licenseData } = generateLicenseKey({
+  const { licenseKey, licenseData } = LicenseGenerationService.create(
+    NodeLicenseCryptographyAdapter.create(),
+  ).generate({
     organizationName: businessName,
     email,
     planType: "GROWTH",

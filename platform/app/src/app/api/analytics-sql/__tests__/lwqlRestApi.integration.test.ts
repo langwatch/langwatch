@@ -69,7 +69,7 @@ import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPo
 import { prisma } from "~/server/db";
 import { getFeatureFlagStore } from "~/server/featureFlag";
 import { pinTimezone } from "~/test-utils/pinTimezone";
-import { FREE_PLAN } from "../../../../../ee/licensing/constants";
+import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { app } from "../[[...route]]/app";
 
 /** Rows seeded per tenant, per dataset. Small: this suite proves shape, not scale. */

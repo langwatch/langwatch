@@ -1,5 +1,5 @@
 import { PlanTypes } from "@ee/billing/planTypes";
-import type { PlanInfo } from "@ee/licensing/planInfo";
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
 import { createLogger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { env } from "~/env.mjs";

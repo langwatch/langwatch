@@ -34,7 +34,7 @@ on:
     # (tools/migrationorder/set.go). A PR that touches neither adds no
     # migration, so there is no ordering to judge.
     paths:
-      - "platform/app/prisma/migrations/**"
+      - "packages/prisma-client/prisma/migrations/**"
       - "platform/app/src/server/clickhouse/migrations/**"
       # The checker and its own gate: a change to either has to run against
       # the real migration sets, not just its unit tests.
