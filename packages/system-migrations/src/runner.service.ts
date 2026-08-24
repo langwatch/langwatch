@@ -77,6 +77,8 @@ export class SystemMigrationRunnerService {
       held: 0,
       parked: 0,
       skipped: 0,
+      alreadyFinalized: 0,
+      alreadyRolledBack: 0,
       claimed: 0,
     };
     if (this.deps.migrations.length === 0) return summary;
@@ -259,7 +261,8 @@ export class SystemMigrationRunnerService {
     // tenant on its legacy path. Re-running either would undo the
     // operator's decision on the very next boot.
     if (isTerminalTenantStatus(existing?.status)) {
-      summary.skipped += 1;
+      if (existing?.status === "rolled_back") summary.alreadyRolledBack += 1;
+      else summary.alreadyFinalized += 1;
       return;
     }
 
