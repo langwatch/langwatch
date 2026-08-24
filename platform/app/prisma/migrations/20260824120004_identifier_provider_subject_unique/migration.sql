@@ -29,6 +29,14 @@
 --     re-linking a provider account a customer previously unlinked is
 --     ordinary. Without the state filter the tombstone would block it.
 --
+-- The three literals ARE `LIVE_IDENTIFIER_STATES`
+-- (packages/identity/src/vocabulary.ts), which every repository `IN` clause
+-- and `isLiveIdentifierState` read from. This file cannot import it - a
+-- migration is immutable history - so the copy here does not follow a change
+-- made there. Adding a live state therefore takes a NEW migration that drops
+-- and recreates this index with the new state in its predicate, or rows in
+-- that state fall outside the guarantee. The constant carries the same note.
+--
 -- FORWARD CONSTRAINT, load-bearing, and the reason this comment is long: the
 -- real invariant is that a subject is unique PER CONNECTION. `providerId`
 -- stands in for the connection today only because there is exactly one
