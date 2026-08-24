@@ -36,15 +36,6 @@ const mockGetRunConfigByIds = vi.fn<
     parameters: null,
   })),
 );
-vi.mock("~/server/scenarios/scenario.service", () => ({
-  ScenarioService: {
-    create: vi.fn().mockReturnValue({
-      getRunConfigByIds: (params: { ids: string[]; projectId: string }) =>
-        mockGetRunConfigByIds(params),
-    }),
-  },
-}));
-
 const mockQueueRun = vi.fn().mockResolvedValue(undefined);
 vi.mock("~/server/app-layer/app", async () => {
   const { appPermissionsService } = await import(
@@ -57,6 +48,10 @@ vi.mock("~/server/app-layer/app", async () => {
       permissions: appPermissionsService(),
       simulations: {
         queueRun: (...args: unknown[]) => mockQueueRun(...args),
+      },
+      scenarios: {
+        getRunConfigByIds: (params: { ids: string[]; projectId: string }) =>
+          mockGetRunConfigByIds(params),
       },
     }),
   };

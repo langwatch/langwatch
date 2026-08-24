@@ -1,7 +1,12 @@
-export {
-  SimulationVerdict as Verdict,
-  SimulationRunStatus as ScenarioRunStatus,
+import {
+  SimulationRunStatus,
+  SimulationVerdict,
 } from "@langwatch/simulation-contract";
+
+export const ScenarioRunStatus = SimulationRunStatus;
+export type ScenarioRunStatus = SimulationRunStatus;
+export const Verdict = SimulationVerdict;
+export type Verdict = SimulationVerdict;
 
 // Scenario event type enum
 export enum ScenarioEventType {

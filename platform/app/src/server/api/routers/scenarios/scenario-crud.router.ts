@@ -64,10 +64,8 @@ export const scenarioCrudRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      void ctx.prisma.scenario
-        .count({
-          where: { projectId: input.projectId, archivedAt: null },
-        })
+      void ctx.app.scenarios
+        .count({ projectId: input.projectId })
         .then((count) => {
           fireScenarioCreatedNurturing({
             userId: ctx.session.user.id,

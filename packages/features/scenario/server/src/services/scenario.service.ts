@@ -59,6 +59,12 @@ export class ScenarioService extends ScenarioServiceContract {
     );
   }
 
+  count(input: { projectId: string }): Promise<number> {
+    return this.options.repository.count(
+      scenarioIdInputSchema.pick({ projectId: true }).parse(input),
+    );
+  }
+
   update(input: ScenarioUpdateInput): Promise<Scenario> {
     return this.options.repository.update(scenarioUpdateInputSchema.parse(input));
   }

@@ -17,6 +17,7 @@ export abstract class ScenarioRepository {
     projectId: string;
   }): Promise<Scenario | null>;
   abstract findAll(input: { projectId: string }): Promise<Scenario[]>;
+  abstract count(input: { projectId: string }): Promise<number>;
   abstract update(input: ScenarioUpdateInput): Promise<Scenario>;
   abstract tryArchive(input: {
     id: string;

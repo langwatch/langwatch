@@ -111,7 +111,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         "Fetching scenario sets data",
       );
       const dates = resolveDateRange(input);
-      return ctx.app.simulations.runs.getScenarioSetsData({
+      return ctx.app.simulations.getScenarioSetsData({
         projectId: input.projectId,
         ...dates,
       });
@@ -142,7 +142,7 @@ export const scenarioEventsRouter = createTRPCRouter({
       );
       const dates = resolveDateRange(input);
       return fetchSuiteRunData({
-        simulations: ctx.app.simulations.runs,
+        simulations: ctx.app.simulations,
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
         limit: input.limit,
@@ -165,7 +165,7 @@ export const scenarioEventsRouter = createTRPCRouter({
     .permission("scenarios:view")
     .query(async ({ input, ctx }) => {
       const dates = resolveDateRange(input);
-      const lastUpdatedAt = await ctx.app.simulations.runs.getLastUpdatedAt({
+      const lastUpdatedAt = await ctx.app.simulations.getLastUpdatedAt({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
         ...dates,
@@ -196,7 +196,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         "Fetching scenario set run data",
       );
       const dates = resolveDateRange(input);
-      const data = await ctx.app.simulations.runs.getRunDataForScenarioSet({
+      const data = await ctx.app.simulations.getRunDataForScenarioSet({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
         limit: input.limit,
@@ -223,7 +223,7 @@ export const scenarioEventsRouter = createTRPCRouter({
       );
       const dates = resolveDateRange(input);
       const result = await fetchSuiteRunData({
-        simulations: ctx.app.simulations.runs,
+        simulations: ctx.app.simulations,
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
         limit: 100,
@@ -247,7 +247,7 @@ export const scenarioEventsRouter = createTRPCRouter({
       );
       // Point lookup by unique run id — no date window, so runs older than any
       // default range stay reachable.
-      const data = await ctx.app.simulations.runs.getScenarioRunData({
+      const data = await ctx.app.simulations.tryGetScenarioRunData({
         projectId: input.projectId,
         scenarioRunId: input.scenarioRunId,
       });
@@ -275,7 +275,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         "Fetching batch run count",
       );
       const dates = resolveDateRange(input);
-      const count = await ctx.app.simulations.runs.getBatchRunCountForScenarioSet({
+      const count = await ctx.app.simulations.getBatchRunCountForScenarioSet({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
         ...dates,
@@ -305,7 +305,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         "Fetching scenario set batch history",
       );
       const dates = resolveDateRange(input);
-      return ctx.app.simulations.runs.getBatchHistoryForScenarioSet({
+      return ctx.app.simulations.getBatchHistoryForScenarioSet({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
         limit: input.limit,
@@ -336,7 +336,7 @@ export const scenarioEventsRouter = createTRPCRouter({
       );
       // Point lookup by batch run id — no date window, so old batches stay
       // reachable when opened directly.
-      const result = await ctx.app.simulations.runs.getRunDataForBatchRun({
+      const result = await ctx.app.simulations.getRunDataForBatchRun({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
         batchRunId: input.batchRunId,
@@ -355,7 +355,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         "Fetching external set summaries",
       );
       const dates = resolveDateRange(input);
-      return ctx.app.simulations.runs.getExternalSetSummaries({
+      return ctx.app.simulations.getExternalSetSummaries({
         projectId: input.projectId,
         ...dates,
       });
@@ -384,7 +384,7 @@ export const scenarioEventsRouter = createTRPCRouter({
         "Fetching all suite run data",
       );
       const dates = resolveDateRange(input);
-      return ctx.app.simulations.runs.getRunDataForAllSuites({
+      return ctx.app.simulations.getRunDataForAllSuites({
         projectId: input.projectId,
         limit: input.limit,
         cursor: input.cursor,

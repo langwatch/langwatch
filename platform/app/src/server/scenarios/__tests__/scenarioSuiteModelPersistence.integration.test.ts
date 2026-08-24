@@ -12,11 +12,11 @@
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { PrismaScenarioAdapter } from "@langwatch/scenario-server";
 
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { prisma } from "../../db";
 import { SuiteRepository } from "../../suites/suite.repository";
-import { ScenarioService } from "../scenario.service";
 
 describe("Scenario / run-plan model persistence (real DB)", () => {
   const ns = `sim-models-${nanoid(8)}`;
@@ -64,7 +64,10 @@ describe("Scenario / run-plan model persistence (real DB)", () => {
     describe("when it is updated with a simulator and judge model", () => {
       /** @scenario "Simulator and judge models are persisted on the scenario" */
       it("stores both model selections", async () => {
-        const service = ScenarioService.create(prisma);
+        const service = PrismaScenarioAdapter.create({
+          prisma,
+          generateId: () => `scenario_${nanoid()}`,
+        });
         const created = await service.create({
           projectId,
           name: `Scenario ${ns}`,

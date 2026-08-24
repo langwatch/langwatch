@@ -38,8 +38,8 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { useRunScenario } from "../../hooks/useRunScenario";
 import { useScenarioTarget } from "../../hooks/useScenarioTarget";
 import type { CustomComponentConfig } from "../../optimization_studio/types/dsl";
-import type { AgentWithFields as TypedAgent } from "@langwatch/agents-contract";
-import { parseScenarioParameterDefinitions } from "../../server/scenarios/parameters";
+import type { AgentWithFields as TypedAgent } from "@langwatch/agent-contract";
+import { parseScenarioParameterDefinitions } from "@langwatch/scenario-contract";
 import { api } from "../../utils/api";
 import { KSUID_RESOURCES } from "../../utils/constants";
 import { AgentTypeSelectorDrawer } from "../agents/AgentTypeSelectorDrawer";
@@ -286,7 +286,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           projectId,
           id: scenarioId,
           ...data,
-          ...(models ?? {}),
+          ...models,
         });
       } catch {
         // Error toast already surfaced by updateMutation.onError; return null
@@ -313,7 +313,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         const result = await createMutation.mutateAsync({
           projectId,
           ...data,
-          ...(models ?? {}),
+          ...models,
         });
         // Transition to edit mode to prevent double-create on subsequent saves.
         // Skip when the drawer is about to close (save-without-running).

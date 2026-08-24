@@ -11,10 +11,10 @@
  */
 
 import { describe, expect, it } from "vitest";
+import type { ScenarioRunConfig } from "@langwatch/scenario-contract";
 
 import type { RunParameterValues } from "../parameters";
 import { resolveRunParameters } from "../resolve-run-parameters";
-import type { ScenarioRunConfig } from "../scenario.repository";
 
 const SECRET_VALUE = "tok-live-abc123";
 

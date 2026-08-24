@@ -34,10 +34,10 @@ const cancelBatchRunSchema = projectSchema.extend({
 function createGetRunsForBatch(
   app: Pick<App, "simulations">,
 ): CancellationServiceDeps["getRunsForBatch"] {
-  const simulationRuns = app.simulations.runs;
+  const simulations = app.simulations;
 
   return async (params) => {
-    const result = await simulationRuns.getRunDataForBatchRun(params);
+    const result = await simulations.getRunDataForBatchRun(params);
     return result.changed ? result.runs : [];
   };
 }

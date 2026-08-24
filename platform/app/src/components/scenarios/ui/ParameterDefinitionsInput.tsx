@@ -2,7 +2,7 @@ import { Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { Plus, X } from "lucide-react";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
-import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
+import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import {
   displayOptionalValue,
   serializeOptionalScalarValue,

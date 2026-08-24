@@ -1,6 +1,7 @@
 import {
   runParameterValuesSchema,
   scenarioParameterDefinitionsSchema,
+  scenarioSchema,
 } from "../src";
 import { describe, expect, it } from "vitest";
 
@@ -19,5 +20,41 @@ describe("Scenario contract", () => {
     );
 
     expect(parsed.success).toBe(false);
+  });
+
+  it("keeps model selections and declared parameter JSON in the scenario contract", () => {
+    const parsed = scenarioSchema.parse({
+      id: "scenario_1",
+      projectId: "project_1",
+      name: "Refund flow",
+      situation: "A {{ params.region }} customer asks for a refund",
+      criteria: ["Answers the question"],
+      labels: [],
+      parameters: [
+        {
+          name: "region",
+          description: "The billing region",
+          defaultValue: "eu-central",
+        },
+      ],
+      simulatorModel: "openai/gpt-5-mini",
+      judgeModel: "openai/gpt-5-nano",
+      maxTurns: 5,
+      minTurns: 1,
+      lastUpdatedById: null,
+      archivedAt: null,
+      createdAt: new Date(0),
+      updatedAt: new Date(1),
+    });
+
+    expect(parsed.parameters).toEqual([
+      {
+        name: "region",
+        description: "The billing region",
+        defaultValue: "eu-central",
+      },
+    ]);
+    expect(parsed.simulatorModel).toBe("openai/gpt-5-mini");
+    expect(parsed.judgeModel).toBe("openai/gpt-5-nano");
   });
 });

@@ -56,6 +56,12 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     return rows.map((row) => scenarioSchema.parse(row));
   }
 
+  count(input: { projectId: string }): Promise<number> {
+    return this.prisma.scenario.count({
+      where: { projectId: input.projectId, archivedAt: null },
+    });
+  }
+
   async update(input: ScenarioUpdateInput): Promise<Scenario> {
     const { id, projectId, ...data } = input;
     return scenarioSchema.parse(

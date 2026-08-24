@@ -1,8 +1,3 @@
-/**
- * Custom error types for scenario domain.
- * These are framework-agnostic and can be mapped to tRPC/HTTP errors in the router layer.
- */
-
 import {
   HandledError,
   type HandledErrorOptions,
@@ -11,13 +6,6 @@ import {
 import type { AppErrorCode } from "~/features/errors/logic/codes";
 import { remediation } from "~/server/app-layer/error-remediation";
 import type { ScenarioContentField } from "./execution/scenario-content-template";
-
-export class ScenarioNotFoundError extends Error {
-  constructor(message = "Scenario not found") {
-    super(message);
-    this.name = "ScenarioNotFoundError";
-  }
-}
 
 /**
  * A run's target agent points at a `langwatch agent dev` tunnel that no
