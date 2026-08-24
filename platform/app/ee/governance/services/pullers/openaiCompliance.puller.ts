@@ -20,7 +20,7 @@
  *     "cost": { "usd": F }
  *   }
  *
- * Spec: specs/ai-governance/puller-framework/copilot-studio-reference.feature
+ * Spec: specs/ai-governance/puller-framework/microsoft-365-audit.feature
  *       (same lock-the-shape pattern; openai/claude follow as ⏳ rows)
  */
 

@@ -16,7 +16,7 @@
  *   anthropic-version: 2023-06-01
  *   Response: { data: [...events...], next_cursor: string | null }
  *
- * Spec: specs/ai-governance/puller-framework/copilot-studio-reference.feature
+ * Spec: specs/ai-governance/puller-framework/microsoft-365-audit.feature
  *       (same lock-the-shape pattern; openai/claude follow as ⏳ rows)
  */
 import {
