@@ -21,6 +21,7 @@ import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { AgentTestingHeader } from "./AgentTestingHeader";
+import { ResultsTab } from "./results/ResultsTab";
 import { useAgentTestingRouting } from "./useAgentTestingRouting";
 import { useAgentTestingStore } from "./useAgentTestingStore";
 
@@ -47,8 +48,9 @@ export function AgentTestingPage() {
   }, [router.isReady, viewParam, hydrateFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The same query keys the v1 page refreshes, so a person moving between the
-  // two interfaces never reads a stale list.
-  useSimulationUpdateListener({
+  // two interfaces never reads a stale list. The connection state travels to
+  // the results, where it decides whether the fallback polling runs at all.
+  const { isConnected: sseConnected } = useSimulationUpdateListener({
     projectId: project?.id ?? "",
     refetch: () => {
       void utils.suites.getSummaries.invalidate();
@@ -85,7 +87,11 @@ export function AgentTestingPage() {
           />
 
           <Box flex={1} width="full" minHeight={0} overflow="hidden">
-            {routing.tab === "cases" ? <TestCasesShell /> : <ResultsShell />}
+            {routing.tab === "cases" ? (
+              <TestCasesShell />
+            ) : (
+              <ResultsTab sseConnected={sseConnected} />
+            )}
           </Box>
         </VStack>
 
@@ -127,20 +133,6 @@ function TestCasesShell() {
         <PlaceholderNote>The test cases land here.</PlaceholderNote>
       </Box>
     </HStack>
-  );
-}
-
-/** The frame of the Results tab: the run plans and the runs of one plan. */
-function ResultsShell() {
-  return (
-    <Box
-      width="full"
-      height="full"
-      padding={4}
-      data-testid="agent-testing-results-tab"
-    >
-      <PlaceholderNote>The results land here.</PlaceholderNote>
-    </Box>
   );
 }
 
