@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { describe, expect, it, vi } from "vitest";
-import { runDeliverGovernance } from "../process-manager/governanceEventsDelivery.process";
+import { AppGovernanceEventsDeliveryRuntime } from "../process-manager/governanceEventsDelivery.process";
 
 function harness(endpoints: Array<{ id: string; enabledEvents: string[] }>) {
   const commits: unknown[] = [];
@@ -41,7 +41,7 @@ describe("governance delivery fan-out", () => {
       { id: "ep_lifecycle", enabledEvents: ["gateway.virtual_key.disabled"] },
       { id: "ep_family", enabledEvents: ["gateway.*"] },
     ]);
-    await runDeliverGovernance(deps)(
+    await AppGovernanceEventsDeliveryRuntime.create(deps).deliver(
       {
         organization_id: "org_1",
         project_id: "proj_1",

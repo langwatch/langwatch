@@ -1,6 +1,6 @@
 import {
+  AppGovernanceEventsDeliveryRuntime,
   GOVERNANCE_EVENTS_PROCESS_NAME,
-  governanceEventsDeliveryPM,
 } from "@ee/governance/process-manager/governanceEventsDelivery.process";
 import type { WebhookDeliveryProcessDeps } from "~/runtime/app/features/webhooks";
 import {
@@ -47,7 +47,9 @@ export function createGovernanceEventsPipeline(
   if (deps.webhookDelivery) {
     pipeline = pipeline.withProcessManager(
       GOVERNANCE_EVENTS_PROCESS_NAME,
-      governanceEventsDeliveryPM(deps.webhookDelivery),
+      AppGovernanceEventsDeliveryRuntime.create(
+        deps.webhookDelivery,
+      ).processManager(),
     );
   }
   return pipeline.build();

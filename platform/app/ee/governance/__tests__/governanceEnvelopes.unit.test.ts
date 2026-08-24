@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { describe, expect, it } from "vitest";
+import { GovernanceEventsDeliveryProcessService } from "@langwatch/enterprise-governance-server";
 import {
   RecordBudgetCrossingCommand,
   RecordVkLifecycleCommand,
@@ -9,10 +10,11 @@ import {
   anchoredPeriodStart,
   nextAnchoredResetAt,
 } from "~/server/gateway/budgetWindow";
-import {
-  budgetCrossingToEnvelope,
-  vkLifecycleToEnvelope,
-} from "../webhooks/governanceEnvelopes";
+
+const budgetCrossingToEnvelope =
+  GovernanceEventsDeliveryProcessService.budgetCrossingEnvelope;
+const vkLifecycleToEnvelope =
+  GovernanceEventsDeliveryProcessService.vkLifecycleEnvelope;
 
 const lifecycle = (
   action: "created" | "rotated" | "disabled" | "enabled" | "revoked",
