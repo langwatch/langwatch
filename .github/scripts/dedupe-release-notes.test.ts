@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { describe, it } from "node:test";
 
 import {
@@ -156,15 +157,17 @@ describe("subjectPullRequestsFor", () => {
   /** @scenario "An unavailable commit subject does not stop generated release notes" */
   it("skips an unavailable commit subject", () => {
     const missingCommit = sha("0");
+    const existingCommit = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
     const warnings: string[] = [];
 
     const result = subjectPullRequestsFor({
-      commitShas: [missingCommit],
+      commitShas: [missingCommit, existingCommit],
       cwd: process.cwd(),
       warn: (message) => warnings.push(message),
     });
 
-    assert.deepEqual(result, { [missingCommit]: undefined });
+    assert.equal(result[missingCommit], undefined);
+    assert.ok(Object.hasOwn(result, existingCommit));
     assert.match(warnings[0]!, new RegExp(missingCommit));
   });
 });
