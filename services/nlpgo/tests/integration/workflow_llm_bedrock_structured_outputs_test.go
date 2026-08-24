@@ -65,6 +65,7 @@ func setupStackWithLLM_bedrockStructured(t *testing.T) *stack {
 	return &stack{url: srv.URL, upstream: upstream, upstreamURL: upstream.URL}
 }
 
+// @scenario bedrock + anthropic response_format rewrites to forced tool_use
 func TestSync_RealWorkflowEndToEnd_BedrockStructuredOutputs(t *testing.T) {
 	accessKey := os.Getenv("AWS_ACCESS_KEY_ID")
 	secretKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
