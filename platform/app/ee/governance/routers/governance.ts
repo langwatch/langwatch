@@ -20,9 +20,9 @@ import { AdminWorkspaceViewAuditService } from "@ee/governance/services/adminWor
 import { GovernanceOcsfExportService } from "@ee/governance/services/governanceOcsfExport.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import {
+  PersonaHomeResolverService,
   type PersonaResolution,
-  resolvePersonaHomeSafe,
-} from "@ee/governance/services/personaResolver.service";
+} from "@langwatch/enterprise-governance-contract";
 import {
   QUARANTINE_DEFAULT_THRESHOLD,
   QUARANTINE_DEFAULT_WINDOW_SECONDS,
@@ -169,7 +169,7 @@ export const governanceRouter = createTRPCRouter({
         firstProjectSlug = orgWideProject?.slug ?? null;
       }
 
-      return resolvePersonaHomeSafe({
+      return PersonaHomeResolverService.create().resolveSafe({
         organizationIntent,
         userLastHomePath: userPin?.lastHomePath ?? null,
         setupState: {

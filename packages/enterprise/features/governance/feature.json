@@ -11,6 +11,7 @@
     "ingestion-pull",
     "ingestion-source",
     "ottl",
+    "persona-home",
     "platform-tool-policy",
     "pull-destination",
     "pulled-usage",

@@ -11,6 +11,7 @@ export * from "./ingestion-source";
 export * from "./ingestion-pull.commands";
 export * from "./ingestion-pull.events";
 export * from "./ottl";
+export * from "./persona-home";
 export * from "./platform-tool-policy";
 export * from "./puller";
 export * from "./pulled-usage.commands";

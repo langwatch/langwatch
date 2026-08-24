@@ -32,6 +32,12 @@ Feature: Enterprise governance package boundary
     Then the result is an exact integer nano-USD value
     And values outside the safe JSON integer range are rejected
 
+  Scenario: Governance owns its persona-home decision
+    Given the application has loaded organization intent and governance setup state
+    When the portable persona-home policy resolves the user's destination
+    Then governance chooses between the governance and project homes
+    And the application remains responsible for authentication and redirect transport
+
   Scenario: Contracts are transport independent
     Given a browser imports the governance contract root
     Then no server, Eventing, application, environment, or generated database module loads

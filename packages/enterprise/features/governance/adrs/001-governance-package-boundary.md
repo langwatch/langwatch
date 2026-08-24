@@ -18,7 +18,10 @@ vertical could be composed.
 Create portable governance contracts and separate server and web packages.
 Governance owns ingestion and normalisation, organisational attribution,
 governance policy and enforcement, governance anomalies and audit facts, and
-the operator surfaces that expose those decisions. The ingestion-pull and
+the operator surfaces that expose those decisions. It also owns the pure
+persona-home policy that chooses between Governance and project homes from
+organisation intent and Governance setup state; the application still owns
+authentication, signal loading and the redirect transport. The ingestion-pull and
 pulled-usage workflows therefore belong to governance rather than to a generic
 Enterprise event-sourcing directory.
 

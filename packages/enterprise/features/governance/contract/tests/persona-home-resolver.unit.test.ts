@@ -1,7 +1,7 @@
 /**
- * Unit tests for the pure-function persona resolver.
+ * Unit tests for the pure persona resolver.
  *
- * The resolver is a small pure function; integration semantics (Prisma
+ * The resolver is a small pure class; integration semantics (Prisma
  * + tRPC + getUsageStats) are exercised via the
  * personaResolver.tRPC.integration.test.ts companion. These unit tests
  * fix the matrix of input combinations to outputs without DB.
@@ -11,10 +11,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  PersonaHomeResolverService,
   type PersonaResolverInput,
-  resolvePersonaHome,
-  resolvePersonaHomeSafe,
-} from "../personaResolver.service";
+} from "../src/persona-home";
+
+const personaHomes = PersonaHomeResolverService.create();
+const resolvePersonaHome = personaHomes.resolve.bind(personaHomes);
+const resolvePersonaHomeSafe = personaHomes.resolveSafe.bind(personaHomes);
 
 const baseInput: PersonaResolverInput = {
   // ADR-038 I1: null = legacy org. Every pre-existing case below must pass

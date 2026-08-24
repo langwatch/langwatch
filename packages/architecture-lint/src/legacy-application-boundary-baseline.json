@@ -617,7 +617,7 @@
       "platform/app/ee/governance/routers/aiTools.ts": ["@ee/governance/services/aiToolEntry.service"],
       "platform/app/ee/governance/routers/anomalyRules.ts": ["@ee/governance/services/activity-monitor/anomalyRule.service"],
       "platform/app/ee/governance/routers/departments.ts": ["@ee/governance/services/department/department.service"],
-      "platform/app/ee/governance/routers/governance.ts": ["@ee/governance/services/adminWorkspaceViewAudit.service","@ee/governance/services/governanceOcsfExport.service","@ee/governance/services/personaResolver.service","@ee/governance/services/personalWorkspace.service","@ee/governance/services/quarantineFillEvaluator.service","@ee/governance/services/setupState.service"],
+      "platform/app/ee/governance/routers/governance.ts": ["@ee/governance/services/adminWorkspaceViewAudit.service","@ee/governance/services/governanceOcsfExport.service","@ee/governance/services/personalWorkspace.service","@ee/governance/services/quarantineFillEvaluator.service","@ee/governance/services/setupState.service"],
       "platform/app/ee/governance/routers/ingestionKey.ts": ["@ee/governance/services/ingestionKey.service"],
       "platform/app/ee/governance/routers/ingestionSources.ts": ["@ee/governance/services/activity-monitor/ingestionSource.service","@ee/governance/services/activity-monitor/ottlGatewayClient"],
       "platform/app/ee/governance/routers/ingestionTemplates.ts": ["@ee/governance/services/ingestionTemplate.service"],
