@@ -44,7 +44,7 @@ Feature: Feature package boundary lint
 
   @unit @architecture
   Scenario: Governed packages use one schema runtime
-    Given a feature contract declares Zod 3 or feature source imports zod/v3 or a Hono-specific Zod adapter
+    Given a governed feature package declares Zod 3 or its source imports zod/v3 or a Hono-specific Zod adapter
     When architecture lint checks the package
     Then it rejects the import
     And directs the feature to Zod 4 through Standard Schema

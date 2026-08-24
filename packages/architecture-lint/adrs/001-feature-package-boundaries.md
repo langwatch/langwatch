@@ -156,11 +156,12 @@ fails the gate.
 The same declaration scan prevents an apparently portable contract or web
 package from re-exporting a forbidden type indirectly.
 
-Governed feature contracts use Zod 4 through `zod`. The manifest check rejects
-older Zod majors, while the source rule rejects `zod/v3`,
-`@hono/zod-validator` and `hono-openapi/zod`; REST adapters
-consume contract schemas through Standard Schema instead of coupling a feature
-to a Hono-specific schema adapter.
+Governed feature contracts use Zod 4 through `zod`, and any other governed
+feature package that declares Zod uses the same major. The manifest check
+rejects older Zod majors, while the source rule rejects `zod/v3`,
+`@hono/zod-validator` and `hono-openapi/zod`. REST adapters consume contract
+schemas through Standard Schema instead of coupling a feature to a
+Hono-specific schema adapter.
 
 ### Failures are actionable and adoption is strict
 

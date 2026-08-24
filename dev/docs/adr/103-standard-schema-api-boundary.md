@@ -32,8 +32,9 @@ contract is using Zod 4.
 ## Decision
 
 Governed feature contract packages author schemas with Zod 4, import it only
-from `zod`, and infer their transport-safe types from those schemas. They do not
-import `zod/v3`.
+from `zod`, and infer their transport-safe types from those schemas. Any other
+governed feature package that needs Zod also uses the same Zod 4 runtime. No
+feature source imports `zod/v3`.
 
 `@langwatch/api` exposes `ApiSchema` as a Standard Schema capability. Its
 builders, validators, response validation, SSE events, discovery catalogue and
@@ -57,8 +58,9 @@ objects. A transport may add documentation metadata, but it may not maintain a
 second validation schema.
 
 Architecture lint requires a Zod 4 manifest range in every governed contract
-and rejects `zod/v3`, `@hono/zod-validator`, and `hono-openapi/zod` throughout
-feature source.
+and in every other governed feature package that declares Zod. It rejects
+`zod/v3`, `@hono/zod-validator`, and `hono-openapi/zod` throughout feature
+source.
 
 ## Alternatives considered
 
@@ -71,8 +73,8 @@ it would put transport details back into feature-facing code.
 
 ## Consequences
 
-- Every governed feature contract has one Zod 4 schema and inferred type
-  source.
+- Every governed feature uses Zod 4 wherever it owns schemas, with contracts as
+  the inferred type source for portable values.
 - RPC, REST validation, SSE, discovery and OpenAPI consume Standard Schema.
 - Existing Zod 3 application routes continue to compile during migration.
 - Feature packages contain no Zod-major compatibility code.
