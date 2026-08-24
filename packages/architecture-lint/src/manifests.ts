@@ -115,11 +115,11 @@ export function lintManifests(
         !isZod4Range(zodVersion)
       ) {
         violations.push({
-          policy: "schema-runtime",
+          policy: "retired-package-runtime",
           file: pkg.manifestPath,
           specifier: "zod",
-          message: `Governed feature packages must use Zod 4; found ${JSON.stringify(zodVersion)}.`,
-          allowed: 'Declare "zod": "^4.4.3" and import schemas from "zod".',
+          message: `Feature packages cannot use the retired Zod runtime; found ${JSON.stringify(zodVersion)}.`,
+          allowed: 'Declare the repository Zod 4 range and import schemas from "zod".',
         });
       }
     }

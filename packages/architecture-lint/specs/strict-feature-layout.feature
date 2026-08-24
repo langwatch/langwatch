@@ -21,7 +21,7 @@ Feature: Strict versioned feature source layout
   @unit @architecture
   Scenario: Server artifacts have canonical homes and names
     Given a layout-version-0 server source file
-    When it represents a service, repository, store, projection, port, adapter, API, or migration
+    When it represents a service, repository, store, projection, subscriber, process, intent, port, adapter, API, or migration
     Then it is beneath the matching canonical directory
     And its filename follows the version-0 dot-separated grammar
     And an unknown top-level source directory is rejected
@@ -41,12 +41,41 @@ Feature: Strict versioned feature source layout
     And concrete runtime classes expose static create
     And standalone factories do not replace the class
 
+  @unit @architecture @eventing
+  Scenario: Eventing roles remain mechanically distinct
+    Given a layout-version-0 feature uses Eventing
+    When architecture lint checks its projection, subscriber, process, and intent source
+    Then projection and process evolution contain no async, network, timer, or dynamic import work
+    And external process work lives in a retry-safe intent executor
+    And no role fabricates or appends durable events directly
+    And every subscriber has a named redelivery contract test
+
+  @unit @architecture
+  Scenario: A capability communicates absence through its name
+    Given a service, port, repository, or store method can miss a value
+    When architecture lint checks its result contract
+    Then an ordinary method returns a value or throws its domain error
+    And only a try-prefixed method exposes null or undefined
+    And require-prefixed methods are rejected
+    And every class method declares an explicit result type
+    And private repositories follow the same rule as public services
+    And optional method pairs are not added without a concrete caller
+
   @unit @architecture
   Scenario: Internal server dependencies point toward the service contract
     Given a layout-version-0 server package
     When an API imports persistence or a service imports API, migration, or a concrete adapter
     Then Oxlint reports a feature-layer violation
     And the diagnostic identifies the allowed dependency direction
+
+  @unit @architecture
+  Scenario: API handlers use the composed request context
+    Given a layout-version-0 API class handles a request
+    When Oxlint checks its source
+    Then a service, actor, or tenant resolver callback receiving context is rejected
+    And casting the context or constructing a service or repository is rejected
+    And awaiting a resolver before awaiting the service operation is rejected
+    And direct context.app, context.actor(), and context.authorize() delegation is accepted
 
   @integration @architecture
   Scenario: Layout evolution is explicit

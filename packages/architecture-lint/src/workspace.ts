@@ -1,10 +1,12 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { readFeatureCatalogue } from "./feature-catalogue";
 import type {
   ApplicationPackageRole,
   ArchitectureViolation,
   ClassifiedPackage,
   EnterpriseCompositionRole,
+  FeatureCatalogueEntry,
   FeatureLayoutVersion,
   FeaturePackageRole,
   PackageManifest,
@@ -45,7 +47,6 @@ function readFeatureConfiguration(
   violations: ArchitectureViolation[],
 ): {
   layoutVersion: FeatureLayoutVersion | undefined;
-  subjects: readonly string[] | undefined;
 } {
   const path = join(featureRoot, "feature.json");
   if (!existsSync(path)) {
@@ -56,7 +57,7 @@ function readFeatureConfiguration(
         "Feature ownership roots must declare a layoutVersion in feature.json.",
       allowed: "Use layoutVersion 0, the initial strict feature layout.",
     });
-    return { layoutVersion: undefined, subjects: undefined };
+    return { layoutVersion: undefined };
   }
 
   let value: unknown;
@@ -68,7 +69,7 @@ function readFeatureConfiguration(
       file: path,
       message: `feature.json must be valid JSON: ${error instanceof Error ? error.message : String(error)}`,
     });
-    return { layoutVersion: undefined, subjects: undefined };
+    return { layoutVersion: undefined };
   }
 
   const layoutVersion =
@@ -82,41 +83,19 @@ function readFeatureConfiguration(
       message: `Unsupported feature layoutVersion ${JSON.stringify(layoutVersion)}.`,
       allowed: "The only supported version is 0, the initial strict layout.",
     });
-    return { layoutVersion: undefined, subjects: undefined };
+    return { layoutVersion: undefined };
   }
 
-  const subjectsValue =
-    typeof value === "object" && value !== null && "subjects" in value
-      ? (value as { subjects?: unknown }).subjects
-      : undefined;
-  let subjects: readonly string[] | undefined;
-  if (subjectsValue !== undefined) {
-    const valid =
-      Array.isArray(subjectsValue) &&
-      subjectsValue.length > 0 &&
-      subjectsValue.every(
-        (subject) =>
-          typeof subject === "string" &&
-          /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(subject),
-      ) &&
-      new Set(subjectsValue).size === subjectsValue.length &&
-      [...subjectsValue]
-        .sort()
-        .every((subject, index) => subject === subjectsValue[index]);
-    if (!valid) {
-      violations.push({
-        policy: "feature-source-subject",
-        file: path,
-        message:
-          "feature.json subjects must be a non-empty, sorted, duplicate-free array of lower-case kebab-case names.",
-        allowed:
-          "Declare each deliberately owned contract/server subject once and keep the list sorted.",
-      });
-    } else {
-      subjects = subjectsValue;
-    }
+  const keys = Object.keys(value as Record<string, unknown>);
+  if (keys.length !== 1 || keys[0] !== "layoutVersion") {
+    violations.push({
+      policy: "feature-source-subject",
+      file: path,
+      message: "feature.json may only select layoutVersion; feature ownership is declared centrally.",
+      allowed: "Change packages/features/catalogue.json and the owning ADR/spec to expand feature ownership.",
+    });
   }
-  return { layoutVersion, subjects };
+  return { layoutVersion };
 }
 
 function directories(path: string): string[] {
@@ -129,18 +108,38 @@ function directories(path: string): string[] {
 
 export function discoverClassifiedPackages(root: string): {
   packages: ClassifiedPackage[];
+  catalogue: FeatureCatalogueEntry[];
   violations: ArchitectureViolation[];
 } {
   const packages: ClassifiedPackage[] = [];
   const violations: ArchitectureViolation[] = [];
+  const catalogue = readFeatureCatalogue(root, violations);
+  const catalogueByRoot = new Map(
+    catalogue.map((entry) => [join(root, entry.root), entry]),
+  );
 
   const discoverFeatures = (featuresRoot: string, enterprise: boolean) => {
     for (const feature of directories(featuresRoot)) {
       const featureRoot = join(featuresRoot, feature);
-      const { layoutVersion, subjects } = readFeatureConfiguration(
+      const { layoutVersion } = readFeatureConfiguration(
         featureRoot,
         violations,
       );
+      const catalogueEntry = catalogueByRoot.get(featureRoot);
+      if (!catalogueEntry) {
+        violations.push({
+          policy: "feature-catalogue",
+          file: featureRoot,
+          message: `Feature root ${JSON.stringify(feature)} is not registered in packages/features/catalogue.json.`,
+          allowed: "Use the singular catalogue identifier and record new ownership in its ADR and specification.",
+        });
+      } else if ((catalogueEntry.classification === "enterprise") !== enterprise) {
+        violations.push({
+          policy: "feature-catalogue",
+          file: featureRoot,
+          message: `Feature ${JSON.stringify(feature)} is in the wrong core/Enterprise tree for its catalogue classification.`,
+        });
+      }
       const featureManifest = join(featureRoot, "package.json");
       if (existsSync(featureManifest)) {
         violations.push({
@@ -186,7 +185,7 @@ export function discoverClassifiedPackages(root: string): {
           feature,
           featureRoot,
           layoutVersion,
-          subjects,
+          subjects: catalogueEntry?.subjects,
           enterprise,
         });
       }
@@ -502,5 +501,5 @@ export function discoverClassifiedPackages(root: string): {
     }
   }
 
-  return { packages, violations };
+  return { packages, catalogue, violations };
 }

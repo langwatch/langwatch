@@ -15,6 +15,29 @@ Feature: Feature package boundary lint
     Then no violation is reported
 
   @unit @architecture
+  Scenario: Architecture lint stays on structural facts
+    Given routine dependency upgrades, formatting, and subjective implementation style are checked elsewhere
+    When architecture lint checks the workspace
+    Then it checks ownership, package roles, services, repositories, persistence containment, and durable-processing safety
+    And it rejects package runtimes that the architecture has explicitly retired
+
+  @unit @architecture
+  Scenario: Legacy edge reconciliation stays out of the hot path
+    Given the temporary application split has a checked-in shrinking edge baseline
+    When routine architecture lint checks the workspace
+    Then it does not rebuild the legacy baseline
+    And the explicit migration audit reconciles stale and newly added legacy edges
+
+  @unit @architecture
+  Scenario: Legacy feature fragments only shrink
+    Given a migrated feature has remaining path-shaped implementation, transport, composition, page-shell, or infrastructure-adapter modules in platform/app
+    And those exact modules are recorded in the checked-in feature fragment inventory
+    When architecture lint checks the workspace
+    Then a new module matching a catalogue-owned subject is rejected
+    And a removed inventory module is reported as stale
+    And inventory ordering and duplicate feature/file entries are rejected
+
+  @unit @architecture
   Scenario: Physical package names match their feature roles
     Given a feature surface package name does not match its registered singular identifier, path and role
     When architecture lint checks the workspace
@@ -60,11 +83,11 @@ Feature: Feature package boundary lint
     Then each forbidden dependency is reported
 
   @unit @architecture
-  Scenario: Governed packages use one schema runtime
-    Given a governed feature package declares Zod 3 or its source imports zod/v3 or a Hono-specific Zod adapter
+  Scenario: Feature contracts remain transport-neutral
+    Given governed feature source imports a Hono-specific Zod adapter
     When architecture lint checks the package
     Then it rejects the import
-    And directs the feature to Zod 4 through Standard Schema
+    And directs the feature to Standard Schema
 
   @unit @architecture
   Scenario: Web production code cannot acquire backend dependencies
@@ -117,6 +140,13 @@ Feature: Feature package boundary lint
     Then it fails and asks for deliberate named entry points
 
   @unit @architecture
+  Scenario: A root barrel cannot disguise private persistence
+    Given a feature server root re-exports a repository, store, or projection
+    When architecture lint checks the source layout
+    Then it rejects the private runtime export
+    And ordinary consumers remain limited to the feature service contract
+
+  @unit @architecture
   Scenario: Prisma imports stay in concrete adapters
     Given generated Prisma code is imported outside server/src/repositories/prisma
     When architecture lint checks the source
@@ -141,10 +171,31 @@ Feature: Feature package boundary lint
     Then it accepts the helper as an implementation detail
 
   @unit @architecture
-  Scenario: Feature server control flow remains explicit
-    Given a feature server object uses a conditional spread or nested ternary
-    When Oxlint checks the source
-    Then it rejects the hidden control flow
+  Scenario: Services do not reach through another domain's repository
+    Given a service imports a repository owned by another feature or legacy domain
+    When Oxlint checks the service module
+    Then it rejects the repository dependency
+    And directs the service to depend on the owning domain's service
+
+  @unit @architecture
+  Scenario: Service dependencies are explicit domain capabilities
+    Given a service imports a database client or recovers the global application graph
+    When Oxlint checks the service module
+    Then it rejects that hidden dependency
+    And directs the service to receive its own repository or another service
+
+  @unit @architecture
+  Scenario: Retired schema runtimes cannot re-enter feature packages
+    Given a feature package declares Zod 3 or imports zod/v3
+    When architecture lint checks its manifest and source
+    Then it rejects the retired package runtime
+
+  @unit @architecture
+  Scenario: Retired package surfaces cannot remain in application code
+    Given a first-party package has been replaced by its singular feature surfaces
+    When source imports the retired package name or one of its old subpaths
+    Then architecture lint rejects the import
+    And names the canonical contract, server, or web surface
 
   @unit @architecture
   Scenario: Feature packages receive validated environment configuration

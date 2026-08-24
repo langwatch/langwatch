@@ -15,8 +15,6 @@ const REQUIRED_SECTIONS = [
   "Consequences",
 ] as const;
 
-const MINIMUM_SECTION_WORDS = 8;
-
 function architectureRoot(pkg: ClassifiedPackage): string {
   if (pkg.feature) return dirname(pkg.root);
   return pkg.root;
@@ -40,18 +38,6 @@ function sectionBody(content: string, section: string): string | undefined {
   return match?.[1];
 }
 
-function hasEnoughInformation(body: string): boolean {
-  if (/\b(?:not applicable|does not apply)\b/i.test(body)) return true;
-  const prose = body
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/`[^`]+`/g, " ")
-    .replace(/\[[^\]]+\]\([^\)]+\)/g, " ");
-  return (
-    (prose.match(/[\p{L}\p{N}][\p{L}\p{N}'-]*/gu) ?? []).length >=
-    MINIMUM_SECTION_WORDS
-  );
-}
-
 export function lintArchitectureRecords(
   packages: ClassifiedPackage[],
 ): ArchitectureViolation[] {
@@ -59,11 +45,14 @@ export function lintArchitectureRecords(
   // Applications are composition and deployment roots documented by the
   // repository-level application ADR/spec. Package-local records belong to
   // reusable ownership boundaries, not each executable wrapper.
-  const roots = new Set(
-    packages.filter((pkg) => pkg.kind !== "application").map(architectureRoot),
-  );
+  const roots = new Map<string, string | undefined>();
+  for (const pkg of packages) {
+    if (pkg.kind === "application") continue;
+    const root = architectureRoot(pkg);
+    if (!roots.has(root)) roots.set(root, pkg.feature);
+  }
 
-  for (const root of roots) {
+  for (const [root] of roots) {
     const adrs = join(root, "adrs");
     const specs = join(root, "specs");
     const index = join(adrs, "README.md");
@@ -109,12 +98,6 @@ export function lintArchitectureRecords(
           policy: "architecture-record",
           file: boundaryRecord,
           message: `Boundary ADR must contain a "${section}" section, even when the decision is that the concern does not apply.`,
-        });
-      } else if (!hasEnoughInformation(body)) {
-        violations.push({
-          policy: "architecture-record",
-          file: boundaryRecord,
-          message: `Boundary ADR section "${section}" is too thin to record the package decision; explain the constraint or state why it does not apply.`,
         });
       }
     }

@@ -11,6 +11,12 @@ const root = resolve(valueAfter("--root") ?? process.cwd());
 const violations = lintWorkspace({
   root,
   declarations: !process.argv.includes("--no-declarations"),
+  legacyApplicationMigration: !process.argv.includes(
+    "--no-legacy-application-migration",
+  ),
+  legacyFeatureFragments: !process.argv.includes(
+    "--no-legacy-feature-fragments",
+  ),
 });
 
 if (violations.length > 0) {

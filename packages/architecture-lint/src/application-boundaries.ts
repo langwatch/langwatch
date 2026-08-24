@@ -84,23 +84,91 @@ function isWithin(root: string, path: string): boolean {
   );
 }
 
-function sourceLine(source: string, offset: number): number {
-  let line = 1;
-  for (let index = 0; index < offset; index += 1) {
-    if (source.charCodeAt(index) === 10) line += 1;
+function sourceLineStarts(source: string): number[] {
+  const starts = [0];
+  for (let index = 0; index < source.length; index += 1) {
+    if (source.charCodeAt(index) === 10) starts.push(index + 1);
   }
-  return line;
+  return starts;
+}
+
+function sourceLine(starts: readonly number[], offset: number): number {
+  let low = 0;
+  let high = starts.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (starts[middle]! <= offset) low = middle + 1;
+    else high = middle;
+  }
+  return low;
 }
 
 function importsIn(file: string): SourceImport[] {
   const source = readFileSync(file, "utf8");
-  const found = ts
-    .preProcessFile(source, true, true)
-    .importedFiles.map(({ fileName, pos }) => ({
-      file,
-      line: sourceLine(source, pos),
-      specifier: fileName,
-    }));
+  const lineStarts = sourceLineStarts(source);
+  const scanner = ts.createScanner(
+    ts.ScriptTarget.Latest,
+    true,
+    file.endsWith("x") ? ts.LanguageVariant.JSX : ts.LanguageVariant.Standard,
+    source,
+  );
+  const found: SourceImport[] = [];
+  let mode: "export" | "import" | "require" | null = null;
+  let acceptsString = false;
+
+  for (
+    let token = scanner.scan();
+    token !== ts.SyntaxKind.EndOfFileToken;
+    token = scanner.scan()
+  ) {
+    if (token === ts.SyntaxKind.ImportKeyword) {
+      mode = "import";
+      acceptsString = true;
+      continue;
+    }
+    if (token === ts.SyntaxKind.ExportKeyword) {
+      mode = "export";
+      acceptsString = false;
+      continue;
+    }
+    if (
+      token === ts.SyntaxKind.Identifier &&
+      scanner.getTokenText() === "require"
+    ) {
+      mode = "require";
+      acceptsString = true;
+      continue;
+    }
+    if (token === ts.SyntaxKind.FromKeyword && mode !== null) {
+      acceptsString = true;
+      continue;
+    }
+    if (token === ts.SyntaxKind.StringLiteral && mode && acceptsString) {
+      found.push({
+        file,
+        line: sourceLine(lineStarts, scanner.getTokenPos()),
+        specifier: scanner.getTokenValue(),
+      });
+      mode = null;
+      acceptsString = false;
+      continue;
+    }
+    if (
+      mode === "import" &&
+      token !== ts.SyntaxKind.OpenParenToken &&
+      token !== ts.SyntaxKind.TypeKeyword
+    ) {
+      acceptsString = false;
+    }
+    if (
+      token === ts.SyntaxKind.SemicolonToken ||
+      token === ts.SyntaxKind.FunctionKeyword ||
+      token === ts.SyntaxKind.ClassKeyword
+    ) {
+      mode = null;
+      acceptsString = false;
+    }
+  }
   return found.sort(
     (left, right) => left.line - right.line || left.specifier.localeCompare(right.specifier),
   );
@@ -726,12 +794,17 @@ function lintNewEnterpriseAliases(root: string): ArchitectureViolation[] {
 export function lintApplicationBoundaries(
   root: string,
   packages: ClassifiedPackage[],
+  options?: { legacyMigration?: boolean },
 ): ArchitectureViolation[] {
   return [
     ...lintClassifiedSourceImports(packages),
     ...lintCompositionSourceShape(packages),
     ...lintRuntimeConstructionImports(root, packages),
-    ...lintLegacyApplicationBoundaries(root),
-    ...lintNewEnterpriseAliases(root),
+    ...(options?.legacyMigration === false
+      ? []
+      : [
+          ...lintLegacyApplicationBoundaries(root),
+          ...lintNewEnterpriseAliases(root),
+        ]),
   ];
 }

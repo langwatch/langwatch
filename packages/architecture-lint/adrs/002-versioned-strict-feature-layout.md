@@ -61,6 +61,9 @@ packages/features/<feature>/
 │       ├── stores/<subject>.store.ts
 │       ├── stores/<adapter>/<adapter>.<subject>.store.ts
 │       ├── projections/<subject>.projection.ts
+│       ├── subscribers/<subject>.subscriber.ts
+│       ├── processes/<subject>.process.ts
+│       ├── intents/<subject>.intent.ts
 │       ├── ports/<subject>.port.ts
 │       ├── adapters/<adapter>.<subject>.adapter.ts
 │       ├── api/<surface>/<subject>.api.ts
@@ -88,6 +91,27 @@ behaviour belongs to a service, projection, migration, adapter, or the app or
 worker composition root. A feature that truly needs a new reusable layer must
 change the shared layout decision rather than inventing a local directory.
 
+Eventing roles are distinct architecture artifacts. Projection and process
+evolution are synchronous and deterministic. Projections return derived state
+or writes and leave persistence to the Eventing executor and projection store.
+Processes return state, wakes, and deterministically keyed intents. External
+work belongs in a retry-safe intent executor. Subscribers may invoke external
+effects only under an idempotency boundary proven by a named redelivery test.
+Projections, processes, and subscribers never construct or append durable
+events directly; they invoke the owning feature command/pipeline.
+
+Result semantics use one vocabulary across services, ports, repositories, and
+stores. Ordinary methods return a value or throw their domain error. Only
+`try*` methods expose `null` or `undefined`; `require*` is forbidden. An
+optional method is added only for a concrete caller, never as a speculative
+pair. Every class method in those boundary modules declares its result type;
+the rule is identical for public services and private repositories.
+
+Architecture lint checks that the feature owns the required ADR sections and
+links its behavioural specification. Review remains responsible for whether
+the prose is useful and feature-specific; the fast structural command does not
+attempt semantic similarity or minimum-word analysis.
+
 Files ending in `.service.ts`, `.store.ts`, `.projection.ts`, `.api.ts`, and
 `.migration.ts` export the correspondingly named class. Concrete runtime
 classes expose `static create`. Repository and store ports are abstract classes;
@@ -99,6 +123,15 @@ contract service and map its result or handled errors. They do not import a
 repository, store, projection, migration, or infrastructure adapter. Services
 do not import API, migration, or concrete adapter modules. A canonical adapter
 class binds private concrete persistence to the service at composition.
+
+Request handlers use the process-composed service graph directly through
+`context.app`, authenticated identity through `context.actor()`, and validated
+input-dependent permissions through `context.authorize()`. API options
+are static configuration, not callbacks that resolve services, actors, or
+tenant ids from each request. API source may not cast its context, construct a
+service or repository, or await a resolver before awaiting the operation.
+Tenant targets remain validated input and authentication authorizes the same
+tenant before dispatch.
 
 ### Public surfaces and transports
 
@@ -143,8 +176,10 @@ and are mapped only at API boundaries.
 
 `feature.json` is parsed by architecture lint. Unknown versions, missing files,
 invalid JSON, disallowed directories, misplaced artifact suffixes, malformed
-filenames, wrong module shapes, and forbidden internal imports fail ordinary
-repository lint. Fixtures cover the strict version-0 layout.
+filenames, wrong module shapes, forbidden internal imports, ambiguous fallible
+results, impure Eventing role source, direct event fabrication, and missing
+subscriber redelivery tests fail ordinary repository lint. Fixtures cover the
+strict version-0 layout.
 
 ## Alternatives considered
 

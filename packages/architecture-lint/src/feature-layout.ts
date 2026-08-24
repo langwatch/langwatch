@@ -1,8 +1,12 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { relative, sep } from "node:path";
 import ts from "typescript";
 import { walkFiles } from "./files";
-import type { ArchitectureViolation, ClassifiedPackage } from "./types";
+import type {
+  ArchitectureViolation,
+  ClassifiedPackage,
+  FeatureCatalogueEntry,
+} from "./types";
 
 const NAME = "[a-z0-9]+(?:-[a-z0-9]+)*";
 const CONTRACT_ARTIFACT = new RegExp(
@@ -12,16 +16,10 @@ const SERVER_ONLY_CONTRACT_ARTIFACT =
   /\.(?:adapter|api|mapper|migration|port|projection|repository|store)\.ts$/;
 const CONTRACT_ARTIFACT_SUFFIX =
   /\.(?:commands|errors|events|queries|service)\.ts$/;
-const FORBIDDEN_SCHEMA_IMPORTS = new Set([
-  "zod/v3",
-  "@hono/zod-validator",
-  "hono-openapi/zod",
-]);
-
 const SERVER_PATTERNS = [
   /^index\.ts$/,
   /^testing\.ts$/,
-  new RegExp(`^fixtures/${NAME}\.fixture\.ts$`),
+  new RegExp(`^fixtures/${NAME}\\.fixture\\.ts$`),
   new RegExp(`^services/${NAME}\\.service\\.ts$`),
   new RegExp(`^ports/${NAME}\\.port\\.ts$`),
   new RegExp(`^repositories/${NAME}\\.repository\\.ts$`),
@@ -31,6 +29,9 @@ const SERVER_PATTERNS = [
   new RegExp(`^stores/${NAME}\\.store\\.ts$`),
   new RegExp(`^stores/(${NAME})/\\1\\.${NAME}\\.store\\.ts$`),
   new RegExp(`^projections/${NAME}\\.projection\\.ts$`),
+  new RegExp(`^subscribers/${NAME}\\.subscriber\\.ts$`),
+  new RegExp(`^processes/${NAME}\\.process\\.ts$`),
+  new RegExp(`^intents/${NAME}\\.intent\\.ts$`),
   new RegExp(`^adapters/${NAME}\\.${NAME}\\.adapter\\.ts$`),
   new RegExp(`^api/${NAME}/${NAME}\\.api\\.ts$`),
   new RegExp(`^migrations/${NAME}-import\\.${NAME}\\.migration\\.ts$`),
@@ -46,32 +47,6 @@ function violation(
   allowed: string,
 ): ArchitectureViolation {
   return { policy: "feature-source-layout", file, message, allowed };
-}
-
-function lintSchemaImports(pkg: ClassifiedPackage): ArchitectureViolation[] {
-  const violations: ArchitectureViolation[] = [];
-  const files = walkFiles(`${pkg.root}/src`, (path) =>
-    /\.[cm]?[jt]sx?$/.test(path),
-  );
-
-  for (const file of files) {
-    const source = readFileSync(file, "utf8");
-    for (const imported of ts.preProcessFile(source, true, true)
-      .importedFiles) {
-      if (!FORBIDDEN_SCHEMA_IMPORTS.has(imported.fileName)) continue;
-      const line = source.slice(0, imported.pos).split("\n").length;
-      violations.push({
-        policy: "schema-runtime",
-        file,
-        line,
-        specifier: imported.fileName,
-        message: `Governed feature source cannot import ${JSON.stringify(imported.fileName)}.`,
-        allowed:
-          'Declare "zod": "^4.4.3", import schemas from "zod", and pass them to transports through Standard Schema.',
-      });
-    }
-  }
-  return violations;
 }
 
 function lintContract(pkg: ClassifiedPackage): ArchitectureViolation[] {
@@ -142,6 +117,16 @@ function lintServer(pkg: ClassifiedPackage): ArchitectureViolation[] {
 
   for (const file of files) {
     const path = workspacePath(`${pkg.root}/src`, file);
+    if (/^services\/.+-process\.service\.ts$/.test(path)) {
+      violations.push(
+        violation(
+          file,
+          `Process manager source ${JSON.stringify(path)} cannot masquerade as a service.`,
+          "Move pure evolution to processes/<subject>.process.ts and retry-safe external work to intents/<subject>.intent.ts.",
+        ),
+      );
+      continue;
+    }
     if (SERVER_PATTERNS.some((pattern) => pattern.test(path))) {
       if (/^services\/.+\.service\.ts$/.test(path)) serviceCount += 1;
       continue;
@@ -150,7 +135,7 @@ function lintServer(pkg: ClassifiedPackage): ArchitectureViolation[] {
       violation(
         file,
         `Server source path ${JSON.stringify(path)} is not part of strict layout version 0.`,
-        "Use services, repositories, stores, projections, ports, adapters, api/<surface>, or migrations with the canonical filename grammar.",
+        "Use services, repositories, stores, projections, subscribers, processes, intents, ports, adapters, api/<surface>, or migrations with the canonical filename grammar.",
       ),
     );
   }
@@ -167,51 +152,175 @@ function lintServer(pkg: ClassifiedPackage): ArchitectureViolation[] {
   return violations;
 }
 
-function lintDeclaredSubjects(pkg: ClassifiedPackage): ArchitectureViolation[] {
+const PRIVATE_SERVER_EXPORT =
+  /(?:^|\/)(?:projections|repositories|stores)(?:\/|$)/;
+
+function lintPrivateServerExports(
+  pkg: ClassifiedPackage,
+): ArchitectureViolation[] {
+  const file = `${pkg.root}/src/index.ts`;
+  if (!existsSync(file)) return [];
+  const source = readFileSync(file, "utf8");
+  const sourceFile = ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+  const privateImports = new Set<string>();
+  const violations: ArchitectureViolation[] = [];
+  const add = (node: ts.Node, specifier?: string): void => {
+    violations.push({
+      policy: "private-runtime-export",
+      file,
+      line:
+        sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
+          .line + 1,
+      specifier,
+      message:
+        "A feature server root cannot expose a repository, store, or projection implementation.",
+      allowed:
+        "Export the composition adapter and service; keep persistence and projection modules private to the feature server.",
+    });
+  };
+
+  for (const statement of sourceFile.statements) {
+    if (
+      ts.isImportDeclaration(statement) &&
+      ts.isStringLiteral(statement.moduleSpecifier) &&
+      PRIVATE_SERVER_EXPORT.test(statement.moduleSpecifier.text)
+    ) {
+      const clause = statement.importClause;
+      if (clause?.name) privateImports.add(clause.name.text);
+      if (clause?.namedBindings) {
+        if (ts.isNamespaceImport(clause.namedBindings)) {
+          privateImports.add(clause.namedBindings.name.text);
+        } else {
+          for (const element of clause.namedBindings.elements) {
+            privateImports.add(element.name.text);
+          }
+        }
+      }
+      continue;
+    }
+    if (!ts.isExportDeclaration(statement)) continue;
+    if (
+      statement.moduleSpecifier &&
+      ts.isStringLiteral(statement.moduleSpecifier) &&
+      PRIVATE_SERVER_EXPORT.test(statement.moduleSpecifier.text)
+    ) {
+      add(statement, statement.moduleSpecifier.text);
+      continue;
+    }
+    if (
+      statement.exportClause &&
+      ts.isNamedExports(statement.exportClause)
+    ) {
+      for (const element of statement.exportClause.elements) {
+        const local = element.propertyName?.text ?? element.name.text;
+        if (privateImports.has(local)) add(element);
+      }
+    }
+  }
+  return violations;
+}
+
+const ARTIFACT_PARTS = new Set([
+  "adapter",
+  "api",
+  "commands",
+  "errors",
+  "events",
+  "fixture",
+  "mapper",
+  "migration",
+  "port",
+  "process",
+  "projection",
+  "queries",
+  "repository",
+  "service",
+  "store",
+  "subscriber",
+  "intent",
+]);
+const QUALIFIED_ARTIFACTS = new Set([
+  "adapter",
+  "mapper",
+  "migration",
+  "repository",
+  "store",
+]);
+
+function claimsSubject(
+  candidate: string,
+  feature: string,
+  subject: string,
+): boolean {
+  if (candidate === subject) return true;
+  return (
+    candidate.startsWith(`${feature}-`) &&
+    candidate.slice(feature.length + 1) === subject
+  );
+}
+
+function claimedSubjects(path: string): string[] {
+  const filename = path.slice(path.lastIndexOf("/") + 1, -3);
+  const parts = filename.split(".");
+  const artifact = parts.at(-1);
+  if (
+    parts.length >= 3 &&
+    artifact &&
+    QUALIFIED_ARTIFACTS.has(artifact)
+  ) {
+    return [parts.at(-2)!];
+  }
+  return parts.filter((part) => !ARTIFACT_PARTS.has(part));
+}
+
+function lintOwnedSubjects(
+  pkg: ClassifiedPackage,
+  catalogue: readonly FeatureCatalogueEntry[],
+  packages: readonly ClassifiedPackage[],
+): ArchitectureViolation[] {
   if (!pkg.subjects || (pkg.kind !== "contract" && pkg.kind !== "server")) {
     return [];
+  }
+  // Ownership is enforced once its canonical feature has a physical package
+  // to consume. Dormant catalogue entries are migration intent, not a demand
+  // for placeholder packages.
+  const migratedFeatures = new Set<string>();
+  for (const candidatePackage of packages) {
+    if (candidatePackage.feature) migratedFeatures.add(candidatePackage.feature);
+  }
+  const subjectOwners = new Map<string, string>();
+  for (const entry of catalogue) {
+    if (!migratedFeatures.has(entry.id)) continue;
+    for (const subject of entry.subjects) subjectOwners.set(subject, entry.id);
   }
   const violations: ArchitectureViolation[] = [];
   const files = walkFiles(`${pkg.root}/src`, (path) => /\.tsx?$/.test(path));
   for (const file of files) {
     const path = workspacePath(`${pkg.root}/src`, file);
     if (path === "index.ts") continue;
-    const filename = path.slice(path.lastIndexOf("/") + 1, -3);
-    const candidates = filename
-      .split(".")
-      .filter(
-        (part) =>
-          ![
-            "adapter",
-            "api",
-            "commands",
-            "errors",
-            "events",
-            "mapper",
-            "migration",
-            "port",
-            "projection",
-            "repository",
-            "service",
-            "store",
-          ].includes(part),
-      );
-    const declared = candidates.some((candidate) =>
-      pkg.subjects!.some(
-        (subject) =>
-          candidate === subject ||
-          candidate.startsWith(`${subject}-`) ||
-          candidate.endsWith(`-${subject}`) ||
-          candidate.includes(`-${subject}-`),
+    if (!/\.(?:adapter|commands|errors|events|intent|process|projection|queries|repository|service|store|subscriber)\.tsx?$/.test(path)) {
+      continue;
+    }
+    const candidates = claimedSubjects(path);
+    const foreign = candidates.flatMap((candidate) =>
+      [...subjectOwners].filter(
+        ([subject, owner]) =>
+          owner !== pkg.feature && claimsSubject(candidate, pkg.feature!, subject),
       ),
     );
-    if (declared) continue;
+    if (foreign.length === 0) continue;
+    const [subject, owner] = foreign[0]!;
     violations.push({
       policy: "feature-source-subject",
       file,
-      message: `Source module ${JSON.stringify(path)} is outside the subjects declared by ${pkg.feature}/feature.json.`,
-      allowed:
-        "Move it to its owning feature, or deliberately expand feature.json, the feature boundary ADR, and its specification together.",
+      message: `Source module ${JSON.stringify(path)} claims ${JSON.stringify(subject)}, which belongs to the singular ${JSON.stringify(owner)} feature.`,
+      allowed: `Move the implementation to ${owner}, then inject its contract service into ${pkg.feature}. Local feature.json changes cannot broaden ownership.`,
     });
   }
   return violations;
@@ -219,14 +328,17 @@ function lintDeclaredSubjects(pkg: ClassifiedPackage): ArchitectureViolation[] {
 
 export function lintFeatureLayouts(
   packages: ClassifiedPackage[],
+  catalogue: readonly FeatureCatalogueEntry[],
 ): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   for (const pkg of packages) {
     if (pkg.layoutVersion !== 0) continue;
-    violations.push(...lintSchemaImports(pkg));
-    violations.push(...lintDeclaredSubjects(pkg));
+    violations.push(...lintOwnedSubjects(pkg, catalogue, packages));
     if (pkg.kind === "contract") violations.push(...lintContract(pkg));
-    if (pkg.kind === "server") violations.push(...lintServer(pkg));
+    if (pkg.kind === "server") {
+      violations.push(...lintServer(pkg));
+      violations.push(...lintPrivateServerExports(pkg));
+    }
   }
   return violations;
 }

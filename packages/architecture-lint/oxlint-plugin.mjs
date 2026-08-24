@@ -1,5 +1,13 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from "node:path";
 
 const workspaceCache = new Map();
 const featureLayoutCache = new Map();
@@ -122,6 +130,24 @@ function importedPackage(specifier, workspace) {
   return undefined;
 }
 
+const RETIRED_PACKAGE_ENTRYPOINTS = new Map([
+  ["zod/v3", "zod"],
+  [
+    "@langwatch/automations",
+    "@langwatch/automation-contract, @langwatch/automation-server, or @langwatch/automation-web",
+  ],
+  ["@ee", "the owning @langwatch/enterprise-<feature>-<surface> package"],
+]);
+
+function retiredPackageReplacement(specifier) {
+  for (const [retired, replacement] of RETIRED_PACKAGE_ENTRYPOINTS) {
+    if (specifier === retired || specifier.startsWith(`${retired}/`)) {
+      return replacement;
+    }
+  }
+  return undefined;
+}
+
 const boundaryRule = {
   meta: {
     type: "problem",
@@ -130,8 +156,6 @@ const boundaryRule = {
         "Feature server packages may be imported only by app or worker runtime composition roots.",
       crossFeature:
         "Cross-feature collaboration must use the owning feature's contract package.",
-      environment:
-        "Feature and framework packages receive typed configuration; they must not read environment variables directly.",
       packageEscape:
         "A relative import cannot escape its physical workspace package.",
       packageRole:
@@ -140,8 +164,10 @@ const boundaryRule = {
         "Prisma may be imported only by a server repository adapter under src/repositories/prisma.",
       featureLayer:
         "Strict feature layers point toward the service contract: APIs cannot import persistence or infrastructure, and services cannot import APIs, migrations, or concrete adapters.",
+      retiredPackageRuntime:
+        "This package entry point belongs to a retired runtime or package surface; use {{replacement}}.",
       schemaBoundary:
-        "Feature packages use Zod 4 through Standard Schema; import from zod and the root hono-openapi API.",
+        "Feature contracts remain transport-neutral; use the root hono-openapi API and Standard Schema instead of a Hono-specific schema adapter.",
       sealedExports:
         "This package subpath is not declared in the target package's exports map.",
     },
@@ -158,6 +184,15 @@ const boundaryRule = {
     const reportImport = (node, specifier) => {
       if (typeof specifier !== "string") return;
       const target = importedPackage(specifier, workspace);
+      const replacement = retiredPackageReplacement(specifier);
+      if (replacement) {
+        context.report({
+          node,
+          messageId: "retiredPackageRuntime",
+          data: { replacement },
+        });
+        return;
+      }
 
       if (specifier.startsWith(".")) {
         const packageRoot = packageRootForFile(filename, context.cwd);
@@ -257,8 +292,7 @@ const boundaryRule = {
 
       if (
         classification.feature &&
-        (specifier === "zod/v3" ||
-          specifier === "@hono/zod-validator" ||
+        (specifier === "@hono/zod-validator" ||
           specifier === "hono-openapi/zod")
       ) {
         context.report({ node, messageId: "schemaBoundary" });
@@ -325,15 +359,33 @@ const boundaryRule = {
           reportImport(node.arguments[0], node.arguments[0].value);
         }
       },
+    };
+  },
+};
+
+const environmentBoundariesRule = {
+  meta: {
+    type: "problem",
+    messages: {
+      environment:
+        "Feature and framework packages receive typed configuration; they must not read environment variables directly.",
+    },
+  },
+  create(context) {
+    const filename = normalizedFilename(context);
+    const classification = classifyFile(filename, context.cwd);
+    const governed =
+      classification.feature ||
+      classification.role === "config" ||
+      classification.role === "design-system";
+    const productionSource =
+      !/(\/__tests__\/|\/tests\/|\.(test|unit|integration)\.)/.test(
+        classification.workspacePath,
+      );
+    if (!governed || !productionSource) return {};
+
+    return {
       MemberExpression(node) {
-        if (!productionSource) return;
-        if (
-          !classification.feature &&
-          classification.role !== "config" &&
-          classification.role !== "design-system"
-        ) {
-          return;
-        }
         const isProcessEnv =
           node.object.type === "Identifier" &&
           node.object.name === "process" &&
@@ -570,25 +622,196 @@ const featureModuleClassesRule = {
   },
 };
 
-const noConditionalSpreadRule = {
+function serviceSubject(filename) {
+  const name = basename(filename);
+  return name.endsWith(".service.ts")
+    ? name.slice(0, -".service.ts".length)
+    : undefined;
+}
+
+function serviceOwnerRoot(filename, cwd) {
+  const normalized = relative(cwd, filename).split(sep).join("/");
+  const feature = normalized.match(
+    /^(packages\/(?:enterprise\/)?features\/[^/]+\/server)\/src\/services\//,
+  );
+  if (feature) return resolve(cwd, feature[1]);
+  const application = normalized.match(
+    /^(platform\/app\/src\/server\/(?:app-layer\/)?[^/]+)\//,
+  );
+  return application ? resolve(cwd, application[1]) : dirname(filename);
+}
+
+function repositoryTarget(specifier, filename, cwd) {
+  if (specifier.startsWith(".")) return resolve(dirname(filename), specifier);
+  if (specifier.startsWith("~/")) {
+    return resolve(cwd, "platform/app/src", specifier.slice(2));
+  }
+  return undefined;
+}
+
+function importedName(specifier) {
+  if (specifier.type === "ImportSpecifier") {
+    return specifier.imported.name ?? specifier.imported.value;
+  }
+  return specifier.local?.name;
+}
+
+function importsRepository(node) {
+  const pathNamesRepository = node.source.value
+    .split("/")
+    .at(-1)
+    ?.replace(/\.[cm]?[jt]s$/, "")
+    .endsWith(".repository");
+  return (
+    pathNamesRepository ||
+    node.specifiers.some((specifier) =>
+      importedName(specifier)?.endsWith("Repository"),
+    )
+  );
+}
+
+function importsDatabaseClient(node) {
+  const specifier = node.source.value;
+  return (
+    specifier === "@prisma/client" ||
+    specifier === "@clickhouse/client" ||
+    specifier === "ioredis" ||
+    specifier === "redis" ||
+    /(?:generated\/prisma|prisma\/client|\/clickhouse(?:\/|$)|\/redis(?:\/|$)|\/db(?:\/|$))/.test(
+      specifier,
+    ) ||
+    node.specifiers.some((item) =>
+      /(?:PrismaClient|ClickHouseClient|RedisClient)$/.test(
+        importedName(item) ?? "",
+      ),
+    )
+  );
+}
+
+function importsGlobalApplication(node) {
+  return (
+    /(?:^|\/)app-layer\/app$/.test(node.source.value) ||
+    node.specifiers.some((item) =>
+      /^(?:getApp|tryGetApp|initializeApp)$/.test(importedName(item) ?? ""),
+    )
+  );
+}
+
+function escapesRoot(root, target) {
+  const path = relative(root, target);
+  return path === ".." || path.startsWith(`..${sep}`) || isAbsolute(path);
+}
+
+const serviceDependenciesRule = {
   meta: {
-    type: "suggestion",
+    type: "problem",
     messages: {
-      conditional:
-        "Build optional fields with explicit statements; do not hide control flow in an object spread.",
+      databaseClient:
+        "A service cannot import a database client; persistence belongs behind its own repository.",
+      foreignRepository:
+        "A service may depend on its own repository and on other services; it must not depend on another subject's repository.",
+      globalApplication:
+        "A service cannot recover the global application graph; inject the service dependency explicitly.",
+    },
+  },
+  create(context) {
+    const filename = normalizedFilename(context);
+    const subject = serviceSubject(filename);
+    if (!subject) return {};
+    const ownerRoot = serviceOwnerRoot(filename, context.cwd);
+
+    return {
+      ImportDeclaration(node) {
+        if (importsDatabaseClient(node)) {
+          context.report({ node: node.source, messageId: "databaseClient" });
+        }
+        if (importsGlobalApplication(node)) {
+          context.report({ node: node.source, messageId: "globalApplication" });
+        }
+        if (!importsRepository(node)) return;
+        const target = repositoryTarget(
+          node.source.value,
+          filename,
+          context.cwd,
+        );
+        if (!target || escapesRoot(ownerRoot, target)) {
+          context.report({ node: node.source, messageId: "foreignRepository" });
+        }
+      },
+    };
+  },
+};
+
+function isFeatureApi(classification) {
+  return (
+    classification.role === "server" &&
+    /^src\/api\/[^/]+\/.+\.api\.ts$/.test(classification.relative ?? "")
+  );
+}
+
+function identifierName(node) {
+  return node?.type === "Identifier" ? node.name : undefined;
+}
+
+function isContextIdentifier(node) {
+  return ["c", "ctx", "context"].includes(identifierName(node));
+}
+
+function isOptionsMethodCall(node) {
+  if (node.callee.type !== "MemberExpression") return false;
+  const owner = node.callee.object;
+  return (
+    owner.type === "MemberExpression" &&
+    owner.object.type === "ThisExpression" &&
+    !owner.computed &&
+    identifierName(owner.property) === "options"
+  );
+}
+
+const apiContextServicesRule = {
+  meta: {
+    type: "problem",
+    messages: {
+      contextCast:
+        "API context is already typed; do not cast it to recover application services.",
+      construction:
+        "API classes delegate through context.app; they do not construct services, repositories, stores, or adapters.",
+      doubleAwait:
+        "Await one service call; do not await a resolver and then await the service operation.",
+      resolver:
+        "API options are static configuration, not per-request callbacks; use context.app, context.actor(), context.authorize(), and validated input.",
     },
   },
   create(context) {
     const filename = normalizedFilename(context);
     const classification = classifyFile(filename, context.cwd);
-    if (classification.role !== "server") return {};
+    if (!isFeatureApi(classification)) return {};
+
     return {
-      SpreadElement(node) {
-        if (
-          node.argument.type === "ConditionalExpression" ||
-          node.argument.type === "LogicalExpression"
-        ) {
-          context.report({ node, messageId: "conditional" });
+      AwaitExpression(node) {
+        const nestedAwait =
+          node.argument.type === "AwaitExpression" ||
+          (node.argument.type === "CallExpression" &&
+            node.argument.callee.type === "MemberExpression" &&
+            node.argument.callee.object.type === "AwaitExpression");
+        if (nestedAwait) {
+          context.report({ node, messageId: "doubleAwait" });
+        }
+      },
+      CallExpression(node) {
+        if (isOptionsMethodCall(node)) {
+          context.report({ node, messageId: "resolver" });
+        }
+      },
+      NewExpression(node) {
+        const name = identifierName(node.callee);
+        if (name && /(Service|Repository|Store|Adapter)$/.test(name)) {
+          context.report({ node, messageId: "construction" });
+        }
+      },
+      TSAsExpression(node) {
+        if (isContextIdentifier(node.expression)) {
+          context.report({ node, messageId: "contextCast" });
         }
       },
     };
@@ -596,10 +819,12 @@ const noConditionalSpreadRule = {
 };
 
 export const rules = {
+  "api-context-services": apiContextServicesRule,
+  "environment-boundaries": environmentBoundariesRule,
   "package-boundaries": boundaryRule,
   "feature-module-classes": featureModuleClassesRule,
   "service-classes": serviceClassesRule,
-  "no-conditional-spread": noConditionalSpreadRule,
+  "service-dependencies": serviceDependenciesRule,
 };
 
 export default {

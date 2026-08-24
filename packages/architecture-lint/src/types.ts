@@ -6,6 +6,15 @@ export type EnterpriseCompositionRole = "api" | "worker" | "web";
 
 export type FeatureLayoutVersion = 0;
 
+export type FeatureClassification = "core" | "enterprise";
+
+export type FeatureCatalogueEntry = {
+  id: string;
+  root: string;
+  classification: FeatureClassification;
+  subjects: readonly string[];
+};
+
 export type PackageKind =
   | FeaturePackageRole
   | "application"
@@ -53,4 +62,6 @@ export type ArchitectureViolation = {
 export type LintWorkspaceOptions = {
   root: string;
   declarations?: boolean;
+  legacyApplicationMigration?: boolean;
+  legacyFeatureFragments?: boolean;
 };

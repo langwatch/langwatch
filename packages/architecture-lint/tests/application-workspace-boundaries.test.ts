@@ -365,6 +365,22 @@ describe("shrinking legacy application boundary baseline", () => {
     expect(policy("application-migration-baseline")).toEqual([]);
   });
 
+  it("keeps legacy baseline reconciliation out of routine lint", () => {
+    legacyBrowserEdge();
+
+    const routine = lintWorkspace({
+      root,
+      declarations: false,
+      legacyApplicationMigration: false,
+    });
+
+    expect(
+      routine.filter((violation) =>
+        violation.policy.startsWith("application-migration"),
+      ),
+    ).toEqual([]);
+  });
+
   it("fails when a removed edge leaves a stale baseline entry", () => {
     legacyBrowserEdge();
     const edges = collectLegacyApplicationBoundaryEdges(root);

@@ -16,7 +16,10 @@
     "src"
   ],
   "scripts": {
-    "lint": "tsx src/cli.ts --root ../..",
+    "lint": "tsx src/cli.ts --root ../.. --no-declarations --no-legacy-application-migration",
+    "lint:declarations": "tsx src/cli.ts --root ../.. --no-legacy-application-migration",
+    "lint:migration": "tsx src/cli.ts --root ../.. --no-declarations",
+    "rename-package": "tsx src/rename-workspace-package.cli.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"

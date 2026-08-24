@@ -683,8 +683,7 @@
       "platform/app/ee/governance/services/routingPolicy.service.ts": ["~/server/gateway/changeEvent.repository","~/server/modelProviders/latestAliases"],
       "platform/app/ee/governance/services/spendSpikeAnomalyWorker.ts": ["~/server/app-layer/app","~/server/db"],
       "platform/app/ee/governance/subscribers/governanceKpisSync.subscriber.ts": ["~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection","~/server/event-sourcing/pipelines/trace-processing/schemas/events"],
-      "platform/app/ee/governance/subscribers/governanceOcsfEventsSync.subscriber.ts": ["~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection","~/server/event-sourcing/pipelines/trace-processing/schemas/events"],
-      "platform/app/ee/governance/subscribers/traceAlertTriggerMatch.subscriber.ts": ["~/server/app-layer/automations/dispatch/triggerActionDispatch","~/server/app-layer/automations/trigger.service","~/server/app-layer/traces/types","~/server/event-sourcing/pipelines/automations/subscribers/evaluationAlertTriggerMatch.subscriber","~/server/event-sourcing/pipelines/trace-processing/schemas/events","~/server/event-sourcing/pipelines/trace-processing/subscribers/_originGuardedSubscriber","~/server/filters/triggerFilter.matcher","~/server/metrics"]
+      "platform/app/ee/governance/subscribers/governanceOcsfEventsSync.subscriber.ts": ["~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection","~/server/event-sourcing/pipelines/trace-processing/schemas/events"]
     }
   }
 }

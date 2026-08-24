@@ -26,14 +26,26 @@ still reach its internals.
 
 The source checks need to be fast enough to run with ordinary lint. Oxlint's
 JavaScript plugin API can derive a rule from the current filename and inspect
-imports and syntax in its native traversal. Workspace manifests, cycles,
-emitted declarations and Markdown architecture records are repository-level
-concerns and remain in a small graph-aware companion check.
+imports and syntax in its native traversal. Workspace manifests, cycles and
+Markdown architecture records are repository-level concerns and remain in a
+small graph-aware companion check. Emitting every package's declarations is a
+separate, heavier verification command rather than work hidden inside lint.
 
 The first feature packages must not wait for a later cleanup to establish this
 gate. Agents, Entitlements, shared Configuration, the Design System, and the
 architecture tool itself should be born behind the same record requirements
 that future packages inherit.
+
+Architecture lint is deliberately narrow. It encodes stable facts visible from
+source shape and dependency direction: ownership, package roles, service and
+repository structure, persistence containment, and durable-processing safety.
+It does not provide general dependency-upgrade policy or police formatting,
+complexity, or subjective implementation preferences. It does reject an
+explicitly retired runtime or package entry point when allowing both versions
+would break the repository's contract boundary. Package managers, TypeScript,
+ordinary Oxlint, Oxfmt, tests, and review handle the remaining concerns.
+Retired entry points are an explicit, small source-rule map; the lint does not
+infer freshness from registry versions or semver ranges.
 
 ## Decision
 
@@ -172,12 +184,13 @@ fails the gate.
 The same declaration scan prevents an apparently portable contract or web
 package from re-exporting a forbidden type indirectly.
 
-Governed feature contracts use Zod 4 through `zod`, and any other governed
-feature package that declares Zod uses the same major. The manifest check
-rejects older Zod majors, while the source rule rejects `zod/v3`,
-`@hono/zod-validator` and `hono-openapi/zod`. REST adapters consume contract
+Feature contracts remain transport-neutral. The source rule rejects
+`@hono/zod-validator` and `hono-openapi/zod`; REST adapters consume contract
 schemas through Standard Schema instead of coupling a feature to a
-Hono-specific schema adapter.
+Hono-specific adapter. Zod 3 is an explicitly retired package runtime, so
+feature contracts declare Zod 4 and governed feature surfaces may not
+reintroduce `zod/v3`. This is a narrow compatibility invariant, not a general
+dependency-upgrade rule.
 
 ### Failures are actionable and adoption is strict
 
@@ -200,8 +213,10 @@ root ownership and the prohibition on reading environment variables inside
 feature packages. The `langwatch/service-classes` rule requires service modules
 to export service classes with a static `create` method and rejects exported
 standalone service factories. Private, pure module-local helpers remain valid
-implementation details. `langwatch/no-conditional-spread` and Oxlint's
-`no-nested-ternary` keep control flow explicit in feature server code.
+implementation details. `langwatch/service-dependencies` rejects repository
+reach-through: a service
+may import repositories owned by its own feature or legacy domain, while
+cross-domain collaboration must use the other domain's service.
 
 The plugin operates on production source. Tests may import their test runner
 and Node tooling, but cross-package and export-map boundaries still apply.
@@ -232,21 +247,29 @@ configuration; none of these surfaces is a product HTTP or worker transport.
 
 ### Dependencies
 
-The source rule runs through Oxlint's JavaScript plugin interface. The
-workspace checker uses TypeScript only for declaration emission and Node file
-APIs for deterministic manifest, graph, ADR, and specification inspection.
+The source rule runs through Oxlint's JavaScript plugin interface. The fast
+workspace checker uses TypeScript only for lightweight syntax inspection and
+Node file APIs for deterministic manifest, graph, ADR, and specification
+inspection. The separate declaration check uses TypeScript declaration emit.
 
 ### Persistence
 
-Architecture lint owns no persistence. It reads the current source tree and
-package manifests without writing a cache, baseline, generated policy file, or
-exception registry that could drift from the checked repository.
+The normal architecture lint owns no persistence. It reads the current source
+tree and package manifests without writing a cache or generated policy file.
+The separate application-migration audit reads one checked-in, exact shrinking
+baseline; it cannot add or regenerate accepted edges automatically.
 
 ### Runtime and registration
 
 The root `lint:architecture` script loads the plugin and then invokes the
 workspace CLI. Importing the package registers nothing, and CI receives a
-non-zero exit only from violations found during that explicit invocation.
+non-zero exit only from violations found during that explicit invocation. The
+root `lint:architecture:declarations` command opts into declaration emit and
+the corresponding public-surface leak checks.
+
+The temporary `platform/app` edge baseline is reconciled by
+`lint:architecture:migration`, not the ordinary hot path. Source imports of
+retired entry points such as `@ee/*` still fail immediately in Oxlint.
 
 ### Environment and configuration
 
@@ -264,8 +287,8 @@ alternative. The CLI formats all violations and exits non-zero once.
 
 Fixture tests exercise valid and invalid package graphs, source syntax,
 declaration leaks, and architecture-record completeness. Required ADR sections
-must contain a short explanation or explicitly state why a concern does not
-apply, so heading-only records cannot satisfy the gate.
+must exist, the record declares its status, and it links the behavioural spec.
+Whether the prose is useful and specific is deliberately left to review.
 
 ## Alternatives considered
 
