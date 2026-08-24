@@ -40,11 +40,11 @@ import {
 } from "~/utils/posthogErrorCapture";
 
 import type {
+  GovernancePuller as PullerAdapter,
   NormalizedPullEvent,
-  PullerAdapter,
   PullResult,
   PullRunOptions,
-} from "./pullerAdapter";
+} from "@langwatch/enterprise-governance-contract";
 
 const logger = createLogger("langwatch:puller:s3_polling");
 

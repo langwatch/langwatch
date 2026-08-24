@@ -8,15 +8,16 @@
  * Add new adapters by registering them here AND exporting them from
  * this module so admin-UI source-type discovery picks them up.
  */
+import { PullerRegistryService } from "@langwatch/enterprise-governance-server";
 import { AnthropicAdminPuller } from "./anthropicAdmin.puller";
 import { ClaudeComplianceReferencePuller } from "./claudeCompliance.puller";
 import { CopilotStudioReferencePuller } from "./copilotStudio.puller";
 import { DatabricksGeniePuller } from "./databricksGenie.puller";
 import { HttpPollingPullerAdapter } from "./httpPollingPullerAdapter";
 import { OpenAiComplianceReferencePuller } from "./openaiCompliance.puller";
-import { pullerAdapterRegistry } from "./pullerAdapter";
 import { S3PollingPullerAdapter } from "./s3PollingPullerAdapter";
 
+const pullerAdapterRegistry = PullerRegistryService.create();
 let registered = false;
 
 export function registerBuiltInPullers(): void {
@@ -47,10 +48,10 @@ export type { HttpPollingConfig } from "./httpPollingPullerAdapter";
 export { OPENAI_COMPLIANCE_PULL_CONFIG } from "./openaiCompliance.puller";
 export type {
   NormalizedPullEvent,
-  PullerAdapter,
+  GovernancePuller as PullerAdapter,
   PullResult,
   PullRunOptions,
-} from "./pullerAdapter";
+} from "@langwatch/enterprise-governance-contract";
 export type { S3PollingConfig } from "./s3PollingPullerAdapter";
 export {
   AnthropicAdminPuller,

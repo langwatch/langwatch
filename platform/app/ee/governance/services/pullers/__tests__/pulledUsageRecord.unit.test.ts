@@ -11,7 +11,7 @@ import {
   buildPulledUsageRecord,
   type PulledUsageSourceAttribution,
 } from "../pulledUsageRecord";
-import type { NormalizedPullEvent } from "../pullerAdapter";
+import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 
 const SOURCE: PulledUsageSourceAttribution = {
   ingestionSourceId: "src_1",

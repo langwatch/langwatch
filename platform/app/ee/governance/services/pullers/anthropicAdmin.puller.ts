@@ -39,11 +39,11 @@ import { z } from "zod";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import { PULLED_USAGE_HINT_KEY } from "./pulledUsageRecord";
 import type {
+  GovernancePuller as PullerAdapter,
   NormalizedPullEvent,
-  PullerAdapter,
   PullResult,
   PullRunOptions,
-} from "./pullerAdapter";
+} from "@langwatch/enterprise-governance-contract";
 
 const logger = createLogger("langwatch:governance:anthropic-admin-puller");
 

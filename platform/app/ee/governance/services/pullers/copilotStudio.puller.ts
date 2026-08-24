@@ -19,7 +19,10 @@ import {
   type HttpPollingConfig,
   HttpPollingPullerAdapter,
 } from "./httpPollingPullerAdapter";
-import type { PullResult, PullRunOptions } from "./pullerAdapter";
+import type {
+  PullResult,
+  PullRunOptions,
+} from "@langwatch/enterprise-governance-contract";
 
 /**
  * Locked reference config for Microsoft Copilot Studio. The URL +

@@ -1,23 +1,12 @@
+import type {
+  PullResult,
+  PullRunOptions,
+} from "@langwatch/enterprise-governance-contract";
+
 export interface RegisteredGovernancePuller {
   readonly id: string;
   validateConfig(config: unknown): unknown;
-  runOnce(
-    options: {
-      cursor: string | null;
-      credentials?: Record<string, string>;
-      context?: { organizationId: string; ingestionSourceId: string };
-      deadlineMs?: number;
-      signal?: {
-        readonly aborted: boolean;
-        readonly reason?: unknown;
-      };
-    },
-    config: unknown,
-  ): Promise<{
-    events: unknown[];
-    cursor: string | null;
-    errorCount: number;
-  }>;
+  runOnce(options: PullRunOptions, config: unknown): Promise<PullResult>;
 }
 
 export class PullerRegistryService {

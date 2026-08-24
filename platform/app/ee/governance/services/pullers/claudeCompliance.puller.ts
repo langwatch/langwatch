@@ -23,7 +23,10 @@ import {
   type HttpPollingConfig,
   HttpPollingPullerAdapter,
 } from "./httpPollingPullerAdapter";
-import type { PullResult, PullRunOptions } from "./pullerAdapter";
+import type {
+  PullResult,
+  PullRunOptions,
+} from "@langwatch/enterprise-governance-contract";
 
 /**
  * Locked reference config for Anthropic's compliance API. Admins

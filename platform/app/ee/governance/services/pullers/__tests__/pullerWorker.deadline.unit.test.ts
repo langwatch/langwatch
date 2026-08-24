@@ -12,7 +12,10 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { PullResult, PullRunOptions } from "../pullerAdapter";
+import type {
+  PullResult,
+  PullRunOptions,
+} from "@langwatch/enterprise-governance-contract";
 
 const sourceFindUnique = vi.fn();
 const sourceUpdate = vi.fn();
@@ -83,7 +86,7 @@ function hangingAdapter() {
 }
 
 async function loadWorkerWith(adapter: { id: string }) {
-  const { pullerAdapterRegistry } = await import("../pullerAdapter");
+  const { pullerAdapterRegistry } = await import("../index");
   pullerAdapterRegistry.register(adapter as never);
   return import("../pullerWorker");
 }

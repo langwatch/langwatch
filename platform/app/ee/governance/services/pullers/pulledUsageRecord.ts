@@ -23,7 +23,7 @@ import {
 import { AppPulledUsagePricingService } from "@ee/event-sourcing/pipelines/pulled-usage-processing/services/pulled-usage-pricing.service";
 import { z } from "zod";
 
-import type { NormalizedPullEvent } from "./pullerAdapter";
+import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 
 /** The key an adapter attaches its usage hint under, inside `extra`. */
 export const PULLED_USAGE_HINT_KEY = "pulled_usage" as const;

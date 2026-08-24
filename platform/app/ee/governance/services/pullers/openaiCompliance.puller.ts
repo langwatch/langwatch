@@ -24,7 +24,10 @@
  *       (same lock-the-shape pattern; openai/claude follow as ⏳ rows)
  */
 
-import type { PullResult, PullRunOptions } from "./pullerAdapter";
+import type {
+  PullResult,
+  PullRunOptions,
+} from "@langwatch/enterprise-governance-contract";
 import {
   type S3PollingConfig,
   S3PollingPullerAdapter,

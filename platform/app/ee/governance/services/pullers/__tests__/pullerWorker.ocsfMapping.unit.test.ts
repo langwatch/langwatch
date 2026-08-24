@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { NormalizedPullEvent } from "../pullerAdapter";
+import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 
 // We re-import the mapping helper from the worker module's internals
 // via a small shim. Keeping the helper unexported keeps the worker

@@ -23,11 +23,11 @@ import { z } from "zod";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 
 import type {
+  GovernancePuller as PullerAdapter,
   NormalizedPullEvent,
-  PullerAdapter,
   PullResult,
   PullRunOptions,
-} from "./pullerAdapter";
+} from "@langwatch/enterprise-governance-contract";
 
 const logger = createLogger("langwatch:puller:http_polling");
 
