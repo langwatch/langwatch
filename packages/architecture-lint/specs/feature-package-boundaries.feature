@@ -137,6 +137,13 @@ Feature: Feature package boundary lint
     And placeholder text does not satisfy a required section
     And an explicitly documented not-applicable concern is accepted
 
+  @unit @architecture
+  Scenario: Test fixtures have a named non-production home
+    Given a strict server package contains a lower-case kebab-case fixture under src/fixtures
+    When architecture lint checks the package
+    Then the fixture path is accepted
+    And production consumers still use the package root instead of the testing subpath
+
   @integration @architecture
   Scenario: Repository lint includes package architecture
     Given the monorepo contains nested feature packages

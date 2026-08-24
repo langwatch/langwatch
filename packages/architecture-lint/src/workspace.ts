@@ -1,8 +1,10 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import type {
+  ApplicationPackageRole,
   ArchitectureViolation,
   ClassifiedPackage,
+  EnterpriseCompositionRole,
   FeatureLayoutVersion,
   FeaturePackageRole,
   PackageManifest,
@@ -13,6 +15,26 @@ const FEATURE_ROLES = new Set<FeaturePackageRole>([
   "server",
   "web",
 ]);
+
+const APPLICATION_PACKAGES: ReadonlyArray<{
+  role: ApplicationPackageRole;
+  path: string;
+  name: string;
+}> = [
+  { role: "ui", path: "ui", name: "@langwatch/ui" },
+  { role: "api", path: "api", name: "@langwatch/platform-api" },
+  { role: "worker", path: "worker", name: "@langwatch/worker" },
+  { role: "server", path: "server", name: "@langwatch/server" },
+];
+
+const ENTERPRISE_COMPOSITION_PACKAGES: ReadonlyArray<{
+  role: EnterpriseCompositionRole;
+  name: string;
+}> = [
+  { role: "api", name: "@langwatch/enterprise-api" },
+  { role: "worker", name: "@langwatch/enterprise-worker" },
+  { role: "web", name: "@langwatch/enterprise-web" },
+];
 
 function readManifest(path: string): PackageManifest {
   return JSON.parse(readFileSync(path, "utf8")) as PackageManifest;
@@ -134,6 +156,248 @@ export function discoverClassifiedPackages(root: string): {
 
   discoverFeatures(join(root, "packages", "features"), false);
   discoverFeatures(join(root, "packages", "enterprise", "features"), true);
+
+  const sharedApplicationRoot = join(root, "apps", "shared");
+  if (existsSync(sharedApplicationRoot)) {
+    violations.push({
+      policy: "application-layout",
+      file: sharedApplicationRoot,
+      message: "apps/shared is not an application or a reusable package boundary.",
+      allowed:
+        "Put product behaviour in its feature package and shared infrastructure in a deliberately named package.",
+    });
+  }
+
+  const applicationsRoot = join(root, "apps");
+  for (const directory of directories(applicationsRoot)) {
+    if (APPLICATION_PACKAGES.some(({ path }) => path === directory)) continue;
+    const unexpectedManifest = join(
+      applicationsRoot,
+      directory,
+      "package.json",
+    );
+    if (!existsSync(unexpectedManifest) || directory === "shared") continue;
+    violations.push({
+      policy: "application-layout",
+      file: unexpectedManifest,
+      message: `Unknown application workspace apps/${directory}.`,
+      allowed: "The fixed application roots are ui, api, worker, and server.",
+    });
+  }
+
+  for (const application of APPLICATION_PACKAGES) {
+    const applicationRoot = join(root, "apps", application.path);
+    const manifestPath = join(applicationRoot, "package.json");
+    if (!existsSync(manifestPath)) continue;
+    const manifest = readManifest(manifestPath);
+    if (manifest.name !== application.name) {
+      violations.push({
+        policy: "application-layout",
+        file: manifestPath,
+        message: `Application package at apps/${application.path} must be named "${application.name}", found ${JSON.stringify(manifest.name)}.`,
+      });
+    }
+    packages.push({
+      name: manifest.name ?? application.name,
+      root: applicationRoot,
+      manifestPath,
+      manifest,
+      kind: "application",
+      applicationRole: application.role,
+      enterprise: false,
+    });
+  }
+
+  const devRuntimeRoot = join(root, "tools", "dev-runtime");
+  const devRuntimeManifest = join(devRuntimeRoot, "package.json");
+  if (existsSync(devRuntimeManifest)) {
+    const manifest = readManifest(devRuntimeManifest);
+    if (manifest.private !== true) {
+      violations.push({
+        policy: "application-layout",
+        file: devRuntimeManifest,
+        message: "tools/dev-runtime must be a private contributor package.",
+        allowed: 'Set "private": true; the combined runtime is never shipped.',
+      });
+    }
+    packages.push({
+      name: manifest.name ?? "@langwatch/dev-runtime",
+      root: devRuntimeRoot,
+      manifestPath: devRuntimeManifest,
+      manifest,
+      kind: "dev-runtime",
+      enterprise: false,
+    });
+  }
+
+  const enterpriseRoot = join(root, "packages", "enterprise");
+  const enterpriseLicense = join(enterpriseRoot, "LICENSE.md");
+  const enterpriseReadme = join(enterpriseRoot, "README.md");
+  const enterpriseManifest = join(enterpriseRoot, "package.json");
+  const hasEnterprisePackages =
+    existsSync(enterpriseManifest) ||
+    ENTERPRISE_COMPOSITION_PACKAGES.some(({ role }) =>
+      existsSync(join(enterpriseRoot, "composition", role, "package.json")),
+    ) ||
+    packages.some((pkg) => pkg.enterprise);
+
+  if (hasEnterprisePackages && !existsSync(enterpriseLicense)) {
+    violations.push({
+      policy: "enterprise-layout",
+      file: enterpriseLicense,
+      message:
+        "packages/enterprise/LICENSE.md must govern every Enterprise package before source is placed in this tree.",
+    });
+  }
+  if (hasEnterprisePackages && !existsSync(enterpriseReadme)) {
+    violations.push({
+      policy: "enterprise-layout",
+      file: enterpriseReadme,
+      message:
+        "packages/enterprise/README.md must explain and catalogue the governed Enterprise tree.",
+    });
+  }
+  if (
+    existsSync(enterpriseLicense) &&
+    !/^#\s+LangWatch Enterprise License\s*$/m.test(
+      readFileSync(enterpriseLicense, "utf8"),
+    )
+  ) {
+    violations.push({
+      policy: "enterprise-license",
+      file: enterpriseLicense,
+      message:
+        "packages/enterprise/LICENSE.md must contain the LangWatch Enterprise License.",
+    });
+  }
+
+  if (existsSync(enterpriseManifest)) {
+    const manifest = readManifest(enterpriseManifest);
+    if (manifest.name !== "@langwatch/enterprise") {
+      violations.push({
+        policy: "enterprise-layout",
+        file: enterpriseManifest,
+        message:
+          'The portable Enterprise catalogue package must be named "@langwatch/enterprise".',
+      });
+    }
+    if (
+      typeof manifest.license !== "string" ||
+      !/LICENSE\.md/i.test(manifest.license) ||
+      /Apache-2\.0/i.test(manifest.license)
+    ) {
+      violations.push({
+        policy: "enterprise-license",
+        file: enterpriseManifest,
+        message:
+          "The Enterprise root manifest must identify packages/enterprise/LICENSE.md rather than an Apache license.",
+        allowed: 'Use "license": "SEE LICENSE IN LICENSE.md".',
+      });
+    }
+    packages.push({
+      name: manifest.name ?? "@langwatch/enterprise",
+      root: enterpriseRoot,
+      manifestPath: enterpriseManifest,
+      manifest,
+      kind: "enterprise-root",
+      enterprise: true,
+    });
+  }
+
+  for (const composition of ENTERPRISE_COMPOSITION_PACKAGES) {
+    const compositionRoot = join(
+      enterpriseRoot,
+      "composition",
+      composition.role,
+    );
+    const manifestPath = join(compositionRoot, "package.json");
+    if (!existsSync(manifestPath)) continue;
+    const manifest = readManifest(manifestPath);
+    if (manifest.name !== composition.name) {
+      violations.push({
+        policy: "enterprise-layout",
+        file: manifestPath,
+        message: `Enterprise ${composition.role} composition must be named "${composition.name}", found ${JSON.stringify(manifest.name)}.`,
+      });
+    }
+    packages.push({
+      name: manifest.name ?? composition.name,
+      root: compositionRoot,
+      manifestPath,
+      manifest,
+      kind: "enterprise-composition",
+      enterpriseCompositionRole: composition.role,
+      enterprise: true,
+    });
+  }
+
+  if (existsSync(enterpriseRoot)) {
+    for (const directory of directories(enterpriseRoot)) {
+      if (directory === "composition" || directory === "features") continue;
+      const unexpectedManifest = join(
+        enterpriseRoot,
+        directory,
+        "package.json",
+      );
+      if (!existsSync(unexpectedManifest)) continue;
+      violations.push({
+        policy: "enterprise-layout",
+        file: unexpectedManifest,
+        message: `Enterprise aggregate package at packages/enterprise/${directory} is outside the fixed package layout.`,
+        allowed:
+          "Use the portable root, composition/{api,worker,web}, or features/<feature>/{contract,server,web}.",
+      });
+    }
+    const compositionRoot = join(enterpriseRoot, "composition");
+    for (const directory of directories(compositionRoot)) {
+      if (
+        ENTERPRISE_COMPOSITION_PACKAGES.some(({ role }) => role === directory)
+      ) {
+        continue;
+      }
+      const unexpectedManifest = join(
+        compositionRoot,
+        directory,
+        "package.json",
+      );
+      if (!existsSync(unexpectedManifest)) continue;
+      violations.push({
+        policy: "enterprise-layout",
+        file: unexpectedManifest,
+        message: `Unknown Enterprise composition role "${directory}".`,
+        allowed: "Use api, worker, or web.",
+      });
+    }
+  }
+
+  for (const directory of directories(join(root, "packages"))) {
+    if (directory === "enterprise") continue;
+    const manifestPath = join(root, "packages", directory, "package.json");
+    if (!existsSync(manifestPath)) continue;
+    const manifest = readManifest(manifestPath);
+    if (!manifest.name?.startsWith("@langwatch/enterprise")) continue;
+    violations.push({
+      policy: "enterprise-layout",
+      file: manifestPath,
+      message: `${manifest.name} is an Enterprise aggregate outside packages/enterprise.`,
+      allowed:
+        "Use the portable root, composition/{api,worker,web}, or features/<feature>/{contract,server,web}.",
+    });
+  }
+
+  for (const pkg of packages) {
+    if (!pkg.enterprise || pkg.kind === "enterprise-root") continue;
+    if (/Apache-2\.0/i.test(pkg.manifest.license ?? "")) {
+      violations.push({
+        policy: "enterprise-license",
+        file: pkg.manifestPath,
+        message:
+          "An Enterprise descendant package cannot claim that its source is Apache-2.0.",
+        allowed:
+          "Inherit the LangWatch Enterprise license rooted at packages/enterprise/LICENSE.md.",
+      });
+    }
+  }
 
   const designSystemRoot = join(root, "packages", "design-system");
   const designSystemManifest = join(designSystemRoot, "package.json");

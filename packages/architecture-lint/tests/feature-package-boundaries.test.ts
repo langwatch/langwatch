@@ -334,6 +334,10 @@ describe("strict feature source layout", () => {
       "packages/features/agents/server/src/api/internal/agent.api.ts",
       "export class AgentApi { static create() { return new AgentApi(); } }",
     );
+    write(
+      "packages/features/agents/server/src/fixtures/agent.fixture.ts",
+      "export const agentFixture = { id: 'agent_1' };",
+    );
 
     expect(policies()).not.toContain("feature-source-layout");
   });
@@ -389,5 +393,82 @@ describe("strict feature source layout", () => {
       (policy) => policy === "feature-source-layout",
     );
     expect(layoutPolicies.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("Prisma client containment", () => {
+  /** @scenario Prisma imports stay in concrete adapters */
+  it("allows generated Prisma only in strict feature Prisma adapters", () => {
+    featurePackage({ feature: "agents", role: "server" });
+    write(
+      "packages/features/agents/server/src/repositories/prisma/prisma.agents.repository.ts",
+      'import type { Prisma } from "@langwatch/prisma-client/generated"; export class PrismaAgentsRepository { static create(_query: Prisma.AgentWhereInput) { return new PrismaAgentsRepository(); } }',
+    );
+
+    expect(policies()).not.toContain("prisma-containment");
+  });
+
+  it("rejects generated Prisma from contract, web, and feature service source", () => {
+    featurePackage({
+      feature: "agents",
+      role: "contract",
+      source:
+        'export type { PrismaClient } from "@langwatch/prisma-client/generated";',
+    });
+    featurePackage({
+      feature: "agents",
+      role: "web",
+      source:
+        'export type { PrismaClient } from "@langwatch/prisma-client/generated";',
+    });
+    featurePackage({ feature: "agents", role: "server" });
+    write(
+      "packages/features/agents/server/src/services/agents.service.ts",
+      'import type { PrismaClient } from "@langwatch/prisma-client/generated"; export class AgentsService { static create(_client: PrismaClient) { return new AgentsService(); } }',
+    );
+
+    expect(
+      policies().filter((policy) => policy === "prisma-containment"),
+    ).toHaveLength(3);
+  });
+
+  it("allows lifecycle construction in an app but rejects it from feature services", () => {
+    featurePackage({ feature: "agents", role: "server" });
+    write(
+      "packages/features/agents/server/src/services/agents.service.ts",
+      'import type { PrismaConnectionService } from "@langwatch/prisma-client"; export class AgentsService { static create(_connection: PrismaConnectionService) { return new AgentsService(); } }',
+    );
+    write(
+      "apps/api/package.json",
+      JSON.stringify({
+        name: "@langwatch/platform-api",
+        type: "module",
+        exports: { ".": "./src/index.ts" },
+      }),
+    );
+    write(
+      "apps/api/src/index.ts",
+      'import { PrismaConnectionService } from "@langwatch/prisma-client"; export { PrismaConnectionService };',
+    );
+
+    expect(
+      policies().filter((policy) => policy === "prisma-containment"),
+    ).toHaveLength(1);
+  });
+
+  /** @scenario Prisma cannot leak through public declarations */
+  it("rejects generated Prisma reached through a public server re-export", () => {
+    featurePackage({
+      feature: "agents",
+      role: "server",
+      source:
+        'export type { PrismaBacked } from "./repositories/prisma/prisma.agents.repository";',
+    });
+    write(
+      "packages/features/agents/server/src/repositories/prisma/prisma.agents.repository.ts",
+      'export type { Prisma as PrismaBacked } from "@langwatch/prisma-client/generated";',
+    );
+
+    expect(policies({ declarations: true })).toContain("public-declarations");
   });
 });

@@ -14,6 +14,7 @@ const CONTRACT_ARTIFACT_SUFFIX =
 const SERVER_PATTERNS = [
   /^index\.ts$/,
   /^testing\.ts$/,
+  new RegExp(`^fixtures/${NAME}\.fixture\.ts$`),
   new RegExp(`^services/${NAME}\\.service\\.ts$`),
   new RegExp(`^ports/${NAME}\\.port\\.ts$`),
   new RegExp(`^repositories/${NAME}\\.repository\\.ts$`),

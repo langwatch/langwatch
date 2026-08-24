@@ -19,6 +19,49 @@ function isZod4Range(value: string | undefined): boolean {
   return value !== undefined && /(?:^|[^\d])4(?:\.|$)/.test(value);
 }
 
+function isEnterpriseRuntimeDependency(name: string): boolean {
+  return [
+    /^node:/,
+    /^react(?:\/|$)/,
+    /^react-dom(?:\/|$)/,
+    /^@chakra-ui(?:\/|$)/,
+    /^hono(?:\/|$)/,
+    /^@hono(?:\/|$)/,
+    /^@trpc(?:\/|$)/,
+    /^@prisma(?:\/|$)/,
+    /^@langwatch\/prisma-client(?:\/|$)/,
+    /^@langwatch\/api(?:\/|$)/,
+  ].some((pattern) => pattern.test(name));
+}
+
+function compatibleEnterpriseCompositionTarget(
+  pkg: ClassifiedPackage,
+  target: ClassifiedPackage,
+): boolean {
+  if (target.kind === "contract") return true;
+  if (!target.enterprise || !target.feature) return false;
+  if (pkg.enterpriseCompositionRole === "web") return target.kind === "web";
+  return target.kind === "server";
+}
+
+function matchingEnterpriseComposition(
+  pkg: ClassifiedPackage,
+  target: ClassifiedPackage,
+): boolean {
+  if (target.kind !== "enterprise-composition") return true;
+  if (pkg.kind !== "application") return false;
+  if (pkg.applicationRole === "ui") {
+    return target.enterpriseCompositionRole === "web";
+  }
+  if (pkg.applicationRole === "api") {
+    return target.enterpriseCompositionRole === "api";
+  }
+  if (pkg.applicationRole === "worker") {
+    return target.enterpriseCompositionRole === "worker";
+  }
+  return false;
+}
+
 export function manifestDependencies(
   manifest: PackageManifest,
 ): Record<string, string> {
@@ -79,8 +122,99 @@ export function lintManifests(
 
     for (const dependency of Object.keys(manifestDependencies(pkg.manifest))) {
       const target = byName.get(dependency);
+      if (
+        pkg.kind === "enterprise-root" &&
+        isEnterpriseRuntimeDependency(dependency)
+      ) {
+        violations.push({
+          policy: "enterprise-composition",
+          file: pkg.manifestPath,
+          specifier: dependency,
+          message:
+            "The portable Enterprise catalogue cannot depend on runtime, transport, persistence, or UI packages.",
+          allowed: "Depend only on portable feature contracts.",
+        });
+      }
       if (!target) continue;
-      if (!pkg.enterprise && target.enterprise) {
+      if (
+        pkg.kind === "application" &&
+        target.kind === "application" &&
+        target !== pkg
+      ) {
+        violations.push({
+          policy: "application-boundary",
+          file: pkg.manifestPath,
+          specifier: dependency,
+          message: `Application ${pkg.applicationRole} cannot depend on application ${target.applicationRole}.`,
+          allowed:
+            "Move reusable behaviour to its owning feature or infrastructure package.",
+        });
+      }
+      if (
+        target.kind === "enterprise-composition" &&
+        !matchingEnterpriseComposition(pkg, target)
+      ) {
+        violations.push({
+          policy: "enterprise-composition",
+          file: pkg.manifestPath,
+          specifier: dependency,
+          message: `${pkg.name} cannot depend on the ${target.enterpriseCompositionRole} Enterprise composition package.`,
+          allowed:
+            pkg.kind === "application"
+              ? `Use only the Enterprise composition matching apps/${pkg.applicationRole}.`
+              : "Only the matching application composition root may consume this package.",
+        });
+      }
+      if (
+        pkg.kind === "enterprise-composition" &&
+        target.kind === "enterprise-composition"
+      ) {
+        violations.push({
+          policy: "enterprise-composition",
+          file: pkg.manifestPath,
+          specifier: dependency,
+          message:
+            "Enterprise API, worker, and web composition packages cannot depend on one another.",
+        });
+      }
+      if (
+        pkg.kind === "enterprise-composition" &&
+        target.feature &&
+        !compatibleEnterpriseCompositionTarget(pkg, target)
+      ) {
+        violations.push({
+          policy: "enterprise-composition",
+          file: pkg.manifestPath,
+          specifier: dependency,
+          message: `The ${pkg.enterpriseCompositionRole} Enterprise composition cannot import ${target.kind} surface ${target.name}.`,
+          allowed:
+            pkg.enterpriseCompositionRole === "web"
+              ? "Depend only on portable contracts and Enterprise web surfaces."
+              : `Depend only on portable contracts and Enterprise ${pkg.enterpriseCompositionRole} or server installers.`,
+        });
+      }
+      if (
+        pkg.kind === "enterprise-root" &&
+        target.kind !== "contract"
+      ) {
+        violations.push({
+          policy: "enterprise-composition",
+          file: pkg.manifestPath,
+          specifier: dependency,
+          message:
+            "The portable Enterprise catalogue cannot depend on implementation or composition packages.",
+          allowed: "Depend only on portable feature contracts.",
+        });
+      }
+      if (
+        !pkg.enterprise &&
+        target.enterprise &&
+        !(
+          pkg.kind === "application" &&
+          target.kind === "enterprise-composition" &&
+          matchingEnterpriseComposition(pkg, target)
+        )
+      ) {
         violations.push({
           policy: "enterprise-direction",
           file: pkg.manifestPath,

@@ -94,6 +94,7 @@ contract/src/
 server/src/
 ├── index.ts
 ├── testing.ts
+├── fixtures/<subject>.fixture.ts
 ├── services/<subject>.service.ts
 ├── repositories/<subject>.repository.ts
 ├── repositories/<adapter>/<adapter>.<subject>.repository.ts
@@ -192,6 +193,14 @@ An adapter binds a concrete technology or a set of private ports without moving
 business behaviour out of the service. For example,
 `adapters/prisma.agent.adapter.ts` binds a private Prisma repository to
 `AgentService`. Adapters are classes with `static create`.
+
+### Testing fixtures
+
+Reusable, inert test data lives in `server/src/fixtures/<subject>.fixture.ts`
+and is exposed only through the deliberate `./testing` package subpath. Fixture
+modules may export pure values and builders; production source must not import
+that subpath. A fixture is not an adapter and must not be placed under
+`adapters/` merely to make it reachable from tests.
 
 ### API
 

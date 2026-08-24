@@ -1,13 +1,30 @@
 import { relative, resolve } from "node:path";
+import { lintApplicationBoundaries } from "./application-boundaries";
 import { lintArchitectureRecords } from "./architecture-records";
 import { lintCycles } from "./cycles";
 import { lintDeclarations } from "./declarations";
 import { lintFeatureLayouts } from "./feature-layout";
 import { lintManifests } from "./manifests";
+import { lintPrismaBoundaries } from "./prisma-boundaries";
 import type { ArchitectureViolation, LintWorkspaceOptions } from "./types";
 import { discoverClassifiedPackages } from "./workspace";
 
-export type { ArchitectureViolation, LintWorkspaceOptions } from "./types";
+export type {
+  ApplicationPackageRole,
+  ArchitectureViolation,
+  ClassifiedPackage,
+  EnterpriseCompositionRole,
+  LintWorkspaceOptions,
+  PackageKind,
+} from "./types";
+export type {
+  LegacyApplicationBoundaryEdge,
+  LegacyApplicationBoundaryKind,
+} from "./application-boundaries";
+export {
+  collectLegacyApplicationBoundaryEdges,
+  formatLegacyApplicationBoundaryBaseline,
+} from "./application-boundaries";
 export { discoverClassifiedPackages } from "./workspace";
 
 export function lintWorkspace(
@@ -20,6 +37,8 @@ export function lintWorkspace(
     ...lintFeatureLayouts(discovery.packages),
     ...lintArchitectureRecords(discovery.packages),
     ...lintManifests(discovery.packages),
+    ...lintApplicationBoundaries(root, discovery.packages),
+    ...lintPrismaBoundaries(discovery.packages),
     ...lintCycles(discovery.packages),
     ...(options.declarations === false
       ? []
