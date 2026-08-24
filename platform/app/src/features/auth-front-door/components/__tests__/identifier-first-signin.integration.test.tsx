@@ -51,6 +51,10 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
+vi.mock("~/hooks/usePublicEnv", () => ({
+  usePublicEnv: () => ({ data: { IS_SAAS: true } }),
+}));
+
 vi.mock("~/utils/auth-client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/utils/auth-client")>();
   return {

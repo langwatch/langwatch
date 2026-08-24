@@ -2,7 +2,7 @@ import { Box, HStack, Text } from "@chakra-ui/react";
 import { type ReactNode, useId } from "react";
 import type { FieldError } from "react-hook-form";
 import "../authFrontDoor.css";
-import { BRAND } from "../logic/brand";
+import { BRAND, MONO_FONT } from "../logic/brand";
 
 /**
  * One labelled row of the front door's forms: a small quiet label, the input,
@@ -35,8 +35,17 @@ export function FrontDoorField({
 
   return (
     <Box width="full">
-      <HStack width="full" justify="space-between" marginBottom="6px">
-        <Text asChild fontSize="13px" color="fg.muted">
+      <HStack width="full" justify="space-between" marginBottom="7px">
+        {/* The site's small technical voice: mono, spaced, quiet — the same
+            register the "or" divider speaks in. */}
+        <Text
+          asChild
+          fontFamily={MONO_FONT}
+          fontSize="11px"
+          textTransform="uppercase"
+          letterSpacing="0.14em"
+          color="fg.muted"
+        >
           <label htmlFor={id}>{label}</label>
         </Text>
         {labelEnd ?? null}

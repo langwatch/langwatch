@@ -19,6 +19,7 @@ import {
 } from "../logic/methodLabels";
 import { CheckYourEmail } from "./CheckYourEmail";
 import { CredentialSignInForm } from "./CredentialSignInForm";
+import { FrontDoorFinePrint } from "./FrontDoorFinePrint";
 import { IdentifierStepForm } from "./IdentifierStepForm";
 import {
   AlternativeMethods,
@@ -165,7 +166,7 @@ export function IdentifierFirstSignIn() {
   }
 
   return (
-    <AuthCard title="Log in to LangWatch">
+    <AuthCard title="Log in to LangWatch" finePrint={<FrontDoorFinePrint />}>
       <IdentifierStepForm
         submitLabel="Continue"
         isSubmitting={routing.isDeciding}
@@ -284,7 +285,9 @@ function SignUpLink({
         textDecorationColor="border"
         _hover={{ textDecorationColor: "fg" }}
       >
-        <Link href={`/auth/signup${query ? `?${query}` : ""}`}>{linked}</Link>
+        <Link viewTransition href={`/auth/signup${query ? `?${query}` : ""}`}>
+          {linked}
+        </Link>
       </Box>
     </Text>
   );

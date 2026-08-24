@@ -62,7 +62,9 @@ export function FrontDoorShell({
       {isHosted && headline ? (
         // Capped at the site's content width and centred, so a big monitor
         // widens the field around the conversation rather than flinging the
-        // headline and the card to opposite edges of it.
+        // headline and the card to opposite edges of it. Both doors keep the
+        // same seats — words on the left, card on the right — so crossing
+        // between them only changes what is said, never where anything is.
         <Flex
           position="relative"
           zIndex={1}

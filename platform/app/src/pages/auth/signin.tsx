@@ -44,10 +44,14 @@ export default function SignIn() {
   if (!frontDoor.isResolved) return null;
   if (frontDoor.enabled) {
     return (
-      // Log-in has no case to make: the person already has an account and is
-      // trying to get to it. The panel appears on the hosted sign-up, where a
-      // first-time visitor is deciding.
-      <FrontDoorShell>
+      // The same room as sign-up, same seats: words on the left, card on the
+      // right. The panel greets rather than pitches, because somebody logging
+      // in already made the decision the sign-up headline argues for.
+      <FrontDoorShell
+        headline="Let's see what your agents have been up to."
+        headlineAccent="up to"
+        tagline="Log in and pick up where you left off."
+      >
         <IdentifierFirstSignIn />
       </FrontDoorShell>
     );

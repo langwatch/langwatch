@@ -36,8 +36,9 @@
 	/* The ground the whole viewport stands on: the site's paper. */
 	--lw-front-door-ground: #ffffff;
 	/* The primary action is the site's `btn-primary`: an ink pill, not an
-	   orange one. Orange is the accent here, never the button. */
-	--lw-front-door-action: #141417;
+	   orange one. Orange is the accent here, never the button. A breath of
+	   translucency so the pill reads as glass over the card's glass. */
+	--lw-front-door-action: rgba(20, 20, 23, 0.9);
 	--lw-front-door-action-hover: #26261f;
 	--lw-front-door-on-action: #efeee9;
 	/* Text on a tinted surface, and the tint itself: the brand's own cuts. */
@@ -57,28 +58,32 @@
 		#2563eb 0%,
 		#d9531e 100%
 	);
-	/* The glass the card is made of: the site's light glass — a milky
-	   translucent surface with a bright hairline and an inner highlight, the
-	   ground blurring through it. */
-	--lw-front-door-card-bg: rgba(255, 255, 255, 0.58);
-	--lw-front-door-card-border: rgba(255, 255, 255, 0.8);
+	/* The glass the card is made of: the site's light glass — a thin milky
+	   surface with a bright hairline and an inner highlight, the ground
+	   showing through it. Thin enough that the mesh's colour actually moves
+	   inside the card; the fields below are what carry the type. */
+	--lw-front-door-card-bg: rgba(255, 255, 255, 0.4);
+	--lw-front-door-card-border: rgba(255, 255, 255, 0.85);
 	--lw-front-door-card-shadow:
 		inset 0 1px 1px rgba(255, 255, 255, 0.9),
 		inset 0 0 0 0.5px rgba(255, 255, 255, 0.5),
 		0 24px 48px -20px rgba(20, 20, 23, 0.28);
 	/* Fields sit a step more solid than the card, so type stays crisp. */
-	--lw-front-door-field-bg: rgba(255, 255, 255, 0.72);
+	--lw-front-door-field-bg: rgba(255, 255, 255, 0.62);
 	--lw-front-door-field-border: rgba(20, 20, 23, 0.14);
+	/* The warmth an activation gives off: the brand, as light rather than
+	   as a surface. */
+	--lw-front-door-glow: rgba(245, 107, 26, 0.28);
 }
 
 .dark {
 	/* The site's dark band: ink-950, not the app panel grey. */
 	--lw-front-door-ground: #0a0a0c;
-	/* The action inverts the way the site's dark sections invert everything:
-	   a paper pill with ink text. */
-	--lw-front-door-action: #efeee9;
-	--lw-front-door-action-hover: #ffffff;
-	--lw-front-door-on-action: #0a0a0c;
+	/* On ink, the action is the brand itself: the orange that is LangWatch,
+	   which reads as a light source here the way it never could on paper. */
+	--lw-front-door-action: rgba(245, 107, 26, 0.92);
+	--lw-front-door-action-hover: #ff8a3d;
+	--lw-front-door-on-action: #ffffff;
 	--lw-front-door-ink: #ff8a3d;
 	--lw-front-door-tint: rgba(245, 107, 26, 0.18);
 	--lw-front-door-hairline: rgba(239, 238, 233, 0.14);
@@ -96,15 +101,18 @@
 		#5fa3ff 0%,
 		#ffa24d 100%
 	);
-	/* The site's dark glass, verbatim: border-white/10 over bg-white/[0.03],
-	   nudged just enough for a form to sit on. */
-	--lw-front-door-card-bg: rgba(255, 255, 255, 0.045);
+	/* Dark glass is smoked, not clear: an ink-tinted pane with the site's
+	   white/10 hairline. The glow still moves through the blur, but the type
+	   always has a dark floor under it — a clear film over a bright warp left
+	   the words fighting the light behind them. */
+	--lw-front-door-card-bg: rgba(10, 10, 12, 0.55);
 	--lw-front-door-card-border: rgba(255, 255, 255, 0.1);
 	--lw-front-door-card-shadow:
 		inset 0 1px 0 rgba(255, 255, 255, 0.06),
 		0 24px 60px -24px rgba(0, 0, 0, 0.65);
 	--lw-front-door-field-bg: rgba(255, 255, 255, 0.06);
 	--lw-front-door-field-border: rgba(255, 255, 255, 0.14);
+	--lw-front-door-glow: rgba(255, 138, 61, 0.22);
 }
 
 /*
@@ -133,7 +141,7 @@
 		#cddcf9 72%,
 		#ffffff 100%
 	);
-	opacity: 0.55;
+	opacity: 0.72;
 }
 
 .dark .lw-front-door-ambient-static {
@@ -147,14 +155,37 @@
 	opacity: 1;
 }
 
+/* The live shader arrives, it never pops: the static gradient in the same
+   palette is always painted underneath, and the shader fades in over it once
+   its first frame exists. What a visitor sees is colour that sharpens, not a
+   blank page that suddenly acquires a background. */
+.lw-front-door-shader-arrive {
+	animation: lw-front-door-arrive 700ms ease 120ms both;
+}
+
+/* Only a `from`: each layer fades up to its own resting opacity — the warp
+   to its 0.55, the mesh to its 0.95 — not to a hardcoded 1. */
+@keyframes lw-front-door-arrive {
+	from {
+		opacity: 0;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.lw-front-door-shader-arrive {
+		animation: none;
+	}
+}
+
 /* The live dark shader sits in the site's own frame: anchored to the card's
-   side, full height, dissolving toward the reading side. */
+   side, full height, bled past every edge so no seam of bare ground shows,
+   dissolving toward the reading side. */
 .lw-front-door-warp {
 	position: absolute;
-	top: -10%;
-	right: -10%;
-	width: 78%;
-	height: 120%;
+	top: -12%;
+	right: -12%;
+	width: 84%;
+	height: 124%;
 	opacity: 0.55;
 	-webkit-mask-image: linear-gradient(
 		to left,
@@ -175,11 +206,11 @@
 /* Where the card stands alone, the glow stands behind it instead of off to
    one side: same shader, held in a centred pool. */
 .lw-front-door-warp--center {
-	top: -10%;
+	top: -12%;
 	right: auto;
 	left: 50%;
 	transform: translateX(-50%);
-	width: 90%;
+	width: 130%;
 	-webkit-mask-image: radial-gradient(
 		ellipse 62% 70% at 50% 42%,
 		black 0%,
@@ -242,16 +273,37 @@
 	-webkit-mask-image: linear-gradient(to right, black, transparent 82%);
 	mask-image: linear-gradient(to right, black, transparent 82%);
 }
-
-/* The press: the button gives a little and springs back. */
+/* The press: the button gives a little, springs back, and gives off a
+   little of the brand's warmth — the activation a click deserves. The pill
+   itself is glass like the card it sits on: a touch translucent, lit along
+   its top edge, the ground faintly moving through it. */
 .lw-front-door-primary {
+	background-image: linear-gradient(
+		180deg,
+		rgba(255, 255, 255, 0.22),
+		rgba(255, 255, 255, 0.04) 55%,
+		rgba(255, 255, 255, 0) 100%
+	);
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+	-webkit-backdrop-filter: blur(8px);
+	backdrop-filter: blur(8px);
 	transition:
 		transform 120ms ease,
+		box-shadow 260ms ease,
 		background-color 200ms ease;
+}
+
+.lw-front-door-primary:hover {
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.28),
+		0 2px 18px -4px var(--lw-front-door-glow);
 }
 
 .lw-front-door-primary:active {
 	transform: translateY(1px);
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.28),
+		0 4px 26px -6px var(--lw-front-door-glow);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -264,13 +316,53 @@
 }
 
 /* The card: glass over the ground. The blur is what makes it glass — the
-   ground's colour moves through it rather than stopping at it. */
+   ground's colour moves through it rather than stopping at it. And the card
+   answers being used: while anything on it holds focus, the glass warms with
+   a slow breath of the brand's light, so clicking into a field feels like
+   the surface noticed. */
 .lw-front-door-card {
 	background: var(--lw-front-door-card-bg) !important;
 	border-color: var(--lw-front-door-card-border) !important;
 	box-shadow: var(--lw-front-door-card-shadow);
-	-webkit-backdrop-filter: blur(22px) saturate(1.4);
-	backdrop-filter: blur(22px) saturate(1.4);
+	-webkit-backdrop-filter: blur(26px) saturate(1.5);
+	backdrop-filter: blur(26px) saturate(1.5);
+	transition:
+		box-shadow 420ms ease,
+		border-color 420ms ease;
+}
+
+.lw-front-door-card:focus-within {
+	box-shadow:
+		var(--lw-front-door-card-shadow),
+		0 0 56px -14px var(--lw-front-door-glow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.lw-front-door-card {
+		transition: none;
+	}
+}
+
+/*
+ * Crossing between the two doors: the card and the value panel carry
+ * view-transition names, so a log-in link on the sign-up page (and back)
+ * slides each across the page to its mirrored place — the real card, glass
+ * and all, not a facsimile. Browsers without the API, and anybody asking for
+ * less motion, get the ordinary instant swap.
+ */
+@media (prefers-reduced-motion: no-preference) {
+	[data-auth-card] {
+		view-transition-name: lw-auth-card;
+	}
+	.lw-front-door-panel {
+		view-transition-name: lw-front-door-panel;
+	}
+}
+
+::view-transition-group(lw-auth-card),
+::view-transition-group(lw-front-door-panel) {
+	animation-duration: 460ms;
+	animation-timing-function: cubic-bezier(0.22, 0.8, 0.2, 1);
 }
 
 /* The hairline either side of the word "or". */

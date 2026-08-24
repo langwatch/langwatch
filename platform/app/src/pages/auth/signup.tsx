@@ -63,9 +63,9 @@ export default function SignUp() {
       // slot with nothing true to put in it yet, so it stays empty rather than
       // carrying a logo nobody agreed to.
       <FrontDoorShell
-        headline="Your first trace is just a sign-up away."
-        headlineAccent="sign-up"
-        tagline="Evaluate, observe and optimize your agents. No credit card, straight to the workspace."
+        headline="See what your agents are actually doing."
+        headlineAccent="actually"
+        tagline="Traces, evaluations and monitoring for every run. Free to start, no credit card."
       >
         <VerificationFirstSignUp />
       </FrontDoorShell>

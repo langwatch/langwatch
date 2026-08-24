@@ -1,6 +1,6 @@
-import { Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Input, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { type ReactNode, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import "../authFrontDoor.css";
@@ -31,15 +31,19 @@ export type IdentifierStepValues = z.infer<typeof identifierSchema>;
  * browser fills it, and so a passkey can be offered against the same field
  * when D07 brings them.
  *
- * A rejection is only ever an answer to something the person did. The empty
- * field never complains on arrival: "Enter your email address" appears after
- * they have left the field empty having actually been in it, after they have
- * typed something and deleted it, or on submit — never because the page
- * loaded, and never because autofocus put the caret there and something else
- * took it away.
+ * A rejection is only ever an answer to something the person wrote. Three
+ * rules, in the order they matter:
+ *
+ *   - An empty field is never an error until they ask to continue. Not on
+ *     load, not on blur, not after autofocus lost the caret: empty means
+ *     "not started", and "not started" is not wrong.
+ *   - What they typed is judged when they leave the field, not while their
+ *     hands are still on it. No error appears mid-keystroke.
+ *   - A rejection already on screen lifts the moment the address becomes
+ *     valid, so fixing it is rewarded live even though breaking it was
+ *     never punished live.
  */
 export function IdentifierStepForm({
-  intro,
   submitLabel,
   isSubmitting,
   defaultEmail,
@@ -47,7 +51,6 @@ export function IdentifierStepForm({
   alternatives,
   onSubmit,
 }: {
-  intro?: ReactNode;
   submitLabel: string;
   isSubmitting: boolean;
   defaultEmail?: string;
@@ -58,54 +61,38 @@ export function IdentifierStepForm({
 }) {
   const addressField = useFocusWhenSettled();
 
-  // What the person has actually done, as opposed to what the browser did to
-  // the field. Autofocus focuses it and a stray click blurs it, and neither
-  // is the person leaving the field: only a pointer or a key inside the field
-  // counts as having been in it. State rather than a ref, because a rejection
-  // the resolver has already recorded becomes visible the moment this flips,
-  // and a ref flipping repaints nothing.
-  const [wasInField, setWasInField] = useState(false);
-  // Once there has been content, an empty field is a deletion, and the
-  // rejection may say so immediately rather than waiting for a blur.
-  const hadContent = useRef(false);
-
   const form = useForm<IdentifierStepValues>({
     resolver: zodResolver(identifierSchema),
-    mode: "onTouched",
+    // Nothing validates automatically before submit; the handlers below
+    // decide when a judgement is welcome.
+    mode: "onSubmit",
+    reValidateMode: "onSubmit",
     defaultValues: { email: defaultEmail ?? "" },
   });
 
   const emailRegistration = form.register("email", {
-    onChange: (event: { target: { value: string } }) => {
-      if (event.target.value) {
-        hadContent.current = true;
-      } else if (hadContent.current) {
-        void form.trigger("email");
-      }
+    onBlur: () => {
+      const value = form.getValues("email");
+      if (value) void form.trigger("email");
+      else form.clearErrors("email");
+    },
+    onChange: () => {
+      // Clearing only: typing can lift a rejection, never earn one.
+      if (!form.formState.errors.email) return;
+      const parsed = identifierSchema.safeParse({
+        email: form.getValues("email"),
+      });
+      if (parsed.success) form.clearErrors("email");
     },
   });
 
-  const emailError = form.formState.errors.email;
-  const showEmailError =
-    emailError && (form.formState.isSubmitted || wasInField)
-      ? emailError
-      : undefined;
+  const showEmailError = form.formState.errors.email;
 
   return (
     <VStack width="full" align="stretch" gap="14px">
       {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
         <VStack width="full" align="stretch" gap="14px">
-          {intro ? (
-            <Text
-              width="full"
-              fontSize="13.5px"
-              lineHeight="1.55"
-              color="fg.muted"
-            >
-              {intro}
-            </Text>
-          ) : null}
           <FrontDoorField label="Email" error={showEmailError}>
             {(id) => (
               <Input
@@ -120,8 +107,6 @@ export function IdentifierStepForm({
                 autoComplete="username webauthn"
                 {...FIELD_SURFACE}
                 _focusVisible={FIELD_FOCUS}
-                onPointerDown={() => setWasInField(true)}
-                onKeyDown={() => setWasInField(true)}
                 {...emailRegistration}
                 ref={(node) => {
                   emailRegistration.ref(node);

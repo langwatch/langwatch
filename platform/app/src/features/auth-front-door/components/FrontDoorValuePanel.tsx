@@ -36,6 +36,7 @@ export function FrontDoorValuePanel({
 }) {
   return (
     <Box
+      className="lw-front-door-panel"
       position="relative"
       width={{ base: "full", md: "50%" }}
       flexShrink={0}

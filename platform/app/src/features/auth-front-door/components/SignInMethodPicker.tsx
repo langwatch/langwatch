@@ -1,12 +1,36 @@
-import { Alert, Badge, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  Alert,
+  Badge,
+  Box,
+  Button,
+  HStack,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import type { SignInMethod } from "@langwatch/identity";
 import type { ReactNode } from "react";
 import { signInMethodActionLabel } from "../logic/methodLabels";
 import { signInRoutingReasonCopy } from "../logic/routingReasonCopy";
 import "../authFrontDoor.css";
 import { BRAND, MONO_FONT, SHAPE } from "../logic/brand";
-import { METHOD_PREVIEWS_ENABLED, MethodPreviews } from "./MethodPreviews";
 import { SignInMethodIcon } from "./SignInMethodIcon";
+
+/**
+ * A development stack rarely has social credentials mounted, so its routing
+ * decision offers none of them — which would hide the whole social rail from
+ * exactly the people iterating on it. In dev the rail shows the cloud's full
+ * social set, wired to the real sign-in call; everywhere else the rail is
+ * exactly what the decision offered.
+ */
+const DEV_SHOWS_ALL_SOCIAL = import.meta.env.DEV;
+
+/** The cloud's social set. Ids are the real provider ids, so a click dials
+ *  the real provider and the marks and labels are the real ones. */
+const SOCIAL_METHODS: readonly SignInMethod[] = [
+  { id: "google", kind: "federated", connectionId: null },
+  { id: "github", kind: "federated", connectionId: null },
+  { id: "azure-ad", kind: "federated", connectionId: null },
+];
 
 /**
  * The method picker: exactly the methods the routing decision named, in the
@@ -85,16 +109,17 @@ export function hasAlternativeMethods(
   methodSet: readonly SignInMethod[],
 ): boolean {
   return (
-    METHOD_PREVIEWS_ENABLED ||
+    DEV_SHOWS_ALL_SOCIAL ||
     methodSet.some((method) => method.kind === "federated")
   );
 }
 
 /**
  * The methods a person can take instead of typing an address: the instance's
- * federated methods, plus the passkey method's reserved place while it is
- * still a preview. Rendered under the address step's divider on both doors,
- * so the two screens offer the same alternatives in the same order.
+ * federated methods, in the order the decision named them. Rendered under the
+ * address step's divider on both doors, so the two screens offer the same
+ * alternatives in the same order. Every button is live — a method appears
+ * here because it can be dialed, or not at all.
  */
 export function AlternativeMethods({
   methodSet,
@@ -105,6 +130,15 @@ export function AlternativeMethods({
   lastUsedMethodId?: string | null;
   onFederatedMethodChosen: (method: SignInMethod) => void;
 }) {
+  const offered = methodSet.filter((method) => method.kind === "federated");
+  const offeredIds = new Set(offered.map((method) => method.id));
+  const methods = DEV_SHOWS_ALL_SOCIAL
+    ? [
+        ...offered,
+        ...SOCIAL_METHODS.filter((method) => !offeredIds.has(method.id)),
+      ]
+    : offered;
+
   return (
     <VStack
       width="full"
@@ -112,17 +146,14 @@ export function AlternativeMethods({
       gap={3}
       data-testid="alternative-methods"
     >
-      {methodSet
-        .filter((method) => method.kind === "federated")
-        .map((method) => (
-          <FederatedMethodButton
-            key={method.id}
-            method={method}
-            isLastUsed={lastUsedMethodId === method.id}
-            onChosen={onFederatedMethodChosen}
-          />
-        ))}
-      <MethodPreviews offered={methodSet} />
+      {methods.map((method) => (
+        <FederatedMethodButton
+          key={method.id}
+          method={method}
+          isLastUsed={lastUsedMethodId === method.id}
+          onChosen={onFederatedMethodChosen}
+        />
+      ))}
     </VStack>
   );
 }
@@ -146,15 +177,24 @@ export function FederatedMethodButton({
       width="full"
       minHeight="44px"
       position="relative"
+      fontSize="14px"
       fontWeight={600}
       borderRadius={SHAPE.action}
       justifyContent="center"
-      gap="9px"
       overflow="visible"
-      _hover={{ backgroundColor: "bg.subtle", borderColor: "fg.subtle" }}
+      borderColor="var(--lw-front-door-field-border)"
+      _hover={{
+        backgroundColor: "var(--lw-front-door-field-bg)",
+        borderColor: "fg.subtle",
+      }}
       onClick={() => onChosen(method)}
     >
-      <SignInMethodIcon method={method} />
+      {/* Three seats: the mark on the left rail, the words in the middle,
+          the badge (if any) on the right rail. Every method's label centres
+          on the same axis whatever sits beside it. */}
+      <Box position="absolute" insetInlineStart="16px" display="flex">
+        <SignInMethodIcon method={method} />
+      </Box>
       <Text>{signInMethodActionLabel(method)}</Text>
       {isLastUsed ? (
         <span className="lw-front-door-badge-float">
@@ -185,7 +225,7 @@ export function LastUsedBadge() {
  *  way the site says its small technical words: mono, spaced, quiet. */
 export function MethodDivider() {
   return (
-    <HStack width="full" gap="10px" paddingY={1}>
+    <HStack width="full" gap="10px" paddingY="6px">
       <Divider />
       <Text
         fontFamily={MONO_FONT}

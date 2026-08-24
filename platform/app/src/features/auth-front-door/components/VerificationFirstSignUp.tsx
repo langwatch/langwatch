@@ -14,6 +14,7 @@ import {
   rememberLastUsedMethod,
 } from "../logic/lastUsedMethod";
 import { CredentialSignInForm } from "./CredentialSignInForm";
+import { FrontDoorFinePrint } from "./FrontDoorFinePrint";
 import { IdentifierStepForm } from "./IdentifierStepForm";
 import {
   AlternativeMethods,
@@ -168,7 +169,11 @@ export function VerificationFirstSignUp() {
   if (sentTo) return <LinkIsOnItsWay email={sentTo} />;
 
   return (
-    <AuthCard title="Create your LangWatch account">
+    <AuthCard
+      title="Create your LangWatch account"
+      intro="We will confirm your email address before anything else."
+      finePrint={<FrontDoorFinePrint />}
+    >
       {requestVerification.error ? (
         <HandledErrorAlert
           error={requestVerification.error}
@@ -176,7 +181,6 @@ export function VerificationFirstSignUp() {
         />
       ) : null}
       <IdentifierStepForm
-        intro="We will confirm your email address before anything else."
         submitLabel="Continue"
         isSubmitting={requestVerification.isPending}
         defaultEmail={carriedEmail}
@@ -291,13 +295,15 @@ function LinkNoLongerWorks({
   onResend: (email: string) => void | Promise<unknown>;
 }) {
   return (
-    <AuthCard title="Create your LangWatch account">
+    <AuthCard
+      title="Create your LangWatch account"
+      intro="Enter your email and we will send a new confirmation link."
+    >
       <HandledErrorAlert
         error={error}
         fallbackTitle="That confirmation link no longer works"
       />
       <IdentifierStepForm
-        intro="Enter your email and we will send a new confirmation link."
         submitLabel="Send a new link"
         isSubmitting={isSending}
         onSubmit={({ email }) => onResend(email)}
@@ -393,7 +399,9 @@ function LogInLink({
         textDecorationColor="border"
         _hover={{ textDecorationColor: "fg" }}
       >
-        <Link href={href}>{linked}</Link>
+        <Link viewTransition href={href}>
+          {linked}
+        </Link>
       </Box>
     </Text>
   );
