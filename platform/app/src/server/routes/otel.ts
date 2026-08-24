@@ -7,7 +7,6 @@
  * - POST /api/otel/v1/metrics
  */
 
-import { resolveSourceNonBillable } from "@ee/governance/services/costAttributionPolicy.service";
 import {
   dropForeignScopesForVscodeKey,
   enforceApiKeyIdOnLogRequest,
@@ -34,6 +33,7 @@ import { getApp } from "~/server/app-layer/app";
 import { PlanLimitExceededError } from "~/server/app-layer/usage/errors";
 import type { UsageLimitResult } from "~/server/app-layer/usage/usage.service";
 import { prisma } from "~/server/db";
+import { AppGovernanceRuntime } from "~/runtime/app/features/governance";
 import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
   OTLP_CORRECTED_PATH_HEADER,
@@ -82,6 +82,7 @@ const secured = createServiceApp({ basePath: "/api/otel/v1" });
 // ── shared auth + limit check ────────────────────────────────────────
 
 const tokenResolver = TokenResolver.create(prisma);
+const governanceRuntime = AppGovernanceRuntime.create(prisma);
 
 type RouteContext = {
   req: {
@@ -384,7 +385,7 @@ async function applyReceiverProvenanceToTraces({
   // Whether this tool's direct-OTLP usage is bundled (non-billed per token).
   // Cached per (org, sourceType); drives the trace summary's billed-vs-non-
   // billed cost split. Gateway usage never reaches here.
-  const nonBillable = await resolveSourceNonBillable({
+  const nonBillable = await governanceRuntime.resolveSourceNonBillable({
     organizationId: resolved.organizationId,
     sourceType: resolved.ingestSourceType,
   });
@@ -421,7 +422,7 @@ async function applyReceiverProvenanceToLogs({
   // same bundled-vs-billed resolution the trace path does; without it their
   // cost never gets the non-billable marker and a bundled coding session reads
   // as real spend.
-  const nonBillable = await resolveSourceNonBillable({
+  const nonBillable = await governanceRuntime.resolveSourceNonBillable({
     organizationId: resolved.organizationId,
     sourceType: resolved.ingestSourceType,
   });

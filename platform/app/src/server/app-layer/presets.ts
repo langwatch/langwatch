@@ -23,7 +23,6 @@ import {
   SubscriptionItemCalculatorService,
 } from "~/runtime/app/features/billing";
 import { AppGovernancePipelineRuntime } from "@ee/event-sourcing/pipelineSet";
-import { resolveSourceNonBillable } from "@ee/governance/services/costAttributionPolicy.service";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/services/governanceTraceActivity.clickhouse.repository";
@@ -41,6 +40,7 @@ import {
   RedisReplayMarkerChecker,
 } from "@langwatch/eventing";
 import { AppAuditLogRuntime } from "~/runtime/app/features/audit-log";
+import { AppGovernanceRuntime } from "~/runtime/app/features/governance";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { RedisConnectionService } from "@langwatch/redis-client";
@@ -1669,6 +1669,7 @@ export function initializeDefaultApp(options?: {
     redis: (redis ?? null) as unknown as RedisLike | null,
   });
 
+  const governanceRuntime = AppGovernanceRuntime.create(prisma);
   const pullRequestUsage = new PullRequestUsageService({
     pullRequests: githubPullRequestsRepository,
     sessions: repositories.codingAgentSession,
@@ -1679,7 +1680,8 @@ export function initializeDefaultApp(options?: {
     // The one place the bundled-plan policy is reached: the service takes the
     // answer as a dep so the read stays free of the enterprise module, and the
     // receiver and this rollup resolve bundled-ness the same way.
-    isSourceNonBillable: resolveSourceNonBillable,
+    isSourceNonBillable: (input) =>
+      governanceRuntime.resolveSourceNonBillable(input),
   });
 
   // The Sessions screen's read: the same session service, plus the mapping

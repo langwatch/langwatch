@@ -1,30 +1,48 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "~/generated/prisma/client";
-
 import {
-  __resetCostAttributionCacheForTests,
-  resolveSourceNonBillable,
-} from "../costAttributionPolicy.service";
+  PostgresGovernanceAdapter,
+  type GovernanceDatabase,
+} from "../src/adapters/postgres.governance.adapter";
 
-function fakePrisma(tiles: Array<{ config: unknown }>): PrismaClient {
-  return {
-    aiToolEntry: {
-      findMany: vi.fn().mockResolvedValue(tiles),
-    },
-  } as unknown as PrismaClient;
+class PolicyHarness {
+  private constructor(
+    readonly findMany: ReturnType<typeof vi.fn>,
+    readonly policy: ReturnType<
+      ReturnType<typeof PostgresGovernanceAdapter.create>["build"]
+    >["policy"],
+  ) {}
+
+  static create(tiles: Array<{ config: unknown }>): PolicyHarness {
+    const findMany = vi.fn().mockResolvedValue(tiles);
+    const database = {
+      aiToolEntry: {
+        findMany,
+      },
+    } as GovernanceDatabase;
+    return new PolicyHarness(
+      findMany,
+      PostgresGovernanceAdapter.create({ database }).build().policy,
+    );
+  }
+
+  resolve(input: {
+    organizationId: string;
+    sourceType: string;
+  }): Promise<boolean> {
+    return this.policy.resolveSourceNonBillable(input);
+  }
 }
 
 beforeEach(() => {
-  __resetCostAttributionCacheForTests();
+  vi.clearAllMocks();
 });
 
 describe("resolveSourceNonBillable", () => {
   describe("when no catalog tile matches the source", () => {
     it("defaults the OTLP/ingest path to non-billable (bundled)", async () => {
-      const result = await resolveSourceNonBillable({
+      const result = await PolicyHarness.create([]).resolve({
         organizationId: "org_1",
         sourceType: "claude_code",
-        prisma: fakePrisma([]),
       });
       expect(result).toBe(true);
     });
@@ -32,12 +50,11 @@ describe("resolveSourceNonBillable", () => {
 
   describe("when the matching tile opts into per-token billing", () => {
     it("returns false (billed) for bundledPlan === false", async () => {
-      const result = await resolveSourceNonBillable({
+      const result = await PolicyHarness.create([
+        { config: { assistantKind: "claude_code", bundledPlan: false } },
+      ]).resolve({
         organizationId: "org_1",
         sourceType: "claude_code",
-        prisma: fakePrisma([
-          { config: { assistantKind: "claude_code", bundledPlan: false } },
-        ]),
       });
       expect(result).toBe(false);
     });
@@ -46,22 +63,22 @@ describe("resolveSourceNonBillable", () => {
   describe("when the matching tile is bundled or leaves the flag absent", () => {
     it("returns true for bundledPlan === true", async () => {
       expect(
-        await resolveSourceNonBillable({
+        await PolicyHarness.create([
+          { config: { assistantKind: "codex", bundledPlan: true } },
+        ]).resolve({
           organizationId: "org_1",
           sourceType: "codex",
-          prisma: fakePrisma([
-            { config: { assistantKind: "codex", bundledPlan: true } },
-          ]),
         }),
       ).toBe(true);
     });
 
     it("returns true when bundledPlan is omitted", async () => {
       expect(
-        await resolveSourceNonBillable({
+        await PolicyHarness.create([
+          { config: { assistantKind: "gemini" } },
+        ]).resolve({
           organizationId: "org_1",
           sourceType: "gemini",
-          prisma: fakePrisma([{ config: { assistantKind: "gemini" } }]),
         }),
       ).toBe(true);
     });
@@ -69,12 +86,11 @@ describe("resolveSourceNonBillable", () => {
 
   describe("when a different tool is set to billed", () => {
     it("does not leak the override to an unrelated source", async () => {
-      const result = await resolveSourceNonBillable({
+      const result = await PolicyHarness.create([
+        { config: { assistantKind: "claude_code", bundledPlan: false } },
+      ]).resolve({
         organizationId: "org_1",
         sourceType: "opencode",
-        prisma: fakePrisma([
-          { config: { assistantKind: "claude_code", bundledPlan: false } },
-        ]),
       });
       expect(result).toBe(true);
     });
@@ -82,20 +98,18 @@ describe("resolveSourceNonBillable", () => {
 
   describe("caching", () => {
     it("serves the second lookup from cache without re-querying", async () => {
-      const prisma = fakePrisma([
+      const harness = PolicyHarness.create([
         { config: { assistantKind: "claude_code", bundledPlan: false } },
       ]);
-      await resolveSourceNonBillable({
+      await harness.resolve({
         organizationId: "org_1",
         sourceType: "claude_code",
-        prisma,
       });
-      await resolveSourceNonBillable({
+      await harness.resolve({
         organizationId: "org_1",
         sourceType: "claude_code",
-        prisma,
       });
-      expect(prisma.aiToolEntry.findMany).toHaveBeenCalledTimes(1);
+      expect(harness.findMany).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -221,7 +221,7 @@ function buildWebhookLogRequest(
 }
 
 const logger = createLogger("langwatch:ingest");
-const governanceRuntime = AppGovernanceRuntime.create();
+const governanceRuntime = AppGovernanceRuntime.create(prisma);
 
 /**
  * Cost-event extraction via OTTL.
