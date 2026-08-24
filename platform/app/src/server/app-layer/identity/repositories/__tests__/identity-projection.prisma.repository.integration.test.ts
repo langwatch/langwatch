@@ -45,6 +45,7 @@ const fact = (id: string, state: "ATTACHED" | "VERIFIED" | "DETACHED") => ({
   domain: "acme.com",
   identifierHash: "hmac:abc",
   accountId: null,
+  providerAccountId: null,
   connectionId: null,
   state,
   verifiedAtMs: state === "ATTACHED" ? null : 1_690_000_001_000,

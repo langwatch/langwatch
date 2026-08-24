@@ -248,7 +248,7 @@ Feature: The identifier model - identity as an event-sourced pipeline
   # The fallback to the legacy table IS the migration - a user with no
   # identifiers has not been backfilled, and that table is still their truth.
 
-  @unit
+  @unit @integration
   Scenario: better-auth reads an account from the identifiers
     Given "sam"'s identifier backfill has finalized
     When better-auth looks up an account by its provider and subject
@@ -256,7 +256,7 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And the credential row answers what secrets it carries
     And better-auth cannot tell the row moved
 
-  @unit
+  @unit @integration
   Scenario: A tombstoned identifier can never sign anyone in
     Given "sam" holds a DETACHED identifier for a provider subject
     When better-auth looks that subject up
@@ -269,12 +269,20 @@ Feature: The identifier model - identity as an event-sourced pipeline
     Then the projection answers nothing and the legacy Account row answers
     And an operator rollback returns a finalized user to the same path
 
-  @unit
+  @unit @integration
   Scenario: A token refresh touches secrets and emits no event
     Given "sam"'s identifier backfill has finalized
     When an OAuth refresh rewrites the access token
     Then only the credential row is written
+    And the fields the refresh did not name keep the values they had
     And no identity command is dispatched, because a refresh is not a fact
+
+  @integration
+  Scenario: A retried sign-up stores one credential, not two
+    Given a sign-up ceremony has stored "sam"'s credential for a provider
+    When the same ceremony is retried and derives the same identifier
+    Then the credential already stored is left standing
+    And one identifier can never hold two credentials
 
   @unit
   Scenario: The account adapter answers only the shapes it knows

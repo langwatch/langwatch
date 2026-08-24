@@ -130,6 +130,33 @@ export class IdentityAccountAdapter implements RowEngine {
   readonly incrementOne: RowEngine["incrementOne"] = async (data) =>
     this.base.incrementOne(data) as never;
 
+  /**
+   * The transactional engine, re-wrapped — NOT handed over bare.
+   *
+   * This is load-bearing rather than tidy. better-auth runs sign-up inside
+   * `adapter.transaction`, and every read and write in there goes to the
+   * engine the callback receives; during a sign-up it is the ONLY method it
+   * calls on this adapter at all. Passing `callback` through unchanged hands
+   * better-auth the stock engine for the whole transaction, so `account`
+   * stops being intercepted exactly where accounts are created.
+   *
+   * The credential write inside still goes through this class's own
+   * repository, which is not enlisted in better-auth's transaction. A
+   * rolled-back sign-up can therefore leave a credential row behind. It is
+   * inert — nothing can reach a credential whose identifier was never
+   * folded — and `create` is idempotent on the id the ceremony pinned, so a
+   * retry adopts it rather than colliding.
+   */
   readonly transaction: RowEngine["transaction"] = (callback) =>
-    this.base.transaction(callback);
+    this.base.transaction((engine) => {
+      // The transactional engine is narrower than a full adapter (no
+      // `transaction` of its own), so it is widened to wrap and narrowed
+      // back on the way out. The wrapping is the point; the casts only
+      // reconcile the two shapes better-auth uses for the same thing.
+      const wrapped = new IdentityAccountAdapter(
+        engine as unknown as RowEngine,
+        this.accounts,
+      );
+      return callback(wrapped as unknown as Parameters<typeof callback>[0]);
+    });
 }
