@@ -17,7 +17,7 @@
  * is correct precisely because it is not on this path.
  */
 
-import { gatewayDebitsPM } from "@ee/governance/process-manager/gatewayDebits.process";
+import { AppGatewayDebitsProcessRuntime } from "@ee/governance/process-manager/gatewayDebits.process";
 import { webhookDeliveryPM } from "~/runtime/app/features/webhooks";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -160,10 +160,10 @@ describe("transient process message keys", () => {
     /** @scenario A transient process mints message keys that a redelivery re-derives exactly */
     it("mints the same keys regardless of wall clock", () => {
       const { handlers, initial } = capture(
-        gatewayDebitsPM({
+        AppGatewayDebitsProcessRuntime.create({
           prisma: {} as never,
           budgetCHRepository: {} as never,
-        }) as unknown as (pm: unknown) => unknown,
+        }).processManager() as unknown as (pm: unknown) => unknown,
       );
 
       for (const [type, data] of [

@@ -14,7 +14,7 @@
  * if the ladder from allow to warn to block ever stops working.
  */
 import {
-  runWriteGatewayDebits,
+  AppGatewayDebitsProcessRuntime,
   type WriteGatewayDebitsPayload,
 } from "@ee/governance/process-manager/gatewayDebits.process";
 import { nanoid } from "nanoid";
@@ -191,10 +191,11 @@ describe("given a blocking budget on traffic the gateway is serving", () => {
     const chRepo = new GatewayBudgetClickHouseRepository(resolveClient);
     service = GatewayBudgetService.create(prisma, chRepo);
 
-    writeDebits = runWriteGatewayDebits({
+    const debitRuntime = AppGatewayDebitsProcessRuntime.create({
       prisma,
       budgetCHRepository: chRepo,
     });
+    writeDebits = (payload) => debitRuntime.write(payload);
 
     recordOneRequest = async () => {
       await writeDebits(

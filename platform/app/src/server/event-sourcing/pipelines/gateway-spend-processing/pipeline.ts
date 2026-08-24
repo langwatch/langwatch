@@ -1,7 +1,7 @@
 import {
+  AppGatewayDebitsProcessRuntime,
   GATEWAY_DEBITS_PROCESS_NAME,
   type GatewayDebitsProcessDeps,
-  gatewayDebitsPM,
 } from "@ee/governance/process-manager/gatewayDebits.process";
 import {
   WEBHOOK_DELIVERY_PROCESS_NAME,
@@ -96,7 +96,9 @@ export function createGatewaySpendProcessingPipeline(
   if (deps.gatewayDebits) {
     pipeline = pipeline.withProcessManager(
       GATEWAY_DEBITS_PROCESS_NAME,
-      gatewayDebitsPM(deps.gatewayDebits),
+      AppGatewayDebitsProcessRuntime.create(
+        deps.gatewayDebits,
+      ).processManager(),
     );
   }
   if (deps.settlement) {

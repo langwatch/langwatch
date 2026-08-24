@@ -15,7 +15,7 @@
  * Spec: specs/ai-gateway/audio-endpoints.feature
  */
 import {
-  runWriteGatewayDebits,
+  AppGatewayDebitsProcessRuntime,
   type WriteGatewayDebitsPayload,
 } from "@ee/governance/process-manager/gatewayDebits.process";
 import { nanoid } from "nanoid";
@@ -149,7 +149,11 @@ beforeAll(async () => {
     if (!client) throw new Error("no ClickHouse client in test environment");
     return client;
   });
-  writeDebits = runWriteGatewayDebits({ prisma, budgetCHRepository: chRepo });
+  const debitRuntime = AppGatewayDebitsProcessRuntime.create({
+    prisma,
+    budgetCHRepository: chRepo,
+  });
+  writeDebits = (payload) => debitRuntime.write(payload);
 }, 180_000);
 
 afterAll(async () => {

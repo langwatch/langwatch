@@ -20,7 +20,7 @@
  * one, so this is the shape that has to stay correct.
  */
 import {
-  runWriteGatewayDebits,
+  AppGatewayDebitsProcessRuntime,
   type WriteGatewayDebitsPayload,
 } from "@ee/governance/process-manager/gatewayDebits.process";
 import { nanoid } from "nanoid";
@@ -322,7 +322,11 @@ beforeAll(async () => {
     return client;
   });
   service = GatewayBudgetService.create(prisma, chRepo);
-  writeDebits = runWriteGatewayDebits({ prisma, budgetCHRepository: chRepo });
+  const debitRuntime = AppGatewayDebitsProcessRuntime.create({
+    prisma,
+    budgetCHRepository: chRepo,
+  });
+  writeDebits = (payload) => debitRuntime.write(payload);
 }, 180_000);
 
 afterAll(async () => {

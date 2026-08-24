@@ -43,7 +43,7 @@ vi.mock("~/server/modelProviders/llmModelCost", async (importOriginal) => {
   return { ...original, getStaticModelCosts: () => catalog };
 });
 
-import { gatewayDebitsPM } from "@ee/governance/process-manager/gatewayDebits.process";
+import { AppGatewayDebitsProcessRuntime } from "@ee/governance/process-manager/gatewayDebits.process";
 import {
   deliverPayloadToRow,
   webhookDeliveryPM,
@@ -249,7 +249,10 @@ describe("one price per gateway request", () => {
     ).not.toBe(priced.costNanoUsd);
 
     const debit = intentPayloadFor(
-      (builder) => gatewayDebitsPM({} as never)(builder as never),
+      (builder) =>
+        AppGatewayDebitsProcessRuntime.create({} as never).processManager()(
+          builder as never,
+        ),
       "writeDebits",
       confirmed,
     );

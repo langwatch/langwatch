@@ -6,6 +6,8 @@ export const GATEWAY_SPEND_CONFIRMED_EVENT_TYPE =
   "lw.gateway.spend.confirmed" as const;
 export const GATEWAY_SPEND_FAILED_EVENT_TYPE =
   "lw.gateway.spend.failed" as const;
+export const GATEWAY_SPEND_SETTLED_EVENT_TYPE =
+  "lw.gateway.spend.settled" as const;
 
 export type GatewaySpendUsage = {
   input_tokens: number;
@@ -48,6 +50,14 @@ export type GatewaySpendFailedData = GatewaySpendOutcomeData & {
   error: { type: string; http_status: number };
 };
 
+export type GatewaySpendSettledData = GatewaySpendAttribution & {
+  gateway_request_id: string;
+  occurred_at: number;
+  reason: string;
+  model: string;
+  model_provider_id: string;
+};
+
 export type GatewaySpendProcessingEvent =
   | (Event<GatewaySpendAdmittedData> & {
       type: typeof GATEWAY_SPEND_ADMITTED_EVENT_TYPE;
@@ -57,12 +67,33 @@ export type GatewaySpendProcessingEvent =
     })
   | (Event<GatewaySpendFailedData> & {
       type: typeof GATEWAY_SPEND_FAILED_EVENT_TYPE;
+    })
+  | (Event<GatewaySpendSettledData> & {
+      type: typeof GATEWAY_SPEND_SETTLED_EVENT_TYPE;
     });
+
+export type GatewayBudgetScope =
+  | "ORGANIZATION"
+  | "TEAM"
+  | "PROJECT"
+  | "VIRTUAL_KEY"
+  | "PRINCIPAL"
+  | "GROUP"
+  | "ATTRIBUTED_USER";
+
+export type GatewayBudgetWindow =
+  | "MINUTE"
+  | "HOUR"
+  | "DAY"
+  | "WEEK"
+  | "MONTH"
+  | "TOTAL"
+  | "MANUAL";
 
 export type GatewayBudgetDefinition = {
   id: string;
-  scopeType: string;
-  window: string;
+  scopeType: GatewayBudgetScope;
+  window: GatewayBudgetWindow;
   onBreach: "BLOCK" | "WARN";
 };
 
@@ -75,9 +106,9 @@ export type GatewayResolvedBudget = {
 export type GatewayBudgetDebitRow = {
   tenantId: string;
   budgetId: string;
-  scope: string;
+  scope: GatewayBudgetScope;
   scopeId: string;
-  window: string;
+  window: GatewayBudgetWindow;
   virtualKeyId: string;
   providerKey: string | null;
   gatewayRequestId: string;

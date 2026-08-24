@@ -3,7 +3,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ResolvedBudget } from "~/server/gateway/budgetResolution.service";
 import {
-  runWriteGatewayDebits,
+  AppGatewayDebitsProcessRuntime,
   writeGatewayDebitsSchema,
 } from "../process-manager/gatewayDebits.process";
 
@@ -101,7 +101,12 @@ function harness({
     ...(shouldEmit ? { changeEventDedupe: { shouldEmit } } : {}),
   } as never;
 
-  return { run: runWriteGatewayDebits(deps), create, insertDebitsForBudgets };
+  const runtime = AppGatewayDebitsProcessRuntime.create(deps);
+  return {
+    run: (payload: Parameters<typeof runtime.write>[0]) => runtime.write(payload),
+    create,
+    insertDebitsForBudgets,
+  };
 }
 
 describe("BUDGET_UPDATED change events from the gateway debit writer", () => {

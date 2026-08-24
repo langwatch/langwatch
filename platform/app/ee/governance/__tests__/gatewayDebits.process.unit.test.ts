@@ -8,7 +8,7 @@ import {
 } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/constants";
 import type { GatewayDebitsState } from "../process-manager/gatewayDebits.process";
 import {
-  gatewayDebitsPM,
+  AppGatewayDebitsProcessRuntime,
   writeGatewayDebitsSchema,
 } from "../process-manager/gatewayDebits.process";
 
@@ -59,10 +59,10 @@ function capture() {
       return builder;
     },
   };
-  gatewayDebitsPM({
+  AppGatewayDebitsProcessRuntime.create({
     prisma: {} as never,
     budgetCHRepository: {} as never,
-  })(builder as never);
+  }).processManager()(builder as never);
   return { handlers, initial: () => initial };
 }
 
