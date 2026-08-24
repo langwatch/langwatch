@@ -25,6 +25,25 @@ const createNoOpHandle = (logger: Logger): ObservabilityHandle => ({
 });
 
 /**
+ * Renders a rejected value for the message below, without throwing.
+ *
+ * The message is the only thing standing between a misconfigured caller and
+ * silence, so producing it must not fail. `JSON.stringify` raises a TypeError on
+ * a BigInt, which would replace the diagnostic with an unrelated serialisation
+ * error from the code meant to report the problem. It returns `undefined` rather
+ * than a string for a symbol or a function, which would render as "undefined"
+ * and name nothing. Both fall back to the type, which is what a caller needs to
+ * see.
+ */
+const describeRejectedValue = (value: unknown): string => {
+  try {
+    return JSON.stringify(value) ?? typeof value;
+  } catch {
+    return typeof value;
+  }
+};
+
+/**
  * Whether `langwatch` names the disable sentinel, an options object, or neither.
  *
  * The third case is why this exists. `langwatch: "disable"` used to satisfy
@@ -37,7 +56,9 @@ const createNoOpHandle = (logger: Logger): ObservabilityHandle => ({
  *
  * `null` was the same shape of hole from the other side: `typeof null` is
  * `"object"`, so it reached the property reads below and threw a TypeError
- * naming neither the option nor the value.
+ * naming neither the option nor the value. An array is the same hole again: it
+ * is a non-null object, so it read as a configuration, every field came back
+ * `undefined`, and the API key fell through to the environment.
  *
  * An unrecognised value is treated as disabled rather than guessed at. It is the
  * only safe reading: every value that lands here is a caller who did not
@@ -53,12 +74,12 @@ const resolveLangWatchOption = (
     return { disabled: langwatch === LANGWATCH_DISABLED, config: {} };
   }
 
-  if (typeof langwatch === "object" && langwatch !== null) {
+  if (typeof langwatch === "object" && langwatch !== null && !Array.isArray(langwatch)) {
     return { disabled: false, config: langwatch };
   }
 
   logger.error(
-    `Invalid \`langwatch\` option: ${JSON.stringify(langwatch)}.\n` +
+    `Invalid \`langwatch\` option: ${describeRejectedValue(langwatch)}.\n` +
       `Expected an options object, or "${LANGWATCH_DISABLED}" to turn the integration off.\n` +
       `Treating it as "${LANGWATCH_DISABLED}", because a value that is neither cannot be read as a request to export.`,
   );

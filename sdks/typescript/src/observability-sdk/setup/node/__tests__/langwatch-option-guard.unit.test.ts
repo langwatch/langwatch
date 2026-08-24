@@ -20,7 +20,13 @@
  *
  * `null` was the mirror image. `typeof null === "object"`, so it passed the
  * object branch and threw a TypeError on the first property read, naming neither
- * the option nor the value.
+ * the option nor the value. An array passed that branch too, and worse: it read
+ * as a configuration whose every field was `undefined`, so the exporter came up
+ * on the environment's API key with nothing reported at all.
+ *
+ * Reporting a rejected value is its own hazard. `JSON.stringify` throws on a
+ * BigInt, so naming the value that way turned the diagnostic into an unrelated
+ * serialisation error.
  *
  * The assertions below are about the EXPORTER, not about a log line, because
  * "did we send data the caller asked us not to send" is the thing that matters.
@@ -109,18 +115,24 @@ describe("given an options object", () => {
 });
 
 describe("given a value that is neither the sentinel nor an options object", () => {
-  const nearMisses: [string, unknown][] = [
-    ["a typo of the sentinel", "disable"],
-    ["a different casing", "Disabled"],
-    ["the sentinel with whitespace", " disabled"],
-    ["an unrelated string", "off"],
-    ["the empty string", ""],
-    ["null", null],
-    ["a boolean", true],
-    ["a number", 0],
+  // The third column is how the report must name the value. It is spelled out
+  // rather than derived, because deriving it with JSON.stringify would make the
+  // test throw on the very value the third case is about.
+  const nearMisses: [string, unknown, string][] = [
+    ["a typo of the sentinel", "disable", '"disable"'],
+    ["a different casing", "Disabled", '"Disabled"'],
+    ["the sentinel with whitespace", " disabled", '" disabled"'],
+    ["an unrelated string", "off", '"off"'],
+    ["the empty string", "", '""'],
+    ["null", null, "null"],
+    ["a boolean", true, "true"],
+    ["a number", 0, "0"],
+    ["an array", [], "[]"],
+    ["a bigint", BigInt(1), "bigint"],
+    ["a symbol", Symbol("nope"), "symbol"],
   ];
 
-  describe.each(nearMisses)("when it is %s", (_label, value) => {
+  describe.each(nearMisses)("when it is %s", (_label, value, rendered) => {
     it("constructs no exporter, because it cannot be read as a request to export", () => {
       setup(value);
       expect(exporterWasConstructed()).toBe(false);
@@ -130,11 +142,15 @@ describe("given a value that is neither the sentinel nor an options object", () 
       setup(value);
       const reported = logger.error.mock.calls.map(([message]) => String(message)).join("\n");
       expect(reported).toContain("Invalid `langwatch` option");
-      expect(reported).toContain(JSON.stringify(value));
+      expect(reported).toContain(rendered);
     });
   });
 
   it("does not throw on null, which used to reach a property read", () => {
     expect(() => setup(null)).not.toThrow();
+  });
+
+  it("does not throw on a value JSON cannot serialise, which the report itself used to hit", () => {
+    expect(() => setup(BigInt(1))).not.toThrow();
   });
 });
