@@ -1,9 +1,8 @@
 """The litellm client has to satisfy the shape langchain-openai calls it with.
 
-langchain-openai 0.3 routes the non-streaming path through
-`client.with_raw_response.create(...)` followed by `.parse()`, rather than
-calling `client.create(...)` directly as 0.2 did. These tests pin that shape so
-a future bump cannot quietly reintroduce the AttributeError.
+langchain-openai routes the non-streaming path through
+`client.with_raw_response.create(...)` followed by `.parse()`. These tests pin
+that shape so a future bump cannot quietly reintroduce the AttributeError.
 """
 
 import asyncio

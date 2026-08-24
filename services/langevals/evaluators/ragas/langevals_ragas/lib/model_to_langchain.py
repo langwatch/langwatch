@@ -13,10 +13,10 @@ import litellm
 class RawCompletion:
     """The `.parse()` / `.headers` shape ChatOpenAI expects back from a raw call.
 
-    langchain-openai 0.3 routes the non-streaming path through
+    langchain-openai routes the non-streaming path through
     `client.with_raw_response.create(...)` and then calls `.parse()` on what
     comes back. litellm returns the parsed response directly, so the two are
-    bridged here rather than by pinning langchain-openai below 0.3.
+    bridged here.
     """
 
     def __init__(self, response):
