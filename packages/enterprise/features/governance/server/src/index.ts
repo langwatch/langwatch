@@ -2,6 +2,7 @@ export * from "@langwatch/enterprise-governance-contract";
 export * from "./adapters/ingestion-pull.ingestion-pull.adapter";
 export * from "./adapters/postgres.governance.adapter";
 export * from "./adapters/postgres.ingestion-pull-lifecycle.adapter";
+export * from "./adapters/postgres.ingestion-pull-run-projection.adapter";
 export * from "./adapters/pulled-usage.pulled-usage.adapter";
 export * from "./ports/gateway-debit.port";
 export * from "./ports/governance-diagnostics.port";

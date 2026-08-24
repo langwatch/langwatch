@@ -1,11 +1,14 @@
-import type { IngestionPullRunStatusData } from "@langwatch/enterprise-governance-server";
 import type {
   ProjectionStoreContext,
   StateProjectionStore,
   StoredProjection,
 } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
-import { Prisma, type PrismaClient } from "~/generated/prisma/client";
+import {
+  Prisma,
+  type PrismaClient,
+} from "@langwatch/prisma-client/generated";
+import type { IngestionPullRunStatusData } from "../../projections/ingestion-pull-run-status-eventing.projection";
 
 type Row = Prisma.IngestionPullRunProjectionGetPayload<object>;
 const INGESTION_PULL_RUN_KSUID_RESOURCE = "ingpullrun";
@@ -34,7 +37,13 @@ function fromRow(row: Row): StoredProjection<IngestionPullRunStatusData> {
 export class PrismaIngestionPullRunProjectionRepository
   implements StateProjectionStore<IngestionPullRunStatusData>
 {
-  constructor(private readonly prisma: PrismaClient) {}
+  private constructor(private readonly prisma: PrismaClient) {}
+
+  static create(database: object): PrismaIngestionPullRunProjectionRepository {
+    return new PrismaIngestionPullRunProjectionRepository(
+      database as PrismaClient,
+    );
+  }
 
   async load(
     projectionKey: string,

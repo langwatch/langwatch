@@ -612,7 +612,7 @@
       "platform/app/src/tasks.generated.ts": ["./tasks/backfillAnnotationsToClickhouse","./tasks/backfillDatasetContentToS3","./tasks/backfillStalledSimulationRuns","./tasks/cleanupOldLambdas","./tasks/clickhouseMigrate","./tasks/generateOpenAPISpec","./tasks/generateWebhookSignatureVectors","./tasks/migrateCustomModels","./tasks/migrateModelProviderKeys","./tasks/migrateObjectStorage","./tasks/provisionLwql","./tasks/runTopicClustering","./tasks/sendSlackAlert"]
     },
     "ee-alias": {
-      "platform/app/ee/event-sourcing/pipelineSet.ts": ["@ee/event-sourcing/pipelines/ingestion-pull-processing","@ee/event-sourcing/pipelines/ingestion-pull-processing/process-manager/ingestionPullEffects","@ee/governance/process-manager/pulledUsageLedger.process","@ee/governance/services/pullers/ingestionPullLifecycle","@ee/governance/services/pullers/pullerWorker","@ee/governance/services/pullers/repositories/ingestion-pull-run-projection.prisma.repository"],
+      "platform/app/ee/event-sourcing/pipelineSet.ts": ["@ee/event-sourcing/pipelines/ingestion-pull-processing","@ee/event-sourcing/pipelines/ingestion-pull-processing/process-manager/ingestionPullEffects","@ee/governance/process-manager/pulledUsageLedger.process","@ee/governance/services/pullers/ingestionPullLifecycle","@ee/governance/services/pullers/pullerWorker"],
       "platform/app/ee/governance/routers/activityMonitor.ts": ["@ee/governance/services/activity-monitor/activityMonitor.service"],
       "platform/app/ee/governance/routers/aiTools.ts": ["@ee/governance/services/aiToolEntry.service"],
       "platform/app/ee/governance/routers/anomalyRules.ts": ["@ee/governance/services/activity-monitor/anomalyRule.service"],

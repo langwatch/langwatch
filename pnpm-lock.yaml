@@ -719,6 +719,12 @@ importers:
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../../eventing
+      '@langwatch/ksuid':
+        specifier: ^2.0.2
+        version: 2.0.2
+      '@langwatch/prisma-client':
+        specifier: workspace:*
+        version: link:../../../../prisma-client
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -21857,7 +21863,7 @@ snapshots:
       isstream: 0.1.2
       jsonwebtoken: 9.0.3
       mime-types: 2.1.35
-      retry-axios: 2.6.0(axios@1.19.0)
+      retry-axios: 2.6.0(axios@1.19.0(debug@4.4.3))
       tough-cookie: 4.1.4
     transitivePeerDependencies:
       - supports-color
@@ -24911,7 +24917,7 @@ snapshots:
 
   ret@0.5.0: {}
 
-  retry-axios@2.6.0(axios@1.19.0):
+  retry-axios@2.6.0(axios@1.19.0(debug@4.4.3)):
     dependencies:
       axios: 1.19.0(debug@4.4.3)
 

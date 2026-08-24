@@ -4,6 +4,7 @@ import {
   IngestionPullProcessService,
   IngestionPullRunPort,
   IngestionPullService,
+  PostgresIngestionPullRunProjectionAdapter,
   PulledUsageEventingAdapter,
 } from "@langwatch/enterprise-governance-server";
 import type { EventSourcing } from "@langwatch/eventing";
@@ -21,7 +22,6 @@ import {
   type PulledUsageDispatcher,
   runIngestionPull,
 } from "@ee/governance/services/pullers/pullerWorker";
-import { PrismaIngestionPullRunProjectionRepository } from "@ee/governance/services/pullers/repositories/ingestion-pull-run-projection.prisma.repository";
 
 const logger = createLogger("langwatch:enterprise:governance-runtime");
 
@@ -150,9 +150,9 @@ export class AppGovernancePipelineRuntime {
     });
     const pipeline = this.deps.eventSourcing.register(
       IngestionPullEventingAdapter.create({
-        runStatusStore: new PrismaIngestionPullRunProjectionRepository(
+        runStatusStore: PostgresIngestionPullRunProjectionAdapter.create(
           this.deps.prisma,
-        ),
+        ).build(),
         process,
       }).build(),
     );

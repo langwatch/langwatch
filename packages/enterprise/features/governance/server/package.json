@@ -22,6 +22,8 @@
   "dependencies": {
     "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
+    "@langwatch/ksuid": "^2.0.2",
+    "@langwatch/prisma-client": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

@@ -1,11 +1,13 @@
-import type { IngestionPullRunStatusData } from "@langwatch/enterprise-governance-server";
+import {
+  type IngestionPullRunStatusData,
+  PostgresIngestionPullRunProjectionAdapter,
+} from "@langwatch/enterprise-governance-server";
 import type { StoredProjection } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { GuardParams } from "~/utils/dbGuardMiddleware";
 import { guardProjectId } from "~/utils/dbMultiTenancyProtection";
-import { PrismaIngestionPullRunProjectionRepository } from "../ingestion-pull-run-projection.prisma.repository";
 
 const PROJECT_ID = "governance-project-1";
 const SOURCE_ID = "source-1";
@@ -61,7 +63,9 @@ describe("PrismaIngestionPullRunProjectionRepository tenancy", () => {
         findUnique,
       },
     } as unknown as PrismaClient;
-    const repository = new PrismaIngestionPullRunProjectionRepository(prisma);
+    const repository = PostgresIngestionPullRunProjectionAdapter.create(
+      prisma,
+    ).build();
 
     await expect(
       repository.load(SOURCE_ID, {
@@ -91,7 +95,9 @@ describe("PrismaIngestionPullRunProjectionRepository tenancy", () => {
         callback(tx),
       ),
     } as unknown as PrismaClient;
-    const repository = new PrismaIngestionPullRunProjectionRepository(prisma);
+    const repository = PostgresIngestionPullRunProjectionAdapter.create(
+      prisma,
+    ).build();
 
     await expect(
       repository.store(storedProjection(), {
