@@ -1,4 +1,4 @@
-import { NOTIFICATION_CADENCES } from "@langwatch/automations/cadences";
+import { NOTIFICATION_CADENCES } from "@langwatch/automation-contract";
 import { EventSchema } from "@langwatch/eventing";
 import { z } from "zod";
 import { TriggerAction } from "~/generated/prisma/client";

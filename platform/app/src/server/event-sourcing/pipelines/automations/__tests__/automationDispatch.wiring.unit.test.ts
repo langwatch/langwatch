@@ -52,15 +52,6 @@ vi.mock("~/server/api/utils", () => ({
   getProtectionsForProject: vi.fn().mockResolvedValue({}),
 }));
 
-vi.mock("~/server/app-layer/automations/webhook-delivery.service", () => ({
-  WebhookDeliveryService: {
-    create: vi.fn(() => ({
-      record: vi.fn().mockResolvedValue(undefined),
-      pruneExpired: pruneExpiredMock,
-    })),
-  },
-}));
-
 vi.mock("~/server/app-layer/automations/dispatch/emailCaps", () => ({
   consumeEmailCapSlot: vi.fn().mockResolvedValue({ allowed: true, count: 1 }),
   consumeTenantEmailCapSlot: vi
@@ -84,12 +75,18 @@ describe("automation dispatch wiring smoke", () => {
       const ports = buildAutomationDispatchPorts({
         prisma: prisma as never,
         redis: null,
-        triggers: triggers as never,
-        emailSuppressions: { filterSuppressed: filterSuppressedMock } as never,
+        automation: {
+          ...triggers,
+          filterSuppressed: filterSuppressedMock,
+          recordWebhookDelivery: vi.fn().mockResolvedValue(undefined),
+          pruneWebhookDeliveries: pruneExpiredMock,
+          tryGetCustomGraph: vi.fn().mockResolvedValue(null),
+        } as never,
         projects: {} as never,
         evaluations: { runs: {} as never },
         traces: { spans: {} as never },
         traceSummaryRepository: {} as never,
+        analytics: {} as never,
         resolveClickHouseClient: async () => {
           throw new Error("no ClickHouse in this test");
         },
@@ -97,7 +94,7 @@ describe("automation dispatch wiring smoke", () => {
 
       expect(ports.settlementDeps).toEqual(
         expect.objectContaining({
-          triggers,
+          automation: expect.objectContaining(triggers),
           baseHost: "https://app.example.com",
           emailHourlyCap: 100,
           tenantDailyCap: 1_000,

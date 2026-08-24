@@ -2,7 +2,7 @@ import { isIP } from "node:net";
 import {
   inspectWebhookUrlShape,
   type WebhookUrlProblem,
-} from "@langwatch/automations/providers/webhook";
+} from "@langwatch/automation-contract";
 import { DispatchError } from "@langwatch/eventing";
 import {
   createSSRFValidator,

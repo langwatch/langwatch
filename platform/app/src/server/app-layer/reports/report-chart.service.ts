@@ -1,4 +1,4 @@
-import type { ReportChart } from "@langwatch/automations/templating/templateContext";
+import type { ReportChart } from "@langwatch/automation-contract";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import type { CustomGraph } from "~/generated/prisma/client";
 import type {
@@ -12,7 +12,7 @@ import {
   extractGroupTotals,
   extractSeriesPoints,
 } from "~/server/app-layer/analytics/series-points";
-import type { ReportSource } from "~/server/app-layer/automations/report.builder";
+import type { ReportSource } from "@langwatch/automation-contract";
 
 /**
  * Turn a report's chart source — one custom graph, or every panel on a

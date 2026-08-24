@@ -14,15 +14,15 @@ import {
   MIN_TRACE_DEBOUNCE_MS,
   NOTIFICATION_CADENCES,
   type NotificationCadence,
-} from "@langwatch/automations/cadences";
-import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
+} from "@langwatch/automation-contract";
+import { defaultsForSourceKind } from "@langwatch/automation-contract";
 import {
   EXAMPLE_MATCHES,
   TEMPLATE_VARIABLES,
-} from "@langwatch/automations/templating/exampleContext";
-import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
-import { renderTriggerSlack } from "@langwatch/automations/templating/renderSlack";
-import { renderWebhookBody } from "@langwatch/automations/templating/renderWebhookBody";
+} from "@langwatch/automation-contract";
+import { renderTriggerEmail } from "@langwatch/automation-contract";
+import { renderTriggerSlack } from "@langwatch/automation-contract";
+import { renderWebhookBody } from "@langwatch/automation-contract";
 import {
   buildExampleGraphAlertTemplateContext,
   buildExampleReportTemplateContext,
@@ -30,7 +30,7 @@ import {
   type GraphAlertTemplateContext,
   type ReportTemplateContext,
   type TemplateContext,
-} from "@langwatch/automations/templating/templateContext";
+} from "@langwatch/automation-contract";
 import { Mail, Send } from "lucide-react";
 import {
   useCallback,
@@ -543,10 +543,10 @@ export function AutomationDrawer({
           alertType: row.alertType,
           action,
           actionParams: row.actionParams,
-          emailSubjectTemplate: row.emailSubjectTemplate,
-          emailBodyTemplate: row.emailBodyTemplate,
-          slackTemplate: row.slackTemplate,
-          slackTemplateType: row.slackTemplateType,
+          emailSubjectTemplate: row.templates.emailSubjectTemplate,
+          emailBodyTemplate: row.templates.emailBodyTemplate,
+          slackTemplate: row.templates.slackTemplate,
+          slackTemplateType: row.templates.slackTemplateType,
         }),
       },
     };

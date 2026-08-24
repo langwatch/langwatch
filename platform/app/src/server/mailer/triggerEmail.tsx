@@ -1,4 +1,4 @@
-import { EMAIL_RX } from "@langwatch/automations/providers/email";
+import { EMAIL_RX } from "@langwatch/automation-contract";
 import { toDispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -125,7 +125,7 @@ export const sendTriggerEmail = async ({
    * - `recordRecipientSent(hash)` — called AFTER a successful provider call to
    *   persist the delivery record so that future retries can skip it.
    *
-   * Callers (outbox dispatcher) back these with TriggerService.isSendClaimed /
+   * Callers (outbox dispatcher) back these with AutomationService.isSendClaimed /
    * claimSend (keyed with the recipient hash encoded into the traceId field)
    * so dedup survives across outbox retries. Omitting either callback falls
    * back to always-send behaviour (backward-compatible with existing callers).

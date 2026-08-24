@@ -1,12 +1,12 @@
-import { filterBlockKit } from "@langwatch/automations/templating/blockKitAllowlist";
-import { renderLiquid } from "@langwatch/automations/templating/engine";
-import { EXAMPLE_MATCHES } from "@langwatch/automations/templating/exampleContext";
+import { filterBlockKit } from "@langwatch/automation-contract";
+import { renderLiquid } from "@langwatch/automation-contract";
+import { EXAMPLE_MATCHES } from "@langwatch/automation-contract";
 import {
   buildExampleGraphAlertTemplateContext,
   buildReportTemplateContext,
   buildTemplateContext,
   type GraphAlertTemplateContext,
-} from "@langwatch/automations/templating/templateContext";
+} from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
 import { AlertType, TriggerAction } from "~/generated/prisma/client";
 import { SERVER_PROVIDERS } from "~/server/app-layer/automations/providers/registry";

@@ -1,26 +1,26 @@
 import {
   type SlackActionParams,
   slackDeliveryMethodOf,
-} from "@langwatch/automations/providers/slack";
-import { REPORT_TRIGGER_DEFAULTS } from "@langwatch/automations/templating/defaults";
-import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
+} from "@langwatch/automation-contract";
+import { REPORT_TRIGGER_DEFAULTS } from "@langwatch/automation-contract";
+import { renderTriggerEmail } from "@langwatch/automation-contract";
 import {
   renderTriggerSlack,
   type SlackTemplateType,
-} from "@langwatch/automations/templating/renderSlack";
+} from "@langwatch/automation-contract";
 import {
-  buildReportTemplateContext,
-  type ReportChart,
-  type ReportTraceRow,
-} from "@langwatch/automations/templating/templateContext";
+	buildReportTemplateContext,
+	type ReportChart,
+	type ReportTraceRow,
+	type ReportSource,
+	extractReportFromTriggerRow,
+} from "@langwatch/automation-contract";
 import { createLogger } from "@langwatch/observability";
 import { Cron } from "croner";
 import type { Project, Trigger } from "~/generated/prisma/client";
 import type { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import type { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/slack/server";
-import type { ReportSource } from "~/server/app-layer/automations/report.builder";
-import { extractReportFromTriggerRow } from "~/server/app-layer/automations/report.builder";
 import type { ScheduledJobFire } from "~/server/app-layer/scheduler/scheduler.types";
 import type { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 

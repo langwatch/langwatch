@@ -1,8 +1,8 @@
-import { renderTriggerSlack } from "@langwatch/automations/templating/renderSlack";
+import { renderTriggerSlack } from "@langwatch/automation-contract";
 import {
   buildGraphAlertTemplateContext,
   type GraphAlertTemplateContext,
-} from "@langwatch/automations/templating/templateContext";
+} from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
 import { SLACK_BLOCK_KIT_TEMPLATES } from "../registry";
 

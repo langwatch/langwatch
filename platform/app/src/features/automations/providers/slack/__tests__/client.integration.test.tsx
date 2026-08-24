@@ -57,7 +57,7 @@ vi.mock("~/utils/api", () => ({
 import {
   SLACK_BOT_TOKEN_KEPT,
   type SlackPreview,
-} from "@langwatch/automations/providers/slack";
+} from "@langwatch/automation-contract";
 import slackClient, { type SlackSlice } from "../client";
 import {
   SLACK_BLOCK_KIT_TEMPLATES,

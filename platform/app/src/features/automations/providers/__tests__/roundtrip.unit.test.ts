@@ -1,8 +1,8 @@
-import { annotationQueueActionParamsSchema } from "@langwatch/automations/providers/annotationQueue";
-import { datasetActionParamsSchema } from "@langwatch/automations/providers/dataset";
-import { emailActionParamsSchema } from "@langwatch/automations/providers/email";
-import { slackActionParamsSchema } from "@langwatch/automations/providers/slack";
-import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
+import { annotationQueueActionParamsSchema } from "@langwatch/automation-contract";
+import { datasetActionParamsSchema } from "@langwatch/automation-contract";
+import { emailActionParamsSchema } from "@langwatch/automation-contract";
+import { slackActionParamsSchema } from "@langwatch/automation-contract";
+import type { SavedTriggerRow } from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
 import { TriggerAction } from "~/generated/prisma/client";
 import type { AnnotationQueueSlice } from "../annotationQueue/client";

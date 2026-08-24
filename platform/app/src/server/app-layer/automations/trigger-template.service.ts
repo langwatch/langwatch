@@ -1,15 +1,15 @@
 import {
   defaultsForSourceKind,
   type TemplateSourceKind,
-} from "@langwatch/automations/templating/defaults";
-import { EXAMPLE_MATCHES } from "@langwatch/automations/templating/exampleContext";
-import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
+} from "@langwatch/automation-contract";
+import { EXAMPLE_MATCHES } from "@langwatch/automation-contract";
+import { renderTriggerEmail } from "@langwatch/automation-contract";
 import {
   renderTriggerSlack,
   type SlackPayload,
   type SlackTemplateType,
-} from "@langwatch/automations/templating/renderSlack";
-import { renderWebhookBody } from "@langwatch/automations/templating/renderWebhookBody";
+} from "@langwatch/automation-contract";
+import { renderWebhookBody } from "@langwatch/automation-contract";
 import {
   buildExampleGraphAlertTemplateContext,
   buildExampleReportTemplateContext,
@@ -18,9 +18,9 @@ import {
   type ReportSourceKind,
   type ReportTemplateContext,
   type TemplateContext,
-} from "@langwatch/automations/templating/templateContext";
-import { validateLiquid } from "@langwatch/automations/templating/validate";
-import type { AlertType } from "~/generated/prisma/client";
+} from "@langwatch/automation-contract";
+import { validateLiquid } from "@langwatch/automation-contract";
+import type { AlertType } from "@langwatch/automation-contract";
 import { computeDefaultFrom } from "~/server/mailer/emailSender";
 import {
   buildTriggerNoReplyAddress,
@@ -165,7 +165,7 @@ export function validateTemplateDraft(draft: TemplateDraft): void {
  * server-side because it touches credentials (SES, Slack webhooks). Live
  * preview rendering happens entirely client-side via the same shared
  * templating module — the renderers below are imported from
- * `@langwatch/automations/templating/*` so both sides see identical output for any given
+ * `@langwatch/automation-contract` so both sides see identical output for any given
  * draft.
  *
  * `TestFireTriggerDeps` holds the two composition-time dependencies

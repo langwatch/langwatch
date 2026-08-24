@@ -1,4 +1,4 @@
-import { TEMPLATE_VARIABLES } from "@langwatch/automations/templating/exampleContext";
+import { TEMPLATE_VARIABLES } from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
 import { detectUnknownVariables, positionInsideLiquid } from "../liquidMonaco";
 

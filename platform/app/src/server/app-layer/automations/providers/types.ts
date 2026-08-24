@@ -1,4 +1,4 @@
-import type { SharedDef } from "@langwatch/automations/providers/types";
+import type { SharedDef } from "@langwatch/automation-contract";
 import type { TriggerAction } from "~/generated/prisma/client";
 
 /**

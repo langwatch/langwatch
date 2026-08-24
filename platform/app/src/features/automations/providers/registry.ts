@@ -1,14 +1,14 @@
-import annotationQueueShared from "@langwatch/automations/providers/annotationQueue";
-import datasetShared from "@langwatch/automations/providers/dataset";
-import emailShared, {
+import { annotationQueueProvider as annotationQueueShared } from "@langwatch/automation-contract";
+import { datasetProvider as datasetShared } from "@langwatch/automation-contract";
+import { emailProvider as emailShared,
   type EmailPreview,
-} from "@langwatch/automations/providers/email";
-import slackShared, {
+} from "@langwatch/automation-contract";
+import { slackProvider as slackShared,
   type SlackPreview,
-} from "@langwatch/automations/providers/slack";
-import webhookShared, {
+} from "@langwatch/automation-contract";
+import { webhookProvider as webhookShared,
   type WebhookPreview,
-} from "@langwatch/automations/providers/webhook";
+} from "@langwatch/automation-contract";
 import { TriggerAction } from "~/generated/prisma/client";
 import annotationQueueClient, {
   type AnnotationQueueSlice,

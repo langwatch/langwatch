@@ -87,7 +87,7 @@ describe("automationRouter.testFireTemplate", () => {
     previousApp = globalForApp.__langwatch_app;
     globalForApp.__langwatch_app = createTestApp({
       triggerTemplates: { testFire: mockTestFire } as any,
-      projects: { getById: mockProjectGetById } as any,
+      projects: { tryGetById: mockProjectGetById } as any,
     });
   });
 

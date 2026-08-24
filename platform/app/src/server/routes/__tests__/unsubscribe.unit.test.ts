@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const appMock = vi.hoisted(() => ({
+  automation: { confirmUnsubscribe: vi.fn() },
+}));
+
 vi.mock("~/server/app-layer/app", () => ({
-  getApp: vi.fn(),
-  // Reached through the TtlCache these paths read; null keeps it in-memory.
-  tryGetApp: () => null,
+  getApp: () => appMock,
+  tryGetApp: () => appMock,
 }));
 
 vi.mock("@langwatch/observability", () => ({
@@ -15,24 +18,20 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import { getApp } from "~/server/app-layer/app";
-import { InvalidUnsubscribeTokenError } from "~/server/app-layer/automations/emailSuppression.service";
+import { InvalidUnsubscribeTokenError } from "@langwatch/automation-contract";
 import { _resetMemoryRateLimitStore } from "~/server/rateLimit";
 import { app } from "../unsubscribe";
 
 // Transport-mapping test only: the unsubscribe behaviour itself (token
 // verification, scope handling, persistence) is owned and tested by
-// EmailSuppressionService — here the service is a mock and the assertions
+// AutomationService — here the service is a mock and the assertions
 // are about HTTP semantics (status codes, Allow header, rate limit).
-const confirmUnsubscribe = vi.fn();
+const confirmUnsubscribe = appMock.automation.confirmUnsubscribe;
 
 beforeEach(() => {
   vi.clearAllMocks();
   _resetMemoryRateLimitStore();
   confirmUnsubscribe.mockResolvedValue(undefined);
-  (getApp as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-    emailSuppressions: { confirmUnsubscribe },
-  });
 });
 
 function request({

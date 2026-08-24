@@ -1,6 +1,6 @@
 import { Text, VStack } from "@chakra-ui/react";
-import type { DatasetActionParams } from "@langwatch/automations/providers/dataset";
-import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
+import type { DatasetActionParams } from "@langwatch/automation-contract";
+import type { SavedTriggerRow } from "@langwatch/automation-contract";
 import { Database } from "lucide-react";
 import { useEffect } from "react";
 import { DatasetSelector } from "~/components/datasets/DatasetSelector";
@@ -9,7 +9,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import {
   type DatasetColumns,
   datasetColumnsSchema,
-} from "~/server/datasets/types";
+} from "@langwatch/dataset-contract";
 import { api } from "~/utils/api";
 import { keepDraftOnSubFlowReturn } from "../../state/subFlow";
 import type { ClientDef, ConfigFormProps, SummaryIdentity } from "../types";

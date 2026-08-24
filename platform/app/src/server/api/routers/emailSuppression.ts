@@ -1,8 +1,7 @@
 import { auditLog } from "~/runtime/app/features/audit-log";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { getApp } from "~/server/app-layer/app";
-import { InvalidUnsubscribeTokenError } from "~/server/app-layer/automations/emailSuppression.service";
+import { InvalidUnsubscribeTokenError } from "@langwatch/automation-contract";
 import { getClientIp } from "~/utils/getClientIp";
 import { rateLimit } from "../../rateLimit";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
@@ -55,7 +54,7 @@ export const emailSuppressionRouter = createTRPCRouter({
         action: "resolve",
         max: 30,
       });
-      const view = await getApp().emailSuppressions.resolveUnsubscribeView({
+      const view = await ctx.app.automation.tryResolveUnsubscribeView({
         token: input.token,
       });
       if (!view) {
@@ -87,7 +86,7 @@ export const emailSuppressionRouter = createTRPCRouter({
         max: 10,
       });
       try {
-        await getApp().emailSuppressions.confirmUnsubscribe({
+        await ctx.app.automation.confirmUnsubscribe({
           token: input.token,
           scope: input.scope,
         });
@@ -116,7 +115,7 @@ export const emailSuppressionRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("triggers:view")
     .query(async ({ input, ctx }) => {
-      const rows = await getApp().emailSuppressions.getAllEnriched({
+      const rows = await ctx.app.automation.getAllEnriched({
         projectId: input.projectId,
       });
       void auditLog({
@@ -149,7 +148,7 @@ export const emailSuppressionRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), id: z.string() }))
     .permission("triggers:manage")
     .mutation(async ({ input, ctx }) => {
-      await getApp().emailSuppressions.remove({
+      await ctx.app.automation.removeSuppression({
         projectId: input.projectId,
         id: input.id,
       });

@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { CADENCE_LABELS } from "@langwatch/automations/cadences";
+import { CADENCE_LABELS } from "@langwatch/automation-contract";
 import { useEffect, useState } from "react";
 import {
   GRAPH_ALERT_TIME_PERIODS,

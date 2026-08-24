@@ -3,7 +3,7 @@ import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
 
 import { confirmSettledMatch } from "../dispatch/confirmSettledMatch";
 import { isMatchEverythingTrigger } from "../matchEverything";
-import type { TriggerSummary } from "../repositories/trigger.repository";
+import type { TriggerSummary } from "../trigger-summary";
 
 function trigger(overrides: Partial<TriggerSummary> = {}): TriggerSummary {
   return {

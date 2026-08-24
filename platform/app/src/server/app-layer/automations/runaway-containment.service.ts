@@ -7,7 +7,7 @@ import {
   incrementAutomationContainmentFailedTotal,
 } from "~/server/metrics";
 import { isMatchEverythingTrigger } from "./matchEverything";
-import type { TriggerSummary } from "./repositories/trigger.repository";
+import type { TriggerSummary } from "./trigger-summary";
 
 const logger = createLogger("langwatch:automations:runaway-containment");
 

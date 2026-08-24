@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { GraphTriggerEvaluationReason } from "../../../../app-layer/automations/graph-trigger-evaluation.service";
 import type { GraphTriggerSweepCandidate } from "../../../../app-layer/automations/graph-trigger-heartbeat";
 
-const logger = createLogger("langwatch:triggers:graph-alert-sweep");
+const logger = createLogger("langwatch:automation:graph-alert-sweep");
 
 export const GRAPH_ALERT_SWEEP_PROCESS_NAME = "graphAlertSweep" as const;
 export const GRAPH_ALERT_SWEEP_INTERVAL_MS = 30_000;

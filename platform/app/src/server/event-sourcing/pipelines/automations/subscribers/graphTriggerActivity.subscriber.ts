@@ -1,10 +1,10 @@
 import type { Event } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { GraphTriggerEvaluationReason } from "~/server/app-layer/automations/graph-trigger-evaluation.service";
-import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
+import type { AutomationService } from "@langwatch/automation-contract";
 
 const logger = createLogger(
-  "langwatch:triggers:graph-trigger-activity-subscriber",
+  "langwatch:automation:graph-trigger-activity-subscriber",
 );
 
 /** Locked ADR-034 Phase 5 real-time debounce. */
@@ -34,7 +34,7 @@ export function graphTriggerActivityGroupKey(event: {
 }
 
 export interface GraphTriggerActivityDeps {
-  triggers: TriggerService;
+  automation: AutomationService;
   evaluateGraphTrigger: (params: {
     triggerId: string;
     projectId: string;
@@ -60,7 +60,7 @@ export function createGraphTriggerActivityHandler(
     if (event.occurredAt < Date.now() - 60 * 60 * 1000) return;
 
     const triggers =
-      await deps.triggers.getActiveGraphTriggersForProject(projectId);
+      await deps.automation.getActiveGraphTriggersForProject(projectId);
     if (triggers.length === 0) return;
 
     let failures = 0;

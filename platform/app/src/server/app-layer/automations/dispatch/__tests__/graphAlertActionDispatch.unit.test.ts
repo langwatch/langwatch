@@ -9,7 +9,7 @@ vi.mock("~/utils/encryption", () => ({
   decrypt: (s: string) => s.replace(/^enc\(/, "").replace(/\)$/, ""),
 }));
 
-import { buildGraphAlertTemplateContext } from "@langwatch/automations/templating/templateContext";
+import { buildGraphAlertTemplateContext } from "@langwatch/automation-contract";
 import {
   dispatchGraphAlertAction,
   graphAlertFireDigest,

@@ -13,7 +13,7 @@ import {
   type GraphTriggerSentRepository,
   graphAlertIncidentKey,
   type OpenGraphTriggerSent,
-} from "../repositories/trigger.repository";
+} from "../graph-trigger-sent.repository";
 
 const PROJECT_ID = "proj-1";
 const TRIGGER_ID = "trig-1";

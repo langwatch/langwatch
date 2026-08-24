@@ -9,13 +9,12 @@ import {
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { sendAutomationLimitEmail } from "~/server/mailer/automationLimitEmail";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
-import type { ProjectService } from "../projects/project.service";
-import type { EmailSuppressionService } from "./emailSuppression.service";
+import type { ProjectService } from "@langwatch/project-contract";
+import type { AutomationService } from "@langwatch/automation-contract";
 import type {
   ClaimLease,
   RunawayContainmentDeps,
 } from "./runaway-containment.service";
-import type { TriggerService } from "./trigger.service";
 
 const logger = createLogger("langwatch:automations:runaway-containment");
 
@@ -131,17 +130,15 @@ async function releaseClaim({
 
 export function defaultRunawayContainmentDeps({
   prisma,
-  triggers,
+  automation,
   projects,
-  emailSuppressions,
   baseHost,
   resolveClickHouseClient,
   redis,
 }: {
   prisma: PrismaClient;
-  triggers: TriggerService;
+  automation: AutomationService;
   projects: ProjectService;
-  emailSuppressions: EmailSuppressionService;
   baseHost: string;
   resolveClickHouseClient: ClickHouseClientResolver;
   /**
@@ -169,14 +166,16 @@ export function defaultRunawayContainmentDeps({
     },
 
     pauseTrigger: async ({ triggerId, projectId, reason, at }) => {
-      await triggers.update({
-        triggerId,
+      await automation.update({
+        id: triggerId,
         projectId,
-        data: { active: false, pausedReason: reason, pausedAt: at },
+        active: false,
+        pausedReason: reason,
+        pausedAt: at,
       });
       // Without this the match subscriber keeps recording matches for up to
       // the cache TTL, which is the whole window the pause exists to close.
-      await triggers.invalidate(projectId);
+      await automation.invalidate(projectId);
     },
 
     notificationRecipients: async ({ projectId, triggerId }) => {
@@ -196,7 +195,7 @@ export function defaultRunawayContainmentDeps({
       // suppression-store failure must not swallow the one mail that explains
       // why an automation stopped producing records.
       try {
-        return await emailSuppressions.filterSuppressed({
+        return await automation.filterSuppressed({
           projectId,
           triggerId,
           emails,
@@ -222,13 +221,13 @@ export function defaultRunawayContainmentDeps({
     releaseClaim: (lease) => releaseClaim({ connection: redis, lease }),
 
     projectName: async (projectId) =>
-      (await projects.getById(projectId))?.name ?? "your project",
+      (await projects.tryGetById(projectId))?.name ?? "your project",
 
     // The authoring drawer (`openDrawer("automation", { automationId })`) is
     // the only surface that can edit a query-based condition, which is exactly
     // what the mail asks the customer to narrow.
     automationUrl: async ({ projectId, triggerId }) => {
-      const project = await projects.getById(projectId);
+      const project = await projects.tryGetById(projectId);
       const slug = project?.slug ?? "";
       return `${baseHost}/${slug}/automations?drawer.open=automation&drawer.automationId=${triggerId}`;
     },

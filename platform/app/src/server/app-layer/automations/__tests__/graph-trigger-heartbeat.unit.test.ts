@@ -7,8 +7,8 @@ import {
   type GraphTriggerHeartbeatDeps,
   type HeartbeatCandidateSources,
 } from "../graph-trigger-heartbeat";
-import type { TriggerSummary } from "../repositories/trigger.repository";
-import type { TriggerService } from "../trigger.service";
+import type { TriggerSummary } from "../trigger-summary";
+import type { AutomationService } from "@langwatch/automation-contract";
 
 const PROJECT_A = "proj-a";
 const PROJECT_B = "proj-b";
@@ -47,7 +47,7 @@ function makeTrigger(
 
 function makeTriggersService(
   perProject: Record<string, TriggerSummary[]>,
-): TriggerService {
+): AutomationService {
   return {
     getActiveTraceTriggersForProject: vi.fn(async () => []),
     getActiveGraphTriggersForProject: vi.fn(
@@ -57,7 +57,7 @@ function makeTriggersService(
     isSendClaimed: vi.fn(),
     updateLastRunAt: vi.fn(),
     invalidate: vi.fn(),
-  } as unknown as TriggerService;
+  } as unknown as AutomationService;
 }
 
 function makeSources(overrides: {
@@ -123,7 +123,7 @@ describe("decideGraphTriggerHeartbeat", () => {
     it("returns no enqueues", async () => {
       const triggers = makeTriggersService({});
       deps = {
-        triggers,
+        automation: triggers,
         prisma: prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
         resolveClickHouseClient: async () => chStub.client,
         lookupTriggerSource: async () => "trace" as const,
@@ -151,7 +151,7 @@ describe("decideGraphTriggerHeartbeat", () => {
         ],
       });
       deps = {
-        triggers,
+        automation: triggers,
         prisma: prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
         resolveClickHouseClient: async () => chStub.client,
         lookupTriggerSource: async () => "trace" as const,
@@ -180,7 +180,7 @@ describe("decideGraphTriggerHeartbeat", () => {
         ],
       });
       deps = {
-        triggers,
+        automation: triggers,
         prisma: prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
         resolveClickHouseClient: async () => chStub.client,
         lookupTriggerSource: async () => "trace" as const,
@@ -213,7 +213,7 @@ describe("decideGraphTriggerHeartbeat", () => {
         ],
       });
       deps = {
-        triggers,
+        automation: triggers,
         prisma: prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
         resolveClickHouseClient: async () => chStub.client,
         lookupTriggerSource: async () => "trace" as const,
@@ -244,7 +244,7 @@ describe("decideGraphTriggerHeartbeat", () => {
         ],
       });
       deps = {
-        triggers,
+        automation: triggers,
         prisma: prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
         resolveClickHouseClient: async () => chStub.client,
         lookupTriggerSource: async () => "trace" as const,
@@ -287,7 +287,7 @@ describe("decideGraphTriggerHeartbeat", () => {
         ],
       });
       deps = {
-        triggers,
+        automation: triggers,
         prisma: prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
         resolveClickHouseClient: async () => chStub.client,
         lookupTriggerSource: async () => "trace" as const,

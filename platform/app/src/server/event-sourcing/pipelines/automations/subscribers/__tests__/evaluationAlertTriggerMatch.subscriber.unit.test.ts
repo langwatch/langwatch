@@ -1,7 +1,7 @@
 import type { TriggerContext } from "@langwatch/eventing";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
-import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
+import type { TriggerSummary } from "~/server/app-layer/automations/trigger-summary";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { RecordTriggerMatchCommand } from "~/server/event-sourcing/pipelines/automations/commands/recordTriggerMatch.command";
@@ -80,7 +80,7 @@ function context(
 
 function deps(triggerRows: TriggerSummary[] = [trigger()]) {
   return {
-    triggers: {
+    automation: {
       getActiveTraceTriggersForProject: vi.fn().mockResolvedValue(triggerRows),
     },
     traceSummaryStore: {
@@ -107,7 +107,7 @@ describe("evaluation alert trigger match subscriber", () => {
 
       await createEvaluationAlertTriggerMatchHandler({
         ...dependencies,
-        triggers: dependencies.triggers as never,
+        automation: dependencies.triggers as never,
         traceSummaryStore: dependencies.traceSummaryStore as never,
       })(event(), context());
 
@@ -146,7 +146,7 @@ describe("evaluation alert trigger match subscriber", () => {
         const dependencies = deps();
         const handler = createEvaluationAlertTriggerMatchHandler({
           ...dependencies,
-          triggers: dependencies.triggers as never,
+          automation: dependencies.triggers as never,
           traceSummaryStore: dependencies.traceSummaryStore as never,
         });
 
@@ -206,7 +206,7 @@ describe("evaluation alert trigger match subscriber", () => {
 
       await createEvaluationAlertTriggerMatchHandler({
         ...dependencies,
-        triggers: dependencies.triggers as never,
+        automation: dependencies.triggers as never,
         traceSummaryStore: dependencies.traceSummaryStore as never,
       })(inputEvent, inputContext);
 
@@ -222,7 +222,7 @@ describe("evaluation alert trigger match subscriber", () => {
 
       await createEvaluationAlertTriggerMatchHandler({
         ...dependencies,
-        triggers: dependencies.triggers as never,
+        automation: dependencies.triggers as never,
         traceSummaryStore: dependencies.traceSummaryStore as never,
       })(event(), context());
 

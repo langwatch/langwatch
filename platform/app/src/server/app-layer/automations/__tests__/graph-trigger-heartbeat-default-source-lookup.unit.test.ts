@@ -17,7 +17,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
 import { defaultGraphTriggerHeartbeatDeps } from "../graph-trigger-heartbeat";
-import type { TriggerService } from "../trigger.service";
+import type { AutomationService } from "@langwatch/automation-contract";
 
 const PROJECT = "proj-1";
 const GRAPH = "graph-1";
@@ -41,7 +41,7 @@ function makeDeps(graph: unknown) {
   >[0]["prisma"];
 
   const deps = defaultGraphTriggerHeartbeatDeps({
-    triggers: {} as TriggerService,
+    automation: {} as AutomationService,
     prisma,
     resolveClickHouseClient: async () => {
       throw new Error("no ClickHouse in this test");

@@ -7,7 +7,7 @@ import {
   Stack,
   Text,
 } from "@chakra-ui/react";
-import type { SlackDeliveryMethod } from "@langwatch/automations/providers/slack";
+import type { SlackDeliveryMethod } from "@langwatch/automation-contract";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import {

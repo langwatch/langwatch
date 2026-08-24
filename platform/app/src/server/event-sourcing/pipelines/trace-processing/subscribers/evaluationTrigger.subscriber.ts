@@ -1,7 +1,7 @@
 import type { QueueSendOptions } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import type { MonitorService } from "~/server/app-layer/monitors/monitor.service";
+import type { MonitorService } from "@langwatch/monitor-contract";
 import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 import { KSUID_RESOURCES } from "../../../../../utils/constants";
 import { featureFlagService } from "../../../../featureFlag";
@@ -28,7 +28,7 @@ const CAUSALITY_LOOP_GUARD_DISABLED_FLAG =
 const logger = createLogger("langwatch:trace-processing:evaluation-trigger");
 
 export interface EvaluationTriggerSubscriberDeps {
-  monitors: MonitorService;
+  monitors: Pick<MonitorService, "getEnabledOnMessageMonitors">;
   evaluation: (
     data: ExecuteEvaluationCommandData,
     options?: QueueSendOptions<ExecuteEvaluationCommandData>,

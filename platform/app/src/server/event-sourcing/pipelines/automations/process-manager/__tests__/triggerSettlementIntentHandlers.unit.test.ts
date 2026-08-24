@@ -2,7 +2,7 @@ import type { IntentContext } from "@langwatch/eventing";
 import { DispatchError, isDispatchError } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
-import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
+import type { TriggerSummary } from "~/server/app-layer/automations/trigger-summary";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { Trace } from "~/server/tracer/types";
 import {
@@ -142,7 +142,7 @@ function makeDeps(activeTrigger: TriggerSummary) {
     updateLastRunAt: vi.fn().mockResolvedValue(undefined),
   };
   const deps = {
-    triggers,
+    automation: triggers,
     projects: {
       getById: vi.fn().mockResolvedValue({
         id: "project-1",
@@ -278,7 +278,7 @@ describe("trigger settlement intent handlers integration", () => {
         templates: emailTemplates,
       });
       const { deps, raw } = makeDeps(triggerA);
-      raw.triggers.getActiveTraceTriggersForProject.mockImplementation(
+      raw.automation.getActiveTraceTriggersForProject.mockImplementation(
         async () => [
           triggerA,
           trigger(TriggerAction.SEND_EMAIL, {
@@ -564,7 +564,7 @@ describe("trigger settlement intent handlers integration", () => {
         1,
       );
       expect(raw.resolvePersistDailyCap).toHaveBeenCalledTimes(1);
-      expect(raw.projects.getById).toHaveBeenCalledTimes(1);
+      expect(raw.projects.tryGetById).toHaveBeenCalledTimes(1);
       expect(triggers.filterSendClaimed).toHaveBeenCalledWith({
         triggerId: "trigger-1",
         traceIds: ["trace-1", "trace-2"],

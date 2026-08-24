@@ -1,13 +1,13 @@
 import { setTimeout as sleep } from "node:timers/promises";
-import { slackDeliveryMethodOf } from "@langwatch/automations/providers/slack";
-import type { WebhookMethod } from "@langwatch/automations/providers/webhook";
-import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
-import { renderTriggerSlack } from "@langwatch/automations/templating/renderSlack";
-import { renderWebhookBody } from "@langwatch/automations/templating/renderWebhookBody";
+import { slackDeliveryMethodOf } from "@langwatch/automation-contract";
+import type { WebhookMethod } from "@langwatch/automation-contract";
+import { renderTriggerEmail } from "@langwatch/automation-contract";
+import { renderTriggerSlack } from "@langwatch/automation-contract";
+import { renderWebhookBody } from "@langwatch/automation-contract";
 import {
   buildTemplateContext,
   type TemplateMatchInput,
-} from "@langwatch/automations/templating/templateContext";
+} from "@langwatch/automation-contract";
 import type { FoldProjectionStore, IntentExecutor } from "@langwatch/eventing";
 import {
   createTenantId,
@@ -32,12 +32,12 @@ import {
   decryptWebhookHeaders,
   decryptWebhookSigningSecrets,
 } from "~/server/app-layer/automations/providers/webhook/server";
-import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
-import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
+import type { TriggerSummary } from "~/server/app-layer/automations/trigger-summary";
+import type { AutomationService } from "@langwatch/automation-contract";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
-import type { ProjectService } from "~/server/app-layer/projects/project.service";
+import type { ProjectService } from "@langwatch/project-contract";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { DatasetRecordEntry } from "~/server/datasets/types";
+import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
 import {
   sendRenderedTriggerEmail,
   sendTriggerEmail,
@@ -58,7 +58,7 @@ import {
   TRIGGER_SETTLEMENT_INTENT_TYPES,
 } from "./triggerSettlementProcess.types";
 
-const logger = createLogger("langwatch:triggers:settlement-dispatch");
+const logger = createLogger("langwatch:automation:settlement-dispatch");
 
 /** Log bounded-state flushes after the process commit, never from pure
  *  evolve. The cap never discards matches — it dispatches the oldest ones
@@ -111,7 +111,7 @@ interface ActionParams {
  * queue transport — the ProcessManagerOutbox owns retry now.
  */
 export interface TriggerSettlementDispatchDeps extends ConfirmSettledMatchDeps {
-  triggers: TriggerService;
+  automation: AutomationService;
   projects: ProjectService;
   /** Base host for deep links inside rendered customer templates (ADR-036). */
   baseHost: string;
@@ -274,7 +274,7 @@ async function dispatchNotifyDigest({
   messageKey: string;
 }): Promise<void> {
   const triggersForProject =
-    await deps.triggers.getActiveTraceTriggersForProject(projectId);
+    await deps.automation.getActiveTraceTriggersForProject(projectId);
   const trigger = triggersForProject.find((t) => t.id === triggerId);
   if (!trigger) {
     logger.info(
@@ -284,7 +284,7 @@ async function dispatchNotifyDigest({
     return;
   }
 
-  const project = await deps.projects.getById(projectId);
+  const project = await deps.projects.tryGetById(projectId);
   if (!project) {
     throw new DispatchError({
       message: `project ${projectId} not found at dispatch time`,
@@ -324,7 +324,7 @@ async function dispatchNotifyDigest({
     ) {
       continue;
     }
-    const alreadySent = await deps.triggers.isSendClaimed({
+    const alreadySent = await deps.automation.isSendClaimed({
       triggerId,
       traceId,
       projectId,
@@ -466,13 +466,13 @@ async function dispatchNotifyDigest({
       const recipientClaimKey = (recipientHash: string) =>
         `rcpt:${dispatchDigest}:${recipientHash}`;
       const isRecipientSent = (recipientHash: string) =>
-        deps.triggers.isSendClaimed({
+        deps.automation.isSendClaimed({
           triggerId,
           traceId: recipientClaimKey(recipientHash),
           projectId,
         });
       const recordRecipientSent = async (recipientHash: string) => {
-        await deps.triggers.claimSend({
+        await deps.automation.claimSend({
           triggerId,
           traceId: recipientClaimKey(recipientHash),
           projectId,
@@ -636,7 +636,7 @@ async function dispatchNotifyDigest({
   // double-send).
   for (const { traceId } of candidates) {
     try {
-      await deps.triggers.claimSend({ triggerId, traceId, projectId });
+      await deps.automation.claimSend({ triggerId, traceId, projectId });
     } catch (claimErr) {
       logger.warn(
         {
@@ -677,7 +677,7 @@ async function dispatchNotifyDigest({
   // send already happened; a failure here must not throw (retry would
   // re-emit an identical digest).
   try {
-    await deps.triggers.updateLastRunAt(triggerId, projectId);
+    await deps.automation.updateLastRunAt({ triggerId, projectId });
   } catch (lastRunErr) {
     logger.warn(
       {
@@ -796,7 +796,7 @@ interface PersistPageContext {
   triggerId: string;
   trigger: TriggerSummary;
   project: NonNullable<
-    Awaited<ReturnType<TriggerSettlementDispatchDeps["projects"]["getById"]>>
+    Awaited<ReturnType<TriggerSettlementDispatchDeps["projects"]["tryGetById"]>>
   >;
   cap: Awaited<
     ReturnType<TriggerSettlementDispatchDeps["resolvePersistDailyCap"]>
@@ -832,7 +832,7 @@ async function claimPersistDispatch(
 
   for (let attempt = 0; attempt < attempts; attempt++) {
     try {
-      await deps.triggers.claimSend({ triggerId, traceId, projectId });
+      await deps.automation.claimSend({ triggerId, traceId, projectId });
       return;
     } catch (claimErr) {
       const waitMs = CLAIM_RETRY_DELAYS_MS[attempt];
@@ -1062,7 +1062,7 @@ async function dispatchPersistMatchPage({
   traceIds: string[];
 }): Promise<void> {
   const triggersForProject =
-    await deps.triggers.getActiveTraceTriggersForProject(projectId);
+    await deps.automation.getActiveTraceTriggersForProject(projectId);
   const trigger = triggersForProject.find((t) => t.id === triggerId);
   if (!trigger) {
     logger.info(
@@ -1073,7 +1073,7 @@ async function dispatchPersistMatchPage({
   }
 
   const uniqueTraceIds = [...new Set(traceIds)];
-  const alreadySent = await deps.triggers.filterSendClaimed({
+  const alreadySent = await deps.automation.filterSendClaimed({
     triggerId,
     traceIds: uniqueTraceIds,
     projectId,
@@ -1086,7 +1086,7 @@ async function dispatchPersistMatchPage({
   const cap = await deps.resolvePersistDailyCap(projectId);
   // The action layer needs the project row; resolving it once here keeps a
   // page at one read instead of one per trace.
-  const project = await deps.projects.getById(projectId);
+  const project = await deps.projects.tryGetById(projectId);
   if (!project) {
     throw new DispatchError({
       message: `project ${projectId} not found at dispatch time`,

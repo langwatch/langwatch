@@ -2,7 +2,7 @@ import type { IntentSpec, WakeHandler } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
-const logger = createLogger("langwatch:triggers:webhook-delivery-prune");
+const logger = createLogger("langwatch:automation:webhook-delivery-prune");
 
 export const WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME =
   "webhookDeliveryPrune" as const;

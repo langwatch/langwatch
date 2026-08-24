@@ -3,7 +3,7 @@ import {
   sanitizeWebhookHeaders,
   WEBHOOK_HEADER_VALUE_KEPT,
   type WebhookMethod,
-} from "@langwatch/automations/providers/webhook";
+} from "@langwatch/automation-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { assertDispatchBudget } from "./dispatchBudget";
 import { sendHttpDestination } from "./httpDestination";

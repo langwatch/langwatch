@@ -9,10 +9,9 @@ import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import type { ProjectService } from "../../projects/project.service";
-import type { EmailSuppressionService } from "../emailSuppression.service";
+import type { ProjectService } from "@langwatch/project-contract";
 import { defaultRunawayContainmentDeps } from "../runaway-containment.deps";
-import type { TriggerService } from "../trigger.service";
+import type { AutomationService } from "@langwatch/automation-contract";
 
 const resolveOrganizationId =
   vi.fn<(projectId: string) => Promise<string | undefined>>();
@@ -34,13 +33,12 @@ function makeDeps() {
     prisma: {
       organizationUser: { findMany },
     } as unknown as PrismaClient,
-    triggers: {} as TriggerService,
+    automation: {
+      filterSuppressed,
+    } as unknown as AutomationService,
     projects: {
       getById: async () => ({ slug: "acme-proj" }),
     } as unknown as ProjectService,
-    emailSuppressions: {
-      filterSuppressed,
-    } as unknown as EmailSuppressionService,
     baseHost: "https://app.langwatch.ai",
     // Only the trace count reaches ClickHouse, and nothing here counts traces.
     resolveClickHouseClient: (async () => {

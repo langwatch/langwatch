@@ -12,10 +12,10 @@ import {
   EMAIL_RX,
   type EmailActionParams,
   type EmailPreview,
-} from "@langwatch/automations/providers/email";
-import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
-import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
-import { filterVariablesForCadence } from "@langwatch/automations/templating/exampleContext";
+} from "@langwatch/automation-contract";
+import type { SavedTriggerRow } from "@langwatch/automation-contract";
+import { defaultsForSourceKind } from "@langwatch/automation-contract";
+import { filterVariablesForCadence } from "@langwatch/automation-contract";
 import { Mail, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { VariableInfoIcon } from "~/features/automations/components/VariableInfoIcon";

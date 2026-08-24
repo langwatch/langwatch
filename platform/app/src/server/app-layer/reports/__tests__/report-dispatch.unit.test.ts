@@ -1,7 +1,7 @@
 import type {
   ReportChart,
   ReportTraceRow,
-} from "@langwatch/automations/templating/templateContext";
+} from "@langwatch/automation-contract";
 import { describe, expect, it, vi } from "vitest";
 import type { Project, Trigger } from "~/generated/prisma/client";
 import { TriggerAction, TriggerKind } from "~/generated/prisma/client";

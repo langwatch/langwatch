@@ -22,10 +22,10 @@ import {
   type SlackPreview,
   type SlackTemplateType,
   slackDeliveryMethodOf,
-} from "@langwatch/automations/providers/slack";
-import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
-import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
-import { filterVariablesForCadence } from "@langwatch/automations/templating/exampleContext";
+} from "@langwatch/automation-contract";
+import type { SavedTriggerRow } from "@langwatch/automation-contract";
+import { defaultsForSourceKind } from "@langwatch/automation-contract";
+import { filterVariablesForCadence } from "@langwatch/automation-contract";
 import { ExternalLink } from "lucide-react";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { FaSlack } from "react-icons/fa";

@@ -119,7 +119,7 @@ status, latency, retry outcome and the bounded receiver response.
 
 ### Layering
 
-- `@langwatch/automations` owns the browser-safe provider schema.
+- `@langwatch/automation-contract` owns the browser-safe provider schema.
 - The web feature owns its configuration and preview components.
 - The automation application layer owns encryption, rendering and delivery
   orchestration.
@@ -150,7 +150,7 @@ with the process-manager lease and attempt state.
 
 ## References
 
-- `packages/automations/src/providers/webhook.ts`
+- `packages/features/automation/contract/src/providers/webhook.ts`
 - `platform/app/src/server/webhooks/sendWebhook.ts`
 - `platform/app/src/server/app-layer/automations/delivery/deliverWebhook.ts`
 - [Eventing framework boundary](../../../packages/eventing/adrs/20260820-eventing-framework-boundary.md)

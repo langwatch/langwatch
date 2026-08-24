@@ -11,7 +11,7 @@
  * @see specs/scenarios/scenario-run-parameters.feature
  */
 
-import { renderLiquid } from "@langwatch/automations/templating/engine";
+import { renderLiquid } from "@langwatch/automation-contract";
 
 import type { RunParameterValues } from "../parameters";
 

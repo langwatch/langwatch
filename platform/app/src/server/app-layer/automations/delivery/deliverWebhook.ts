@@ -1,10 +1,10 @@
-import type { WebhookMethod } from "@langwatch/automations/providers/webhook";
-import { isDispatchError } from "@langwatch/eventing";
-import { createLogger } from "@langwatch/observability";
 import type {
   WebhookDeliveryInput,
   WebhookFailureResponse,
-} from "~/server/app-layer/automations/repositories/webhook-delivery.repository";
+  WebhookMethod,
+} from "@langwatch/automation-contract";
+import { isDispatchError } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
 import {
   assertWebhookDelivered,
   sendWebhook,

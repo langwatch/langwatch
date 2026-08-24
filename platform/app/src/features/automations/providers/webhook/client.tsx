@@ -8,7 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
+import type { SavedTriggerRow } from "@langwatch/automation-contract";
 import {
   isReservedWebhookHeader,
   validateWebhookUrlShape,
@@ -17,9 +17,9 @@ import {
   type WebhookActionParams,
   type WebhookMethod,
   type WebhookPreview,
-} from "@langwatch/automations/providers/webhook";
-import { defaultsForSourceKind } from "@langwatch/automations/templating/defaults";
-import { filterVariablesForCadence } from "@langwatch/automations/templating/exampleContext";
+} from "@langwatch/automation-contract";
+import { defaultsForSourceKind } from "@langwatch/automation-contract";
+import { filterVariablesForCadence } from "@langwatch/automation-contract";
 import { Plus, Trash2, Webhook } from "lucide-react";
 import { useMemo } from "react";
 import { SegmentedControl } from "~/components/ui/segmented-control";

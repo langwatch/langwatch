@@ -1,4 +1,4 @@
-import type { GatedBlockType } from "@langwatch/automations/templating/blockKitAllowlist";
+import type { GatedBlockType } from "@langwatch/automation-contract";
 import type { ComponentType } from "react";
 import digestCompactSource from "./digest_compact.liquid?raw";
 import digestEvaluatorRollupSource from "./digest_evaluator_rollup.liquid?raw";

@@ -12,7 +12,7 @@ import {
   CADENCE_LABELS,
   CADENCE_WINDOW_MS,
   type NotificationCadence,
-} from "@langwatch/automations/cadences";
+} from "@langwatch/automation-contract";
 import { HelpCircle, Plus } from "react-feather";
 import { Tooltip } from "~/components/ui/tooltip";
 import {

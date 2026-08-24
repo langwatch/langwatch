@@ -1,4 +1,4 @@
-import { TriggerAction } from "@langwatch/automations/enums";
+import { TriggerAction } from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
 import { dailyCapAdvice, isPersistAction } from "../dailyCapAdvice";
 

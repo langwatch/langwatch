@@ -1,4 +1,4 @@
-import { reportScheduleSchema } from "~/server/app-layer/automations/report.builder";
+import { reportScheduleSchema } from "@langwatch/automation-contract";
 
 /**
  * Pure schedule <-> cron helpers for the Report cadence facet. Kept out of

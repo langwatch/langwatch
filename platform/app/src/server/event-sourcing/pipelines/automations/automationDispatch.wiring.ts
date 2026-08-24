@@ -4,10 +4,9 @@ import { Cluster, type Redis } from "ioredis";
 import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
-import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
+import type { DatasetService } from "@langwatch/dataset-contract";
 import { getProtectionsForProject } from "~/server/api/utils";
-import { getApp } from "~/server/app-layer/app";
-import { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
+import type { AnalyticsService } from "~/server/app-layer/analytics/analytics.service";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import {
@@ -19,7 +18,6 @@ import {
   consumePersistCapSlot,
   resolvePersistDailyCap,
 } from "~/server/app-layer/automations/dispatch/persistCap";
-import type { EmailSuppressionService } from "~/server/app-layer/automations/emailSuppression.service";
 import {
   evaluateGraphTrigger,
   type GraphTriggerEvaluationDeps,
@@ -31,13 +29,12 @@ import {
   defaultGraphTriggerHeartbeatDeps,
   type GraphTriggerSweepCandidate,
 } from "~/server/app-layer/automations/graph-trigger-heartbeat";
-import { PrismaGraphTriggerSentRepository } from "~/server/app-layer/automations/repositories/trigger.prisma.repository";
+import { PrismaGraphTriggerSentRepository } from "~/server/app-layer/automations/graph-trigger-sent.repository";
 import { defaultRunawayContainmentDeps } from "~/server/app-layer/automations/runaway-containment.deps";
 import { handlePersistCapBreach } from "~/server/app-layer/automations/runaway-containment.service";
-import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
-import { WebhookDeliveryService } from "~/server/app-layer/automations/webhook-delivery.service";
+import type { AutomationService } from "@langwatch/automation-contract";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
-import type { ProjectService } from "~/server/app-layer/projects/project.service";
+import type { ProjectService } from "@langwatch/project-contract";
 import type { TraceSummaryRepository } from "~/server/app-layer/traces/repositories/trace-summary.repository";
 import type { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
 import { TraceReadDerivationService } from "~/server/app-layer/traces/trace-read-derivation.service";
@@ -74,25 +71,28 @@ export interface AutomationDispatchPorts {
 export function buildAutomationDispatchPorts({
   prisma,
   redis,
-  triggers,
-  emailSuppressions,
+  automation,
   projects,
   evaluations,
   traces,
   traceSummaryRepository,
+  analytics,
   resolveClickHouseClient,
+  dataset,
 }: {
   prisma: PrismaClient;
   redis: Redis | Cluster | null;
-  triggers: TriggerService;
-  emailSuppressions: EmailSuppressionService;
+  automation: AutomationService;
   projects: ProjectService;
   evaluations: { runs: EvaluationRunService };
   traces: { spans: SpanStorageService };
   traceSummaryRepository: TraceSummaryRepository;
+  analytics: AnalyticsService;
   /** The composition root's ClickHouse resolver — the heartbeat's recency
    *  probe reads through it. Passed down, never imported. */
   resolveClickHouseClient: ClickHouseClientResolver;
+  /** Dataset writes go through the process-owned Dataset service. */
+  dataset?: DatasetService;
 }): AutomationDispatchPorts {
   // Fail loud if BASE_HOST is missing: every alert dispatch interpolates it
   // into deep links; an empty baseHost silently ships broken links.
@@ -144,25 +144,21 @@ export function buildAutomationDispatchPorts({
   const graphTriggerSentRepo = new PrismaGraphTriggerSentRepository(prisma);
   // ADR-040 §6: one delivery-log writer shared by the digest dispatch and
   // the graph-alert path.
-  const webhookDeliveries = WebhookDeliveryService.create(prisma);
   const recordWebhookDelivery = (
-    input: Parameters<typeof webhookDeliveries.record>[0],
-  ) => webhookDeliveries.record(input);
-  // Graph-config loads go through the automations-owned service, not raw
-  // prisma — same query shape, service/repository layering (no direct
-  // prisma in composition-root closures).
-  const customGraphs = AutomationCustomGraphService.create(prisma);
-  const graphTriggerEvalDeps: GraphTriggerEvaluationDeps = {
-    loadTrigger: async ({ triggerId, projectId }) =>
-      triggers.getById({ triggerId, projectId }),
+	input: Parameters<AutomationService["recordWebhookDelivery"]>[0],
+	) => automation.recordWebhookDelivery(input);
+	// Graph-config loads go through the process-owned automation service.
+	const graphTriggerEvalDeps: GraphTriggerEvaluationDeps = {
+		loadTrigger: async ({ triggerId, projectId }) =>
+			automation.tryGetById({ triggerId, projectId }),
     loadCustomGraph: async ({ customGraphId, projectId }) =>
-      customGraphs.getById({ customGraphId, projectId }),
-    loadProject: async (projectId) => projects.getById(projectId),
-    getTimeseries: async (input, options) =>
-      getApp().analytics.service.getTimeseries(input, options),
+      automation.tryGetCustomGraph({ customGraphId, projectId }),
+    loadProject: async (projectId) => projects.tryGetById(projectId),
+    getTimeseries: (input, options) =>
+      analytics.getTimeseries(input, options),
     triggerSent: graphTriggerSentRepo,
     updateLastRunAt: async ({ triggerId, projectId }) =>
-      triggers.updateLastRunAt(triggerId, projectId),
+			automation.updateLastRunAt({ triggerId, projectId }),
     notifier: {
       dispatch: async (input) =>
         dispatchGraphAlertAction({
@@ -176,7 +172,7 @@ export function buildAutomationDispatchPorts({
             // digest path consumes; claims keyed on the fire digest so a
             // retry re-reads the count instead of burning a second slot.
             filterSuppressedRecipients: ({ projectId, triggerId, emails }) =>
-              emailSuppressions.filterSuppressed({
+              automation.filterSuppressed({
                 projectId,
                 triggerId,
                 emails,
@@ -209,9 +205,9 @@ export function buildAutomationDispatchPorts({
             tenantDailyCap: env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
             // ADR-031 per-recipient at-most-once ledger — the SAME
             // TriggerSent claim store the digest dispatch threads in.
-            isRecipientSent: (params) => triggers.isSendClaimed(params),
+            isRecipientSent: (params) => automation.isSendClaimed(params),
             recordRecipientSent: async (params) => {
-              await triggers.claimSend(params);
+              await automation.claimSend(params);
             },
           },
           input,
@@ -235,14 +231,14 @@ export function buildAutomationDispatchPorts({
   };
 
   const heartbeatDeps = defaultGraphTriggerHeartbeatDeps({
-    triggers,
+    automation,
     prisma,
     resolveClickHouseClient,
   });
   const heartbeatSources = defaultCandidateSources(prisma);
 
   const settlementDeps: TriggerSettlementDispatchDeps = {
-    triggers,
+    automation,
     projects,
     baseHost,
     traceSummaryStore,
@@ -275,7 +271,7 @@ export function buildAutomationDispatchPorts({
         redis,
       }),
     filterSuppressedEmails: ({ projectId, triggerId, emails }) =>
-      emailSuppressions.filterSuppressed({ projectId, triggerId, emails }),
+      automation.filterSuppressed({ projectId, triggerId, emails }),
     traceById: async (projectId, traceId) => {
       const protections = await getProtectionsDeduped(projectId);
       return traceService.getById(projectId, traceId, protections);
@@ -284,7 +280,14 @@ export function buildAutomationDispatchPorts({
       await createOrUpdateQueueItems({ ...params, prisma });
     },
     addToDataset: async (params) => {
-      await createManyDatasetRecords(params);
+      if (!dataset) {
+        throw new Error("Dataset service is not configured for automation dispatch");
+      }
+      await dataset.batchCreateRecords({
+        slugOrId: params.datasetId,
+        projectId: params.projectId,
+        entries: params.datasetRecords,
+      });
     },
     recordWebhookDelivery,
     resolvePersistDailyCap: (projectId) => resolvePersistDailyCap(projectId),
@@ -294,9 +297,8 @@ export function buildAutomationDispatchPorts({
       handlePersistCapBreach(
         defaultRunawayContainmentDeps({
           prisma,
-          triggers,
+          automation,
           projects,
-          emailSuppressions,
           baseHost,
           resolveClickHouseClient,
           redis,
@@ -314,6 +316,6 @@ export function buildAutomationDispatchPorts({
         sources: heartbeatSources,
         now,
       }),
-    pruneWebhookDeliveries: () => webhookDeliveries.pruneExpired(),
+    pruneWebhookDeliveries: () => automation.pruneWebhookDeliveries(),
   };
 }

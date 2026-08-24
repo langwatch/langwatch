@@ -26,12 +26,13 @@
 import {
   type SlackActionParams,
   slackDeliveryMethodOf,
-} from "@langwatch/automations/providers/slack";
-import { buildGraphAlertTemplateContext } from "@langwatch/automations/templating/templateContext";
+  type CustomGraph,
+  type Trigger,
+} from "@langwatch/automation-contract";
+import { buildGraphAlertTemplateContext } from "@langwatch/automation-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
-import type { CustomGraph, Project, Trigger } from "~/generated/prisma/client";
 import type {
   SeriesInputType,
   TimeseriesInputType,
@@ -57,7 +58,7 @@ import {
 import type {
   GraphTriggerSentRepository,
   OpenGraphTriggerSent,
-} from "./repositories/trigger.repository";
+} from "./graph-trigger-sent.repository";
 import { parseSeriesIndex } from "./seriesName";
 
 const logger = createLogger("langwatch:graph-trigger-evaluation");
@@ -168,7 +169,7 @@ export interface GraphTriggerEvaluationDeps {
     customGraphId: string;
     projectId: string;
   }): Promise<CustomGraph | null>;
-  loadProject(projectId: string): Promise<Project | null>;
+  loadProject(projectId: string): Promise<ProjectIdentity | null>;
   getTimeseries(
     input: TimeseriesInputType,
     options?: TimeseriesReadOptions,
@@ -185,6 +186,12 @@ export interface GraphTriggerEvaluationDeps {
   baseHost: string;
   now(): Date;
 }
+
+export type ProjectIdentity = {
+  id: string;
+  name: string;
+  slug: string;
+};
 
 /**
  * Evaluate (and possibly fire / resolve) one custom-graph trigger.

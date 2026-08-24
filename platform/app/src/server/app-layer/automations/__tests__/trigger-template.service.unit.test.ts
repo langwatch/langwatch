@@ -1,8 +1,8 @@
 import {
   TEST_FIRE_EMAIL_SUBJECT_PREFIX,
   TEST_FIRE_NOTICE,
-} from "@langwatch/automations/templating/banner";
-import { DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE } from "@langwatch/automations/templating/defaults";
+} from "@langwatch/automation-contract";
+import { DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE } from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
 import graphAlertDetailedSource from "~/features/automations/providers/slack/templates/graph_alert_detailed.liquid?raw";
 import { AlertType } from "~/generated/prisma/client";

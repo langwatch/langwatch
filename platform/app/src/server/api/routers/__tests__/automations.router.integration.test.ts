@@ -117,13 +117,13 @@ import {
   persistCapKey,
   resolvePersistDailyCap,
 } from "../../../app-layer/automations/dispatch/persistCap";
-import { PrismaTriggerRepository } from "../../../app-layer/automations/repositories/trigger.prisma.repository";
-import { TriggerService } from "../../../app-layer/automations/trigger.service";
+import { AppAutomationRuntime } from "~/runtime/app/features/automation";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { automationRouter } from "../automations";
 
 // One mock prisma client shared by the tRPC ctx (per-request service
-// factories) and the app-level TriggerService the router reaches via
-// getApp().triggers — so every query lands on the same mocks regardless of
+// factories) and the app-level AutomationService the router reaches via
+// getApp().automation — so every query lands on the same mocks regardless of
 // which acquisition path the router uses.
 const mockPrismaClient = {
   trigger: {
@@ -177,19 +177,20 @@ describe("automationRouter", () => {
     });
     previousApp = globalForApp.__langwatch_app;
     // Real service + repository over the mocked prisma client, so the
-    // router's getApp().triggers CRUD hits the same trigger mocks the ctx
+    // router's getApp().automation CRUD hits the same trigger mocks the ctx
     // does; the cache/schedule methods stay mocked (the schedule-side
     // assertions target the service-method signatures).
-    const triggerService = new TriggerService(
-      new PrismaTriggerRepository(mockPrismaClient),
-    );
-    Object.assign(triggerService, {
+    const automation = AppAutomationRuntime.create({
+      database: mockPrismaClient as unknown as PrismaClient,
+      redis: connection,
+    }).build();
+    Object.assign(automation, {
       invalidate: mockTriggersInvalidate,
       syncReportSchedule: mockSyncReportSchedule,
       removeReportSchedule: mockRemoveReportSchedule,
     });
     globalForApp.__langwatch_app = createTestApp({
-      triggers: triggerService,
+      automation,
       // The cap counters this suite asserts on live on the real Redis, and
       // both the router's read and the direct consume calls take it from here.
       redis: connection,

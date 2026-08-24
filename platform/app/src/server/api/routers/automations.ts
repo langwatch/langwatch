@@ -1,13 +1,16 @@
 import {
   DEFAULT_TRACE_DEBOUNCE_MS,
-  MAX_TRACE_DEBOUNCE_MS,
-  MIN_TRACE_DEBOUNCE_MS,
-  NOTIFICATION_CADENCES,
-  type NotificationCadence,
-} from "@langwatch/automations/cadences";
-import { EMAIL_RX } from "@langwatch/automations/providers/email";
-import type { SlackActionParams } from "@langwatch/automations/providers/slack";
-import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/automations/providers/webhook";
+	MAX_TRACE_DEBOUNCE_MS,
+	MIN_TRACE_DEBOUNCE_MS,
+	NOTIFICATION_CADENCES,
+	extractReportFromTriggerRow,
+	reportActionParamsSchema,
+	type CreateTriggerCommand,
+	type NotificationCadence,
+} from "@langwatch/automation-contract";
+import { EMAIL_RX } from "@langwatch/automation-contract";
+import type { SlackActionParams } from "@langwatch/automation-contract";
+import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/automation-contract";
 import { isDispatchError } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
 import { generate as ksuid } from "@langwatch/ksuid";
@@ -15,12 +18,9 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
   AlertType,
-  type Prisma,
   TriggerAction,
   TriggerKind,
 } from "~/generated/prisma/client";
-import { getApp } from "~/server/app-layer/app";
-import { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
 import { listSlackChannels } from "~/server/app-layer/automations/delivery/slackWebApi";
 import {
   readPersistCapCounts,
@@ -51,18 +51,13 @@ import {
   type WebhookStoredActionParams,
 } from "~/server/app-layer/automations/providers/webhook/server";
 import {
-  buildReportTriggerData,
-  extractReportFromTriggerRow,
-  reportActionParamsSchema,
+	buildReportTriggerData,
 } from "~/server/app-layer/automations/report.builder";
-import { TriggerFireHistoryService } from "~/server/app-layer/automations/trigger-fire-history.service";
 import {
   type DraftProject,
   type TestFireWebhookDestination,
   validateTemplateDraft,
 } from "~/server/app-layer/automations/trigger-template.service";
-import { WebhookDeliveryService } from "~/server/app-layer/automations/webhook-delivery.service";
-import { MonitorService } from "~/server/app-layer/monitors/monitor.service";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import { featureFlagService } from "~/server/featureFlag";
 import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";
@@ -235,8 +230,9 @@ function toTemplateTRPCError(err: unknown): TRPCError {
 
 async function resolveProjectIdentity(
   projectId: string,
+  projects: { tryGetSummaryById(projectId: string): Promise<{ name: string; slug: string } | null> },
 ): Promise<DraftProject> {
-  const project = await getApp().projects.getById(projectId);
+  const project = await projects.tryGetSummaryById(projectId);
   if (!project) throw new ProjectNotFoundError(projectId);
   return { name: project.name, slug: project.slug };
 }
@@ -310,7 +306,7 @@ export const automationRouter = createTRPCRouter({
         throw toTemplateTRPCError(new TriggerFiltersRequiredError());
       }
 
-      const project = await getApp().projects.getById(input.projectId);
+      const project = await ctx.app.projects.tryGetSummaryById(input.projectId);
 
       if (!project) {
         throw toTemplateTRPCError(new ProjectNotFoundError(input.projectId));
@@ -356,43 +352,41 @@ export const automationRouter = createTRPCRouter({
         }
       }
 
-      const trigger = await getApp().triggers.create({
-        data: {
-          id: ksuid(KSUID_RESOURCES.TRIGGER).toString(),
-          name: input.name,
-          action: input.action,
-          actionParams: input.actionParams,
-          filters: JSON.stringify(input.filters),
-          projectId: input.projectId,
-          lastRunAt: new Date().getTime(),
-          notificationCadence: resolveCadenceForCreate(
-            input.action,
-            input.notificationCadence,
-          ),
-        },
+      const trigger = await ctx.app.automation.create({
+        id: ksuid(KSUID_RESOURCES.TRIGGER).toString(),
+        name: input.name,
+        action: input.action,
+        actionParams: input.actionParams,
+        filters: input.filters,
+        projectId: input.projectId,
+        lastRunAt: new Date(),
+        notificationCadence: resolveCadenceForCreate(
+          input.action,
+          input.notificationCadence,
+        ),
       });
 
-      await getApp().triggers.invalidate(input.projectId);
+      await ctx.app.automation.invalidate(input.projectId);
 
       return redactTriggerForRead(trigger);
     }),
   deleteById: protectedProcedure
     .input(z.object({ projectId: z.string(), triggerId: z.string() }))
     .permission("triggers:delete")
-    .mutation(async ({ input }) => {
-      await getApp().triggers.softDeleteById({
+    .mutation(async ({ input, ctx }) => {
+      await ctx.app.automation.softDeleteById({
         triggerId: input.triggerId,
         projectId: input.projectId,
       });
 
       // Best-effort: deactivate any scheduled-report entry for this trigger
       // (harmless no-op for non-report triggers).
-      await getApp().triggers.removeReportSchedule({
+      await ctx.app.automation.removeReportSchedule({
         projectId: input.projectId,
         triggerId: input.triggerId,
       });
 
-      await getApp().triggers.invalidate(input.projectId);
+      await ctx.app.automation.invalidate(input.projectId);
 
       return { success: true };
     }),
@@ -400,20 +394,15 @@ export const automationRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("triggers:view")
     .query(async ({ ctx, input }) => {
-      const triggers = await getApp().triggers.getAllForProject({
+      const triggers = await ctx.app.automation.getAllForProject({
         projectId: input.projectId,
       });
 
-      const allCheckIds = triggers.flatMap((trigger) => {
-        if (typeof trigger.filters === "string") {
-          const triggerFilters = JSON.parse(trigger.filters);
-          return extractCheckKeys(triggerFilters);
-        } else {
-          return [];
-        }
-      });
+      const allCheckIds = triggers.flatMap((trigger) =>
+        extractCheckKeys(trigger.filters),
+      );
 
-      const allChecks = await MonitorService.create(ctx.prisma).getAllByIds({
+      const allChecks = await ctx.app.monitors.getAllByIds({
         monitorIds: allCheckIds,
         projectId: input.projectId,
       });
@@ -433,9 +422,7 @@ export const automationRouter = createTRPCRouter({
         .filter((id): id is string => typeof id === "string" && id.length > 0);
       const customGraphs =
         customGraphIds.length > 0
-          ? await AutomationCustomGraphService.create(
-              ctx.prisma,
-            ).getAllNamesByIds({
+          ? await ctx.app.automation.getCustomGraphNamesByIds({
               customGraphIds,
               projectId: input.projectId,
             })
@@ -443,13 +430,7 @@ export const automationRouter = createTRPCRouter({
       const customGraphsById = new Map(customGraphs.map((g) => [g.id, g]));
 
       const enhancedTriggers = triggers.map((trigger) => {
-        let triggerFilters: Record<string, any> = {};
-
-        if (typeof trigger.filters === "string") {
-          triggerFilters = JSON.parse(trigger.filters);
-        }
-
-        const checkIds = extractCheckKeys(triggerFilters);
+        const checkIds = extractCheckKeys(trigger.filters);
 
         const checks = checkIds.map((id) => checksMap[id]).filter(Boolean);
 
@@ -495,9 +476,8 @@ export const automationRouter = createTRPCRouter({
     .permission("triggers:view")
     .query(async ({ ctx, input }) => {
       const cap = await resolvePersistDailyCap(input.projectId);
-      const triggers = await ctx.prisma.trigger.findMany({
-        where: { projectId: input.projectId },
-        select: { id: true },
+      const triggers = await ctx.app.automation.getAllForProject({
+        projectId: input.projectId,
       });
       const counts = await readPersistCapCounts({
         projectId: input.projectId,
@@ -511,8 +491,7 @@ export const automationRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("triggers:view")
     .query(async ({ ctx, input }) => {
-      const fireHistory = TriggerFireHistoryService.create(ctx.prisma);
-      return fireHistory.getAllFireStatsForProject({
+      return ctx.app.automation.getFireStats({
         projectId: input.projectId,
       });
     }),
@@ -526,8 +505,7 @@ export const automationRouter = createTRPCRouter({
     )
     .permission("triggers:view")
     .query(async ({ ctx, input }) => {
-      const fireHistory = TriggerFireHistoryService.create(ctx.prisma);
-      return fireHistory.getAllRecentFiresForTrigger({
+      return ctx.app.automation.getRecentFires({
         projectId: input.projectId,
         triggerId: input.triggerId,
         limit: input.limit,
@@ -546,8 +524,7 @@ export const automationRouter = createTRPCRouter({
     )
     .permission("triggers:view")
     .query(async ({ ctx, input }) => {
-      const deliveries = WebhookDeliveryService.create(ctx.prisma);
-      return deliveries.getRecentByTrigger({
+      return ctx.app.automation.getRecentWebhookDeliveries({
         projectId: input.projectId,
         triggerId: input.triggerId,
         limit: input.limit,
@@ -563,8 +540,7 @@ export const automationRouter = createTRPCRouter({
     )
     .permission("triggers:view")
     .query(async ({ ctx, input }) => {
-      const fireHistory = TriggerFireHistoryService.create(ctx.prisma);
-      return fireHistory.getAllRecentFiresForProject({
+      return ctx.app.automation.getRecentFires({
         projectId: input.projectId,
         limit: input.limit,
       });
@@ -577,8 +553,8 @@ export const automationRouter = createTRPCRouter({
   getReportSchedules: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .permission("triggers:view")
-    .query(async ({ input }) => {
-      return getApp().triggers.getReportSchedules({
+    .query(async ({ input, ctx }) => {
+      return ctx.app.automation.getReportSchedules({
         projectId: input.projectId,
       });
     }),
@@ -591,8 +567,8 @@ export const automationRouter = createTRPCRouter({
       }),
     )
     .permission("triggers:update")
-    .mutation(async ({ input }) => {
-      const existing = await getApp().triggers.getById({
+    .mutation(async ({ input, ctx }) => {
+      const existing = await ctx.app.automation.tryGetById({
         triggerId: input.triggerId,
         projectId: input.projectId,
       });
@@ -620,44 +596,42 @@ export const automationRouter = createTRPCRouter({
         });
       }
 
-      const trigger = await getApp().triggers.update({
-        triggerId: input.triggerId,
+      const trigger = await ctx.app.automation.update({
+        id: input.triggerId,
         projectId: input.projectId,
-        data: {
-          active: input.active,
-          // Resuming clears the platform's pause record. Leaving it behind
-          // would make a running automation keep claiming it was paused for
-          // runaway volume, and the next genuine pause would be
-          // indistinguishable from the stale one.
-          ...(input.active ? { pausedReason: null, pausedAt: null } : {}),
-        },
+        active: input.active,
+        // Resuming clears the platform's pause record. Leaving it behind
+        // would make a running automation keep claiming it was paused for
+        // runaway volume, and the next genuine pause would be
+        // indistinguishable from the stale one.
+        ...(input.active ? { pausedReason: null, pausedAt: null } : {}),
       });
 
       if (isReport) {
         if (input.active && report) {
-          await getApp().triggers.syncReportSchedule({
+          await ctx.app.automation.syncReportSchedule({
             projectId: input.projectId,
             triggerId: input.triggerId,
             cron: report.schedule.cron,
             timezone: report.schedule.timezone,
           });
         } else {
-          await getApp().triggers.removeReportSchedule({
+          await ctx.app.automation.removeReportSchedule({
             projectId: input.projectId,
             triggerId: input.triggerId,
           });
         }
       }
 
-      await getApp().triggers.invalidate(input.projectId);
+      await ctx.app.automation.invalidate(input.projectId);
 
       return redactTriggerForRead(trigger);
     }),
   getTriggerById: protectedProcedure
     .input(z.object({ triggerId: z.string(), projectId: z.string() }))
     .permission("triggers:view")
-    .query(async ({ input }) => {
-      const trigger = await getApp().triggers.getById({
+    .query(async ({ input, ctx }) => {
+      const trigger = await ctx.app.automation.tryGetById({
         triggerId: input.triggerId,
         projectId: input.projectId,
       });
@@ -684,10 +658,10 @@ export const automationRouter = createTRPCRouter({
     // triggers:update (not :view): this endpoint decrypts and exercises the
     // stored Slack bot token — the same capability testFireTemplate gates on.
     .permission("triggers:update")
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       let token = input.botToken?.trim() || null;
       if (!token && input.automationId) {
-        const saved = await getApp().triggers.getById({
+        const saved = await ctx.app.automation.tryGetById({
           triggerId: input.automationId,
           projectId: input.projectId,
         });
@@ -727,7 +701,7 @@ export const automationRouter = createTRPCRouter({
       // in its query keeps a legitimately empty structured set, and alerts and
       // reports have no trace condition to require in the first place.
       if (!hasActionableTriggerFilters(sanitized)) {
-        const existing = await getApp().triggers.getById({
+        const existing = await ctx.app.automation.tryGetById({
           triggerId: input.triggerId,
           projectId: input.projectId,
         });
@@ -745,15 +719,13 @@ export const automationRouter = createTRPCRouter({
         }
       }
 
-      const trigger = await getApp().triggers.update({
-        triggerId: input.triggerId,
+      const trigger = await ctx.app.automation.update({
+        id: input.triggerId,
         projectId: input.projectId,
-        data: {
-          filters: JSON.stringify(sanitized),
-        },
+        filters: sanitized,
       });
 
-      await getApp().triggers.invalidate(input.projectId);
+      await ctx.app.automation.invalidate(input.projectId);
 
       return redactTriggerForRead(trigger);
     }),
@@ -887,7 +859,7 @@ export const automationRouter = createTRPCRouter({
           const channel = input.botDestination.channelId.trim();
           let token = input.botDestination.botToken?.trim() || null;
           if (!token && input.automationId) {
-            const saved = await getApp().triggers.getById({
+            const saved = await ctx.app.automation.tryGetById({
               triggerId: input.automationId,
               projectId: input.projectId,
             });
@@ -923,7 +895,7 @@ export const automationRouter = createTRPCRouter({
         ) {
           let saved: Record<string, string> = {};
           if (input.automationId) {
-            const row = await getApp().triggers.getById({
+            const row = await ctx.app.automation.tryGetById({
               triggerId: input.automationId,
               projectId: input.projectId,
             });
@@ -956,7 +928,7 @@ export const automationRouter = createTRPCRouter({
         // fire signs exactly as a real one does, which is the only way an
         // author can point the button at their receiver's verification.
         if (webhookDestination && input.automationId) {
-          const row = await getApp().triggers.getById({
+          const row = await ctx.app.automation.tryGetById({
             triggerId: input.automationId,
             projectId: input.projectId,
           });
@@ -968,8 +940,11 @@ export const automationRouter = createTRPCRouter({
           }
         }
 
-        const project = await resolveProjectIdentity(input.projectId);
-        return await getApp().triggerTemplates.testFire({
+        const project = await resolveProjectIdentity(
+          input.projectId,
+          ctx.app.projects,
+        );
+        return await ctx.app.triggerTemplates.testFire({
           channel: input.channel,
           trigger: input.trigger,
           project,
@@ -1060,9 +1035,7 @@ export const automationRouter = createTRPCRouter({
           // The graph must belong to the calling project — multitenancy
           // gate. Without this a hostile client could attach a trigger to
           // a graph from another tenant.
-          const graphExists = await AutomationCustomGraphService.create(
-            ctx.prisma,
-          ).existsInProject({
+          const graphExists = await ctx.app.automation.customGraphExistsInProject({
             customGraphId: input.customGraphId ?? "",
             projectId: input.projectId,
           });
@@ -1178,7 +1151,7 @@ export const automationRouter = createTRPCRouter({
         loadExisting: async () =>
           input.triggerId
             ? (
-                await getApp().triggers.getById({
+                await ctx.app.automation.tryGetById({
                   triggerId: input.triggerId,
                   projectId: input.projectId,
                 })
@@ -1208,7 +1181,14 @@ export const automationRouter = createTRPCRouter({
       // hand-rolling the row). The dispatcher only knows one shape; drift
       // between the two writers silently breaks dispatch for whichever
       // format loses.
-      let data: Omit<Prisma.TriggerUncheckedCreateInput, "projectId">;
+      let data: Omit<
+        CreateTriggerCommand,
+        | "id"
+        | "projectId"
+        | "lastRunAt"
+        | "notificationCadence"
+        | "traceDebounceMs"
+      >;
       if (isGraphAlert && input.graphAlert && input.customGraphId) {
         const graphAlert: GraphAlertActionParams = input.graphAlert;
         const builderInput = {
@@ -1227,14 +1207,16 @@ export const automationRouter = createTRPCRouter({
         data = {
           name: built.name,
           action: built.action,
-          triggerKind: TriggerKind.ALERT,
+          triggerKind: "ALERT",
           alertType: built.alertType,
-          filters: built.filters,
+          filters: z.record(z.string(), z.unknown()).parse(built.filters),
           // Graph alerts never carry a trace-filter query; clear it so a kind
           // conversion can't leave a stale one behind.
           filterQuery: null,
           customGraphId: built.customGraphId,
-          actionParams: built.actionParams,
+          actionParams: z
+            .record(z.string(), z.unknown())
+            .parse(built.actionParams),
           slackTemplateType: input.templates.slackTemplateType ?? null,
           slackTemplate: input.templates.slackTemplate ?? null,
           emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
@@ -1251,8 +1233,8 @@ export const automationRouter = createTRPCRouter({
         data = {
           name: built.name,
           action: built.action,
-          triggerKind: TriggerKind.REPORT,
-          filters: built.filters,
+          triggerKind: "REPORT",
+          filters: z.record(z.string(), z.unknown()).parse(built.filters),
           // Converting an existing graph alert into a report must release the
           // graph: a left-behind `customGraphId` re-arms the row as a threshold
           // alert on the heartbeat path, so the report fires as an alert too.
@@ -1263,7 +1245,9 @@ export const automationRouter = createTRPCRouter({
           // so the column is cleared (a source change can't strand a stale one).
           filterQuery:
             input.report.source.kind === "traceQuery" ? filterQuery : null,
-          actionParams: built.actionParams,
+          actionParams: z
+            .record(z.string(), z.unknown())
+            .parse(built.actionParams),
           slackTemplateType: input.templates.slackTemplateType ?? null,
           slackTemplate: input.templates.slackTemplate ?? null,
           emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
@@ -1273,15 +1257,15 @@ export const automationRouter = createTRPCRouter({
         data = {
           name: input.name,
           action: input.action,
-          triggerKind: TriggerKind.AUTOMATION,
+          triggerKind: "AUTOMATION",
           alertType: input.alertType ?? null,
           // A trace-subject automation supersedes the structured `filters` with
           // its liqe query; persist an empty `{}` so the legacy matcher is a
           // no-op and the dispatcher reads `filterQuery` instead.
-          filters: filterQuery !== null ? "{}" : JSON.stringify(input.filters),
+          filters: filterQuery !== null ? {} : input.filters,
           filterQuery,
           customGraphId: input.customGraphId ?? null,
-          actionParams: actionParams as Prisma.InputJsonValue,
+          actionParams,
           slackTemplateType: input.templates.slackTemplateType ?? null,
           slackTemplate: input.templates.slackTemplate ?? null,
           emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
@@ -1296,18 +1280,16 @@ export const automationRouter = createTRPCRouter({
           input.notificationCadence,
           isGraphAlert,
         );
-        trigger = await getApp().triggers.update({
-          triggerId: input.triggerId,
+        trigger = await ctx.app.automation.update({
+          id: input.triggerId,
           projectId: input.projectId,
-          data: {
-            ...data,
-            ...(cadenceUpdate !== undefined
-              ? { notificationCadence: cadenceUpdate }
-              : {}),
-            ...(input.traceDebounceMs !== undefined
-              ? { traceDebounceMs: input.traceDebounceMs }
-              : {}),
-          },
+          ...data,
+          ...(cadenceUpdate !== undefined
+            ? { notificationCadence: cadenceUpdate }
+            : {}),
+          ...(input.traceDebounceMs !== undefined
+            ? { traceDebounceMs: input.traceDebounceMs }
+            : {}),
         });
       } else {
         // A graph alert owns its custom-graph's unique `customGraphId` slot.
@@ -1319,44 +1301,40 @@ export const automationRouter = createTRPCRouter({
         // graphs.updateById upsert-by-customGraphId behaviour.
         const existingForGraph =
           isGraphAlert && input.customGraphId
-            ? await getApp().triggers.getByCustomGraphId({
+            ? await ctx.app.automation.tryGetByCustomGraphId({
                 projectId: input.projectId,
                 customGraphId: input.customGraphId,
               })
             : null;
         if (existingForGraph) {
-          trigger = await getApp().triggers.update({
-            triggerId: existingForGraph.id,
+          trigger = await ctx.app.automation.update({
+            id: existingForGraph.id,
             projectId: input.projectId,
-            data: {
-              ...data,
-              deleted: false,
-              active: true,
-              lastRunAt: new Date().getTime(),
-              notificationCadence: resolveCadenceForCreate(
-                input.action,
-                input.notificationCadence,
-                isGraphAlert,
-              ),
-              traceDebounceMs:
-                input.traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
-            },
+            ...data,
+            deleted: false,
+            active: true,
+            lastRunAt: new Date(),
+            notificationCadence: resolveCadenceForCreate(
+              input.action,
+              input.notificationCadence,
+              isGraphAlert,
+            ),
+            traceDebounceMs:
+              input.traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
           });
         } else {
-          trigger = await getApp().triggers.create({
-            data: {
-              id: ksuid(KSUID_RESOURCES.TRIGGER).toString(),
-              projectId: input.projectId,
-              lastRunAt: new Date().getTime(),
-              notificationCadence: resolveCadenceForCreate(
-                input.action,
-                input.notificationCadence,
-                isGraphAlert,
-              ),
-              traceDebounceMs:
-                input.traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
-              ...data,
-            },
+          trigger = await ctx.app.automation.create({
+            id: ksuid(KSUID_RESOURCES.TRIGGER).toString(),
+            projectId: input.projectId,
+            lastRunAt: new Date(),
+            notificationCadence: resolveCadenceForCreate(
+              input.action,
+              input.notificationCadence,
+              isGraphAlert,
+            ),
+            traceDebounceMs:
+              input.traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
+            ...data,
           });
         }
       }
@@ -1364,7 +1342,7 @@ export const automationRouter = createTRPCRouter({
       if (isReport && input.report) {
         // Wire the report onto the calendar scheduler (ADR-044): its trigger
         // id is the scheduler targetId; publishWake nudges every pod's loop.
-        await getApp().triggers.syncReportSchedule({
+        await ctx.app.automation.syncReportSchedule({
           projectId: input.projectId,
           triggerId: trigger.id,
           cron: input.report.schedule.cron,
@@ -1376,13 +1354,13 @@ export const automationRouter = createTRPCRouter({
         // and the report handler repeatedly loads a now-non-report trigger,
         // fails to parse its actionParams, and skips every cadence. Idempotent,
         // so a trigger that was never a report costs one no-op deactivate.
-        await getApp().triggers.removeReportSchedule({
+        await ctx.app.automation.removeReportSchedule({
           projectId: input.projectId,
           triggerId: trigger.id,
         });
       }
 
-      await getApp().triggers.invalidate(input.projectId);
+      await ctx.app.automation.invalidate(input.projectId);
       return redactTriggerForRead(trigger);
     }),
 });

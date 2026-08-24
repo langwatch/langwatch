@@ -1,18 +1,14 @@
 import { createLogger } from "@langwatch/observability";
+import {
+  type Trigger,
+  TriggerFiltersRequiredError,
+} from "@langwatch/automation-contract";
 import { describeRoute, resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
-import { z } from "zod";
+import { z } from "zod/v4";
 import { badRequestSchema } from "~/app/api/shared/schemas";
-import {
-  type Prisma,
-  type Trigger,
-  TriggerKind,
-} from "~/generated/prisma/client";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import { getApp } from "~/server/app-layer/app";
-import { TriggerFiltersRequiredError } from "~/server/app-layer/automations/errors";
-import { prisma } from "~/server/db";
 import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { baseResponses } from "../../shared/base-responses";
@@ -71,23 +67,12 @@ const updateTriggerSchema = z.object({
 });
 
 function toTriggerResponse(trigger: Trigger) {
-  let filters: Record<string, unknown> = {};
-  if (typeof trigger.filters === "string") {
-    try {
-      filters = JSON.parse(trigger.filters) as Record<string, unknown>;
-    } catch {
-      filters = {};
-    }
-  } else if (trigger.filters && typeof trigger.filters === "object") {
-    filters = trigger.filters as Record<string, unknown>;
-  }
-
   return {
     id: trigger.id,
     name: trigger.name,
     action: trigger.action,
     actionParams: (trigger.actionParams ?? {}) as Record<string, unknown>,
-    filters,
+    filters: trigger.filters,
     active: trigger.active,
     message: trigger.message,
     alertType: trigger.alertType,
@@ -119,9 +104,8 @@ secured.access(requires("triggers:view")).get(
     const project = c.get("project");
     logger.info({ projectId: project.id }, "Listing triggers");
 
-    const triggers = await prisma.trigger.findMany({
-      where: { projectId: project.id, deleted: false },
-      orderBy: { createdAt: "desc" },
+    const triggers = await c.app.automation.getAllForProject({
+      projectId: project.id,
     });
 
     return c.json(
@@ -164,11 +148,12 @@ secured.access(requires("triggers:view")).get(
     const { id } = c.req.param();
     logger.info({ projectId: project.id, triggerId: id }, "Getting trigger");
 
-    const trigger = await prisma.trigger.findFirst({
-      where: { id, projectId: project.id, deleted: false },
+    const trigger = await c.app.automation.tryGetById({
+      triggerId: id,
+      projectId: project.id,
     });
 
-    if (!trigger) {
+    if (!trigger || trigger.deleted) {
       return c.json({ error: "Trigger not found" }, 404);
     }
 
@@ -213,21 +198,16 @@ secured.access(requires("triggers:create")).post(
       throw new TriggerFiltersRequiredError();
     }
 
-    const trigger = await prisma.trigger.create({
-      data: {
-        id: nanoid(),
-        name: body.name,
-        action: body.action,
-        actionParams: body.actionParams as Prisma.InputJsonValue,
-        filters: JSON.stringify(body.filters),
-        projectId: project.id,
-        lastRunAt: new Date().getTime(),
-        message: body.message ?? null,
-        alertType: body.alertType ?? null,
-      },
+    const trigger = await c.app.automation.create({
+      id: nanoid(),
+      name: body.name,
+      action: body.action,
+      actionParams: body.actionParams,
+      filters: body.filters ?? {},
+      projectId: project.id,
+      message: body.message ?? null,
+      alertType: body.alertType ?? null,
     });
-
-    await getApp().triggers.invalidate(project.id);
 
     return c.json(
       {
@@ -272,11 +252,12 @@ secured.access(requires("triggers:update")).patch(
     const body = c.req.valid("json");
     logger.info({ projectId: project.id, triggerId: id }, "Updating trigger");
 
-    const trigger = await prisma.trigger.findFirst({
-      where: { id, projectId: project.id, deleted: false },
+    const trigger = await c.app.automation.tryGetById({
+      triggerId: id,
+      projectId: project.id,
     });
 
-    if (!trigger) {
+    if (!trigger || trigger.deleted) {
       return c.json({ error: "Trigger not found" }, 404);
     }
 
@@ -287,26 +268,26 @@ secured.access(requires("triggers:update")).patch(
     if (
       body.filters !== undefined &&
       !hasActionableTriggerFilters(body.filters) &&
-      trigger.triggerKind === TriggerKind.AUTOMATION &&
+      trigger.triggerKind === "AUTOMATION" &&
       (trigger.filterQuery ?? "").trim() === ""
     ) {
       throw new TriggerFiltersRequiredError();
     }
 
-    const data: Record<string, unknown> = {};
+    const data: Parameters<typeof c.app.automation.update>[0] = {
+      id,
+      projectId: project.id,
+    };
     if (body.name !== undefined) data.name = body.name;
     if (body.active !== undefined) data.active = body.active;
     if (body.message !== undefined) data.message = body.message;
     if (body.alertType !== undefined) data.alertType = body.alertType;
-    if (body.filters !== undefined) data.filters = JSON.stringify(body.filters);
+    if (body.filters !== undefined) data.filters = body.filters;
     if (body.actionParams !== undefined) data.actionParams = body.actionParams;
 
-    const updated = await prisma.trigger.update({
-      where: { id, projectId: project.id },
-      data,
+    const updated = await c.app.automation.update({
+      ...data,
     });
-
-    await getApp().triggers.invalidate(project.id);
 
     return c.json({
       ...toTriggerResponse(updated),
@@ -349,20 +330,23 @@ secured.access(requires("triggers:manage")).delete(
     const { id } = c.req.param();
     logger.info({ projectId: project.id, triggerId: id }, "Deleting trigger");
 
-    const trigger = await prisma.trigger.findFirst({
-      where: { id, projectId: project.id, deleted: false },
+    const trigger = await c.app.automation.tryGetById({
+      triggerId: id,
+      projectId: project.id,
     });
 
-    if (!trigger) {
+    if (!trigger || trigger.deleted) {
       return c.json({ error: "Trigger not found" }, 404);
     }
 
-    await prisma.trigger.update({
-      where: { id, projectId: project.id },
-      data: { deleted: true, active: false },
+    await c.app.automation.softDeleteById({
+      triggerId: id,
+      projectId: project.id,
     });
-
-    await getApp().triggers.invalidate(project.id);
+    await c.app.automation.removeReportSchedule({
+      triggerId: id,
+      projectId: project.id,
+    });
 
     return c.json({ id, deleted: true });
   },

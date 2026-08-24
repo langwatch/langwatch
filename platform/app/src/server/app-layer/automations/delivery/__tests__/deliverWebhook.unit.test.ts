@@ -1,6 +1,6 @@
 import { DispatchError } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-import type { WebhookDeliveryInput } from "~/server/app-layer/automations/repositories/webhook-delivery.repository";
+import type { WebhookDeliveryInput } from "@langwatch/automation-contract";
 import type {
   sendWebhook,
   WebhookSendResult,

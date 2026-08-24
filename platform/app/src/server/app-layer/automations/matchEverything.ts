@@ -1,7 +1,7 @@
 import { TriggerKind } from "~/generated/prisma/client";
 
 import { hasActionableTriggerFilters } from "~/server/filters/triggerFilter.matcher";
-import type { TriggerSummary } from "./repositories/trigger.repository";
+import type { TriggerSummary } from "./trigger-summary";
 
 /**
  * A trace automation with nothing to narrow it: no structured filter that

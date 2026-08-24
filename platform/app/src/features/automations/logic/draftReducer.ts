@@ -1,7 +1,8 @@
 import {
-  DEFAULT_TRACE_DEBOUNCE_MS,
-  type NotificationCadence,
-} from "@langwatch/automations/cadences";
+	DEFAULT_TRACE_DEBOUNCE_MS,
+	reportSourceSchema,
+	type NotificationCadence,
+} from "@langwatch/automation-contract";
 import {
   type AllSlices,
   CLIENT_PROVIDERS,
@@ -16,7 +17,6 @@ import {
   type GraphAlertTimePeriod,
   extractGraphAlertFromTriggerRow as parseGraphAlertRow,
 } from "~/server/app-layer/automations/graph-alert.builder";
-import { reportSourceSchema } from "~/server/app-layer/automations/report.builder";
 import type { FilterField } from "~/server/filters/types";
 import { describeCron, isValidCron } from "./reportSchedule";
 

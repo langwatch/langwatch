@@ -1,6 +1,6 @@
 import type { TriggerContext } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-import type { MonitorSummary } from "~/server/app-layer/monitors/repositories/monitor.repository";
+import type { MonitorSummary } from "@langwatch/monitor-contract";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {

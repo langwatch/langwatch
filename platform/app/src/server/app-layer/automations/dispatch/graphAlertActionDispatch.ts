@@ -1,15 +1,15 @@
-import { ALERT_TRIGGER_DEFAULTS } from "@langwatch/automations/templating/defaults";
-import { renderTriggerEmail } from "@langwatch/automations/templating/renderEmail";
+import { ALERT_TRIGGER_DEFAULTS } from "@langwatch/automation-contract";
+import { renderTriggerEmail } from "@langwatch/automation-contract";
 import {
   renderTriggerSlack,
   type SlackTemplateType,
-} from "@langwatch/automations/templating/renderSlack";
-import { renderWebhookBody } from "@langwatch/automations/templating/renderWebhookBody";
-import type { GraphAlertTemplateContext } from "@langwatch/automations/templating/templateContext";
+} from "@langwatch/automation-contract";
+import { renderWebhookBody } from "@langwatch/automation-contract";
+import type { GraphAlertTemplateContext } from "@langwatch/automation-contract";
+import type { Trigger } from "@langwatch/automation-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { createHash } from "crypto";
-import type { Project, Trigger } from "~/generated/prisma/client";
 import {
   deliverWebhook,
   type WebhookDeliveryRecorder,
@@ -82,7 +82,7 @@ function destinationHash(destination: string): string {
  */
 export interface GraphAlertDispatchInput {
   trigger: Trigger;
-  project: Project;
+  project: { id: string };
   /** ADR-034 Phase 8.1 template-variable context. The evaluator builds
    *  it via `buildGraphAlertTemplateContext` and hands it in. */
   context: GraphAlertTemplateContext;
@@ -126,7 +126,7 @@ export interface GraphAlertDispatchDeps {
    * headers the cron path does, so it MUST honour the same suppression
    * list — otherwise a recipient who one-click-unsubscribed keeps receiving
    * alerts (RFC 8058 compliance regression). Returns the recipients that
-   * survive suppression. Mirrors `getApp().emailSuppressions.filterSuppressed`
+   * survive suppression. Mirrors `getApp().automation.filterSuppressed`
    * used by the cron's `handleSendEmail`.
    */
   filterSuppressedRecipients: (params: {
@@ -388,8 +388,8 @@ export async function dispatchGraphAlertAction({
       };
     }
     const rendered = await renderTriggerEmail({
-      subjectTemplate: trigger.emailSubjectTemplate,
-      bodyTemplate: trigger.emailBodyTemplate,
+      subjectTemplate: trigger.templates.emailSubjectTemplate,
+      bodyTemplate: trigger.templates.emailBodyTemplate,
       context,
       defaults,
     });
@@ -429,7 +429,9 @@ export async function dispatchGraphAlertAction({
 
   if (trigger.action === "SEND_SLACK_MESSAGE") {
     const templateType: SlackTemplateType | null =
-      trigger.slackTemplateType === "block_kit" ? "block_kit" : "string";
+      trigger.templates.slackTemplateType === "block_kit"
+        ? "block_kit"
+        : "string";
 
     // Bot connection (ADR-041): post via the Web API with the gate open so the
     // alert's chart/table/alert blocks render.
@@ -451,7 +453,7 @@ export async function dispatchGraphAlertAction({
       }
       const rendered = await renderTriggerSlack({
         templateType,
-        template: trigger.slackTemplate,
+        template: trigger.templates.slackTemplate,
         context,
         defaults,
         allowGatedBlocks: true,
@@ -510,7 +512,7 @@ export async function dispatchGraphAlertAction({
     }
     const rendered = await renderTriggerSlack({
       templateType,
-      template: trigger.slackTemplate,
+      template: trigger.templates.slackTemplate,
       context,
       defaults,
     });

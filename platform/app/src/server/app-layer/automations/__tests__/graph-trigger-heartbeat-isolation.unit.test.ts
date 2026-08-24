@@ -17,8 +17,8 @@ import {
   type GraphTriggerHeartbeatDeps,
   type HeartbeatCandidateSources,
 } from "../graph-trigger-heartbeat";
-import type { TriggerSummary } from "../repositories/trigger.repository";
-import type { TriggerService } from "../trigger.service";
+import type { TriggerSummary } from "../trigger-summary";
+import type { AutomationService } from "@langwatch/automation-contract";
 
 const BROKEN = "proj-broken";
 const HEALTHY = "proj-healthy";
@@ -58,7 +58,7 @@ function makeDeps({
     query: vi.fn(async () => ({ json: async () => [{ lastMs: null }] })),
   };
   return {
-    triggers: { getActiveGraphTriggersForProject } as unknown as TriggerService,
+    automation: { getActiveGraphTriggersForProject } as unknown as AutomationService,
     prisma: {
       triggerSent: { findMany: vi.fn(async () => []) },
     } as unknown as GraphTriggerHeartbeatDeps["prisma"],

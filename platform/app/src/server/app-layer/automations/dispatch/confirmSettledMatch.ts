@@ -1,4 +1,4 @@
-import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
+import type { TriggerSummary } from "~/server/app-layer/automations/trigger-summary";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import {
   evaluateQueryInMemory,

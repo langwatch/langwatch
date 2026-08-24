@@ -1,7 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The webhook provider client had zero test coverage (packages/automations'
+ * The webhook provider client had zero test coverage in the shared automation
+ * provider implementation before this test was added.
  * webhook.ts unit suite covers the shared schema/sanitizer, but nothing
  * exercised this provider's client.tsx: URL validation surfaced in the
  * ConfigForm, the kept-header sentinel round-trip through fromTriggerRow /
@@ -10,16 +11,16 @@
  * and ../../email/__tests__/client.integration.test.tsx).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
+import type { SavedTriggerRow } from "@langwatch/automation-contract";
 import {
   WEBHOOK_HEADER_VALUE_KEPT,
   type WebhookActionParams,
-} from "@langwatch/automations/providers/webhook";
+} from "@langwatch/automation-contract";
 import {
   DEFAULT_ALERT_WEBHOOK_BODY_TEMPLATE,
   DEFAULT_REPORT_WEBHOOK_BODY_TEMPLATE,
   DEFAULT_WEBHOOK_BODY_TEMPLATE,
-} from "@langwatch/automations/templating/defaults";
+} from "@langwatch/automation-contract";
 import {
   cleanup,
   fireEvent,
@@ -52,7 +53,7 @@ vi.mock(
   },
 );
 
-import type { WebhookPreview } from "@langwatch/automations/providers/webhook";
+import type { WebhookPreview } from "@langwatch/automation-contract";
 import webhookClient, { type WebhookSlice } from "../client";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

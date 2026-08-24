@@ -1,5 +1,5 @@
-import type { AnnotationQueueActionParams } from "@langwatch/automations/providers/annotationQueue";
-import type { SavedTriggerRow } from "@langwatch/automations/providers/types";
+import type { AnnotationQueueActionParams } from "@langwatch/automation-contract";
+import type { SavedTriggerRow } from "@langwatch/automation-contract";
 import { Users } from "lucide-react";
 import { AddParticipants } from "~/components/traces/AddParticipants";
 import type { ClientDef, ConfigFormProps, SummaryIdentity } from "../types";

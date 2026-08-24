@@ -1,16 +1,16 @@
 import {
   CADENCE_WINDOW_MS,
   type NotificationCadence,
-} from "@langwatch/automations/cadences";
+} from "@langwatch/automation-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { TriggerAction } from "~/generated/prisma/client";
-import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
-import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
-import type { ProjectService } from "~/server/app-layer/projects/project.service";
+import type { TriggerSummary } from "~/server/app-layer/automations/trigger-summary";
+import type { AutomationService } from "@langwatch/automation-contract";
+import type { ProjectService } from "@langwatch/project-contract";
 import { queryNeeds } from "~/server/app-layer/traces/filter-to-clickhouse";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { DatasetRecordEntry } from "~/server/datasets/types";
+import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 import {
   mapTraceToDatasetEntry,
@@ -102,7 +102,7 @@ export function computeScheduledFor({
 }
 
 export interface TriggerActionDispatchDeps {
-  triggers: TriggerService;
+  automation: AutomationService;
   projects: ProjectService;
   traceById: (projectId: string, traceId: string) => Promise<Trace | undefined>;
   addToAnnotationQueue: (params: {
@@ -150,9 +150,9 @@ export async function dispatchTriggerAction({
    * for one project and resolves the row once; without it this function
    * loads its own.
    */
-  project?: NonNullable<Awaited<ReturnType<ProjectService["getById"]>>>;
+  project?: NonNullable<Awaited<ReturnType<ProjectService["tryGetById"]>>>;
 }): Promise<void> {
-  const project = preloadedProject ?? (await deps.projects.getById(tenantId));
+  const project = preloadedProject ?? (await deps.projects.tryGetById(tenantId));
 
   if (!project) {
     logger.warn({ tenantId, triggerId: trigger.id }, "Project not found");
@@ -227,7 +227,10 @@ export async function dispatchTriggerAction({
     return;
   }
 
-  await deps.triggers.updateLastRunAt(trigger.id, tenantId);
+  await deps.automation.updateLastRunAt({
+    triggerId: trigger.id,
+    projectId: tenantId,
+  });
 
   logger.info(
     { tenantId, traceId, triggerId: trigger.id, action: trigger.action },

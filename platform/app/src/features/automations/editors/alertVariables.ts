@@ -1,4 +1,4 @@
-import type { VariableInfo } from "@langwatch/automations/templating/exampleContext";
+import type { VariableInfo } from "@langwatch/automation-contract";
 
 /**
  * Variable surface for graph-alert templates (`draft.source ===

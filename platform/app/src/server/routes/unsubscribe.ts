@@ -15,9 +15,8 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import { InvalidUnsubscribeTokenError } from "@langwatch/automation-contract";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
-import { getApp } from "~/server/app-layer/app";
-import { InvalidUnsubscribeTokenError } from "~/server/app-layer/automations/emailSuppression.service";
 import { rateLimit } from "~/server/rateLimit";
 import { getClientIpFromHonoContext } from "~/utils/getClientIp";
 
@@ -48,7 +47,7 @@ secured
     }
 
     try {
-      await getApp().emailSuppressions.confirmUnsubscribe({
+      await c.app.automation.confirmUnsubscribe({
         token,
         scope: "trigger",
       });

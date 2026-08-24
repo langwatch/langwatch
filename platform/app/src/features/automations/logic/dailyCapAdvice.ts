@@ -1,4 +1,4 @@
-import { TriggerAction } from "@langwatch/automations/enums";
+import { TriggerAction } from "@langwatch/automation-contract";
 
 /**
  * Actions that write one record per confirmed match, the only ones the plan's

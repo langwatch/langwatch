@@ -1,10 +1,10 @@
 import {
   CADENCE_WINDOW_MS,
   NOTIFICATION_CADENCES,
-} from "@langwatch/automations/cadences";
+} from "@langwatch/automation-contract";
 import { describe, expect, it, vi } from "vitest";
 import { TriggerAction, TriggerKind } from "~/generated/prisma/client";
-import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
+import type { TriggerSummary } from "~/server/app-layer/automations/trigger-summary";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
   computeScheduledFor,
@@ -229,9 +229,9 @@ describe("dispatchTriggerAction trace loading", () => {
 
   function makeDeps() {
     return {
-      triggers: { updateLastRunAt: vi.fn().mockResolvedValue(undefined) },
+      automation: { updateLastRunAt: vi.fn().mockResolvedValue(undefined) },
       projects: {
-        getById: vi
+        tryGetById: vi
           .fn()
           .mockResolvedValue({ id: "project-1", name: "P", slug: "p" }),
       },
@@ -290,12 +290,12 @@ describe("dispatchTriggerAction trace loading", () => {
           foldState,
           project: { id: "project-1", name: "P", slug: "p" } as NonNullable<
             Awaited<
-              ReturnType<TriggerActionDispatchDeps["projects"]["getById"]>
+              ReturnType<TriggerActionDispatchDeps["projects"]["tryGetById"]>
             >
           >,
         });
 
-        expect(deps.projects.getById).not.toHaveBeenCalled();
+        expect(deps.projects.tryGetById).not.toHaveBeenCalled();
       });
     });
   });

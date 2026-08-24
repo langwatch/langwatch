@@ -1,4 +1,4 @@
-import type { SlackPayload } from "@langwatch/automations/templating/renderSlack";
+import type { SlackPayload } from "@langwatch/automation-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { sendHttpDestination } from "~/server/webhooks/httpDestination";

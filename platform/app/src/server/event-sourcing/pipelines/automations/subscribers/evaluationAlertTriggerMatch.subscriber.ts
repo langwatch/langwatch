@@ -5,14 +5,14 @@ import {
   NOTIFY_TRIGGER_ACTIONS,
   triggerReadsEvaluations,
 } from "~/server/app-layer/automations/dispatch/triggerActionDispatch";
-import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
+import type { AutomationService } from "@langwatch/automation-contract";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerMatchRecordedEventData } from "~/server/event-sourcing/pipelines/automations/schemas/events";
 import type { EvaluationProcessingEvent } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/events";
 
 const logger = createLogger(
-  "langwatch:triggers:evaluation-alert-trigger-match-subscriber",
+  "langwatch:automation:evaluation-alert-trigger-match-subscriber",
 );
 
 /**
@@ -31,7 +31,7 @@ export interface RecordTriggerMatchPort {
 }
 
 export function createEvaluationAlertTriggerMatchHandler(deps: {
-  triggers: TriggerService;
+  automation: AutomationService;
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   recordTriggerMatch: RecordTriggerMatchPort;
 }) {
@@ -61,7 +61,7 @@ export function createEvaluationAlertTriggerMatchHandler(deps: {
       );
       return;
     }
-    const triggers = await deps.triggers.getActiveTraceTriggersForProject(
+    const triggers = await deps.automation.getActiveTraceTriggersForProject(
       context.tenantId,
     );
     for (const trigger of triggers.filter(triggerReadsEvaluations)) {

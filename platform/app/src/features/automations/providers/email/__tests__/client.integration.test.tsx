@@ -13,7 +13,7 @@ import {
   ALERT_TRIGGER_DEFAULTS,
   REPORT_TRIGGER_DEFAULTS,
   TRACE_TRIGGER_DEFAULTS,
-} from "@langwatch/automations/templating/defaults";
+} from "@langwatch/automation-contract";
 import {
   cleanup,
   fireEvent,
@@ -58,7 +58,7 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-import type { EmailPreview } from "@langwatch/automations/providers/email";
+import type { EmailPreview } from "@langwatch/automation-contract";
 import emailClient, { type EmailSlice } from "../client";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

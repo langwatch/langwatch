@@ -30,14 +30,14 @@ import { prisma } from "~/server/db";
 // Registers the counters the metric assertions read back.
 import "~/server/metrics";
 
-import { PrismaTriggerRepository } from "../repositories/trigger.prisma.repository";
-import type { TriggerSummary } from "../repositories/trigger.repository";
+import type { TriggerSummary } from "../trigger-summary";
 import {
   handlePersistCapBreach,
   RUNAWAY_PAUSE_REASON,
   type RunawayContainmentDeps,
 } from "../runaway-containment.service";
-import { TriggerService } from "../trigger.service";
+import { AppAutomationRuntime } from "~/runtime/app/features/automation";
+import type { AutomationService } from "@langwatch/automation-contract";
 
 describe("Feature: runaway automation containment", () => {
   const ns = `runaway-${nanoid(8)}`;
@@ -48,7 +48,7 @@ describe("Feature: runaway automation containment", () => {
   let organization: Organization | undefined;
   let team: Team | undefined;
   let project: Project | undefined;
-  let triggers: TriggerService;
+  let triggers: AutomationService;
 
   let projectTraces24h = 10_000;
   let sentEmails: Array<{ kind: string; skippedToday: number }>;
@@ -69,9 +69,11 @@ describe("Feature: runaway automation containment", () => {
         pauseAttempts++;
         if (pauseFails) throw new Error("connection terminated");
         await triggers.update({
-          triggerId,
+          id: triggerId,
           projectId,
-          data: { active: false, pausedReason: reason, pausedAt: at },
+          active: false,
+          pausedReason: reason,
+          pausedAt: at,
         });
         await triggers.invalidate(projectId);
       },
@@ -172,7 +174,7 @@ describe("Feature: runaway automation containment", () => {
         apiKey: `test-api-key-${ns}`,
       },
     });
-    triggers = new TriggerService(new PrismaTriggerRepository(prisma));
+    triggers = AppAutomationRuntime.create({ database: prisma, redis: null }).build();
   });
 
   beforeEach(() => {

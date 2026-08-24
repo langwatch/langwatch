@@ -1,9 +1,9 @@
-import type { NotificationCadence } from "@langwatch/automations/cadences";
+import type { NotificationCadence } from "@langwatch/automation-contract";
 import type {
   SavedTriggerRow,
   SharedDef,
   TemplateDraft,
-} from "@langwatch/automations/providers/types";
+} from "@langwatch/automation-contract";
 import type { ComponentType } from "react";
 
 /**

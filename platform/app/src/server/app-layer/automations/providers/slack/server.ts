@@ -2,7 +2,7 @@ import {
   SLACK_BOT_TOKEN_KEPT,
   type SlackActionParams,
   slackDeliveryMethodOf,
-} from "@langwatch/automations/providers/slack";
+} from "@langwatch/automation-contract";
 import { TriggerAction } from "~/generated/prisma/client";
 import { decrypt, encrypt } from "~/utils/encryption";
 import { MissingSlackBotTokenError } from "../../errors";

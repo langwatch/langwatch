@@ -32,11 +32,10 @@ import {
 } from "~/server/app-layer/analytics/routing/field-availability";
 import type { ActionParams } from "~/server/app-layer/automations/trigger.types";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { prisma as defaultPrisma } from "~/server/db";
 import { isNoDataPredicate } from "./evaluate-custom-graph-threshold.service";
 import type { GraphTriggerEvaluationReason } from "./graph-trigger-evaluation.service";
 import { parseSeriesIndex } from "./seriesName";
-import type { TriggerService } from "./trigger.service";
+import type { AutomationService } from "@langwatch/automation-contract";
 
 const logger = createLogger(
   "langwatch:app-layer:triggers:graph-trigger-heartbeat",
@@ -62,7 +61,7 @@ interface CandidateTrigger {
 }
 
 export interface GraphTriggerHeartbeatDeps {
-  triggers: TriggerService;
+  automation: AutomationService;
   prisma: PrismaClient;
   /** Resolver matching the slim repository's contract — same signature so
    *  tests can stub a single client and the prod path uses the default
@@ -328,7 +327,7 @@ async function loadCandidatesForProject({
   hasOpenSent: boolean;
 }): Promise<CandidateTrigger[]> {
   const triggers =
-    await deps.triggers.getActiveGraphTriggersForProject(projectId);
+    await deps.automation.getActiveGraphTriggersForProject(projectId);
   if (triggers.length === 0) return [];
 
   const openIds = hasOpenSent
@@ -337,7 +336,7 @@ async function loadCandidatesForProject({
 
   const candidates: CandidateTrigger[] = [];
   for (const trigger of triggers) {
-    const params = (trigger.actionParams ?? {}) as ActionParams;
+    const params = (trigger.actionParams ?? {}) as unknown as ActionParams;
     const operator = params.operator;
     const threshold = params.threshold;
     const timePeriod = params.timePeriod;
@@ -493,18 +492,18 @@ async function loadProjectRecency({
 
 /** Default deps factory used by the worker bootstrap registration site. */
 export function defaultGraphTriggerHeartbeatDeps({
-  triggers,
-  prisma = defaultPrisma,
+  automation,
+  prisma,
   resolveClickHouseClient,
 }: {
-  triggers: TriggerService;
-  prisma?: PrismaClient;
+  automation: AutomationService;
+  prisma: PrismaClient;
   /** The composition root's resolver, passed in rather than imported: this
    *  factory has no business deciding which ClickHouse a tenant reads. */
   resolveClickHouseClient: ClickHouseClientResolver;
 }): GraphTriggerHeartbeatDeps {
   return {
-    triggers,
+    automation,
     prisma,
     resolveClickHouseClient,
     lookupTriggerSource: async ({ customGraphId, projectId, seriesName }) => {

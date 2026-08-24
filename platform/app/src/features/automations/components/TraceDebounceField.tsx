@@ -2,7 +2,7 @@ import { Field, HStack, Input, Text } from "@chakra-ui/react";
 import {
   MAX_TRACE_DEBOUNCE_MS,
   MIN_TRACE_DEBOUNCE_MS,
-} from "@langwatch/automations/cadences";
+} from "@langwatch/automation-contract";
 import { useEffect, useState } from "react";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";

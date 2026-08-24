@@ -1,7 +1,7 @@
 import {
   AlertType as PackageAlertType,
   TriggerAction as PackageTriggerAction,
-} from "@langwatch/automations";
+} from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
 import {
   AlertType as PrismaAlertType,
@@ -9,7 +9,7 @@ import {
 } from "~/generated/prisma/client";
 
 /**
- * @langwatch/automations owns copies of the Prisma enums so that CLI/MCP/web
+ * @langwatch/automation-contract owns copies of the Prisma enums so that CLI/MCP/web
  * consumers need no database dependency. These assertions pin the two in
  * lockstep — adding a value to either side without the other fails here.
  * The type-level checks fail the typecheck on drift in either direction.
