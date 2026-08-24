@@ -24,6 +24,7 @@
 import { pullScheduleSchema } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/schemas/events";
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
 import { syncIngestionPullSource } from "@ee/governance/services/pullers/ingestionPullLifecycle";
+import { hasPollerCursor } from "@ee/governance/services/pullers/pollerCursor";
 import {
   HandledError,
   NotFoundError,
@@ -186,6 +187,53 @@ function assertPullSchedule(pullSchedule: string): void {
     complaints.join(" ") || "Pull schedule is not a valid cron expression",
     { meta: { formErrors: complaints } },
   );
+}
+
+/**
+ * Refuse a change of report kind on a source that has already pulled.
+ *
+ * The Anthropic adapter's two reports price the same spend twice over — its
+ * header states the invariant as "Never both", because usage is priced by us
+ * and cost is the provider's own figure for the identical consumption. A
+ * source obeys that invariant by picking one at create time, and its events
+ * carry that choice in their ids: `usage:*` or `cost:*`, never a mix.
+ *
+ * Editing the report kind is what breaks it. The adapter derives a query
+ * identity from the report, so a changed report no longer matches the stored
+ * cursor; the cursor is discarded, the new report replays from the backfill
+ * start, and its events land in a namespace the old ones never occupied. No
+ * row is overwritten because nothing collides — the two sets simply coexist,
+ * both counting the same money, which is the outcome the adapter says must
+ * never happen.
+ *
+ * This lives in the service rather than in the form because the invariant is
+ * a property of the stored events, not of the drawer: the form declining to
+ * offer the edit is a courtesy, and a caller that skips the form would
+ * otherwise walk straight past it. The cursor is the test for "has pulled"
+ * because it is the same thing the adapter consults, and it is read through
+ * the shared predicate so the two cannot drift apart.
+ */
+export function assertReportUnchangedOncePulled({
+  existing,
+  incoming,
+}: {
+  existing: Pick<IngestionSource, "parserConfig" | "pollerCursor">;
+  incoming: Record<string, unknown>;
+}): void {
+  const stored = (existing.parserConfig as Record<string, unknown>) ?? {};
+  const storedReport = stored.report;
+  if (typeof storedReport !== "string") return;
+  if (incoming.report === storedReport) return;
+  if (!hasPollerCursor(existing.pollerCursor)) return;
+
+  const complaint =
+    `This source has already pulled its ${storedReport} report. ` +
+    "Changing the report would record the same spend a second time under " +
+    "the other report, so it is fixed once a source has run. Archive this " +
+    "source and create a new one to switch reports.";
+  throw new ValidationError(complaint, {
+    meta: { formErrors: [complaint] },
+  });
 }
 
 async function syncPullProcessBestEffort({
@@ -480,6 +528,7 @@ export class IngestionSourceService {
           incoming[key] = stored[key];
         }
       }
+      assertReportUnchangedOncePulled({ existing, incoming });
       assertPullDestinationAllowed(incoming);
       data.parserConfig = encryptParserConfigCredentials(
         incoming,
