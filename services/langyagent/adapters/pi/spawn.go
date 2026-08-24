@@ -397,6 +397,10 @@ func buildWorkerEnv(in SpawnInput) []string {
 		// anthropic stamps ttl "1h" on its cache_control breakpoints, the
 		// Responses lane asks for 24h prompt_cache_retention.
 		"PI_CACHE_RETENTION=long",
+		// The CLI's `ui call` names the conversation it is driving with this.
+		// It is a claim, not a credential: the control plane verifies the id
+		// belongs to the session key's owning user before doing anything.
+		"LANGY_CONVERSATION_ID="+in.ConversationID,
 	)
 	for _, c := range in.Capabilities {
 		env = append(env, c.Contribute()...)

@@ -319,9 +319,11 @@ func TestEgress_NoAllowlistAllowsButFlagsMonitorOnly(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("monitor-only host got status %d, want 200 (nothing blocked)", status)
 	}
-	if !h.dialer.dialedAuthority("some-new-host.example:443") {
-		t.Fatalf("expected the host to be dialed in monitor-only mode")
-	}
+	// The 200 is written before the destination is dialed, so reading the
+	// status does not mean the dial has been recorded yet. The decision below
+	// IS ordered before the 200, which is why only this one has to wait.
+	waitFor(t, func() bool { return h.dialer.dialedAuthority("some-new-host.example:443") },
+		func() string { return "expected the host to be dialed in monitor-only mode" })
 	if !h.monitor.has(egressAllowedMonitor) {
 		t.Fatalf("expected an allowed_monitor flag, got %v", h.monitor.decisions())
 	}

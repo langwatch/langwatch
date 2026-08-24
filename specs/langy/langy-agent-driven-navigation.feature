@@ -185,6 +185,16 @@ Feature: Langy opens the resource it surfaced in the browser
       Then the user is taken to that resource
       And they land on the same page the product's own links open
 
+    # A prompt used to open as a drawer stacked over the playground's own "no
+    # prompts open" empty state, so the page behind the form was blank and the
+    # one surface built for reading a prompt and running it was the surface the
+    # drawer covered.
+    @unit
+    Scenario: A prompt opens in the playground, ready to run
+      When Langy asks to open a prompt
+      Then the playground opens that prompt as a tab
+      And the reader can edit and run it where they landed
+
     @unit
     Scenario: An id the project cannot resolve drops silently
       When a navigate instruction names an id that does not resolve in this project

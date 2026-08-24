@@ -142,6 +142,44 @@ describe("LangyDeclarativeCard", () => {
     });
   });
 
+  describe("given a collection whose rows are named by kind", () => {
+    // The UI actions a page accepts are keyed by kind and carry no name, so
+    // every row fell back to the numbered noun: "UI action 1", "UI action 2".
+    // The list said how many there were and nothing about any of them.
+    const output = JSON.stringify({
+      actions: [
+        { kind: "workbench.getState", permission: "experiments:view" },
+        { kind: "workbench.duplicateTarget", permission: "experiments:update" },
+      ],
+    });
+
+    describe("when the card renders", () => {
+      /** @scenario The listed actions read as what they do */
+      it("names each row by its kind", () => {
+        renderCard({ name: "langwatch.ui.actions", output });
+
+        expect(screen.getByText("workbench.getState")).toBeTruthy();
+        expect(screen.getByText("workbench.duplicateTarget")).toBeTruthy();
+        expect(screen.queryByText("UI action 1")).toBeNull();
+      });
+
+      /** @scenario A listed action with a display name keeps it */
+      it("still prefers a real name when the row has one", () => {
+        renderCard({
+          name: "langwatch.ui.actions",
+          output: JSON.stringify({
+            actions: [
+              { kind: "workbench.getState", name: "Read the workbench" },
+            ],
+          }),
+        });
+
+        expect(screen.getByText("Read the workbench")).toBeTruthy();
+        expect(screen.queryByText("workbench.getState")).toBeNull();
+      });
+    });
+  });
+
   describe("given a collection read that matched nothing", () => {
     describe("when the card renders", () => {
       it("says there are none — a real answer, not a failure", () => {
@@ -385,6 +423,28 @@ describe("LangyDeclarativeCard", () => {
         ).toBeTruthy();
         expect(screen.queryByText("No prompts yet.")).toBeNull();
       });
+    });
+  });
+
+  describe("given a page action Langy carried out on the open page", () => {
+    /** @scenario "Every LangWatch action Langy takes shows a result card" */
+    it("titles the card with the action, and spends no row on the correlation id", () => {
+      renderCard({
+        name: "langwatch.ui.call",
+        output: JSON.stringify({
+          kind: "workbench.duplicateTarget",
+          status: "done",
+          executedVia: "browser",
+          actionId: "i5KRzS-5c2UVUD99UzyWw",
+          result: { targetId: "target-cW6HpQ0S" },
+        }),
+      });
+
+      // "UI action" stays as the overline: it names the family. The title is
+      // the one line that has to say what happened.
+      expect(screen.getByText("Duplicate target")).toBeTruthy();
+      expect(screen.queryByText("action id")).toBeNull();
+      expect(screen.queryByText("i5KRzS-5c2UVUD99UzyWw")).toBeNull();
     });
   });
 });

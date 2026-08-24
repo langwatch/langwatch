@@ -53845,6 +53845,8 @@ So for anything in these skills that reads or writes a project: make sure `LANGW
 
 Improvements start from evidence, never from generic advice.
 
+**No traces in the project?** Then there is no production evidence to mine and this skill cannot start. Say so in one line and switch method: measure the answers against a dataset instead of against live traffic. In Langy, run the prompt improvement loop (`prompt-optimization`). In a coding agent, use the `experiments` skill. Come back here once real traffic exists.
+
 1. **Use an existing diagnosis when there is one.** Look for `agent-performance-report.html` (or ask if a recent diagnosis exists). If present, read it and extract the findings and their example trace IDs.
 2. **No diagnosis available?** Run a focused evidence sweep yourself:
 
@@ -65654,6 +65656,15 @@ openapi: "POST /api/experiment/init"
 
 ---
 
+# FILE: ./api-reference/experiments/list-an-experiment-s-versions.mdx
+
+---
+title: "List an experiment's versions"
+openapi: "GET /api/experiments/{slug}/versions"
+---
+
+---
+
 # FILE: ./api-reference/experiments/list-experiments-for-the-project.mdx
 
 ---
@@ -65694,6 +65705,24 @@ openapi: "GET /api/experiments/runs/{runId}"
 
 ---
 
+# FILE: ./api-reference/experiments/post-create-an-experiment.mdx
+
+---
+title: "Create an experiment and its setup"
+openapi: "POST /api/experiments"
+---
+
+---
+
+# FILE: ./api-reference/experiments/read-an-experiment-s-setup.mdx
+
+---
+title: "Read an experiment's setup"
+openapi: "GET /api/experiments/{slug}/workbench-state"
+---
+
+---
+
 # FILE: ./api-reference/experiments/read-run-results.mdx
 
 ---
@@ -65712,11 +65741,29 @@ openapi: "POST /api/dspy/log_steps"
 
 ---
 
+# FILE: ./api-reference/experiments/restore-an-experiment-version.mdx
+
+---
+title: "Restore an experiment version"
+openapi: "POST /api/experiments/{slug}/versions/{version}/restore"
+---
+
+---
+
 # FILE: ./api-reference/experiments/run-an-experiment.mdx
 
 ---
 title: "Run an experiment"
 openapi: "POST /api/experiments/{slug}/run"
+---
+
+---
+
+# FILE: ./api-reference/experiments/save-an-experiment-s-setup.mdx
+
+---
+title: "Save an experiment's setup"
+openapi: "PUT /api/experiments/{slug}/workbench-state"
 ---
 
 ---

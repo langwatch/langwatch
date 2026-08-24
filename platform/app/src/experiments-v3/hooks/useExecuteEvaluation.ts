@@ -487,13 +487,21 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         { output: unknown; cost?: number; duration?: number }
       > = {};
       const expandedCells = [...baseExecutionCells];
-      if (scope.type === "target" || scope.type === "cell") {
-        const deps = targetComparisonDeps(scope.targetId);
-        if (deps.length) {
-          const rowsForExpansion =
-            scope.type === "cell"
-              ? [scope.rowIndex]
+      const scopedTargetIds =
+        scope.type === "target" || scope.type === "cell"
+          ? [scope.targetId]
+          : scope.type === "target-rows"
+            ? scope.targetIds
+            : [];
+      if (scopedTargetIds.length) {
+        const rowsForExpansion =
+          scope.type === "cell"
+            ? [scope.rowIndex]
+            : scope.type === "target-rows" && scope.rowIndices
+              ? scope.rowIndices
               : datasetRows.map((_, i) => i);
+        for (const scopedTargetId of scopedTargetIds) {
+          const deps = targetComparisonDeps(scopedTargetId);
           for (const depTargetId of deps) {
             const depOutputs = currentTargetOutputs[depTargetId] ?? [];
             const depMeta = currentTargetMetadata[depTargetId] ?? [];

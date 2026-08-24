@@ -508,10 +508,20 @@ export const buildSignatureNodeFromPrompt = ({
     verbosity: prompt.verbosity,
   });
 
-  const messages: ChatMessage[] = prompt.messages.map((m) => ({
-    role: m.role as "user" | "assistant" | "system",
-    content: m.content,
-  }));
+  // The VersionedPrompt read model prepends a synthesized
+  // `{role:"system", content: prompt.prompt}` to `messages` (storage keeps
+  // system text only in the `prompt` column — see hoistSystemMessage).
+  // `instructions` below already carries that same text, so forwarding the
+  // synthesized entry would send the system prompt twice. Strip system
+  // roles here: for a prompt with no template messages this leaves the
+  // list empty, which makes the engine fold the scalar inputs into a user
+  // turn instead of sending a request with no user message at all.
+  const messages: ChatMessage[] = prompt.messages
+    .filter((m) => m.role !== "system")
+    .map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content,
+    }));
 
   return {
     id: nodeId,
