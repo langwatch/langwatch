@@ -350,13 +350,19 @@ func preflightPortlessCAIn(home string) error {
 	if !errors.Is(err, fs.ErrPermission) {
 		return nil
 	}
+	// The diagnostic line names the absolute path so there is no doubt WHICH
+	// file; the command lines below stay on `~` because they are meant to be
+	// pasted into a shell, and a home directory with a space in it (or any
+	// other shell metacharacter) would splice an interpolated absolute path
+	// into the wrong arguments. `~/.portless/ca.srl` IS this file — the path
+	// is always $HOME/.portless/ca.srl — so nothing is lost by the shorthand.
 	return fmt.Errorf(
 		"portless's CA serial is not writable by you: %s\n"+
 			"openssl writes it while signing, so every per-host certificate comes out EMPTY and the proxy serves no certificate at all — the handshake failure looks exactly like the SAN bug of #7117, which is already fixed.\n"+
 			"Clear the root-owned leftovers and the empty certs they produced, then re-run `haven up` (no sudo needed — the directory is yours):\n"+
-			"  rm -f %s ~/.portless/proxy.tls\n"+
+			"  rm -f ~/.portless/ca.srl ~/.portless/proxy.tls\n"+
 			"  find ~/.portless/host-certs -name '*.pem' -size 0 -delete",
-		srl, srl)
+		srl)
 }
 
 // serviceEndpoint resolves how one routed service is actually reachable.
@@ -494,13 +500,25 @@ var apiBundleRelPath = filepath.Join("dist", "server", "server.cjs")
 // Only the missing case builds. An existing bundle is left alone: rebuilding
 // on every `up` would add a minute to a bring-up for a file that only
 // server-side edits invalidate, and those already require a manual rebuild.
+//
+// The contract is the whole point: when this returns nil, node has a file to
+// execute. So both ends are checked against that, not against a weaker proxy.
+// A REGULAR file, because `node <a directory>` is the same crash by another
+// name; and re-checked AFTER the build, because a build can exit 0 without
+// emitting the server bundle (a changed build script, a partial run) and
+// trusting the exit code would hand the lane the exact MODULE_NOT_FOUND
+// crash-loop this function exists to prevent — only now with no explanation.
 func (o *Orchestrator) ensureAPIBundle(ctx context.Context, lwDir string, env []string) error {
-	if _, err := os.Stat(filepath.Join(lwDir, apiBundleRelPath)); err == nil {
+	bundle := filepath.Join(lwDir, apiBundleRelPath)
+	if info, err := os.Stat(bundle); err == nil && info.Mode().IsRegular() {
 		return nil
 	}
 	fmt.Println("building the app bundle (missing — first `up` in this worktree)…")
 	if err := o.sup.RunOnce(ctx, "build", lwDir, "pnpm -s run build", env); err != nil {
 		return fmt.Errorf("the app bundle failed to build — the api lane runs %s and cannot start without it: %w", apiBundleRelPath, err)
+	}
+	if info, err := os.Stat(bundle); err != nil || !info.Mode().IsRegular() {
+		return fmt.Errorf("the app build reported success but left no %s behind — the api lane runs that file and cannot start without it", apiBundleRelPath)
 	}
 	return nil
 }
