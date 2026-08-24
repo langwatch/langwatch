@@ -13,10 +13,11 @@ import type { SectionNavItemData } from "./sectionNavItems";
  * Hooks cannot be called in a loop over arbitrary flags, so every flag
  * that appears in a nav list is resolved here by name. Today that is one:
  * the billed-cost placeholders. Adding a second flag to a nav list means
- * touching three places here — its `useFeatureFlag` call, its `case` in
- * the lookup, and the `enabled` gate that skips the query for lists which
- * do not use it. Forgetting any of them hides the item rather than
- * showing it, which is the safe failure.
+ * touching three places here, and they fail differently. Miss its
+ * `useFeatureFlag` call or its `case` in the lookup and the exhaustive
+ * `default: false` below hides the item — the safe failure. Miss its
+ * `enabled` gate and nothing hides: the query simply runs on lists that
+ * never read it, costing a round-trip nobody sees.
  */
 export function useVisibleSectionNavItems(
   items: readonly SectionNavItemData[],
@@ -33,8 +34,7 @@ export function useVisibleSectionNavItems(
   // carries no flagged entry — without this the flag round-trips on every
   // gateway page for a result the filter below never reads.
   const needsBilledCost = items.some(
-    (item) =>
-      item.featureFlag === "release_ui_governance_billed_cost_enabled",
+    (item) => item.featureFlag === "release_ui_governance_billed_cost_enabled",
   );
   const billedCost = useFeatureFlag(
     "release_ui_governance_billed_cost_enabled",
