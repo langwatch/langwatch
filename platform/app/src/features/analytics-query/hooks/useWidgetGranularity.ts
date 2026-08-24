@@ -113,14 +113,12 @@ export function useWidgetGranularity(): WidgetGranularityState {
       // Same route, query only: the picks are read from the URL on render, so
       // the dashboard re-renders without remounting and only the card whose
       // step changed re-runs.
-      void router.push(
-        {
-          query: {
-            ...rest,
-            ...(next ? { [WIDGET_GRANULARITY_QUERY_PARAMETER]: next } : {}),
-          },
+      void router.push({
+        query: {
+          ...rest,
+          ...(next ? { [WIDGET_GRANULARITY_QUERY_PARAMETER]: next } : {}),
         },
-      );
+      });
     },
     [encodedValue, router],
   );
