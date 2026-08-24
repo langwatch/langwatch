@@ -1,9 +1,9 @@
+import { ledgerActorFor } from "@langwatch/actor";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { ApiKey, PrismaClient } from "~/generated/prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";
-import { ledgerActorFor } from "~/server/app-layer/authz/ledger-actor";
 import {
   MalformedCustomRolePermissionsError,
   parseCustomRolePermissions,
@@ -11,7 +11,6 @@ import {
 } from "~/server/rbac/custom-role-permissions";
 import {
   checkRoleBindingPermission,
-  resolveApiKeyPermission,
   resolveLegacyCeiling,
 } from "~/server/rbac/role-binding-resolver";
 import { RoleRepository } from "~/server/role/repositories/role.repository";
@@ -86,9 +85,19 @@ type RoleBindingBase = {
   scopeId: string;
 };
 
-type RoleBindingInput =
+export type RoleBindingInput =
   | (RoleBindingBase & { role: "ADMIN" | "MEMBER" | "VIEWER" })
-  | (RoleBindingBase & { role: "CUSTOM"; customRoleId?: string });
+  | CustomRoleBindingInput;
+
+/**
+ * A binding carrying an explicit permission list rather than a built-in role.
+ * Only these are mintable under `permissionMode: "restricted"`, so the
+ * selection dry run takes exactly this shape.
+ */
+export type CustomRoleBindingInput = RoleBindingBase & {
+  role: "CUSTOM";
+  customRoleId?: string;
+};
 
 type CreatorScope =
   | { type: "org"; id: string }
@@ -571,6 +580,58 @@ export class ApiKeyService {
   }
 
   /**
+   * The mint-time validation of {@link create}, exposed as a dry run for
+   * callers that decide a selection long before they mint (the CLI device-flow
+   * approval stamps a selection that `create` only consumes at exchange time).
+   * Same checks, same errors, nothing persisted: the permission format, the
+   * empty-input refusals, org membership, every binding within the user's own
+   * ceiling for every permission, and personal-team scopes owned by the user.
+   * An input this method accepts is an input `create` mints.
+   *
+   * The bindings are CUSTOM by type, not by runtime guard: `create` refuses a
+   * restricted key whose bindings carry a built-in role, and the ceiling walk
+   * routes a built-in role to a one-permission probe that never reads the
+   * supplied list. Accepting one here would be both permissive and weaker
+   * than the mint, so the compiler rules it out instead.
+   */
+  async assertSelectionWithinCeiling({
+    userId,
+    organizationId,
+    bindings,
+    permissions,
+  }: {
+    userId: string;
+    organizationId: string;
+    bindings: CustomRoleBindingInput[];
+    permissions: string[];
+  }): Promise<void> {
+    if (permissions.length === 0) {
+      throw new ApiKeyScopeViolationError(
+        "CUSTOM bindings require at least one permission",
+      );
+    }
+    if (bindings.length === 0) {
+      throw new ApiKeyScopeViolationError(
+        "A personal API key needs at least one role binding",
+      );
+    }
+    ApiKeyService.assertPermissionFormat(permissions);
+    await this.ensureCallerIsOrgMember({ userId, organizationId });
+    await this.assertBindingsWithinCeiling({
+      prisma: this.prisma,
+      ceilingUserId: userId,
+      organizationId,
+      bindings,
+      rawPermissions: [...permissions].sort(),
+    });
+    await assertPersonalTeamScopesOwnedBy({
+      client: this.prisma,
+      scopes: bindings,
+      ownerUserId: userId,
+    });
+  }
+
+  /**
    * Validates every requested binding against the ceiling user's permissions.
    *
    * A read taken immediately before the grants are appended, not a check
@@ -748,7 +809,6 @@ export class ApiKeyService {
           // mint out into dozens of detached collects. The mint path's engine
           // coverage comes from enforceApiKeyCeiling instead, which shadows
           // the same question on every request the key goes on to make.
-          skipShadow: true,
         })) || legacy.grants(perm as Permission);
       if (!userHas) {
         throw new ApiKeyScopeViolationError(
@@ -795,7 +855,6 @@ export class ApiKeyService {
           // Same reason as the custom-role loop above: the mint path's engine
           // coverage comes from the per-request enforceApiKeyCeiling path,
           // not from one shadow per candidate permission.
-          skipShadow: true,
         })) || legacy.grants(perm as Permission);
 
       if (!userHas) {
@@ -967,6 +1026,7 @@ export class ApiKeyService {
     callerUserId,
     callerIsAdmin,
     organizationId,
+    awaitProjection = true,
   }: {
     id: string;
     /**
@@ -976,6 +1036,15 @@ export class ApiKeyService {
     callerUserId: string | null;
     callerIsAdmin: boolean;
     organizationId: string;
+    /**
+     * Whether the deletion of the key's private role holds for its
+     * projection. The key row itself is revoked imperatively either way, so
+     * the key is dead on the next read regardless, and the retired role is
+     * named after the key id, so no later mint waits for that name to come
+     * free. A caller that only needs the credential dead (the hard-cut
+     * ingestion-key rotation) turns this off and saves a fold pickup cycle.
+     */
+    awaitProjection?: boolean;
   }): Promise<ApiKey> {
     const apiKey = await this.repo.findById({ id });
     if (!apiKey) throw new ApiKeyNotFoundError(id);
@@ -1009,6 +1078,7 @@ export class ApiKeyService {
           userId: callerUserId,
           fallback: "apiKeyService",
         }),
+        awaitProjection,
       });
     }
 
@@ -1052,33 +1122,6 @@ export class ApiKeyService {
       organizationId,
     });
     return !!binding;
-  }
-
-  /**
-   * Whether the presented credential resolves the given permission at
-   * organization scope: the same primitive the route-level
-   * `requireOrgPermission` middleware applies, exposed for handlers that need
-   * a second, stricter permission on one branch of a route.
-   */
-  async hasOrgScopedPermission({
-    apiKeyId,
-    userId,
-    organizationId,
-    permission,
-  }: {
-    apiKeyId: string;
-    userId: string | null;
-    organizationId: string;
-    permission: Permission;
-  }): Promise<boolean> {
-    return resolveApiKeyPermission({
-      prisma: this.prisma,
-      apiKeyId,
-      userId,
-      organizationId,
-      scope: { type: "org", id: organizationId },
-      permission,
-    });
   }
 
   /**

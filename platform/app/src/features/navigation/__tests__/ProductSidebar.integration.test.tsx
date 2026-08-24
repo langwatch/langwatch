@@ -60,6 +60,12 @@ vi.mock("~/utils/compat/next-router", () => ({
   }),
 }));
 
+// The sidebar marks its entries against the address in the address bar, not
+// the route pattern, so this is the one the fixtures below set.
+vi.mock("~/utils/compat/next-navigation", () => ({
+  usePathname: () => mockPathname,
+}));
+
 vi.mock("~/hooks/useRequiredSession", () => ({
   useRequiredSession: () => ({
     data: {
@@ -147,8 +153,107 @@ vi.mock("~/utils/tracking", () => ({
 }));
 
 import { MENU_WIDTH_EXPANDED } from "~/components/MainMenu";
+import { forgetMenuScrollPositions } from "~/components/sidebar/useMenuScrollPosition";
 import { ProductSidebar } from "../shell/ProductSidebar";
 import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../shell/shellLayout";
+
+/**
+ * jsdom has no scrollIntoView at all, so the menu's own call is what the
+ * scroll assertions read: which entry it aimed at, and where in the
+ * column it asked to put it. Removed again in afterEach.
+ */
+function recordScrollIntoView(): {
+  element: HTMLElement;
+  options?: ScrollIntoViewOptions;
+}[] {
+  const scrolls: { element: HTMLElement; options?: ScrollIntoViewOptions }[] =
+    [];
+  (
+    window.HTMLElement.prototype as unknown as {
+      scrollIntoView: (options?: ScrollIntoViewOptions) => void;
+    }
+  ).scrollIntoView = function (
+    this: HTMLElement,
+    options?: ScrollIntoViewOptions,
+  ) {
+    scrolls.push({ element: this, options });
+  };
+  return scrolls;
+}
+
+const MENU_ENTRY_HEIGHT = 32;
+
+/**
+ * jsdom lays nothing out, so the measurements the menu reads are stubbed: how
+ * tall the menu's own box is, and how far each named entry sits below the top
+ * of the content it scrolls through.
+ *
+ * The entries move with the scroll, the way they would in a browser. A stub
+ * that held them still would report an entry as out of view however far the
+ * menu had already scrolled to reach it, and every test would read a menu that
+ * scrolls without end.
+ */
+function stubMenuLayout({
+  entryOffsets,
+  menuHeight,
+}: {
+  entryOffsets: Record<string, number>;
+  menuHeight: number;
+}) {
+  const rectAt = ({ top, height }: { top: number; height: number }) => ({
+    ...EMPTY_RECT,
+    top,
+    y: top,
+    height,
+    bottom: top + height,
+  });
+  window.HTMLElement.prototype.getBoundingClientRect = function (
+    this: HTMLElement,
+  ) {
+    if (this.dataset.testid === "sidebar-scroll-region")
+      return rectAt({ top: 0, height: menuHeight });
+    const label = this.getAttribute("aria-label");
+    const scrolled =
+      document.querySelector<HTMLElement>(
+        '[data-testid="sidebar-scroll-region"]',
+      )?.scrollTop ?? 0;
+    return rectAt({
+      top: ((label ? entryOffsets[label] : undefined) ?? 0) - scrolled,
+      height: MENU_ENTRY_HEIGHT,
+    });
+  } as HTMLElement["getBoundingClientRect"];
+}
+
+/**
+ * Appends a child to the menu and resolves once a MutationObserver has been
+ * handed that change.
+ *
+ * Waiting for the child to be in the DOM proves nothing: it is there the
+ * moment `appendChild` returns, while the observers run later in their own
+ * microtask. Observers are called in the order they were created, and the
+ * menu's own observer is created first, when the column mounts. So by the
+ * time this one runs, the menu has already had its chance to move.
+ */
+async function appendChildAndAwaitMutation(region: HTMLElement) {
+  await new Promise<void>((resolve) => {
+    const observer = new MutationObserver(() => {
+      observer.disconnect();
+      resolve();
+    });
+    observer.observe(region, { childList: true, subtree: true });
+    region.appendChild(document.createElement("div"));
+  });
+}
+
+const EMPTY_RECT = {
+  bottom: 0,
+  height: 0,
+  left: 0,
+  right: 0,
+  toJSON: () => ({}),
+  width: 0,
+  x: 0,
+} as const;
 
 function renderSidebar(surface: "me" | "llm-ops" | "gateway" | "governance") {
   return render(
@@ -164,13 +269,20 @@ beforeEach(() => {
   commandBarOpenMock.mockReset();
   toggleSupportChatMock.mockReset();
   localStorage.clear();
+  // The menu's places outlive a test, the way they outlive a page change.
+  forgetMenuScrollPositions();
 });
+
+const realGetBoundingClientRect =
+  window.HTMLElement.prototype.getBoundingClientRect;
 
 afterEach(() => {
   cleanup();
   // jsdom has no scrollIntoView; the deep-link test installs one.
   delete (window.HTMLElement.prototype as { scrollIntoView?: unknown })
     .scrollIntoView;
+  window.HTMLElement.prototype.getBoundingClientRect =
+    realGetBoundingClientRect;
 });
 
 describe("the product sidebar", () => {
@@ -249,33 +361,168 @@ describe("the product sidebar", () => {
       renderSidebar("governance");
 
       expect(screen.getByText("Overview")).toBeInTheDocument();
-      expect(screen.getByText("Ingestion Sources")).toBeInTheDocument();
+      expect(screen.getByText("Catalog")).toBeInTheDocument();
       expect(screen.getByText("Anomaly Rules")).toBeInTheDocument();
-      expect(screen.getByText("Tool Catalog")).toBeInTheDocument();
+      expect(screen.getByText("Tool Tiles")).toBeInTheDocument();
       expect(screen.getByText("Departments")).toBeInTheDocument();
     });
   });
 
   describe("when a page is opened by its address", () => {
-    /** @scenario "Opening a page by its address reveals its sidebar entry" */
+    /** @scenario "Opening a page below the fold reveals its sidebar entry" */
     it("brings that page's entry into view", async () => {
-      const scrolledInto: HTMLElement[] = [];
-      (
-        window.HTMLElement.prototype as unknown as {
-          scrollIntoView: (options?: ScrollIntoViewOptions) => void;
-        }
-      ).scrollIntoView = function (this: HTMLElement) {
-        scrolledInto.push(this);
-      };
+      const scrolls = recordScrollIntoView();
 
       mockPathname = "/gateway/virtual-keys";
       renderSidebar("gateway");
 
       await waitFor(() => {
         expect(
-          scrolledInto.some((el) => el.textContent?.includes("Virtual Keys")),
+          scrolls.some((scroll) =>
+            scroll.element.textContent?.includes("Virtual Keys"),
+          ),
         ).toBe(true);
       });
+      expect(
+        scrolls.every((scroll) => scroll.options?.block === "nearest"),
+      ).toBe(true);
+    });
+
+    /** @scenario "Opening a page below the fold reveals its sidebar entry" */
+    it("scrolls the menu so that entry sits at the top of the column", async () => {
+      // jsdom lays nothing out, so the entry is placed by hand: 300px
+      // down a menu 200px tall, which puts it below the fold.
+      stubMenuLayout({
+        entryOffsets: { "Virtual Keys": 300 },
+        menuHeight: 200,
+      });
+
+      mockPathname = "/gateway/virtual-keys";
+      renderSidebar("gateway");
+
+      await waitFor(() => {
+        expect(screen.getByTestId("sidebar-scroll-region").scrollTop).toBe(300);
+      });
+    });
+
+    /** @scenario "Opening a page whose entry is in view leaves the menu alone" */
+    it("leaves the menu at its start when the entry is already in view", async () => {
+      // Where the first entries of a menu sit: below Quick Search and the
+      // heading of the first group, and well inside a menu this tall.
+      stubMenuLayout({ entryOffsets: { "Virtual Keys": 71 }, menuHeight: 690 });
+
+      mockPathname = "/gateway/virtual-keys";
+      renderSidebar("gateway");
+
+      const region = screen.getByTestId("sidebar-scroll-region");
+      await waitFor(() => {
+        expect(
+          screen.getByRole("link", { name: "Virtual Keys" }),
+        ).toHaveAttribute("aria-current", "page");
+      });
+      // Anything above zero has taken Quick Search and the heading with it.
+      expect(region.scrollTop).toBe(0);
+    });
+
+    /** @scenario "Moving inside the menu leaves the scroll where it is" */
+    it("does not move the menu when another page in it is opened", async () => {
+      // Budgets sits further down than Virtual Keys, so a menu that
+      // revealed the newly opened page would land on a different number.
+      stubMenuLayout({
+        entryOffsets: { "Virtual Keys": 300, Budgets: 520 },
+        menuHeight: 200,
+      });
+
+      mockPathname = "/gateway/virtual-keys";
+      const { rerender } = renderSidebar("gateway");
+
+      const region = screen.getByTestId("sidebar-scroll-region");
+      await waitFor(() => {
+        expect(region.scrollTop).toBe(300);
+      });
+
+      // Opening another page from the same menu. The column stays mounted
+      // and keeps its scroll; only the entry marked as the page being
+      // shown moves.
+      mockPathname = "/gateway/budgets";
+      rerender(
+        <ChakraProvider value={defaultSystem}>
+          <ProductSidebar surface="gateway" isCompact={false} />
+        </ChakraProvider>,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole("link", { name: "Budgets" })).toHaveAttribute(
+          "aria-current",
+          "page",
+        );
+      });
+      expect(region.scrollTop).toBe(300);
+    });
+
+    /** @scenario "The menu keeps its place while I move around the product" */
+    it("keeps the menu where the reader left it when the column is rebuilt", async () => {
+      // Opening a page rebuilds the column from nothing, so the menu the
+      // reader scrolled is not the menu that comes back.
+      stubMenuLayout({
+        entryOffsets: { "Virtual Keys": 300, Budgets: 380 },
+        menuHeight: 400,
+      });
+
+      mockPathname = "/gateway/virtual-keys";
+      renderSidebar("gateway");
+
+      const reachedFurtherDown = 260;
+      const scrolled = screen.getByTestId("sidebar-scroll-region");
+      scrolled.dispatchEvent(new Event("wheel"));
+      scrolled.scrollTop = reachedFurtherDown;
+      scrolled.dispatchEvent(new Event("scroll"));
+
+      // React takes the node out of the page before it tears the column
+      // down, and a node out of the page reports a scroll of zero. Reading
+      // the menu on the way out therefore reads the top, so the place the
+      // reader reached has to be held before then.
+      Object.defineProperty(scrolled, "scrollTop", {
+        configurable: true,
+        get: () => 0,
+      });
+
+      cleanup();
+      mockPathname = "/gateway/budgets";
+      renderSidebar("gateway");
+
+      const rebuilt = screen.getByTestId("sidebar-scroll-region");
+      await waitFor(() => {
+        expect(screen.getByRole("link", { name: "Budgets" })).toHaveAttribute(
+          "aria-current",
+          "page",
+        );
+      });
+      expect(rebuilt.scrollTop).toBe(reachedFurtherDown);
+    });
+
+    /** @scenario "A reader who scrolls the menu keeps the position they chose" */
+    it("leaves the scroll alone once the reader takes over", async () => {
+      stubMenuLayout({
+        entryOffsets: { "Virtual Keys": 300 },
+        menuHeight: 200,
+      });
+
+      mockPathname = "/gateway/virtual-keys";
+      renderSidebar("gateway");
+
+      const region = screen.getByTestId("sidebar-scroll-region");
+      await waitFor(() => {
+        expect(region.scrollTop).toBe(300);
+      });
+
+      // The reader scrolls the menu themselves, and it keeps changing
+      // under them: the gated groups are still arriving.
+      region.dispatchEvent(new Event("wheel"));
+      region.scrollTop = 40;
+      await appendChildAndAwaitMutation(region);
+
+      expect(region.scrollTop).toBe(40);
     });
   });
 
@@ -305,6 +552,56 @@ describe("the product sidebar", () => {
         screen.getByRole("radiogroup", { name: "Theme" }),
       );
       expect(block).toHaveStyle({ borderTopWidth: "1px" });
+    });
+
+    /** @scenario "The rule keeps the same distance from both edges of the column" */
+    it("draws the rule from a box that fills the column", () => {
+      renderSidebar("governance");
+
+      // A box already at the full width of its parent cannot be widened by a
+      // negative margin: only its left edge moves, which is what put the rule
+      // 8px from the left of the column and 16px from the right. The inset
+      // belongs to the wrapper, where both edges get it. An unset logical
+      // margin reads as "" here, where a set one reads as its length.
+      expect(
+        getComputedStyle(screen.getByTestId("sidebar-bottom-block"))
+          .marginInline,
+      ).toBe("");
+    });
+
+    /** @scenario "The rule keeps the same distance from both edges of the column" */
+    it("lines the block's entries up with the entries above them", () => {
+      renderSidebar("governance");
+
+      const block = screen.getByTestId("sidebar-bottom-block");
+      const inset = (element: HTMLElement) =>
+        getComputedStyle(element).paddingInline;
+
+      // Two steps of the spacing scale to the rule and one more to the
+      // entries under it, which is the one step the entries above them take.
+      expect(inset(block.parentElement!)).toBe("var(--chakra-spacing-2)");
+      expect(inset(block)).toBe("var(--chakra-spacing-1)");
+      expect(inset(screen.getByTestId("sidebar-scroll-region"))).toBe(
+        "var(--chakra-spacing-3)",
+      );
+    });
+
+    /** @scenario "The entries are cut at the rule as they scroll under it" */
+    it("ends the scrolling part at the rule and keeps the gap inside it", () => {
+      renderSidebar("governance");
+
+      const block = screen.getByTestId("sidebar-bottom-block");
+      const region = screen.getByTestId("sidebar-scroll-region");
+      // A margin between the two is a strip the entries disappear in before
+      // they reach the line. As padding inside the scrolling part, the same
+      // space holds the last entry off the rule at rest and the entries
+      // travel through it as the menu moves.
+      // An unset margin reads as "0" here; a spacing step would read as the
+      // variable the scale is written with, as the region's padding does.
+      expect(getComputedStyle(block).marginTop).toBe("0");
+      expect(getComputedStyle(region).paddingBottom).toBe(
+        "var(--chakra-spacing-2)",
+      );
     });
   });
 

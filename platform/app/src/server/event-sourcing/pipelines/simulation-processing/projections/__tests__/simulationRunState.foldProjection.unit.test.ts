@@ -333,6 +333,64 @@ describe("simulationRunStateFoldProjection", () => {
     });
   });
 
+  describe("when an event carries secret parameters on its metadata", () => {
+    // The queued command puts the encrypted values beside the metadata, not
+    // inside it. The started event is the one a caller can shape: the SDK
+    // ingestion route forwards external metadata as it arrives.
+    /** @scenario "A secret value is never written to the simulation runs store" */
+    it("keeps the names and drops the values on a started event", () => {
+      const state = foldEvents([
+        createRunStartedEvent({
+          metadata: {
+            secretParameterNames: ["api_token"],
+            secretParameters: { api_token: "ciphertext-of-tok-live-1" },
+            environment: "staging",
+          },
+        }),
+      ]);
+
+      expect(state.Metadata).not.toContain("ciphertext-of-tok-live-1");
+      const metadata = JSON.parse(state.Metadata!) as Record<string, unknown>;
+      expect(metadata).toEqual({
+        secretParameterNames: ["api_token"],
+        environment: "staging",
+      });
+    });
+
+    /** @scenario "A secret value is never written to the simulation runs store" */
+    it("keeps the names and drops the values on a queued event", () => {
+      const state = foldEvents([
+        createRunQueuedEvent({
+          metadata: {
+            parameters: { region: "eu-central" },
+            secretParameterNames: ["api_token"],
+            secretParameters: { api_token: "ciphertext-of-tok-live-1" },
+          },
+        }),
+      ]);
+
+      expect(state.Metadata).not.toContain("ciphertext-of-tok-live-1");
+      const metadata = JSON.parse(state.Metadata!) as Record<string, unknown>;
+      expect(metadata).toEqual({
+        parameters: { region: "eu-central" },
+        secretParameterNames: ["api_token"],
+      });
+    });
+
+    /** @scenario "A secret value is never written to the simulation runs store" */
+    it("stores nothing from the encrypted values beside the metadata", () => {
+      const state = foldEvents([
+        createRunQueuedEvent({
+          metadata: { parameters: { region: "eu-central" } },
+          secretParameters: { api_token: "ciphertext-of-tok-live-1" },
+        }),
+      ]);
+
+      expect(state.Metadata).not.toContain("ciphertext-of-tok-live-1");
+      expect(state.Metadata).not.toContain("api_token");
+    });
+  });
+
   describe("when MessageSnapshot event is applied", () => {
     it("updates Messages, TraceIds, and UpdatedAt", () => {
       const state = foldEvents([

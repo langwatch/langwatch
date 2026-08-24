@@ -35,6 +35,8 @@ import { buildChildEnvironment } from "./execution/child-environment";
 import { resolveChildProcessSpawn } from "./execution/child-process-spawn";
 import {
   createDataPrefetcherDependencies,
+  type ModelParamsFailureReason,
+  type PrefetchResult,
   prefetchScenarioData,
 } from "./execution/data-prefetcher";
 import type {
@@ -273,6 +275,60 @@ export function parseChildProcessResult(
   return null;
 }
 
+/** The identity and resolved values the prefetch reads off one pool job. */
+function prefetchContext(jobData: ExecutionJobData) {
+  return {
+    projectId: jobData.projectId,
+    scenarioId: jobData.scenarioId,
+    setId: jobData.setId,
+    batchRunId: jobData.batchRunId,
+    scenarioRunId: jobData.scenarioRunId,
+    parameters: jobData.parameters,
+    secretParameters: jobData.secretParameters,
+  };
+}
+
+/**
+ * The prefetch failures the customer's own configuration caused: a disabled or
+ * missing provider, a malformed model name, absent credentials, no model set
+ * for scenarios at all. Their run fails with the remediation message, and the
+ * record logs at warn because there is nothing here for us to fix.
+ *
+ * An allowlist and not `!== "preparation_error"`, so a reason added later is
+ * treated as ours until someone decides otherwise. The sibling clustering
+ * classifier makes the same argument: we do not tell someone their
+ * configuration is broken on the strength of not recognising an error.
+ */
+const CUSTOMER_ACTIONABLE_PREFETCH_REASONS = new Set<ModelParamsFailureReason>([
+  "invalid_model_format",
+  "provider_not_found",
+  "provider_not_enabled",
+  "missing_params",
+  "model_not_configured",
+]);
+
+export function logPrefetchFailure({
+  jobLogger,
+  prefetchResult,
+}: {
+  jobLogger: ReturnType<typeof createScenarioLogger>;
+  prefetchResult: Extract<PrefetchResult, { success: false }>;
+}): void {
+  const isCustomerActionable =
+    prefetchResult.reason !== undefined &&
+    CUSTOMER_ACTIONABLE_PREFETCH_REASONS.has(prefetchResult.reason);
+  jobLogger[isCustomerActionable ? "warn" : "error"](
+    {
+      error: prefetchResult.error,
+      reason: prefetchResult.reason,
+      phase: "prefetch",
+    },
+    isCustomerActionable
+      ? "Scenario prefetch blocked by project configuration; failing the run with its remediation message"
+      : "Failed to prefetch scenario data",
+  );
+}
+
 /**
  * Execute a scenario run by spawning an isolated child process.
  *
@@ -297,14 +353,7 @@ export async function executeScenarioRun(
 
     const prefetchDeps = createDataPrefetcherDependencies();
     const prefetchResult = await prefetchScenarioData({
-      context: {
-        projectId: jobData.projectId,
-        scenarioId: jobData.scenarioId,
-        setId: jobData.setId,
-        batchRunId: jobData.batchRunId,
-        scenarioRunId: jobData.scenarioRunId,
-        parameters: jobData.parameters,
-      },
+      context: prefetchContext(jobData),
       target: jobData.target,
       deps: prefetchDeps,
     });
@@ -321,10 +370,7 @@ export async function executeScenarioRun(
     }
 
     if (!prefetchResult.success) {
-      jobLogger.error(
-        { error: prefetchResult.error, phase: "prefetch" },
-        "Failed to prefetch scenario data",
-      );
+      logPrefetchFailure({ jobLogger, prefetchResult });
       await handleFailedJobResult(jobData, prefetchResult.error, deps);
       return;
     }

@@ -69,6 +69,66 @@ func TestAccumulator_AssemblesToolCallsInOrder(t *testing.T) {
 	}
 }
 
+func TestAccumulator_DropsPreToolNarration(t *testing.T) {
+	acc := New()
+	feed(acc,
+		ff(frames.Delta("Running the analytics query now…")),
+		ff(frames.ToolStart("a", "run", "", "", nil)),
+		ff(frames.ToolEnd("a", "run", nil, false, "ok", 0)),
+		ff(frames.Delta("p95 latency doubled yesterday.")),
+	)
+	text, _ := acc.Result()
+	if text != "p95 latency doubled yesterday." {
+		t.Errorf("text = %q, want only the post-tool answer", text)
+	}
+}
+
+// Whitespace is not an answer. A model that emits a stray newline after its
+// last tool call has said nothing, so the fold must treat it the same as
+// silence and fall back — otherwise the user's reply becomes "\n  \n".
+func TestAccumulator_KeepsFullTextWhenPostToolDeltaIsBlank(t *testing.T) {
+	acc := New()
+	feed(acc,
+		ff(frames.Delta("Annotation added.")),
+		ff(frames.ToolStart("a", "annotate", "", "", nil)),
+		ff(frames.ToolEnd("a", "annotate", nil, false, "ok", 0)),
+		ff(frames.Delta("\n  \n")),
+	)
+	text, _ := acc.Result()
+	if text != "Annotation added." {
+		t.Errorf("text = %q, want full concatenation fallback", text)
+	}
+}
+
+// The post-tool segment usually opens with the newline that separated it from
+// the tool call. That leading whitespace is an artifact of the stream, not part
+// of the answer, and it renders as a blank line at the top of the reply.
+func TestAccumulator_TrimsLeadingWhitespaceFromPostToolAnswer(t *testing.T) {
+	acc := New()
+	feed(acc,
+		ff(frames.ToolStart("a", "run", "", "", nil)),
+		ff(frames.ToolEnd("a", "run", nil, false, "ok", 0)),
+		ff(frames.Delta("\n\np95 doubled.")),
+	)
+	text, _ := acc.Result()
+	if text != "p95 doubled." {
+		t.Errorf("text = %q, want the leading newlines trimmed", text)
+	}
+}
+
+func TestAccumulator_KeepsFullTextWhenSilentAfterLastTool(t *testing.T) {
+	acc := New()
+	feed(acc,
+		ff(frames.Delta("Annotation added.")),
+		ff(frames.ToolStart("a", "annotate", "", "", nil)),
+		ff(frames.ToolEnd("a", "annotate", nil, false, "ok", 0)),
+	)
+	text, _ := acc.Result()
+	if text != "Annotation added." {
+		t.Errorf("text = %q, want full concatenation fallback", text)
+	}
+}
+
 func TestAccumulator_IgnoresNonAccumulatingFrames(t *testing.T) {
 	acc := New()
 	feed(acc,

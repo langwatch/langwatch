@@ -28,6 +28,7 @@ import { getDefaultTeamRoleForOrganizationRole } from "~/utils/memberRoleConstra
 import { InfoWithoutSelecting } from "./settings/InfoWithoutSelecting";
 import {
   LITE_MEMBER_EXPLANATION,
+  LITE_MEMBER_NEEDS_TEAM_WARNING,
   LITE_MEMBER_SHORT_DESCRIPTION,
   SEAT_TYPES_DOC_PATH,
 } from "./settings/seatTypeCopy";
@@ -79,6 +80,28 @@ interface AddMembersFormProps {
    * retyped.
    */
   initialEmails?: string;
+}
+
+/**
+ * Shown when a lite invite names no team. A lite seat grants nothing on its
+ * own, so without a team the person can sign in and see nothing — and the
+ * admin only finds out when they say so.
+ */
+function LiteMemberNeedsTeamWarning() {
+  return (
+    <Box
+      paddingX={4}
+      paddingY={3}
+      backgroundColor="orange.subtle"
+      borderRadius="xl"
+      width="100%"
+      data-testid="lite-member-needs-team-warning"
+    >
+      <Text fontSize="sm" color="fg">
+        {LITE_MEMBER_NEEDS_TEAM_WARNING}
+      </Text>
+    </Box>
+  );
 }
 
 export function AddMembersForm({
@@ -356,17 +379,22 @@ export function AddMembersForm({
         )}
 
         {teamFields.length === 0 && (
-          <HStack gap={2}>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={handleAddTeam}
-              disabled={getAvailableTeamOptions().length === 0}
-            >
-              <Plus size={14} /> Add team
-            </Button>
-          </HStack>
+          <VStack align="start" gap={2} width="100%">
+            {orgRole === OrganizationUserRole.EXTERNAL && (
+              <LiteMemberNeedsTeamWarning />
+            )}
+            <HStack gap={2}>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleAddTeam}
+                disabled={getAvailableTeamOptions().length === 0}
+              >
+                <Plus size={14} /> Add team
+              </Button>
+            </HStack>
+          </VStack>
         )}
 
         <HStack justify="end" width="100%" marginTop={4}>

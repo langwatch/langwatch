@@ -56,6 +56,16 @@ Feature: The Langy home
     And exactly one such canvas is on the page
     And the current announcement reads as a single line across the block's top
 
+  # The results carry a line above them in the raised Cmd+K bar, where the
+  # field and the list share one card and the line is the boundary between
+  # them. Here the results are their own panel under the field, so that line
+  # became a second edge a few pixels inside the panel's own.
+  Scenario: The results panel draws one edge, not two
+    Given the Langy home renders
+    When I type into the field
+    Then the results hang under it as one panel with one border
+    And no further line runs above the first group
+
   Scenario: The example asks are the ones Langy actually offers
     Given the Langy home renders
     Then the row beneath the composer offers three example asks

@@ -20,6 +20,14 @@ const findFirst = vi.fn();
 const deleteFn = vi.fn().mockResolvedValue({ id: "sec_1" });
 const update = vi.fn().mockResolvedValue({ id: "sec_1" });
 
+// The declared permission seam resolves its service from the App.
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsMock } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return appPermissionsMock();
+});
+
 vi.mock("~/server/db", () => ({
   prisma: {
     projectSecret: {
@@ -35,8 +43,9 @@ vi.mock("~/server/db", () => ({
 // Permission enforcement is covered by rbac.secrets.test.ts; this suite is
 // about what a correctly-permissioned caller may still not touch.
 vi.mock("../../rbac", () => ({
-  checkProjectPermission: () => async (opts: { next: () => unknown }) =>
-    opts.next(),
+  resolveProjectPermission: vi
+    .fn()
+    .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
 }));
 
 vi.mock("~/utils/encryption", () => ({

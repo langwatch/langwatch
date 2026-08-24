@@ -16,6 +16,7 @@ packages:
   - "mcp/typescript"
   - "plugins/*"
   - "sdks/typescript"
+  - "services/langyworker"
   - "skills"
   - "tests/agentic-e2e"
 
@@ -53,6 +54,13 @@ minimumReleaseAgeExclude:
   # fails the whole install. Drop this once it ages out (2026-08-24).
   - dayjs@1.11.23
   - es-toolkit@1.51.0
+  # The Langy pi harness pins the pi SDK exactly (services/langyworker); the
+  # release sits right at the age-gate boundary, so name it explicitly rather
+  # than letting the install flap around the 7-day mark. pi-ai is the SDK's
+  # model layer, a direct dependency too (the wrapper reads its model catalog),
+  # pinned to the same release. Drop both once they age out (2026-08-28).
+  - "@earendil-works/pi-coding-agent@0.84.2"
+  - "@earendil-works/pi-ai@0.84.2"
 
 # The union of what the six roots each pinned separately. Overrides are
 # workspace-root-only in pnpm, which is precisely why the old split let these
@@ -109,6 +117,17 @@ overrides:
   # Path-scoped, so they touch only these two dependents.
   "@aws-sdk/xml-builder>fast-xml-parser": ^5.7.0
   "@langchain/community>fast-xml-parser": ^5.7.0
+  # The scenario child bundle inlines @langwatch/scenario and its whole graph
+  # (build-server.mjs, `inlineAll`) but keeps @opentelemetry/* external, so the
+  # SDK bundled in there binds `NoopLoggerProvider` against the app's own
+  # api-logs. 0.221 dropped that export, which killed every scenario run at
+  # module init. The published SDK still calls it; the workspace one already
+  # moved to `createNoopLogger`, so scenario reads from the same copy the app
+  # does instead of a second, older one resolved from npm.
+  # Pinned to the vendored 1.3.0 specifically: mcp/typescript and skills are on
+  # @langwatch/scenario 0.4.x, which pins langwatch to 0.16.1 exactly, and they
+  # are not built through the inlining bundle that breaks.
+  "@langwatch/scenario@1.3.0>langwatch": "workspace:*"
 
   # --- Security ---
   # shell-quote quote() newline escaping (CRITICAL), then a further escaping

@@ -56,6 +56,14 @@ type Meta struct {
 	// X-LangWatch-Params-Dropped response header on both sync and stream
 	// lanes so a drop is never silent.
 	ParamsDropped []string
+	// GuardrailsNotApplied names why the key's guardrails did not run on
+	// this request, when they did not. Surfaced as the
+	// X-LangWatch-Guardrails-Not-Applied response header.
+	GuardrailsNotApplied string
+	// RealtimeSessionID is the LangWatch id of the voice session a mint
+	// opened. Surfaced as X-LangWatch-Session-Id so a caller can join its
+	// own session to the spend record without parsing the vendor body.
+	RealtimeSessionID string
 }
 
 // MetaAccumulator is what interceptors write response metadata into. Dispatch

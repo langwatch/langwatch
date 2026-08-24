@@ -717,7 +717,7 @@ func (e *Engine) runSignature(ctx context.Context, node *dsl.Node, inputs map[st
 	}
 	// Trace a redacted copy: the model gets the full fetched bytes (req.Messages),
 	// but the span's langwatch.input must not store the base64 attachment payload.
-	llmCtx, llmSpan := startLLMSpan(ctx, model, provider, redactAttachmentsForTracing(messages))
+	llmCtx, llmSpan := startLLMSpan(ctx, model, provider, messagesForTracing(messages))
 	resp, err := e.llm.Execute(llmCtx, req)
 	endLLMSpan(llmSpan, resp, err)
 	if err != nil {

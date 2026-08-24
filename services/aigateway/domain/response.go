@@ -15,6 +15,13 @@ type Response struct {
 
 	// Headers to forward to the client.
 	Headers map[string]string
+
+	// RealtimeConversationID is the vendor's own id for the conversation a
+	// session mint just opened, when the mint call reports one. It is the
+	// join key the vendor's post-call report arrives under, and it is known
+	// before the socket exists, which is what makes the match exact instead
+	// of a guess over open sessions. Empty on every other lane.
+	RealtimeConversationID string
 }
 
 // Usage holds token counts and cost information.

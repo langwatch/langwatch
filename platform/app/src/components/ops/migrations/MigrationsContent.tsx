@@ -12,8 +12,10 @@ import {
   Table,
   Text,
 } from "@chakra-ui/react";
-import { Play, Undo2, UserPlus } from "lucide-react";
+import { Play, Undo2, UserPlus, Users } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Checkbox } from "~/components/ui/checkbox";
+import { ListTable } from "~/components/ui/ListTable";
 import { toaster } from "~/components/ui/toaster";
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
@@ -105,7 +107,7 @@ export function MigrationsContent() {
       toaster.create({
         title: "Migration pass started",
         description:
-          "The pass runs in the background under the fleet-wide lease. This page refreshes as organizations move.",
+          "The pass runs in the background, several organizations at a time. This page refreshes as organizations move.",
         type: "success",
       });
       await utils.ops.listSystemMigrations.invalidate();
@@ -186,6 +188,7 @@ export function MigrationsContent() {
           key={migration.name}
           step={index + 1}
           migration={migration}
+          previousMigrationTitle={query.data?.[index - 1]?.title}
           enrollments={enrollments.filter(
             (enrollment) => enrollment.migrationName === migration.name,
           )}
@@ -197,15 +200,83 @@ export function MigrationsContent() {
   );
 }
 
+/**
+ * One status figure. A zero is fine and stays gray and quiet; a non-zero
+ * count takes its palette, so the eye lands only on what moved.
+ */
+function CountBadge({
+  label,
+  count,
+  palette,
+}: {
+  label: string;
+  count: number;
+  palette: string;
+}) {
+  return (
+    <Badge
+      colorPalette={count === 0 ? "gray" : palette}
+      variant={count === 0 ? "subtle" : "solid"}
+    >
+      {label} {count}
+    </Badge>
+  );
+}
+
+/** Space proportional to trouble: a zero reads as one quiet gray chip,
+ *  a non-zero Held or Parked is the loud one. */
+function MigrationStatusBadges({ migration }: { migration: MigrationListing }) {
+  return (
+    <HStack marginBottom={4} flexWrap="wrap" gap={2}>
+      <CountBadge
+        label="Finalized"
+        count={migration.counts.finalized}
+        palette="green"
+      />
+      <CountBadge
+        label="Held"
+        count={migration.counts.migrated}
+        palette="orange"
+      />
+      <CountBadge
+        label="Parked"
+        count={migration.counts.parked}
+        palette="red"
+      />
+      {migration.counts.rolled_back > 0 && (
+        <CountBadge
+          label="Rolled back"
+          count={migration.counts.rolled_back}
+          palette="gray"
+        />
+      )}
+      {migration.enrollment && (
+        <>
+          <CountBadge
+            label="Enrolled"
+            count={migration.enrollment.enrolledCount}
+            palette="blue"
+          />
+          <Badge colorPalette="gray" variant="subtle">
+            Not enrolled {migration.enrollment.notEnrolledCount}
+          </Badge>
+        </>
+      )}
+    </HStack>
+  );
+}
+
 function MigrationSection({
   step,
   migration,
+  previousMigrationTitle,
   enrollments,
   isSaaS,
   canManage,
 }: {
   step: number;
   migration: MigrationListing;
+  previousMigrationTitle?: string;
   enrollments: EnrollmentRecord[];
   isSaaS: boolean;
   canManage: boolean;
@@ -215,43 +286,36 @@ function MigrationSection({
   // requires it rather than recognising a step by its name.
   const requiresConfirmation = migration.requiresOperatorConfirmation;
   return (
-    <Box>
-      <HStack marginBottom={1} flexWrap="wrap">
+    <Box
+      borderWidth="1px"
+      borderColor="border.emphasized"
+      borderRadius="lg"
+      padding={5}
+    >
+      <HStack marginBottom={1} flexWrap="wrap" gap={3}>
         <Heading size="md">
           Step {step} · {migration.title}
         </Heading>
         <Text fontFamily="mono" fontSize="xs" color="fg.muted">
           {migration.name}
         </Text>
-        <Badge colorPalette="green">
-          Finalized {migration.counts.finalized}
-        </Badge>
-        <Badge colorPalette="orange">Held {migration.counts.migrated}</Badge>
-        <Badge colorPalette="red">Parked {migration.counts.parked}</Badge>
-        {migration.counts.rolled_back > 0 && (
-          <Badge colorPalette="gray">
-            Rolled back {migration.counts.rolled_back}
-          </Badge>
-        )}
-        {migration.enrollment && (
-          <>
-            <Badge colorPalette="blue">
-              Enrolled {migration.enrollment.enrolledCount}
-            </Badge>
-            <Badge colorPalette="purple">
-              Not enrolled {migration.enrollment.notEnrolledCount}
-            </Badge>
-          </>
-        )}
         <Spacer />
         {canManage && migration.availableOnThisInstallation && (
           <HStack>
             {isSaaS && (
-              <EnrollAction
-                migrationName={migration.name}
-                migrationTitle={migration.title}
-                requiresConfirmation={requiresConfirmation}
-              />
+              <>
+                <EnrollAction
+                  migrationName={migration.name}
+                  migrationTitle={migration.title}
+                  requiresConfirmation={requiresConfirmation}
+                />
+                <EnrollCohortAction
+                  migrationName={migration.name}
+                  migrationTitle={migration.title}
+                  previousMigrationTitle={previousMigrationTitle}
+                  requiresConfirmation={requiresConfirmation}
+                />
+              </>
             )}
             <RunForOrganizationAction
               migrationName={migration.name}
@@ -268,6 +332,7 @@ function MigrationSection({
       <Text fontSize="sm" color="fg.muted" maxWidth="720px" marginBottom={3}>
         {migration.description}
       </Text>
+      <MigrationStatusBadges migration={migration} />
       {!migration.availableOnThisInstallation ? (
         <Text fontSize="sm" color="fg.muted">
           Not yet available for self-hosted installations. It will run
@@ -284,7 +349,7 @@ function MigrationSection({
               No organizations need attention.
             </Text>
           ) : (
-            <Table.Root size="sm">
+            <ListTable size="sm">
               <Table.Header>
                 <Table.Row>
                   <Table.ColumnHeader>Organization</Table.ColumnHeader>
@@ -301,7 +366,7 @@ function MigrationSection({
                   />
                 ))}
               </Table.Body>
-            </Table.Root>
+            </ListTable>
           )}
         </Stack>
       )}
@@ -463,6 +528,266 @@ function EnrollAction({
 }
 
 /**
+ * Enroll a sampled cohort for THIS migration in one action. The first
+ * step's sample is drawn from organizations not yet enrolled; a later
+ * step's from the step before it. The platform leaves out the ones it
+ * already knows to hold back, by data: an active enterprise
+ * subscription, or a dedicated data plane configured in the environment.
+ * No organization is ever named in code to exclude it.
+ *
+ * Both are defaults an operator can lift, one at a time, which is how a
+ * proven rollout is finished without enrolling the held-back
+ * organizations one id at a time. The description says which of them this
+ * draw will include, because "left out" and "included" must never be a
+ * guess about a checkbox the reader has already ticked.
+ */
+function cohortDialogDescription({
+  previousMigrationTitle,
+  requiresConfirmation,
+  includeEnterprise,
+  includePrivateDataplane,
+}: {
+  previousMigrationTitle?: string;
+  requiresConfirmation: boolean;
+  includeEnterprise: boolean;
+  includePrivateDataplane: boolean;
+}): string {
+  const pool = previousMigrationTitle
+    ? `Enrolls a random sample of organizations enrolled for the ${previousMigrationTitle.toLowerCase()} but not yet for this step. `
+    : "Enrolls a random sample of organizations not yet enrolled for this step. ";
+  const consequence = requiresConfirmation
+    ? "Once their earlier steps finish, the next pass proves parity and moves every enrolled organization's permission checks onto the new engine. "
+    : "It changes nothing about who answers permission checks. ";
+  const included = [
+    includeEnterprise ? "on an enterprise plan" : undefined,
+    includePrivateDataplane ? "with a dedicated data plane" : undefined,
+  ].filter((phrase) => phrase !== undefined);
+  const heldBack = [
+    includeEnterprise ? undefined : "on an enterprise plan",
+    includePrivateDataplane ? undefined : "with a dedicated data plane",
+  ].filter((phrase) => phrase !== undefined);
+  const sentence = (phrases: string[], verb: string) =>
+    `Organizations ${phrases.join(" or ")} ${verb}`;
+  const scope =
+    included.length === 0
+      ? `${sentence(heldBack, "are left out.")}`
+      : heldBack.length === 0
+        ? `${sentence(included, "can be drawn.")}`
+        : `${sentence(included, "can be drawn;")} ${sentence(
+            heldBack,
+            "are left out.",
+          ).toLowerCase()}`;
+  return pool + consequence + scope;
+}
+
+/**
+ * What a finished cohort draw says. A short pool is not an error — the
+ * action asked for a sample and got everything that was left — so it reads
+ * as success with the shortfall explained, and an empty pool as information.
+ */
+function cohortResultToast({
+  enrolledCount,
+  sampleSize,
+}: {
+  enrolledCount: number;
+  sampleSize: number;
+}) {
+  if (enrolledCount === 0) {
+    return {
+      title: "No organizations enrolled",
+      description:
+        "No eligible organizations remained to enroll for this step.",
+      type: "info" as const,
+    };
+  }
+  return {
+    title:
+      enrolledCount === 1
+        ? "1 organization enrolled"
+        : `${enrolledCount} organizations enrolled`,
+    description:
+      enrolledCount < sampleSize
+        ? "Fewer eligible organizations remained than the requested cohort size, so every remaining one was enrolled. The next migration pass picks them up automatically."
+        : "The next migration pass picks the cohort up automatically.",
+    type: "success" as const,
+  };
+}
+
+/**
+ * The two classes a cohort leaves out by default, each on its own switch.
+ * Separate because the risks are different in kind — an enterprise
+ * organization is a commercial relationship, a dedicated-data-plane one
+ * keeps its events in a ClickHouse instance of its own — and a single
+ * "include everything" control would hide that from whoever ticks it.
+ */
+function HeldBackClassFields({
+  includeEnterprise,
+  onIncludeEnterpriseChange,
+  includePrivateDataplane,
+  onIncludePrivateDataplaneChange,
+}: {
+  includeEnterprise: boolean;
+  onIncludeEnterpriseChange: (next: boolean) => void;
+  includePrivateDataplane: boolean;
+  onIncludePrivateDataplaneChange: (next: boolean) => void;
+}) {
+  return (
+    <Stack gap={2} paddingTop={3}>
+      <Text fontSize="sm">Organizations normally held back</Text>
+      <Checkbox
+        size="sm"
+        checked={includeEnterprise}
+        onCheckedChange={() => onIncludeEnterpriseChange(!includeEnterprise)}
+      >
+        Include organizations on an enterprise plan
+      </Checkbox>
+      <Checkbox
+        size="sm"
+        checked={includePrivateDataplane}
+        onCheckedChange={() =>
+          onIncludePrivateDataplaneChange(!includePrivateDataplane)
+        }
+      >
+        Include organizations with a dedicated data plane
+      </Checkbox>
+    </Stack>
+  );
+}
+
+function EnrollCohortAction({
+  migrationName,
+  migrationTitle,
+  previousMigrationTitle,
+  requiresConfirmation,
+}: {
+  migrationName: string;
+  migrationTitle: string;
+  /** The step before this one; a later step's cohort samples from it. */
+  previousMigrationTitle?: string;
+  requiresConfirmation: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button size="xs" variant="outline" onClick={() => setOpen(true)}>
+        <Users size={13} /> Enroll cohort…
+      </Button>
+      {/* Mounted only while open, so the draft — the sample size and both
+       *  lifted exclusions — starts fresh on every open. Lifting an
+       *  exclusion is a decision about ONE cohort, and a checkbox that
+       *  remembered its last state would silently widen the next draw. */}
+      {open && (
+        <CohortDialog
+          migrationName={migrationName}
+          migrationTitle={migrationTitle}
+          previousMigrationTitle={previousMigrationTitle}
+          requiresConfirmation={requiresConfirmation}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+
+/** The mutation behind the cohort dialog, with the surfaces it refreshes. */
+function useEnrollCohort({
+  sampleSize,
+  onEnrolled,
+}: {
+  sampleSize: number;
+  onEnrolled: () => void;
+}) {
+  const utils = api.useUtils();
+  return api.ops.enrollMigrationCohort.useMutation({
+    onSuccess: async (result) => {
+      toaster.create(
+        cohortResultToast({
+          enrolledCount: result.enrolled.length,
+          sampleSize,
+        }),
+      );
+      onEnrolled();
+      await Promise.all([
+        utils.ops.listMigrationEnrollments.invalidate(),
+        utils.ops.listSystemMigrations.invalidate(),
+      ]);
+    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't enroll the cohort" }),
+  });
+}
+
+function CohortDialog({
+  migrationName,
+  migrationTitle,
+  previousMigrationTitle,
+  requiresConfirmation,
+  onClose,
+}: {
+  migrationName: string;
+  migrationTitle: string;
+  previousMigrationTitle?: string;
+  requiresConfirmation: boolean;
+  onClose: () => void;
+}) {
+  const [sampleSizeText, setSampleSizeText] = useState("50");
+  const [includeEnterprise, setIncludeEnterprise] = useState(false);
+  const [includePrivateDataplane, setIncludePrivateDataplane] = useState(false);
+  // Number, not parseInt: "1e3" and "50.5" must disable Confirm rather than
+  // be silently reinterpreted as 1 and 50.
+  const sampleSize = Number(sampleSizeText);
+  const sampleSizeValid =
+    Number.isInteger(sampleSize) && sampleSize >= 1 && sampleSize <= 1000;
+  const enrollCohort = useEnrollCohort({ sampleSize, onEnrolled: onClose });
+
+  return (
+    <ConfirmDialog
+      open
+      onClose={onClose}
+      onConfirm={() => {
+        if (!sampleSizeValid) return;
+        enrollCohort.mutate({
+          migrationName,
+          sampleSize,
+          includeEnterprise,
+          includePrivateDataplane,
+          ...(requiresConfirmation ? { confirm: "ENROLL" as const } : {}),
+        });
+      }}
+      title={`Enroll a cohort for the ${migrationTitle.toLowerCase()}`}
+      description={cohortDialogDescription({
+        previousMigrationTitle,
+        requiresConfirmation,
+        includeEnterprise,
+        includePrivateDataplane,
+      })}
+      isLoading={enrollCohort.isPending}
+      confirmDisabled={!sampleSizeValid}
+    >
+      <Stack gap={1}>
+        <Text fontSize="sm">How many organizations to enroll</Text>
+        <Input
+          size="sm"
+          type="number"
+          min={1}
+          max={1000}
+          step={1}
+          value={sampleSizeText}
+          onChange={(event) => setSampleSizeText(event.target.value)}
+        />
+        <HeldBackClassFields
+          includeEnterprise={includeEnterprise}
+          onIncludeEnterpriseChange={setIncludeEnterprise}
+          includePrivateDataplane={includePrivateDataplane}
+          onIncludePrivateDataplaneChange={setIncludePrivateDataplane}
+        />
+      </Stack>
+    </ConfirmDialog>
+  );
+}
+
+/**
  * Run THIS migration for one organization, now, without waiting for the
  * next boot's pass. The result toast reports the status the organization
  * ended the run in - the operator asked about one organization and gets its
@@ -594,6 +919,10 @@ function RollBackAction({
   );
 }
 
+/** Enrolled-and-fine rows are fine, so past a handful they fold away behind
+ *  a count - a cohort of hundreds must not turn the page into a scroll. */
+const ENROLLMENT_PREVIEW_ROWS = 8;
+
 function EnrollmentTable({
   enrollments,
   canManage,
@@ -601,6 +930,7 @@ function EnrollmentTable({
   enrollments: EnrollmentRecord[];
   canManage: boolean;
 }) {
+  const [showAll, setShowAll] = useState(false);
   if (enrollments.length === 0) {
     return (
       <Text fontSize="sm" color="fg.muted">
@@ -608,26 +938,45 @@ function EnrollmentTable({
       </Text>
     );
   }
+  const visible = showAll
+    ? enrollments
+    : enrollments.slice(0, ENROLLMENT_PREVIEW_ROWS);
+  const hiddenCount = enrollments.length - visible.length;
   return (
-    <Table.Root size="sm">
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Enrolled organization</Table.ColumnHeader>
-          <Table.ColumnHeader>Enrolled by</Table.ColumnHeader>
-          <Table.ColumnHeader>Enrolled at</Table.ColumnHeader>
-          {canManage && <Table.ColumnHeader />}
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
-        {enrollments.map((enrollment) => (
-          <EnrollmentRow
-            key={`${enrollment.organizationId}:${enrollment.migrationName}`}
-            enrollment={enrollment}
-            canManage={canManage}
-          />
-        ))}
-      </Table.Body>
-    </Table.Root>
+    <Stack gap={2}>
+      <ListTable size="sm">
+        <Table.Header>
+          <Table.Row>
+            <Table.ColumnHeader>Enrolled organization</Table.ColumnHeader>
+            <Table.ColumnHeader>Enrolled by</Table.ColumnHeader>
+            <Table.ColumnHeader>Enrolled at</Table.ColumnHeader>
+            {canManage && <Table.ColumnHeader />}
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
+          {visible.map((enrollment) => (
+            <EnrollmentRow
+              key={`${enrollment.organizationId}:${enrollment.migrationName}`}
+              enrollment={enrollment}
+              canManage={canManage}
+            />
+          ))}
+        </Table.Body>
+      </ListTable>
+      {(hiddenCount > 0 || showAll) &&
+        enrollments.length > ENROLLMENT_PREVIEW_ROWS && (
+          <Button
+            size="xs"
+            variant="ghost"
+            alignSelf="flex-start"
+            onClick={() => setShowAll((value) => !value)}
+          >
+            {showAll
+              ? "Show fewer"
+              : `Show all ${enrollments.length} enrolled organizations`}
+          </Button>
+        )}
+    </Stack>
   );
 }
 

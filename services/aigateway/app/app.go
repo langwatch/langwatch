@@ -26,6 +26,7 @@ type App struct {
 	models     ModelResolver
 	traces     AITraceEmitter
 	spend      pipeline.SpendEmitter
+	realtime   RealtimeSessionRegistry
 	metrics    MetricsRecorder
 	breaker    CircuitBreaker
 	logger     *zap.Logger
@@ -47,7 +48,14 @@ func WithModels(m ModelResolver) Option          { return func(app *App) { app.m
 func WithTraces(t AITraceEmitter) Option         { return func(app *App) { app.traces = t } }
 
 // WithSpend wires the spend emitter that records billing lifecycle events.
-func WithSpend(e pipeline.SpendEmitter) Option   { return func(app *App) { app.spend = e } }
+func WithSpend(e pipeline.SpendEmitter) Option { return func(app *App) { app.spend = e } }
+
+// WithRealtimeSessions wires the control plane's open-voice-session record.
+// Without it the realtime mint endpoints refuse rather than mint: a session
+// nobody recorded is unbillable voice.
+func WithRealtimeSessions(r RealtimeSessionRegistry) Option {
+	return func(app *App) { app.realtime = r }
+}
 func WithMetrics(m MetricsRecorder) Option       { return func(app *App) { app.metrics = m } }
 func WithCircuitBreaker(b CircuitBreaker) Option { return func(app *App) { app.breaker = b } }
 func WithLogger(l *zap.Logger) Option            { return func(app *App) { app.logger = l } }
@@ -143,6 +151,9 @@ func (discardMetrics) SetCircuitState(_ string, _ int)                    {}
 func (discardMetrics) RecordCacheOutcome(_ domain.Usage)                  {}
 func (discardMetrics) RecordCacheRuleHit(_, _ string)                     {}
 func (discardMetrics) RecordBudgetBlock(_ string)                         {}
+func (discardMetrics) RecordRealtimeMint(_, _ string)                     {}
+func (discardMetrics) RecordRealtimeSessionLimitBlock()                   {}
+func (discardMetrics) RecordRealtimeRegistryError(_ string)               {}
 func (discardMetrics) SetRequestLabels(_ context.Context, _, _ string)    {}
 func (discardMetrics) ModelLabel(_ domain.BundleConfig, model string) string {
 	return model
@@ -200,11 +211,23 @@ func (a *App) ListModels(ctx context.Context, bundle *domain.Bundle) ([]domain.M
 			ID:         listed,
 			Name:       listed,
 			ProviderID: target.ProviderID,
+			Handle:     target.Handle,
 		})
 	}
 
+	// A routing handle is read against the key's own credential chain, which
+	// travels on either side of the bundle depending on the caller.
+	spellingCfg := cfg
+	if len(spellingCfg.Credentials) == 0 {
+		spellingCfg.Credentials = bundle.Credentials
+	}
+
 	for name, alias := range cfg.ModelAliases {
-		add(name, domain.Model{ID: alias.Model, ProviderID: alias.ProviderID})
+		target, routable := aliasTarget(spellingCfg, alias)
+		if !routable {
+			continue
+		}
+		add(name, target)
 	}
 
 	if len(cfg.AllowedModels) > 0 {
@@ -270,8 +293,10 @@ func (a *App) addDiscovered(ctx context.Context, bundle *domain.Bundle, add func
 	}
 	for _, m := range discovered {
 		// A discovered model is its own target: the catalog reports the id
-		// the provider serves it under, which is the id a client sends.
-		add(m.ID, m)
+		// the provider serves it under. What a client sends is that id
+		// qualified by the instance's routing handle when it has one, so
+		// the listed name reaches the instance that reported the model.
+		add(m.ListingSpelling(), m)
 	}
 	return gaps, nil
 }
@@ -288,6 +313,42 @@ func (a *App) addDiscovered(ctx context.Context, bundle *domain.Bundle, add func
 // key at all, so singling out its provider-qualified names would not make the
 // list truer, only empty, and a key still being wired up keeps a model list
 // that shows what it is configured to reach.
+// aliasTarget reads an alias target the way dispatch reads it, and reports
+// whether a request for the alias could be served at all.
+//
+// The config wire leaves a target whole when its first segment is not a
+// provider family, because only the key's own config tells a routing handle
+// from a model id that contains a slash. Dispatch has that config and splits
+// the target; listing has it too, so it splits here rather than judging the
+// raw string. Judging "eu/gpt-5-mini" whole asked models_allowed, the policy
+// rules and reachability about a model no provider serves, so the endpoint
+// listed aliases dispatch refuses and dropped aliases dispatch serves.
+//
+// A handle names ONE row. When that row is one the key cannot dispatch to,
+// the alias reaches nothing, so it is left out entirely rather than borrowed
+// against another row of the same family.
+func aliasTarget(cfg domain.BundleConfig, alias domain.ModelAlias) (domain.Model, bool) {
+	if alias.ProviderID != "" {
+		return domain.Model{ID: alias.Model, ProviderID: alias.ProviderID}, true
+	}
+
+	resolved := cfg.ReadSpelling(alias.Model)
+	if resolved.CredentialID == "" {
+		return domain.Model{ID: resolved.ModelID, ProviderID: resolved.ProviderID}, true
+	}
+
+	for _, cred := range cfg.Credentials {
+		if cred.ID == resolved.CredentialID {
+			return domain.Model{
+				ID:         resolved.ModelID,
+				ProviderID: resolved.ProviderID,
+				Handle:     cred.Handle,
+			}, true
+		}
+	}
+	return domain.Model{}, false
+}
+
 func reachableProviders(bundle *domain.Bundle) func(domain.ProviderID) bool {
 	creds := bundle.Credentials
 	if len(creds) == 0 {

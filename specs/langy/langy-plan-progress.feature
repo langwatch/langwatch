@@ -59,6 +59,21 @@ Feature: Langy shows a live plan checklist for multi-step work
     Then that step is shown struck through
     And it is not counted toward the completed total
 
+  # "0 of 4 · 4 left" sat above a list where only three steps looked
+  # outstanding: "left" counted the step currently running, and the steps not
+  # yet started had no visible mark at all, so nothing on screen agreed with
+  # either number. Checkboxes make the list countable and the header counts
+  # what is checked.
+  @integration
+  Scenario: Every step reads as a checkbox and the header counts what is checked
+    Given a plan with finished, current, and not-yet-started steps
+    When the checklist renders
+    Then a finished step shows a checked box
+    And the current step shows a filled box
+    And a step not yet started shows an empty box
+    And each box names its status for a reader who gets no shape or colour
+    And the header says how many steps are done out of the total, never "left"
+
   @unit
   Scenario: No plan means today's rendering, unchanged
     Given a turn in which the agent never maintained a todo list
@@ -84,3 +99,15 @@ Feature: Langy shows a live plan checklist for multi-step work
     When that capability starts
     Then a present-continuous sub-status like "Searching traces" shows for the step
     And it is cleared once the step produces output
+
+  # A long scan reports its real position by writing the running count into the
+  # plan item, in one exact shape. The instructions Langy is given carry a single
+  # example of that shape, and it is the only description of it Langy ever reads,
+  # so an example the reader does not accept means Langy writes progress
+  # faithfully and none of it is ever shown, with nothing reporting a problem.
+  @unit
+  Scenario: The documented progress example is the format the parser accepts
+    Given the instructions show Langy how to write a running count
+    When that example is read back the way a live plan item is read
+    Then it is understood as measured progress and the count is drawn
+    And an example the reader cannot understand fails this check instead of shipping

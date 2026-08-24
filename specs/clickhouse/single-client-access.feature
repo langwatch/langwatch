@@ -68,6 +68,45 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
     And the statement already running is left alone
     And the wait bound is shorter than the time one statement may spend on the wire
 
+  # Sizing the bound is where this went wrong in practice. The budget was read
+  # as one server's allowance and then divided across the whole fleet, but the
+  # cluster runs several nodes and the fleet's statements spread over all of
+  # them. Dividing a single node's allowance by every pod understated the real
+  # capacity by roughly the node count, so the platform throttled itself —
+  # waiting seconds for a slot and refusing work — while the cluster sat mostly
+  # idle and rejected nothing. A budget that is wrong in the safe direction is
+  # still wrong: it produces refusals nobody can act on, and a warning that
+  # fires forever teaches everyone to ignore it.
+  Rule: The bound is sized from the cluster's real capacity
+
+    @unit
+    Scenario: The budget counts every node the cluster runs
+      Given a cluster of several nodes each allowing the same number of concurrent queries
+      When the platform sizes each process's bound
+      Then the budget it divides is the whole cluster's capacity, not one node's
+      And a fleet of the same size is allowed a proportionally larger bound
+
+    @unit
+    Scenario: A single-node cluster is sized exactly as before
+      Given a deployment that does not say how many nodes its cluster has
+      When the platform sizes each process's bound
+      Then it assumes one node
+      And the bound is the same one it chose before the cluster size was considered
+
+    @unit
+    Scenario: An operator override beyond the cluster budget is reported, not silently obeyed
+      Given an operator sets a bound larger than the cluster budget allows
+      When the platform sizes each process's bound
+      Then it uses the operator's number
+      And it reports that the fleet may exceed the cluster's concurrent-query budget
+
+    @unit
+    Scenario: An override within the corrected budget is not reported as excessive
+      Given an operator sets a bound the cluster's full capacity can afford
+      When the platform sizes each process's bound
+      Then it uses the operator's number
+      And it does not warn that the budget is exceeded
+
   @unit
   Scenario: ClickHouse is reached through a repository, from the application object
     Given a service needs data that lives in ClickHouse

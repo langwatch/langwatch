@@ -25,6 +25,26 @@ func okf(f frames.Frame, err error) frames.Frame {
 	return f
 }
 
+// The frame an onFrame observer trips on is still delivered: the GitHub gate
+// cancels the stream context from inside its Observe, and when observation ran
+// before the push, that cancellation killed the push of the very tool card
+// the gate judged — the user saw the gate's verdict with no trace of the
+// command behind it.
+func TestFrameSink_ObserverSeesFrameOnlyAfterPush(t *testing.T) {
+	stream := &captureStream{}
+	sink := newFrameSink(stream)
+
+	pushedWhenObserved := -1
+	sink.onFrame = func(frames.Frame) { pushedWhenObserved = len(stream.emitted) }
+
+	if err := sink.Emit(okf(frames.ToolEnd("a", "bash", nil, true, "gh: not logged in", 0))); err != nil {
+		t.Fatalf("emit: %v", err)
+	}
+	if pushedWhenObserved != 1 {
+		t.Fatalf("observer ran with %d frames pushed, want 1 (push must precede observation)", pushedWhenObserved)
+	}
+}
+
 func TestFrameSink_PushesAndAccumulates(t *testing.T) {
 	stream := &captureStream{}
 	sink := newFrameSink(stream)

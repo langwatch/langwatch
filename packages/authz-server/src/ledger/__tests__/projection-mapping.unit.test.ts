@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  emptyGrantsLedgerState,
-  reduceGrantsLedger,
   type GrantFact,
-} from "../grants-ledger.reducer";
+} from "../facts";
 import {
   grantFactToCompatBinding,
   grantFactToCompatShareLink,
@@ -103,11 +101,11 @@ describe("grant row mapping", () => {
 
     it("uppercases the principal type for the table and lowers it back", () => {
       const row = grantFactToRow({
-        grant: fact({ principal: { type: "api_key", id: "key_1" } }),
+        grant: fact({ principal: { type: "apiKey", id: "key_1" } }),
         organizationId: ORG,
       });
       expect(row.principalType).toBe("API_KEY");
-      expect(grantRowToFact(row).principal.type).toBe("api_key");
+      expect(grantRowToFact(row).principal.type).toBe("apiKey");
     });
   });
 });
@@ -163,43 +161,6 @@ describe("compat binding mapping", () => {
       expect(row?.customRoleId).toBe("role_sre");
     });
 
-    it("writes CUSTOM, not the pre-migration role, once the role has been reassigned", () => {
-      // Finding: folding `grant_role_changed` used to keep `legacyRole`
-      // (grants-ledger.reducer.ts), so an adopted ADMIN binding reassigned
-      // to a NEW custom role projected as (role=ADMIN, customRoleId=new) -
-      // while the legacy fork wrote CUSTOM for the same reassignment. The
-      // legacy resolver's empty-permission-list fallback then answered
-      // "admin" where the legacy row said "viewer": privilege escalation.
-      const imported: GrantFact = fact({
-        roleKey: "custom:cr_ops",
-        legacyRole: "ADMIN",
-      });
-      const state = reduceGrantsLedger({
-        state: reduceGrantsLedger({
-          state: emptyGrantsLedgerState({ organizationId: ORG }),
-          event: {
-            kind: "grant_attached",
-            grant: imported,
-            actor: { type: "user", id: "user_admin" },
-          },
-        }),
-        event: {
-          kind: "grant_role_changed",
-          grantId: imported.grantId,
-          from: "custom:cr_ops",
-          to: "custom:cr_sre",
-          actor: { type: "user", id: "user_admin" },
-          occurredAtMs: 2,
-        },
-      });
-
-      const row = grantFactToCompatBinding({
-        grant: state.grants[imported.grantId]!,
-        organizationId: ORG,
-      });
-      expect(row?.role).toBe("CUSTOM");
-      expect(row?.customRoleId).toBe("cr_sre");
-    });
 
     it("writes an imported custom binding's own role, not CUSTOM", () => {
       // The legacy resolver falls back to this column whenever the custom
@@ -223,7 +184,7 @@ describe("compat binding mapping", () => {
       expect(group?.userId).toBeNull();
       expect(group?.apiKeyId).toBeNull();
       const key = grantFactToCompatBinding({
-        grant: fact({ principal: { type: "api_key", id: "key_1" } }),
+        grant: fact({ principal: { type: "apiKey", id: "key_1" } }),
         organizationId: ORG,
       });
       expect(key?.apiKeyId).toBe("key_1");

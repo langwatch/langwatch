@@ -34,7 +34,7 @@ describe("authzGrantsCommands", () => {
   });
 
   describe("when the event-sourcing stack is unavailable", () => {
-    /** @scenario "A migrated organization's grant write refuses while the ledger is unavailable" */
+    /** @scenario "Attaching a grant while the queue is unavailable fails loudly" */
     it("refuses with authz_ledger_unavailable instead of half-happening, and a later retry is not poisoned", async () => {
       mockTryGetApp.mockReturnValue(null as never);
 

@@ -1,7 +1,7 @@
 import type { AuthzReadRepository } from "@langwatch/authz-server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Prisma } from "~/generated/prisma/client";
-import { resetCutoverGateForTesting } from "../../cutover-gate";
+import { resetAuthzEngineGateForTesting } from "../../engine-gate";
 import { CutoverAwareAuthzReadRepository } from "../authz-read.cutover.repository";
 
 /**
@@ -13,7 +13,7 @@ import { CutoverAwareAuthzReadRepository } from "../authz-read.cutover.repositor
  */
 const spyRepository = (name: string): AuthzReadRepository =>
   ({
-    findOrganizationRole: vi.fn().mockResolvedValue(name),
+    findOrganizationMembership: vi.fn().mockResolvedValue(name),
     findUserBindings: vi.fn().mockResolvedValue([]),
     findGroupBindings: vi.fn().mockResolvedValue([]),
     findApiKeyBindings: vi.fn().mockResolvedValue([]),
@@ -33,8 +33,10 @@ const repositoryFor = (onEngine: boolean) => {
   const legacy = spyRepository("legacy");
   const grants = spyRepository("grants");
   const prisma = {
-    authzCutoverProjection: {
-      findUnique: vi.fn().mockResolvedValue({ onEngine }),
+    systemMigrationTenantState: {
+      findUnique: vi
+        .fn()
+        .mockResolvedValue(onEngine ? { status: "finalized" } : null),
     },
   } as unknown as Prisma.TransactionClient;
   return {
@@ -49,10 +51,10 @@ const repositoryFor = (onEngine: boolean) => {
 
 describe("CutoverAwareAuthzReadRepository", () => {
   beforeEach(() => {
-    resetCutoverGateForTesting();
+    resetAuthzEngineGateForTesting();
   });
   afterEach(() => {
-    resetCutoverGateForTesting();
+    resetAuthzEngineGateForTesting();
   });
 
   describe("given the organization is cut over", () => {
@@ -165,7 +167,7 @@ describe("CutoverAwareAuthzReadRepository", () => {
       // both implementations run the same query against the same table, so
       // forking them would cost a gate read and change nothing.
       expect(
-        await repository.findOrganizationRole({
+        await repository.findOrganizationMembership({
           userId: "alice",
           organizationId: "org-1",
         }),
@@ -176,7 +178,7 @@ describe("CutoverAwareAuthzReadRepository", () => {
       await repository.findProjectLineage({ projectId: "proj-1" });
       await repository.findTeamOrganization({ teamId: "team-1" });
 
-      expect(grants.findOrganizationRole).not.toHaveBeenCalled();
+      expect(grants.findOrganizationMembership).not.toHaveBeenCalled();
       expect(grants.findApiKeyOwner).not.toHaveBeenCalled();
       expect(grants.findProjectLineage).not.toHaveBeenCalled();
       expect(grants.findTeamOrganization).not.toHaveBeenCalled();
@@ -206,9 +208,9 @@ describe("CutoverAwareAuthzReadRepository", () => {
 
   describe("when several calls ask about the same organization", () => {
     it("reads the projection once, because the gate caches the answer", async () => {
-      const findUnique = vi.fn().mockResolvedValue({ onEngine: true });
+      const findUnique = vi.fn().mockResolvedValue({ status: "finalized" });
       const prisma = {
-        authzCutoverProjection: { findUnique },
+        systemMigrationTenantState: { findUnique },
       } as unknown as Prisma.TransactionClient;
       const repository = new CutoverAwareAuthzReadRepository(prisma, {
         legacy: spyRepository("legacy"),
@@ -233,10 +235,10 @@ describe("CutoverAwareAuthzReadRepository", () => {
     const gateFlippingAfterFirstRead = () => {
       const findUnique = vi
         .fn()
-        .mockResolvedValueOnce({ onEngine: true })
-        .mockResolvedValue({ onEngine: false });
+        .mockResolvedValueOnce({ status: "finalized" })
+        .mockResolvedValue(null);
       const prisma = {
-        authzCutoverProjection: { findUnique },
+        systemMigrationTenantState: { findUnique },
       } as unknown as Prisma.TransactionClient;
       const legacy = spyRepository("legacy");
       const grants = spyRepository("grants");
@@ -258,7 +260,7 @@ describe("CutoverAwareAuthzReadRepository", () => {
       await repository.findUserBindings(args);
       // The TTL, expired: without a pin the next read consults the projection
       // again and lands on the other head.
-      resetCutoverGateForTesting();
+      resetAuthzEngineGateForTesting();
       await repository.findGroupBindings(args);
       await repository.findCustomRolePermissions({
         organizationId: "org-1",
@@ -282,7 +284,7 @@ describe("CutoverAwareAuthzReadRepository", () => {
       const args = { userId: "alice", organizationId: "org-1" };
 
       await repository.findUserBindings(args);
-      resetCutoverGateForTesting();
+      resetAuthzEngineGateForTesting();
       await repository.beginPass!().findUserBindings(args);
 
       expect(grants.findUserBindings).toHaveBeenCalledTimes(1);

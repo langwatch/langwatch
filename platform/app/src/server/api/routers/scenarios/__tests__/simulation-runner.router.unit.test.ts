@@ -46,15 +46,21 @@ vi.mock("~/server/scenarios/scenario.service", () => ({
 }));
 
 const mockQueueRun = vi.fn().mockResolvedValue(undefined);
-vi.mock("~/server/app-layer/app", () => ({
-  // Consumers that degrade without Redis read through this one.
-  tryGetApp: () => null,
-  getApp: vi.fn().mockReturnValue({
-    simulations: {
-      queueRun: (...args: unknown[]) => mockQueueRun(...args),
-    },
-  }),
-}));
+vi.mock("~/server/app-layer/app", async () => {
+  const { appPermissionsService } = await import(
+    "~/test-utils/appPermissionsMock"
+  );
+  return {
+    // Consumers that degrade without Redis read through this one.
+    tryGetApp: () => null,
+    getApp: vi.fn().mockReturnValue({
+      permissions: appPermissionsService(),
+      simulations: {
+        queueRun: (...args: unknown[]) => mockQueueRun(...args),
+      },
+    }),
+  };
+});
 
 vi.mock("@langwatch/ksuid", () => ({
   generate: vi.fn().mockReturnValue({
@@ -73,13 +79,9 @@ vi.mock("@langwatch/observability", () => ({
 
 // Mock RBAC to always allow - we're testing business logic, not permissions
 vi.mock("../../../rbac", () => ({
-  checkProjectPermission: vi.fn().mockImplementation(() => {
-    return async ({ ctx, next, input }: any) => {
-      return next({
-        ctx: { ...ctx, permissionChecked: true },
-      });
-    };
-  }),
+  resolveProjectPermission: vi
+    .fn()
+    .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
 }));
 
 // Mock audit log to avoid database calls

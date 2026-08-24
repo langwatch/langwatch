@@ -69,9 +69,17 @@ const (
 	// the provider selected by the model prefix, which surfaces as opaque
 	// provider-config errors ("deployments not set", HTML error pages).
 	ErrProviderNotBound = herr.Code("model_provider_not_bound")
-	ErrProviderError    = herr.Code("provider_error")
-	ErrPayloadTooLarge  = herr.Code("payload_too_large")
-	ErrBadRequest       = herr.Code("bad_request")
+	// ErrModelNotRecognized means the request named a model that matches
+	// nothing this key can place: no provider declares it, its name matches no
+	// vendor the gateway can guess from, and the key holds more than one
+	// provider that told us what it serves. Sending it down the chain anyway
+	// makes every vendor answer for a model it never had, and the caller reads
+	// the last vendor's error instead of the real problem. Distinct from
+	// model_provider_not_bound, which is a provider the caller DID name.
+	ErrModelNotRecognized = herr.Code("model_not_recognized")
+	ErrProviderError      = herr.Code("provider_error")
+	ErrPayloadTooLarge    = herr.Code("payload_too_large")
+	ErrBadRequest         = herr.Code("bad_request")
 	// ErrMissingModel is a request-shape error with its own stable identity so
 	// clients and rejection metrics do not have to infer it from prose.
 	ErrMissingModel    = herr.Code("missing_model")
@@ -109,6 +117,16 @@ const (
 	// and the lane has no mapping for it. The code matches OpenAI's own
 	// parameter rejections so SDK error handling stays familiar.
 	ErrUnsupportedParameter = herr.Code("unsupported_parameter")
+	// ErrRealtimeSessionLimit means the virtual key already holds as many
+	// open realtime voice sessions as its realtime.maxOpenSessions allows.
+	// A voice session bills for as long as it runs, so the arrival-rate
+	// limits do not bound it and this is the only cap that does.
+	ErrRealtimeSessionLimit = herr.Code("realtime_session_limit")
+	// ErrRealtimeRegistryUnavailable means the control plane could not
+	// record the session, so the gateway refused to mint one. This is a
+	// deliberate departure from the budget fail-open rule: an unrecorded
+	// session is voice nobody can bill and a cap nobody can enforce.
+	ErrRealtimeRegistryUnavailable = herr.Code("realtime_registry_unavailable")
 )
 
 // KeyExpiredMessage is what a tenant reads when a key's expiration date has

@@ -173,6 +173,37 @@ describe("building one pulled usage record", () => {
       expect(corrected?.observedAtMs).toBeGreaterThan(first!.observedAtMs);
     });
 
+    /** @scenario "The hour's context never changes which record a correction lands on" */
+    it("keeps the restatement key identical though the hour's context changed", () => {
+      // Display-only context rides on `extra` BESIDE the hint, never in it.
+      // Late-arriving statements grow an hour's executed-time total, so a
+      // re-read recomputes it — keyed, that correction would mint a second
+      // record and the ledger would count the question twice.
+      const withHour = (totalExecutionMs: string): NormalizedPullEvent => {
+        const event = usageEvent();
+        return {
+          ...event,
+          extra: {
+            ...event.extra,
+            warehouseHour: { totalExecutionMs, billableUsd: "6" },
+          },
+        };
+      };
+
+      const first = buildPulledUsageRecord({
+        event: withHour("60000"),
+        source: SOURCE,
+        observedAt: OBSERVED_AT,
+      });
+      const corrected = buildPulledUsageRecord({
+        event: withHour("3600000"),
+        source: SOURCE,
+        observedAt: new Date("2026-08-07T09:00:00.000Z"),
+      });
+
+      expect(corrected?.restatementKey).toBe(first?.restatementKey);
+    });
+
     it("mints a different key when a coordinate actually differs", () => {
       const base = buildPulledUsageRecord({
         event: usageEvent(),

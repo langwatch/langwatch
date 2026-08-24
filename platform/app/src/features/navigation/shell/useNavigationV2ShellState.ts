@@ -19,6 +19,7 @@ import {
   SHELL_SIDEBAR_WIDTH_COMPACT,
   SHELL_SIDEBAR_WIDTH_EXPANDED,
 } from "./shellLayout";
+import { useIsMobileViewport } from "./useIsMobileViewport";
 
 type OrganizationTeamProject = ReturnType<typeof useOrganizationTeamProject>;
 type AppSession = ReturnType<typeof useRequiredSession>["data"];
@@ -34,6 +35,8 @@ export interface NavigationV2ShellReadyState {
   isSettingsRoute: boolean;
   isDevelopment: boolean;
   isCompactSidebar: boolean;
+  /** Phone-width viewport: the mobile bar + menu replace the sidebar chrome. */
+  isMobile: boolean;
   /**
    * Width of the sidebar column, and with it the left edge of the
    * content column. The top bar and the content cap both read it here,
@@ -71,6 +74,7 @@ export function useNavigationV2ShellState({
     { base: true, lg: false },
     { fallback: "lg" },
   );
+  const isMobile = useIsMobileViewport();
   const router = useRouter();
 
   useOrgQueryParamSelection();
@@ -116,6 +120,7 @@ export function useNavigationV2ShellState({
     pathname: router.pathname,
     isDevelopment: publicEnv.data?.NODE_ENV === "development",
     isCompactSidebar: isSmallScreen === true,
+    isMobile,
     langyDockInset,
   });
 }
@@ -128,6 +133,7 @@ function toReadyState({
   pathname,
   isDevelopment,
   isCompactSidebar,
+  isMobile,
   langyDockInset,
 }: {
   user: SessionUser;
@@ -136,6 +142,7 @@ function toReadyState({
   pathname: string;
   isDevelopment: boolean;
   isCompactSidebar: boolean;
+  isMobile: boolean;
   langyDockInset: number;
 }): NavigationV2ShellReadyState {
   return {
@@ -147,6 +154,7 @@ function toReadyState({
     isSettingsRoute: route.isSettingsRoute,
     isDevelopment,
     isCompactSidebar,
+    isMobile,
     menuWidth: isCompactSidebar
       ? SHELL_SIDEBAR_WIDTH_COMPACT
       : SHELL_SIDEBAR_WIDTH_EXPANDED,

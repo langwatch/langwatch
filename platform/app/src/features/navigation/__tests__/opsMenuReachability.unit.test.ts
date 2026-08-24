@@ -82,4 +82,29 @@ describe("given the internal ops pages the route table registers", () => {
       expect(isClaimedBy({ address, groups: menu })).toBe(true);
     });
   });
+
+  describe("when the event-sourcing tools are looked for", () => {
+    const TOOLS = ["/ops/projections", "/ops/blobs", "/ops/dejaview"];
+
+    /** @scenario The event-sourcing tools are offered inside their workspace */
+    it.each(TOOLS)("%s is not a top-level ops entry", (address) => {
+      // The menu lists workspaces, not every tool inside one. Claiming an
+      // address through `alsoActiveAt` is how a workspace owns a page that
+      // does not sit under its prefix — an entry of its own here would put
+      // the tool back in the menu, which is what this change removed.
+      expect(opsGroup().items.some((item) => item.href === address)).toBe(
+        false,
+      );
+    });
+
+    /** @scenario The event-sourcing tools are offered inside their workspace */
+    it.each(TOOLS)("%s is claimed by the Event Sourcing entry", (address) => {
+      const eventSourcing = opsGroup().items.find(
+        (item) => item.label === "Event Sourcing",
+      );
+      if (!eventSourcing) throw new Error("no Event Sourcing menu entry");
+
+      expect(eventSourcing.alsoActiveAt).toContain(address);
+    });
+  });
 });

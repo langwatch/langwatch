@@ -9,7 +9,6 @@ import {
   Building2,
   Coins,
   CreditCard,
-  Database,
   DatabaseZap,
   EyeOff,
   Fingerprint,
@@ -17,7 +16,6 @@ import {
   FolderKanban,
   FolderOpen,
   Gauge,
-  History,
   KeyRound,
   Link2,
   Lock,
@@ -25,7 +23,6 @@ import {
   MailX,
   Network,
   RefreshCw,
-  Repeat,
   ScrollText,
   Settings2,
   ShieldCheck,
@@ -35,6 +32,7 @@ import {
   UsersRound,
   Workflow,
 } from "lucide-react";
+import { isPathUnder } from "~/features/navigation/products";
 import { useActivePlan } from "~/hooks/useActivePlan";
 import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
@@ -60,6 +58,28 @@ export interface SettingsMenuItem {
   icon: LucideIcon;
   /** Enterprise-plan entry; renders the quiet grey pill. */
   isEnterprise?: boolean;
+}
+
+/**
+ * Whether a settings entry is the page on screen.
+ *
+ * `pathname` is the address in the address bar, never the route pattern the
+ * compat router resolves: `/settings/*` is one registered pattern, so every
+ * settings page but General and Audit Log reports the same
+ * `/settings/[[...path]]` and no entry matched.
+ *
+ * Spec: specs/navigation/settings-shell-v2.feature
+ */
+export function isSettingsMenuItemActive({
+  item,
+  pathname,
+}: {
+  item: SettingsMenuItem;
+  pathname: string;
+}): boolean {
+  if (item.alsoActiveAt?.includes(pathname)) return true;
+  if (item.isExactMatch) return pathname === item.href;
+  return isPathUnder({ pathname, base: item.includePath ?? item.href });
 }
 
 export interface SettingsMenuGroup {
@@ -98,6 +118,12 @@ function organizationGroup({
         isExactMatch: true,
         icon: Settings2,
       },
+      // Keys sit here rather than in Access, where four enterprise entries
+      // came first and left a page most readers use at the bottom of a group
+      // they cannot open.
+      ...(!isLiteMember
+        ? [{ label: "API Keys", href: "/settings/api-keys", icon: KeyRound }]
+        : []),
       {
         label: "Authentication",
         href: "/settings/authentication",
@@ -152,9 +178,6 @@ function accessGroup({
         icon: FolderKanban,
       },
       ...(showEnterpriseNav && !isLiteMember ? enterpriseAccessItems() : []),
-      ...(!isLiteMember
-        ? [{ label: "API Keys", href: "/settings/api-keys", icon: KeyRound }]
-        : []),
     ],
   };
 }
@@ -283,19 +306,27 @@ export function opsGroup(): SettingsMenuGroup {
       {
         label: "Event Sourcing",
         href: "/ops/event-sourcing",
-        // The scheduler address redirects onto the schedules section of
-        // the event-sourcing workspace.
-        alsoActiveAt: ["/ops/scheduler"],
+        // Addresses this workspace owns that do not sit under its prefix.
+        // The scheduler one redirects onto the schedules section; the other
+        // three are sections of the workspace reached from its own rail —
+        // the payload store and Deja View as pages, projection replay as the
+        // drawer that address redirects to. Naming them here is what keeps
+        // this entry lit while the reader is inside the workspace, and what
+        // tells the reachability test the addresses have an owner.
+        alsoActiveAt: [
+          "/ops/scheduler",
+          "/ops/projections",
+          "/ops/blobs",
+          "/ops/dejaview",
+        ],
         icon: Workflow,
       },
-      {
-        label: "Projection Replay",
-        href: "/ops/projections",
-        icon: Repeat,
-      },
+      // Projection replay, the payload store and Deja View are not here:
+      // all three are event-sourcing tools, and they now live in that
+      // workspace's own rail rather than as top-level Ops entries. Replay was
+      // already only a drawer opened from the projections section, so its
+      // entry here pointed at a redirect.
       { label: "The Foundry", href: "/ops/foundry", icon: Anvil },
-      { label: "Payload store", href: "/ops/blobs", icon: Database },
-      { label: "Deja View", href: "/ops/dejaview", icon: History },
       { label: "Feature Flags", href: "/ops/feature-flags", icon: Flag },
       { label: "Migrations", href: "/ops/migrations", icon: DatabaseZap },
     ],

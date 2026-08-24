@@ -41,6 +41,8 @@ const metricNames = [
   "gq_foreign_siblings_restaged_total",
   "gq_jobs_unroutable_total",
   "gq_batch_bisections_total",
+  // Work-conserving override visibility
+  "gq_jobs_dispatched_override_total",
   // #4682 single-group staging accumulation
   "gq_group_staging_depth_max",
   "gq_groups_over_staging_depth",
@@ -89,6 +91,24 @@ export const gqJobsStagedTotal = new Counter({
 export const gqJobsDispatchedTotal = new Counter({
   name: "gq_jobs_dispatched_total",
   help: "Total number of jobs dispatched from staging to the processing queue",
+  labelNames: ["queue_name"] as const,
+});
+
+/**
+ * The subset of `gq_jobs_dispatched_total` admitted by the work-conserving
+ * override — jobs let past a tenant's fair share because slots would otherwise
+ * have sat idle.
+ *
+ * It exists to make `gq_parked_groups` readable. A high parked count has two
+ * opposite causes that look identical on their own: the cap is holding work
+ * back while capacity is free (bad — the override should have fired), or the
+ * fleet is saturated and there is no slot to give (expected). A non-zero rate
+ * here says the override is doing its job; a flat zero alongside a full fleet
+ * says the parked work is waiting on capacity, not on fairness.
+ */
+export const gqJobsDispatchedOverrideTotal = new Counter({
+  name: "gq_jobs_dispatched_override_total",
+  help: "Jobs dispatched by the work-conserving override, past a tenant's fair share, into slots that would otherwise be idle",
   labelNames: ["queue_name"] as const,
 });
 

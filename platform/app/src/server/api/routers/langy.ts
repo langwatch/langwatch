@@ -16,6 +16,7 @@ import type {
   ConversationDetail,
   ConversationListItem,
 } from "~/server/app-layer/langy/langy-conversation.service";
+import { ADOPTABLE_CONVERSATION_ID } from "~/server/app-layer/langy/langy-conversation.service";
 import type { LangyChatMessageInput } from "~/server/app-layer/langy/langy-turn.service";
 import { isLangyConversationUpdateVisibleToUser } from "~/server/app-layer/langy/langyConversationUpdateVisibility";
 import {
@@ -30,9 +31,11 @@ import {
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
 import { decideSyntheticTerminal } from "~/server/app-layer/langy/streaming/langyTurnSettlement";
 import type { Session } from "~/server/auth";
-import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
+import {
+  checkLangyMessageRateLimit,
+  checkLangyWarmRateLimit,
+} from "~/server/middleware/rate-limit-langy";
 import { trackServerEvent } from "~/server/posthog";
-import { checkProjectPermission, type Permission } from "../rbac";
 import {
   type LangyConversationDetailDto,
   type LangyConversationListCursorDto,
@@ -67,7 +70,7 @@ const logger = createLogger("langwatch:langy:router");
 /**
  * Builds a Langy procedure gated on one `langy:*` permission, with three
  * gates in order:
- *  1. `checkProjectPermission(permission)` — may the caller do THIS to the
+ *  1. `.permission(permission)` — may the caller do THIS to the
  *     project? Reads want `langy:view`; starting a turn wants `langy:create`,
  *     because it provisions credentials, spawns a worker and spends the
  *     project's model budget — not something a read grant should buy.
@@ -78,15 +81,17 @@ const logger = createLogger("langwatch:langy:router");
  *     the `langyEgress` router uses. Last, so membership is always proven
  *     before the flag is read.
  *
- * The permission check must be the FIRST `.use()`: `permissionProcedureBuilder`
+ * The permission declaration comes before any `.use()`: `permissionProcedureBuilder`
  * treats that slot specially and injects `enforcePermissionCheck` after it.
  *
  * `projectId` lives on the base so procedures declare only their own inputs.
  */
-const langyProcedure = (permission: Permission) =>
+const langyProcedure = (
+  permission: "langy:view" | "langy:create" | "langy:update" | "langy:delete",
+) =>
   protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission(permission))
+    .permission(permission)
     .use(refuseDemoProject)
     .use(enforceLangyAccess);
 
@@ -129,14 +134,35 @@ const langyTurnMessageSchema = z.object({
 /**
  * Per-send model override from the sidebar picker. Shape-validated here;
  * the value is checked against the project's Langy VK allowlist in the service.
+ *
+ * The provider segment ends at the FIRST slash; the model half may contain
+ * slashes and colons of its own, because custom OpenAI-compatible providers
+ * accept aggregator ids like "stealth/ox-alpha" or "deepseek/deepseek-r1:free",
+ * which arrive here as "custom/stealth/ox-alpha".
+ *
+ * Every slash-separated segment must be non-empty, so "custom//stealth" and
+ * "custom/stealth/" are refused: they carry a delimiter with no model behind
+ * it, and the allowlist check downstream has nothing to match them against.
  */
 const langyModelOverrideSchema = z
   .string()
   .regex(
-    /^[a-zA-Z0-9_-]+\/[a-zA-Z0-9._-]+$/,
+    /^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9._:-]+)+$/,
     "modelOverride must be in 'provider/model' shape",
   )
   .max(200);
+
+/**
+ * A caller-chosen conversation id the create path may ADOPT, the same shape
+ * gate the app layer enforces (`ADOPTABLE_CONVERSATION_ID`), applied at the
+ * wire so a malformed id fails validation instead of reaching the aggregate.
+ */
+const adoptableConversationIdSchema = z
+  .string()
+  .regex(
+    ADOPTABLE_CONVERSATION_ID,
+    "conversationId must be 6-120 characters from [A-Za-z0-9_-]",
+  );
 
 /** Inputs shared by create + continue (the SAME turn-start operation). */
 const langyTurnInputShape = {
@@ -293,6 +319,7 @@ async function watchForMissedTerminal({
  */
 async function acceptTurn({
   input,
+  adoptConversationId,
   session,
 }: {
   input: {
@@ -306,6 +333,14 @@ async function acceptTurn({
     pageContext?: LangyTurnContext["pageContext"];
     skills?: LangyTurnContext["skills"];
   };
+  /**
+   * Adopt an unknown `conversationId` as a NEW conversation instead of minting
+   * a fresh id. Only the CREATE path sets this, it is how a first message
+   * lands on the conversation a panel-open warm already booted a worker for
+   * (specs/langy/langy-worker-prewarm.feature). Continue keeps today's
+   * semantics: an unknown id there is stale client state and mints fresh.
+   */
+  adoptConversationId?: boolean;
   session: Session;
 }): Promise<{ conversationId: string; turnId: string }> {
   // Alias resolution for pre-rename client bundles; new clients send
@@ -325,6 +360,7 @@ async function acceptTurn({
     idempotencyKey,
     session,
     requestedConversationId: input.conversationId ?? null,
+    ...(adoptConversationId ? { adoptConversationId: true } : {}),
     messages: input.messages,
     ...(input.modelOverride ? { modelOverride: input.modelOverride } : {}),
     isRetry: input.trigger === "regenerate-message",
@@ -493,6 +529,13 @@ export const langyRouter = createTRPCRouter({
         eventCursor: { acceptedAt: number; eventId: string } | null;
         /** The turn in flight, or null — what a refresh reattaches to. */
         currentTurnId: string | null;
+        /**
+         * The model the latest accepted turn ran on, or null before any turn
+         * recorded one. Opening a conversation seeds the composer's picker
+         * from it, so a conversation keeps the model it was last used with
+         * across tabs and reloads.
+         */
+        lastModel: string | null;
       }> => {
         // Both reads go through user-scoped application services. The message
         // service performs its own visibility check; this detail read is also
@@ -540,6 +583,7 @@ export const langyRouter = createTRPCRouter({
           shouldAskFeedback,
           eventCursor: conversation.eventCursor,
           currentTurnId: isTurnInFlight ? conversation.currentTurnId : null,
+          lastModel: conversation.lastModel,
         };
       },
     ),
@@ -615,7 +659,20 @@ export const langyRouter = createTRPCRouter({
    * shared middleware maps to coded TRPCErrors.
    */
   createConversation: langyTurnProcedure
-    .input(z.object(langyTurnInputShape))
+    .input(
+      z.object({
+        /**
+         * The conversation a panel-open warm already booted a worker for
+         * (specs/langy/langy-worker-prewarm.feature). Server-minted by
+         * `warmWorker`, ADOPTED here so the first message reuses the warmed
+         * worker instead of spawning under a fresh id. Absent = mint fresh,
+         * exactly as before. Shape-gated at the wire; an id that exists but is
+         * not adoptable (someone else's, archived) fails loudly in the service.
+         */
+        conversationId: adoptableConversationIdSchema.optional(),
+        ...langyTurnInputShape,
+      }),
+    )
     .mutation(
       async ({
         input,
@@ -626,6 +683,7 @@ export const langyRouter = createTRPCRouter({
             ...input,
             messages: input.messages as LangyChatMessageInput[],
           },
+          ...(input.conversationId ? { adoptConversationId: true } : {}),
           session: ctx.session,
         });
       },
@@ -687,6 +745,78 @@ export const langyRouter = createTRPCRouter({
       });
       return { stopped: true };
     }),
+
+  /**
+   * Pre-boot the conversation's worker on panel open, before the first message
+   * (specs/langy/langy-worker-prewarm.feature). Returns the conversation id
+   * the first message should adopt (server-minted when none is given) and
+   * whether a worker is warm or warming.
+   *
+   * `langy:create`, warming provisions credentials and spawns a worker, so it
+   * wants the same permission as sending, but deliberately NOT the
+   * rate-limited `langyTurnProcedure`: a panel open must never consume the
+   * per-user message budget. Strictly fire-and-forget for the caller: a warm
+   * failure is a cold start, never an error, so nothing on the warm path
+   * throws past this mutation (the access gates above it still do, a caller
+   * without Langy gets the same refusal every langy procedure gives).
+   */
+  warmWorker: langyCreateProcedure
+    .input(
+      z.object({
+        /** Warm an existing conversation's worker; absent mints the id the
+         * first message will adopt. Same shape gate as adoption. */
+        conversationId: adoptableConversationIdSchema.optional(),
+        modelOverride: langyModelOverrideSchema.optional(),
+      }),
+    )
+    .mutation(
+      async ({
+        input,
+        ctx,
+      }): Promise<{ conversationId: string | null; warmed: boolean }> => {
+        try {
+          // The warm skips langyTurnProcedure so a panel open never spends the
+          // message budget, but each call can mint a conversation, mint a
+          // session key and ask for a worker, so it carries its own looser
+          // budget. Over it, the answer is the same silent one every other
+          // warm failure gives: no error to the panel, a cold start on the
+          // first message.
+          const rl = await checkLangyWarmRateLimit({
+            userId: ctx.session.user.id,
+            projectId: input.projectId,
+          });
+          if (!rl.allowed) {
+            logger.warn(
+              { projectId: input.projectId },
+              "langy warm rate limited, cold start on first message",
+            );
+            return {
+              conversationId: input.conversationId ?? null,
+              warmed: false,
+            };
+          }
+          return await getApp().langy.turns.warmConversationWorker({
+            projectId: input.projectId,
+            session: ctx.session,
+            requestedConversationId: input.conversationId ?? null,
+            ...(input.modelOverride
+              ? { modelOverride: input.modelOverride }
+              : {}),
+          });
+        } catch (error) {
+          // The service already swallows warm-path failures; this is the belt
+          // for anything unexpected around it. Never an error to the panel.
+          logger.warn(
+            { error, projectId: input.projectId },
+            "langy warmWorker mutation failed, cold start on first message",
+          );
+          return {
+            conversationId: input.conversationId ?? null,
+            warmed: false,
+          };
+        }
+      },
+    ),
 
   /**
    * The model allowlist the composer's picker narrows to, or null when the
@@ -935,7 +1065,7 @@ export const langyRouter = createTRPCRouter({
         if (!terminal) {
           // A refresh mid-turn can miss the worker's terminal frame (its relay
           // connection dropped before it). follow() would then block until the
-          // hard per-turn deadline, leaving the UI on "Starting up…" for minutes
+          // hard per-turn deadline, leaving the UI on the startup status for minutes
           // though the turn already finished. While we tail the live edge, watch
           // the durable fold + per-turn heartbeat; if the turn has settled with
           // no terminal in the buffer, synthesize one so the client resolves.

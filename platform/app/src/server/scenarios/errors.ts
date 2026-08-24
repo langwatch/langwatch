@@ -131,6 +131,76 @@ export class ScenarioParameterMissingError extends ScenarioParameterError {
 }
 
 /**
+ * Thrown when a scenario declares a secret parameter and the run supplied no
+ * text value for it.
+ *
+ * A secret parameter has no default by design, so there is nothing to fall
+ * back to. Only the names travel on the error: the value is the thing this
+ * whole path exists to keep out of messages, logs and stores.
+ */
+export class ScenarioSecretParameterMissingError extends ScenarioParameterError {
+  declare readonly code: "scenario_secret_parameter_missing";
+
+  constructor({ names }: { names: string[] }) {
+    super({
+      message: `No value supplied for secret scenario parameters: ${names.join(", ")}`,
+      code: "scenario_secret_parameter_missing",
+      httpStatus: 422,
+      meta: { names },
+    });
+    this.name = "ScenarioSecretParameterMissingError";
+  }
+}
+
+/**
+ * Thrown when one run covers a scenario that declares a name as secret and
+ * another that declares the same name as plain.
+ *
+ * A run supplies one value per name. Accepting the pair would send a credential
+ * to the plain scenario's `params` namespace, where it is rendered into the
+ * scenario text and recorded on the run.
+ */
+export class ScenarioSecretParameterConflictError extends ScenarioParameterError {
+  declare readonly code: "scenario_secret_parameter_conflict";
+
+  constructor({ names }: { names: string[] }) {
+    super({
+      message: `Declared as secret by one scenario and as plain by another: ${names.join(", ")}`,
+      code: "scenario_secret_parameter_conflict",
+      httpStatus: 422,
+      meta: { names },
+    });
+    this.name = "ScenarioSecretParameterConflictError";
+  }
+}
+
+/**
+ * Thrown when a scenario's own situation or criteria read a secret parameter.
+ *
+ * The rendered text is handed to the simulated user and the judge and is
+ * recorded with the run, so a secret read there is a secret written down.
+ */
+export class ScenarioSecretParameterInTextError extends ScenarioParameterError {
+  declare readonly code: "scenario_secret_parameter_in_text";
+
+  constructor({
+    names,
+    field,
+  }: {
+    names: string[];
+    field: ScenarioContentField;
+  }) {
+    super({
+      message: `A secret parameter cannot be read from scenario text. ${field} reads: ${names.join(", ")}`,
+      code: "scenario_secret_parameter_in_text",
+      httpStatus: 422,
+      meta: { names, field },
+    });
+    this.name = "ScenarioSecretParameterInTextError";
+  }
+}
+
+/**
  * Thrown when a scenario that declares parameters has text the template engine
  * cannot render, either because it is malformed or because it exhausts the
  * render limits.

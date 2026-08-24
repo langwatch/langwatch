@@ -30,8 +30,7 @@ describe("perOrganizationCachedFlag", () => {
   ) {
     return perOrganizationCachedFlag({
       name: "test-gate",
-      positiveTtlMs: 60_000,
-      negativeTtlMs: 60_000,
+      ttlMs: 60_000,
       ...overrides,
     });
   }

@@ -1,4 +1,4 @@
-import type { LedgerActor } from "@langwatch/authz-server";
+import type { LedgerActor } from "@langwatch/actor";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
@@ -13,7 +13,6 @@ import { RoleService } from "~/server/role/role.service";
 import { RoleBindingService } from "~/server/role-bindings/role-binding.service";
 import { slugify } from "~/utils/slugify";
 import { assertEnterprisePlan, ENTERPRISE_FEATURE_ERRORS } from "../enterprise";
-import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -115,7 +114,7 @@ export const groupRouter = createTRPCRouter({
     // group's role-binding map (which scopes they grant on, what
     // role, which custom role). Authz config, admin-surface.
     // Sole TS caller is settings/groups.tsx, an admin-only page.
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .query(async ({ ctx, input }) => {
       await assertEnterprisePlan({
         organizationId: input.organizationId,
@@ -180,7 +179,7 @@ export const groupRouter = createTRPCRouter({
     // GroupDetailDialog under settings/, an admin-only surface.
     // Mirrors the #47 stack: roleBinding.listForOrg is already at
     // organization:manage; group.getById should match.
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .query(async ({ ctx, input }) => {
       const group = await ctx.prisma.group.findFirst({
         where: { id: input.groupId, organizationId: input.organizationId },
@@ -259,7 +258,7 @@ export const groupRouter = createTRPCRouter({
         memberIds: z.array(z.string()).optional(),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .mutation(async ({ ctx, input }) => {
       await assertEnterprisePlan({
         organizationId: input.organizationId,
@@ -290,7 +289,7 @@ export const groupRouter = createTRPCRouter({
         scopeId: z.string(),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .mutation(async ({ ctx, input }) => {
       const binding = await groupService(ctx.prisma).addBinding({
         groupId: input.groupId,
@@ -314,7 +313,7 @@ export const groupRouter = createTRPCRouter({
         bindingId: z.string(),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .mutation(async ({ ctx, input }) => {
       await groupService(ctx.prisma).removeBinding({
         bindingId: input.bindingId,
@@ -335,7 +334,7 @@ export const groupRouter = createTRPCRouter({
         userId: z.string(),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .mutation(async ({ ctx, input }) => {
       const group = await ctx.prisma.group.findFirst({
         where: { id: input.groupId, organizationId: input.organizationId },
@@ -372,7 +371,7 @@ export const groupRouter = createTRPCRouter({
    */
   delete: protectedProcedure
     .input(z.object({ organizationId: z.string(), groupId: z.string() }))
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .mutation(async ({ ctx, input }) => {
       await groupService(ctx.prisma).delete({
         id: input.groupId,
@@ -398,7 +397,7 @@ export const groupRouter = createTRPCRouter({
         name: z.string().trim().min(1, "Group name is required").max(100),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .mutation(async ({ ctx, input }) => {
       const group = await ctx.prisma.group.findFirst({
         where: { id: input.groupId, organizationId: input.organizationId },
@@ -440,7 +439,7 @@ export const groupRouter = createTRPCRouter({
     // gating the read either misreports a member's effective access or (as
     // customers hit) turns every dialog open into a refused request. An
     // organization that never had groups simply gets an empty list.
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .query(async ({ ctx, input }) => {
       const groups = await ctx.prisma.group.findMany({
         where: {
@@ -480,7 +479,7 @@ export const groupRouter = createTRPCRouter({
         userId: z.string(),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .mutation(async ({ ctx, input }) => {
       const group = await ctx.prisma.group.findFirst({
         where: { id: input.groupId, organizationId: input.organizationId },
@@ -532,7 +531,7 @@ export const groupRouter = createTRPCRouter({
         memberUserIdsToRemove: z.array(z.string()),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .mutation(async ({ ctx, input }) => {
       let resolvedRename: { name: string; slug: string } | null = null;
       if (input.rename) {

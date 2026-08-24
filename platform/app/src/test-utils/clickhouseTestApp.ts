@@ -83,7 +83,12 @@ export function installClickHouseTestApp({
   };
 
   globalForApp.__langwatch_app = createTestApp({
-    clickhouse: { enabled: true, resolveClient: required },
+    clickhouse: {
+      enabled: true,
+      resolveClient: required,
+      resolveOrganizationClient: requiredOrg,
+      allInstances: async () => [],
+    },
     redis: redis ?? null,
     gateway: {
       budgets: new GatewayBudgetClickHouseRepository(required),

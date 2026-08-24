@@ -23,9 +23,13 @@ type CodingAgent interface {
 	// its control port, or fails closed. Returns a herr on a definite security
 	// failure or a readiness timeout.
 	WaitReady(ctx context.Context, ep Endpoint) error
-	// OpenSession starts a fresh session on the agent and returns its id; the
-	// per-turn calls below are routed to it.
-	OpenSession(ctx context.Context, ep Endpoint) (sessionID string, err error)
+	// OpenSession returns the session the per-turn calls below are routed to.
+	// The agent RESUMES the newest session it already holds on disk when one
+	// exists (`resumed` true) — the worker home outlives the process on an idle
+	// reap or a crash, and resuming keeps the conversation's own context and a
+	// byte-stable prompt prefix instead of re-seeding a transcript into a fresh
+	// session. With nothing to resume it starts fresh (`resumed` false).
+	OpenSession(ctx context.Context, ep Endpoint) (sessionID string, resumed bool, err error)
 	// Post queues a turn on sessionID. A herr(domain.ErrSessionNotFound) means the
 	// session vanished and the worker must be recycled.
 	Post(ctx context.Context, ep Endpoint, sessionID string, turn Turn) error
@@ -55,7 +59,15 @@ type Endpoint struct {
 
 // Turn is one message queued on a coding-agent session. ResumeToken (ADR-048)
 // carries an opaque prior-turn checkpoint to resume from; empty on a cold start.
+//
+// TurnID is the control plane's turn id (the one the worker Claimed). The
+// opencode adapter ignores it; the pi adapter tags the wrapper's `turn` command
+// with it, so a later `abort` naming the same id (TurnAborter) reaches exactly
+// this turn on the wire. Empty for an older control plane that threads none,
+// the pi adapter then mints a private id, and an abort (which requires a name)
+// cannot arrive for it anyway.
 type Turn struct {
+	TurnID      string
 	System      string
 	Prompt      string
 	ResumeToken string

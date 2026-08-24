@@ -69,6 +69,17 @@ type BifrostRouter struct {
 	// the session as expired instead of retrying.
 	codexRefresher  domain.CodexTokenRefresher
 	codexBackendURL string
+	// realtimeClient makes the one bounded REST call a voice session mint
+	// needs. Its own client because the mint must not follow redirects and
+	// re-checks every dialed address against the endpoint policy: it carries
+	// the customer's provider key in a header Go does not strip across
+	// hosts.
+	realtimeClient *http.Client
+	// elevenLabsClient serves the two ElevenLabs-native audio routes, which
+	// Bifrost cannot forward. Its own client for the same reasons as the mint
+	// above, with the gateway-wide provider timeout because synthesis and
+	// transcription are real work rather than a mint.
+	elevenLabsClient *http.Client
 }
 
 // BifrostOptions configures the bifrost router.
@@ -129,19 +140,23 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 	if codexURL == "" {
 		codexURL = codexBackendDefaultURL
 	}
+	endpointPolicy := newCustomerEndpointPolicy(
+		opts.BlockLocalHTTPCalls,
+		opts.RequireHTTPSCustomerEndpoints,
+		opts.AllowedEndpointHosts,
+	)
 	return &BifrostRouter{
-		bf:           bf,
-		logger:       opts.Logger,
-		voyageClient: newVoyageClient(),
-		endpointPolicy: newCustomerEndpointPolicy(
-			opts.BlockLocalHTTPCalls,
-			opts.RequireHTTPSCustomerEndpoints,
-			opts.AllowedEndpointHosts,
-		),
+		bf:              bf,
+		logger:          opts.Logger,
+		voyageClient:    newVoyageClient(),
+		endpointPolicy:  endpointPolicy,
 		anthropicCompat: compatEndpoints,
 		codexClient:     newCodexClient(),
 		codexRefresher:  opts.CodexRefresher,
 		codexBackendURL: codexURL,
+		realtimeClient:  newRealtimeClient(endpointPolicy),
+
+		elevenLabsClient: newElevenLabsAudioClient(endpointPolicy),
 	}, nil
 }
 
@@ -193,6 +208,25 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	if err := r.validateCredentialEndpoints(ctx, cred); err != nil {
 		return nil, err
 	}
+	// A realtime session mint is a bounded REST call to the vendor's own
+	// mint endpoint, not an inference request: no Bifrost translation, no
+	// model dispatch, no usage on the answer. It branches before the
+	// provider mapping because the route already named the vendor.
+	if req.Type == domain.RequestTypeRealtimeSession {
+		return r.dispatchRealtimeSession(ctx, req, cred)
+	}
+
+	// ElevenLabs' own audio paths carry that vendor's wire, which Bifrost's
+	// ElevenLabs provider answers with an unsupported-operation error, so the
+	// gateway calls the vendor itself. The route pinned the provider, so the
+	// credential here is already an ElevenLabs one.
+	if elevenLabsNativeRoute(req) {
+		if req.Type == domain.RequestTypeTranscription {
+			return r.dispatchElevenLabsTranscription(ctx, req, cred)
+		}
+		return r.dispatchElevenLabsSpeech(ctx, req, cred)
+	}
+
 	model := req.Model
 	if req.Resolved != nil {
 		model = req.Resolved.ModelID
@@ -1776,6 +1810,14 @@ type bifrostStreamIterator struct {
 	// carry the same extra_fields.params_dropped signal as sync ones.
 	// Never set on raw-framing passthrough streams.
 	paramsDropped []string
+	// usageTail carries the unterminated remainder of the previous
+	// passthrough chunk. Bifrost's passthrough adapter forwards raw
+	// socket reads, not whole SSE events, so a usage-bearing frame can
+	// straddle two chunks; the tail is prepended to the next chunk
+	// before usage parsing so a split frame still counts. Capped at
+	// maxUsageTailBytes so a stream that never closes a frame cannot
+	// grow it without bound.
+	usageTail []byte
 }
 
 func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
@@ -1839,8 +1881,20 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 			if parser == nil {
 				parser = parseGeminiPassthroughUsage
 			}
+			// The chunk boundary is a socket-read boundary, not an SSE
+			// frame boundary, so a usage-bearing frame can arrive split
+			// across two chunks and a per-chunk parse would silently
+			// lose it (Anthropic's message_start, the only frame with
+			// input and cache counts, is the largest and most exposed).
+			// Prepend the unterminated remainder of the previous chunk
+			// so the frame parses whole once its closing bytes arrive.
 			//nolint:staticcheck // explicit embedded-field reference matches the parallel branches above for readability.
-			if u, ok := parser(chunk.BifrostPassthroughResponse.Body); ok {
+			scan := chunk.BifrostPassthroughResponse.Body
+			if len(it.usageTail) > 0 {
+				scan = append(it.usageTail, scan...)
+			}
+			it.usageTail = passthroughUsageTail(scan)
+			if u, ok := parser(scan); ok {
 				// Merge — Anthropic streams emit prompt+cache tokens
 				// once on `message_start` and a stream of output token
 				// counters on `message_delta`, so a chunk-by-chunk
@@ -1893,6 +1947,33 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 		}
 		return true
 	}
+}
+
+// maxUsageTailBytes caps the carry-over buffer between passthrough
+// chunks. A well-formed SSE frame closes within a few socket reads; a
+// pathological stream that never closes one must not grow the tail
+// without bound, so past the cap the tail is dropped, losing at worst
+// that one frame's usage.
+const maxUsageTailBytes = 64 * 1024
+
+// passthroughUsageTail returns the bytes after the last complete SSE
+// frame in scan: everything past the final blank-line terminator
+// ("\n\n", or "\r\n\r\n" on CRLF wires). Frames before that point were
+// already handed to the usage parser, so only the unterminated
+// remainder carries over to the next chunk.
+func passthroughUsageTail(scan []byte) []byte {
+	start := 0
+	if i := bytes.LastIndex(scan, []byte("\n\n")); i >= 0 {
+		start = i + 2
+	}
+	if i := bytes.LastIndex(scan, []byte("\r\n\r\n")); i >= 0 && i+4 > start {
+		start = i + 4
+	}
+	tail := scan[start:]
+	if len(tail) == 0 || len(tail) > maxUsageTailBytes {
+		return nil
+	}
+	return append([]byte(nil), tail...)
 }
 
 // parseGeminiPassthroughUsage extracts Gemini's `usageMetadata` block from a

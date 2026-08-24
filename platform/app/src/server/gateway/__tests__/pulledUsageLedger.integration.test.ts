@@ -21,7 +21,7 @@ import {
 } from "@ee/governance/process-manager/pulledUsageLedger.process";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import {
   startTestContainers,
@@ -197,7 +197,7 @@ beforeAll(async () => {
   });
 
   const resolveClient = async (tenantId: string) => {
-    const client = await getClickHouseClientForProject(tenantId);
+    const client = await getClickHouseClientForTenant(tenantId);
     if (!client) throw new Error("no ClickHouse client in test environment");
     return client;
   };
@@ -246,7 +246,7 @@ describe("given a connected provider source that pulls usage on a schedule", () 
         }),
       );
 
-      const client = await getClickHouseClientForProject(GOV_PROJECT_ID);
+      const client = await getClickHouseClientForTenant(GOV_PROJECT_ID);
       const result = await client!.query({
         query: `SELECT Scope, ScopeId, BudgetId FROM gateway_budget_ledger_events
                 WHERE TenantId = {tenantId:String}
@@ -497,7 +497,7 @@ async function rollupRows(): Promise<
     SpendNanoUSD: string;
   }>
 > {
-  const client = await getClickHouseClientForProject(APP_PROJECT_ID);
+  const client = await getClickHouseClientForTenant(APP_PROJECT_ID);
   const result = await client!.query({
     query: `SELECT Scope,
                    BudgetId,
@@ -519,7 +519,7 @@ async function rollupRows(): Promise<
 
 /** How many physical rows the ledger holds for one restatement key. */
 async function rawRowsFor(restatementKey: string): Promise<number> {
-  const client = await getClickHouseClientForProject(GOV_PROJECT_ID);
+  const client = await getClickHouseClientForTenant(GOV_PROJECT_ID);
   const result = await client!.query({
     query: `SELECT count() AS n FROM gateway_budget_ledger_events
             WHERE TenantId = {tenantId:String} AND GatewayRequestId = {requestId:String}`,

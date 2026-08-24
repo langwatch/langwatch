@@ -142,7 +142,7 @@ Report to the user:
 - What changed in the codebase: the endpoint, the authentication path, the trace adoption.
 - The result of the first run.
 
-Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and the error, and stop there. Do NOT claim a scenario or a suite ran when it did not.
+Report failures as they happened. If a CLI command failed or the platform was unreachable, name the step that failed and what the failure means for the user, and stop there. Do not paste the raw error text, stack trace or debug URL: those can carry secrets and tell the user nothing they can act on. Do NOT claim a scenario or a suite ran when it did not.
 
 A connected setup shows, on the run page: the conversation transcript with the reply text `outputPath` extracted, a trace link on each turn opening the agent's own spans, and judge reasoning that cites spans. A trace-dependent criterion that comes back inconclusive means the traces did not arrive.
 

@@ -73,7 +73,6 @@ export default async function handler(
   // initializing an experiment run requires `experiments:manage`.
   try {
     await enforceApiKeyCeiling({
-      prisma,
       resolved,
       permission: "experiments:manage",
     });

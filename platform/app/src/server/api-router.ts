@@ -58,6 +58,7 @@ import { app as bugReportsApp } from "./routes/bug-reports";
 import { app as collectorApp } from "./routes/collector";
 import { app as cronApp } from "./routes/cron";
 import { app as datasetGenerateApp } from "./routes/dataset-generate";
+import { app as elevenLabsApp } from "./routes/elevenlabs";
 import { app as evaluationsLegacyApp } from "./routes/evaluations-legacy";
 import {
   app as experimentsV3App,
@@ -197,6 +198,7 @@ export function createApiRouter() {
   api.route("/", langyApiApp); // /api/langy/conversations — key-authed turns
   api.route("/", langyInternalApp);
   api.route("/", langyRelayApp);
+  api.route("/", elevenLabsApp); // /api/elevenlabs/webhook/:modelProviderId
   api.route("/", githubApp);
   api.route("/", scenarioGenerateApp);
   api.route("/", scimApp);

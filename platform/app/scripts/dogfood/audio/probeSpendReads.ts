@@ -8,7 +8,7 @@
  * included, for rows this run created seconds ago.
  */
 
-import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
+import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 
@@ -47,7 +47,7 @@ export interface LedgerDebit {
 }
 
 export async function clickhouse(projectId: string) {
-  const client = await getClickHouseClientForProject(projectId);
+  const client = await getClickHouseClientForTenant(projectId);
   if (!client) throw new Error("no ClickHouse client available");
   return client;
 }

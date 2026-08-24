@@ -98,7 +98,14 @@ var envHelpText = `Environment variables.
     LANGWATCH_LOCAL_TLD=test     Use a different TLD (default: localhost).
     HAVEN_BASELINE=1             Mark this stack as the shared default others fall
                                  back to for services they don't run themselves.
-    PORTLESS=0                   Bypass portless entirely (legacy PORT scheme).
+    PORTLESS=0                   Bypass the portless proxy entirely — no proxy
+                                 install/start/trust, no hostname routing. Each
+                                 service is served plain HTTP on its own
+                                 loopback port instead (still at its usual
+                                 app.<slug>.langwatch.localhost hostname, which
+                                 resolves to loopback with no proxy needed).
+                                 The escape hatch for a machine where the
+                                 proxy's TLS handshake won't come up.
     HAVEN_AGENT=1                Plain, colorless, redraw-free output (also on
                                  with --agent, NO_COLOR, or a non-terminal stdout)
                                  — zero token waste when an AI agent drives haven.
@@ -161,6 +168,9 @@ var envHelpText = `Environment variables.
                                  is always reused as-is instead).
     HAVEN_PG_PORT=5432           Port to expect/start Postgres on.
     LANGWATCH_HAVEN_REDIS=0      Do not manage Redis (use .env REDIS_URL).
+    LANGWATCH_HAVEN_REDIS_DB=N   Pin this worktree's Redis DB index (0-15). Use when a
+                                 non-haven process from another worktree holds a DB the
+                                 allocator cannot see, to avoid sharing its job queue.
     HAVEN_REDIS_FORMULA=redis    brew formula to start if none is running.
     HAVEN_REDIS_PORT=6379        Port to expect/start Redis on.
     HAVEN_REDIS_MAXMEMORY_MB=512 maxmemory ceiling applied to the managed Redis

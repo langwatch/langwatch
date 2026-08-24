@@ -93,6 +93,7 @@ function sessionRow(
     cacheReadTokens: 9_000_000_000,
     cacheCreationTokens: 10,
     costUsd: 1.25,
+    agentReportedCostUsd: 0,
     modelCallMs: 5000,
     toolMs: 1234,
     ttftMsTotal: 300,

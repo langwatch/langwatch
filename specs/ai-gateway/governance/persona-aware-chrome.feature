@@ -158,8 +158,8 @@ Feature: AI Gateway Governance — Persona-aware chrome (sidebar + header)
   Scenario: Govern sub-nav stays put across every governance sub-route
     Given user is Persona 4 (governance admin) with both FFs on
     And the user is on "/governance" with the Govern sub-nav visible in
-        the left rail (Overview / Ingestion Sources / Anomaly Rules /
-        Tool Catalog / Departments)
+        the left rail (Overview / Catalog / Anomaly Rules /
+        Tool Tiles / Departments)
     When the user clicks a sub-nav link, or drills into a governance
         sub-route from the Overview, and lands on:
       | route                                              |

@@ -27,6 +27,12 @@ export type FormSnapshot = {
   /** Human-readable label the user typed (or the humanized default). */
   name: string;
   /**
+   * The slug that addresses this instance in a gateway model string. Empty
+   * means the operator wants no handle, which is a real choice: it releases
+   * the name for another provider in the organization.
+   */
+  routingHandle: string;
+  /**
    * Tenant anchor for the write. A provider belongs to an organization
    * and reaches the scopes attached to it, so the organization is always
    * the answer and the project is the narrower handle when there is one.
@@ -165,6 +171,7 @@ export function useProviderFormSubmit({
       projectTopicClusteringModel,
       projectEmbeddingsModel,
       name,
+      routingHandle,
       scopes,
       scopeType,
       scopeId,
@@ -311,6 +318,9 @@ export function useProviderFormSubmit({
         organizationId,
         provider: provider.provider,
         name: trimmedName === "" ? undefined : trimmedName,
+        // Always sent, because an empty string is how the operator clears the
+        // handle. Leaving it out on a clear would keep the old one.
+        routingHandle: (routingHandle ?? "").trim(),
         enabled: true,
         customKeys: customKeysToSend,
         customModels,

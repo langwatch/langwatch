@@ -50,6 +50,24 @@ const MAX_MESSAGE_CONTENT_BYTES = 64 * 1024;
 const MAX_MESSAGE_REST_BYTES = 64 * 1024;
 
 /**
+ * Serialise a run's metadata for the stored column, without the encrypted
+ * secret values.
+ *
+ * The queued event carries those beside the metadata, so this is the second
+ * line rather than the first. It matters for the started event: the SDK
+ * ingestion route forwards whatever metadata the caller sent, so a caller can
+ * put the key there. `secretParameterNames` stays, because names are what a
+ * person reads back off the run.
+ */
+function storedMetadata(
+  metadata: Record<string, unknown> | undefined,
+): string | null {
+  if (!metadata) return null;
+  const { secretParameters: _secretParameters, ...rest } = metadata;
+  return JSON.stringify(rest);
+}
+
+/**
  * Cap an oversized message-content / rest string and emit a structured warn
  * log so an SDK regression doesn't silently land 90+ MB rows in ClickHouse.
  * The returned marker has a stable prefix so monitoring + retroactive scans
@@ -303,9 +321,7 @@ export class SimulationRunStateFoldProjection
       Name: event.data.name ?? null,
       Status: statusAfter({ state, candidate: "QUEUED" }),
       Description: event.data.description ?? null,
-      Metadata: event.data.metadata
-        ? JSON.stringify(event.data.metadata)
-        : null,
+      Metadata: storedMetadata(event.data.metadata),
       QueuedAt: event.occurredAt,
     };
   }
@@ -322,9 +338,7 @@ export class SimulationRunStateFoldProjection
       ScenarioSetId: state.ScenarioSetId || event.data.scenarioSetId,
       Name: state.Name ?? event.data.name ?? null,
       Description: state.Description ?? event.data.description ?? null,
-      Metadata:
-        state.Metadata ??
-        (event.data.metadata ? JSON.stringify(event.data.metadata) : null),
+      Metadata: state.Metadata ?? storedMetadata(event.data.metadata),
       Status: statusAfter({ state, candidate: "IN_PROGRESS" }),
       StartedAt: event.occurredAt,
     };

@@ -2,6 +2,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { appFromContext } from "~/app/api/middleware/app-context";
 import { handledErrorResponseBody } from "~/app/api/middleware/error-handler";
 import {
   type ApiErrorEnvelope,
@@ -15,9 +16,15 @@ import type {
   Project,
 } from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";
-import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
+import { type App, getApp } from "~/server/app-layer/app";
+// A pure rule with a type-only dependency of its own, so reading it here adds
+// no module cycle back into the Langy feature.
+import { classifyForLangy } from "~/server/app-layer/langy/langyPermissionPolicy";
 import { getTokenType } from "./api-key-token.utils";
-import { ApiKeyPermissionDeniedError } from "./errors";
+import {
+  ApiKeyPermissionDeniedError,
+  ApiKeyPermissionNotDelegableError,
+} from "./errors";
 import {
   type OrgResolution,
   type OrgResolvedToken,
@@ -623,18 +630,27 @@ export function collectAuthDiagnostics(c: {
  * Throws `ApiKeyPermissionDeniedError` when denied.
  */
 export async function enforceApiKeyCeiling({
-  prisma,
   resolved,
   permission,
+  app,
 }: {
-  prisma: PrismaClient;
   resolved: ResolvedToken;
   permission: Permission;
+  /**
+   * The App to decide through — pass `appFromContext(c)` where a Hono
+   * context is in hand; handlers without one fall back to the process
+   * singleton (the same instance in production).
+   */
+  app?: App;
 }): Promise<void> {
+  // A legacy project key has no per-permission ceiling: it passes every gate,
+  // including a `permission`-kind policy, because project keys predate RBAC and
+  // carry full project access by design (decision 1: no legacy-key sunset). So
+  // a route's declared permission is decorative for that credential class —
+  // intended, not a gap. Only scoped API keys are checked below.
   if (resolved.type !== "apiKey") return;
 
-  const allowed = await resolveApiKeyPermission({
-    prisma,
+  const allowed = await (app ?? getApp()).permissions.hasApiKeyPermission({
     apiKeyId: resolved.apiKeyId,
     userId: resolved.userId,
     organizationId: resolved.organizationId,
@@ -646,24 +662,56 @@ export async function enforceApiKeyCeiling({
     permission,
   });
 
-  if (!allowed) {
-    permissionLogger.warn(
-      {
-        apiKeyId: resolved.apiKeyId,
-        userId: resolved.userId,
-        projectId: resolved.project.id,
-        permission,
-      },
-      "API key ceiling check failed",
-    );
-    throw new ApiKeyPermissionDeniedError(permission, {
-      meta: {
-        apiKeyId: resolved.apiKeyId,
-        userId: resolved.userId,
-        projectId: resolved.project.id,
-      },
+  if (!allowed) refuseApiKeyCeiling({ resolved, permission });
+}
+
+/**
+ * The refusal, which is two refusals wearing the same face.
+ *
+ * A Langy session key is denied for one of two reasons that are identical from
+ * the ceiling's point of view: the human it mirrors does not hold the
+ * permission, or Langy is never delegated it at all. Only the first is fixed
+ * by widening the key, so telling a customer to widen it for the second sends
+ * them to a door that does not open — which is exactly what Langy did with
+ * `triggers:create`, offering to retry once the user "granted the permission".
+ */
+function refuseApiKeyCeiling({
+  resolved,
+  permission,
+}: {
+  resolved: Extract<ResolvedToken, { type: "apiKey" }>;
+  permission: Permission;
+}): never {
+  const langyVerdict = resolved.isLangySessionKey
+    ? classifyForLangy(permission)
+    : undefined;
+  const notDelegableReason =
+    langyVerdict?.disposition === "excluded" ? langyVerdict.reason : undefined;
+
+  const meta = {
+    apiKeyId: resolved.apiKeyId,
+    userId: resolved.userId,
+    projectId: resolved.project.id,
+  };
+
+  permissionLogger.warn(
+    {
+      ...meta,
+      permission,
+      // The policy's own words, which name the constants a reader of the rule
+      // needs and a customer must never see.
+      ...(notDelegableReason ? { notDelegableReason } : {}),
+    },
+    "API key ceiling check failed",
+  );
+
+  if (notDelegableReason) {
+    throw new ApiKeyPermissionNotDelegableError(permission, {
+      subject: "Langy",
+      meta,
     });
   }
+  throw new ApiKeyPermissionDeniedError(permission, { meta });
 }
 
 /**
@@ -689,7 +737,8 @@ export function apiKeyCeilingDenialResponse(error: unknown): {
 } {
   if (
     HandledError.isHandled(error) &&
-    error.code === "api_key_permission_denied"
+    (error.code === "api_key_permission_denied" ||
+      error.code === "api_key_permission_not_delegable")
   ) {
     const { statusCode, body } = handledErrorResponseBody(error);
     return { status: statusCode, body, message: error.message };
@@ -703,23 +752,33 @@ export function apiKeyCeilingDenialResponse(error: unknown): {
  * from context.
  */
 export function requireApiKeyPermission({
-  prisma,
   permission,
   errorEnvelope = "legacy",
 }: {
-  prisma: PrismaClient;
   permission: Permission;
   errorEnvelope?: ApiErrorEnvelope;
 }): MiddlewareHandler {
   return async (c, next) => {
     const resolved = c.get("resolvedToken") as ResolvedToken | undefined;
     if (!resolved) {
-      await next();
-      return;
+      // A permission gate running with nobody authenticated is a mis-wired
+      // route (the unified auth middleware must be mounted before this one),
+      // not a caller mistake. Refuse rather than wave the request through —
+      // the old pass-through meant a route that forgot its auth middleware
+      // silently lost its permission check too. The plain Error degrades to
+      // the generic unknown response with a trace id (ADR-045) and logs the
+      // misconfiguration loudly; specs/rbac/credential-arbitration.feature.
+      throw new Error(
+        "requireApiKeyPermission ran with no resolved credential — mount the unified auth middleware before the permission gate",
+      );
     }
 
     try {
-      await enforceApiKeyCeiling({ prisma, resolved, permission });
+      await enforceApiKeyCeiling({
+        resolved,
+        permission,
+        app: appFromContext(c),
+      });
     } catch (error) {
       if (!HandledError.isHandled(error)) throw error;
       // The ceiling refuses BENEATH the family's own error handler, so it has

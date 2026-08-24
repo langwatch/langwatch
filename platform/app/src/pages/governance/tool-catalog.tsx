@@ -13,7 +13,7 @@ import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 /**
- * Admin AI Tool Catalog editor - Phase 7 B6+B9 wired surface.
+ * Admin AI Tool Tiles editor - Phase 7 B6+B9 wired surface.
  *
  * Two tabs per `ingestion-templates-catalog.feature` @admin-readonly
  * scenario:
@@ -48,12 +48,12 @@ function ToolCatalogPage() {
 
   if (!canManageCatalog) {
     return (
-      <GovernanceLayout pageTitle="Tool Catalog · Governance · LangWatch">
+      <GovernanceLayout pageTitle="Tool Tiles · Governance · LangWatch">
         <VStack align="stretch" gap={6} width="full">
           <ToolCatalogHeading />
           <PermissionRequiredNotice
             permission="aiTools:manage"
-            detail="The catalog and the ingestion templates stay hidden until then."
+            detail="The tiles and the ingestion templates stay hidden until then."
           />
         </VStack>
       </GovernanceLayout>
@@ -61,7 +61,7 @@ function ToolCatalogPage() {
   }
 
   return (
-    <GovernanceLayout pageTitle="Tool Catalog · Governance · LangWatch">
+    <GovernanceLayout pageTitle="Tool Tiles · Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full">
         <ToolCatalogHeading />
 
@@ -119,10 +119,10 @@ function ToolCatalogHeading() {
     <HStack alignItems="end">
       <VStack align="start" gap={0}>
         <Heading as="h2" size="lg">
-          AI Tool Catalog
+          AI Tool Tiles
         </Heading>
         <Text color="fg.muted" fontSize="sm">
-          Catalog rows your members see on their <code>/me</code> portal.
+          The tiles your members see on their <code>/me</code> portal.
         </Text>
       </VStack>
       <Spacer />
