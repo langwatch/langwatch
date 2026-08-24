@@ -1,5 +1,88 @@
+import { NotFoundError } from "@langwatch/handled-error";
 import { z } from "zod";
 import { unsupportedGovernanceValue } from "./governance.errors";
+
+export const ANOMALY_RULE_SEVERITIES = [
+  "critical",
+  "warning",
+  "info",
+] as const;
+export const ANOMALY_RULE_SCOPES = [
+  "organization",
+  "team",
+  "project",
+  "source_type",
+  "source",
+] as const;
+export const ANOMALY_RULE_STATUSES = ["active", "disabled"] as const;
+
+export const anomalyRuleSeveritySchema = z.enum(ANOMALY_RULE_SEVERITIES);
+export const anomalyRuleScopeSchema = z.enum(ANOMALY_RULE_SCOPES);
+export const anomalyRuleStatusSchema = z.enum(ANOMALY_RULE_STATUSES);
+
+export type AnomalyRuleSeverity = z.infer<typeof anomalyRuleSeveritySchema>;
+export type AnomalyRuleScope = z.infer<typeof anomalyRuleScopeSchema>;
+export type AnomalyRuleStatus = z.infer<typeof anomalyRuleStatusSchema>;
+
+export const anomalyRuleSchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  scope: anomalyRuleScopeSchema,
+  scopeId: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  severity: anomalyRuleSeveritySchema,
+  ruleType: z.string(),
+  thresholdConfig: z.record(z.string(), z.unknown()),
+  destinationConfig: z.record(z.string(), z.unknown()),
+  status: anomalyRuleStatusSchema,
+  archivedAt: z.date().nullable(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  createdById: z.string().nullable(),
+});
+export type AnomalyRule = z.infer<typeof anomalyRuleSchema>;
+
+export const createAnomalyRuleInputSchema = z.object({
+  organizationId: z.string(),
+  name: z.string().min(1).max(128),
+  description: z.string().nullable().optional(),
+  severity: anomalyRuleSeveritySchema,
+  ruleType: z.string().min(1).max(64),
+  scope: anomalyRuleScopeSchema,
+  scopeId: z.string().min(1),
+  thresholdConfig: z.record(z.string(), z.unknown()).optional(),
+  destinationConfig: z.record(z.string(), z.unknown()).optional(),
+  status: anomalyRuleStatusSchema.optional(),
+  actorUserId: z.string(),
+});
+export type CreateAnomalyRuleInput = z.infer<
+  typeof createAnomalyRuleInputSchema
+>;
+
+export const updateAnomalyRuleInputSchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  name: z.string().min(1).max(128).optional(),
+  description: z.string().nullable().optional(),
+  severity: anomalyRuleSeveritySchema.optional(),
+  ruleType: z.string().min(1).max(64).optional(),
+  scope: anomalyRuleScopeSchema.optional(),
+  scopeId: z.string().min(1).optional(),
+  thresholdConfig: z.record(z.string(), z.unknown()).optional(),
+  destinationConfig: z.record(z.string(), z.unknown()).optional(),
+  status: anomalyRuleStatusSchema.optional(),
+});
+export type UpdateAnomalyRuleInput = z.infer<
+  typeof updateAnomalyRuleInputSchema
+>;
+
+export class AnomalyRuleNotFoundError extends NotFoundError {
+  constructor(ruleId: string) {
+    super("anomaly_rule_not_found", "Anomaly rule", ruleId);
+    this.name = "AnomalyRuleNotFoundError";
+  }
+}
 
 export const SUPPORTED_DESTINATION_TYPES = ["webhook"] as const;
 export const webhookDestinationSchema = z

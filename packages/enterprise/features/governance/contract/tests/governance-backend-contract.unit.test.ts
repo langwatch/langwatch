@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  anomalyRuleSchema,
+  createAnomalyRuleInputSchema,
   safeParseDestinationConfig,
   validateThresholdConfig,
 } from "../src/anomaly-rule";
@@ -39,6 +41,39 @@ describe("governance backend contract", () => {
     expect(() =>
       validateThresholdConfig({ ruleType: "typo", config: {} }),
     ).toThrow('Unsupported ruleType "typo"');
+  });
+
+  it("validates portable anomaly rule commands and records with Zod 4", () => {
+    expect(
+      createAnomalyRuleInputSchema.safeParse({
+        organizationId: "organization",
+        name: "Spend spike",
+        severity: "warning",
+        ruleType: "spend_spike",
+        scope: "organization",
+        scopeId: "organization",
+        actorUserId: "user",
+      }).success,
+    ).toBe(true);
+    expect(
+      anomalyRuleSchema.safeParse({
+        id: "rule",
+        organizationId: "organization",
+        name: "Spend spike",
+        description: null,
+        severity: "urgent",
+        ruleType: "spend_spike",
+        scope: "organization",
+        scopeId: "organization",
+        thresholdConfig: {},
+        destinationConfig: {},
+        status: "active",
+        archivedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        createdById: "user",
+      }).success,
+    ).toBe(false);
   });
 
   it("normalizes pull money as a decimal string", () => {

@@ -49,6 +49,10 @@ REST, RPC, tRPC, Eventing, and browser code are adapters or consumers.
 The contract uses Zod 4 and Croner. It imports no application, server,
 database, request-framework, or Eventing runtime type.
 
+Anomaly-rule validation and lifecycle belong to the Governance contract and
+server service. The application router owns authentication and tRPC only;
+Postgres access stays in the feature's private Prisma repository.
+
 ## Persistence
 
 Server persistence is accessed through narrow class ports. Generated Prisma

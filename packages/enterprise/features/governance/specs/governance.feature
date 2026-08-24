@@ -44,6 +44,17 @@ Feature: Enterprise governance package boundary
     Then governance computes the per-source rate and warning threshold
     And ClickHouse access remains behind the injected trace-activity capability
 
+  Scenario: Anomaly rules are validated before persistence
+    Given an administrator supplies an anomaly rule configuration
+    When Governance creates or updates the rule
+    Then the rule scope, severity, threshold and destinations are validated by the Governance contract
+    And Postgres access remains behind the Governance server repository
+
+  Scenario: Anomaly rule reads are tenant scoped
+    Given an anomaly rule belongs to one organization
+    When another organization requests that rule by identifier
+    Then Governance returns no rule
+
   Scenario: Contracts are transport independent
     Given a browser imports the governance contract root
     Then no server, Eventing, application, environment, or generated database module loads
