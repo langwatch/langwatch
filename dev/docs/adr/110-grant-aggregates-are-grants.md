@@ -110,11 +110,18 @@ operator remembering it. An organization created today is created against the
 legacy authorization path exactly as before, writes its founder's legacy rows
 imperatively, and the next pass adopts them. Creation never touches the
 ledger, so nothing here re-introduces the born-on-engine coupling that made
-signup wait on the queue. The one class the automatic cohort leaves out is an
-organization running a private data plane; an operator naming one
-deliberately still enrolls it. The declaration is per migration, so a
-migration still mid-rollout — the identity ones — keeps its enrollment pacing
-untouched.
+signup wait on the queue. The cohort leaves nobody out — an organization
+running a private data plane included. This migration is rooted in the
+ORGANIZATION, and `getClickHouseClientForTenant` resolves an organization-id
+tenant to that organization and routes to its own ClickHouse instance when
+one is configured, refusing to fall back to the shared client rather than
+leaking; so its facts already land where they belong, and excluding it would
+only strand that customer on the legacy authorization path forever. The
+user-rooted identity migrations are the case that genuinely cannot place
+their events — a user tenant is neither a project nor an organization — which
+is why they, and not this one, exclude private-dataplane members. The
+declaration is per migration, so a migration still mid-rollout — the identity
+ones — keeps its enrollment pacing untouched.
 
 **Aggregate ids must be STABLE ACROSS RETRIES, which is not determinism.** The
 event log dedupes on `(TenantId, AggregateType, AggregateId, IdempotencyKey)`,

@@ -73,21 +73,20 @@ Feature: Running system migrations across organizations
     When a pass runs
     Then that organization is migrated
 
-  # The one class no cohort draw has ever included. Their events belong on
-  # their own instance, and a declaration is not the place to change that.
+  # A dedicated data plane is not a reason to leave an organization out on
+  # this axis: these migrations are rooted in the ORGANIZATION, and an
+  # organization-rooted append is placed on that organization's own instance
+  # by the routing. Leaving them out would strand exactly those customers on
+  # their legacy path forever. The user-rooted axis is the one that cannot
+  # place its events — a user tenant is neither a project nor an
+  # organization — and it excludes those members for that reason
+  # (specs/identity/identifier-model.feature).
   @unit
-  Scenario: An automatic cohort leaves out a private-dataplane organization
+  Scenario: An automatic cohort includes a private-dataplane organization
     Given a migration declared enrolled automatically
     And an organization with a dedicated data plane exists
-    When a pass runs
-    Then that organization is left alone with no state recorded
-
-  @unit
-  Scenario: An operator can still enroll a private-dataplane organization by name
-    Given a migration declared enrolled automatically
-    And an operator has enrolled an organization with a dedicated data plane
-    When a pass runs
-    Then that organization is migrated
+    When a pass computes its cohort
+    Then that organization is in it
 
   @unit
   Scenario: Enrolling an organization for an automatically enrolled migration is refused

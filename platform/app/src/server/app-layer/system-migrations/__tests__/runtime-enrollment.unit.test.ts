@@ -193,28 +193,14 @@ describe("migrationPassCohort on cloud", () => {
       ).toBe(false);
     });
 
-    /** @scenario "An automatic cohort leaves out a private-dataplane organization" */
-    it("leaves out the organizations the private ClickHouse routing table names", async () => {
+    /** @scenario "An automatic cohort includes a private-dataplane organization" */
+    it("admits the organizations the private ClickHouse routing table names", async () => {
+      // The routing table is mocked with "org_private" above. An
+      // organization-rooted append is placed on that organization's own
+      // instance, so there is nothing to keep out of the shared log - and
+      // keeping it out would strand that customer on the legacy
+      // authorization path forever.
       stubs.enrollmentFindMany.mockResolvedValueOnce([]);
-
-      const cohort = await migrationPassCohort();
-
-      expect(
-        cohort({
-          tenantId: "org_private",
-          migrationName: AUTHZ_ENGINE_MIGRATION_NAME,
-        }),
-      ).toBe(false);
-    });
-
-    /** @scenario "An operator can still enroll a private-dataplane organization by name" */
-    it("admits a private-dataplane organization an enrollment row names", async () => {
-      stubs.enrollmentFindMany.mockResolvedValueOnce([
-        {
-          organizationId: "org_private",
-          migrationName: AUTHZ_ENGINE_MIGRATION_NAME,
-        },
-      ]);
 
       const cohort = await migrationPassCohort();
 

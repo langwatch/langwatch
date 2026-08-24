@@ -26,10 +26,16 @@
  * authorization-engine migration is finished and automatic while the
  * identity migrations are still soaking behind enrollment.
  *
- * What the automatic path does NOT do is sweep up an organization running a
- * private data plane. No cohort draw has ever included one, and a
- * declaration is not the place to change that; an operator naming one
- * deliberately still can.
+ * A private data plane changes nothing here, and the routing is the reason:
+ * every migration on this axis is ORGANIZATION-rooted, and the event store
+ * places an organization-rooted append on that organization's own ClickHouse
+ * instance when one is configured, refusing to fall back to the shared
+ * client rather than leaking. Leaving those organizations out would strand
+ * them on their legacy path forever - the very drift an automatic cohort
+ * exists to end. The USER-rooted cohort is the case that genuinely cannot
+ * place its events: a user tenant resolves to neither a project nor an
+ * organization, so `userMigrationPassCohort` excludes private-dataplane
+ * members there, and only there.
  *
  * SELF-HOSTED is paced per migration, at release time, by the migration's
  * own `runsAutomaticallyOnSelfHosted` declaration. There is no enrollment
@@ -52,26 +58,21 @@
  * pass; failing that, the migration's own `enrolledAutomatically`
  * declaration does.
  *
- * The automatic path leaves out an organization running a private data
- * plane, the way every cohort draw always has: an operator who names one
- * deliberately still enrolls it, but no declaration sweeps one up. An
- * explicit row therefore outranks the exclusion - it is the operator's
- * decision, not an accident of a widened cohort.
+ * A private data plane is deliberately not asked about: the routing already
+ * places an organization-rooted append on that organization's own instance
+ * (see the module doc). The user-rooted cohort is the one that has to ask.
  */
 export function organizationMigrates({
   isSaaS,
   enrolledAutomatically,
-  hasPrivateDataplane,
   enrolled,
 }: {
   isSaaS: boolean;
   enrolledAutomatically: boolean;
-  hasPrivateDataplane: boolean;
   enrolled: boolean;
 }): boolean {
   if (!isSaaS) return true;
-  if (enrolled) return true;
-  return enrolledAutomatically && !hasPrivateDataplane;
+  return enrolled || enrolledAutomatically;
 }
 
 /**

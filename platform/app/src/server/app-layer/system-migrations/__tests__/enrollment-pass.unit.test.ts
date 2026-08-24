@@ -122,14 +122,12 @@ function passOn({
   isSaaS,
   tenants,
   enrolled,
-  privateDataplaneTenants = [],
   migrations,
   state,
 }: {
   isSaaS: boolean;
   tenants: string[];
   enrolled: Map<string, Set<string>>;
-  privateDataplaneTenants?: string[];
   migrations: SystemMigration[];
   state: SystemMigrationStateRepository;
 }) {
@@ -146,7 +144,6 @@ function passOn({
       organizationMigrates({
         isSaaS,
         enrolledAutomatically: automatic.has(migrationName),
-        hasPrivateDataplane: privateDataplaneTenants.includes(tenantId),
         enrolled: enrolled.get(migrationName)?.has(tenantId) ?? false,
       }),
     migrations: migrations.filter((migration) =>
@@ -318,53 +315,6 @@ describe("the migration pass under its cohort rules", () => {
         "acme",
         "born_later",
       ]);
-    });
-
-    /** @scenario "An automatic cohort leaves out a private-dataplane organization" */
-    it("leaves a private-dataplane organization untouched, with no state recorded", async () => {
-      const automatic = migrationOf({
-        name: "authz-engine-like",
-        runsAutomaticallyOnSelfHosted: true,
-        enrolledAutomatically: true,
-      });
-      const state = new InMemoryStateRepository();
-
-      await passOn({
-        isSaaS: true,
-        tenants: ["acme", "isolated_inc"],
-        enrolled: new Map(),
-        privateDataplaneTenants: ["isolated_inc"],
-        migrations: [automatic],
-        state,
-      });
-
-      expect(automatic.migrateTenant).toHaveBeenCalledTimes(1);
-      expect(automatic.migrateTenant).toHaveBeenCalledWith(
-        expect.objectContaining({ tenantId: "acme" }),
-      );
-      expect(state.tenantIdsWithRecords()).toEqual(["acme"]);
-    });
-
-    /** @scenario "An operator can still enroll a private-dataplane organization by name" */
-    it("drives a private-dataplane organization an operator enrolled deliberately", async () => {
-      const automatic = migrationOf({
-        name: "authz-engine-like",
-        runsAutomaticallyOnSelfHosted: true,
-        enrolledAutomatically: true,
-      });
-      const state = new InMemoryStateRepository();
-
-      await passOn({
-        isSaaS: true,
-        tenants: ["isolated_inc"],
-        enrolled: new Map([["authz-engine-like", new Set(["isolated_inc"])]]),
-        privateDataplaneTenants: ["isolated_inc"],
-        migrations: [automatic],
-        state,
-      });
-
-      expect(automatic.migrateTenant).toHaveBeenCalledTimes(1);
-      expect(state.tenantIdsWithRecords()).toEqual(["isolated_inc"]);
     });
   });
 });

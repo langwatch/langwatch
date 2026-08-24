@@ -11,7 +11,6 @@ function paced(
   return organizationMigrates({
     isSaaS: true,
     enrolledAutomatically: false,
-    hasPrivateDataplane: false,
     enrolled: false,
     ...args,
   });
@@ -40,28 +39,6 @@ describe("organizationMigrates", () => {
       expect(paced({ enrolledAutomatically: true, enrolled: false })).toBe(
         true,
       );
-    });
-
-    /** @scenario "An automatic cohort leaves out a private-dataplane organization" */
-    it("leaves out an organization running a private data plane", () => {
-      expect(
-        paced({
-          enrolledAutomatically: true,
-          hasPrivateDataplane: true,
-          enrolled: false,
-        }),
-      ).toBe(false);
-    });
-
-    /** @scenario "An operator can still enroll a private-dataplane organization by name" */
-    it("includes a private-dataplane organization an operator enrolled deliberately", () => {
-      expect(
-        paced({
-          enrolledAutomatically: true,
-          hasPrivateDataplane: true,
-          enrolled: true,
-        }),
-      ).toBe(true);
     });
   });
 });

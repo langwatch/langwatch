@@ -250,18 +250,16 @@ function automaticallyEnrolledMigrationNames(): Set<string> {
  * query instead of one per tenant per migration, and an enrollment or
  * withdrawal takes effect on the very next pass with no restart. A migration
  * declaring `enrolledAutomatically` admits every organization without
- * consulting that read at all. Self-hosted includes every organization for
- * every migration the installation runs at all.
+ * consulting that read at all - including one running a private data plane,
+ * whose organization-rooted appends the event store already places on its
+ * own instance. Self-hosted includes every organization for every migration
+ * the installation runs at all.
  */
 export async function migrationPassCohort(): Promise<
   (args: { tenantId: string; migrationName: string }) => boolean
 > {
   const isSaaS = env.IS_SAAS === true;
   const automatic = automaticallyEnrolledMigrationNames();
-  // The environment's private ClickHouse routing table names the
-  // organizations an automatic cohort must not sweep up - the same env vars
-  // that route their data are what exclude them, so no id lives in code.
-  const privateOrganizationIds = getPrivateClickHouseUrls();
   // Still read on cloud, and still fresh: the migrations that have not
   // declared themselves automatic are paced by exactly these rows.
   const enrolledByMigration = isSaaS
@@ -271,7 +269,6 @@ export async function migrationPassCohort(): Promise<
     organizationMigrates({
       isSaaS,
       enrolledAutomatically: automatic.has(migrationName),
-      hasPrivateDataplane: privateOrganizationIds.has(tenantId),
       enrolled: enrolledByMigration.get(migrationName)?.has(tenantId) ?? false,
     });
 }
