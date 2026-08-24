@@ -1,6 +1,7 @@
 package engineexec_test
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,22 +26,19 @@ import (
 func TestEngineExecIsTheOnlyTranslation(t *testing.T) {
 	root := filepath.Join("..", "..")
 
+	// The walk only collects names. Reading inside the callback is what gosec
+	// G122 flags, since the path can change under a symlink between the two.
+	candidates, err := goFilesUnder(root)
+	require.NoError(t, err)
+
 	var offenders []string
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() || !strings.HasSuffix(path, ".go") {
-			return nil
-		}
+	for _, path := range candidates {
 		// This package IS the translation.
 		if strings.Contains(filepath.ToSlash(path), "adapters/engineexec/") {
-			return nil
+			continue
 		}
 		src, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
+		require.NoError(t, err)
 		// The signature of a hand-rolled executor: it satisfies
 		// app.WorkflowExecutor by parsing workflow JSON itself.
 		text := string(src)
@@ -48,9 +46,7 @@ func TestEngineExecIsTheOnlyTranslation(t *testing.T) {
 			strings.Contains(text, "engine.ExecuteRequest{") {
 			offenders = append(offenders, path)
 		}
-		return nil
-	})
-	require.NoError(t, err)
+	}
 
 	require.Empty(t, offenders,
 		"these files translate an app request into an engine request themselves; "+
@@ -60,17 +56,22 @@ func TestEngineExecIsTheOnlyTranslation(t *testing.T) {
 // TestTheGuardCanFail keeps the check above from passing because it scans
 // nothing. A guard that walks an empty tree reads exactly like a clean one.
 func TestTheGuardCanFail(t *testing.T) {
-	root := filepath.Join("..", "..")
-	var goFiles int
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	files, err := goFilesUnder(filepath.Join("..", ".."))
+	require.NoError(t, err)
+	require.Greater(t, len(files), 100, "the guard above scanned almost nothing")
+}
+
+// goFilesUnder lists every .go file under root, names only.
+func goFilesUnder(root string) ([]string, error) {
+	var files []string
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if !info.IsDir() && strings.HasSuffix(path, ".go") {
-			goFiles++
+		if !entry.IsDir() && strings.HasSuffix(path, ".go") {
+			files = append(files, path)
 		}
 		return nil
 	})
-	require.NoError(t, err)
-	require.Greater(t, goFiles, 100, "the guard above scanned almost nothing")
+	return files, err
 }
