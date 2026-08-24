@@ -1,6 +1,6 @@
 import type {
-  IdentityAggregateFact,
   IdentityCommand,
+  IdentityFact,
   IdentityFactInput,
 } from "@langwatch/identity";
 
@@ -21,5 +21,5 @@ export interface IdentityLedger {
   commit(args: {
     command: IdentityCommand;
     facts: IdentityFactInput[];
-  }): Promise<IdentityAggregateFact[]>;
+  }): Promise<IdentityFact[]>;
 }

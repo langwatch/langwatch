@@ -9,7 +9,6 @@
  * an id (node:crypto), reads a head, or appends a fact is
  * `@langwatch/identity-server`.
  */
-export { userTenantedCommandSchema } from "./command-envelope";
 export {
   type BackfillDiff,
   type BackfillIdentifierRow,
@@ -162,17 +161,13 @@ export {
   IDENTIFIER_DETACHED_EVENT_TYPE,
   IDENTIFIER_VERIFIED_EVENT_TYPE,
   IDENTITY_COMMAND_TYPES,
-  IDENTIFIER_EVENT_TYPES,
   IDENTITY_EVENT_TYPES,
   IDENTITY_EVENT_VERSION_LATEST,
   type IdentifierFact,
   type IdentityCommand,
   type IdentityCommandType,
-  type IdentifierEventType,
   type IdentityEventType,
   type IdentityFact,
-  type IdentifierFactInput,
-  type IdentityAggregateFact,
   type IdentityFactInput,
   type IdentityFactOf,
   type IdentityHeads,
@@ -181,7 +176,6 @@ export {
   identifierDetachedPayloadSchema,
   identifierVerifiedPayloadSchema,
   identifierFactInputSchema,
-  identityFactInputSchema,
   LINK_PROPOSED_EVENT_TYPE,
   type LinkProposalReason,
   linkProposalReasonSchema,

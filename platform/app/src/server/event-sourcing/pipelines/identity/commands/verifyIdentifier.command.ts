@@ -29,7 +29,7 @@ export class VerifyIdentifierCommand
     command: Command<VerifyIdentifierCommandData>,
   ): Promise<IdentityEvent[]> {
     const facts = await this.guards.verifyIdentifier(command.data);
-    return identityEventsFor<IdentityEvent>({
+    return identityEventsFor({
       command: { type: VERIFY_IDENTIFIER_COMMAND_TYPE, data: command.data },
       facts,
     });

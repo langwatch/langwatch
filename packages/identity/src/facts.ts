@@ -1,11 +1,4 @@
 import { z } from "zod";
-import { userTenantedCommandSchema } from "./command-envelope";
-import {
-  MFA_COMMAND_TYPES,
-  MFA_EVENT_TYPES,
-  type MfaCommand,
-  mfaFactInputSchema,
-} from "./mfa";
 import {
   type IdentifierLifecycleState,
   type IdentifierProvider,
@@ -47,7 +40,7 @@ export const IDENTIFIER_DETACHED_EVENT_TYPE =
 export const USER_ERASED_EVENT_TYPE = "lw.identity.user_erased" as const;
 export const LINK_PROPOSED_EVENT_TYPE = "lw.identity.link_proposed" as const;
 
-export const IDENTIFIER_EVENT_TYPES = [
+export const IDENTITY_EVENT_TYPES = [
   IDENTIFIER_ATTACHED_EVENT_TYPE,
   IDENTIFIER_VERIFIED_EVENT_TYPE,
   IDENTIFIER_DEAD_ENDED_EVENT_TYPE,
@@ -55,18 +48,6 @@ export const IDENTIFIER_EVENT_TYPES = [
   IDENTIFIER_DETACHED_EVENT_TYPE,
   USER_ERASED_EVENT_TYPE,
   LINK_PROPOSED_EVENT_TYPE,
-] as const;
-export type IdentifierEventType = (typeof IDENTIFIER_EVENT_TYPES)[number];
-
-/**
- * Everything the `user_identity` aggregate carries: the identifier facts
- * above AND two-step verification's (D06). One aggregate, several kinds of
- * thing, the way `trace` carries spans, logs and annotations — they share a
- * key, so they share a history and a lane.
- */
-export const IDENTITY_EVENT_TYPES = [
-  ...IDENTIFIER_EVENT_TYPES,
-  ...MFA_EVENT_TYPES,
 ] as const;
 export type IdentityEventType = (typeof IDENTITY_EVENT_TYPES)[number];
 
@@ -213,36 +194,16 @@ export const identifierFactInputSchema = z.discriminatedUnion("type", [
     data: linkProposedPayloadSchema,
   }),
 ]);
-export type IdentifierFactInput = z.infer<typeof identifierFactInputSchema>;
+export type IdentityFactInput = z.infer<typeof identifierFactInputSchema>;
 
-/** A fact with its business time — what the IDENTIFIER reducer folds. Narrow
- *  on purpose: `reduceIdentity` switches exhaustively over these, and a
- *  wider union would make it silently non-exhaustive. */
-export type IdentityFact = IdentifierFactInput & { occurredAt: number };
+/** A fact with its business time — what the reducer folds. Every framework
+ *  identity event is structurally one of these. */
+export type IdentityFact = IdentityFactInput & { occurredAt: number };
 
-export type IdentityFactOf<T extends IdentifierEventType> = Extract<
+export type IdentityFactOf<T extends IdentityEventType> = Extract<
   IdentityFact,
   { type: T }
 >;
-
-/**
- * Everything a command on the `user_identity` aggregate may state: the
- * identifier facts AND two-step verification's. This is the vocabulary the
- * app's ONE envelope stamps, which is why it is wider than what the
- * identifier reducer folds — each projection declares the schemas it
- * handles, so the identifier fold ignores an MFA fact and the enrollment
- * fold ignores an identifier one.
- */
-export const identityFactInputSchema = z.union([
-  identifierFactInputSchema,
-  mfaFactInputSchema,
-]);
-export type IdentityFactInput = z.infer<typeof identityFactInputSchema>;
-
-/** A committed fact of ANY kind this aggregate carries, with its business
- *  time — what the ledger hands back. Wider than `IdentityFact`, which is
- *  only what the identifier reducer folds. */
-export type IdentityAggregateFact = IdentityFactInput & { occurredAt: number };
 
 /** One identifier as the projection knows it — one row of `Identifier`. */
 export interface IdentifierFact {
@@ -311,9 +272,39 @@ export const IDENTITY_COMMAND_TYPES = [
   DETACH_IDENTIFIER_COMMAND_TYPE,
   ERASE_USER_COMMAND_TYPE,
   PROPOSE_LINK_COMMAND_TYPE,
-  ...MFA_COMMAND_TYPES,
 ] as const;
 export type IdentityCommandType = (typeof IDENTITY_COMMAND_TYPES)[number];
+
+const commandIdentitySchema = z.object({
+  /** The user IS the tenant of their own identity history (ADR-029 §4);
+   *  the framework builds the command envelope's tenantId from this field. */
+  tenantId: z.string().min(1),
+  userId: z.string().min(1),
+  commandId: z.string().min(1),
+});
+
+/**
+ * Every identity command carries the identity block AND the invariant that
+ * makes it one history per user: `tenantId === userId`. The emitted fact
+ * takes its `tenantId` from the command envelope and its `aggregateId` from
+ * `userId` — a caller wiring them differently would persist the event under
+ * one tenant's stream and fold it into another user's projection, which
+ * nothing downstream can detect. Refused at the wire boundary instead.
+ *
+ * Exported because `mfa.ts` is the same shape of aggregate — one history per
+ * person, the person as the tenant — and the invariant has to hold there for
+ * the same reason. Two copies of a refinement is two ways for it to drift.
+ */
+export function userTenantedCommandSchema<Shape extends z.ZodRawShape>(
+  shape: Shape,
+) {
+  return commandIdentitySchema
+    .extend(shape)
+    .refine((data) => data.tenantId === data.userId, {
+      message: "tenantId must equal userId: one identity history per user",
+      path: ["tenantId"],
+    });
+}
 
 export const attachIdentifierCommandDataSchema = userTenantedCommandSchema({
   /** The better-auth protocol row, when one exists. */
@@ -399,8 +390,4 @@ export type IdentityCommand =
   | { type: typeof MARK_PRIMARY_COMMAND_TYPE; data: MarkPrimaryCommandData }
   | { type: typeof DETACH_IDENTIFIER_COMMAND_TYPE; data: DetachIdentifierCommandData }
   | { type: typeof ERASE_USER_COMMAND_TYPE; data: EraseUserCommandData }
-  | { type: typeof PROPOSE_LINK_COMMAND_TYPE; data: ProposeLinkCommandData }
-  // Two-step verification rides the same aggregate, so it rides the same
-  // envelope: every one of these carries the identity command block the
-  // envelope reads (userId, tenantId, commandId, occurredAtMs).
-  | MfaCommand;
+  | { type: typeof PROPOSE_LINK_COMMAND_TYPE; data: ProposeLinkCommandData };

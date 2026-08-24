@@ -29,7 +29,7 @@ export class EraseUserCommand
     command: Command<EraseUserCommandData>,
   ): Promise<IdentityEvent[]> {
     const facts = await this.guards.eraseUser(command.data);
-    return identityEventsFor<IdentityEvent>({
+    return identityEventsFor({
       command: { type: ERASE_USER_COMMAND_TYPE, data: command.data },
       facts,
     });

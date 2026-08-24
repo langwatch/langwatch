@@ -33,7 +33,7 @@ export class AttachIdentifierCommand
     command: Command<AttachIdentifierCommandData>,
   ): Promise<IdentityEvent[]> {
     const facts = await this.guards.attachIdentifier(command.data);
-    return identityEventsFor<IdentityEvent>({
+    return identityEventsFor({
       command: { type: ATTACH_IDENTIFIER_COMMAND_TYPE, data: command.data },
       facts,
     });

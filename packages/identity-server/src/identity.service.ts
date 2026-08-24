@@ -108,10 +108,6 @@ export class IdentityService
     facts: Awaited<ReturnType<IdentityGuards["attachIdentifier"]>>,
   ): Promise<IdentityFact[]> {
     if (facts.length === 0) return [];
-    // Every verb on this service is an IDENTIFIER verb, so the facts handed
-    // back are exactly the ones handed in. The ledger's type is wider because
-    // the aggregate also carries two-step verification (D06), which reaches
-    // it through MfaGuards rather than through here.
-    return (await this.ledger.commit({ command, facts })) as IdentityFact[];
+    return this.ledger.commit({ command, facts });
   }
 }

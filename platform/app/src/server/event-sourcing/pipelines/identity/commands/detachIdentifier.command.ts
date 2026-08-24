@@ -29,7 +29,7 @@ export class DetachIdentifierCommand
     command: Command<DetachIdentifierCommandData>,
   ): Promise<IdentityEvent[]> {
     const facts = await this.guards.detachIdentifier(command.data);
-    return identityEventsFor<IdentityEvent>({
+    return identityEventsFor({
       command: { type: DETACH_IDENTIFIER_COMMAND_TYPE, data: command.data },
       facts,
     });

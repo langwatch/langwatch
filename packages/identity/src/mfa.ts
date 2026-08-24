@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { userTenantedCommandSchema } from "./command-envelope";
+import { userTenantedCommandSchema } from "./facts";
 import { identityActorSchema } from "./vocabulary";
 
 /**

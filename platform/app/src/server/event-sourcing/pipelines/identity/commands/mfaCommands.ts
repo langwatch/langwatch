@@ -19,7 +19,7 @@ import type { MfaGuards } from "@langwatch/identity-server";
 import type { ZodTypeAny, z } from "zod";
 import { defineCommandSchema } from "../../..";
 import type { Command, CommandHandler } from "../../../commands/command";
-import { identityEventsFor } from "../envelope";
+import { mfaEventsFor } from "../envelope";
 import type { MfaEvent } from "../schemas/mfaEvents";
 
 /**
@@ -31,10 +31,10 @@ import type { MfaEvent } from "../schemas/mfaEvents";
  * seven times across seven files — the connection pipeline's shape, for the
  * same reason.
  *
- * They stamp their events through `identityEventsFor`, the same envelope the
- * identifier verbs use, because they ride the same aggregate. A second
- * envelope stamping the same aggregate type is exactly the divergence that
- * envelope's comment exists to prevent.
+ * They stamp through `mfaEventsFor`, which sits beside `identityEventsFor` in
+ * the pipeline's one envelope module. Same aggregate and same lane, but its
+ * own `version`: fold read-back is version-gated, and sharing one stamp would
+ * tie an MFA payload change to an identifier-vocabulary bump.
  */
 
 type GuardVerb = {
@@ -74,10 +74,7 @@ function mfaCommand<Schema extends ZodTypeAny>({
       const facts = await (
         this.guards[verb] as (input: never) => Promise<never[]>
       )(data);
-      return identityEventsFor<MfaEvent>({
-        command: { type, data } as MfaCommand,
-        facts,
-      });
+      return mfaEventsFor({ command: { type, data } as MfaCommand, facts });
     }
   };
 }

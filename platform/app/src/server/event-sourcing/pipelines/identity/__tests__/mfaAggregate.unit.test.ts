@@ -1,5 +1,7 @@
 import {
   emptyMfaEnrollment,
+  IDENTITY_EVENT_VERSION_LATEST,
+  MFA_EVENT_VERSION_LATEST,
   type MfaEnrollmentState,
   type MfaFact,
   reduceMfaEnrollment,
@@ -242,6 +244,29 @@ describe("two-step verification event aggregate type", () => {
         "method",
         "userId",
       ]);
+    });
+
+    /** @scenario "Starting a setup records the fact and never the secret" */
+    it("stamps its own schema version, not the identifier vocabulary's", async () => {
+      // Two families on one aggregate, evolving independently. Fold read-back
+      // is version-gated, so sharing a stamp would tie an MFA payload change
+      // to an identifier-vocabulary bump and leave every identifier event
+      // claiming a version nothing in it had changed.
+      const [mfaEvent] = await new EnrollMfaCommand(
+        new MfaGuards(new EnrollmentOf(emptyMfaEnrollment({ userId: USER }))),
+      ).handle(
+        command({
+          ...base,
+          commandId: "mfacmd_v",
+          enrollmentId: ENROLLMENT,
+          method: "totp" as const,
+        }) as never,
+      );
+
+      expect((mfaEvent as { version: string }).version).toBe(
+        MFA_EVENT_VERSION_LATEST,
+      );
+      expect(MFA_EVENT_VERSION_LATEST).not.toBe(IDENTITY_EVENT_VERSION_LATEST);
     });
 
     /** @scenario "One person has one setup, however many organizations they belong to" */
