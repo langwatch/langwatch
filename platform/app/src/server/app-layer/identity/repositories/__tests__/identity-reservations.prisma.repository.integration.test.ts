@@ -30,7 +30,93 @@ afterEach(async () => {
   });
 });
 
+/** The whole point of the table: what `claim` answered is a row that is
+ *  really there. A holder with no row behind it is a lock nobody holds. */
+async function rowFor(normalizedValue: string) {
+  return prisma.identifierReservation.findUnique({
+    where: { normalizedValue },
+  });
+}
+
 describe("PrismaIdentityReservationRepository", () => {
+  describe("when a claim returns a holder", () => {
+    /**
+     * The invariant the two-statement version could break. It inserted, then
+     * read the holder back in a SECOND statement, and a `release()` or
+     * `reapOrphans()` deleting the incumbent in between made that read return
+     * nothing - whereupon the caller was handed its own claim and told it held
+     * a lock that did not exist. The next caller, inserting into the now-free
+     * key, was told the same, and two users staged facts for one address.
+     */
+    /** @scenario "Two concurrent verifications of one address: the loser is refused before any fact" */
+    it("always names a holder a persisted row agrees with, on every transition", async () => {
+      const fresh = await repository.claim({
+        normalizedValue: VALUE,
+        userId: MINE,
+        identifierId: "idf_mine",
+        commandId: "idcmd_mine",
+      });
+      expect(await rowFor(VALUE)).toMatchObject({
+        userId: fresh.userId,
+        identifierId: fresh.identifierId,
+        commandId: fresh.commandId,
+      });
+
+      const contended = await repository.claim({
+        normalizedValue: VALUE,
+        userId: THEIRS,
+        identifierId: "idf_theirs",
+        commandId: "idcmd_theirs",
+      });
+      expect(await rowFor(VALUE)).toMatchObject({
+        userId: contended.userId,
+        identifierId: contended.identifierId,
+        commandId: contended.commandId,
+      });
+
+      // The incumbent's row deleted out from under the key - `release()` and
+      // `reapOrphans()` both do this concurrently, which is what made the old
+      // window reachable rather than theoretical.
+      await prisma.identifierReservation.delete({
+        where: { normalizedValue: VALUE },
+      });
+      const afterDelete = await repository.claim({
+        normalizedValue: VALUE,
+        userId: THEIRS,
+        identifierId: "idf_theirs",
+        commandId: "idcmd_theirs",
+      });
+      expect(afterDelete.userId).toBe(THEIRS);
+      expect(await rowFor(VALUE)).toMatchObject({ userId: THEIRS });
+    });
+
+    /** @scenario "Two concurrent verifications of one address: the loser is refused before any fact" */
+    it("answers one winner to every concurrent claimant, with one row behind it", async () => {
+      const claimants = Array.from({ length: 8 }, (_, index) => ({
+        normalizedValue: VALUE,
+        userId: `${namespace}-u${index}`,
+        identifierId: `idf_${index}`,
+        commandId: `idcmd_${index}`,
+      }));
+
+      const holders = await Promise.all(
+        claimants.map((claimant) => repository.claim(claimant)),
+      );
+
+      // One winner, told to everybody - not "whoever asked".
+      const winners = new Set(holders.map((holder) => holder.userId));
+      expect(winners.size).toBe(1);
+      expect(await rowFor(VALUE)).toMatchObject({
+        userId: [...winners][0] as string,
+      });
+      expect(
+        await prisma.identifierReservation.count({
+          where: { normalizedValue: VALUE },
+        }),
+      ).toBe(1);
+    });
+  });
+
   describe("when two users claim one address", () => {
     /** @scenario "Two concurrent verifications of one address: the loser is refused before any fact" */
     it("answers the first claimant to both, so the second knows it lost", async () => {

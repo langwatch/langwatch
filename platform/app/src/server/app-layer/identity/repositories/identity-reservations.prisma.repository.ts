@@ -18,10 +18,29 @@ export class PrismaIdentityReservationRepository
   constructor(private readonly prisma: PrismaClient) {}
 
   /**
-   * `INSERT ... ON CONFLICT DO NOTHING`, then read the holder back. Two
-   * statements, one decision: the insert is what races, and the read only
-   * reports who won. A read-then-insert would be the very check-then-act this
-   * table exists to replace.
+   * ONE statement, and that is the whole design.
+   *
+   * `ON CONFLICT DO UPDATE ... RETURNING` returns the row that ends up
+   * holding the key — this caller's on an insert, the incumbent's on a
+   * conflict. `DO NOTHING ... RETURNING` returns no row at all on conflict,
+   * which is why this cannot be written that way and then read back: an
+   * insert followed by a separate `findUnique` is two statements, and a
+   * `release()` or `reapOrphans()` deleting the incumbent's row between them
+   * returns nothing while the key sits free. Answering that with the
+   * caller's own claim would tell them they hold a lock that does not
+   * exist — and the next caller, inserting into the now-free key, would be
+   * told the same. Two users staging facts for one address is exactly the
+   * cross-user double-verification this table exists to prevent, and nothing
+   * downstream catches it: `Identifier.value` deliberately carries no unique
+   * constraint. `reapOrphans` cannot help either, because the defect is the
+   * ABSENCE of a row, not a stale one.
+   *
+   * The `SET` is a deliberate no-op — assigning the column to itself is what
+   * makes the row visible to `RETURNING` without changing it. Concurrent
+   * claimants on one key serialize on that row lock, which is the behaviour
+   * wanted: the second waits microseconds and then reads the real winner.
+   * There is no outer transaction anywhere on this path, so the lock is held
+   * for one statement and can never take part in a lock-ordering cycle.
    */
   async claim({
     normalizedValue,
@@ -34,22 +53,26 @@ export class PrismaIdentityReservationRepository
     identifierId: string;
     commandId: string;
   }): Promise<IdentifierReservationHolder> {
-    await this.prisma.$executeRaw`
+    const [held] = await this.prisma.$queryRaw<IdentifierReservationHolder[]>`
       -- @tenancy: the lock is keyed by a normalized address and claimed
       -- before any user is known to hold it, which is what it decides.
       INSERT INTO "IdentifierReservation"
         ("normalizedValue", "userId", "identifierId", "commandId")
       VALUES (${normalizedValue}, ${userId}, ${identifierId}, ${commandId})
-      ON CONFLICT ("normalizedValue") DO NOTHING
+      ON CONFLICT ("normalizedValue") DO UPDATE
+        SET "normalizedValue" = "IdentifierReservation"."normalizedValue"
+      RETURNING "normalizedValue", "userId", "identifierId", "commandId"
     `;
-    const held = await this.prisma.identifierReservation.findUnique({
-      where: { normalizedValue },
-    });
-    // The row cannot be absent: either this insert wrote it or somebody
-    // else's did. A delete racing between the two statements is the one
-    // exception, and answering with this caller's own claim is right — the
-    // value is free, and the next pass reaps the lock nothing backs.
-    return held ?? { normalizedValue, userId, identifierId, commandId };
+    if (held === undefined) {
+      // Unreachable by construction: the statement either inserts or updates,
+      // and both return their row. Refusing loudly rather than inventing a
+      // holder, because a claim that answers without a row behind it is the
+      // one failure this table cannot tolerate.
+      throw new Error(
+        "the address lock returned no holder; the claim statement must always return the winning row",
+      );
+    }
+    return held;
   }
 
   async release({
