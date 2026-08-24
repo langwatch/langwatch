@@ -236,6 +236,9 @@ describe("buildEditSubmission", () => {
       },
       ottlStatements: [],
       pullSchedule: "0 * * * *",
+      // A pull source never offers the destination picker, so an edit of one
+      // always leaves it untouched.
+      destination: undefined,
       ...overrides,
     });
   }

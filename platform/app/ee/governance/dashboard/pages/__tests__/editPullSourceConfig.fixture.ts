@@ -21,5 +21,8 @@ export function composer(
     parserConfig,
     ottlStatements: [],
     pullSchedule,
+    // A pull source carries no conversations, so it never offers a
+    // destination (ADR-088 Decision 8).
+    traceProjectId: null,
   };
 }
