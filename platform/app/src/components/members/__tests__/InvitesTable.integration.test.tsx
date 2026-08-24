@@ -3,13 +3,13 @@
  *
  * Integration tests for the Invites table on the members page.
  *
- * Covers the @integration UI scenarios from specs/members/update-pending-invitation.feature:
- * - Non-admin sees only their own pending approval requests
- * - Admin sees all pending approval requests
- * - Pending approval requests display a badge
+ * Covers the visible invitation states of D11
+ * (specs/identity/resilient-invitations.feature): every invitation shows its
+ * state and expiry, an expired one offers resend, and a revoked one stays
+ * visible with no actions.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   INVITE_STATUS,
@@ -32,6 +32,7 @@ function makeInvite(
     id: string;
     email: string;
     status: INVITE_STATUS;
+    displayStatus: OrganizationInvite["displayStatus"];
   },
 ): OrganizationInvite {
   return {
@@ -40,8 +41,34 @@ function makeInvite(
     requestedByUser: null,
     inviteCode: "invite-code",
     teamIds: "team-1",
+    expiration: new Date(Date.now() + 86400000),
     ...overrides,
   } as OrganizationInvite;
+}
+
+function renderTable(
+  invites: OrganizationInvite[],
+  {
+    isAdmin = true,
+    onResendInvite = vi.fn<(inviteId: string) => void>(),
+    onRevokeInvite = vi.fn<(inviteId: string) => void>(),
+  }: {
+    isAdmin?: boolean;
+    onResendInvite?: (inviteId: string) => void;
+    onRevokeInvite?: (inviteId: string) => void;
+  } = {},
+) {
+  render(
+    <InvitesTable
+      invites={invites}
+      isAdmin={isAdmin}
+      teams={teams}
+      onViewInviteLink={vi.fn()}
+      onResendInvite={onResendInvite}
+      onRevokeInvite={onRevokeInvite}
+    />,
+    { wrapper: Wrapper },
+  );
 }
 
 describe("<InvitesTable/>", () => {
@@ -49,265 +76,96 @@ describe("<InvitesTable/>", () => {
     cleanup();
   });
 
-  describe("when user is a non-admin", () => {
-    const currentUserId = "user-1";
-    const waitingApprovalInvites: OrganizationInvite[] = [
-      makeInvite({
-        id: "inv-1",
-        email: "alice-invite@example.com",
-        status: "WAITING_APPROVAL",
-        requestedBy: "user-1",
-      }),
-      makeInvite({
-        id: "inv-2",
-        email: "bob-invite@example.com",
-        status: "WAITING_APPROVAL",
-        requestedBy: "user-2",
-      }),
-    ];
-
-    it("hides pending approval requests created by other users", () => {
-      render(
-        <InvitesTable
-          waitingApprovalInvites={waitingApprovalInvites}
-          sentInvites={[]}
-          isAdmin={false}
-          currentUserId={currentUserId}
-          teams={teams}
-          onApprove={vi.fn()}
-          onReject={vi.fn()}
-          onViewInviteLink={vi.fn()}
-          onDeleteInvite={vi.fn()}
-        />,
-        { wrapper: Wrapper },
-      );
-
-      expect(screen.queryByText("bob-invite@example.com")).toBeNull();
-    });
-
-    it("shows pending approval requests created by the current user", () => {
-      render(
-        <InvitesTable
-          waitingApprovalInvites={waitingApprovalInvites}
-          sentInvites={[]}
-          isAdmin={false}
-          currentUserId={currentUserId}
-          teams={teams}
-          onApprove={vi.fn()}
-          onReject={vi.fn()}
-          onViewInviteLink={vi.fn()}
-          onDeleteInvite={vi.fn()}
-        />,
-        { wrapper: Wrapper },
-      );
-
-      expect(screen.getByText("alice-invite@example.com")).toBeTruthy();
-    });
-  });
-
-  describe("when user is an admin", () => {
-    const waitingApprovalInvites: OrganizationInvite[] = [
-      makeInvite({
-        id: "inv-10",
-        email: "admin-view@example.com",
-        status: "WAITING_APPROVAL",
-        requestedBy: "user-2",
-      }),
-    ];
-
-    it("shows all pending approval requests", () => {
-      render(
-        <InvitesTable
-          waitingApprovalInvites={waitingApprovalInvites}
-          sentInvites={[]}
-          isAdmin={true}
-          currentUserId="admin-user"
-          teams={teams}
-          onApprove={vi.fn()}
-          onReject={vi.fn()}
-          onViewInviteLink={vi.fn()}
-          onDeleteInvite={vi.fn()}
-        />,
-        { wrapper: Wrapper },
-      );
-
-      expect(screen.getByText("admin-view@example.com")).toBeTruthy();
-    });
-
-    it("shows approve actions for pending invites", () => {
-      render(
-        <InvitesTable
-          waitingApprovalInvites={waitingApprovalInvites}
-          sentInvites={[]}
-          isAdmin={true}
-          currentUserId="admin-user"
-          teams={teams}
-          onApprove={vi.fn()}
-          onReject={vi.fn()}
-          onViewInviteLink={vi.fn()}
-          onDeleteInvite={vi.fn()}
-        />,
-        { wrapper: Wrapper },
-      );
-
-      expect(screen.getByRole("button", { name: "Approve" })).toBeTruthy();
-    });
-
-    it("shows reject actions for pending invites", () => {
-      render(
-        <InvitesTable
-          waitingApprovalInvites={waitingApprovalInvites}
-          sentInvites={[]}
-          isAdmin={true}
-          currentUserId="admin-user"
-          teams={teams}
-          onApprove={vi.fn()}
-          onReject={vi.fn()}
-          onViewInviteLink={vi.fn()}
-          onDeleteInvite={vi.fn()}
-        />,
-        { wrapper: Wrapper },
-      );
-
-      expect(screen.getByRole("button", { name: "Reject" })).toBeTruthy();
-    });
-  });
-
-  describe("when pending approval invites are shown", () => {
-    /** @scenario Member creates an invitation request that requires approval */
-    it("displays a pending approval badge", () => {
-      render(
-        <InvitesTable
-          waitingApprovalInvites={[
-            makeInvite({
-              id: "inv-20",
-              email: "pending@example.com",
-              status: "WAITING_APPROVAL",
-            }),
-          ]}
-          sentInvites={[]}
-          isAdmin={true}
-          currentUserId="admin-user"
-          teams={teams}
-          onApprove={vi.fn()}
-          onReject={vi.fn()}
-          onViewInviteLink={vi.fn()}
-          onDeleteInvite={vi.fn()}
-        />,
-        { wrapper: Wrapper },
-      );
-
-      expect(screen.getByText("Pending Approval")).toBeTruthy();
-    });
-  });
-
-  describe("when sent invites are shown", () => {
-    /** @scenario Admin creates an immediate invite */
-    it("displays an invited badge", () => {
-      render(
-        <InvitesTable
-          waitingApprovalInvites={[]}
-          sentInvites={[
-            makeInvite({
-              id: "inv-21",
-              email: "invited@example.com",
-              status: "PENDING",
-            }),
-          ]}
-          isAdmin={true}
-          currentUserId="admin-user"
-          teams={teams}
-          onApprove={vi.fn()}
-          onReject={vi.fn()}
-          onViewInviteLink={vi.fn()}
-          onDeleteInvite={vi.fn()}
-        />,
-        { wrapper: Wrapper },
-      );
+  describe("when invitations are in every visible state", () => {
+    it("shows each invitation with its state badge", () => {
+      renderTable([
+        makeInvite({
+          id: "inv-1",
+          email: "live@example.com",
+          status: "PENDING",
+          displayStatus: "PENDING",
+        }),
+        makeInvite({
+          id: "inv-2",
+          email: "late@example.com",
+          status: "PENDING",
+          displayStatus: "EXPIRED",
+          expiration: new Date(Date.now() - 1000),
+        }),
+        makeInvite({
+          id: "inv-3",
+          email: "gone@example.com",
+          status: "REVOKED",
+          displayStatus: "REVOKED",
+        }),
+      ]);
 
       expect(screen.getByText("Invited")).toBeTruthy();
+      expect(screen.getByText("Expired")).toBeTruthy();
+      expect(screen.getByText("Revoked")).toBeTruthy();
+      expect(screen.getByText("gone@example.com")).toBeTruthy();
     });
   });
 
-  describe("when pending and sent invites are present", () => {
-    const waitingApprovalInvites = [
-      makeInvite({
-        id: "inv-30",
-        email: "pending@example.com",
-        status: "WAITING_APPROVAL",
-      }),
-    ];
-    const sentInvites = [
-      makeInvite({
-        id: "inv-31",
-        email: "sent@example.com",
-        status: "PENDING",
-      }),
-    ];
-
-    it("renders pending invites before sent invites", () => {
-      render(
-        <InvitesTable
-          waitingApprovalInvites={waitingApprovalInvites}
-          sentInvites={sentInvites}
-          isAdmin={true}
-          currentUserId="admin-user"
-          teams={teams}
-          onApprove={vi.fn()}
-          onReject={vi.fn()}
-          onViewInviteLink={vi.fn()}
-          onDeleteInvite={vi.fn()}
-        />,
-        { wrapper: Wrapper },
+  describe("when an admin opens an expired invitation's actions", () => {
+    it("offers resend, and resending calls back with the invite id", async () => {
+      const onResendInvite = vi.fn();
+      renderTable(
+        [
+          makeInvite({
+            id: "inv-expired",
+            email: "late@example.com",
+            status: "PENDING",
+            displayStatus: "EXPIRED",
+            expiration: new Date(Date.now() - 1000),
+          }),
+        ],
+        { onResendInvite },
       );
 
-      const rows = screen.getAllByRole("row").slice(1);
+      fireEvent.click(screen.getByLabelText("Invite actions"));
+      fireEvent.click(await screen.findByText("Resend invitation"));
 
-      expect(rows).toHaveLength(2);
-      expect(within(rows[0]!).getByText("pending@example.com")).toBeTruthy();
-    });
-
-    it("renders sent invites after pending invites", () => {
-      render(
-        <InvitesTable
-          waitingApprovalInvites={waitingApprovalInvites}
-          sentInvites={sentInvites}
-          isAdmin={true}
-          currentUserId="admin-user"
-          teams={teams}
-          onApprove={vi.fn()}
-          onReject={vi.fn()}
-          onViewInviteLink={vi.fn()}
-          onDeleteInvite={vi.fn()}
-        />,
-        { wrapper: Wrapper },
-      );
-
-      const rows = screen.getAllByRole("row").slice(1);
-
-      expect(rows).toHaveLength(2);
-      expect(within(rows[1]!).getByText("sent@example.com")).toBeTruthy();
+      expect(onResendInvite).toHaveBeenCalledWith("inv-expired");
     });
   });
 
-  describe("when there are no invites", () => {
-    it("renders nothing", () => {
-      const { container } = render(
-        <InvitesTable
-          waitingApprovalInvites={[]}
-          sentInvites={[]}
-          isAdmin={true}
-          currentUserId="admin-user"
-          teams={teams}
-          onApprove={vi.fn()}
-          onReject={vi.fn()}
-          onViewInviteLink={vi.fn()}
-          onDeleteInvite={vi.fn()}
-        />,
-        { wrapper: Wrapper },
+  describe("when an invitation is revoked", () => {
+    it("stays visible but offers no actions", () => {
+      renderTable([
+        makeInvite({
+          id: "inv-revoked",
+          email: "gone@example.com",
+          status: "REVOKED",
+          displayStatus: "REVOKED",
+        }),
+      ]);
+
+      expect(screen.getByText("gone@example.com")).toBeTruthy();
+      expect(screen.queryByLabelText("Invite actions")).toBeNull();
+    });
+  });
+
+  describe("when the viewer is not an admin", () => {
+    it("offers neither resend nor revoke", async () => {
+      renderTable(
+        [
+          makeInvite({
+            id: "inv-view",
+            email: "live@example.com",
+            status: "PENDING",
+            displayStatus: "PENDING",
+          }),
+        ],
+        { isAdmin: false },
       );
 
-      expect(container.textContent).toBe("");
+      fireEvent.click(screen.getByLabelText("Invite actions"));
+      // The menu did open — the link item proves it — so the absences below
+      // are real absences, not an unopened menu.
+      await screen.findByText("View invite link");
+      expect(screen.queryByText("Resend invitation")).toBeNull();
+      expect(screen.queryByText("Revoke")).toBeNull();
     });
   });
 });

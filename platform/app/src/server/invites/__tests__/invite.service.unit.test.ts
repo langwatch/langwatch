@@ -1,11 +1,9 @@
 /**
  * Unit tests for InviteService.
  *
- * Covers the @unit scenarios from specs/members/update-pending-invitation.feature:
- * - Pending invites query returns both PENDING and WAITING_APPROVAL invites
- * - createAdminInviteRecord creates record without sending email
- *
- * Tests the service in isolation with mocked dependencies.
+ * Tests the service in isolation with mocked dependencies. The invitation
+ * lifecycle scenarios live in specs/identity/resilient-invitations.feature
+ * (D11); the resilience-specific claims are in invite-resilience.unit.test.ts.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -418,7 +416,7 @@ describe("InviteService", () => {
       });
     });
 
-    describe("when a WAITING_APPROVAL invite exists for the email", () => {
+    describe("when a PAYMENT_PENDING invite exists for the email", () => {
       it("returns the existing invite", async () => {
         const existingInvite = { id: "inv-2", email: "test@example.com" };
         mockPrisma.organizationInvite.findFirst.mockResolvedValue(
@@ -623,39 +621,37 @@ describe("InviteService", () => {
     });
   });
 
-  describe("approveInvite()", () => {
-    describe("when email service fails", () => {
+  describe("resendInvite()", () => {
+    describe("when the email service fails", () => {
       const mockOrganization = { id: "org-1", name: "Test Org" };
       const mockInvite = {
         id: "inv-1",
         email: "user@example.com",
         inviteCode: "abc123",
-        status: "WAITING_APPROVAL",
-        organization: mockOrganization,
-      };
-      const updatedInvite = {
-        ...mockInvite,
         status: "PENDING",
-        organization: undefined,
+        expiration: new Date(Date.now() - 1000),
+        organization: mockOrganization,
       };
 
       beforeEach(() => {
         mockPrisma.organizationInvite.findFirst.mockResolvedValue(mockInvite);
-        mockPrisma.organizationInvite.update.mockResolvedValue(updatedInvite);
+        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
+          count: 1,
+        });
         mockSendInviteEmail.mockRejectedValue(new Error("SMTP failure"));
       });
 
-      it("still approves the invitation", async () => {
-        const result = await service.approveInvite({
+      it("still resends the invitation with a fresh code", async () => {
+        const result = await service.resendInvite({
           inviteId: "inv-1",
           organizationId: "org-1",
         });
 
-        expect(result.invite.status).toBe("PENDING");
+        expect(result.invite.inviteCode).not.toBe("abc123");
       });
 
-      it("returns emailNotSent as true", async () => {
-        const result = await service.approveInvite({
+      it("returns emailNotSent as true so the fresh link is shown instead", async () => {
+        const result = await service.resendInvite({
           inviteId: "inv-1",
           organizationId: "org-1",
         });

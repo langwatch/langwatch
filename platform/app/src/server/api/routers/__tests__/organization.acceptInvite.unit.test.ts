@@ -2,8 +2,9 @@
  * Unit tests for acceptInvite status guard.
  *
  * Regression tests for #450: acceptInvite must require status === "PENDING"
- * before applying the invite. Non-PENDING statuses (PAYMENT_PENDING,
- * WAITING_APPROVAL) must be rejected with BAD_REQUEST.
+ * before applying the invite. Non-PENDING statuses (PAYMENT_PENDING, and the
+ * retired WAITING_APPROVAL enum value no live row carries any more) must be
+ * rejected with BAD_REQUEST.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {

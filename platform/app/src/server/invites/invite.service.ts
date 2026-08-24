@@ -94,6 +94,8 @@ export type InviteDisplayStatus =
   | "ACCEPTED"
   | "EXPIRED"
   | "REVOKED"
+  // Deprecated Postgres enum value (D11 retirement); no row carries it after
+  // the data migration, but the column type still names it.
   | "WAITING_APPROVAL"
   | "PAYMENT_PENDING";
 
@@ -260,18 +262,6 @@ interface ResolvedInviteTeams {
 }
 
 /**
- * Input for creating a member invite request (WAITING_APPROVAL status).
- */
-interface CreateMemberInviteRequestInput {
-  email: string;
-  role: OrganizationUserRole;
-  organizationId: string;
-  teamIds: string;
-  teamAssignments?: TeamAssignmentInput[];
-  requestedBy: string;
-}
-
-/**
  * Input for creating a PAYMENT_PENDING invite (checkout flow).
  */
 interface CreatePaymentPendingInviteInput {
@@ -284,16 +274,8 @@ interface CreatePaymentPendingInviteInput {
 }
 
 /**
- * Input for approving a WAITING_APPROVAL invite.
- */
-interface ApproveInviteInput {
-  inviteId: string;
-  organizationId: string;
-}
-
-/**
- * Service that encapsulates invite creation, validation, and approval logic.
- * Extracted from the organization router to enable both admin and member invite flows.
+ * Service that encapsulates invite creation, validation, and acceptance
+ * logic, extracted from the organization router.
  *
  * Dependencies are injected to follow DIP and enable testability.
  */
@@ -331,7 +313,7 @@ export class InviteService {
 
   /**
    * Validates that an invite can be created:
-   * - No duplicate invitations across PENDING, WAITING_APPROVAL, and PAYMENT_PENDING statuses
+   * - No duplicate invitations across PENDING and PAYMENT_PENDING statuses
    * - Returns the existing invite if a duplicate is found (null if no duplicate)
    *
    * Case-insensitive on the address, like the membership check next door and
@@ -350,7 +332,7 @@ export class InviteService {
       where: {
         email: { equals: email.trim(), mode: "insensitive" },
         organizationId,
-        status: { in: ["PENDING", "WAITING_APPROVAL", "PAYMENT_PENDING"] },
+        status: { in: ["PENDING", "PAYMENT_PENDING"] },
         OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
       },
     });
@@ -413,7 +395,7 @@ export class InviteService {
   }
 
   /**
-   * Checks license member limits (counting both PENDING and WAITING_APPROVAL invites).
+   * Checks license member limits (counting live PENDING invites).
    * Throws FORBIDDEN if limits are exceeded.
    */
   async checkLicenseLimits({
@@ -1034,7 +1016,7 @@ export class InviteService {
     const invites = await this.prisma.organizationInvite.findMany({
       where: {
         organizationId,
-        status: { in: ["PENDING", "WAITING_APPROVAL", "REVOKED"] },
+        status: { in: ["PENDING", "REVOKED"] },
       },
       include: {
         requestedByUser: {
@@ -1075,7 +1057,7 @@ export class InviteService {
       where: {
         id: inviteId,
         organizationId,
-        status: { in: ["PENDING", "WAITING_APPROVAL", "PAYMENT_PENDING"] },
+        status: { in: ["PENDING", "PAYMENT_PENDING"] },
       },
       data: { status: "REVOKED" },
     });
@@ -1160,89 +1142,6 @@ export class InviteService {
       );
     }
     return this.prisma;
-  }
-
-  /**
-   * Creates an invite request with WAITING_APPROVAL status (member flow).
-   * No expiration is set, and no email is sent.
-   * Tracks the requestedBy user ID.
-   */
-  async createMemberInviteRequest(
-    input: CreateMemberInviteRequestInput,
-  ): Promise<{ invite: OrganizationInvite }> {
-    this.assertAssignmentsWithinInvitedSeat(input);
-    const existingInvite = await this.checkDuplicateInvite({
-      email: input.email,
-      organizationId: input.organizationId,
-    });
-
-    if (existingInvite) {
-      throw new DuplicateInviteError(input.email);
-    }
-
-    const inviteCode = nanoid();
-
-    const savedInvite = await this.prisma.organizationInvite.create({
-      data: {
-        email: input.email,
-        inviteCode,
-        expiration: null,
-        organizationId: input.organizationId,
-        teamIds: input.teamIds,
-        teamAssignments:
-          input.teamAssignments && input.teamAssignments.length > 0
-            ? (input.teamAssignments as unknown as JsonArray)
-            : undefined,
-        role: input.role,
-        status: "WAITING_APPROVAL",
-        requestedBy: input.requestedBy,
-      },
-    });
-
-    return { invite: savedInvite };
-  }
-
-  /**
-   * Approves a WAITING_APPROVAL invite:
-   * - Transitions status to PENDING
-   * - Sets 48-hour expiration
-   * - Attempts to send invitation email (failure does not revert approval)
-   */
-  async approveInvite(
-    input: ApproveInviteInput,
-  ): Promise<{ invite: OrganizationInvite; emailNotSent: boolean }> {
-    const invite = await this.prisma.organizationInvite.findFirst({
-      where: {
-        id: input.inviteId,
-        organizationId: input.organizationId,
-        status: "WAITING_APPROVAL",
-      },
-      include: { organization: true },
-    });
-
-    if (!invite) {
-      throw new InviteNotFoundError();
-    }
-
-    if (!invite.organization) {
-      throw new OrganizationNotFoundError();
-    }
-
-    const updatedInvite = await this.prisma.organizationInvite.update({
-      where: { id: invite.id, organizationId: input.organizationId },
-      data: {
-        status: "PENDING",
-        expiration: new Date(Date.now() + INVITE_EXPIRATION_MS),
-      },
-    });
-
-    const { emailNotSent } = await this.trySendInviteEmail({
-      email: invite.email,
-      organization: invite.organization,
-      inviteCode: invite.inviteCode,
-    });
-
-    return { invite: updatedInvite, emailNotSent };
   }
 
   /**

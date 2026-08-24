@@ -146,10 +146,9 @@ function MembersList({
   const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY;
 
   // The add-member flow (create invites) now lives in the invite drawer; the
-  // page keeps these handlers for the invites table's approve / reject / delete.
-  const { approveInvite, rejectInvite, deleteInvite } = useInviteActions({
+  // page keeps these handlers for the invites table's resend / revoke.
+  const { resendInvite, revokeInvite } = useInviteActions({
     organizationId: organization.id,
-    isAdmin: hasOrganizationManagePermission,
     hasEmailProvider: hasEmailProvider ?? false,
     onInviteCreated: setSelectedInvites,
     onClose: () => {},
@@ -270,19 +269,8 @@ function MembersList({
   const canDisableMember = (memberId: string) =>
     hasOrganizationManagePermission && memberId !== user?.id;
 
-  const sentInvites = useMemo(
-    () =>
-      (pendingInvites.data ?? []).filter(
-        (invite) => invite.status === "PENDING",
-      ),
-    [pendingInvites.data],
-  );
-
-  const waitingApprovalInvites = useMemo(
-    () =>
-      (pendingInvites.data ?? []).filter(
-        (invite) => invite.status === "WAITING_APPROVAL",
-      ),
+  const invites = useMemo(
+    () => pendingInvites.data ?? [],
     [pendingInvites.data],
   );
 
@@ -448,15 +436,12 @@ function MembersList({
         </Card.Root>
 
         <InvitesTable
-          waitingApprovalInvites={waitingApprovalInvites}
-          sentInvites={sentInvites}
+          invites={invites}
           isAdmin={hasOrganizationManagePermission}
-          currentUserId={user?.id ?? ""}
           teams={teams}
-          onApprove={approveInvite}
-          onReject={rejectInvite}
           onViewInviteLink={viewInviteLink}
-          onDeleteInvite={deleteInvite}
+          onResendInvite={resendInvite}
+          onRevokeInvite={revokeInvite}
         />
       </VStack>
 

@@ -8,56 +8,50 @@ import {
   Table,
   VStack,
 } from "@chakra-ui/react";
-import { Mail, MoreVertical, Trash2 } from "lucide-react";
-import { useMemo } from "react";
+import { Mail, MoreVertical, RefreshCw, Trash2 } from "lucide-react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { Link } from "~/components/ui/link";
 import { Menu } from "~/components/ui/menu";
 import type { RouterOutputs } from "~/utils/api";
 import { orgRoleOptions } from "../settings/OrganizationUserRoleField";
-import { WaitingApprovalActions } from "./WaitingApprovalActions";
 
 type OrganizationInvite =
   RouterOutputs["organization"]["getOrganizationPendingInvites"][number];
 
 interface InvitesTableProps {
-  waitingApprovalInvites: OrganizationInvite[];
-  sentInvites: OrganizationInvite[];
+  invites: OrganizationInvite[];
   isAdmin: boolean;
-  currentUserId: string;
   teams: Array<{ id: string; name: string; slug: string }>;
-  onApprove: (inviteId: string) => void;
-  onReject: (inviteId: string) => void;
   onViewInviteLink: (inviteCode: string, email: string) => void;
-  onDeleteInvite: (inviteId: string) => void;
+  onResendInvite: (inviteId: string) => void;
+  onRevokeInvite: (inviteId: string) => void;
 }
 
+/**
+ * Invitation states as a person sees them (D11): PENDING, EXPIRED and
+ * REVOKED are all visible, with expiry dates — an expired invitation is a
+ * resendable state, not a row that silently vanished.
+ */
+const STATUS_BADGES: Record<
+  string,
+  { label: string; colorPalette?: string }
+> = {
+  PENDING: { label: "Invited" },
+  EXPIRED: { label: "Expired", colorPalette: "orange" },
+  REVOKED: { label: "Revoked", colorPalette: "gray" },
+  ACCEPTED: { label: "Accepted", colorPalette: "green" },
+  PAYMENT_PENDING: { label: "Awaiting payment", colorPalette: "orange" },
+};
+
 export function InvitesTable({
-  waitingApprovalInvites,
-  sentInvites,
+  invites,
   isAdmin,
-  currentUserId,
   teams,
-  onApprove,
-  onReject,
   onViewInviteLink,
-  onDeleteInvite,
+  onResendInvite,
+  onRevokeInvite,
 }: InvitesTableProps) {
-  const visibleWaitingApprovalInvites = useMemo(() => {
-    if (isAdmin) {
-      return waitingApprovalInvites;
-    }
-    return waitingApprovalInvites.filter(
-      (invite) => invite.requestedBy === currentUserId,
-    );
-  }, [waitingApprovalInvites, isAdmin, currentUserId]);
-
-  const orderedInvites = useMemo(
-    () => [...visibleWaitingApprovalInvites, ...sentInvites],
-    [visibleWaitingApprovalInvites, sentInvites],
-  );
-
-  if (orderedInvites.length === 0) {
+  if (invites.length === 0) {
     return null;
   }
 
@@ -73,17 +67,25 @@ export function InvitesTable({
                 <Table.ColumnHeader width="56px" />
                 <Table.ColumnHeader>Email</Table.ColumnHeader>
                 <Table.ColumnHeader>Status</Table.ColumnHeader>
+                <Table.ColumnHeader>Expires</Table.ColumnHeader>
                 <Table.ColumnHeader>Role</Table.ColumnHeader>
                 <Table.ColumnHeader>Teams</Table.ColumnHeader>
                 <Table.ColumnHeader width="60px"></Table.ColumnHeader>
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {orderedInvites.map((invite) => {
-                const isWaitingApproval = invite.status === "WAITING_APPROVAL";
+              {invites.map((invite) => {
+                const displayStatus = invite.displayStatus;
+                const badge =
+                  STATUS_BADGES[displayStatus] ?? STATUS_BADGES.PENDING!;
                 const roleLabel =
                   orgRoleOptions.find((o) => o.value === invite.role)?.label ??
                   invite.role;
+                const canResend =
+                  isAdmin &&
+                  (displayStatus === "PENDING" || displayStatus === "EXPIRED");
+                const canRevoke = canResend;
+                const canViewLink = displayStatus === "PENDING";
 
                 return (
                   <Table.Row key={invite.id}>
@@ -92,19 +94,21 @@ export function InvitesTable({
                     </Table.Cell>
                     <Table.Cell>{invite.email}</Table.Cell>
                     <Table.Cell>
-                      {isWaitingApproval ? (
-                        <Badge
-                          size="sm"
-                          variant="surface"
-                          colorPalette="orange"
-                        >
-                          Pending Approval
-                        </Badge>
-                      ) : (
-                        <Badge size="sm" variant="surface">
-                          Invited
-                        </Badge>
-                      )}
+                      <Badge
+                        size="sm"
+                        variant="surface"
+                        colorPalette={badge.colorPalette}
+                      >
+                        {badge.label}
+                      </Badge>
+                    </Table.Cell>
+                    <Table.Cell>
+                      {displayStatus === "PENDING" ||
+                      displayStatus === "EXPIRED"
+                        ? (invite.expiration
+                            ? new Date(invite.expiration).toLocaleDateString()
+                            : "—")
+                        : "—"}
                     </Table.Cell>
                     <Table.Cell>{roleLabel}</Table.Cell>
                     <Table.Cell>
@@ -117,14 +121,7 @@ export function InvitesTable({
                         display="flex"
                         justifyContent="end"
                       >
-                        {isWaitingApproval ? (
-                          <WaitingApprovalActions
-                            isAdmin={isAdmin}
-                            inviteId={invite.id}
-                            onApprove={onApprove}
-                            onReject={onReject}
-                          />
-                        ) : (
+                        {(canViewLink || canResend || canRevoke) && (
                           <Menu.Root>
                             <Menu.Trigger asChild>
                               <IconButton
@@ -136,26 +133,37 @@ export function InvitesTable({
                               </IconButton>
                             </Menu.Trigger>
                             <Menu.Content>
-                              <Menu.Item
-                                value="view-link"
-                                onClick={() =>
-                                  onViewInviteLink(
-                                    invite.inviteCode,
-                                    invite.email,
-                                  )
-                                }
-                              >
-                                <Mail size={16} />
-                                View invite link
-                              </Menu.Item>
-                              {isAdmin && (
+                              {canViewLink && (
                                 <Menu.Item
-                                  value="delete"
+                                  value="view-link"
+                                  onClick={() =>
+                                    onViewInviteLink(
+                                      invite.inviteCode,
+                                      invite.email,
+                                    )
+                                  }
+                                >
+                                  <Mail size={16} />
+                                  View invite link
+                                </Menu.Item>
+                              )}
+                              {canResend && (
+                                <Menu.Item
+                                  value="resend"
+                                  onClick={() => onResendInvite(invite.id)}
+                                >
+                                  <RefreshCw size={16} />
+                                  Resend invitation
+                                </Menu.Item>
+                              )}
+                              {canRevoke && (
+                                <Menu.Item
+                                  value="revoke"
                                   color="red.500"
-                                  onClick={() => onDeleteInvite(invite.id)}
+                                  onClick={() => onRevokeInvite(invite.id)}
                                 >
                                   <Trash2 size={16} />
-                                  Delete
+                                  Revoke
                                 </Menu.Item>
                               )}
                             </Menu.Content>
