@@ -26,18 +26,22 @@ Feature: Langy shows a live plan checklist for multi-step work
     And exactly one step is shown as the current step
     And earlier steps that finished are shown as done
 
+  # The work is NOT nested under its step any more. The transcript carries a
+  # turn in the order it happened (langy-capability-cards.feature, "The
+  # transcript reads in the order the turn happened"), and a card cannot be in
+  # the transcript and inside the checklist at once without being read twice.
   @unit
-  Scenario: The current step nests the work happening under it
-    Given a plan whose second step is the one in progress
-    When Langy runs a tool while that step is current
-    Then the tool's activity card appears nested under the current step
-    And a tool that ran before any step was current is not attributed to a later step
+  Scenario: The checklist is the steps, and the work stays in the transcript
+    Given a turn that ran tools between its plan updates
+    When the checklist is folded from the turn
+    Then it carries the steps and their status
+    And it carries none of the tool calls that ran
 
-  @unit
-  Scenario: Completed steps collapse to a single line
+  @integration
+  Scenario: Completed steps read as one line each
     Given a plan with steps that have finished
-    Then each finished step shows as one collapsed line with a done mark
-    And a finished step can be re-expanded to see the work that happened under it
+    Then each finished step shows as one line with a done mark
+    And the checklist stays readable at a glance however many steps have run
 
   @unit
   Scenario: The checklist survives a reload
@@ -82,9 +86,28 @@ Feature: Langy shows a live plan checklist for multi-step work
   Scenario: The checklist is open while the turn works
     Given a turn maintaining a plan
     When the turn is still running
-    Then the checklist and the work under each step are visible without a click
+    Then every step is visible without a click
     And it folds back to the progress line once the turn settles
     And a reader who opens or closes it themselves keeps their choice
+
+  # A plan is a promise about the rest of the turn, so it belongs where the
+  # reader can see it. Rendered inside the message it scrolled away the moment
+  # the turn wrote more than a screen of text, which is exactly the turn long
+  # enough to want a plan. It is held above the message box instead, the way a
+  # coding agent holds its todo list, and the work stays in the transcript.
+  @integration
+  Scenario: The checklist stays in view while the turn works
+    Given a turn maintaining a plan
+    When the transcript grows past the height of the panel
+    Then the checklist is still visible above the message box
+    And it hides no part of the conversation above it
+
+  @integration
+  Scenario: The checklist rejoins the conversation once the turn is over
+    Given a turn maintaining a plan
+    When the turn settles, fails, or the reader stops it
+    Then the checklist is no longer held above the message box
+    And the plan it reached is still readable inside the turn it belongs to
 
   @unit
   Scenario: No plan means today's rendering, unchanged

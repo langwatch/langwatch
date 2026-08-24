@@ -1,10 +1,11 @@
 /**
  * @vitest-environment jsdom
  *
- * The plan checklist card: steps in order, the current one expanded with its
- * nested work, completed steps collapsed, a cancelled step struck, and a
- * settled/finished plan collapsed to a summary. Plus the zero-regression pin:
- * a turn with no plan renders exactly the flat activity list it does today.
+ * The plan checklist card: steps in order, the current one marked, a cancelled
+ * step struck, and a settled/finished plan collapsed to a summary. The work
+ * each step did is NOT here — it is in the transcript, where it happened
+ * (logic/langyTranscript.ts). Plus the zero-regression pin: a turn with no plan
+ * renders exactly the flat activity list it does today.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { fireEvent, render, screen } from "@testing-library/react";
@@ -26,7 +27,7 @@ function ui(node: React.ReactNode) {
   return render(<ChakraProvider value={defaultSystem}>{node}</ChakraProvider>);
 }
 
-/** A settled non-plan tool call part, the kind that nests under a step. */
+/** A settled non-plan tool call part, the kind the transcript draws. */
 function toolPart(command: string, id: string) {
   return {
     type: "tool-bash",
@@ -47,8 +48,6 @@ function plan(overrides: Partial<LangyPlan> = {}): LangyPlan {
     currentIndex: 1,
     completedCount: 1,
     totalCount: 3,
-    itemParts: [[], [toolPart("echo summarising", "c-summary")], []],
-    preamble: [],
     ...overrides,
   };
 }
@@ -64,11 +63,13 @@ describe("LangyPlanCard", () => {
       expect(screen.getByText("Open a fix")).toBeDefined();
     });
 
-    /** @scenario The checklist is open while the turn works */
-    it("shows the work happening under the current step", () => {
+    // The calls belong to the transcript, which draws each one where it
+    // happened. Nested here as well, every card would be read twice.
+    /** @scenario "The checklist is the steps, and the work stays in the transcript" */
+    it("carries none of the work the steps did", () => {
       ui(<LangyPlanCard plan={plan()} isStreaming />);
-      // The tool that ran while step 2 was current is shown by default.
-      expect(screen.getByText("echo summarising")).toBeDefined();
+      expect(screen.queryByText("echo summarising")).toBeNull();
+      expect(screen.queryByLabelText("Langy activity")).toBeNull();
     });
 
     /** @scenario The checklist is open while the turn works */
@@ -79,19 +80,6 @@ describe("LangyPlanCard", () => {
       expect(screen.getByText("Plan · 1 of 3 done")).toBeDefined();
       expect(screen.queryByText("Find the slow traces")).toBeNull();
       expect(screen.getByText("Summarise them")).toBeDefined();
-    });
-
-    it("does not expand a completed step's work by default", () => {
-      ui(
-        <LangyPlanCard
-          plan={plan({
-            itemParts: [[toolPart("echo searching", "c1")], [], []],
-          })}
-          isStreaming
-        />,
-      );
-      // Step 1 is completed, so its nested call is collapsed away until clicked.
-      expect(screen.queryByText("echo searching")).toBeNull();
     });
   });
 
@@ -125,6 +113,42 @@ describe("LangyPlanCard", () => {
       expect(markers).toEqual(["completed", "in_progress", "pending"]);
       expect(screen.getByText("Plan · 1 of 3 done")).toBeDefined();
       expect(screen.queryByText(/left/)).toBeNull();
+    });
+
+    /** @scenario "Completed steps read as one line each" */
+    it("gives every step one row, done or not, however many have run", () => {
+      const items = Array.from({ length: 8 }, (_, index) => ({
+        content: `Step ${index + 1}`,
+        status: index < 6 ? ("completed" as const) : ("pending" as const),
+      }));
+      ui(
+        <LangyPlanCard
+          plan={plan({
+            items,
+            currentIndex: 6,
+            completedCount: 6,
+            totalCount: 8,
+          })}
+          isStreaming
+        />,
+      );
+
+      const rows = screen.getAllByRole("listitem");
+      expect(rows).toHaveLength(8);
+      // One line each: a row is its marker and its text, so its height cannot
+      // grow with what the step did, and the whole list stays scannable.
+      for (const [index, row] of rows.entries()) {
+        expect(row.textContent).toBe(`Step ${index + 1}`);
+        expect(row.querySelectorAll("[data-plan-marker]")).toHaveLength(1);
+      }
+      expect(
+        rows.filter(
+          (row) =>
+            row
+              .querySelector("[data-plan-marker]")
+              ?.getAttribute("aria-label") === "Completed",
+        ),
+      ).toHaveLength(6);
     });
 
     /** @scenario Every step reads as a checkbox and the header counts what is checked */
@@ -173,7 +197,6 @@ describe("LangyPlanCard", () => {
             currentIndex: -1,
             completedCount: 2,
             totalCount: 2,
-            itemParts: [[], []],
           })}
           isStreaming={false}
         />,

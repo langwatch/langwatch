@@ -213,13 +213,32 @@ function subscribeTurnStream({
 
   return new ReadableStream<UIMessageChunk>({
     start(controller) {
-      const textId = crypto.randomUUID();
+      // The prose of a turn is not one block: it is the paragraphs written
+      // between the calls. A single text id held open for the whole turn made
+      // every delta land in the SAME part, so the message's parts said "all the
+      // text, then all the tools" whatever order they arrived in, and the panel
+      // had no way to draw a card between two paragraphs. A run is opened by
+      // the first delta after a tool and closed when the next tool starts, so
+      // the parts array is the turn's own order.
+      let openTextId: string | null = null;
       let closed = false;
+
+      const openText = () => {
+        if (openTextId) return openTextId;
+        openTextId = crypto.randomUUID();
+        controller.enqueue({ type: "text-start", id: openTextId });
+        return openTextId;
+      };
+      const closeText = () => {
+        if (!openTextId) return;
+        controller.enqueue({ type: "text-end", id: openTextId });
+        openTextId = null;
+      };
 
       const finish = (reason: LangyTurnSettleReason) => {
         if (closed) return;
         closed = true;
-        controller.enqueue({ type: "text-end", id: textId });
+        closeText();
         controller.enqueue({ type: "finish" });
         controller.close();
         sub?.unsubscribe();
@@ -227,7 +246,6 @@ function subscribeTurnStream({
       };
 
       controller.enqueue({ type: "start" });
-      controller.enqueue({ type: "text-start", id: textId });
 
       // The manager emits a readiness status ("Starting Langy…") into the cold window
       // (worker tool prep produces no frames for many seconds). It is a
@@ -253,12 +271,18 @@ function subscribeTurnStream({
             clearColdStartStatus();
             controller.enqueue({
               type: "text-delta",
-              id: textId,
+              id: openText(),
               delta: entry.text,
             });
             return;
           case "tool":
             clearColdStartStatus();
+            // A starting call ends the paragraph before it, which is what puts
+            // its card between that paragraph and the next. An ENDING call
+            // updates the part it already opened, wherever that sits, so the
+            // card stays where the work began and the text after it is not cut
+            // in two by an output that lands late.
+            if (entry.phase === "start") closeText();
             enqueueToolChunk(controller, entry);
             return;
           case "reasoning":

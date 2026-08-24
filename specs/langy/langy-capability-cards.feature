@@ -299,6 +299,24 @@ Feature: Langy renders domain-capability cards for tool calls
       Given the first thing Langy did in a turn failed
       Then the failure is the first thing in the transcript
 
+    # Ordering held inside the activity block and nowhere else. The block itself
+    # sat above the reply and the whole reply below it, so a turn that wrote a
+    # paragraph, ran a tool, wrote another paragraph and ran another tool showed
+    # both cards on top and both paragraphs underneath. Watching it was worse
+    # than reading it: the cards changed in one place while the text grew in
+    # another, and nothing said which paragraph followed which call.
+    @integration
+    Scenario: A tool card sits between the paragraphs it ran between
+      Given Langy wrote a paragraph, ran a tool, and then wrote another paragraph
+      Then the tool's card is shown after the first paragraph and before the second
+      And the reply is not collected into one block underneath the cards
+
+    @integration
+    Scenario: A turn is read in the order it was watched in
+      Given a turn that wrote text and ran tools in turn
+      When it settles
+      Then the settled turn keeps the order the reader watched it arrive in
+
   # The scenario library lives under Simulations, and a scenario's own page is
   # the library with that scenario open. Pointing at the Simulations index sent
   # the user to the run history instead, where the scenario they just made is

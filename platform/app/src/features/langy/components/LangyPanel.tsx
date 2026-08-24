@@ -130,6 +130,7 @@ import {
   resolvePeekTranslate,
   SIDEBAR_PEEK_NEAR_PX,
 } from "../logic/langyPeekDock";
+import { langyPlan } from "../logic/langyPlan";
 import { resolveLangyStopTarget } from "../logic/langyStopTarget";
 import {
   currentTurnAssistant,
@@ -157,6 +158,7 @@ import {
 } from "./ConversationSkeleton";
 import { EmptyState } from "./EmptyState";
 import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
+import { LangyCardBoundary } from "./LangyCardBoundary";
 import { LangyCardGallery } from "./LangyCardGallery";
 import { LangyContextTargetLayer } from "./LangyContextTargetLayer";
 import { LangyDevDrawer } from "./LangyDevDrawer";
@@ -164,6 +166,7 @@ import { LangyError } from "./LangyError";
 import { LangyExternalLinkDialog } from "./LangyExternalLinkDialog";
 import { LangyMakeDefaultDialog } from "./LangyMakeDefaultDialog";
 import { LangyMark, LangyMarkGradientDefs } from "./LangyMark";
+import { LangyPlanCard } from "./LangyPlanCard";
 import { LangyRecoveringLine } from "./LangyRecoveringLine";
 import { LangyThinkingLine } from "./LangyThinkingLine";
 import { toPendingCapabilities } from "./LangyToolActivity";
@@ -2225,6 +2228,18 @@ function LangyPanel({
   // the current turn has provable output; statuses the agent reports mid-turn
   // are untouched.
   const currentTurnMessage = currentTurnAssistant(displayMessages);
+  // The plan of the turn that is running, if it kept one. The same gate the
+  // message uses for `isStreaming`, so exactly one of the two renders a plan:
+  // held above the composer while the turn works, back inside the message the
+  // moment it settles, fails, or the reader stops it.
+  const turnPlanItems = useLangyStore((s) => s.turnPlan);
+  const streamingMessage =
+    displayBusy && displayMessages.at(-1)?.role === "assistant"
+      ? displayMessages.at(-1)
+      : undefined;
+  const pinnedPlan = streamingMessage
+    ? langyPlan(streamingMessage, { overrideItems: turnPlanItems })
+    : null;
   const turnHasVisibleOutput =
     !!runningTool(currentTurnMessage) ||
     hasTokens(currentTurnMessage) ||
@@ -3118,6 +3133,27 @@ function LangyPanel({
                     onClick={jumpToLatest}
                   />
                 </Box>
+                {/* The plan the running turn is following. Held here, between
+            the conversation and the composer, because a plan is a promise
+            about the rest of the turn and rendered inside the message it
+            scrolled away the moment the turn wrote more than a screen — which
+            is exactly the turn long enough to want a plan. A row of the column,
+            never an overlay, so it cannot cover the conversation above it; it
+            scrolls inside itself when the plan is long. It leaves when the turn
+            does, and the message renders the plan it reached from then on. */}
+                {pinnedPlan ? (
+                  <Box
+                    paddingX={floating ? "19px" : "14px"}
+                    paddingBottom="8px"
+                    maxHeight="34%"
+                    overflowY="auto"
+                    flexShrink={0}
+                  >
+                    <LangyCardBoundary scope="the plan">
+                      <LangyPlanCard plan={pinnedPlan} isStreaming />
+                    </LangyCardBoundary>
+                  </Box>
+                ) : null}
                 {/* "One turn at a time" is a WAIT, not a failure: it rides here, a
             dismissable notice attached above the composer, and the draft the user
             just tried to send stays in the field (restored in `send`) rather than
