@@ -18,6 +18,7 @@ describe("followConversationModel", () => {
     useLangyStore.setState({
       activeConversationId: "conv-1",
       modelOverride: "",
+      isModelPickedByUser: false,
       modelSeededForConversationId: null,
     });
   });
@@ -27,7 +28,6 @@ describe("followConversationModel", () => {
       useLangyStore.getState().followConversationModel({
         conversationId: "conv-1",
         model: "custom/stealth/ox-alpha",
-        resolvedDefault: DEFAULT,
       });
 
       expect(useLangyStore.getState().modelOverride).toBe(
@@ -36,12 +36,11 @@ describe("followConversationModel", () => {
     });
 
     it("restores it over the panel-seeded default too", () => {
-      useLangyStore.setState({ modelOverride: DEFAULT });
+      useLangyStore.getState().setModelOverride(DEFAULT);
 
       useLangyStore.getState().followConversationModel({
         conversationId: "conv-1",
         model: "custom/stealth/ox-alpha",
-        resolvedDefault: DEFAULT,
       });
 
       expect(useLangyStore.getState().modelOverride).toBe(
@@ -52,17 +51,31 @@ describe("followConversationModel", () => {
 
   describe("when the user picked a model since opening the conversation", () => {
     it("never replaces the pick", () => {
-      useLangyStore.setState({ modelOverride: "anthropic/claude-sonnet-5" });
+      useLangyStore.getState().pickModel("anthropic/claude-sonnet-5");
 
       useLangyStore.getState().followConversationModel({
         conversationId: "conv-1",
         model: "custom/stealth/ox-alpha",
-        resolvedDefault: DEFAULT,
       });
 
       expect(useLangyStore.getState().modelOverride).toBe(
         "anthropic/claude-sonnet-5",
       );
+    });
+
+    /** @scenario A pick that matches the default is still the user's pick */
+    it("keeps a pick that happens to be the resolved default", () => {
+      // Picking the model that is (or just became) the project default is the
+      // one case where "the pill equals the default" cannot tell a choice from
+      // a seed. The pick is what the user is looking at, so it wins.
+      useLangyStore.getState().pickModel(DEFAULT);
+
+      useLangyStore.getState().followConversationModel({
+        conversationId: "conv-1",
+        model: "custom/stealth/ox-alpha",
+      });
+
+      expect(useLangyStore.getState().modelOverride).toBe(DEFAULT);
     });
   });
 
@@ -71,14 +84,12 @@ describe("followConversationModel", () => {
       useLangyStore.getState().followConversationModel({
         conversationId: "conv-1",
         model: "custom/stealth/ox-alpha",
-        resolvedDefault: DEFAULT,
       });
-      useLangyStore.getState().setModelOverride("openai/gpt-5-mini");
+      useLangyStore.getState().pickModel("openai/gpt-5-mini");
 
       useLangyStore.getState().followConversationModel({
         conversationId: "conv-1",
         model: "custom/stealth/ox-alpha",
-        resolvedDefault: DEFAULT,
       });
 
       expect(useLangyStore.getState().modelOverride).toBe("openai/gpt-5-mini");
@@ -90,7 +101,6 @@ describe("followConversationModel", () => {
       useLangyStore.getState().followConversationModel({
         conversationId: "conv-2",
         model: "custom/stealth/ox-alpha",
-        resolvedDefault: DEFAULT,
       });
 
       expect(useLangyStore.getState().modelOverride).toBe("");
@@ -103,6 +113,7 @@ describe("switching conversations", () => {
     useLangyStore.setState({
       activeConversationId: "conv-1",
       modelOverride: "custom/stealth/ox-alpha",
+      isModelPickedByUser: true,
       modelSeededForConversationId: "conv-1",
     });
   });
@@ -113,6 +124,7 @@ describe("switching conversations", () => {
 
     const state = useLangyStore.getState();
     expect(state.modelOverride).toBe("");
+    expect(state.isModelPickedByUser).toBe(false);
     expect(state.modelSeededForConversationId).toBeNull();
   });
 
@@ -121,6 +133,18 @@ describe("switching conversations", () => {
 
     const state = useLangyStore.getState();
     expect(state.modelOverride).toBe("");
+    expect(state.isModelPickedByUser).toBe(false);
     expect(state.modelSeededForConversationId).toBeNull();
+  });
+
+  /** @scenario A new conversation starts on the resolved default again */
+  it("askLangy hands over a fresh conversation on the default too", () => {
+    useLangyStore.getState().askLangy("what is this chart telling me?");
+
+    const state = useLangyStore.getState();
+    expect(state.modelOverride).toBe("");
+    expect(state.isModelPickedByUser).toBe(false);
+    expect(state.modelSeededForConversationId).toBeNull();
+    expect(state.pendingPrompt).toBe("what is this chart telling me?");
   });
 });

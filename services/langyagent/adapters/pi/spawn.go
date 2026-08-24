@@ -139,8 +139,10 @@ func modelLane(model string) workerModelConfig {
 		// answers 400 "Unsupported parameter: prompt_cache_retention" on the
 		// field the flag makes pi send (the API-key Responses endpoint
 		// accepts it, which is how it slipped past the spike). The gateway
-		// also strips the field on the codex route, so this is belt and
-		// braces on the same invariant.
+		// keeps the codex body to what that backend accepts, which is what
+		// covers the fields pi sends with no flag of ours behind them (its
+		// own default max output tokens, for one), so this lane only avoids
+		// asking for what it knows cannot be served.
 		lane.Compat = map[string]any{"supportsStore": false}
 	case strings.HasPrefix(model, "openai/"):
 		lane.API = "openai-responses"
