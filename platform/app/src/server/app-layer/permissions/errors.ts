@@ -44,20 +44,17 @@ export class LiteMemberRestrictedError extends HandledError {
  *
  * Nothing here names who disabled them or how many seats the license covers:
  * that is the organization's business, and the person asking has an admin to
- * ask.
+ * ask. No `meta` either: nothing renders one, and the scope a check was made
+ * on is a project or team as often as an organization.
  */
 export class MembershipDisabledError extends HandledError {
   declare readonly code: "membership_disabled";
 
-  constructor(organizationId: string) {
+  constructor() {
     super(
       "membership_disabled",
       "Your access to this organization has been disabled",
-      {
-        meta: { organizationId },
-        httpStatus: 403,
-        fault: "customer",
-      },
+      { httpStatus: 403, fault: "customer" },
     );
     this.name = "MembershipDisabledError";
   }

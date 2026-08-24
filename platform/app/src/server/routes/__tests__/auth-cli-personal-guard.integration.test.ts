@@ -496,6 +496,36 @@ describe("CLI login personal-project guards", () => {
       });
     });
 
+    describe("when the caller's own seat has been disabled", () => {
+      /** @scenario project-login approval denies a member whose seat has been disabled */
+      it("returns forbidden and never the project's API key", async () => {
+        // The row stays, with its ADMIN role — only the access is gone. A
+        // project key has no owner, so nothing downstream would have caught
+        // this: the membership gate on approve is the whole defence.
+        await prisma.organizationUser.updateMany({
+          where: { userId: USER_ID, organizationId: ORG_ID },
+          data: { disabledAt: new Date() },
+        });
+        try {
+          const userCode = await mintDeviceCode("project_api_key");
+
+          const { status, json } = await approve({
+            user_code: userCode,
+            project_id: SHARED_PROJECT_ID,
+          });
+
+          expect(status).toBe(403);
+          expect(json.error).toBe("forbidden");
+          expect(JSON.stringify(json)).not.toContain(SHARED_API_KEY);
+        } finally {
+          await prisma.organizationUser.updateMany({
+            where: { userId: USER_ID, organizationId: ORG_ID },
+            data: { disabledAt: null },
+          });
+        }
+      });
+    });
+
     describe("when the caller lacks write access to the picked project", () => {
       /** @scenario project-login approval denies a project the caller cannot write */
       it("returns forbidden and never the project's API key", async () => {

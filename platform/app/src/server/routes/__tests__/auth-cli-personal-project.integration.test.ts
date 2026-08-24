@@ -451,6 +451,39 @@ describe("/me credentials delivery, given a token whose user is no longer an act
     await prisma.user.deleteMany({ where: { id: offboardId } }).catch(() => {});
   });
 
+  /** @scenario a disabled member's pre-disable token cannot mint or return a personal key */
+  it("refuses a member whose seat was disabled, revokes the token, and creates no workspace", async () => {
+    const disabledId = `usr-disabled-${suffix}`;
+    const token = `lw_at_disabled${suffix.replace(/[^a-z0-9]/gi, "")}`;
+    // An active member when the token was issued; an admin then disabled the
+    // seat. The row stays, with its role — only the access is gone.
+    await seedUserWithCliToken({
+      id: disabledId,
+      email: `disabled-${suffix}@example.com`,
+      name: `Disabled ${suffix}`,
+      token,
+      member: true,
+    });
+    await prisma.organizationUser.updateMany({
+      where: { userId: disabledId, organizationId: ORG_ID },
+      data: { disabledAt: new Date() },
+    });
+
+    const before = await personalTeamCount(disabledId);
+    const res = await app.request("/api/auth/cli/personal-project", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    expect(res.status).toBe(403);
+    expect(await personalTeamCount(disabledId)).toBe(before);
+    expect(await redisConnection!.get(`lwcli:access:${token}`)).toBeNull();
+
+    await prisma.organizationUser
+      .deleteMany({ where: { userId: disabledId, organizationId: ORG_ID } })
+      .catch(() => {});
+    await prisma.user.deleteMany({ where: { id: disabledId } }).catch(() => {});
+  });
+
   /** @scenario a deactivated user's token cannot mint or return a personal key */
   it("refuses a deactivated user even while org membership lingers", async () => {
     const deactId = `usr-deact-${suffix}`;

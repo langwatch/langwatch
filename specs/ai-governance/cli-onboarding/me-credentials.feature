@@ -149,6 +149,15 @@ Feature: /me credentials just work - CLI credential resolution after device logi
     And a follow-up call with the same token is 401
 
   @bdd @cli-onboarding @credentials @tenancy @integration
+  Scenario: a disabled member's pre-disable token cannot mint or return a personal key
+    Given a device-session token issued while the user was an active member of an organization
+    And an admin then disables that membership to free its seat
+    When the CLI calls GET /api/auth/cli/personal-project with that token
+    Then the response is 403
+    And no personal team, project, or role binding is created
+    And the presented access token is revoked
+
+  @bdd @cli-onboarding @credentials @tenancy @integration
   Scenario: a deactivated user's token cannot mint or return a personal key
     Given a device-session token for a user whose account is deactivated
     When the CLI calls GET /api/auth/cli/personal-project with that token

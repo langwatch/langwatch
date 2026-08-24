@@ -135,7 +135,10 @@ export class ForkAwarePermissionDecisionRepository
       ...(permitted
         ? {}
         : {
-            denialReason: await organizationDenialReason(ctx, organizationId),
+            denialReason: await organizationDenialReason({
+              ctx,
+              organizationId,
+            }),
           }),
     };
   }

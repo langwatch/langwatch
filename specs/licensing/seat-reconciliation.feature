@@ -80,9 +80,11 @@ Feature: Reconciling an organization down to its licensed seats
     But a link shared only with the organization does not
 
   @unit
-  Scenario: Disabling takes effect at once, not when a cache expires
-    When an admin disables or re-enables a membership
-    Then every authorization answer held for that organization is retired immediately
+  Scenario: Disabling or re-enabling a membership takes effect on the next request
+    When an admin disables a membership
+    Then the member is refused on their very next request
+    When the admin re-enables it
+    Then the member is allowed again on their very next request
 
   @integration
   Scenario: A disabled member can be re-enabled when a seat is free

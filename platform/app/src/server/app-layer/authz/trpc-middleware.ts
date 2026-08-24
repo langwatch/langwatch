@@ -283,7 +283,7 @@ function deniedError({
   // offers an upgrade they cannot buy, and the generic denial names a
   // permission nobody can grant them while the seat is off.
   if (denialReason === "membership-disabled") {
-    const disabled = new MembershipDisabledError(scope.id);
+    const disabled = new MembershipDisabledError();
     return new TRPCError({
       code: "UNAUTHORIZED",
       message: disabled.message,

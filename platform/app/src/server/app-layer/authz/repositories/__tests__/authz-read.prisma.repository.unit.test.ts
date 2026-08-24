@@ -12,7 +12,7 @@ import { PrismaAuthzReadRepository } from "../authz-read.prisma.repository";
  * key it was minted for.
  */
 describe("PrismaAuthzReadRepository", () => {
-  describe("findOrganizationMembership", () => {
+  describe("when reading organization membership", () => {
     describe("when the user is an active member of the organization", () => {
       it("reads the membership row for this user in this organization", async () => {
         const findFirst = vi

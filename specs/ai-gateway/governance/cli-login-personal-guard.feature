@@ -97,6 +97,14 @@ Feature: CLI login never lands a user on a personal project
       Then the response is 403 with error "forbidden"
       And the project's API key is NOT returned
 
+    @integration @project-picker @rbac
+    Scenario: project-login approval denies a member whose seat has been disabled
+      Given a pending device code with credential_type "project_api_key"
+      And an admin has disabled the caller's membership to free its seat
+      When the caller approves with a shared project's id
+      Then the response is 403 with error "forbidden"
+      And the project's API key is NOT returned
+
     @unit @project-picker
     Scenario: the project picker lists the caller's personal project explicitly and omits internal-governance projects
       Given an org team with a personal project, an internal-governance project, and a shared project

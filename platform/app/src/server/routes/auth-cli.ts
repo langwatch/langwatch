@@ -473,12 +473,16 @@ async function ensureActiveOrgMemberOr403(
       where: { id: tokenRecord.user_id },
       select: { deactivatedAt: true },
     }),
-    prisma.organizationUser.findUnique({
+    // `disabledAt` is part of the predicate: a seat an admin disabled to
+    // reclaim it is not an active membership, and the keys minted here are
+    // the ones the owner ceiling never reaches — a project key has no owner,
+    // and the gateway honours a personal virtual key on its own status. A
+    // disabled row reads as no membership, and the session is severed below.
+    prisma.organizationUser.findFirst({
       where: {
-        userId_organizationId: {
-          userId: tokenRecord.user_id,
-          organizationId: tokenRecord.organization_id,
-        },
+        userId: tokenRecord.user_id,
+        organizationId: tokenRecord.organization_id,
+        disabledAt: null,
       },
       select: { userId: true },
     }),
@@ -2549,14 +2553,16 @@ secured.access(cliApproveAuth).post("/approve", async (c: Context) => {
   }
   const { user_code, organization_id, project_id } = parsed.data;
 
-  // Verify caller is a member of the org they're issuing a key for.
-  const membership = await prisma.organizationUser.findUnique({
+  // Verify the caller is an ACTIVE member of the org they're issuing a key
+  // for: a membership an admin disabled to reclaim its seat must not approve
+  // a device and hand out a key it could not use itself.
+  const membership = await prisma.organizationUser.findFirst({
     where: {
-      userId_organizationId: {
-        userId: session.user.id,
-        organizationId: organization_id,
-      },
+      userId: session.user.id,
+      organizationId: organization_id,
+      disabledAt: null,
     },
+    select: { userId: true },
   });
   if (!membership) {
     return c.json(

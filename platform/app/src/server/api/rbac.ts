@@ -539,14 +539,13 @@ export type PermissionResult = {
   permitted: boolean;
   organizationRole: OrganizationUserRole | null;
   /**
-   * Why the check failed, when the answer came from the engine — the boundary
-   * needs it to raise the error a caller can act on rather than a generic
-   * refusal.
+   * Why the check failed, when there is something a caller can act on — the
+   * boundary needs it to raise that error rather than a generic refusal.
    *
-   * Absent on the legacy walk, which never produced one and is being deleted
-   * (ADR-110). A legacy-head organization therefore still DENIES a disabled
-   * member — the security answer is the same on both heads — it just falls
-   * back to the generic copy instead of naming the seat.
+   * Set by the engine, and by the membership gate both heads share, which
+   * names a disabled seat before either walk reads a binding. Absent from the
+   * legacy binding walk itself, which never produced one and is being deleted
+   * (ADR-110).
    */
   denialReason?: AuthzDenialReason;
 };
@@ -763,11 +762,14 @@ async function checkPermissionFromBindings({
 
     const teamUser = await prisma.teamUser.findFirst({
       // Gate the legacy fallback on org membership too: a stale cross-org
-      // TeamUser row must not confer access any more than a stale RoleBinding.
+      // TeamUser row must not confer access any more than a stale RoleBinding,
+      // and neither does a seat an admin disabled.
       where: {
         userId,
         teamId: teamScope.scopeId,
-        team: { organization: { members: { some: { userId } } } },
+        team: {
+          organization: { members: { some: { userId, disabledAt: null } } },
+        },
       },
       select: { role: true, assignedRoleId: true },
     });
@@ -881,15 +883,17 @@ async function resolveBindingPermission({
 }
 
 /**
- * The single source of truth for "is this user a CURRENT member of this org,
- * and with what role". `null` means no `OrganizationUser` row — the caller must
- * fail closed rather than fall through to bindings, because a stale cross-org
- * RoleBinding can still name a non-member at a project/team scope.
- *
- * Every scoped permission path derives membership through here so a future
- * tenancy fix lands once instead of in each resolver.
+ * The membership row as stored: the role, and whether an admin disabled the
+ * seat. Both are facts. The policy that a disabled membership is not a
+ * current one lives in `currentRoleOf`, the same split the AuthZ read port
+ * makes, so a refusal can still say WHICH gate closed.
  */
-async function getCurrentOrganizationRole({
+type CurrentMembership = {
+  role: OrganizationUserRole;
+  disabled: boolean;
+};
+
+async function getCurrentMembership({
   prisma,
   userId,
   organizationId,
@@ -897,23 +901,90 @@ async function getCurrentOrganizationRole({
   prisma: PrismaClient;
   userId: string;
   organizationId: string;
-}): Promise<OrganizationUserRole | null> {
+}): Promise<CurrentMembership | null> {
   const member = await prisma.organizationUser?.findFirst({
-    // A membership an admin disabled to reclaim its seat is not a current
-    // one: it keeps its role and its history and confers no access until it
-    // is re-enabled (seat-reconciliation.feature). Matches the predicate the
-    // AuthZ collector applies to the same row.
-    where: { userId, organizationId, disabledAt: null },
-    select: { role: true },
+    where: { userId, organizationId },
+    select: { role: true, disabledAt: true },
   });
-  return member?.role ?? null;
+  if (!member) return null;
+  // `!== null`, not `!= null`: a row arriving without the column reads as
+  // DISABLED, the same loud-lockout choice the read repository makes.
+  return { role: member.role, disabled: member.disabledAt !== null };
 }
 
 /**
+ * A membership an admin disabled to reclaim its seat is not a current one: it
+ * keeps its role and its history and confers no access until it is re-enabled
+ * (seat-reconciliation.feature). Matches the policy the AuthZ collector
+ * applies to the same row.
+ */
+function currentRoleOf(
+  membership: CurrentMembership | null,
+): OrganizationUserRole | null {
+  return membership && !membership.disabled ? membership.role : null;
+}
+
+/**
+ * Why a membership read refused, when there is something to say. A disabled
+ * seat is named so the boundary can tell the person their access was turned
+ * off rather than that they are not a member. An absent row says nothing
+ * here: the generic denial is already the right answer for it.
+ */
+function membershipDenialReason(
+  membership: CurrentMembership | null,
+): AuthzDenialReason | undefined {
+  return membership?.disabled ? "membership-disabled" : undefined;
+}
+
+/**
+ * The single source of truth for "is this user a CURRENT member of this org,
+ * and with what role". `null` means no active `OrganizationUser` row — the
+ * caller must fail closed rather than fall through to bindings, because a
+ * stale cross-org RoleBinding can still name a non-member at a project/team
+ * scope.
+ *
+ * Every scoped permission path derives membership through here so a future
+ * tenancy fix lands once instead of in each resolver.
+ */
+async function getCurrentOrganizationRole(args: {
+  prisma: PrismaClient;
+  userId: string;
+  organizationId: string;
+}): Promise<OrganizationUserRole | null> {
+  return currentRoleOf(await getCurrentMembership(args));
+}
+
+/** A denial reached before any binding was read. */
+function refused(denialReason?: AuthzDenialReason): PermissionResult {
+  return {
+    permitted: false,
+    organizationRole: null,
+    ...(denialReason ? { denialReason } : {}),
+  };
+}
+
+type ProjectPermissionContext = {
+  userId: string;
+  teamId: string;
+  organizationId: string;
+  organizationRole: OrganizationUserRole;
+};
+
+/**
+ * The context resolved to a denial before any binding was read, carrying
+ * the reason when there is one a caller can act on.
+ */
+type ProjectPermissionRefusal = {
+  refused: true;
+  denialReason?: AuthzDenialReason;
+};
+
+/**
  * Where a project sits and where the caller stands in it: everything a
- * permission check needs before it looks at a single binding. Null when the
- * answer is already a denial, either because the project has no team or
- * organization or because the caller is not a member of that organization.
+ * permission check needs before it looks at a single binding. A refusal when
+ * the answer is already a denial, either because the project has no team or
+ * organization or because the caller is not an active member of that
+ * organization.
  *
  * Resolved on its own so a gate that tests several permissions pays for it
  * once: only the binding check below differs from permission to permission.
@@ -921,14 +992,9 @@ async function getCurrentOrganizationRole({
 async function resolveProjectPermissionContext(
   ctx: { prisma: PrismaClient; session: Session | null },
   projectId: string,
-): Promise<{
-  userId: string;
-  teamId: string;
-  organizationId: string;
-  organizationRole: OrganizationUserRole;
-} | null> {
+): Promise<ProjectPermissionContext | ProjectPermissionRefusal> {
   const userId = ctx.session?.user?.id;
-  if (!userId) return null;
+  if (!userId) return { refused: true };
 
   const projectTeam = await ctx.prisma.project.findUnique?.({
     where: { id: projectId },
@@ -938,21 +1004,26 @@ async function resolveProjectPermissionContext(
   const teamId = projectTeam?.team.id;
   const organizationId = projectTeam?.team.organizationId;
 
-  if (!teamId || !organizationId) return null;
+  if (!teamId || !organizationId) return { refused: true };
 
-  const organizationRole = await getCurrentOrganizationRole({
+  const membership = await getCurrentMembership({
     prisma: ctx.prisma,
     userId,
     organizationId,
   });
+  const organizationRole = currentRoleOf(membership);
 
   // Fail closed on current organization membership. A user who is not an
-  // OrganizationUser of the owning org is denied outright, even if a stale
-  // RoleBinding (created through a since-closed cross-org path) still names them
-  // at this project/team scope. The membership check — not the binding row — is
-  // the authoritative tenancy boundary. See the same gate in resolveTeamPermission
-  // and batchScopePermissions, and the direct-binding predicate below.
-  if (organizationRole === null) return null;
+  // active OrganizationUser of the owning org is denied outright, even if a
+  // stale RoleBinding (created through a since-closed cross-org path) still
+  // names them at this project/team scope. The membership check — not the
+  // binding row — is the authoritative tenancy boundary. See the same gate in
+  // resolveTeamPermission and batchScopePermissions, and the direct-binding
+  // predicate below. A disabled seat is refused here too, before either head
+  // runs, and named so the boundary can say so.
+  if (organizationRole === null) {
+    return { refused: true, denialReason: membershipDenialReason(membership) };
+  }
 
   return { userId, teamId, organizationId, organizationRole };
 }
@@ -993,7 +1064,7 @@ export async function resolveProjectPermission(
   }
 
   const context = await resolveProjectPermissionContext(ctx, projectId);
-  if (!context) return { permitted: false, organizationRole: null };
+  if ("refused" in context) return refused(context.denialReason);
 
   /** The legacy binding walk, run only while this organization is still
    *  waiting for its migration. */
@@ -1063,7 +1134,7 @@ export async function resolveProjectPermissionAny(
   }
 
   const context = await resolveProjectPermissionContext(ctx, projectId);
-  if (!context) return { permitted: false, organizationRole: null };
+  if ("refused" in context) return refused(context.denialReason);
 
   const scopes = projectPermissionScopes({
     projectId,
@@ -1088,6 +1159,7 @@ export async function resolveProjectPermissionAny(
     return {
       permitted: decision.allowed,
       organizationRole: decision.organizationRole ?? context.organizationRole,
+      denialReason: decision.denialReason,
     };
   }
 
@@ -1149,17 +1221,19 @@ export async function resolveTeamPermission(
     return { permitted: false, organizationRole: null };
   }
 
-  const organizationRole = await getCurrentOrganizationRole({
+  const membership = await getCurrentMembership({
     prisma: ctx.prisma,
     userId: ctx.session.user.id,
     organizationId: team.organizationId,
   });
+  const organizationRole = currentRoleOf(membership);
 
-  // Fail closed on current organization membership — a non-member is denied even
-  // if a stale cross-org binding names them at this team scope. See the matching
-  // gate in resolveProjectPermission.
+  // Fail closed on current organization membership — a non-member is denied
+  // even if a stale cross-org binding names them at this team scope, and a
+  // disabled seat is refused by name. See the matching gate in
+  // resolveProjectPermission.
   if (organizationRole === null) {
-    return { permitted: false, organizationRole: null };
+    return refused(membershipDenialReason(membership));
   }
 
   const userId = ctx.session.user.id;
@@ -1196,6 +1270,7 @@ export async function resolveTeamPermission(
     return {
       permitted: decision.allowed,
       organizationRole: decision.organizationRole ?? organizationRole,
+      denialReason: decision.denialReason,
     };
   }
 
@@ -1246,17 +1321,24 @@ export async function hasOrganizationPermission(
   return hasOrganizationPermissionLegacy(ctx, organizationId, permission);
 }
 
-export async function organizationDenialReason(
-  ctx: { prisma: PrismaClient; session: Session },
-  organizationId: string,
-): Promise<AuthzDenialReason | undefined> {
+/**
+ * Why an organization-scope check refused, asked only after it did: one
+ * indexed read on the refusal path rather than a second walk, so the
+ * permitted path pays nothing. Undefined when there is nothing more useful
+ * to say than the generic denial.
+ */
+export async function organizationDenialReason({
+  ctx,
+  organizationId,
+}: {
+  ctx: { prisma: PrismaClient; session: Session };
+  organizationId: string;
+}): Promise<AuthzDenialReason | undefined> {
   const userId = ctx.session?.user?.id;
   if (!userId) return undefined;
-  const membership = await ctx.prisma.organizationUser?.findFirst({
-    where: { userId, organizationId },
-    select: { disabledAt: true },
-  });
-  return membership?.disabledAt ? "membership-disabled" : undefined;
+  return membershipDenialReason(
+    await getCurrentMembership({ prisma: ctx.prisma, userId, organizationId }),
+  );
 }
 
 async function hasOrganizationPermissionLegacy(

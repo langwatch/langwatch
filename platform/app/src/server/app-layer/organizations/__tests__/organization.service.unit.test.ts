@@ -333,7 +333,7 @@ describe("OrganizationService", () => {
     });
 
     describe("when disabling another member", () => {
-      /** @scenario Disabling takes effect at once, not when a cache expires */
+      /** @scenario Disabling or re-enabling a membership takes effect on the next request */
       it("retires the organization's cached authorization answers", async () => {
         // Disabling writes a column, not a grant, so nothing else bumps the
         // authz epoch. Without this the revocation an admin just performed
