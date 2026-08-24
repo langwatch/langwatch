@@ -70,16 +70,18 @@ const UPWARD_KEYS = new Set(["ArrowUp", "PageUp", "Home"]);
  * gesture there is — a reader at the live edge flicking further down, which
  * moves nothing, and a finalisation clamp arriving in the same breath.
  *
- * A pointer drag is the one gesture that cannot report a direction: the button
- * goes down on the scrollbar and the column follows the hand until it is let
- * go. So a pointer that is held AND moving qualifies whatever happens while it
- * moves. A button merely resting moves nothing and qualifies nothing.
+ * A pointer drag is the one gesture that cannot report a direction, so it is
+ * qualified by where it can reach instead. A press that lands on the scroller
+ * ITSELF is its scrollbar, and the column follows that hand until it is let
+ * go; a press that lands on a child is a click or a text selection, which
+ * moves nothing. A selection does eventually scroll the column, but only once
+ * it is dragged past the top edge, and there the pointer says so itself.
  */
 function trackReaderGestures(el: HTMLElement) {
   const controller = new AbortController();
   let lastUpwardAt = 0;
   let touchY: number | null = null;
-  let pointerIsDown = false;
+  let drag: { onScrollbar: boolean; topEdge: number } | null = null;
 
   const onWheel = (event: WheelEvent) => {
     if (event.deltaY < 0) lastUpwardAt = Date.now();
@@ -99,13 +101,18 @@ function trackReaderGestures(el: HTMLElement) {
   };
   // Touch reports its own direction above, so a resting finger is not a drag.
   const onPointerDown = (event: PointerEvent) => {
-    pointerIsDown = event.pointerType !== "touch";
+    if (event.pointerType === "touch") return;
+    const onScrollbar = event.target === el;
+    drag = { onScrollbar, topEdge: el.getBoundingClientRect().top };
   };
-  const onPointerMove = () => {
-    if (pointerIsDown) lastUpwardAt = Date.now();
+  const onPointerMove = (event: PointerEvent) => {
+    if (!drag) return;
+    if (drag.onScrollbar || event.clientY < drag.topEdge) {
+      lastUpwardAt = Date.now();
+    }
   };
   const onPointerUp = () => {
-    pointerIsDown = false;
+    drag = null;
   };
 
   const opts = { passive: true, signal: controller.signal };

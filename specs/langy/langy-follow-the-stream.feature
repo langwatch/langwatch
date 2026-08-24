@@ -88,6 +88,21 @@ Feature: The Langy conversation follows the stream
       When I drag the scrollbar up
       Then the column stops following, and offers to jump to the latest
 
+    # A press on the message text is a click or a selection, and it reaches the
+    # column the same way the scrollbar does. Neither moves the column, so
+    # neither may excuse what the column does to itself next.
+    @integration
+    Scenario: Selecting text in the column does not stop the follow
+      Given the Langy panel is open and scrolled to the bottom
+      When I select text in the answer, and then the column jumps upward on its own
+      Then the column keeps following, and offers nothing to jump to
+
+    @integration
+    Scenario: A selection dragged above the column stops the follow
+      Given the Langy panel is open and an answer is streaming
+      When I select text and drag above the top of the column
+      Then the column stops following, and offers to jump to the latest
+
     # Following is a smooth scroll, and a smooth scroll reports every position
     # it passes through. Each one is "not at the bottom yet", so reading them as
     # the reader's own would stop the follow on the very movement that was
