@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { createLogger } from "@langwatch/observability";
+import {
+  AnomalySpendReaderPort,
+  type AnomalySpendSourceFilter,
+} from "@langwatch/enterprise-governance-server";
 /**
  * GovernanceKpisClickHouseRepository — reads and writes the
  * `governance_kpis` fold projection.
@@ -38,8 +42,10 @@ export interface GovernanceKpiContribution {
   lastEventOccurredAt: Date;
 }
 
-export class GovernanceKpisClickHouseRepository {
-  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+export class GovernanceKpisClickHouseRepository extends AnomalySpendReaderPort {
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {
+    super();
+  }
 
   async insertContribution(row: GovernanceKpiContribution): Promise<void> {
     if (!row.tenantId || !row.sourceId || !row.traceId) {
@@ -96,9 +102,10 @@ export class GovernanceKpisClickHouseRepository {
     windowStart: Date;
     windowEnd: Date;
     baselineStart: Date;
-    sourceFilter: { sql: string; params: Record<string, unknown> };
+    sourceFilter: AnomalySpendSourceFilter;
   }): Promise<{ currentSpend: number; baselineSpend: number }> {
     const client = await this.resolveClient(input.tenantId);
+    const sourceFilter = toClickHouseSourceFilter(input.sourceFilter);
     const result = await client.query({
       query: `
         SELECT
@@ -108,14 +115,14 @@ export class GovernanceKpisClickHouseRepository {
         WHERE TenantId = {tenantId:String}
           AND HourBucket >= fromUnixTimestamp64Milli({baselineStartMs:UInt64})
           AND HourBucket < fromUnixTimestamp64Milli({windowEndMs:UInt64})
-          ${input.sourceFilter.sql}
+          ${sourceFilter.sql}
       `,
       query_params: {
         tenantId: input.tenantId,
         windowStartMs: input.windowStart.getTime(),
         windowEndMs: input.windowEnd.getTime(),
         baselineStartMs: input.baselineStart.getTime(),
-        ...input.sourceFilter.params,
+        ...sourceFilter.params,
       },
       format: "JSONEachRow",
     });
@@ -129,4 +136,23 @@ export class GovernanceKpisClickHouseRepository {
       baselineSpend: Number(row?.baselineSpend ?? 0),
     };
   }
+}
+
+function toClickHouseSourceFilter(filter: AnomalySpendSourceFilter): {
+  sql: string;
+  params: Record<string, string>;
+} {
+  if (filter.type === "source") {
+    return {
+      sql: "AND SourceId = {sourceId:String}",
+      params: { sourceId: filter.id },
+    };
+  }
+  if (filter.type === "source_type") {
+    return {
+      sql: "AND SourceType = {sourceType:String}",
+      params: { sourceType: filter.id },
+    };
+  }
+  return { sql: "", params: {} };
 }

@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { createLogger } from "@langwatch/observability";
+import {
+  AnomalyAlertDispatcherService,
+  PostgresSpendSpikeAnomalyAdapter,
+} from "@langwatch/enterprise-governance-server";
 /**
  * Periodic spend-spike anomaly evaluation tick.
  *
@@ -22,7 +26,7 @@ import {
   toError,
   withScope,
 } from "~/utils/posthogErrorCapture";
-import { SpendSpikeAnomalyEvaluator } from "./spendSpikeAnomalyEvaluator.service";
+import { SsrfSafeAnomalyAlertHttpAdapter } from "./activity-monitor/ssrf-safe.anomaly-alert-http.adapter";
 
 const logger = createLogger("langwatch:workers:spendSpikeAnomalyWorker");
 
@@ -49,10 +53,13 @@ export function startSpendSpikeAnomalyWorker(): SpendSpikeAnomalyWorkerHandle {
   const tick = async () => {
     if (stopped) return;
     try {
-      const evaluator = SpendSpikeAnomalyEvaluator.create({
-        prisma,
-        kpisRepository: getApp().governance.kpis,
-      });
+      const evaluator = PostgresSpendSpikeAnomalyAdapter.create({
+        database: prisma,
+        spend: getApp().governance.kpis,
+        dispatcher: AnomalyAlertDispatcherService.create({
+          http: SsrfSafeAnomalyAlertHttpAdapter.create(),
+        }),
+      }).build();
       const result = await evaluator.evaluateAll({ now: new Date() });
       logger.info(
         {

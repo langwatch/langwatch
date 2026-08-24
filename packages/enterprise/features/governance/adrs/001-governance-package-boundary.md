@@ -54,6 +54,8 @@ server service. The application router owns authentication and tRPC only;
 Postgres access stays in the feature's private Prisma repository.
 Governance also owns alert fan-out, bounded retries, signing and delivery
 outcomes. The application injects its SSRF-safe HTTP adapter.
+Spend-spike orchestration consumes structured spend filters through a narrow
+port; ClickHouse query syntax remains inside the application adapter.
 
 ## Persistence
 

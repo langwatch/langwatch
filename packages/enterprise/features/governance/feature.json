@@ -17,6 +17,7 @@
     "pull-destination",
     "pulled-usage",
     "puller",
-    "quarantine-fill"
+    "quarantine-fill",
+    "spend-spike-anomaly"
   ]
 }

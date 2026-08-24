@@ -68,6 +68,12 @@ Feature: Enterprise governance package boundary
     And every destination produces an auditable outcome
     And the application supplies the SSRF-safe HTTP adapter
 
+  Scenario: Spend spike evaluation does not expose storage syntax
+    Given an active spend spike rule targets a source or source type
+    When Governance reads the current and baseline spend windows
+    Then the feature passes a structured source filter to the spend capability
+    And ClickHouse query syntax remains inside the application adapter
+
   Scenario: Contracts are transport independent
     Given a browser imports the governance contract root
     Then no server, Eventing, application, environment, or generated database module loads
