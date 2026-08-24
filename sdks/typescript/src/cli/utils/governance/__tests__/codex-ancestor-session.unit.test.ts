@@ -5,18 +5,24 @@
  * Feature: specs/ai-governance/cli-wrappers/session-context-declare.feature
  */
 
-import { describe, expect, it } from "vitest";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
   type AncestorProbe,
+  readSymlinkedPaths,
   resolveCodexSessionFromAncestors,
 } from "../codex-ancestor-session";
 
 const SESSION_A = "0199a1f4-2c5e-7a10-9f61-2d7f0a3b5c11";
 const SESSION_B = "0199a1f4-2c5e-7a10-9f61-2d7f0a3b5c22";
+const SESSIONS_ROOT = "/home/agent/.codex/sessions";
 
 const rolloutOf = (sessionId: string) =>
-  `/home/agent/.codex/sessions/2026/08/24/rollout-2026-08-24T10-00-00-${sessionId}.jsonl`;
+  `${SESSIONS_ROOT}/2026/08/24/rollout-2026-08-24T10-00-00-${sessionId}.jsonl`;
 
 /** A process tree as a plain map: pid to parent, pid to open files. */
 function fakeProbe({
@@ -48,6 +54,7 @@ describe("resolving the codex session from the process tree", () => {
       const found = await resolveCodexSessionFromAncestors({
         startPid: 100,
         probe,
+        sessionsRoot: SESSIONS_ROOT,
       });
 
       expect(found?.sessionId).toBe(SESSION_A);
@@ -66,6 +73,7 @@ describe("resolving the codex session from the process tree", () => {
       const found = await resolveCodexSessionFromAncestors({
         startPid: 100,
         probe,
+        sessionsRoot: SESSIONS_ROOT,
       });
 
       // SESSION_B is the newer writer on this machine and is not an ancestor.
@@ -87,6 +95,7 @@ describe("resolving the codex session from the process tree", () => {
       const found = await resolveCodexSessionFromAncestors({
         startPid: 100,
         probe,
+        sessionsRoot: SESSIONS_ROOT,
       });
 
       expect(found?.sessionId).toBe(SESSION_A);
@@ -102,7 +111,11 @@ describe("resolving the codex session from the process tree", () => {
       });
 
       expect(
-        await resolveCodexSessionFromAncestors({ startPid: 100, probe }),
+        await resolveCodexSessionFromAncestors({
+          startPid: 100,
+          probe,
+          sessionsRoot: SESSIONS_ROOT,
+        }),
       ).toBeNull();
     });
   });
@@ -118,7 +131,11 @@ describe("resolving the codex session from the process tree", () => {
       };
 
       expect(
-        await resolveCodexSessionFromAncestors({ startPid: 100, probe }),
+        await resolveCodexSessionFromAncestors({
+          startPid: 100,
+          probe,
+          sessionsRoot: SESSIONS_ROOT,
+        }),
       ).toBeNull();
     });
   });
@@ -133,7 +150,11 @@ describe("resolving the codex session from the process tree", () => {
       };
 
       expect(
-        await resolveCodexSessionFromAncestors({ startPid: 100, probe }),
+        await resolveCodexSessionFromAncestors({
+          startPid: 100,
+          probe,
+          sessionsRoot: SESSIONS_ROOT,
+        }),
       ).toBeNull();
     });
   });
@@ -150,6 +171,7 @@ describe("resolving the codex session from the process tree", () => {
       const found = await resolveCodexSessionFromAncestors({
         startPid: 100,
         probe,
+        sessionsRoot: SESSIONS_ROOT,
         maxHops: 5,
       });
 
@@ -171,6 +193,7 @@ describe("resolving the codex session from the process tree", () => {
       const found = await resolveCodexSessionFromAncestors({
         startPid: 100,
         probe,
+        sessionsRoot: SESSIONS_ROOT,
         budgetMs: 2_000,
         nowMs: () => clock,
       });
@@ -184,11 +207,60 @@ describe("resolving the codex session from the process tree", () => {
       const probe = fakeProbe({ parents: {}, openFiles: {} });
 
       expect(
-        await resolveCodexSessionFromAncestors({ startPid: 1, probe }),
+        await resolveCodexSessionFromAncestors({
+          startPid: 1,
+          probe,
+          sessionsRoot: SESSIONS_ROOT,
+        }),
       ).toBeNull();
       expect(
-        await resolveCodexSessionFromAncestors({ probe }),
+        await resolveCodexSessionFromAncestors({
+          probe,
+          sessionsRoot: SESSIONS_ROOT,
+        }),
       ).toBeNull();
+    });
+  });
+
+  describe("when an ancestor holds a rollout-shaped file outside the sessions tree", () => {
+    /** @scenario "A rollout-shaped file outside the codex sessions tree names no session" */
+    it("does not treat it as a codex session", async () => {
+      const probe = fakeProbe({
+        parents: { 100: 90, 90: 1 },
+        openFiles: {
+          90: [
+            `/tmp/rollout-2026-08-24T10-00-00-${SESSION_A}.jsonl`,
+            `/home/agent/.codex/sessions-evil/rollout-2026-08-24T10-00-00-${SESSION_B}.jsonl`,
+          ],
+        },
+      });
+
+      expect(
+        await resolveCodexSessionFromAncestors({
+          startPid: 100,
+          probe,
+          sessionsRoot: SESSIONS_ROOT,
+        }),
+      ).toBeNull();
+    });
+
+    /** @scenario "A rollout-shaped file outside the codex sessions tree names no session" */
+    it("skips it and keeps walking to the real one", async () => {
+      const probe = fakeProbe({
+        parents: { 100: 90, 90: 80, 80: 1 },
+        openFiles: {
+          90: [`/tmp/rollout-2026-08-24T10-00-00-${SESSION_B}.jsonl`],
+          80: [rolloutOf(SESSION_A)],
+        },
+      });
+
+      const found = await resolveCodexSessionFromAncestors({
+        startPid: 100,
+        probe,
+        sessionsRoot: SESSIONS_ROOT,
+      });
+
+      expect(found?.sessionId).toBe(SESSION_A);
     });
   });
 
@@ -200,8 +272,79 @@ describe("resolving the codex session from the process tree", () => {
       });
 
       expect(
-        await resolveCodexSessionFromAncestors({ startPid: 100, probe }),
+        await resolveCodexSessionFromAncestors({
+          startPid: 100,
+          probe,
+          sessionsRoot: SESSIONS_ROOT,
+        }),
       ).toBeNull();
+    });
+  });
+});
+
+describe("resolving a directory of descriptor symlinks", () => {
+  let dir: string;
+
+  afterEach(() => {
+    if (dir) fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  function fdDirWith(count: number): string {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "lw-fd-"));
+    const target = path.join(dir, "target");
+    fs.writeFileSync(target, "");
+    const fdDir = path.join(dir, "fd");
+    fs.mkdirSync(fdDir);
+    for (let i = 0; i < count; i++) {
+      fs.symlinkSync(target, path.join(fdDir, String(i)));
+    }
+    return fdDir;
+  }
+
+  describe("when there is time left", () => {
+    it("resolves every descriptor", async () => {
+      const fdDir = fdDirWith(3);
+
+      const paths = await readSymlinkedPaths({ dir: fdDir, timeoutMs: 5_000 });
+
+      expect(paths).toHaveLength(3);
+    });
+  });
+
+  describe("when the deadline has already passed", () => {
+    /** @scenario "Ancestor resolution unavailable falls back to recent-rollout inference" */
+    it("resolves nothing rather than read thousands of descriptors", async () => {
+      const fdDir = fdDirWith(3);
+
+      const paths = await readSymlinkedPaths({ dir: fdDir, timeoutMs: 0 });
+
+      expect(paths).toEqual([]);
+    });
+  });
+
+  describe("when the deadline passes partway through", () => {
+    it("stops at the batch boundary instead of finishing the directory", async () => {
+      const fdDir = fdDirWith(200);
+      let clock = 0;
+
+      const paths = await readSymlinkedPaths({
+        dir: fdDir,
+        timeoutMs: 100,
+        nowMs: () => (clock += 60),
+      });
+
+      expect(paths.length).toBeLessThan(200);
+    });
+  });
+
+  describe("when the directory cannot be read", () => {
+    it("resolves nothing instead of throwing", async () => {
+      expect(
+        await readSymlinkedPaths({
+          dir: "/proc/does-not-exist/fd",
+          timeoutMs: 1_000,
+        }),
+      ).toEqual([]);
     });
   });
 });

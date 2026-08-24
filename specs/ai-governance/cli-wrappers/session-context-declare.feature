@@ -84,6 +84,14 @@ Rule: The agent can declare its working context itself
     When the declare command runs with no flags
     Then the record declares codex with the session id of the ancestor's rollout
 
+  # Any process can hold a file named like a rollout open. Only codex writes
+  # one into its sessions tree, so the name alone establishes nothing.
+  @unit
+  Scenario: A rollout-shaped file outside the codex sessions tree names no session
+    Given an ancestor process holds a file named like a rollout, outside the codex sessions tree
+    When the declare command runs with no flags
+    Then that file names no session and resolution continues past it
+
   # The process tree cannot always be read: a restrictive sandbox, a platform
   # without the tools, or a command run outside any codex process at all.
   @unit

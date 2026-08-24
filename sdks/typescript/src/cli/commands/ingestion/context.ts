@@ -13,23 +13,7 @@
  * is running in, and the always-loaded guidance the CLI installs tells every
  * session to run it when it switches.
  *
- * Which session that is, in order:
- *
- *   1. `--agent` plus `--session-id`, when the caller knows better.
- *   2. The claude session this process runs inside: claude exports
- *      `CLAUDECODE` and `CLAUDE_CODE_SESSION_ID` into every shell it spawns.
- *      Checked first so a codex started inside a claude session declares for
- *      the claude session actually doing the work.
- *   3. The codex session this process runs UNDER: codex holds its rollout
- *      transcript open for the whole session and spawns the shell that runs
- *      this, so the first ancestor process holding a rollout open is the
- *      session asking. Deterministic, and unbothered by other sessions.
- *   4. Failing that, the codex session active on this machine, inferred from
- *      the rollout transcripts. This is what answers when the process tree
- *      cannot be read, under a restrictive sandbox above all. Inference
- *      cannot tell two simultaneously active sessions apart, so there it
- *      declares nothing and asks for the flags rather than name the wrong
- *      session.
+ * Which session that is is decided in `context-session.ts`.
  *
  * Unlike the hooks this command talks to whoever ran it: its stdout is the
  * agent's tool result, so it says in one line what it declared or why it
@@ -78,26 +62,16 @@ import {
   sessionTitleFromPrompt,
 } from "@/cli/utils/governance/session-context";
 import {
-  type CodexRolloutMeta,
-  parseCodexRollout,
-} from "@/cli/utils/governance/codex-rollout";
-import {
   codexSessionIndexPath,
   readCodexThreadNames,
 } from "@/cli/utils/governance/codex-session-index";
-import {
-  defaultCodexSessionsRoot,
-  findRolloutForThread,
-} from "@/cli/utils/governance/codex-rollout-otlp";
-import { resolveLiveCodexSession } from "@/cli/utils/governance/codex-live-session";
-import {
-  type AncestorProbe,
-  resolveCodexSessionFromAncestors,
-} from "@/cli/utils/governance/codex-ancestor-session";
-import { readFile } from "node:fs/promises";
+import { defaultCodexSessionsRoot } from "@/cli/utils/governance/codex-rollout-otlp";
+import type { AncestorProbe } from "@/cli/utils/governance/codex-ancestor-session";
 
-/** The agents a declaration can name, keyed by their normalized spelling. */
-const AGENTS = new Set(["claude_code", "codex", "opencode"]);
+import {
+  type ResolvedSession,
+  resolveSession,
+} from "./context-session";
 
 export interface ContextCommandOptions {
   /** Declare for this session instead of resolving the live one. */
@@ -120,14 +94,6 @@ export interface ContextCommandOptions {
   readCliConfig?: () => CliTelemetryConfig;
   /** One line to whoever ran the command. Defaults to stdout. */
   writeLine?: (line: string) => void;
-}
-
-/** Which session the declaration is for, and what titles its seams carry. */
-interface ResolvedSession {
-  agent: string;
-  sessionId: string;
-  /** The codex rollout identity, when the session resolved to codex. */
-  codexMeta: CodexRolloutMeta | null;
 }
 
 /**
@@ -292,129 +258,6 @@ async function declare({
     // A fingerprint we cannot record costs one duplicate record next time.
   }
   writeLine(`Declared ${declared}`);
-}
-
-/**
- * Which session is asking. Flags first, then the claude environment, then
- * the newest recently-active codex rollout. Announces its own failure,
- * because "nothing was declared" must never be silent to the agent.
- */
-async function resolveSession({
-  sessionId,
-  agent,
-  env,
-  now,
-  codexSessionsRoot,
-  ancestorStartPid,
-  ancestorProbe,
-  writeLine,
-}: {
-  sessionId?: string;
-  agent?: string;
-  env: NodeJS.ProcessEnv;
-  now: () => number;
-  codexSessionsRoot: string;
-  ancestorStartPid: number;
-  ancestorProbe?: AncestorProbe;
-  writeLine: (line: string) => void;
-}): Promise<ResolvedSession | null> {
-  if (sessionId || agent) {
-    const normalized = agent?.trim().toLowerCase().replace(/-/g, "_") ?? "";
-    const trimmedSessionId = sessionId?.trim() ?? "";
-    if (!trimmedSessionId || !AGENTS.has(normalized)) {
-      writeLine(
-        "Pass both --agent (claude-code, codex or opencode) and --session-id to declare for an explicit session.",
-      );
-      return null;
-    }
-    return {
-      agent: normalized,
-      sessionId: trimmedSessionId,
-      codexMeta:
-        normalized === "codex"
-          ? await readCodexMeta({
-              sessionId: trimmedSessionId,
-              codexSessionsRoot,
-            })
-          : null,
-    };
-  }
-
-  // The claude environment wins over the rollout sweep: a codex (or any
-  // other process) started from inside a claude session inherits these, and
-  // the session doing the work, the one whose cost this checkout explains,
-  // is the claude one.
-  const claudeSessionId = env.CLAUDE_CODE_SESSION_ID?.trim();
-  if (env.CLAUDECODE && claudeSessionId) {
-    return { agent: "claude_code", sessionId: claudeSessionId, codexMeta: null };
-  }
-
-  // The process tree answers exactly when it can, so it is asked before the
-  // machine-wide inference below.
-  const ancestor = await resolveCodexSessionFromAncestors({
-    startPid: ancestorStartPid,
-    ...(ancestorProbe ? { probe: ancestorProbe } : {}),
-  });
-  if (ancestor) {
-    return {
-      agent: "codex",
-      sessionId: ancestor.sessionId,
-      // The same rollout the session is writing, read for the same title the
-      // turn harvest sends, so the two seams' fingerprints agree.
-      codexMeta: await readRolloutMeta(ancestor.rolloutPath),
-    };
-  }
-
-  const live = await resolveLiveCodexSession({
-    sessionsRoot: codexSessionsRoot,
-    nowMs: now(),
-  });
-  if (live.kind === "session") {
-    return {
-      agent: "codex",
-      sessionId: live.session.sessionId,
-      codexMeta: live.session.meta,
-    };
-  }
-  if (live.kind === "ambiguous") {
-    writeLine(
-      "Multiple active codex sessions; run with --agent codex --session-id <id>.",
-    );
-    return null;
-  }
-
-  writeLine(
-    "Could not find a live coding-agent session on this machine. Pass --agent and --session-id to name one.",
-  );
-  return null;
-}
-
-/** The rollout identity at a known transcript path, best-effort. */
-async function readRolloutMeta(
-  rolloutPath: string,
-): Promise<CodexRolloutMeta | null> {
-  try {
-    return parseCodexRollout(await readFile(rolloutPath, "utf8")).meta;
-  } catch {
-    return null;
-  }
-}
-
-/** The rollout identity for an explicitly named codex session, best-effort. */
-async function readCodexMeta({
-  sessionId,
-  codexSessionsRoot,
-}: {
-  sessionId: string;
-  codexSessionsRoot: string;
-}): Promise<CodexRolloutMeta | null> {
-  try {
-    const rollout = await findRolloutForThread(sessionId, codexSessionsRoot);
-    if (!rollout) return null;
-    return parseCodexRollout(await readFile(rollout, "utf8")).meta;
-  } catch {
-    return null;
-  }
 }
 
 function describeContext({
