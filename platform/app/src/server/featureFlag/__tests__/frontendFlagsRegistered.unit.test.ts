@@ -21,9 +21,9 @@ import { resolveFlagDefinition } from "../registry";
  * directly, so they exercise the same predicate the service does — including
  * family-prefix matches — instead of a copy that can drift from it.
  *
- * Two keys predate this check and are pinned below rather than changed here;
- * altering either is a behavior change that belongs in its own PR, not in a
- * test that exists to stop the NEXT one.
+ * Three keys predate this check and are pinned below rather than changed here;
+ * altering any of them is a behavior change that belongs in its own PR, not in
+ * a test that exists to stop the NEXT one.
  */
 
 /**
@@ -35,10 +35,17 @@ import { resolveFlagDefinition } from "../registry";
 const UNREGISTERED_GRANDFATHERED = ["ops_ui_ops_menu_pinned"];
 
 /**
- * Registered but deliberately not PRODUCT-scoped. `release_langy_enabled`
- * is SYSTEM with `envOverridable: false`, which reads as intentional.
+ * Registered but deliberately not PRODUCT-scoped. Both are SYSTEM with
+ * `envOverridable: false`, which reads as intentional: the Langy rollout
+ * levers answer only to the operator store, never to an env var. Scope
+ * itself changes nothing in the resolver, which treats SYSTEM and PRODUCT
+ * identically, so both keys still resolve through the store and still take
+ * per-organization targeting rules.
  */
-const NON_PRODUCT_GRANDFATHERED = ["release_langy_enabled"];
+const NON_PRODUCT_GRANDFATHERED = [
+  "release_langy_enabled",
+  "release_langy_ui_actions",
+];
 
 describe("frontend feature flags", () => {
   describe("when a flag is exposed to the frontend via tRPC", () => {
@@ -69,9 +76,12 @@ describe("frontend feature flags", () => {
   });
 
   describe("when the grandfathered exceptions are listed", () => {
-    it("names exactly the two keys that predate this check", () => {
+    it("names exactly the three keys that predate this check", () => {
       expect(UNREGISTERED_GRANDFATHERED).toEqual(["ops_ui_ops_menu_pinned"]);
-      expect(NON_PRODUCT_GRANDFATHERED).toEqual(["release_langy_enabled"]);
+      expect(NON_PRODUCT_GRANDFATHERED).toEqual([
+        "release_langy_enabled",
+        "release_langy_ui_actions",
+      ]);
     });
   });
 });
