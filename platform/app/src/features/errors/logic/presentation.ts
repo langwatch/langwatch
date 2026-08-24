@@ -1241,6 +1241,67 @@ const presentations = {
         : "Sign out and sign back in as the account this invitation was sent to.";
     },
   },
+  // ---------------------------------------------------------------------
+  // Joining an organization (D12, ADR-117)
+  //
+  // `join_not_available` is the deliberately vague one, and it is vague on
+  // purpose: it answers an organization that does not exist, one that turned
+  // joining off, one whose identity provider already admits people, and an
+  // address nobody has verified. Copy that told those apart would be an
+  // oracle for which organizations exist and who works at them. So it names
+  // the ONE thing the reader can act on — ask a colleague — and stops.
+  // ---------------------------------------------------------------------
+  join_not_available: {
+    title: "Nothing to join with this address",
+    describe: () =>
+      "If you expected to find your team here, ask a colleague to send you an invitation.",
+  },
+  join_request_not_found: {
+    title: "That request is no longer there",
+    describe: () =>
+      "It may have been answered or withdrawn already. Refresh to see what is waiting now.",
+  },
+  join_request_not_pending: {
+    title: "That request was already answered",
+    describe: () =>
+      "Somebody approved, rejected or withdrew it. Refresh to see where it ended up.",
+  },
+  join_request_already_pending: {
+    title: "You have already asked",
+    describe: () =>
+      "Your request is waiting for an administrator. You will get an email either way.",
+  },
+  join_request_throttled: {
+    title: "Give it a moment",
+    describe: (error) => {
+      const seconds = num(error, "retryAfterSeconds", 0);
+      if (seconds <= 0) return "Try that again shortly.";
+      const days = Math.ceil(seconds / 86400);
+      if (seconds >= 86400) {
+        return `Try again in ${days} ${days === 1 ? "day" : "days"}.`;
+      }
+      const minutes = Math.ceil(seconds / 60);
+      return `Try again in ${minutes} ${minutes === 1 ? "minute" : "minutes"}.`;
+    },
+  },
+  join_auto_not_licensed: {
+    title: "Automatic joining needs a licence",
+    describe: () =>
+      "Colleagues can still ask to join and you approve them. To let them in without asking, add a licence.",
+  },
+  // Company domains only, and the copy stops there. Listing what counts as a
+  // consumer mail provider would turn the refusal into a way to enumerate
+  // the deny-list.
+  join_auto_domain_unproven: {
+    title: "That domain is not proven yet",
+    describe: () =>
+      "Automatic joining works for company domains that at least two of your members have verified. Personal email domains are never eligible.",
+  },
+  join_auto_connection_admits: {
+    title: "Your identity provider already admits that domain",
+    describe: () =>
+      "People on it sign in through single sign-on, so there is nothing for automatic joining to add.",
+  },
   team_not_in_organization: {
     title: "That team isn't in this organization",
     describe: () => "Pick a team that belongs to this organization.",

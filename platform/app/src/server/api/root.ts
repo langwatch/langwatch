@@ -56,6 +56,7 @@ import { monitorsRouter } from "./routers/monitors";
 import { onboardingRouter } from "./routers/onboarding/onboarding.router";
 import { opsRouter } from "./routers/ops";
 import { optimizationRouter } from "./routers/optimization";
+import { joinRequestsRouter } from "./routers/joinRequests";
 import { organizationRouter } from "./routers/organization";
 import { personalVirtualKeysRouter } from "./routers/personalVirtualKeys";
 import { personalWorkspaceFeaturesRouter } from "./routers/personalWorkspaceFeatures";
@@ -96,6 +97,7 @@ const coreRouters = {
   evaluators: evaluatorsRouter,
   httpProxy: httpProxyRouter,
   organization: organizationRouter,
+  joinRequests: joinRequestsRouter,
   project: projectRouter,
   team: teamRouter,
   traces: tracesRouter,

@@ -26,9 +26,12 @@ import {
   VerificationCeremonyService,
 } from "@langwatch/identity-server";
 import { IdentityCeremonies } from "@langwatch/identity-server/better-auth";
+import { platformSSOAllowed } from "@ee/sso/sso-gate";
 import { hash } from "bcrypt";
 import { env } from "~/env.mjs";
 import { prisma } from "../../db";
+import { featureFlagService } from "../../featureFlag";
+import { grantsLedgerWriter } from "../authz/ledger";
 import { sendSignUpVerificationEmail } from "../../mailer/signUpVerificationEmail";
 import { createCredentialUser } from "../../users/credential-user";
 import { PrismaSystemMigrationStateRepository } from "../system-migrations/repositories/system-migration-state.prisma.repository";
@@ -261,20 +264,23 @@ export function joinRequests(): JoinRequestService {
  * read no env, and the licence asymmetry — the gate holds `auto` and lets
  * `request` through — is a decision this composition root states once.
  */
-export function joinRequestsService(deps: {
-  grants: ConstructorParameters<typeof PrismaJoinMembership>[1];
-  autoJoinLicensed: () => Promise<boolean>;
-  enabled: (args: { userId: string }) => Promise<boolean>;
-}): JoinRequestsService {
+export function joinRequestsService(): JoinRequestsService {
   return new JoinRequestsService({
     requests: joinRequests(),
     reads: new PrismaJoinRequestReadRepository(prisma),
     candidates: new PrismaJoinCandidateRepository(prisma),
-    membership: new PrismaJoinMembership(prisma, deps.grants),
+    membership: new PrismaJoinMembership(prisma, grantsLedgerWriter()),
     notifier: new EmailJoinRequestNotifier(prisma),
     settings: new PrismaJoinSettings(prisma),
-    autoJoinLicensed: deps.autoJoinLicensed,
-    enabled: deps.enabled,
+    // The licence asymmetry, stated once: the gate that has always held
+    // single sign-on holds AUTOMATIC joining, because that is federation —
+    // the deployment decides who counts as a colleague and admits them with
+    // nobody in the loop. Asking to join is not gated and never reads this,
+    // which is what keeps "my company is invisible" fixed on precisely the
+    // self-hosted deployments that have no other way out.
+    autoJoinLicensed: () => platformSSOAllowed(),
+    enabled: ({ userId }) =>
+      featureFlagService.isEnabled("join_requests", { distinctId: userId }),
   });
 }
 
