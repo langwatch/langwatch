@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 import type { LicenseError } from "./license-constants";
 import type { PlanInfo } from "./license-plan";
 

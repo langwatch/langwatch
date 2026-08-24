@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 
 export const licenseOrganizationQuerySchema = z.object({
   organizationId: z.string().min(1),

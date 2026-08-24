@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 import { licenseDataSchema } from "./license";
 
 export const storeLicenseInputSchema = z.object({
