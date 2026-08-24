@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { destinationConfigSchema } from "../destinationConfig.schema";
+import {
+  destinationConfigSchema,
+  safeParseDestinationConfig,
+} from "../destinationConfig.schema";
 
 describe("email destination config", () => {
   it("canonicalizes recipient case and whitespace", () => {
@@ -35,5 +38,11 @@ describe("email destination config", () => {
       ],
     });
     expect(result.success).toBe(false);
+  });
+
+  it("rejects persisted destination values that are not arrays", () => {
+    expect(
+      safeParseDestinationConfig({ destinations: { type: "email" } }).ok,
+    ).toBe(false);
   });
 });

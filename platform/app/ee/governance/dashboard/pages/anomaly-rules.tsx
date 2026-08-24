@@ -27,6 +27,10 @@ import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 import { docsUrl } from "~/utils/docsUrl";
+import {
+  destinationConfigWithEmailRecipients,
+  emailRecipientsFromDestinationConfig,
+} from "../logic/destinationConfigEditor";
 
 /**
  * Anomaly rule authoring surface, wired to api.anomalyRules.* (Sergey
@@ -406,45 +410,6 @@ function buildRulePayload({
     thresholdConfig,
     destinationConfig,
   };
-}
-
-function emailRecipientsFromDestinationConfig(raw: string): string {
-  try {
-    const parsed = JSON.parse(raw || "{}") as {
-      destinations?: Array<{ type?: string; to?: unknown }>;
-    };
-    const email = parsed.destinations?.find(({ type }) => type === "email");
-    return Array.isArray(email?.to) ? email.to.join("\n") : "";
-  } catch {
-    return "";
-  }
-}
-
-function destinationConfigWithEmailRecipients(
-  raw: string,
-  recipientsText: string,
-): string {
-  const parsed = JSON.parse(raw || "{}") as {
-    destinations?: Array<Record<string, unknown>>;
-  };
-  const destinations = (parsed.destinations ?? []).filter(
-    ({ type }) => type !== "email",
-  );
-  const to = recipientsText
-    .split(/[\n,]/)
-    .map((address) => address.trim())
-    .filter(Boolean);
-  return JSON.stringify(
-    {
-      ...parsed,
-      destinations: [
-        ...destinations,
-        ...(to.length ? [{ type: "email", to }] : []),
-      ],
-    },
-    null,
-    2,
-  );
 }
 
 /** The three mutations the page drives, with their toasts and cache busting. */

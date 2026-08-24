@@ -132,7 +132,7 @@ const baseInput = (suffix: string) => ({
 });
 
 describe("AnomalyRule.thresholdConfig — structured schema", () => {
-  describe("email destination recipients", () => {
+  describe("when configuring email destination recipients", () => {
     /** @scenario Email destination recipients must be active organization members */
     it("accepts an organization member and rejects an outside address", async () => {
       const caller = callerFor(adminUserId);
@@ -221,6 +221,9 @@ describe("AnomalyRule.thresholdConfig — structured schema", () => {
           role: OrganizationUserRole.MEMBER,
         },
       });
+      await prisma.organizationUser.delete({
+        where: { userId_organizationId: { userId: orphan.id, organizationId } },
+      });
       await prisma.user.delete({ where: { id: orphan.id } });
       await expect(
         caller.anomalyRules.create({
@@ -233,9 +236,6 @@ describe("AnomalyRule.thresholdConfig — structured schema", () => {
           },
         }),
       ).rejects.toBeDefined();
-      await prisma.organizationUser.delete({
-        where: { userId_organizationId: { userId: orphan.id, organizationId } },
-      });
     });
   });
 

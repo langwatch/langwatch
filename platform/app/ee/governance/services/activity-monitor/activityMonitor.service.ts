@@ -1732,21 +1732,45 @@ export class ActivityMonitorService {
   }
 }
 
+function isDeliveryCount(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    Number.isInteger(value) &&
+    value >= 0
+  );
+}
+
+function deliveryStatusMatchesCounts(candidate: EmailDeliveryStatus): boolean {
+  const { acceptedCount, failedCount, status, totalCount } = candidate;
+  if (acceptedCount + failedCount !== totalCount) return false;
+  if (status === "accepted") return acceptedCount > 0 && failedCount === 0;
+  if (status === "partial_failure") {
+    return acceptedCount > 0 && failedCount > 0;
+  }
+  return acceptedCount === 0 && failedCount > 0;
+}
+
 function parseEmailDeliveryStatus(value: unknown): EmailDeliveryStatus | null {
   if (!value || typeof value !== "object" || !("email" in value)) return null;
   const email = (value as { email?: unknown }).email;
   if (!email || typeof email !== "object") return null;
   const candidate = email as Record<string, unknown>;
+  const counts = [
+    candidate.acceptedCount,
+    candidate.failedCount,
+    candidate.totalCount,
+  ];
   if (
     !["accepted", "partial_failure", "failed"].includes(
       String(candidate.status),
     ) ||
-    typeof candidate.acceptedCount !== "number" ||
-    typeof candidate.failedCount !== "number" ||
-    typeof candidate.totalCount !== "number" ||
-    typeof candidate.updatedAtIso !== "string"
+    !counts.every(isDeliveryCount) ||
+    typeof candidate.updatedAtIso !== "string" ||
+    !Number.isFinite(Date.parse(candidate.updatedAtIso))
   ) {
     return null;
   }
-  return candidate as unknown as EmailDeliveryStatus;
+  const parsed = candidate as unknown as EmailDeliveryStatus;
+  return deliveryStatusMatchesCounts(parsed) ? parsed : null;
 }

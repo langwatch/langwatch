@@ -166,7 +166,10 @@ export class AnomalyRuleService {
       Object.keys(input.destinationConfig).length > 0
     ) {
       const config = validateDestinationConfig(input.destinationConfig);
-      await this.validateEmailRecipients(input.organizationId, config);
+      await this.validateEmailRecipients({
+        organizationId: input.organizationId,
+        config,
+      });
       input.destinationConfig = config;
     }
     return this.prisma.anomalyRule.create({
@@ -243,7 +246,10 @@ export class AnomalyRuleService {
       // strict schema.
       if (Object.keys(input.destinationConfig).length > 0) {
         const config = validateDestinationConfig(input.destinationConfig);
-        await this.validateEmailRecipients(input.organizationId, config);
+        await this.validateEmailRecipients({
+          organizationId: input.organizationId,
+          config,
+        });
         input.destinationConfig = config;
       }
       data.destinationConfig = input.destinationConfig as Prisma.InputJsonValue;
@@ -263,10 +269,13 @@ export class AnomalyRuleService {
     });
   }
 
-  private async validateEmailRecipients(
-    organizationId: string,
-    config: DestinationConfigParsed,
-  ): Promise<void> {
+  private async validateEmailRecipients({
+    organizationId,
+    config,
+  }: {
+    organizationId: string;
+    config: DestinationConfigParsed;
+  }): Promise<void> {
     const recipients = config.destinations.flatMap((destination) =>
       destination.type === "email" ? destination.to : [],
     );
