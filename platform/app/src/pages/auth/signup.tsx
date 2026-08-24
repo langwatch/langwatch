@@ -15,6 +15,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
   FrontDoorShell,
+  TrustyStrippers,
   useIdentityFrontDoor,
   VerificationFirstSignUp,
 } from "~/features/auth-front-door";
@@ -59,13 +60,14 @@ export default function SignUp() {
   if (frontDoor.enabled) {
     return (
       // The pitch is the hosted product's, and it lives OUTSIDE the card: the
-      // card itself is the same on every installation. The trust strip is a
-      // slot with nothing true to put in it yet, so it stays empty rather than
-      // carrying a logo nobody agreed to.
+      // card itself is the same on every installation. The strip under it
+      // names the stack rather than customers — see TrustyStrippers for
+      // why that is not a "trusted by" row.
       <FrontDoorShell
         headline="See what your agents are actually doing."
         headlineAccent="actually"
         tagline="Traces, evaluations and monitoring for every run. Free to start, no credit card."
+        trustStrip={<TrustyStrippers />}
       >
         <VerificationFirstSignUp />
       </FrontDoorShell>

@@ -128,6 +128,10 @@ export function SignUpCredentialForm({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [serverErrorIsOnTheForm, setServerErrorIsOnTheForm] = useState(false);
   const [passkeyError, setPasskeyError] = useState<unknown>(null);
+  // Whether the password half of the form has opened. Latched rather than
+  // derived from focus, so the confirmation does not vanish the moment
+  // somebody tabs into it.
+  const [isChoosingPassword, setIsChoosingPassword] = useState(false);
   // Only where this deployment mounted the plugin. Offering to create a
   // passkey against an endpoint that was never registered is an offer we
   // cannot honour.
@@ -192,10 +196,17 @@ export function SignUpCredentialForm({
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
       <VStack width="full" align="stretch" gap="13px">
-        {/* Every failure this card can have shows in one place, at the top. */}
+        {/* Every failure this card can have shows in one place, at the top.
+
+            The marker below is a false positive, not an exemption: the title
+            is a string constant and is the only thing that slot can render.
+            The raw-message scanner reaches it because `onSubmit` holds a local
+            assigned from a `?.message`, and that file-level taint arrives at a
+            literal — the identical alerts on the log-in screen, in files
+            without such a local, are not flagged. */}
         <HandledErrorAlert
           error={passkeyError}
-          fallbackTitle="Could not create a passkey"
+          fallbackTitle="Could not create a passkey" // no-raw-error-toast-ok
           className="lw-front-door-alert"
         />
         {/* The address this is for, and the way back to change it. It is the
@@ -206,10 +217,10 @@ export function SignUpCredentialForm({
           onAction={onUseDifferentEmail}
           testId="signup-identifier"
         />
-        {/* Above the password fields, because it is the better thing to leave
-            with and the one most people have never been offered. Beside them
-            rather than in front of them: declining has to cost nothing, and
-            here it costs a glance — the fields are already on the screen. */}
+        {/* Above the password, because it is the better thing to leave with
+            and the one most people have never been offered. Beside it rather
+            than in front of it: declining has to cost nothing, and here it
+            costs a glance — the other way on is already on the screen. */}
         {offersPasskeys ? (
           <>
             <PasskeySignUpButton
@@ -243,25 +254,40 @@ export function SignUpCredentialForm({
             <PasswordInput
               id={id}
               autoComplete="new-password"
-              registration={form.register("password", blurJudged("password"))}
+              registration={form.register("password", {
+                ...blurJudged("password"),
+                // The second half of the form arrives the moment somebody
+                // starts using the first. A manager that fills both fields at
+                // once fires this too, so an autofilled sign-up never has to
+                // wait for a focus that never happens.
+                onChange: () => setIsChoosingPassword(true),
+              })}
+              onFocus={() => setIsChoosingPassword(true)}
             />
           )}
         </FrontDoorField>
-        <FrontDoorField
-          label="Confirm password"
-          error={form.formState.errors.confirmPassword}
-        >
-          {(id) => (
-            <PasswordInput
-              id={id}
-              autoComplete="new-password"
-              registration={form.register(
-                "confirmPassword",
-                blurJudged("confirmPassword"),
-              )}
-            />
-          )}
-        </FrontDoorField>
+        {/* Confirm and the submit are the SAME decision as typing a password,
+            so they arrive with it rather than sitting there first. Four
+            stacked things — a passkey, a password, a confirmation and a
+            call to action — is a screen that asks somebody to plan before
+            they can start; one field is a screen that asks them to begin. */}
+        {isChoosingPassword ? (
+          <FrontDoorField
+            label="Confirm password"
+            error={form.formState.errors.confirmPassword}
+          >
+            {(id) => (
+              <PasswordInput
+                id={id}
+                autoComplete="new-password"
+                registration={form.register(
+                  "confirmPassword",
+                  blurJudged("confirmPassword"),
+                )}
+              />
+            )}
+          </FrontDoorField>
+        ) : null}
         <FormServerError form={form} />
         {submitError ? (
           <Alert.Root
@@ -280,21 +306,26 @@ export function SignUpCredentialForm({
             fallbackTitle="Couldn't create your account"
           />
         ) : null}
-        <Button
-          className="lw-front-door-primary"
-          type="submit"
-          width="full"
-          minHeight="44px"
-          marginTop={2}
-          fontWeight={600}
-          borderRadius={SHAPE.action}
-          backgroundColor={BRAND.action}
-          color={BRAND.onAction}
-          _hover={{ backgroundColor: BRAND.actionHover }}
-          loading={register.isPending || isSigningIn}
-        >
-          Create account
-        </Button>
+        {/* Arrives with the confirmation. Before that the passkey button IS
+            the call to action, and a second primary button under an empty
+            field only competes with it. */}
+        {isChoosingPassword ? (
+          <Button
+            className="lw-front-door-primary"
+            type="submit"
+            width="full"
+            minHeight="44px"
+            marginTop={2}
+            fontWeight={600}
+            borderRadius={SHAPE.action}
+            backgroundColor={BRAND.action}
+            color={BRAND.onAction}
+            _hover={{ backgroundColor: BRAND.actionHover }}
+            loading={register.isPending || isSigningIn}
+          >
+            Create account
+          </Button>
+        ) : null}
       </VStack>
     </form>
   );

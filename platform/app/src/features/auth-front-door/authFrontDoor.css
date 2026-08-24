@@ -35,12 +35,18 @@
 :root {
 	/* The ground the whole viewport stands on: the site's paper. */
 	--lw-front-door-ground: #ffffff;
-	/* The primary action is the site's `btn-primary`: an ink pill, not an
-	   orange one. Orange is the accent here, never the button. A breath of
-	   translucency so the pill reads as glass over the card's glass. */
-	--lw-front-door-action: rgba(20, 20, 23, 0.9);
-	--lw-front-door-action-hover: #26261f;
-	--lw-front-door-on-action: #efeee9;
+	/* The primary action is the brand orange on both grounds. It used to be an
+	   ink pill here and orange only on dark, on the reasoning that orange was
+	   the accent and never the button — but the two themes then disagreed
+	   about what the most important thing on the screen looks like, and the
+	   door is the one place every customer sees before they see anything else.
+
+	   Deepened from the dark theme's #f56b1a: white on the vivid orange is
+	   about 2.9:1, which fails on a white ground at this text size. This cut
+	   clears 4.5:1 and still reads as the same orange. */
+	--lw-front-door-action: #c2510a;
+	--lw-front-door-action-hover: #a83e05;
+	--lw-front-door-on-action: #ffffff;
 	/* Text on a tinted surface, and the tint itself: the brand's own cuts. */
 	--lw-front-door-ink: #a83e05;
 	--lw-front-door-tint: #fdece0;

@@ -2,7 +2,7 @@ import { Box, Heading, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { FullLogo } from "~/components/icons/FullLogo";
 import "../authFrontDoor.css";
-import { HEADING_FONT, MONO_FONT } from "../logic/brand";
+import { HEADING_FONT } from "../logic/brand";
 
 /**
  * The case the hosted product makes, next to the door rather than inside it.
@@ -67,7 +67,7 @@ export function FrontDoorValuePanel({
           display="flex"
           marginBottom={{ base: 1, md: 2 }}
         >
-          <FullLogo width={132} height={32.4} />
+          <FullLogo width={176} height={43.2} />
         </Box>
         <Heading
           as="h2"
@@ -102,13 +102,17 @@ export function FrontDoorValuePanel({
           <AccentedHeadline text={headline} accent={headlineAccent} />
         </Heading>
         {tagline ? (
+          // Set in the body face at reading size rather than as 12.5px mono.
+          // The mono was the site's caption voice and it made the one line
+          // arguing FOR the product read like a build log — small, technical,
+          // and the least inviting thing on a page whose whole job is to
+          // invite. It keeps a trace of the old treatment in its tracking.
           <Text
             display={{ base: "none", md: "block" }}
-            fontFamily={MONO_FONT}
-            fontSize="12.5px"
-            letterSpacing="0.02em"
-            lineHeight="1.7"
-            maxWidth="44ch"
+            fontSize="16px"
+            lineHeight="1.6"
+            letterSpacing="0.01em"
+            maxWidth="42ch"
             color="fg.muted"
             data-testid="front-door-tagline"
           >

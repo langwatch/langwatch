@@ -105,6 +105,12 @@ model User {
   // dismissal applies across projects, browsers, and devices.
   // Spec: specs/traces-v2/tour-visibility-and-persistence.feature
   tracesExplorerTourDismissedAt DateTime?
+  /// When this person last said "not now" to being offered a passkey
+  /// (ADR-120). On the account rather than in browser storage for two
+  /// reasons: a per-browser record forgets on a new device, which is exactly
+  /// where the offer should be MORE eager, and an interval nobody can enforce
+  /// is not an interval. NULL means never asked.
+  passkeyNudgeDismissedAt       DateTime?
   Annotation                    Annotation[]
   shareLinks                    ShareLink[]
   Workflow                      Workflow[]

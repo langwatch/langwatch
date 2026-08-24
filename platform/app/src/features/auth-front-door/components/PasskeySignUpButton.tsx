@@ -66,6 +66,11 @@ async function createAccountWithPasskey(
     const result = await authClient.passkey.addPasskey({
       context: email,
       name: email,
+      // The session is minted by the same transaction that writes the
+      // credential, so this button ends with somebody signed in rather than
+      // holding a passkey for an account they must now sign in to — which
+      // would mean a second system prompt straight after the first.
+      createSession: true,
     });
     return result?.error ? readRefusal(result.error) : "created";
   } catch {

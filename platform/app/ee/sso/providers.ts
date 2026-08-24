@@ -43,6 +43,21 @@ export const fallbackName = (profile: Record<string, any>): string => {
 };
 
 /**
+ * The avatar an identity provider claims, but only where it claimed a string.
+ *
+ * `picture` is whatever the provider chose to put in the token — some send an
+ * object, some send null, some omit it. It lands in a `String?` column either
+ * way, so anything else is a write that either throws or stores `"[object
+ * Object]"` as somebody's avatar URL. better-auth 1.7 types the mapped `image`
+ * as `string | undefined` and made that visible; the coercion is the fix, not
+ * the cast that would silence it.
+ *
+ * Exported for unit testing.
+ */
+export const profileImage = (value: unknown): string | undefined =>
+  typeof value === "string" && value.trim() ? value : void 0;
+
+/**
  * True when an Auth0 `sub` identifies a user who authenticated through a SAML
  * connection. Auth0 encodes the connection strategy as the first
  * pipe-delimited segment of `sub` (`{strategy}|{connection}|{id}`); SAML
@@ -237,11 +252,12 @@ export const discoveryUrlFor = (issuer: string, envName: string): string => {
  * domain separately: Cognito publishes that domain as the
  * `authorization_endpoint` of the user pool's discovery document.
  *
- * `redirectURI` is pinned to `/api/auth/callback/<providerId>` rather than the
- * genericOAuth plugin's own `/api/auth/oauth2/callback/<providerId>` so that
- * every provider in the self-hosting docs registers the same shape of callback
- * URL. BetterAuth serves that path because the plugin registers each config in
- * `ctx.socialProviders`, which is what the core callback route resolves against.
+ * `redirectURI` is pinned to `/api/auth/callback/<providerId>` so that every
+ * provider in the self-hosting docs registers the same shape of callback URL.
+ * BetterAuth serves that path because the plugin registers each config in
+ * `ctx.socialProviders`, which is what the core callback route resolves
+ * against — and since better-auth 1.7 that core route is the only callback
+ * there is, the plugin having stopped mounting one of its own.
  *
  * Exported for unit testing.
  */
@@ -270,7 +286,7 @@ export const oidcProviderConfig = ({
   mapProfileToUser: (profile) => ({
     name: fallbackName(profile),
     email: profile.email,
-    image: profile.picture,
+    image: profileImage(profile.picture),
   }),
 });
 
@@ -354,15 +370,20 @@ export const PLAIN_OIDC_PROVIDERS = [
 ] as const;
 
 /**
- * Every generic-OAuth provider whose `redirectURI` is pinned to the legacy
- * `/api/auth/callback/<providerId>` path instead of the genericOAuth plugin's
- * own `/api/auth/oauth2/callback/<providerId>`.
+ * Every generic-OAuth provider whose `redirectURI` is pinned to
+ * `/api/auth/callback/<providerId>` — the path customer IdPs have registered
+ * as an allowed callback, and the one the self-hosting docs tell operators to
+ * register.
  *
- * `createApiRouter` registers its legacy-callback rewrites from this list, so
- * the two halves cannot drift: a provider that pins the legacy path without a
- * matching rewrite sends its IdP round-trip to better-auth's core social
- * callback instead of the plugin's, which is a second code path nobody chose
- * and which no test would notice, because sign-in still succeeds.
+ * It used to be the LEGACY path, opposite the genericOAuth plugin's own
+ * `/api/auth/oauth2/callback/<providerId>`, and `createApiRouter` rewrote one
+ * to the other from this list. better-auth 1.7 removed the plugin's endpoints
+ * — every config is a first-class social provider now — so the core callback
+ * answers this path directly and the rewrite is gone. The list stays because
+ * the PIN is still the thing that has to hold: `legacyCallbackParity.test.ts`
+ * checks every id here builds a config pinned to it, and that every row of the
+ * OIDC table appears here. A provider that drifts sends its IdP somewhere
+ * nobody registered, and only that provider's sign-in breaks.
  *
  * Derived from the table above rather than restated, so adding a row is enough.
  * Auth0 and Okta are listed by hand because they are hand-coded branches.
@@ -406,15 +427,16 @@ export const buildGenericOAuthConfigs = (
       // instead of silently using an existing session — matches the original
       // NextAuth Auth0Provider behavior (`authorization: { params: { prompt: "login" } }`).
       authorizationUrlParams: { prompt: "login" },
-      // Pin the OAuth `redirect_uri` to the LEGACY NextAuth callback path
-      // (`/api/auth/callback/auth0`). BetterAuth's genericOAuth plugin
-      // defaults to `/api/auth/oauth2/callback/auth0`, but existing customer
-      // Auth0 applications have only the legacy path registered as an
-      // allowed callback. Sending a different `redirect_uri` would cause
-      // Auth0 to reject the authorization request.
-      // BetterAuth serves that path because the genericOAuth plugin registers
-      // each config in `ctx.socialProviders`, which is what the core callback
-      // route resolves against.
+      // Pin the OAuth `redirect_uri` to the NextAuth-era callback path
+      // (`/api/auth/callback/auth0`): existing customer Auth0 applications
+      // have only that path registered as an allowed callback, and sending a
+      // different `redirect_uri` would cause Auth0 to reject the
+      // authorization request outright.
+      // BetterAuth serves it because the genericOAuth plugin registers each
+      // config in `ctx.socialProviders`, which is what the core callback route
+      // resolves against. Before 1.7 the plugin also mounted its own
+      // `/api/auth/oauth2/callback/auth0` and this pin was the thing steering
+      // round-trips away from it; that endpoint no longer exists.
       redirectURI: legacyCallbackUrl({
         baseUrl: e.NEXTAUTH_URL,
         providerId: "auth0",
@@ -422,7 +444,7 @@ export const buildGenericOAuthConfigs = (
       mapProfileToUser: (profile) => ({
         name: fallbackName(profile),
         email: profile.email,
-        image: profile.picture,
+        image: profileImage(profile.picture),
         // SAML sign-ins count as verified: the email was asserted by the
         // organization's own IdP, but Auth0 reports `email_verified: false`
         // for every SAML connection, which would stop BetterAuth from
@@ -459,7 +481,7 @@ export const buildGenericOAuthConfigs = (
       mapProfileToUser: (profile) => ({
         name: fallbackName(profile),
         email: profile.email,
-        image: profile.image ?? profile.picture,
+        image: profileImage(profile.image ?? profile.picture),
       }),
     });
   }

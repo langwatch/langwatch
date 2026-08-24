@@ -17,6 +17,7 @@ import { z } from "zod";
 import {
   FrontDoorShell,
   IdentifierFirstSignIn,
+  TrustyStrippers,
   useIdentityFrontDoor,
 } from "~/features/auth-front-door";
 import { safeRedirectTarget, signIn, useSession } from "~/utils/auth-client";
@@ -51,6 +52,7 @@ export default function SignIn() {
         headline="Let's see what your agents have been up to."
         headlineAccent="up to"
         tagline="Log in and pick up where you left off."
+        trustStrip={<TrustyStrippers />}
       >
         <IdentifierFirstSignIn />
       </FrontDoorShell>

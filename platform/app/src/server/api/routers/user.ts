@@ -12,6 +12,7 @@ import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
+import { deploymentOffersPasskeys } from "~/server/app-layer/identity/signin-method-policy";
 import { NoAdminConfiguredError } from "~/server/app-layer/organizations/errors";
 import {
   Auth0ApiError,
@@ -23,7 +24,6 @@ import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
 import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRequestEmail";
 import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
-import { trackServerEvent } from "~/server/posthog";
 import { rateLimit } from "~/server/rateLimit";
 import { AvatarRateLimitedError } from "~/server/user-avatar/avatar";
 import { UserAvatarService } from "~/server/user-avatar/avatar.service";
@@ -36,6 +36,13 @@ import { env } from "../../../env.mjs";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 
 const logger = createLogger("langwatch:user-router");
+
+/**
+ * How long "not now" lasts (ADR-120). Long enough that the offer reads as an
+ * offer rather than a nag, short enough that somebody who declined on the day
+ * they signed up is asked again once they have something worth protecting.
+ */
+const PASSKEY_NUDGE_INTERVAL_DAYS = 30;
 
 export const userRouter = createTRPCRouter({
   getTraceExplorerTourPreference: protectedProcedure
@@ -281,6 +288,184 @@ export const userRouter = createTRPCRouter({
         // between this transaction's count and delete.
         { isolationLevel: "Serializable" },
       );
+
+      return { success: true };
+    }),
+  /**
+   * Whether to offer this person a passkey right now (ADR-120).
+   *
+   * Three conditions, and the first is the one that keeps it from being noise:
+   * somebody who already HOLDS a passkey is never asked, whatever they signed
+   * in with today — a member on a machine that does not hold theirs has a good
+   * reason, and asking them to make another is a nag with no upside.
+   *
+   * The interval lives on the account rather than in browser storage, so a new
+   * device does not restart the count and the 30 days actually mean 30 days.
+   */
+  passkeyNudge: protectedProcedure
+    .input(z.object({}))
+    .noPermission({
+      reason: "operates on the session user's own account, no tenant scope",
+    })
+    .query(async ({ ctx }) => {
+      if (!deploymentOffersPasskeys()) return { offer: false };
+
+      const [passkeys, user] = await Promise.all([
+        ctx.prisma.passkey.count({ where: { userId: ctx.session.user.id } }),
+        ctx.prisma.user.findUnique({
+          where: { id: ctx.session.user.id },
+          select: { passkeyNudgeDismissedAt: true },
+        }),
+      ]);
+      if (passkeys > 0) return { offer: false };
+
+      const dismissedAt = user?.passkeyNudgeDismissedAt;
+      if (!dismissedAt) return { offer: true };
+
+      const askAgainAfter =
+        dismissedAt.getTime() + PASSKEY_NUDGE_INTERVAL_DAYS * 24 * 60 * 60_000;
+      return { offer: Date.now() >= askAgainAfter };
+    }),
+  /**
+   * "Not now". Dated rather than flagged, because the offer comes back — a
+   * flag would make one dismissal permanent, and somebody who declines on the
+   * day they sign up is not somebody who never wants a passkey.
+   */
+  dismissPasskeyNudge: protectedProcedure
+    .input(z.object({}))
+    .noPermission({
+      reason: "operates on the session user's own account, no tenant scope",
+    })
+    .mutation(async ({ ctx }) => {
+      await ctx.prisma.user.update({
+        where: { id: ctx.session.user.id },
+        data: { passkeyNudgeDismissedAt: new Date() },
+      });
+      return { success: true };
+    }),
+  /**
+   * Whether the session user can sign in with a password.
+   *
+   * The settings page needs it to know which of two things to offer: changing
+   * a password, or setting a first one. Passkey sign-up and SSO both produce
+   * accounts with no password at all, and offering "Change password" to
+   * somebody who has none is an offer that can only fail.
+   */
+  hasPassword: protectedProcedure
+    .input(z.object({}))
+    .noPermission({
+      reason: "operates on the session user's own account, no tenant scope",
+    })
+    .query(async ({ ctx }) => {
+      return {
+        hasPassword: await UserService.create(ctx.prisma).hasPassword({
+          id: ctx.session.user.id,
+        }),
+      };
+    }),
+  /**
+   * Set a FIRST password, for an account that has none.
+   *
+   * A passkey is the better credential and this does not argue otherwise. But
+   * an account whose only way in is one device is an account one lost phone
+   * away from a support ticket, and the recovery that would rescue it —
+   * "forgot password" — updates credential rows in place: with no password
+   * ever set it matched nothing and reported success, which is a reset that
+   * silently does nothing.
+   *
+   * It can only ever FILL AN EMPTY SLOT. Where a password already exists this
+   * refuses and `changePassword` is the way, which is what keeps it from
+   * becoming a no-proof overwrite of somebody's credential: a stolen session
+   * can already read everything, and the thing worth denying it is a
+   * credential that outlives the session being revoked. Setting the first one
+   * still hands it persistence, so the attempt is throttled, and every other
+   * session is ended the moment it lands.
+   */
+  setPassword: protectedProcedure
+    .input(z.object({ password: z.string().min(1) }))
+    .noPermission({
+      reason: "operates on the session user's own account, no tenant scope",
+    })
+    .mutation(async ({ ctx, input }) => {
+      // The same rules the form ran, from the same module, so the two cannot
+      // drift into accepting different passwords.
+      const problem = passwordProblem(input.password);
+      if (problem) {
+        throw new ValidationError(problem, {
+          meta: { fieldErrors: { password: [problem] } },
+        });
+      }
+
+      // Email mode only. Under Auth0 the password lives in the Auth0 tenant
+      // and this row is not where it would go.
+      if ((await resolveAuthProvider()) !== "email") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Passwords are not available for this auth provider",
+        });
+      }
+
+      const limit = await rateLimit({
+        key: `user.setPassword:${ctx.session.user.id}`,
+        windowSeconds: 60 * 15,
+        max: 5,
+      });
+      if (!limit.allowed) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: "Too many attempts. Please try again later.",
+        });
+      }
+
+      const credentialAccount = await ctx.prisma.account.findFirst({
+        where: { userId: ctx.session.user.id, provider: "credential" },
+        select: { id: true, password: true },
+      });
+
+      // The refusal that makes this safe to expose. Overwriting a password
+      // without proving the old one is account takeover with extra steps.
+      if (credentialAccount?.password) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "This account already has a password. Change it instead of setting a new one.",
+        });
+      }
+
+      const hashedPassword = await hash(input.password, 10);
+
+      if (credentialAccount) {
+        await ctx.prisma.account.update({
+          where: { id: credentialAccount.id },
+          data: { password: hashedPassword },
+        });
+      } else {
+        // An account that predates the credential row being written up front
+        // (an SSO-only user, say). The row is what password reset updates, so
+        // it has to exist before recovery can work.
+        await ctx.prisma.account.create({
+          data: {
+            userId: ctx.session.user.id,
+            type: "credential",
+            provider: "credential",
+            providerAccountId: ctx.session.user.id,
+            password: hashedPassword,
+          },
+        });
+      }
+
+      // Every other session ends. A password is a credential that outlives
+      // session revocation, so anything else holding a session at the moment
+      // one appears must not keep it. Skipped while impersonating for the
+      // same reason `changePassword` skips it: the session id in hand is the
+      // operator's, not the subject's.
+      if (!ctx.session.user.impersonator && ctx.session.sessionId) {
+        await revokeOtherSessionsForUser({
+          prisma: ctx.prisma,
+          userId: ctx.session.user.id,
+          keepSessionId: ctx.session.sessionId,
+        });
+      }
 
       return { success: true };
     }),

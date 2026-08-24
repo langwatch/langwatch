@@ -378,24 +378,19 @@ export const signOut = async (opts?: {
   navigate("/api/auth/logout");
 };
 
-const SOCIAL_PROVIDERS = new Set([
-  "google",
-  "github",
-  "gitlab",
-  "microsoft",
-  "azure-ad",
-]);
-
 /**
  * Link an OAuth account to the currently signed-in user. This is distinct
  * from `signIn(provider)` — which creates/switches sessions. Linking routes
- * through BetterAuth's `/link-social` (for social providers) or
- * `/oauth2/link` (for generic-oauth providers, which is everything not in
- * `SOCIAL_PROVIDERS` below), both of
- * which enforce same-email matching via
- * `accountLinking.allowDifferentEmails !== true`, blocking the
- * "sign in while logged in and silently switch sessions" regression that a
- * naive `signIn(provider)` call exhibited.
+ * through BetterAuth's `/link-social`, which enforces same-email matching via
+ * `accountLinking.allowDifferentEmails !== true`, blocking the "sign in while
+ * logged in and silently switch sessions" regression that a naive
+ * `signIn(provider)` call exhibited.
+ *
+ * ONE endpoint, since better-auth 1.7. Generic-oauth providers used to link
+ * through the plugin's own `/oauth2/link` and everything else through
+ * `/link-social`; the plugin no longer mounts endpoints at all, because it
+ * registers each configured provider as a first-class social provider. So the
+ * fork is gone and an Okta account links exactly the way a GitHub one does.
  *
  * The caller passes the same provider id used in `NEXTAUTH_PROVIDER` and we
  * map `azure-ad` → `microsoft` internally so the UI doesn't need to know the
@@ -406,33 +401,13 @@ export const linkAccount = async (
   options?: { callbackUrl?: string },
 ): Promise<{ error?: string; ok?: boolean }> => {
   const callbackURL = safeRedirectTarget(options?.callbackUrl) || "/";
+  const mapped = provider === "azure-ad" ? "microsoft" : provider;
 
-  if (SOCIAL_PROVIDERS.has(provider)) {
-    const mapped = provider === "azure-ad" ? "microsoft" : provider;
-    const res = await fetch("/api/auth/link-social", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ provider: mapped, callbackURL }),
-    });
-    if (!res.ok) {
-      return { error: await res.text(), ok: false };
-    }
-    const data = (await res.json()) as { url?: string; redirect?: boolean };
-    if (data.url && data.redirect !== false) {
-      navigate(data.url);
-    }
-    return { ok: true };
-  }
-
-  // Generic-oauth providers: the plugin's own endpoint. This is the
-  // fall-through on purpose, so a newly supported OIDC provider links
-  // correctly without being listed anywhere here.
-  const res = await fetch("/api/auth/oauth2/link", {
+  const res = await fetch("/api/auth/link-social", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify({ providerId: provider, callbackURL }),
+    body: JSON.stringify({ provider: mapped, callbackURL }),
   });
   if (!res.ok) {
     return { error: await res.text(), ok: false };

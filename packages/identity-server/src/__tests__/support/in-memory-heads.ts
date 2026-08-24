@@ -128,6 +128,11 @@ export function attachData(overrides?: Record<string, unknown>) {
     accountId: "acc_1",
     provider: "google" as const,
     providerAccountId: "gid_123",
+    // Mixed case AND a plus tag, because normalization treats them
+    // differently and both halves are worth pinning: the case is folded, the
+    // tag SURVIVES. `sam.j+x@acme.com` and `sam.j@acme.com` are two addresses,
+    // and a normalizer that merged them would hand one person's sign-in to
+    // whoever holds the untagged mailbox.
     value: "Sam.J+x@Acme.com",
     occurredAtMs: T0,
     ceremony: { flow: "oauth-callback" },

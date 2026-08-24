@@ -17,9 +17,14 @@ import { genericOAuth } from "better-auth/plugins";
 
 /**
  * Mirrors the production configuration's federation surface: a social
- * provider (auth0/okta ride `socialProviders`) plus `genericOAuth`, which is
- * what mounts the `/sign-in/oauth2` and `/oauth2/*` family. A narrower
- * instance would enumerate fewer routes and quietly weaken the check.
+ * provider plus `genericOAuth`.
+ *
+ * Since better-auth 1.7 the plugin mounts no routes of its own — it registers
+ * each config as a first-class social provider, and federation runs through
+ * the core `/sign-in/social` and `/callback/:id`. It stays configured here
+ * anyway: the point of this instance is to enumerate what production mounts,
+ * and a plugin that goes back to mounting its own endpoints has to show up as
+ * an unclassified route rather than as nothing at all.
  */
 const buildAuth = () =>
   betterAuth({
@@ -65,9 +70,14 @@ export const ROUTE_CLASSIFICATION: Record<string, "federating" | "local"> = {
   "/sign-in/social": "federating",
   "/callback/:id": "federating",
   "/link-social": "federating",
-  "/sign-in/oauth2": "federating",
-  "/oauth2/callback/:providerId": "federating",
-  "/oauth2/link": "federating",
+  // `/sign-in/oauth2`, `/oauth2/callback/:providerId` and `/oauth2/link` were
+  // here until better-auth 1.7. The genericOAuth plugin used to mount its own
+  // parallel family of endpoints; it now registers each config as a
+  // first-class social provider instead and mounts NOTHING, so every
+  // federated login — Auth0, Okta, any OIDC provider — rides the three routes
+  // above. The gate is unchanged in effect: those three were already
+  // classified `federating` and already refused, which is why this rewrite
+  // left nothing unclassified.
 
   // Session and identity reads: gate-independent by construction.
   "/get-session": "local",

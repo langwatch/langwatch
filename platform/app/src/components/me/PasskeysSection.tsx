@@ -2,16 +2,19 @@ import {
   Box,
   Button,
   Card,
+  Field,
   HStack,
-  IconButton,
+  Input,
   Spacer,
   Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Fingerprint, Trash2, Usb } from "lucide-react";
-import { useState } from "react";
+import { Fingerprint, MoreVertical, Usb } from "lucide-react";
+import { useEffect, useState } from "react";
 
+import { Dialog } from "~/components/ui/dialog";
+import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { authClient } from "~/utils/auth-client";
@@ -46,6 +49,170 @@ function isSecurityKey(passkey: HeldPasskey): boolean {
 }
 
 /**
+ * What to call one in a list of them.
+ *
+ * A passkey registered from the sign-up screen is labelled with the address it
+ * was created for; one added from settings carries whatever the browser chose,
+ * which is often nothing. "Passkey" is the honest fallback — better than an
+ * id, and it is exactly why renaming exists.
+ */
+function passkeyLabel(passkey: HeldPasskey): string {
+  return passkey.name?.trim() || "Passkey";
+}
+
+/**
+ * Giving a passkey a name somebody will recognise later.
+ *
+ * The guidance is blunt about why this matters: a person with three passkeys
+ * and no names cannot tell which is the work laptop and which is the phone
+ * they no longer own, so they remove none of them. A name is what makes the
+ * list actionable, and it is the one thing the ceremony cannot supply.
+ */
+function RenamePasskeyDialog({
+  passkey,
+  onClose,
+  onRename,
+}: {
+  passkey: HeldPasskey | null;
+  onClose: () => void;
+  onRename: (input: { id: string; name: string }) => Promise<void>;
+}) {
+  const [name, setName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Seeded from the passkey being renamed rather than held in sync with it:
+  // the dialog opens once per passkey, and re-seeding on every render would
+  // fight whatever is being typed.
+  useEffect(() => {
+    if (passkey) setName(passkey.name ?? "");
+  }, [passkey]);
+
+  const save = async () => {
+    if (!passkey) return;
+    setIsSaving(true);
+    try {
+      await onRename({ id: passkey.id, name: name.trim() });
+      onClose();
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <Dialog.Root
+      open={!!passkey}
+      onOpenChange={(details) => {
+        if (!details.open) onClose();
+      }}
+      placement="center"
+    >
+      <Dialog.Content bg="bg">
+        <Dialog.CloseTrigger />
+        <Dialog.Header>
+          <Dialog.Title fontSize="md" fontWeight="500">
+            Rename passkey
+          </Dialog.Title>
+        </Dialog.Header>
+        <Dialog.Body>
+          <Field.Root>
+            <Field.Label>Name</Field.Label>
+            <Input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Work laptop"
+              data-testid="passkey-name"
+            />
+          </Field.Root>
+        </Dialog.Body>
+        <Dialog.Footer>
+          <HStack gap={3} justify="end" width="full">
+            <Button variant="outline" onClick={onClose} disabled={isSaving}>
+              Cancel
+            </Button>
+            <Button
+              colorPalette="orange"
+              loading={isSaving}
+              disabled={!name.trim()}
+              onClick={() => void save()}
+              data-testid="save-passkey-name"
+            >
+              Save
+            </Button>
+          </HStack>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog.Root>
+  );
+}
+
+/**
+ * Confirming a removal, because a passkey is a way in and this is the click
+ * that ends it. Named, so nobody removes the wrong one from a list of three.
+ */
+function RemovePasskeyDialog({
+  passkey,
+  onClose,
+  onRemove,
+}: {
+  passkey: HeldPasskey | null;
+  onClose: () => void;
+  onRemove: (id: string) => Promise<void>;
+}) {
+  const [isRemoving, setIsRemoving] = useState(false);
+
+  const remove = async () => {
+    if (!passkey) return;
+    setIsRemoving(true);
+    try {
+      await onRemove(passkey.id);
+      onClose();
+    } finally {
+      setIsRemoving(false);
+    }
+  };
+
+  return (
+    <Dialog.Root
+      open={!!passkey}
+      onOpenChange={(details) => {
+        if (!details.open) onClose();
+      }}
+      placement="center"
+    >
+      <Dialog.Content bg="bg">
+        <Dialog.CloseTrigger />
+        <Dialog.Header>
+          <Dialog.Title fontSize="md" fontWeight="500">
+            Remove {passkey ? passkeyLabel(passkey) : "passkey"}?
+          </Dialog.Title>
+        </Dialog.Header>
+        <Dialog.Body>
+          <Text fontSize="sm" color="fg.muted">
+            You will not be able to sign in with it again. The passkey stays on
+            your device until you delete it there too.
+          </Text>
+        </Dialog.Body>
+        <Dialog.Footer>
+          <HStack gap={3} justify="end" width="full">
+            <Button variant="outline" onClick={onClose} disabled={isRemoving}>
+              Cancel
+            </Button>
+            <Button
+              colorPalette="red"
+              loading={isRemoving}
+              onClick={() => void remove()}
+              data-testid="confirm-remove-passkey"
+            >
+              Remove
+            </Button>
+          </HStack>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog.Root>
+  );
+}
+
+/**
  * One group of cards under a heading it earns. Renders nothing when empty:
  * "Passkeys on security keys (0)" is a heading about an absence, and the
  * page is not a report.
@@ -53,11 +220,13 @@ function isSecurityKey(passkey: HeldPasskey): boolean {
 function PasskeyGroup({
   heading,
   passkeys,
+  onRename,
   onRemove,
 }: {
   heading: string;
   passkeys: HeldPasskey[];
-  onRemove: (id: string) => Promise<void>;
+  onRename: (passkey: HeldPasskey) => void;
+  onRemove: (passkey: HeldPasskey) => void;
 }) {
   if (passkeys.length === 0) return null;
 
@@ -81,21 +250,40 @@ function PasskeyGroup({
               </Box>
               <VStack align="start" gap={0}>
                 <Text fontSize="sm" fontWeight={500}>
-                  {passkey.name ?? "Passkey"}
+                  {passkeyLabel(passkey)}
                 </Text>
                 <Text fontSize="xs" color="fg.muted">
                   Added {new Date(passkey.createdAt).toLocaleDateString()}
                 </Text>
               </VStack>
               <Spacer />
-              <IconButton
-                variant="ghost"
-                size="sm"
-                aria-label="Remove this passkey"
-                onClick={() => void onRemove(passkey.id)}
-              >
-                <Trash2 size={16} />
-              </IconButton>
+              {/* One trigger per row, per row-actions-overflow-menu.md: two
+                  icon buttons in a row is the pattern that doc exists to
+                  stop, and it puts a destructive action one stray click from
+                  a credential. */}
+              <Menu.Root>
+                <Menu.Trigger asChild>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    aria-label={`Actions for ${passkeyLabel(passkey)}`}
+                  >
+                    <MoreVertical size={14} />
+                  </Button>
+                </Menu.Trigger>
+                <Menu.Content>
+                  <Menu.Item value="rename" onClick={() => onRename(passkey)}>
+                    Rename
+                  </Menu.Item>
+                  <Menu.Item
+                    value="remove"
+                    color="red.500"
+                    onClick={() => onRemove(passkey)}
+                  >
+                    Remove
+                  </Menu.Item>
+                </Menu.Content>
+              </Menu.Root>
             </HStack>
           </Card.Body>
         </Card.Root>
@@ -125,6 +313,11 @@ export function PasskeysSection() {
   const publicEnv = usePublicEnv();
   const passkeys = authClient.useListPasskeys();
   const [isCreating, setIsCreating] = useState(false);
+  // Which passkey a dialog is open for, or null. Held as the row rather than
+  // an id so the dialogs can name it — "Remove?" over a list of three
+  // identical-looking cards is not a question anybody can answer.
+  const [renaming, setRenaming] = useState<HeldPasskey | null>(null);
+  const [removing, setRemoving] = useState<HeldPasskey | null>(null);
 
   // A deployment that never mounted the plugin has no endpoint behind any of
   // this. Rendering the hero there would be an offer we cannot honour.
@@ -167,6 +360,18 @@ export function PasskeysSection() {
     } catch {
       toaster.error({
         title: "That passkey wasn't removed",
+        description: "Try again in a moment.",
+      });
+    }
+  };
+
+  const rename = async ({ id, name }: { id: string; name: string }) => {
+    try {
+      await authClient.passkey.updatePasskey({ id, name });
+      toaster.success({ title: "Passkey renamed" });
+    } catch {
+      toaster.error({
+        title: "That passkey wasn't renamed",
         description: "Try again in a moment.",
       });
     }
@@ -218,12 +423,14 @@ export function PasskeysSection() {
           <PasskeyGroup
             heading="Passkeys on your devices"
             passkeys={held.filter((passkey) => !isSecurityKey(passkey))}
-            onRemove={remove}
+            onRename={setRenaming}
+            onRemove={setRemoving}
           />
           <PasskeyGroup
             heading="Passkeys on security keys"
             passkeys={held.filter(isSecurityKey)}
-            onRemove={remove}
+            onRename={setRenaming}
+            onRemove={setRemoving}
           />
           <Box>
             <Button
@@ -238,6 +445,17 @@ export function PasskeysSection() {
           </Box>
         </VStack>
       ) : null}
+
+      <RenamePasskeyDialog
+        passkey={renaming}
+        onClose={() => setRenaming(null)}
+        onRename={rename}
+      />
+      <RemovePasskeyDialog
+        passkey={removing}
+        onClose={() => setRemoving(null)}
+        onRemove={remove}
+      />
     </VStack>
   );
 }

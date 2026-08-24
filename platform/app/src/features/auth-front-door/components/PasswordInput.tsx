@@ -28,6 +28,7 @@ export function PasswordInput({
   autoComplete,
   registration,
   inputRef,
+  onFocus,
 }: {
   id: string;
   /** `current-password` where one is being given, `new-password` where one is
@@ -36,6 +37,9 @@ export function PasswordInput({
   registration: UseFormRegisterReturn;
   /** For a field the screen wants to focus once the entrance has settled. */
   inputRef?: Ref<HTMLInputElement>;
+  /** Where reaching the field is itself the signal — the sign-up step opens
+   *  the rest of the form on it. */
+  onFocus?: () => void;
 }) {
   const [isRevealed, setIsRevealed] = useState(false);
 
@@ -52,6 +56,7 @@ export function PasswordInput({
         {...FIELD_SURFACE}
         _focusVisible={FIELD_FOCUS}
         {...registration}
+        onFocus={onFocus}
         ref={(node: HTMLInputElement | null) => {
           registration.ref(node);
           if (typeof inputRef === "function") inputRef(node);

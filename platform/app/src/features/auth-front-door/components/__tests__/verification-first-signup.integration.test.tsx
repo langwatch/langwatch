@@ -146,6 +146,23 @@ const expiredLink = {
   },
 };
 
+/**
+ * Types the same password into both boxes.
+ *
+ * Two steps, because the second box is not on the screen yet: the credential
+ * step opens with one field, and the confirmation and the submit arrive once
+ * somebody starts using it. Re-querying after the first is what proves that —
+ * a single up-front `querySelectorAll` would have found one element and this
+ * helper exists so every caller notices.
+ */
+const fillPasswordPair = async (container: HTMLElement, password: string) => {
+  const first = container.querySelector('input[type="password"]');
+  await userEvent.type(first as HTMLInputElement, password);
+
+  const both = container.querySelectorAll('input[type="password"]');
+  await userEvent.type(both[1] as HTMLInputElement, password);
+};
+
 const renderScreen = () =>
   render(
     <ChakraProvider value={defaultSystem}>
@@ -204,9 +221,7 @@ describe("given the sign-up screen", () => {
       await userEvent.click(screen.getByRole("button", { name: "Continue" }));
       await screen.findByTestId("signup-identifier");
 
-      const passwords = container.querySelectorAll('input[type="password"]');
-      await userEvent.type(passwords[0]!, "a-good-password");
-      await userEvent.type(passwords[1]!, "a-good-password");
+      await fillPasswordPair(container, "a-good-password");
       await userEvent.click(
         screen.getByRole("button", { name: /create|continue|sign up/i }),
       );
@@ -323,9 +338,7 @@ describe("given the sign-up screen", () => {
       );
       await screen.findByTestId("signup-identifier");
 
-      const passwords = container.querySelectorAll('input[type="password"]');
-      await userEvent.type(passwords[0]!, "a-good-password");
-      await userEvent.type(passwords[1]!, "a-good-password");
+      await fillPasswordPair(container, "a-good-password");
       await userEvent.click(
         screen.getByRole("button", { name: /create|continue|sign up/i }),
       );

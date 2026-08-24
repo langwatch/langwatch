@@ -94,7 +94,7 @@ describe("the SSO callback's linking decision", () => {
         connectionId: "conn_acme",
         provider: "oidc",
         subject: "okta|000111",
-        normalizedEmail: "sam.j@acme.com",
+        normalizedEmail: "sam.j+news@acme.com",
       });
       expect(proposals.proposeLink).not.toHaveBeenCalled();
     });
@@ -146,7 +146,7 @@ describe("the SSO callback's linking decision", () => {
           tenantId: "user_sam",
           userId: "user_sam",
           reason: "unverified_orphan",
-          value: "sam.j@acme.com",
+          value: "sam.j+news@acme.com",
           providerAccountId: "okta|000111",
         }),
       );
@@ -236,7 +236,7 @@ describe("the SSO callback's linking decision", () => {
         connectionId: "conn_acme",
         provider: "oidc",
         subject: "okta|000111",
-        normalizedEmail: "sam.j@acme.com",
+        normalizedEmail: "sam.j+news@acme.com",
       });
     });
 

@@ -13,6 +13,7 @@ export { IdentifierFirstSignIn } from "./components/IdentifierFirstSignIn";
 export { InviteLanding } from "./components/InviteLanding";
 export { JoinBeforeCreateInterstitial } from "./components/JoinBeforeCreateInterstitial";
 export { SignInMethodPicker } from "./components/SignInMethodPicker";
+export { TrustyStrippers } from "./components/TrustyStrippers";
 export { VerificationFirstSignUp } from "./components/VerificationFirstSignUp";
 export { useIdentityFrontDoor } from "./hooks/useIdentityFrontDoor";
 export type {

@@ -108,6 +108,18 @@ export function IdentifierStepForm({
                 {...FIELD_SURFACE}
                 _focusVisible={FIELD_FOCUS}
                 {...emailRegistration}
+                // "Required" is answered by coming back to the field, so it
+                // clears the moment somebody does — before a keystroke. The
+                // rejection said "this is empty"; reaching for it is the whole
+                // of the correction, and leaving it red while they type reads
+                // as the screen not noticing.
+                //
+                // Only the empty case. A rejection about the ADDRESS is about
+                // what is in the box, and that is still true on focus — it
+                // lifts on the keystroke that fixes it (`onChange` above).
+                onFocus={() => {
+                  if (!form.getValues("email")) form.clearErrors("email");
+                }}
                 ref={(node) => {
                   emailRegistration.ref(node);
                   addressField.current = node;

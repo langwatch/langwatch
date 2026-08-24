@@ -30,7 +30,7 @@ describe("attachIdentifier guard", () => {
       const attached = facts[0]!;
       expect(attached.type).toBe(IDENTIFIER_ATTACHED_EVENT_TYPE);
       if (attached.type !== IDENTIFIER_ATTACHED_EVENT_TYPE) return;
-      expect(attached.data.value).toBe("sam.j@acme.com");
+      expect(attached.data.value).toBe("sam.j+x@acme.com");
       expect(attached.data.domain).toBe("acme.com");
       expect(attached.data.identifierHash).toMatch(/^hmac:[0-9a-f]{64}$/);
       expect(attached.data.state).toBe("VERIFIED");
@@ -73,7 +73,7 @@ describe("attachIdentifier guard", () => {
     /** @scenario "Concurrent verification races dead-end the loser" */
     it("dead-ends the VERIFIED-arrival attach instead of granting the value", async () => {
       const heads = new InMemoryHeads();
-      heads.activeByValue.set("sam.j@acme.com", {
+      heads.activeByValue.set("sam.j+x@acme.com", {
         userId: "user_other",
         identifierId: "idf_theirs",
       });
@@ -87,7 +87,7 @@ describe("attachIdentifier guard", () => {
 
     it("still verifies the holder's own re-attach of their value", async () => {
       const heads = new InMemoryHeads();
-      heads.activeByValue.set("sam.j@acme.com", {
+      heads.activeByValue.set("sam.j+x@acme.com", {
         userId: USER,
         identifierId: "idf_mine",
       });
@@ -300,7 +300,7 @@ describe("detachIdentifier guard", () => {
       expect(heads.heads.get(USER)?.identifiers[identifierId]).toMatchObject({
         state: "DETACHED",
         detachedAtMs: T0 + 5000,
-        value: "sam.j@acme.com",
+        value: "sam.j+x@acme.com",
       });
       expect(await detach(heads, identifierId)).toEqual([]);
     });

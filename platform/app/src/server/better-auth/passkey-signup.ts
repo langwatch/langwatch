@@ -3,7 +3,6 @@ import { normalizeIdentifierValue } from "@langwatch/identity";
 import { createLogger } from "@langwatch/observability";
 import type { GenericEndpointContext } from "better-auth";
 import { APIError } from "better-auth/api";
-import { setSessionCookie } from "better-auth/cookies";
 import { env } from "~/env.mjs";
 import { signUpVerification } from "~/server/app-layer/identity/runtime";
 import { prisma } from "~/server/db";
@@ -131,23 +130,24 @@ async function resolveUser({
 }
 
 /**
- * The ceremony succeeded, so the account is earned: create it, and sign the
- * person in.
- *
- * Both halves happen HERE rather than on the screen, and the session is the
- * reason. `verify-registration` establishes no session of its own — only
- * `verify-authentication` does — so a browser that stopped at the passkey row
- * would be holding a credential for an account it is not signed in to, and the
- * only way in would be a second ceremony: one system prompt to create the
- * passkey, another immediately after to use it. That double prompt is exactly
- * the disorientation the guidance warns about, and it reads as the first one
- * having failed.
+ * The ceremony succeeded, so the account is earned: create it, and hand its id
+ * back for the passkey to be written against.
  *
  * Returning `userId` is what attaches the passkey to the real account rather
  * than to the provisional handle the challenge was minted with.
+ *
+ * The SESSION is not opened here. The client asks for it with
+ * `createSession: true`, and the plugin then runs this callback, the passkey
+ * write and the session mint inside ONE transaction — so a failure at any of
+ * the three leaves no account, no orphan credential and no half-open door.
+ * Opening it by hand from this callback (which is what this did before
+ * better-auth 1.7) made those three separate writes with nothing spanning
+ * them. The session is what makes passkey sign-up a single ceremony: without
+ * it the browser would hold a credential for an account it is not signed in
+ * to, and the way in would be a second system prompt straight after the first,
+ * which reads as the first one having failed.
  */
 async function afterVerification({
-  ctx,
   context,
 }: {
   ctx: GenericEndpointContext;
@@ -161,25 +161,6 @@ async function afterVerification({
 
   const user = await createPasskeyUser({ prisma, email });
 
-  const session = await ctx.context.internalAdapter.createSession(user.id);
-  if (!session) {
-    // The account exists and the passkey is about to be written against it, so
-    // this is recoverable by signing in with the passkey just created. Said as
-    // an error rather than swallowed, because the screen has to stop rather
-    // than send somebody onwards into a session they do not have.
-    logger.error(
-      { userId: user.id },
-      "passkey sign-up could not open a session",
-    );
-    throw new APIError("INTERNAL_SERVER_ERROR", {
-      code: "UNABLE_TO_CREATE_SESSION",
-      message:
-        "Your account was created. Sign in with your passkey to carry on.",
-    });
-  }
-  const created = await ctx.context.internalAdapter.findUserById(user.id);
-  if (created) await setSessionCookie(ctx, { session, user: created });
-
   // The address confirmation follows them in, exactly as it does on the
   // password path (ADR-117 §6, revised). Sent from HERE rather than from the
   // screen because the screen navigates away the moment this returns, and a
@@ -188,6 +169,11 @@ async function afterVerification({
   // Not awaited and not allowed to fail the ceremony: the account is made and
   // the person is signed in, so a mailer that is down is not theirs to solve
   // on the way through the door. It is recoverable from inside the app.
+  //
+  // It can outlive a transaction that then rolls back, in which case a link
+  // arrives for an address with no account behind it. That link does not
+  // break anything — it confirms an address, finds nothing to mark, and lands
+  // on the same "pick a way in" step an unspent link always lands on.
   void signUpVerification()
     .requestVerification({ email })
     .catch((failure: unknown) => {

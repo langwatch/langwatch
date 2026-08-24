@@ -33,11 +33,11 @@
     "zod": "^3.25.76"
   },
   "peerDependencies": {
-    "better-auth": "^1.6.23"
+    "better-auth": "^1.7.1"
   },
   "devDependencies": {
     "@types/node": "^26",
-    "better-auth": "^1.6.23",
+    "better-auth": "^1.7.1",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
   }

@@ -240,6 +240,35 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     Then the removal is refused because losing the other would leave no way back
     And the screen names adding a verified email address as the way forward
 
+  # An account whose only way in is one device is one lost phone from a
+  # support ticket, and the recovery that would rescue it does not work on its
+  # own: password reset updates a credential row in place, so an account that
+  # never had a password matched nothing and was told the reset had worked.
+  #
+  # Setting a first password is therefore part of holding a passkey, not an
+  # argument against it.
+  @unit
+  Scenario: An account with no password can set a first one
+    Given "sam" signed up with a passkey and has never had a password
+    When "sam" opens their sign-in methods
+    Then they are offered a password to set, not a password to change
+    And setting one asks for no current password, because there is none
+
+  # The refusal that makes the offer safe to make. Setting a password takes no
+  # proof beyond the session, so it must never be able to REPLACE one: that
+  # would turn a stolen session into a credential that survives revoking it.
+  @unit
+  Scenario: Setting a password can never overwrite one
+    Given "sam" already has a password
+    When a request tries to set a first password anyway
+    Then it is refused and the existing password is untouched
+
+  @unit
+  Scenario: A new password ends every other session
+    Given "sam" is signed in on two devices and has no password
+    When "sam" sets one
+    Then the other device is signed out
+
   # The detach guards are specs/identity/identifier-model.feature's. A
   # passkey is an identifier, so it gets no guard of its own.
   @unit

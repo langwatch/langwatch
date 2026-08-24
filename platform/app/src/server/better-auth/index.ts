@@ -189,7 +189,9 @@ let droppedSecondaryWrites = 0;
  * The key is deliberately not logged. Better-auth keys secondary storage by
  * session token, so the key IS a credential.
  */
-const reportDroppedSecondaryWrite = (operation: "set" | "delete"): void => {
+const reportDroppedSecondaryWrite = (
+  operation: "set" | "delete" | "increment",
+): void => {
   droppedSecondaryWrites += 1;
   logger.warn(
     { operation, droppedSecondaryWrites },
@@ -215,6 +217,38 @@ export const secondaryStorage: BetterAuthOptions["secondaryStorage"] =
           // A miss, not a failure: better-auth falls through to the database.
           if (!redis) return null;
           return await redis.get(`better-auth:${key}`);
+        },
+        // Read-and-clear in one round trip, so two callers racing for a
+        // single-use value cannot both be handed it. `GETDEL` is what the
+        // rest of the app already uses for exactly this (the scenario tab
+        // registry, the GitHub install nonce).
+        getAndDelete: async (key) => {
+          const redis = secondaryStorageConnection();
+          if (!redis) return null;
+          return await redis.getdel(`better-auth:${key}`);
+        },
+        // The counter behind distributed rate limiting. Required by
+        // better-auth 1.7 — before it, the limiter read and wrote a serialized
+        // record, which two pods could interleave.
+        //
+        // The TTL is applied ONLY on creation, which is the whole shape of a
+        // fixed window: extending it on every hit would mean a key under
+        // sustained traffic never expires, and the limit becomes permanent
+        // rather than per-window.
+        increment: async (key, ttl) => {
+          const redis = secondaryStorageConnection();
+          // No Redis, no counter. Answering "first hit in the window" leaves
+          // the limiter open rather than closed, which is the same call every
+          // other callback here makes: this store is an accelerator, and a
+          // deployment that loses it must not lose the ability to sign in.
+          if (!redis) {
+            reportDroppedSecondaryWrite("increment");
+            return 1;
+          }
+          const namespaced = `better-auth:${key}`;
+          const count = await redis.incr(namespaced);
+          if (count === 1) await redis.expire(namespaced, ttl);
+          return count;
         },
         set: async (key, value, ttl) => {
           const redis = secondaryStorageConnection();

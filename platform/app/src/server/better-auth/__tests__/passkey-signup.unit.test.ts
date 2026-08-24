@@ -21,14 +21,6 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   }),
 }));
 
-// Writing the session cookie is BetterAuth's own, and it wants the whole
-// endpoint context to do it. What matters here is that it is called with the
-// session that was just opened, which is what the stub records.
-const setSessionCookie = vi.fn();
-vi.mock("better-auth/cookies", () => ({
-  setSessionCookie: (...args: unknown[]) => setSessionCookie(...args),
-}));
-
 import {
   PASSKEY_SIGNUP_EMAIL_INVALID,
   PASSKEY_SIGNUP_EMAIL_TAKEN,
@@ -40,14 +32,11 @@ const fakeContext = () => {
   const createSession = vi.fn().mockResolvedValue({ id: "session_1" });
   const findUserById = vi.fn().mockResolvedValue({ id: "user_1" });
   return {
+    // `createSession` is here to be asserted UNCALLED: the plugin opens the
+    // session, inside the transaction, and a callback that opened its own
+    // would make two for one ceremony.
     ctx: {
       context: { internalAdapter: { createSession, findUserById } },
-      setCookie: vi.fn(),
-      // `setSessionCookie` writes through the response headers the endpoint
-      // context carries; a bare object is enough for the callback to run.
-      responseHeaders: new Headers(),
-      headers: new Headers(),
-      context_: null,
     } as never,
     createSession,
   };
@@ -193,22 +182,23 @@ describe("given passkey sign-up, which creates an account with no session", () =
     });
 
     /**
-     * `verify-registration` establishes no session of its own. Without this
-     * the browser would hold a credential for an account it is not signed in
-     * to, and getting in would take a second system prompt straight after the
-     * first — which reads as the first one having failed.
+     * The plugin mints the session, inside the transaction this callback runs
+     * in — so the callback must NOT open one of its own. Two sessions for one
+     * ceremony is the bug this pins: the hand-rolled mint that predated
+     * better-auth 1.7 would now run beside the plugin's.
      */
     /** @scenario Signing up with a passkey creates the account and the session together */
-    it("opens the session itself, so nobody is prompted twice", async () => {
+    it("leaves the session to the transaction that writes the credential", async () => {
       const { ctx, createSession } = fakeContext();
 
-      await afterVerification({ ctx, context: "someone@example.com" });
-
-      expect(createSession).toHaveBeenCalledWith("user_1");
-      expect(setSessionCookie).toHaveBeenCalledWith(
+      const result = await afterVerification({
         ctx,
-        expect.objectContaining({ session: { id: "session_1" } }),
-      );
+        context: "someone@example.com",
+      });
+
+      expect(createSession).not.toHaveBeenCalled();
+      // The account it hands back is what the plugin mints the session for.
+      expect(result.userId).toBe("user_1");
     });
 
     it("sends the address confirmation after them, not in front of them", async () => {
