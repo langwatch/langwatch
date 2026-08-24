@@ -55,6 +55,12 @@ Feature: Enterprise governance package boundary
     When another organization requests that rule by identifier
     Then Governance returns no rule
 
+  Scenario: Spend spike decisions are deterministic
+    Given a valid spend spike threshold and current and baseline spend windows
+    When Governance evaluates the threshold
+    Then an existing open alert takes precedence over another firing
+    And the decision fires only when the minimum baseline and configured ratio are met
+
   Scenario: Contracts are transport independent
     Given a browser imports the governance contract root
     Then no server, Eventing, application, environment, or generated database module loads

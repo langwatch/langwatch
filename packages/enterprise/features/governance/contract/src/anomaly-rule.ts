@@ -181,3 +181,92 @@ export function safeParseSpendSpikeThresholdConfig(
     ? { ok: true, data: result.data }
     : { ok: false, error: result.error };
 }
+
+export const DEFAULT_SPEND_SPIKE_CONFIG: SpendSpikeThresholdConfig = {
+  windowSec: 3600,
+  ratioVsBaseline: 2,
+  minBaselineUsd: 1,
+};
+
+export const spendSpikeDecisionSchema = z.enum([
+  "fire",
+  "skip_below_baseline",
+  "skip_below_threshold",
+  "skip_dedup",
+  "skip_no_data",
+  "skip_invalid_config",
+]);
+export type SpendSpikeDecision = z.infer<typeof spendSpikeDecisionSchema>;
+
+export const spendSpikeEvaluationInputSchema = z.object({
+  ruleId: z.string(),
+  organizationId: z.string(),
+  config: spendSpikeThresholdConfigSchema,
+  currentSpendUsd: z.number(),
+  baselineSpendUsd: z.number(),
+  hasOpenAlertInWindow: z.boolean(),
+  windowStart: z.date(),
+  windowEnd: z.date(),
+});
+export type SpendSpikeEvaluationInput = z.infer<
+  typeof spendSpikeEvaluationInputSchema
+>;
+
+export const spendSpikeEvaluationResultSchema = z.object({
+  ruleId: z.string(),
+  organizationId: z.string(),
+  decision: spendSpikeDecisionSchema,
+  reason: z.string(),
+  currentSpendUsd: z.number(),
+  baselineSpendUsd: z.number(),
+  windowStart: z.date(),
+  windowEnd: z.date(),
+});
+export type SpendSpikeEvaluationResult = z.infer<
+  typeof spendSpikeEvaluationResultSchema
+>;
+
+export function evaluateSpendSpike(
+  input: SpendSpikeEvaluationInput,
+): SpendSpikeEvaluationResult {
+  const base = {
+    ruleId: input.ruleId,
+    organizationId: input.organizationId,
+    currentSpendUsd: input.currentSpendUsd,
+    baselineSpendUsd: input.baselineSpendUsd,
+    windowStart: input.windowStart,
+    windowEnd: input.windowEnd,
+  };
+
+  if (input.hasOpenAlertInWindow) {
+    return {
+      ...base,
+      decision: "skip_dedup",
+      reason:
+        "Existing open alert for this rule covers the current window — not re-firing.",
+    };
+  }
+
+  if (input.baselineSpendUsd < input.config.minBaselineUsd) {
+    return {
+      ...base,
+      decision: "skip_below_baseline",
+      reason: `Baseline ${input.baselineSpendUsd.toFixed(4)} USD < minBaselineUsd ${input.config.minBaselineUsd} — signal too small to trigger.`,
+    };
+  }
+
+  const threshold = input.baselineSpendUsd * input.config.ratioVsBaseline;
+  if (input.currentSpendUsd < threshold) {
+    return {
+      ...base,
+      decision: "skip_below_threshold",
+      reason: `Current ${input.currentSpendUsd.toFixed(4)} USD < threshold ${threshold.toFixed(4)} USD (baseline ${input.baselineSpendUsd.toFixed(4)} × ratio ${input.config.ratioVsBaseline}).`,
+    };
+  }
+
+  return {
+    ...base,
+    decision: "fire",
+    reason: `Current ${input.currentSpendUsd.toFixed(4)} USD ≥ threshold ${threshold.toFixed(4)} USD (baseline ${input.baselineSpendUsd.toFixed(4)} × ratio ${input.config.ratioVsBaseline}).`,
+  };
+}

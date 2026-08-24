@@ -33,7 +33,11 @@
  * are ee/-only).
  */
 import { createLogger } from "@langwatch/observability";
-import { safeParseSpendSpikeThresholdConfig } from "@langwatch/enterprise-governance-contract";
+import {
+  evaluateSpendSpike,
+  safeParseSpendSpikeThresholdConfig,
+  type SpendSpikeEvaluationResult,
+} from "@langwatch/enterprise-governance-contract";
 import type {
   AnomalyRule,
   Prisma,
@@ -47,92 +51,7 @@ const logger = createLogger(
   "langwatch:governance:spend-spike-anomaly-evaluator",
 );
 
-export interface SpendSpikeThresholdConfig {
-  windowSec: number;
-  ratioVsBaseline: number;
-  minBaselineUsd: number;
-}
-
-export const DEFAULT_SPEND_SPIKE_CONFIG: SpendSpikeThresholdConfig = {
-  windowSec: 3600,
-  ratioVsBaseline: 2.0,
-  minBaselineUsd: 1.0,
-};
-
 const BASELINE_WINDOWS = 6; // average over previous 6 windows
-
-export interface SpendSpikeEvaluationResult {
-  ruleId: string;
-  organizationId: string;
-  decision:
-    | "fire"
-    | "skip_below_baseline"
-    | "skip_below_threshold"
-    | "skip_dedup"
-    | "skip_no_data"
-    | "skip_invalid_config";
-  reason: string;
-  currentSpendUsd: number;
-  baselineSpendUsd: number;
-  windowStart: Date;
-  windowEnd: Date;
-}
-
-/**
- * Pure-function evaluator: given the per-window spend numbers, decides
- * whether to fire. Separated from I/O so it's trivially unit-testable.
- */
-export function evaluateSpendSpike(input: {
-  ruleId: string;
-  organizationId: string;
-  config: SpendSpikeThresholdConfig;
-  currentSpendUsd: number;
-  baselineSpendUsd: number;
-  hasOpenAlertInWindow: boolean;
-  windowStart: Date;
-  windowEnd: Date;
-}): SpendSpikeEvaluationResult {
-  const base = {
-    ruleId: input.ruleId,
-    organizationId: input.organizationId,
-    currentSpendUsd: input.currentSpendUsd,
-    baselineSpendUsd: input.baselineSpendUsd,
-    windowStart: input.windowStart,
-    windowEnd: input.windowEnd,
-  };
-
-  if (input.hasOpenAlertInWindow) {
-    return {
-      ...base,
-      decision: "skip_dedup",
-      reason:
-        "Existing open alert for this rule covers the current window — not re-firing.",
-    };
-  }
-
-  if (input.baselineSpendUsd < input.config.minBaselineUsd) {
-    return {
-      ...base,
-      decision: "skip_below_baseline",
-      reason: `Baseline ${input.baselineSpendUsd.toFixed(4)} USD < minBaselineUsd ${input.config.minBaselineUsd} — signal too small to trigger.`,
-    };
-  }
-
-  const threshold = input.baselineSpendUsd * input.config.ratioVsBaseline;
-  if (input.currentSpendUsd < threshold) {
-    return {
-      ...base,
-      decision: "skip_below_threshold",
-      reason: `Current ${input.currentSpendUsd.toFixed(4)} USD < threshold ${threshold.toFixed(4)} USD (baseline ${input.baselineSpendUsd.toFixed(4)} × ratio ${input.config.ratioVsBaseline}).`,
-    };
-  }
-
-  return {
-    ...base,
-    decision: "fire",
-    reason: `Current ${input.currentSpendUsd.toFixed(4)} USD ≥ threshold ${threshold.toFixed(4)} USD (baseline ${input.baselineSpendUsd.toFixed(4)} × ratio ${input.config.ratioVsBaseline}).`,
-  };
-}
 
 /**
  * I/O layer: queries governance_kpis + prisma.anomalyAlert + writes
