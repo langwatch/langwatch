@@ -1,3 +1,4 @@
+import { passkey } from "@better-auth/passkey";
 import {
   buildGenericOAuthConfigs,
   buildSocialProviders,
@@ -19,6 +20,7 @@ import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError } from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
+import { twoFactor } from "better-auth/plugins/two-factor";
 import { env } from "~/env.mjs";
 import { tryGetApp } from "~/server/app-layer/app";
 import { identityCeremonies } from "~/server/app-layer/identity/runtime";
@@ -73,10 +75,54 @@ const genericOAuthConfigs = buildGenericOAuthConfigs(env);
 // it would override admin impersonation with its own mechanism. We use our
 // own `isAdmin` check (ee/admin/isAdmin.ts) and the legacy
 // Session.impersonating JSON column handled in src/server/auth.ts.
-const plugins =
-  genericOAuthConfigs.length > 0
+/**
+ * D06 / D07. Both flags are read at module load, because that is when
+ * `betterAuth()` below is constructed and a plugin decides which ROUTES
+ * exist. With a flag off the plugin is not registered at all, so its routes
+ * are not mounted and nothing about the feature is reachable — which is what
+ * makes "with the flag off nothing about it exists" true of the surface
+ * rather than merely of the screens.
+ *
+ * Turning a flag back off is not a deletion. `TwoFactor` and `Passkey` rows
+ * survive it and nobody is signed out; the feature stops being ASKED for,
+ * and turning it on again finds everything where it was.
+ *
+ * Env rather than a feature flag for both: a challenge stands between a
+ * password and a session, and registering a passkey happens on the sign-in
+ * screen. Feature flags are read per project, and neither caller has one yet.
+ */
+const mfaEnrollmentOpen = env.MFA_ENROLLMENT_OPEN === "on";
+const passkeysEnabled = env.PASSKEYS_ENABLED === "on";
+
+const plugins = [
+  ...(genericOAuthConfigs.length > 0
     ? [genericOAuth({ config: genericOAuthConfigs })]
-    : [];
+    : []),
+  ...(mfaEnrollmentOpen
+    ? [
+        twoFactor({
+          issuer: "LangWatch",
+          // Encrypted, not hashed. A backup code has to be COMPARED against
+          // what the person types, and the plugin's own verification path
+          // decrypts and compares; hashing them would make the plugin
+          // unable to verify its own codes. `NEXTAUTH_SECRET` is the key,
+          // which is why turning the flag on without one set is refused at
+          // boot by the env schema rather than at first use.
+          backupCodeOptions: { storeBackupCodes: "encrypted" },
+        }),
+      ]
+    : []),
+  ...(passkeysEnabled
+    ? [
+        passkey({
+          rpName: "LangWatch",
+          // The relying party is the app's own origin. Left to the plugin's
+          // default derivation from `baseURL` so a self-hosted install on
+          // its own hostname works without a second place to configure it.
+        }),
+      ]
+    : []),
+];
 
 /**
  * Wire BetterAuth's secondary storage to the App's Redis connection. Used by
@@ -303,6 +349,16 @@ export const auth = betterAuth({
      * Both crash with "Record not found" when the row only exists in Redis.
      * Forcing dual-write keeps Redis useful (rate limiting, secondary
      * storage for plugins) while preserving DB-backed impersonation.
+     *
+     * D06 gives this a second, independent reason that outlives the first.
+     * A session now records WHICH sign-in method minted it and WHAT that
+     * sign-in proved (`Session.identifierId`, `Session.amr`), and an
+     * organization's two-step requirement reads that when a member reaches
+     * its data. A session row that existed only in Redis could not carry
+     * either column, so the requirement would read null for everybody and
+     * hold every federated member at a gate they cannot pass. Even when
+     * impersonation eventually stops using `Session.impersonating`, this
+     * option stays required.
      */
     storeSessionInDatabase: true,
   },

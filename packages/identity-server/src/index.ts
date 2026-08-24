@@ -73,6 +73,8 @@ export type {
   IdentityVerificationRepository,
 } from "./identity-verification.repository";
 export { IdentityService } from "./identity.service";
+export type { MfaEnrollmentRepository } from "./mfa-enrollment.repository";
+export { MfaGuards } from "./mfa-guards";
 export {
   type SignInBreakGlassLimiter,
   type SignInDomainRoutingPort,
@@ -103,6 +105,22 @@ export {
   SignInCallbackLinkingService,
   type SignInCallbackLinkingDeps,
 } from "./signin-callback-linking.service";
+export {
+  JoinRequestGuards,
+  type JoinRequestGuardsDeps,
+} from "./join-request-guards";
+export {
+  approveJoinCommandId,
+  expireJoinCommandId,
+  newJoinRequestCommandId,
+  newJoinRequestId,
+} from "./join-request-id";
+export type { JoinRequestLedger } from "./join-request-ledger";
+export type {
+  JoinCandidateRepository,
+  JoinRequestReadRepository,
+} from "./join-request.repository";
+export { JoinRequestService } from "./join-request.service";
 export {
   SCIM_APPLY_MAX_ATTEMPTS,
   ScimSyncGuards,
@@ -137,6 +155,7 @@ export type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
+  SsoPlatformOperatorRepository,
 } from "./sso-connection.repository";
 export { SsoConnectionService } from "./sso-connection.service";
 export {

@@ -164,7 +164,7 @@ export const linkProposedPayloadSchema = z.object({
  * stamped by whoever appends — the app's pipeline envelope — from the
  * command that produced it.
  */
-export const identityFactInputSchema = z.discriminatedUnion("type", [
+export const identifierFactInputSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal(IDENTIFIER_ATTACHED_EVENT_TYPE),
     data: identifierAttachedPayloadSchema,
@@ -194,7 +194,7 @@ export const identityFactInputSchema = z.discriminatedUnion("type", [
     data: linkProposedPayloadSchema,
   }),
 ]);
-export type IdentityFactInput = z.infer<typeof identityFactInputSchema>;
+export type IdentityFactInput = z.infer<typeof identifierFactInputSchema>;
 
 /** A fact with its business time — what the reducer folds. Every framework
  *  identity event is structurally one of these. */
@@ -290,8 +290,14 @@ const commandIdentitySchema = z.object({
  * `userId` — a caller wiring them differently would persist the event under
  * one tenant's stream and fold it into another user's projection, which
  * nothing downstream can detect. Refused at the wire boundary instead.
+ *
+ * Exported because `mfa.ts` is the same shape of aggregate — one history per
+ * person, the person as the tenant — and the invariant has to hold there for
+ * the same reason. Two copies of a refinement is two ways for it to drift.
  */
-function commandDataSchema<Shape extends z.ZodRawShape>(shape: Shape) {
+export function userTenantedCommandSchema<Shape extends z.ZodRawShape>(
+  shape: Shape,
+) {
   return commandIdentitySchema
     .extend(shape)
     .refine((data) => data.tenantId === data.userId, {
@@ -300,7 +306,7 @@ function commandDataSchema<Shape extends z.ZodRawShape>(shape: Shape) {
     });
 }
 
-export const attachIdentifierCommandDataSchema = commandDataSchema({
+export const attachIdentifierCommandDataSchema = userTenantedCommandSchema({
   /** The better-auth protocol row, when one exists. */
   accountId: z.string().min(1).nullable(),
   provider: identifierProviderSchema,
@@ -326,7 +332,7 @@ export type AttachIdentifierCommandData = z.infer<
   typeof attachIdentifierCommandDataSchema
 >;
 
-export const verifyIdentifierCommandDataSchema = commandDataSchema({
+export const verifyIdentifierCommandDataSchema = userTenantedCommandSchema({
   identifierId: z.string().min(1),
   /** The consumed Verification record (magic-link ceremonies). */
   verificationId: z.string().min(1).nullable(),
@@ -338,7 +344,7 @@ export type VerifyIdentifierCommandData = z.infer<
   typeof verifyIdentifierCommandDataSchema
 >;
 
-export const markPrimaryCommandDataSchema = commandDataSchema({
+export const markPrimaryCommandDataSchema = userTenantedCommandSchema({
   identifierId: z.string().min(1),
   occurredAtMs: z.number().int().nonnegative(),
   actor: identityActorSchema,
@@ -347,7 +353,7 @@ export type MarkPrimaryCommandData = z.infer<
   typeof markPrimaryCommandDataSchema
 >;
 
-export const detachIdentifierCommandDataSchema = commandDataSchema({
+export const detachIdentifierCommandDataSchema = userTenantedCommandSchema({
   identifierId: z.string().min(1),
   occurredAtMs: z.number().int().nonnegative(),
   actor: identityActorSchema,
@@ -356,13 +362,13 @@ export type DetachIdentifierCommandData = z.infer<
   typeof detachIdentifierCommandDataSchema
 >;
 
-export const eraseUserCommandDataSchema = commandDataSchema({
+export const eraseUserCommandDataSchema = userTenantedCommandSchema({
   occurredAtMs: z.number().int().nonnegative(),
   actor: identityActorSchema,
 });
 export type EraseUserCommandData = z.infer<typeof eraseUserCommandDataSchema>;
 
-export const proposeLinkCommandDataSchema = commandDataSchema({
+export const proposeLinkCommandDataSchema = userTenantedCommandSchema({
   proposalId: z.string().min(1),
   connectionId: z.string().min(1).nullable(),
   provider: identifierProviderSchema,

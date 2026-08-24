@@ -357,6 +357,11 @@ export function backofficeGroup(): SettingsMenuGroup {
         icon: CreditCard,
       },
       {
+        label: "Single Sign-On",
+        href: "/ops/backoffice/sso-connections",
+        icon: ShieldCheck,
+      },
+      {
         label: "Bug Reports",
         href: "/ops/backoffice/bug-reports",
         icon: Bug,

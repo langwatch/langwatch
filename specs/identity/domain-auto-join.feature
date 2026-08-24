@@ -52,7 +52,7 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
 
   # ── Walking in ─────────────────────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: A verified colleague joins an opted-in organization immediately
     Given "ana" turned on automatic joining for "acme.com"
     When "sam" completes sign-up and verification
@@ -96,27 +96,27 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
     Then colleagues may ask to join
     And nobody joins automatically until an administrator turns that on
 
-  @unit @unimplemented
+  @unit
   Scenario: Turning it on names the domain and needs corroboration
     Given only one member of "acme" holds a verified address on "acme.com"
     When "ana" turns on automatic joining for "acme.com"
     Then the attempt is refused with code join_auto_domain_unproven and status 422
     And it succeeds once a second member holds a verified address on that domain
 
-  @unit @unimplemented
+  @unit
   Scenario: A public email domain cannot be turned on at all
     When "ana" turns on automatic joining for a consumer mail domain
     Then the attempt is refused with code join_auto_domain_unproven and status 422
     And the refusal says company domains only, without listing the deny-list
 
-  @unit @unimplemented
+  @unit
   Scenario: An organization whose identity provider admits people cannot turn it on
     Given "acme" has an ACTIVE SSO connection for "acme.com"
     When "ana" turns on automatic joining
     Then the attempt is refused with code join_auto_connection_admits and status 409
     And the refusal points at the connection's own provisioning as the way in
 
-  @unit @unimplemented
+  @unit
   Scenario: Turning it off stops future joins and touches nobody already in
     Given "acme" has automatic joining on and members who arrived that way
     When "ana" turns it back to asking
@@ -138,7 +138,7 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
 
   # ── The license line ───────────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: An unlicensed deployment cannot turn automatic joining on
     Given a self-hosted deployment that has never held a genuine license
     When "ana" turns on automatic joining for "acme.com"
@@ -154,7 +154,7 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
     And approving it makes "sam" a member
     And nothing on that path consulted the license at all
 
-  @unit @unimplemented
+  @unit
   Scenario: Losing the license stops automatic joining without stranding members
     Given "acme" has automatic joining on under a genuine license
     When the deployment restarts without one

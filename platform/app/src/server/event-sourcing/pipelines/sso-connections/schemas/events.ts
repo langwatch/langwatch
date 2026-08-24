@@ -11,10 +11,12 @@ import {
   connectionResumedPayloadSchema,
   connectionSuspendedPayloadSchema,
   connectionTornDownPayloadSchema,
+  DOMAIN_ATTESTED_EVENT_TYPE,
   DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
   DOMAIN_CLAIM_REJECTED_EVENT_TYPE,
   DOMAIN_CLAIMED_EVENT_TYPE,
   DOMAIN_VERIFIED_EVENT_TYPE,
+  domainAttestedPayloadSchema,
   domainClaimApprovedPayloadSchema,
   domainClaimedPayloadSchema,
   domainClaimRejectedPayloadSchema,
@@ -85,6 +87,12 @@ export type VerificationRequestedEvent = z.infer<
   typeof verificationRequestedEventSchema
 >;
 
+export const domainAttestedEventSchema = EventSchema.extend({
+  type: z.literal(DOMAIN_ATTESTED_EVENT_TYPE),
+  data: domainAttestedPayloadSchema,
+});
+export type DomainAttestedEvent = z.infer<typeof domainAttestedEventSchema>;
+
 export const domainVerifiedEventSchema = EventSchema.extend({
   type: z.literal(DOMAIN_VERIFIED_EVENT_TYPE),
   data: domainVerifiedPayloadSchema,
@@ -138,6 +146,7 @@ export const ssoConnectionEventSchema = z.discriminatedUnion("type", [
   domainClaimRejectedEventSchema,
   connectionDiscardedEventSchema,
   verificationRequestedEventSchema,
+  domainAttestedEventSchema,
   domainVerifiedEventSchema,
   connectionActivatedEventSchema,
   connectionSuspendedEventSchema,

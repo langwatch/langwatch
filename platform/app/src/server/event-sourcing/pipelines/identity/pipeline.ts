@@ -1,10 +1,19 @@
-import type { IdentityGuards } from "@langwatch/identity-server";
+import type { IdentityGuards, MfaGuards } from "@langwatch/identity-server";
 import { definePipeline } from "../..";
 import type { StateProjectionStore } from "../../projections/stateProjection.types";
 import { AttachIdentifierCommand } from "./commands/attachIdentifier.command";
 import { DetachIdentifierCommand } from "./commands/detachIdentifier.command";
 import { EraseUserCommand } from "./commands/eraseUser.command";
 import { MarkPrimaryCommand } from "./commands/markPrimary.command";
+import {
+  ConfirmMfaCommand,
+  ConsumeBackupCodeCommand,
+  DisableMfaCommand,
+  EnrollMfaCommand,
+  ExpireMfaEnrollmentCommand,
+  RecordMfaVerificationFailureCommand,
+  RegenerateBackupCodesCommand,
+} from "./commands/mfaCommands";
 import { ProposeLinkCommand } from "./commands/proposeLink.command";
 import { VerifyIdentifierCommand } from "./commands/verifyIdentifier.command";
 import {
@@ -12,10 +21,15 @@ import {
   IdentityStateFoldProjection,
 } from "./projections/identityState.foldProjection";
 import {
+  MfaEnrollmentStateFoldProjection,
+  type MfaFoldState,
+} from "./projections/mfaEnrollmentState.foldProjection";
+import {
   IDENTITY_PIPELINE_NAME,
   USER_IDENTITY_AGGREGATE_TYPE,
 } from "./schemas/constants";
 import type { IdentityEvent } from "./schemas/events";
+import type { MfaEvent } from "./schemas/mfaEvents";
 
 export interface IdentityPipelineDeps {
   identityProjectionStore: StateProjectionStore<IdentityFoldState>;
@@ -23,6 +37,10 @@ export interface IdentityPipelineDeps {
    *  IdentityGuards over the app's heads repository, the same instance shape
    *  the calling path uses. */
   identityGuards: IdentityGuards;
+  /** The `MfaEnrollment` head + cursor (D06), folded on this same pipeline. */
+  mfaProjectionStore: StateProjectionStore<MfaFoldState>;
+  /** The two-step verification guards, over the same person's state. */
+  mfaGuards: MfaGuards;
 }
 
 /**
@@ -35,15 +53,27 @@ export interface IdentityPipelineDeps {
  * and opens only when a user's backfill is finalized - so deploying this
  * pipeline emits nothing on its own.
  *
- * Lanes: the commands keep the default per-aggregate group key. The queue
- * composes `${tenantId}/${jobPath}/${aggregateType}:${aggregateId}` and here
- * the tenant IS the user, so the default lane is already one per user and
- * there is nothing narrower to shard by (ADR-114's sharded per-organization
- * lane exists because many grants share one tenant). A user holds a handful
- * of identifiers, so a lane never has a batch to coalesce either.
+ * It also carries two-step verification (D06). Different kind of thing, same
+ * aggregate, because they share a key: an enrollment belongs to exactly the
+ * person their identifiers belong to. `trace` does the same with spans, logs
+ * and annotations.
+ *
+ * Sharing the aggregate is a CORRECTNESS property, not a tidiness one. The
+ * queue composes its group key as
+ * `${tenantId}/${jobPath}/${aggregateType}:${aggregateId}`, and here the
+ * tenant IS the person, so one person's identifier commands and their
+ * two-step commands land in the SAME lane and serialise against each other.
+ * Turning two-step verification off and detaching a sign-in method cannot
+ * interleave — each reads the state the other left. Split across two
+ * aggregates they would have raced, and the strands guard could have read a
+ * state that was already stale by the time it refused.
+ *
+ * There is nothing narrower to shard by (ADR-114's sharded per-organization
+ * lane exists because many grants share one tenant), and a person holds a
+ * handful of identifiers, so a lane never has a batch to coalesce either.
  */
 export function createIdentityPipeline(deps: IdentityPipelineDeps) {
-  return definePipeline<IdentityEvent>()
+  return definePipeline<IdentityEvent | MfaEvent>()
     .withName(IDENTITY_PIPELINE_NAME)
     .withAggregateType(USER_IDENTITY_AGGREGATE_TYPE)
     .withProjection(
@@ -81,6 +111,47 @@ export function createIdentityPipeline(deps: IdentityPipelineDeps) {
       "proposeLink",
       ProposeLinkCommand,
       new ProposeLinkCommand(deps.identityGuards),
+    )
+    .withProjection(
+      "mfaEnrollmentState",
+      new MfaEnrollmentStateFoldProjection({
+        store: deps.mfaProjectionStore,
+      }),
+    )
+    .withCommandInstance(
+      "enrollMfa",
+      EnrollMfaCommand,
+      new EnrollMfaCommand(deps.mfaGuards),
+    )
+    .withCommandInstance(
+      "confirmMfa",
+      ConfirmMfaCommand,
+      new ConfirmMfaCommand(deps.mfaGuards),
+    )
+    .withCommandInstance(
+      "expireMfaEnrollment",
+      ExpireMfaEnrollmentCommand,
+      new ExpireMfaEnrollmentCommand(deps.mfaGuards),
+    )
+    .withCommandInstance(
+      "disableMfa",
+      DisableMfaCommand,
+      new DisableMfaCommand(deps.mfaGuards),
+    )
+    .withCommandInstance(
+      "consumeBackupCode",
+      ConsumeBackupCodeCommand,
+      new ConsumeBackupCodeCommand(deps.mfaGuards),
+    )
+    .withCommandInstance(
+      "regenerateBackupCodes",
+      RegenerateBackupCodesCommand,
+      new RegenerateBackupCodesCommand(deps.mfaGuards),
+    )
+    .withCommandInstance(
+      "recordMfaVerificationFailure",
+      RecordMfaVerificationFailureCommand,
+      new RecordMfaVerificationFailureCommand(deps.mfaGuards),
     )
     .build();
 }

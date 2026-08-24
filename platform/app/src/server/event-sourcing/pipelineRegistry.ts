@@ -20,13 +20,18 @@ import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/we
 import type {
   IdentityHeadsRepository,
   ScimSyncReadRepository,
+  JoinRequestReadRepository,
+  MfaEnrollmentRepository,
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
+  SsoPlatformOperatorRepository,
 } from "@langwatch/identity-server";
 import {
   IdentityGuards,
   ScimSyncGuards,
+  JoinRequestGuards,
+  MfaGuards,
   SsoConnectionGuards,
 } from "@langwatch/identity-server";
 import type {
@@ -162,6 +167,7 @@ import { createGithubMaintenancePipeline } from "./pipelines/github-maintenance/
 import { createGovernanceEventsPipeline } from "./pipelines/governance-events/pipeline";
 import { createIdentityPipeline } from "./pipelines/identity/pipeline";
 import type { IdentityFoldState } from "./pipelines/identity/projections/identityState.foldProjection";
+import type { MfaFoldState } from "./pipelines/identity/projections/mfaEnrollmentState.foldProjection";
 import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
 import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
 import { createLangyMaintenancePipeline } from "./pipelines/langy-maintenance/pipeline";
@@ -191,7 +197,10 @@ import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processin
 import type { SimulationProcessingEvent } from "./pipelines/simulation-processing/schemas/events";
 import { createScimSyncPipeline } from "./pipelines/scim-sync/pipeline";
 import type { ScimSyncFoldState } from "./pipelines/scim-sync/projections/scimSyncState.foldProjection";
+import { createJoinRequestPipeline } from "./pipelines/join-requests/pipeline";
 import { createSsoConnectionPipeline } from "./pipelines/sso-connections/pipeline";
+import type { JoinRequestLifecyclePort } from "./pipelines/join-requests/process-manager/joinRequestLifecycle.process";
+import type { JoinRequestFoldState } from "./pipelines/join-requests/projections/joinRequestState.foldProjection";
 import type { ConnectionTeardownPort } from "./pipelines/sso-connections/process-manager/connectionTeardown.process";
 import type { SsoConnectionFoldState } from "./pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
@@ -375,6 +384,10 @@ export interface PipelineRepositories {
   identityProjection: StateProjectionStore<IdentityFoldState>;
   /** Postgres reads the identity guards run against (ADR-101 §2). */
   identityHeads: IdentityHeadsRepository;
+  /** The two-step verification pipeline's `MfaEnrollment` head + cursor (D06). */
+  mfaProjection: StateProjectionStore<MfaFoldState>;
+  /** Postgres reads the two-step verification guards run against (D06). */
+  mfaEnrollments: MfaEnrollmentRepository;
   /** The connection pipeline's `SsoConnection` head + cursor (D04). */
   ssoConnectionProjection: StateProjectionStore<SsoConnectionFoldState>;
   /** Postgres reads the connection guards run against (ADR-117 §5). */
@@ -383,12 +396,21 @@ export interface PipelineRepositories {
   ssoConnectionStranding: SsoConnectionStrandingRepository;
   /** Activation's break-glass precondition (D05 hardens it). */
   ssoBreakGlassBindings: SsoBreakGlassBindingRepository;
+  /** Whether an actor is a LangWatch platform operator — what makes deciding
+   *  a domain claim and attesting a domain operator acts (D05 tier 1). */
+  ssoPlatformOperators: SsoPlatformOperatorRepository;
   /** How the teardown grace wake dispatches its completion command. */
   ssoConnectionTeardown: ConnectionTeardownPort;
   /** The directory-sync pipeline's `ScimSyncState` head + cursor (D08). */
   scimSyncProjection: StateProjectionStore<ScimSyncFoldState>;
   /** Postgres reads the directory-sync guards run against (D08). */
   scimSyncReads: ScimSyncReadRepository;
+  /** The join-request pipeline's `JoinRequest` head + cursor (D12). */
+  joinRequestProjection: StateProjectionStore<JoinRequestFoldState>;
+  /** Postgres reads the join-request guards run against (ADR-117, D12). */
+  joinRequestReads: JoinRequestReadRepository;
+  /** How the reminder and expiry wakes reach the world. */
+  joinRequestLifecycle: JoinRequestLifecyclePort;
 }
 
 export interface PipelineRegistryDeps {
@@ -694,6 +716,12 @@ export class PipelineRegistry {
         identityGuards: new IdentityGuards(
           this.deps.repositories.identityHeads,
         ),
+        // Two-step verification rides this same aggregate (D06), so its
+        // commands share the per-person lane rather than racing it. Ships
+        // dark: `MFA_ENROLLMENT_OPEN` defaults to `off`, so the two-factor
+        // plugin is not registered and nothing dispatches these.
+        mfaProjectionStore: this.deps.repositories.mfaProjection,
+        mfaGuards: new MfaGuards(this.deps.repositories.mfaEnrollments),
       }),
     );
     // The SSO connection pipeline (ADR-117 §5, D04). Ships dark:
@@ -710,6 +738,7 @@ export class PipelineRegistry {
           connections: this.deps.repositories.ssoConnectionReads,
           breakGlass: this.deps.repositories.ssoBreakGlassBindings,
           stranding: this.deps.repositories.ssoConnectionStranding,
+          platformOperators: this.deps.repositories.ssoPlatformOperators,
         }),
         teardown: this.deps.repositories.ssoConnectionTeardown,
       }),
@@ -728,6 +757,20 @@ export class PipelineRegistry {
         scimSyncGuards: new ScimSyncGuards({
           syncs: this.deps.repositories.scimSyncReads,
         }),
+      }),
+    );
+
+    // The join-request pipeline (ADR-117, D12). Ships dark: `JOIN_REQUESTS`
+    // defaults off, so nothing dispatches a join command, no interstitial
+    // renders and no admin panel appears — a deploy changes nothing on its
+    // own, and rollback is the flag.
+    this.deps.eventSourcing.register(
+      createJoinRequestPipeline({
+        joinRequestProjectionStore: this.deps.repositories.joinRequestProjection,
+        joinRequestGuards: new JoinRequestGuards({
+          requests: this.deps.repositories.joinRequestReads,
+        }),
+        lifecycle: this.deps.repositories.joinRequestLifecycle,
       }),
     );
 

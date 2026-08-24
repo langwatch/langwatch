@@ -53,6 +53,17 @@ model Session {
   impersonating Json?
   ipAddress     String?
   userAgent     String?  @db.Text
+  /// Which of the user's sign-in methods minted this session (D06). NULL on
+  /// every session that predates the column and on any mint we could not
+  /// attribute - an ordinary value, not an error. Nothing reads it to decide
+  /// whether the session is valid, so no session was ended to add it.
+  identifierId  String?
+  /// What the sign-in that minted this session PROVED, as RFC 8176 method
+  /// references (D06). Empty on every session minted before the column, and
+  /// on any ordinary password sign-in. An organization that requires a second
+  /// factor reads this when a member reaches its data; it is never read at
+  /// mint and never ends a session.
+  amr           String[] @default([])
   createdAt     DateTime @default(now())
   updatedAt     DateTime @default(now()) @updatedAt
 
@@ -71,8 +82,15 @@ model User {
   // in the user's event history is unlinkable noise. Row-truth; never in an
   // event.
   userHashKey                   String?
+  /// Owned by the two-factor plugin (D06), which is why it is a plain
+  /// boolean rather than a state: the plugin flips it when a setup is
+  /// confirmed and when it is turned off, and challenges every sign-in while
+  /// it is true. The lifecycle - and the history - lives on MfaEnrollment.
+  twoFactorEnabled              Boolean                  @default(false)
   accounts                      Account[]
   sessions                      Session[]
+  twoFactors                    TwoFactor[]
+  passkeys                      Passkey[]
   teamMemberships               TeamUser[]
   orgMemberships                OrganizationUser[]
   createdAt                     DateTime                 @default(now())
@@ -184,6 +202,105 @@ model IdentityProjectionCursor {
   updatedAt         DateTime @default(now()) @updatedAt
 }
 
+/// The two-factor plugin's own table (D06). Protocol state, and row-truth for
+/// good (ADR-101 R12): the shared secret and the backup codes live here and
+/// in no event, ever. Nothing in this repo reads or writes these columns -
+/// the plugin owns them end to end, including the lockout counters, which is
+/// why `failedVerificationCount` and `lockedUntil` are here rather than
+/// rebuilt on the projection.
+///
+/// `backupCodes` holds an ENCRYPTED blob, not hashes. A backup code has to be
+/// compared against what somebody types, and the plugin decrypts and compares;
+/// hashing them would leave it unable to verify its own codes.
+model TwoFactor {
+  id                      String    @id @default(nanoid())
+  userId                  String
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  secret                  String    @db.Text
+  backupCodes             String    @db.Text
+  verified                Boolean   @default(true)
+  failedVerificationCount Int       @default(0)
+  lockedUntil             DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @default(now()) @updatedAt
+
+  @@index([userId])
+  @@index([secret])
+}
+
+/// The passkey plugin's own table (D07). Protocol state, like TwoFactor: the
+/// public key and the signature counter are the plugin's to read and write.
+/// A passkey also becomes an `Identifier` row with provider `passkey`, which
+/// is what makes it a sign-in method like any other - this table is the
+/// credential, that one is the identity.
+///
+/// `aaguid` names the authenticator MODEL, never a device or a person, and is
+/// only present at registration. Privacy-preserving platforms report all
+/// zeroes, so a label derived from it is best-effort by construction.
+model Passkey {
+  id           String   @id @default(nanoid())
+  name         String?
+  publicKey    String   @db.Text
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialID String
+  counter      Int      @default(0)
+  deviceType   String
+  backedUp     Boolean  @default(false)
+  transports   String?
+  aaguid       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  @@index([userId])
+  @@index([credentialID])
+}
+
+/// The two-step verification pipeline's projection (D06 - see
+/// specs/identity/mfa-and-session-shape.feature). One row per PERSON, because
+/// one person has one setup however many organizations they belong to.
+///
+/// A pure event-truth head like `SsoConnection`: every column is fold-written,
+/// rows are never deleted (DISABLED is a tombstone, so history survives being
+/// turned off), and a replay rebuilds it whole-row from the event log. The
+/// cursor columns are inline because the fold produces exactly one row per
+/// aggregate - the `Identifier` fan-out needed its own cursor table, this
+/// does not.
+///
+/// Every column here is a lifecycle fact. There is deliberately nowhere in
+/// this model a secret or a backup code could be put: `consumedBackupCodeIndexes`
+/// holds POSITIONS, which is what lets "how many are left" be answered
+/// without the projection ever knowing a code.
+model MfaEnrollment {
+  /// The user. Also the aggregate id and the tenant - one identity history
+  /// per person (ADR-029 §4).
+  userId                    String    @id
+  /// The current enrollment, or NULL for somebody who never started one.
+  enrollmentId              String?
+  /// totp. Never sms.
+  method                    String?
+  /// NONE | PENDING | ENABLED | EXPIRED | DISABLED
+  state                     String
+  enrolledAt                DateTime?
+  confirmedAt               DateTime?
+  expiredAt                 DateTime?
+  disabledAt                DateTime?
+  /// password+totp | org-admin - who ended it, and on whose authority.
+  disabledVia               String?
+  backupCodeCount           Int       @default(0)
+  /// Positions already spent, ascending. Never codes.
+  consumedBackupCodeIndexes Int[]     @default([])
+  failedCount               Int       @default(0)
+  occurredAt                DateTime
+  lastEventId               String
+  acceptedAt                DateTime
+  projectionVersion         String
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @default(now()) @updatedAt
+
+  @@index([state])
+}
+
 /// The SSO connection pipeline's projection (ADR-117 §5, D04 - see
 /// specs/identity/sso-connection-lifecycle.feature). A pure event-truth head
 /// like `Identifier`: every column is fold-written, rows are never deleted
@@ -212,6 +329,10 @@ model SsoConnection {
   approvedDomains     String[]
   /// The only domains that ever route, and only while state is ACTIVE.
   verifiedDomains     String[]
+  /// [{ domain, method, actorId, verifiedAtMs }] - what proved each verified
+  /// domain, and who. Kept on the row rather than only in the log so that an
+  /// operator-attested domain can never be read as one the customer proved.
+  domainVerifications Json      @default("[]")
   /// { domain, method, tokenHash } while a ceremony is in flight.
   pendingVerification Json?
   idpMetadata         Json
@@ -237,6 +358,64 @@ model SsoConnection {
   @@index([organizationId])
   @@index([state])
   @@index([verifiedDomains], type: Gin)
+}
+
+/// The join-request pipeline's projection (ADR-117, D12 - see
+/// specs/identity/join-requests.feature). A pure event-truth head like
+/// `Identifier` and `SsoConnection`: every column is fold-written, rows are
+/// never deleted (a terminal state is a tombstone the admin panel stops
+/// listing, not an absence), and a replay rebuilds it whole-row from the
+/// event log.
+///
+/// The fold cursor lives on the row rather than in a sibling table, because
+/// one row IS one aggregate here - a request.
+///
+/// No relation to Organization or User on purpose, matching the two heads
+/// above: a projection is rebuilt from events, and a foreign key would make a
+/// replay depend on relational state the log does not carry.
+///
+/// Membership is NOT here. An approval dispatches an attach on the grants
+/// ledger, exactly as accepting an invitation does, and that ledger fact
+/// carries `source: "join-request"` as its provenance - which is what puts a
+/// join approval on the customer's audit page beside every other membership
+/// change rather than in a history of its own.
+///
+/// The requester's address is not here either: the DOMAIN is the fact, and it
+/// is the only part of an address a join decision may depend on.
+model JoinRequest {
+  id                String    @id
+  userId            String
+  organizationId    String
+  /// The normalized domain the match was made on.
+  domain            String
+  /// PENDING | APPROVED | REJECTED | EXPIRED | WITHDRAWN
+  state             String
+  /// How the domain was matched; `verified-identifier-domain` today.
+  matchedVia        String
+  /// While PENDING: when the day-14 wake lapses it. Null once resolved.
+  expiresAt         DateTime?
+  resolvedAt        DateTime?
+  /// user | policy | invite - who ended it. `policy` is domain auto-join's
+  /// own principal, deliberately not the one SSO auto-join uses.
+  resolvedByType    String?
+  /// The admin's user id, `domain-auto`, or the invitation id.
+  resolvedById      String?
+  /// user | invite-accepted, on a withdrawal.
+  withdrawalCause   String?
+  occurredAt        DateTime
+  lastEventId       String
+  acceptedAt        DateTime
+  projectionVersion String
+  /// Event-derived, not database-managed: `@default(now())` / `@updatedAt`
+  /// would make a replayed row differ from the row it rebuilds, which is
+  /// exactly the parity this projection has to keep.
+  createdAt         DateTime
+  updatedAt         DateTime
+
+  @@index([organizationId, state])
+  @@index([userId, state])
+  @@index([userId, organizationId])
+  @@index([domain])
 }
 
 enum TeamUserRole {
@@ -381,6 +560,13 @@ model Organization {
   /// this value, regardless of the underlying refresh-token TTL.
   /// Spec: specs/ai-governance/sessions/session-ttl.feature.
   maxSessionDurationDays Int                  @default(0)
+  /// Every member of this organization can prove a second factor (D06). A
+  /// MEMBERSHIP CONDITION, not a session policy: it is asked when a member
+  /// reaches this organization's data, it holds the ones who cannot prove
+  /// one at an enrollment gate for THIS organization alone, and it ends no
+  /// session, ever. Turning it on signs nobody out.
+  /// Spec: specs/identity/mfa-and-session-shape.feature.
+  mfaRequired            Boolean              @default(false)
   signupData             Json?
   signedDPA              Boolean              @default(false)
   elasticsearchNodeUrl   String?
@@ -394,6 +580,20 @@ model Organization {
   sentPlanLimitAlert     DateTime?
   ssoDomain              String?              @unique
   ssoProvider            String?
+  /// How colleagues on a matching domain get in (D12, ADR-117):
+  /// `off` (invisible to them entirely) | `request` (they ask, an admin
+  /// approves) | `auto` (a verified colleague walks straight in).
+  ///
+  /// `request` is the default for a self-serve organization; `auto` is never
+  /// a default and never inferred - an administrator turns it on, names the
+  /// domain in `joinDomains` while doing it, and the licence gate holds that
+  /// value while letting `request` through.
+  domainJoin             String               @default("request")
+  /// The domains an administrator NAMED when turning automatic joining on.
+  /// Empty means automatic joining admits nobody whatever `domainJoin` says -
+  /// which is what keeps a setting left on from admitting a domain nobody
+  /// ever agreed to.
+  joinDomains            String[]
   presenceEnabled        Boolean              @default(true)
   /// Org-level trace-sharing kill switch. Off = trace share links cannot be
   /// created in ANY project of this org, and existing links stop resolving —
@@ -756,25 +956,25 @@ enum INVITE_STATUS {
 }
 
 model OrganizationInvite {
-  id              String               @id @default(nanoid())
-  email           String
-  inviteCode      String               @unique
-  expiration      DateTime?
-  status          INVITE_STATUS        @default(PENDING)
-  organizationId  String
-  organization    Organization         @relation(fields: [organizationId], references: [id])
-  teamIds         String
-  teamAssignments Json? // Array of {teamId: string, role: TeamUserRole, customRoleId?: string}
-  role            OrganizationUserRole
-  requestedBy     String?
-  requestedByUser User?                @relation(fields: [requestedBy], references: [id])
-  subscriptionId  String?
+  id                      String               @id @default(nanoid())
+  email                   String
+  inviteCode              String               @unique
+  expiration              DateTime?
+  status                  INVITE_STATUS        @default(PENDING)
+  organizationId          String
+  organization            Organization         @relation(fields: [organizationId], references: [id])
+  teamIds                 String
+  teamAssignments         Json? // Array of {teamId: string, role: TeamUserRole, customRoleId?: string}
+  role                    OrganizationUserRole
+  requestedBy             String?
+  requestedByUser         User?                @relation(fields: [requestedBy], references: [id])
+  subscriptionId          String?
   // Who accepted, and through which VERIFIED identifier the acceptance
   // matched (null for pre-identifier users, who match on User.email).
   acceptedByUserId        String?
   acceptedViaIdentifierId String?
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @default(now()) @updatedAt
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @default(now()) @updatedAt
 
   @@index([organizationId])
   @@index([requestedBy])
@@ -2796,7 +2996,7 @@ model GrantUsage {
 // same fold. Imported roles keep their CustomRole id, so custom:<id>
 // roleKeys stay stable across the cutover.
 model Role {
-  id             String   @id
+  id             String    @id
   organizationId String // plain column, never a relation (see Grant)
   name           String
   description    String?

@@ -9,12 +9,16 @@
  * `~/server/db` at module scope. Every environment read the services need
  * is a closure passed from here — the packages read no env of their own.
  */
+
+import { platformSSOAllowed } from "@ee/sso/sso-gate";
 import type { SignInDomainRoutingPort } from "@langwatch/identity-server";
 import {
   IdentityBackfillService,
   IdentityEmailService,
   IdentityGuards,
   IdentityService,
+  JoinRequestGuards,
+  JoinRequestService,
   newIdentityCommandId,
   ShadowComparingDomainRoutingRepository,
   SignInRouterService,
@@ -27,19 +31,34 @@ import { IdentityCeremonies } from "@langwatch/identity-server/better-auth";
 import { hash } from "bcrypt";
 import { env } from "~/env.mjs";
 import { prisma } from "../../db";
+import { featureFlagService } from "../../featureFlag";
 import { sendSignUpVerificationEmail } from "../../mailer/signUpVerificationEmail";
 import { createCredentialUser } from "../../users/credential-user";
+import { grantsLedgerWriter } from "../authz/ledger";
 import { PrismaSystemMigrationStateRepository } from "../system-migrations/repositories/system-migration-state.prisma.repository";
 import { LocalDoorBreakGlassBinding } from "./break-glass-binding";
 import { InProcessBreakGlassLimiter } from "./break-glass-limiter";
 import { IdentitySsoConnectionGrandfatherMigration } from "./connection-grandfather.migration";
 import { IdentityIdentifierBackfillMigration } from "./identifier-backfill.migration";
+import {
+  EmailJoinRequestNotifier,
+  PrismaJoinMembership,
+  PrismaJoinSettings,
+} from "./join-request-adapters";
+import { JoinRequestLedgerWriter } from "./join-request-ledger";
+import { JoinRequestsService } from "./join-requests.service";
 import { IdentityLedgerWriter } from "./ledger";
+import { AdminEmailPlatformOperators } from "./platform-operators";
 import { PrismaIdentityBackfillRepository } from "./repositories/identity-backfill.prisma.repository";
 import { PrismaIdentityHeadsRepository } from "./repositories/identity-heads.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./repositories/identity-projection.prisma.repository";
 import { PrismaIdentityUsersRepository } from "./repositories/identity-users.prisma.repository";
 import { PrismaIdentityVerificationRepository } from "./repositories/identity-verification.prisma.repository";
+import {
+  PrismaJoinCandidateRepository,
+  PrismaJoinRequestReadRepository,
+} from "./repositories/join-request.prisma.repository";
+import { PrismaJoinRequestProjectionRepository } from "./repositories/join-request-projection.prisma.repository";
 import { LegacySsoDomainRoutingRepository } from "./repositories/legacy-sso-domain.prisma.repository";
 import { PrismaLegacySsoOrganizationRepository } from "./repositories/legacy-sso-organization.prisma.repository";
 import {
@@ -210,11 +229,62 @@ export function ssoConnections(): SsoConnectionService {
       connections: new PrismaSsoConnectionReadRepository(prisma),
       breakGlass: new LocalDoorBreakGlassBinding(),
       stranding: new PrismaSsoConnectionStrandingRepository(prisma),
+      platformOperators: new AdminEmailPlatformOperators(prisma),
     }),
     new SsoConnectionLedgerWriter({
       projectionStore: new PrismaSsoConnectionProjectionRepository(prisma),
     }),
   );
+}
+
+/**
+ * The join-request write surface (D12, ADR-117). Composed per call like the
+ * two above: the ledger writer resolves the pipeline handle lazily, so a
+ * command composed before the App exists still appends once one does.
+ *
+ * This is the ONLY way a request changes. The sign-up interstitial, the
+ * members panel, the auto-join policy and the expiry wake all call these
+ * verbs; nothing writes a `JoinRequest` row, because the row is a projection
+ * of this log.
+ */
+export function joinRequests(): JoinRequestService {
+  return new JoinRequestService(
+    new JoinRequestGuards({
+      requests: new PrismaJoinRequestReadRepository(prisma),
+    }),
+    new JoinRequestLedgerWriter({
+      projectionStore: new PrismaJoinRequestProjectionRepository(prisma),
+    }),
+  );
+}
+
+/**
+ * Everything AROUND the lifecycle: matching, the reveal discipline, the rate
+ * limits, the notifications, and how an approval becomes a membership.
+ *
+ * `autoJoinLicensed` and `enabled` arrive as closures rather than as reads
+ * inside the service, for the reason every other seam here does: the packages
+ * read no env, and the licence asymmetry — the gate holds `auto` and lets
+ * `request` through — is a decision this composition root states once.
+ */
+export function joinRequestsService(): JoinRequestsService {
+  return new JoinRequestsService({
+    requests: joinRequests(),
+    reads: new PrismaJoinRequestReadRepository(prisma),
+    candidates: new PrismaJoinCandidateRepository(prisma),
+    membership: new PrismaJoinMembership(prisma, grantsLedgerWriter()),
+    notifier: new EmailJoinRequestNotifier(prisma),
+    settings: new PrismaJoinSettings(prisma),
+    // The licence asymmetry, stated once: the gate that has always held
+    // single sign-on holds AUTOMATIC joining, because that is federation —
+    // the deployment decides who counts as a colleague and admits them with
+    // nobody in the loop. Asking to join is not gated and never reads this,
+    // which is what keeps "my company is invisible" fixed on precisely the
+    // self-hosted deployments that have no other way out.
+    autoJoinLicensed: () => platformSSOAllowed(),
+    enabled: ({ userId }) =>
+      featureFlagService.isEnabled("join_requests", { distinctId: userId }),
+  });
 }
 
 /** The D04 grandfather as the migrations runtime registers it (tenant =

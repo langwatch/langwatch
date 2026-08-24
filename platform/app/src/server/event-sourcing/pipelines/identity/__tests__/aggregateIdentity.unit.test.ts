@@ -27,6 +27,7 @@ function fact(overrides: Partial<IdentifierFact>): IdentifierFact {
     identifierId: "idf_1",
     userId: USER,
     provider: "google",
+    providerAccountId: null,
     value: "sam.j@acme.com",
     domain: "acme.com",
     identifierHash: null,
@@ -153,6 +154,8 @@ describe("identity event aggregate type", () => {
       const declared = createIdentityPipeline({
         identityProjectionStore: {} as never,
         identityGuards: {} as never,
+        mfaProjectionStore: {} as never,
+        mfaGuards: {} as never,
       }).metadata.aggregateType;
       const events = await handler.handle(command(data) as never);
 

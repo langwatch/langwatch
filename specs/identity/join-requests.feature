@@ -53,14 +53,14 @@ Feature: Join requests - asking to join the organization your colleagues already
 
   # ── Asking, and being let in ───────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: A verified colleague asks to join and the admins are told
     When "sam" asks to join "acme"
     Then the request is PENDING
     And every admin of "acme" is told "sam" is waiting, by email and in the product
     And "sam" is told the request reached them, without naming who they are
 
-  @integration @unimplemented
+  @integration
   Scenario: One click makes the requester a member
     Given "sam" has a PENDING request to join "acme"
     When "ana" approves it
@@ -68,7 +68,7 @@ Feature: Join requests - asking to join the organization your colleagues already
     And "sam" is a member of "acme" with the organization's default role
     And "sam" is told they are in, by email and in the product
 
-  @integration @unimplemented
+  @integration
   Scenario: Membership lands through the same ledger an invitation uses
     Given "sam" has a PENDING request to join "acme"
     When "ana" approves it
@@ -76,21 +76,21 @@ Feature: Join requests - asking to join the organization your colleagues already
     And the grant names the join request as what authorized it
     And "acme"'s audit page shows the approval with "ana" as the actor
 
-  @unit @unimplemented
+  @unit
   Scenario: Approval never carries a role choice
     Given "sam" has a PENDING request to join "acme"
     When "ana" approves it
     Then the only role on offer is the organization's default one
     And raising "sam" above it is a separate, later act
 
-  @integration @unimplemented
+  @integration
   Scenario: A replayed approval attaches membership exactly once
     Given "ana"'s approval already attached "sam"'s membership
     When the approval is retried
     Then nothing that already landed is applied a second time
     And "sam" is a member exactly once
 
-  @unit @unimplemented
+  @unit
   Scenario: Approving somebody who is already a member resolves the request and adds nothing
     Given "sam" joined "acme" by invitation while the request was open
     When "ana" approves the request
@@ -99,14 +99,14 @@ Feature: Join requests - asking to join the organization your colleagues already
 
   # ── The other four endings ─────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: A rejection ends the request without asking for a reason
     Given "sam" has a PENDING request to join "acme"
     When "ana" rejects it
     Then the request is REJECTED and records that "ana" resolved it
     And "sam" is told the request was not approved, with no reason and no rejector named
 
-  @unit @unimplemented
+  @unit
   Scenario: The requester can withdraw and stop bothering anybody
     Given "sam" has a PENDING request to join "acme"
     When "sam" withdraws it
@@ -114,28 +114,28 @@ Feature: Join requests - asking to join the organization your colleagues already
     And it leaves the admins' panel
     And no reminder and no expiry wake follows
 
-  @unit @unimplemented
+  @unit
   Scenario: Fourteen days of silence expires the request
     Given "sam" has a PENDING request to join "acme"
     When fourteen days pass with nobody answering
     Then the request is EXPIRED
     And "sam" is told it lapsed and may ask again
 
-  @unit @unimplemented
+  @unit
   Scenario: The seventh day reminds the admins once
     Given "sam" has a PENDING request to join "acme"
     When seven days pass with nobody answering
     Then the admins are reminded exactly once
     And a second reminder is not sent before the request expires
 
-  @unit @unimplemented
+  @unit
   Scenario: Every ending is terminal
     Given "sam"'s request was rejected, expired or withdrawn
     When anyone tries to approve or reject it
     Then the attempt is refused with code join_request_not_pending and status 409
     And the request keeps the ending it already had
 
-  @unit @unimplemented
+  @unit
   Scenario: A request from another organization is not there to answer
     Given a request to join an organization "ana" does not administer
     When "ana" tries to approve it
@@ -148,21 +148,21 @@ Feature: Join requests - asking to join the organization your colleagues already
   # limits do the work: at most one open request per person per organization,
   # and the same rate limiting the sign-in endpoints already carry.
 
-  @unit @unimplemented
+  @unit
   Scenario: One open request per person per organization
     Given "sam" has a PENDING request to join "acme"
     When "sam" asks to join "acme" again
     Then the attempt is refused with code join_request_already_pending and status 409
     And no second notification goes out
 
-  @unit @unimplemented
+  @unit
   Scenario: Asking is rate limited the way signing in is
     Given "sam" has asked to join as often as the installation allows for now
     When "sam" asks again
     Then the attempt is refused with code join_request_throttled and status 429
     And the refusal says how long is left, from the answer it got
 
-  @unit @unimplemented
+  @unit
   Scenario: A rejected person cannot immediately ask again
     Given "ana" rejected "sam"'s request
     When "sam" asks again within the cool-down
@@ -181,7 +181,7 @@ Feature: Join requests - asking to join the organization your colleagues already
   # owns the invitation's own lifecycle; what is bound here is only the
   # crossing points, so a person can never hold both at once.
 
-  @integration @unimplemented
+  @integration
   Scenario: An invitation answers a pending request and supersedes it
     Given "sam" has a PENDING request to join "acme"
     When "ana" sends "sam" a formal invitation while the request is open
@@ -189,7 +189,7 @@ Feature: Join requests - asking to join the organization your colleagues already
     And "sam" holds one invitation and no open request
     And the role and teams on that invitation are the ones the invitation carried
 
-  @integration @unimplemented
+  @integration
   Scenario: Accepting any invitation withdraws the same person's pending request
     Given "sam" has a PENDING request to join "acme"
     And "sam" holds a separate invitation to "acme" sent before the request
@@ -197,7 +197,7 @@ Feature: Join requests - asking to join the organization your colleagues already
     Then the request is WITHDRAWN because the invitation was accepted
     And "sam" is a member exactly once
 
-  @unit @unimplemented
+  @unit
   Scenario: A pending request never blocks an invitation
     Given "sam" has a PENDING request to join "acme"
     When "ana" invites "sam" to "acme"
@@ -206,14 +206,14 @@ Feature: Join requests - asking to join the organization your colleagues already
 
   # ── Where an admin answers ─────────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: Requests wait beside invitations in the members area
     Given "acme" has pending invitations and "sam"'s pending request
     When "ana" opens the members area
     Then the pending requests and the pending invitations are in one panel
     And each request shows who is asking and when they asked
 
-  @unit @unimplemented
+  @unit
   Scenario: Answering a request needs the authority that already gates inviting
     Given a member of "acme" who cannot invite colleagues
     When they try to approve or reject "sam"'s request
@@ -222,7 +222,7 @@ Feature: Join requests - asking to join the organization your colleagues already
 
   # ── The flag ───────────────────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: With the flag off nothing here exists
     Given the join-requests flag is off
     When "sam" signs up with a work email

@@ -56,6 +56,7 @@ import { monitorsRouter } from "./routers/monitors";
 import { onboardingRouter } from "./routers/onboarding/onboarding.router";
 import { opsRouter } from "./routers/ops";
 import { optimizationRouter } from "./routers/optimization";
+import { joinRequestsRouter } from "./routers/joinRequests";
 import { organizationRouter } from "./routers/organization";
 import { personalVirtualKeysRouter } from "./routers/personalVirtualKeys";
 import { personalWorkspaceFeaturesRouter } from "./routers/personalWorkspaceFeatures";
@@ -77,6 +78,7 @@ import { setupSkillsRouter } from "./routers/setupSkills";
 import { shareRouter } from "./routers/share";
 import { sharedTraceRouter } from "./routers/sharedTrace";
 import { spansRouter } from "./routers/spans";
+import { ssoConnectionsRouter } from "./routers/ssoConnections";
 import { storedObjectsRouter } from "./routers/stored-objects.router";
 import { subscriptionRouter } from "./routers/subscription";
 import { suiteRouter } from "./routers/suites";
@@ -96,6 +98,7 @@ const coreRouters = {
   evaluators: evaluatorsRouter,
   httpProxy: httpProxyRouter,
   organization: organizationRouter,
+  joinRequests: joinRequestsRouter,
   project: projectRouter,
   team: teamRouter,
   traces: tracesRouter,
@@ -129,6 +132,7 @@ const coreRouters = {
   llmModelCost: llmModelCostsRouter,
   user: userRouter,
   bugReports: bugReportsRouter,
+  ssoConnections: ssoConnectionsRouter,
   annotationScore: annotationScoreRouter,
   publicEnv: publicEnvRouter,
   setupSkills: setupSkillsRouter,
