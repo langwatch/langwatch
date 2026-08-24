@@ -52,7 +52,9 @@ import {
   langyRelayFrameSchema,
 } from "./langyRelayFrame";
 import type { LangyResourceLinkStore } from "./langyResourceLinks";
+import type { LangyStreamEntry } from "./langyTokenBuffer";
 import { LANGY_EMPTY_TURN_FALLBACK } from "./langyTokenBuffer";
+import { type LangyTurnSegment, turnOrderFromStream } from "./langyTurnOrder";
 
 /** The CLI grammar the agent uses to say WHICH resource to open — never an
  * address. `langwatch navigate open <resourceId>`; the platform resolves
@@ -202,6 +204,14 @@ export interface LangyRelayBuffer {
     turnId: string;
     href: string;
   }): Promise<void>;
+  /**
+   * The whole turn as it was streamed. Read once at finalize, to record the
+   * paragraphs written between the calls in the order they were written.
+   */
+  readTail(a: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<{ reads: Array<{ entry: LangyStreamEntry }> }>;
 }
 
 /** The slice of the conversation service the relay dispatches durable events through. */
@@ -603,6 +613,12 @@ export class LangyTurnRelay {
           backstopSilentTurn: (frame.text ?? "").trim() === "",
         });
         const text = backstopped ? LANGY_EMPTY_TURN_FALLBACK : frame.text;
+        // markEnd flushed the last tokens, so the stream now holds the whole
+        // turn: the paragraphs written between the calls, which exist nowhere
+        // else, in the order they were written. Read once, here, so the record
+        // keeps the turn as the reader watched it rather than every call
+        // followed by the closing reply.
+        const order = await this.turnOrder(at);
         await this.deps.conversations.ingestAgentTurnResult({
           projectId,
           conversationId,
@@ -612,6 +628,7 @@ export class LangyTurnRelay {
           ...(frame.toolCalls !== undefined
             ? { toolCalls: frame.toolCalls }
             : {}),
+          ...(order.length > 0 ? { order } : {}),
         });
         return { status: "terminal" };
       }
@@ -659,6 +676,30 @@ export class LangyTurnRelay {
           });
         }
         return { status: "terminal" };
+    }
+  }
+
+  /**
+   * The turn's own account of what happened when, folded off its live stream.
+   *
+   * Best effort by design: a turn long enough to outlive its buffer, or one
+   * whose Redis read fails, records the shape it always did rather than
+   * failing a finalize that is otherwise complete. An empty account reads the
+   * same as no account at all, which is the fallback.
+   */
+  private async turnOrder(at: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<LangyTurnSegment[]> {
+    try {
+      const { reads } = await this.deps.buffer.readTail(at);
+      return turnOrderFromStream(reads.map(({ entry }) => entry));
+    } catch (error) {
+      this.deps.logger?.warn(
+        { ...at, error },
+        "could not read a turn's order; recording its calls before its reply",
+      );
+      return [];
     }
   }
 

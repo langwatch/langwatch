@@ -50,6 +50,12 @@ export interface WorkbenchStateView {
   state: PersistedEvaluationsV3State | null;
   version: number;
   updatedAt: Date;
+  /**
+   * Who wrote this version — "user", "langy" or "api". Absent for an
+   * experiment saved before versions were recorded, which is why a reader of
+   * this field says nothing rather than guessing.
+   */
+  actorLabel?: WorkbenchActorLabel;
 }
 
 export interface WorkbenchSaveResult {
@@ -502,6 +508,12 @@ export class ExperimentService {
       throw new ExperimentTypeMismatchError();
     }
 
+    const [latest] = await this.repository.findVersions({
+      projectId,
+      experimentId: row.id,
+      take: 1,
+    });
+
     return {
       experimentId: row.id,
       slug: row.slug,
@@ -509,6 +521,9 @@ export class ExperimentService {
       state: (row.workbenchState as PersistedEvaluationsV3State | null) ?? null,
       version: row.workbenchVersion,
       updatedAt: row.updatedAt,
+      ...(latest
+        ? { actorLabel: latest.authorLabel as WorkbenchActorLabel }
+        : {}),
     };
   }
 

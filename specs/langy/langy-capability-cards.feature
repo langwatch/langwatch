@@ -317,6 +317,41 @@ Feature: Langy renders domain-capability cards for tool calls
       When it settles
       Then the settled turn keeps the order the reader watched it arrive in
 
+    # The record was built as every tool call first and the reply after them,
+    # from the text the agent wrote after its LAST call. Everything written
+    # between calls existed only on the live edge, so a reader who refreshed
+    # got a pile of cards and one closing paragraph, and the account of what
+    # happened was gone. The agent was even told to hoard its text to the end
+    # because of it, which is the wrong way round: the record follows the turn,
+    # the turn does not bend to fit the record.
+    @unit
+    Scenario: The record keeps the paragraphs written between the calls
+      Given a turn that wrote, ran a call, wrote again, and ran a second call
+      When the turn is recorded
+      Then the recorded parts are the paragraphs and the calls in the order they happened
+      And no paragraph written between two calls is dropped
+
+    @unit
+    Scenario: A card is recorded where the work began
+      Given a call whose result arrived after the agent had written more text
+      When the turn is recorded
+      Then the call is recorded at the point it started, not where it finished
+
+    @unit
+    Scenario: A reloaded turn reads the same as the turn that was watched
+      Given a turn that wrote text and ran tools in turn
+      When the reader reloads the page
+      Then the turn reads in the same order it did while it was happening
+
+    # A turn long enough to outlive its live buffer, or one finalized by the
+    # agent's own HTTP post rather than the relay, has no ordered account to
+    # rebuild from. It records what it always did rather than guessing an order.
+    @unit
+    Scenario: A turn with no ordered account on hand records what it always did
+      Given a finalized turn whose ordered account is not available
+      When the turn is recorded
+      Then the recorded parts are its calls followed by its reply
+
   # The scenario library lives under Simulations, and a scenario's own page is
   # the library with that scenario open. Pointing at the Simulations index sent
   # the user to the run history instead, where the scenario they just made is

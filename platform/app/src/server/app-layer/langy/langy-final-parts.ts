@@ -9,6 +9,7 @@ import {
 } from "@langwatch/langy";
 import { getLangyBlocksCounter } from "~/server/metrics";
 import { LangyCliEnvelopeService } from "./execution/langy-cli-envelope.service";
+import type { LangyTurnSegment } from "./streaming/langyTurnOrder";
 
 /**
  * A tool call the agent ran during a turn, in the compact form both the backend
@@ -32,11 +33,29 @@ export interface LangyFinalToolCall {
 const cliEnvelope = LangyCliEnvelopeService.create();
 
 /**
- * Assemble the durable assistant-message parts for a finalized turn: the tool
- * cards this turn ran are placed BEFORE the prose, so a refreshed client
- * replays the tool cards in order and then the text. The part shape matches the
- * AI-SDK tool part the live stream emits, so the SAME renderer draws them live
- * and on reload.
+ * Assemble the durable assistant-message parts for a finalized turn.
+ *
+ * With an `order` — the turn's own account of what happened when
+ * (`streaming/langyTurnOrder`) — the parts are the paragraphs and the calls
+ * interleaved the way the reader watched them arrive, so a refreshed page reads
+ * the same as the turn did. Without one, the calls are recorded first and the
+ * reply after them, which is what this always did and what a turn finalized
+ * without a live account (the agent's own HTTP post, a turn whose buffer has
+ * lapsed) can still say honestly.
+ *
+ * `text` stays authoritative for the REPLY: it is what the agent asked to keep,
+ * and it lands as the turn's last text however the parts were assembled. The
+ * order supplies only the paragraphs written BEFORE the last call, which exist
+ * nowhere else. Nothing is written twice, and a turn that ended on a call still
+ * gets its reply.
+ *
+ * Only one of the two finalize paths ever stores a turn (the event store dedupes
+ * on turnId), so the two shapes never mix inside one message: a turn is either
+ * recorded in its real order or in the calls-then-reply shape, never half of
+ * each.
+ *
+ * The part shape matches the AI-SDK tool part the live stream emits, so the SAME
+ * renderer draws them live and on reload.
  *
  * Every tool call passes through the CLI envelope first: a `bash` that ran the
  * LangWatch CLI is recorded as the capability it was (`langwatch.trace.search`),
@@ -61,11 +80,14 @@ const cliEnvelope = LangyCliEnvelopeService.create();
 export function buildFinalAssistantParts({
   text,
   toolCalls = [],
+  order,
 }: {
   text: string;
   toolCalls?: LangyFinalToolCall[];
+  /** What happened when, when the turn's live account was still on hand. */
+  order?: readonly LangyTurnSegment[];
 }): LangyMessagePart[] {
-  const toolParts: LangyMessagePart[] = toolCalls.map((rawCall) => {
+  const toolPartOf = (rawCall: LangyFinalToolCall): LangyMessagePart => {
     const call = cliEnvelope.normalizeToolFrame({
       frame: { ...rawCall, phase: "end" },
     });
@@ -80,8 +102,60 @@ export function buildFinalAssistantParts({
         ? { errorText: call.output ?? "Tool call failed" }
         : { output: call.output ?? "" }),
     });
-  });
-  return [...toolParts, ...assistantTextParts(text)];
+  };
+
+  if (!order?.length) {
+    return [...toolCalls.map(toolPartOf), ...assistantTextParts(text)];
+  }
+  return orderedParts({ text, toolCalls, order, toolPartOf });
+}
+
+/**
+ * The parts of a turn whose order is known: its paragraphs and its calls, as
+ * they happened, with the reply last.
+ *
+ * The account names calls by id, so a call it never mentions — one the harness
+ * reported only at the end, one that arrived after the buffer lapsed — is not
+ * dropped. It keeps the place it always had, before the reply.
+ *
+ * The last text segment of the account is the reply the agent was still writing
+ * when the turn ended, and `text` is that same reply in its authoritative form,
+ * so the account's copy is replaced rather than kept alongside it.
+ */
+function orderedParts({
+  text,
+  toolCalls,
+  order,
+  toolPartOf,
+}: {
+  text: string;
+  toolCalls: LangyFinalToolCall[];
+  order: readonly LangyTurnSegment[];
+  toolPartOf: (call: LangyFinalToolCall) => LangyMessagePart;
+}): LangyMessagePart[] {
+  const byId = new Map(toolCalls.map((call) => [call.id, call]));
+  const lastTextIndex = order.findLastIndex(
+    (segment) => segment.kind === "text",
+  );
+
+  const parts: LangyMessagePart[] = [];
+  const recorded = new Set<string>();
+  for (const [index, segment] of order.entries()) {
+    if (segment.kind === "tool") {
+      const call = byId.get(segment.id);
+      if (!call) continue;
+      recorded.add(call.id);
+      parts.push(toolPartOf(call));
+      continue;
+    }
+    // The reply is appended once, below, from `text`.
+    if (index === lastTextIndex) continue;
+    if (segment.text.trim() === "") continue;
+    parts.push(...assistantTextParts(segment.text));
+  }
+
+  const unrecorded = toolCalls.filter((call) => !recorded.has(call.id));
+  return [...parts, ...unrecorded.map(toolPartOf), ...assistantTextParts(text)];
 }
 
 /**

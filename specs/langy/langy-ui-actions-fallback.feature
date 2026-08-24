@@ -77,9 +77,29 @@ Feature: Langy UI actions fall back to the backend and the page catches up
 
   @integration
   Scenario: A backend edit never clobbers a workbench with unsaved changes
-    Given the workbench has unsaved edits
+    Given the workbench has unsaved edits and autosave has stood down
     When a newer version lands for this experiment
     Then the stale banner appears and nothing reloads until the user asks
+
+  # A tab with unsaved edits already has its own save coming, and that save's
+  # answer is the truth: a new version, or a refusal. Bannering on the version
+  # signal instead told the reader their work clashed with "somewhere else"
+  # while Langy was driving THAT TAB, seconds before the tab's own save landed
+  # and made the whole thing moot. The reader was interrupted by their own
+  # keystrokes.
+  @integration
+  Scenario: A tab with a save on the way waits for its own answer
+    Given the workbench has unsaved edits and a save on the way
+    When a newer version lands for this experiment
+    Then no banner appears, and the tab's own save decides what happens next
+
+  # Langy drives the open page, so most versions it announces are its own work
+  # on the reader's behalf. "Somewhere else" reads as a stranger.
+  @integration
+  Scenario: A change Langy made is named as Langy's
+    Given the server holds a newer version written by Langy
+    When the tab probes the version after coming back into focus
+    Then the banner names Langy rather than saying it happened somewhere else
 
   @integration
   Scenario: A returning tab detects staleness and reloads a clean workbench

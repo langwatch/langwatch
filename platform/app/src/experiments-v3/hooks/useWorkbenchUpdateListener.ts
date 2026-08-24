@@ -16,6 +16,26 @@ const VISIBILITY_PROBE_MIN_INTERVAL_MS = 5_000;
 type ApplyServerVersion = (serverVersion: number, actorLabel?: string) => void;
 
 /**
+ * True when this tab's own save is going to settle the version it just heard
+ * about, so the signal is not news and acting on it only gets in the way.
+ *
+ * A save in flight is usually the very write the signal announces, and its
+ * response carries the truth: the new version, or the stale error. Unsaved
+ * edits mean a save is on its way for the same reason — autosave arms on every
+ * change. Bannering instead of waiting told the reader their work clashed with
+ * "somewhere else" while Langy was driving THIS tab, seconds before their own
+ * save landed and settled it.
+ *
+ * Once autosave has stood down (it refuses to run while the workbench is
+ * already stale) nothing is coming, and the signal is the only word there is.
+ */
+function thisTabWillAnswerFirst(isDirty: boolean): boolean {
+  const state = useEvaluationsV3Store.getState();
+  if (state.ui.autosaveStatus.evaluation === "saving") return true;
+  return isDirty && !state.staleWorkbench;
+}
+
+/**
  * The one rule both signals run: a newer server version reloads a CLEAN
  * workbench silently, and banners a DIRTY one so the user decides, because a
  * reload clears their edits.
@@ -43,15 +63,7 @@ const useApplyServerVersion = ({
     (serverVersion, actorLabel) => {
       const known = versionRef.current;
       if (known === undefined || serverVersion <= known) return;
-      // A save in flight is usually the very write this signal announces; the
-      // mutation response carries the truth (the new version, or the stale
-      // error), so acting here would banner a tab for its own save.
-      if (
-        useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation ===
-        "saving"
-      ) {
-        return;
-      }
+      if (thisTabWillAnswerFirst(isDirtyRef.current)) return;
       if (isDirtyRef.current) {
         setStaleWorkbench({ serverVersion, actorLabel });
         return;
@@ -153,7 +165,9 @@ const useVisibilityVersionProbe = ({
       lastProbeAtRef.current = now;
       void trpcUtils.experiments.getWorkbenchVersion
         .fetch({ projectId, experimentSlug })
-        .then(({ version }) => applyServerVersion(version))
+        .then(({ version, actorLabel }) =>
+          applyServerVersion(version, actorLabel),
+        )
         .catch(() => undefined);
     };
     document.addEventListener("visibilitychange", probe);

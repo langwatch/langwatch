@@ -62,6 +62,7 @@ import {
   type LangyMessageRow,
   NullLangyMessageRepository,
 } from "./repositories/langy-message.repository";
+import type { LangyTurnSegment } from "./streaming/langyTurnOrder";
 
 export type { LangyConversationRepository as LangyConversationReadRepository } from "./repositories/langy-conversation.repository";
 
@@ -1012,6 +1013,7 @@ export class LangyConversationService {
     status,
     text,
     toolCalls,
+    order,
     errorCode,
     errorCause,
   }: {
@@ -1021,6 +1023,12 @@ export class LangyConversationService {
     status: "completed" | "failed";
     text?: string;
     toolCalls?: LangyFinalToolCall[];
+    /**
+     * What the turn did when, when the finalizing path still held its live
+     * account. With it the record reads in the turn's own order; without it
+     * (the agent's own HTTP post) the calls are recorded before the reply.
+     */
+    order?: readonly LangyTurnSegment[];
     errorCode?: string;
     /**
      * The failure's typed cause chain when the manager knew it (deserialized
@@ -1048,7 +1056,11 @@ export class LangyConversationService {
       projectId,
       conversationId,
       turnId,
-      parts: buildFinalAssistantParts({ text: text ?? "", toolCalls }),
+      parts: buildFinalAssistantParts({
+        text: text ?? "",
+        toolCalls,
+        ...(order !== undefined ? { order } : {}),
+      }),
       outcome: "completed",
     });
   }

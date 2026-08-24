@@ -43,6 +43,10 @@ function fakeBuffer() {
     markError: vi.fn(async () => {}),
     heartbeat: vi.fn(async () => {}),
     appendNavigate: vi.fn(async () => {}),
+    // The turn's ordered account, read once at finalize. Empty here, which is
+    // the "no account on hand" fallback: these cases assert the relay's
+    // dispatch, not the shape of the record it builds.
+    readTail: vi.fn(async () => ({ reads: [] })),
   } satisfies LangyRelayBuffer;
 }
 
