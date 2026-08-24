@@ -878,31 +878,38 @@ const ANNOTATION_RE =
  * can open a span that is not really a comment, and the cost of that is bounded
  * by the paragraph above.
  */
+/** The offset just past `close` after `from`, or the end of `src`. */
+function spanEnd(src: string, from: number, close: string): number {
+  const at = src.indexOf(close, from);
+  return at === -1 ? src.length : at + close.length;
+}
+
+/** The end of the block comment opening at `i`, or null if none opens there. */
+function blockCommentAt(src: string, i: number): number | null {
+  return src[i] === "/" && src[i + 1] === "*"
+    ? spanEnd(src, i + 2, "*/")
+    : null;
+}
+
+/** The end of the triple-quoted string opening at `i`, or null if none does. */
+function tripleQuoteAt(src: string, i: number): number | null {
+  const ch = src[i];
+  if (ch !== '"' && ch !== "'") return null;
+  const quote = ch.repeat(3);
+  return src.startsWith(quote, i) ? spanEnd(src, i + 3, quote) : null;
+}
+
 function markerlessBindingSpans(src: string): { start: number; end: number }[] {
   const spans: { start: number; end: number }[] = [];
-  const len = src.length;
-  let i = 0;
 
-  while (i < len) {
-    if (src[i] === "/" && src[i + 1] === "*") {
-      const close = src.indexOf("*/", i + 2);
-      const end = close === -1 ? len : close + 2;
-      spans.push({ start: i, end });
-      i = end;
+  for (let i = 0; i < src.length; ) {
+    const end = blockCommentAt(src, i) ?? tripleQuoteAt(src, i);
+    if (end === null) {
+      i++;
       continue;
     }
-
-    const ch = src[i];
-    if ((ch === '"' || ch === "'") && src.startsWith(ch.repeat(3), i)) {
-      const quote = ch.repeat(3);
-      const close = src.indexOf(quote, i + 3);
-      const end = close === -1 ? len : close + 3;
-      spans.push({ start: i, end });
-      i = end;
-      continue;
-    }
-
-    i++;
+    spans.push({ start: i, end });
+    i = end;
   }
 
   return spans;
