@@ -15,7 +15,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { Field } from "~/optimization_studio/types/dsl";
 import { areFormValuesEqual } from "~/prompts/utils/areFormValuesEqual";
 import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
-import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { generateHumanReadableId } from "~/utils/humanReadableId";

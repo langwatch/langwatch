@@ -11,11 +11,11 @@ import { Info, Plus, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
-import { FieldTypeSelect } from "~/prompts/components/ui/FieldTypeSelect";
+import { FieldTypeSelect } from "@langwatch/prompt-web";
 import {
   TYPE_LABELS,
   VariableTypeIcon,
-} from "~/prompts/components/ui/VariableTypeIcon";
+} from "@langwatch/prompt-web";
 import {
   generateUniqueIdentifier,
   normalizeIdentifier,

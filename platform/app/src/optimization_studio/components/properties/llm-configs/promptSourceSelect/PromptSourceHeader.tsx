@@ -18,7 +18,7 @@ import {
   formValuesToTriggerSaveVersionParams,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "~/prompts/utils/llmPromptConfigUtils";
-import type { VersionedPrompt } from "~/server/prompt-config";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 
 import { useNodeDrift } from "../signature-properties-panel/hooks/useNodeDrift";
 import { useSyncPromptHandle } from "../signature-properties-panel/hooks/useSyncPromptHandle";

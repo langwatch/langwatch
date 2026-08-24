@@ -9,7 +9,6 @@ import {
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
-import { PromptService } from "~/server/prompt-config/prompt.service";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { app } from "../[[...route]]/app";
@@ -241,7 +240,7 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
 
     beforeEach(() => {
       spy = vi
-        .spyOn(PromptService.prototype, "getPromptByIdOrHandle")
+        .spyOn(getApp().prompts, "tryGetPromptByIdOrHandle")
         .mockRejectedValue(new Error("database connection lost"));
     });
 

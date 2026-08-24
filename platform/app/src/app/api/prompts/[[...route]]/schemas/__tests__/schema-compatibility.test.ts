@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
+import { getLatestConfigVersionSchema } from "@langwatch/prompt-contract";
 import { apiResponsePromptWithVersionDataSchema } from "../outputs";
 
 describe("Schema compatibility", () => {

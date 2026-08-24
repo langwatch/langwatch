@@ -9,7 +9,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { PromptConfigFormValues } from "~/prompts";
 import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
 import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompts/utils/llmPromptConfigUtils";
-import type { VersionedPrompt } from "~/server/prompt-config";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { api } from "~/utils/api";
 
 const logger = createLogger(

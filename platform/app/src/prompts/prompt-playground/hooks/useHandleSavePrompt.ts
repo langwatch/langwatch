@@ -11,7 +11,7 @@ import {
   formValuesToTriggerSaveVersionParams,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "~/prompts/utils/llmPromptConfigUtils";
-import type { VersionedPrompt } from "~/server/prompt-config";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { api } from "~/utils/api";
 import { useTabId } from "../components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent";
 import {

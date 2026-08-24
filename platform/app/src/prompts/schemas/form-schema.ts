@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
+import { getLatestConfigVersionSchema } from "@langwatch/prompt-contract";
 import { FALLBACK_MAX_TOKENS, MIN_MAX_TOKENS } from "~/utils/constants";
 import {
   handleSchema,

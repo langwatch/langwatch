@@ -21,7 +21,7 @@ import {
   useDrawer,
 } from "~/hooks/useDrawer";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
-import { getDisplayHandle } from "~/prompts/utils/promptHandle";
+import { getDisplayHandle } from "@langwatch/prompt-web";
 
 export type PromptListDrawerProps = {
   open?: boolean;

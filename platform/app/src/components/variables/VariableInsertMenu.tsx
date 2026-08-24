@@ -9,7 +9,7 @@ import type { ComponentType } from "~/optimization_studio/types/dsl";
 import {
   VariableTypeBadge,
   VariableTypeIcon,
-} from "~/prompts/components/ui/VariableTypeIcon";
+} from "@langwatch/prompt-web";
 import { Popover } from "../ui/popover";
 import type {
   AvailableSource,

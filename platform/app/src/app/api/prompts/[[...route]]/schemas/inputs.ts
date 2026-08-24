@@ -11,7 +11,7 @@ import {
   schemaVersionSchema,
   scopeSchema,
 } from "~/prompts/schemas/field-schemas";
-import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
+import { getLatestConfigVersionSchema } from "@langwatch/prompt-contract";
 
 /**
  * Schema for creating new prompt versions

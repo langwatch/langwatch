@@ -1,5 +1,5 @@
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
-import { NEW_PROMPT_TITLE } from "~/prompts/utils/promptHandle";
+import { NEW_PROMPT_TITLE } from "@langwatch/prompt-web";
 import { useHasUnsavedChanges } from "../../../hooks/useHasUnsavedChanges";
 import { useDraggableTabsBrowserStore } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
 import { useTabById } from "../../../prompt-playground-store/useTabById";

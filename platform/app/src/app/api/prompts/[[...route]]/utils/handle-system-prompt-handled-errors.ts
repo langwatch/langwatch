@@ -3,7 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import {
   SystemPromptConflictError,
   SystemPromptRequiredError,
-} from "~/server/prompt-config/errors";
+} from "@langwatch/prompt-contract";
 
 /**
  * Maps system-prompt HandledErrors thrown by the prompt service to Hono HTTP

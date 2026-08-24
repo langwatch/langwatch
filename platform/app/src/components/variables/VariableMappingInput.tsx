@@ -17,7 +17,7 @@ import type { ComponentType, Field } from "~/optimization_studio/types/dsl";
 import {
   VariableTypeBadge,
   VariableTypeIcon,
-} from "~/prompts/components/ui/VariableTypeIcon";
+} from "@langwatch/prompt-web";
 
 // ============================================================================
 // Types

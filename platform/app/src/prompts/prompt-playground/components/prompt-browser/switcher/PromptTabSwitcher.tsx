@@ -10,7 +10,7 @@ import {
 import {
   getDisplayHandle,
   getPromptFolder,
-} from "~/prompts/utils/promptHandle";
+} from "@langwatch/prompt-web";
 import { usePromptTabSummary } from "../tab/usePromptTabSummary";
 
 interface PromptTabSwitcherProps {

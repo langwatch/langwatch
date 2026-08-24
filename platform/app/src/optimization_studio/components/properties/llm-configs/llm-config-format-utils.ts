@@ -1,5 +1,5 @@
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
-import { normalizeReasoningFromProviderFields } from "~/server/prompt-config/reasoningBoundary";
+import { normalizeReasoningFromProviderFields } from "@langwatch/prompt-contract";
 
 /**
  * Form representation of LLM config (camelCase)

@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 import {
   SystemPromptConflictError,
   SystemPromptRequiredError,
-} from "~/server/prompt-config/errors";
+} from "@langwatch/prompt-contract";
 
 import { handleSystemPromptHandledErrors } from "../handle-system-prompt-handled-errors";
 

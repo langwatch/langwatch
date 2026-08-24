@@ -20,8 +20,8 @@ import {
   versionMetadataToFormFormat,
   versionMetadataToNodeFormat,
 } from "~/prompts/schemas/version-metadata-schema";
-import type { DatasetColumnType } from "~/server/datasets/types";
-import type { VersionedPrompt } from "~/server/prompt-config";
+import type { DatasetColumnType } from "@langwatch/dataset-contract";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import {
   type LlmConfigInputType,
   LlmConfigInputTypes,
@@ -31,7 +31,7 @@ import {
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { kebabCase } from "~/utils/stringCasing";
 
-import { generateUniqueIdentifier } from "./identifierUtils";
+import { generateUniqueIdentifier } from "@langwatch/prompt-web";
 
 export function promptConfigFormValuesToOptimizationStudioNodeData(
   formValues: PromptConfigFormValues,

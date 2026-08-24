@@ -13,7 +13,7 @@ import {
   parseLlmConfigVersion,
   type SchemaVersion,
   type schemaValidators,
-} from "~/server/prompt-config";
+} from "@langwatch/prompt-contract";
 
 import type { NodeDataset } from "../optimization_studio/types/dsl";
 

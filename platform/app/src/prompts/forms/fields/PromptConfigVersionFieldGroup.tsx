@@ -14,7 +14,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { PropertySectionTitle } from "~/optimization_studio/components/properties/BasePropertiesPanel";
 import type { PromptConfigFormValues } from "~/prompts";
 import { TypeSelector } from "~/prompts/components/ui/TypeSelector";
-import { generateUniqueIdentifier } from "~/prompts/utils/identifierUtils";
+import { generateUniqueIdentifier } from "@langwatch/prompt-web";
 
 /**
  * ConfigFieldGroup

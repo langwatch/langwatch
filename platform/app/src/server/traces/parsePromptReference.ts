@@ -1,4 +1,4 @@
-import { parsePromptShorthand } from "../prompt-config/parsePromptShorthand";
+import { parsePromptShorthand } from "@langwatch/prompt-contract";
 
 /**
  * Result of parsing prompt reference from span attributes.

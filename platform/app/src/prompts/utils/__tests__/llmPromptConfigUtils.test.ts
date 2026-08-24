@@ -3,7 +3,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { PromptScope } from "~/generated/prisma/client";
 import { formSchema } from "~/prompts/schemas/form-schema";
-import type { VersionedPrompt } from "~/server/prompt-config";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { buildDefaultFormValues } from "../buildDefaultFormValues";
 import {
   formValuesToTriggerSaveVersionParams,

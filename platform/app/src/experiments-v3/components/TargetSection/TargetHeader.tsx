@@ -30,7 +30,7 @@ import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
-import { VersionBadge } from "~/prompts/components/ui/VersionBadge";
+import { VersionBadge } from "@langwatch/prompt-web";
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../constants";
 

@@ -1,37 +1,33 @@
 import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute, resolver } from "hono-openapi";
-import { z } from "zod";
+import { z } from "zod/v4";
 import { afterPromptCreated } from "~/server/app-layer/billing/nurturing/promptCreation";
 import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
+import { prisma } from "~/server/db";
 import {
   commitMessageSchema,
   versionSchema,
 } from "~/prompts/schemas/field-schemas";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import { prisma } from "~/server/db";
-import { ShorthandParseError } from "~/server/prompt-config/errors";
-import { parsePromptShorthand } from "~/server/prompt-config/parsePromptShorthand";
+import {
+  parsePromptShorthand,
+  ShorthandParseError,
+} from "@langwatch/prompt-contract";
 import {
   PromptTagConflictError,
   PromptTagNotFoundError,
   PromptTagProtectedError,
-  PromptTagService,
   PromptTagValidationError,
-} from "~/server/prompt-config/prompt-tag.service";
-import { TagValidationError } from "~/server/prompt-config/repositories/llm-config-tag.repository";
-import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
+} from "@langwatch/prompt-contract";
+import { getLatestConfigVersionSchema } from "@langwatch/prompt-contract";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import {
   type AuthMiddlewareVariables,
   type OrganizationMiddlewareVariables,
   organizationMiddleware,
 } from "../../middleware";
-import {
-  type PromptServiceMiddlewareVariables,
-  promptServiceMiddleware,
-} from "../../middleware/prompt-service";
 import { baseResponses, conflictResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 import {
@@ -51,22 +47,19 @@ const logger = createLogger("langwatch:api:prompts");
 patchZodOpenapi();
 
 // Define types for our Hono context variables
-export type PromptAppVariables = PromptServiceMiddlewareVariables &
-  AuthMiddlewareVariables &
+export type PromptAppVariables = AuthMiddlewareVariables &
   OrganizationMiddlewareVariables;
 
 export function registerPromptRoutes(
   secured: SecuredApp<{ Variables: PromptAppVariables }>,
 ): void {
-  // organizationMiddleware + promptServiceMiddleware run AFTER the access chain
-  // (which authenticates and sets `project`), so they are applied per-route
-  // rather than app-wide.
+  // Organization resolution runs after the access chain, which authenticates
+  // and sets `project`. The Prompt service is already process-owned on App.
 
   // Get all prompts
   secured.access(requires("prompts:view")).get(
     "/",
     organizationMiddleware,
-    promptServiceMiddleware,
     describeRoute({
       description: "Get all prompts for a project",
       responses: {
@@ -82,7 +75,7 @@ export function registerPromptRoutes(
       },
     }),
     async (c) => {
-      const service = c.get("promptService");
+      const service = c.app.prompts;
       const project = c.get("project");
       const organization = c.get("organization");
 
@@ -125,7 +118,6 @@ export function registerPromptRoutes(
   secured.access(requires("prompts:manage")).put(
     "/:id{.+?}/tags/:tag",
     organizationMiddleware,
-    promptServiceMiddleware,
     describeRoute({
       description:
         'Assign a tag (e.g. "production", "staging") to a specific prompt version',
@@ -158,7 +150,7 @@ export function registerPromptRoutes(
     }),
     zValidator("json", z.object({ versionId: z.string() })),
     async (c) => {
-      const service = c.get("promptService");
+      const service = c.app.prompts;
       const project = c.get("project");
       const organization = c.get("organization");
       const { id, tag } = c.req.param();
@@ -170,7 +162,7 @@ export function registerPromptRoutes(
       );
 
       try {
-        const config = await service.repository.getPromptByIdOrHandle({
+        const config = await service.tryGetPromptByIdOrHandle({
           idOrHandle: id,
           projectId: project.id,
           organizationId: organization.id,
@@ -204,7 +196,7 @@ export function registerPromptRoutes(
           }),
         );
       } catch (error: unknown) {
-        if (error instanceof TagValidationError) {
+        if (error instanceof PromptTagValidationError) {
           throw new HTTPException(422, {
             message: error.message,
           });
@@ -220,7 +212,6 @@ export function registerPromptRoutes(
   secured.access(requires("prompts:view")).get(
     "/tags",
     organizationMiddleware,
-    promptServiceMiddleware,
     describeRoute({
       description: "List all prompt tag definitions for the organization",
       responses: {
@@ -245,8 +236,7 @@ export function registerPromptRoutes(
     }),
     async (c) => {
       const organization = c.get("organization");
-      const tagService = PromptTagService.create(prisma);
-      const tags = await tagService.getAll({ organizationId: organization.id });
+      const tags = await c.app.prompts.listTags({ organizationId: organization.id });
 
       return c.json(
         tags.map((tag) => ({
@@ -262,7 +252,6 @@ export function registerPromptRoutes(
   secured.access(requires("prompts:manage")).post(
     "/tags",
     organizationMiddleware,
-    promptServiceMiddleware,
     describeRoute({
       description: "Create a custom prompt tag definition for the organization",
       responses: {
@@ -287,10 +276,8 @@ export function registerPromptRoutes(
     async (c) => {
       const organization = c.get("organization");
       const { name } = c.req.valid("json");
-      const tagService = PromptTagService.create(prisma);
-
       try {
-        const tag = await tagService.create({
+        const tag = await c.app.prompts.createTag({
           organizationId: organization.id,
           name,
         });
@@ -320,7 +307,6 @@ export function registerPromptRoutes(
   secured.access(requires("prompts:manage")).put(
     "/tags/:tag",
     organizationMiddleware,
-    promptServiceMiddleware,
     describeRoute({
       description: "Rename a prompt tag definition",
       responses: {
@@ -346,10 +332,8 @@ export function registerPromptRoutes(
       const organization = c.get("organization");
       const { tag: oldName } = c.req.param();
       const { name: newName } = c.req.valid("json");
-      const tagService = PromptTagService.create(prisma);
-
       try {
-        const tag = await tagService.rename({
+        const tag = await c.app.prompts.renameTag({
           organizationId: organization.id,
           oldName,
           newName,
@@ -383,7 +367,6 @@ export function registerPromptRoutes(
   secured.access(requires("prompts:manage")).delete(
     "/tags/:tag",
     organizationMiddleware,
-    promptServiceMiddleware,
     describeRoute({
       description: "Delete a prompt tag definition and cascade to assignments",
       responses: {
@@ -394,10 +377,8 @@ export function registerPromptRoutes(
     async (c) => {
       const organization = c.get("organization");
       const { tag: tagName } = c.req.param();
-      const tagService = PromptTagService.create(prisma);
-
       try {
-        const tag = await tagService.deleteByName({
+        const tag = await c.app.prompts.tryDeleteTagByName({
           organizationId: organization.id,
           name: tagName,
         });
@@ -427,7 +408,6 @@ export function registerPromptRoutes(
   secured.access(requires("prompts:view")).get(
     "/:id{.+?}/versions",
     organizationMiddleware,
-    promptServiceMiddleware,
     describeRoute({
       description:
         "Get all versions for a prompt. Does not include base prompt data, only versioned data.",
@@ -445,7 +425,7 @@ export function registerPromptRoutes(
       },
     }),
     async (c) => {
-      const service = c.get("promptService");
+      const service = c.app.prompts;
       const project = c.get("project");
       const organization = c.get("organization");
       const { id } = c.req.param();
@@ -486,7 +466,6 @@ export function registerPromptRoutes(
   secured.access(requires("prompts:update")).post(
     "/:id{.+?}/versions/:versionId/restore",
     organizationMiddleware,
-    promptServiceMiddleware,
     describeRoute({
       description:
         "Restore a prompt to a previous version. Creates a new version with the same config data as the specified version.",
@@ -504,7 +483,7 @@ export function registerPromptRoutes(
       },
     }),
     async (c) => {
-      const service = c.get("promptService");
+      const service = c.app.prompts;
       const project = c.get("project");
       const organization = c.get("organization");
       const { id, versionId } = c.req.param();
@@ -544,7 +523,6 @@ export function registerPromptRoutes(
   secured.access(requires("prompts:view")).get(
     "/:id{.+}",
     organizationMiddleware,
-    promptServiceMiddleware,
     describeRoute({
       description:
         "Get a specific prompt by slug, with optional shorthand syntax for tags and versions. " +
@@ -598,7 +576,7 @@ export function registerPromptRoutes(
       },
     }),
     async (c) => {
-      const service = c.get("promptService");
+      const service = c.app.prompts;
       const project = c.get("project");
       const organization = c.get("organization");
       const { id } = c.req.param();
@@ -629,7 +607,7 @@ export function registerPromptRoutes(
           "Getting prompt",
         );
 
-        const config = await service.getPromptByIdOrHandle({
+        const config = await service.tryGetPromptByIdOrHandle({
           idOrHandle: shorthand.slug,
           projectId: project.id,
           organizationId: organization.id,
@@ -654,7 +632,7 @@ export function registerPromptRoutes(
         if (error instanceof HTTPException) {
           throw error;
         }
-        if (error instanceof TagValidationError) {
+        if (error instanceof PromptTagValidationError) {
           throw new HTTPException(422, {
             message: error.message,
           });
@@ -679,7 +657,6 @@ export function registerPromptRoutes(
   secured.access(requires("prompts:create")).post(
     "/",
     organizationMiddleware,
-    promptServiceMiddleware,
     describeRoute({
       description: "Create a new prompt with default initial version",
       responses: {
@@ -692,7 +669,7 @@ export function registerPromptRoutes(
     }),
     zValidator("json", createPromptInputSchema),
     async (c) => {
-      const service = c.get("promptService");
+      const service = c.app.prompts;
       const project = c.get("project");
       const organization = c.get("organization");
       const { tags, ...data } = c.req.valid("json");
@@ -740,7 +717,7 @@ export function registerPromptRoutes(
             "Assigned tags to initial version",
           );
 
-          const refetched = await service.getPromptByIdOrHandle({
+          const refetched = await service.tryGetPromptByIdOrHandle({
             idOrHandle: newConfig.id,
             projectId: project.id,
             organizationId: organization.id,
@@ -764,7 +741,7 @@ export function registerPromptRoutes(
         });
       } catch (error: any) {
         logger.error({ projectId: project.id, error }, "Error creating prompt");
-        if (error instanceof TagValidationError) {
+        if (error instanceof PromptTagValidationError) {
           throw new HTTPException(422, {
             message: error.message,
           });
@@ -781,7 +758,6 @@ export function registerPromptRoutes(
   secured.access(requires("prompts:manage")).post(
     "/:id{.+?}/sync",
     organizationMiddleware,
-    promptServiceMiddleware,
     describeRoute({
       description: "Sync/upsert a prompt with local content",
       responses: {
@@ -828,7 +804,7 @@ export function registerPromptRoutes(
       }),
     ),
     async (c) => {
-      const service = c.get("promptService");
+      const service = c.app.prompts;
       const project = c.get("project");
       const organization = c.get("organization");
       const { id } = c.req.param();
@@ -891,7 +867,7 @@ export function registerPromptRoutes(
           });
         }
 
-        if (error instanceof TagValidationError) {
+        if (error instanceof PromptTagValidationError) {
           throw new HTTPException(422, {
             message: error.message,
           });
@@ -911,7 +887,6 @@ export function registerPromptRoutes(
   secured.access(requires("prompts:update")).put(
     "/:id{.+}",
     organizationMiddleware,
-    promptServiceMiddleware,
     describeRoute({
       description: "Update a prompt",
       responses: {
@@ -936,7 +911,7 @@ export function registerPromptRoutes(
     }),
     zValidator("json", updatePromptInputSchema),
     async (c) => {
-      const service = c.get("promptService");
+      const service = c.app.prompts;
       const project = c.get("project");
       const organization = c.get("organization");
       const { id } = c.req.param();
@@ -997,7 +972,7 @@ export function registerPromptRoutes(
             "Assigned tags to updated version",
           );
 
-          const refetched = await service.getPromptByIdOrHandle({
+          const refetched = await service.tryGetPromptByIdOrHandle({
             idOrHandle: updatedConfig.id,
             projectId,
             organizationId: organization.id,
@@ -1029,7 +1004,7 @@ export function registerPromptRoutes(
           { projectId, promptId: id, error },
           "Error updating prompt",
         );
-        if (error instanceof TagValidationError) {
+        if (error instanceof PromptTagValidationError) {
           throw new HTTPException(422, {
             message: error.message,
           });
@@ -1046,7 +1021,6 @@ export function registerPromptRoutes(
   secured.access(requires("prompts:manage")).delete(
     "/:id{.+}",
     organizationMiddleware,
-    promptServiceMiddleware,
     describeRoute({
       description: "Delete a prompt",
       responses: {
@@ -1061,18 +1035,18 @@ export function registerPromptRoutes(
       },
     }),
     async (c) => {
-      const service = c.get("promptService");
+      const service = c.app.prompts;
       const project = c.get("project");
       const organization = c.get("organization");
       const { id } = c.req.param();
 
       logger.info({ projectId: project.id, promptId: id }, "Deleting prompt");
 
-      const result = await service.repository.deleteConfig(
-        id,
-        project.id,
-        organization.id,
-      );
+      const result = await service.deletePrompt({
+        idOrHandle: id,
+        projectId: project.id,
+        organizationId: organization.id,
+      });
 
       logger.info(
         { projectId: project.id, promptId: id, success: result.success },

@@ -15,7 +15,7 @@ import {
   formValuesToTriggerSaveVersionParams,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "~/prompts/utils/llmPromptConfigUtils";
-import type { VersionedPrompt } from "~/server/prompt-config";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { PromptConfigProvider } from "../../providers/PromptConfigProvider";
 import { DemonstrationsField } from "../fields/DemonstrationsField";

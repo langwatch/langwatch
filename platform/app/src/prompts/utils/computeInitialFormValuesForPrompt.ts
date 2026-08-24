@@ -4,7 +4,7 @@ import {
   versionedPromptToPromptConfigFormValues,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "~/prompts/utils/llmPromptConfigUtils";
-import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 
 /**
  * computeInitialFormValuesForPrompt

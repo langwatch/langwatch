@@ -35,7 +35,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRegisterDrawerFooter } from "~/optimization_studio/components/drawers/useInsideDrawer";
 import { PromptEditorFooter } from "~/prompts/components/PromptEditorFooter";
 import { PromptEditorHeader } from "~/prompts/components/PromptEditorHeader";
-import { VersionBadge } from "~/prompts/components/ui/VersionBadge";
+import { VersionBadge } from "@langwatch/prompt-web";
 import { ChangeHandleDialog } from "~/prompts/forms/ChangeHandleDialog";
 import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
 import {
@@ -54,7 +54,7 @@ import {
   formValuesToTriggerSaveVersionParams,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "~/prompts/utils/llmPromptConfigUtils";
-import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { useUpgradeModalStore } from "~/stores/upgradeModalStore";
 import type { LlmConfigInputType } from "~/types";
 import { api } from "~/utils/api";

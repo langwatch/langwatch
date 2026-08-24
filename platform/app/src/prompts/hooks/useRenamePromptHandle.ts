@@ -5,7 +5,7 @@ import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
-import type { VersionedPrompt } from "~/server/prompt-config";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { api } from "~/utils/api";
 
 const logger = createLogger(

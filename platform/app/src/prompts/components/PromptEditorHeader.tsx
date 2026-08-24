@@ -9,7 +9,7 @@ import { GeneratePromptApiSnippetDialog } from "~/prompts/components/GeneratePro
 import { SavePromptButton } from "~/prompts/components/SavePromptButton";
 import { ModelSelectFieldMini } from "~/prompts/forms/fields/ModelSelectFieldMini";
 import { VersionHistoryButton } from "~/prompts/forms/prompt-config-form/components/VersionHistoryButton";
-import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 
 export type PromptEditorHeaderProps = {
   /** Callback when save button is clicked */

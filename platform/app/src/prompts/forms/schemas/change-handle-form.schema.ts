@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { PromptScope } from "~/generated/prisma/client";
 
-import { isValidHandle } from "../../../server/prompt-config/repositories/llm-config-version-schema";
+import { isValidHandle } from "@langwatch/prompt-contract";
 
 export const changeHandleFormSchema = z.object({
   handle: z

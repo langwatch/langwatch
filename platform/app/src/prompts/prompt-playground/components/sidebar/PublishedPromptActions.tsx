@@ -19,8 +19,8 @@ import { PushToCopiesDialog } from "~/prompts/components/PushToCopiesDialog";
 import { usePrompts } from "~/prompts/hooks/usePrompts";
 import { useRenamePromptHandle } from "~/prompts/hooks/useRenamePromptHandle";
 import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
-import { getDisplayHandle } from "~/prompts/utils/promptHandle";
-import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import { getDisplayHandle } from "@langwatch/prompt-web";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { api } from "~/utils/api";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 

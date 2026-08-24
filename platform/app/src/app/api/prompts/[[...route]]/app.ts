@@ -1,14 +1,11 @@
 import { createProjectApp } from "~/server/api/security";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import type { OrganizationMiddlewareVariables } from "../../middleware/organization";
-import type { PromptServiceMiddlewareVariables } from "../../middleware/prompt-service";
 import { registerPromptRoutes } from "./app.v1";
 
 patchZodOpenapi();
 
-const secured = createProjectApp<
-  PromptServiceMiddlewareVariables & OrganizationMiddlewareVariables
->({
+const secured = createProjectApp<OrganizationMiddlewareVariables>({
   basePath: "/api/prompts",
 });
 

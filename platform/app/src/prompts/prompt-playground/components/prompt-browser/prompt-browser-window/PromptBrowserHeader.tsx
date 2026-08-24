@@ -6,7 +6,7 @@ import { useHandleSavePrompt } from "~/prompts/prompt-playground/hooks/useHandle
 import { useHasUnsavedChanges } from "~/prompts/prompt-playground/hooks/useHasUnsavedChanges";
 import { useDraggableTabsBrowserStore } from "~/prompts/prompt-playground/prompt-playground-store/DraggableTabsBrowserStore";
 import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompts/utils/llmPromptConfigUtils";
-import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { useTabId } from "../ui/TabContext";
 
 /**

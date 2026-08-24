@@ -19,11 +19,11 @@ import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { CodeEditor } from "~/optimization_studio/components/code/CodeEditorModal";
 import type { Field } from "~/optimization_studio/types/dsl";
-import { FieldTypeSelect } from "~/prompts/components/ui/FieldTypeSelect";
+import { FieldTypeSelect } from "@langwatch/prompt-web";
 import {
   TYPE_LABELS,
   VariableTypeIcon,
-} from "~/prompts/components/ui/VariableTypeIcon";
+} from "@langwatch/prompt-web";
 import { outputsSchema } from "~/prompts/schemas";
 import {
   generateUniqueIdentifier,

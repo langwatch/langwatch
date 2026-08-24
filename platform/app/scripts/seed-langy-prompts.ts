@@ -38,7 +38,8 @@ import {
   LANGY_TURN_OVERRIDE_FALLBACK,
 } from "~/server/app-layer/langy/langyPromptRegistry";
 import { prisma } from "~/server/db";
-import { PromptService } from "~/server/prompt-config/prompt.service";
+import type { PromptService } from "@langwatch/prompt-contract";
+import { PostgresPromptAdapter } from "@langwatch/prompt-server";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** repo-root/langwatch/scripts → repo root → services/.../AGENTS.md */
@@ -87,7 +88,7 @@ async function upsertPrompt(params: {
 }): Promise<{ configId: string; versionId: string } | null> {
   const { service, projectId, organizationId, handle, prompt, dryRun } = params;
 
-  const existing = await service.getPromptByIdOrHandle({
+  const existing = await service.tryGetPromptByIdOrHandle({
     idOrHandle: handle,
     projectId,
   });
@@ -155,7 +156,7 @@ async function main() {
       (args.dryRun ? " [DRY RUN]" : ""),
   );
 
-  const service = new PromptService(prisma);
+  const service = PostgresPromptAdapter.create({ database: prisma }).build();
 
   const targets: Array<{ handle: string; prompt: string }> = [
     { handle: LANGY_PROMPT_HANDLES.agentDefinition, prompt: agentDefinition },

@@ -1,4 +1,4 @@
-import type { VersionedPrompt } from "~/server/prompt-config";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import type { RouterInputs } from "~/utils/api";
 
 /**

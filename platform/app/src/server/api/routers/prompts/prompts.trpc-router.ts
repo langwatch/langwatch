@@ -13,8 +13,8 @@ import {
   runtimeParametersSchema,
 } from "~/prompts/schemas";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
-import { hoistSystemMessage, PromptService } from "~/server/prompt-config";
-import { TagValidationError } from "~/server/prompt-config/repositories/llm-config-tag.repository";
+import { hoistSystemMessage } from "@langwatch/prompt-contract";
+import { PromptTagValidationError } from "@langwatch/prompt-contract";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
 /**
@@ -28,7 +28,7 @@ export const promptsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("prompts:view")
     .query(async ({ ctx, input }) => {
-      const service = new PromptService(ctx.prisma);
+      const service = ctx.app.prompts;
       return await service.getAllPrompts(input);
     }),
 
@@ -44,8 +44,8 @@ export const promptsRouter = createTRPCRouter({
     )
     .permission("prompts:view")
     .query(async ({ ctx, input }) => {
-      const service = new PromptService(ctx.prisma);
-      const prompt = await service.getPromptByIdOrHandle({
+      const service = ctx.app.prompts;
+      const prompt = await service.tryGetPromptByIdOrHandle({
         idOrHandle: input.idOrHandle,
         projectId: input.projectId,
       });
@@ -57,35 +57,7 @@ export const promptsRouter = createTRPCRouter({
         });
       }
 
-      const copies = await ctx.prisma.llmPromptConfig.findMany({
-        where: {
-          copiedFromPromptId: prompt.id,
-          deletedAt: null,
-        },
-        select: {
-          id: true,
-          handle: true,
-          projectId: true,
-          project: {
-            select: {
-              id: true,
-              name: true,
-              team: {
-                select: {
-                  id: true,
-                  name: true,
-                  organization: {
-                    select: {
-                      id: true,
-                      name: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      });
+      const copies = await service.listCopies({ sourcePromptId: prompt.id });
 
       // Filter copies based on user's prompts:update permission
       const copiesWithPermissions = await Promise.all(
@@ -99,10 +71,10 @@ export const promptsRouter = createTRPCRouter({
             id: copy.id,
             handle: copy.handle ?? copy.id,
             projectId: copy.projectId,
-            projectName: copy.project.name,
-            teamName: copy.project.team.name,
-            organizationName: copy.project.team.organization.name,
-            fullPath: `${copy.project.team.organization.name} / ${copy.project.team.name} / ${copy.project.name}`,
+            projectName: copy.projectName,
+            teamName: copy.teamName,
+            organizationName: copy.organizationName,
+            fullPath: `${copy.organizationName} / ${copy.teamName} / ${copy.projectName}`,
             hasPermission,
           };
         }),
@@ -124,7 +96,7 @@ export const promptsRouter = createTRPCRouter({
     )
     .permission("prompts:update")
     .mutation(async ({ ctx, input }) => {
-      const service = new PromptService(ctx.prisma);
+      const service = ctx.app.prompts;
       const authorId = ctx.session?.user?.id;
       return await service.restoreVersion({
         ...input,
@@ -172,7 +144,7 @@ export const promptsRouter = createTRPCRouter({
     )
     .permission("prompts:create")
     .mutation(async ({ ctx, input }) => {
-      const service = new PromptService(ctx.prisma);
+      const service = ctx.app.prompts;
       const authorId = ctx.session?.user?.id;
 
       const result = await service.createPrompt({
@@ -231,7 +203,7 @@ export const promptsRouter = createTRPCRouter({
     )
     .permission("prompts:update")
     .mutation(async ({ ctx, input }) => {
-      const service = new PromptService(ctx.prisma);
+      const service = ctx.app.prompts;
       const authorId = ctx.session?.user?.id;
 
       return await service.updatePrompt({
@@ -260,7 +232,7 @@ export const promptsRouter = createTRPCRouter({
     )
     .permission("prompts:update")
     .mutation(async ({ ctx, input }) => {
-      const service = new PromptService(ctx.prisma);
+      const service = ctx.app.prompts;
       return await service.updateHandle({
         idOrHandle: input.id,
         projectId: input.projectId,
@@ -287,10 +259,10 @@ export const promptsRouter = createTRPCRouter({
     .permission("prompts:view")
     .query(async ({ ctx, input }) => {
       try {
-        const service = new PromptService(ctx.prisma);
-        return await service.getPromptByIdOrHandle(input);
+        const service = ctx.app.prompts;
+        return await service.tryGetPromptByIdOrHandle(input);
       } catch (error) {
-        if (error instanceof TagValidationError) {
+        if (error instanceof PromptTagValidationError) {
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: error.message,
@@ -317,7 +289,7 @@ export const promptsRouter = createTRPCRouter({
     )
     .permission("prompts:view")
     .query(async ({ ctx, input }) => {
-      const service = new PromptService(ctx.prisma);
+      const service = ctx.app.prompts;
       return await service.checkHandleUniqueness(input);
     }),
 
@@ -333,7 +305,7 @@ export const promptsRouter = createTRPCRouter({
     )
     .permission("prompts:view")
     .query(async ({ ctx, input }) => {
-      const service = new PromptService(ctx.prisma);
+      const service = ctx.app.prompts;
       return await service.checkModifyPermission(input);
     }),
 
@@ -349,7 +321,7 @@ export const promptsRouter = createTRPCRouter({
     )
     .permission("prompts:view")
     .query(async ({ ctx, input }) => {
-      const service = new PromptService(ctx.prisma);
+      const service = ctx.app.prompts;
       return await service.getAllVersions(input);
     }),
 
@@ -365,7 +337,7 @@ export const promptsRouter = createTRPCRouter({
     )
     .permission("prompts:delete")
     .mutation(async ({ ctx, input }) => {
-      const service = new PromptService(ctx.prisma);
+      const service = ctx.app.prompts;
       return await service.deletePrompt(input);
     }),
 
@@ -397,7 +369,7 @@ export const promptsRouter = createTRPCRouter({
         });
       }
 
-      const service = new PromptService(ctx.prisma);
+      const service = ctx.app.prompts;
       const authorId = ctx.session?.user?.id;
 
       // A missing source prompt raises `prompt_not_found`, a HandledError:
@@ -432,7 +404,7 @@ export const promptsRouter = createTRPCRouter({
     )
     .permission("prompts:create")
     .mutation(async ({ ctx, input }) => {
-      const service = new PromptService(ctx.prisma);
+      const service = ctx.app.prompts;
       const authorId = ctx.session?.user?.id;
 
       const duplicatedPrompt = await service.duplicatePrompt({
@@ -462,11 +434,11 @@ export const promptsRouter = createTRPCRouter({
     )
     .permission("prompts:update")
     .mutation(async ({ ctx, input }) => {
-      const service = new PromptService(ctx.prisma);
+      const service = ctx.app.prompts;
       const authorId = ctx.session?.user?.id;
 
       // Get the prompt (copy)
-      const prompt = await service.getPromptByIdOrHandle({
+      const prompt = await service.tryGetPromptByIdOrHandle({
         idOrHandle: input.idOrHandle,
         projectId: input.projectId,
       });
@@ -478,48 +450,18 @@ export const promptsRouter = createTRPCRouter({
         });
       }
 
-      // Get the raw config to check copiedFromPromptId
-      const promptConfig = await ctx.prisma.llmPromptConfig.findUnique({
-        where: { id: prompt.id },
-        select: { copiedFromPromptId: true },
-      });
-
-      if (!promptConfig?.copiedFromPromptId) {
+      const copySource = await service.tryGetCopySource({ promptId: prompt.id });
+      if (!copySource) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "This prompt is not a copy and has no source to sync from",
         });
       }
 
-      // Get the source prompt
-      const sourcePromptRaw = await ctx.prisma.llmPromptConfig.findUnique({
-        where: { id: promptConfig.copiedFromPromptId },
-        include: {
-          versions: {
-            orderBy: { createdAt: "desc" },
-            take: 1,
-          },
-        },
-      });
-
-      if (!sourcePromptRaw || sourcePromptRaw.deletedAt) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Source prompt has been deleted",
-        });
-      }
-
-      if (!sourcePromptRaw.versions[0]) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Source prompt or its latest version not found",
-        });
-      }
-
       // Check permissions on source project
       const hasSourcePermission = await probeProjectPermission(
         ctx,
-        sourcePromptRaw.projectId,
+        copySource.sourceProjectId,
         "prompts:view",
       );
 
@@ -532,9 +474,9 @@ export const promptsRouter = createTRPCRouter({
       }
 
       // Get source prompt using service to get properly formatted data
-      const sourcePrompt = await service.getPromptByIdOrHandle({
-        idOrHandle: sourcePromptRaw.id,
-        projectId: sourcePromptRaw.projectId,
+      const sourcePrompt = await service.tryGetPromptByIdOrHandle({
+        idOrHandle: copySource.sourcePromptId,
+        projectId: copySource.sourceProjectId,
       });
 
       if (!sourcePrompt) {
@@ -613,11 +555,11 @@ export const promptsRouter = createTRPCRouter({
     )
     .permission("prompts:update")
     .mutation(async ({ ctx, input }) => {
-      const service = new PromptService(ctx.prisma);
+      const service = ctx.app.prompts;
       const authorId = ctx.session?.user?.id;
 
       // Get the source prompt
-      const sourcePrompt = await service.getPromptByIdOrHandle({
+      const sourcePrompt = await service.tryGetPromptByIdOrHandle({
         idOrHandle: input.idOrHandle,
         projectId: input.projectId,
       });
@@ -629,27 +571,8 @@ export const promptsRouter = createTRPCRouter({
         });
       }
 
-      // Get copies using raw Prisma query
-      const sourcePromptRaw = await ctx.prisma.llmPromptConfig.findUnique({
-        where: { id: sourcePrompt.id },
-        select: {
-          id: true,
-          handle: true,
-          copiedPrompts: {
-            where: { deletedAt: null },
-            select: { id: true, projectId: true, handle: true },
-          },
-        },
-      });
-
-      if (!sourcePromptRaw) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Prompt not found",
-        });
-      }
-
-      if (sourcePromptRaw.copiedPrompts.length === 0) {
+      const copies = await service.listCopies({ sourcePromptId: sourcePrompt.id });
+      if (copies.length === 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "This prompt has no copies to push to",
@@ -658,10 +581,10 @@ export const promptsRouter = createTRPCRouter({
 
       // Filter copies if copyIds is provided
       const copiesToPush = input.copyIds
-        ? sourcePromptRaw.copiedPrompts.filter((copy) =>
+        ? copies.filter((copy) =>
             input.copyIds!.includes(copy.id),
           )
-        : sourcePromptRaw.copiedPrompts;
+        : copies;
 
       if (copiesToPush.length === 0) {
         throw new TRPCError({
@@ -761,7 +684,7 @@ export const promptsRouter = createTRPCRouter({
 
       return {
         pushedTo: results.length,
-        totalCopies: sourcePromptRaw.copiedPrompts.length,
+        totalCopies: copies.length,
         selectedCopies: copiesToPush.length,
         results,
       };
@@ -776,7 +699,7 @@ export const promptsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), configId: z.string() }))
     .permission("prompts:view")
     .query(async ({ ctx, input }) => {
-      const service = new PromptService(ctx.prisma);
+      const service = ctx.app.prompts;
       return service.getTagsForConfig({
         configId: input.configId,
         projectId: input.projectId,
@@ -798,7 +721,7 @@ export const promptsRouter = createTRPCRouter({
     )
     .permission("prompts:update")
     .mutation(async ({ ctx, input }) => {
-      const service = new PromptService(ctx.prisma);
+      const service = ctx.app.prompts;
 
       try {
         return await service.assignTag({
@@ -809,7 +732,7 @@ export const promptsRouter = createTRPCRouter({
           userId: ctx.session?.user?.id,
         });
       } catch (error) {
-        if (error instanceof TagValidationError) {
+        if (error instanceof PromptTagValidationError) {
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: error.message,

@@ -1,0 +1,25 @@
+{
+  "name": "@langwatch/prompt-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Prompt feature service and private persistence port.",
+  "type": "module",
+  "exports": {
+    ".": { "types": "./src/index.ts", "default": "./src/index.ts" }
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": ["src"],
+  "scripts": { "typecheck": "tsc --noEmit", "test": "vitest run", "test:unit": "vitest run" },
+  "dependencies": {
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@trpc/server": "^11.0.0",
+    "nanoid": "^5.1.5",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": { "typescript": "^7.0.2", "vitest": "^4.1.9" }
+}

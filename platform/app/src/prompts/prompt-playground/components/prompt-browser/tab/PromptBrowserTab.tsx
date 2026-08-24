@@ -1,8 +1,7 @@
 import { Box, Circle, HStack, type StackProps, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { LuX } from "react-icons/lu";
-import { VersionBadge } from "~/prompts/components/ui/VersionBadge";
-import { getDisplayHandle } from "~/prompts/utils/promptHandle";
+import { getDisplayHandle, VersionBadge } from "@langwatch/prompt-web";
 import { withController } from "~/utils/withControllerHOC";
 import { usePromptBrowserTabController } from "./usePromptBrowserTabController";
 

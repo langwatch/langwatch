@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { PromptService } from "~/server/prompt-config/prompt.service";
+import type { PromptService } from "@langwatch/prompt-contract";
 import {
   LANGY_PROMPT_DEFAULT_TAG,
   LANGY_PROMPT_HANDLES,
@@ -12,9 +12,9 @@ const PROJECT_ID = "project_system";
 
 /** Build a fake PromptService whose read returns whatever `prompt` is passed. */
 function fakePromptService(
-  getPromptByIdOrHandle: PromptService["getPromptByIdOrHandle"],
-): Pick<PromptService, "getPromptByIdOrHandle"> {
-  return { getPromptByIdOrHandle };
+  tryGetPromptByIdOrHandle: PromptService["tryGetPromptByIdOrHandle"],
+): Pick<PromptService, "tryGetPromptByIdOrHandle"> {
+  return { tryGetPromptByIdOrHandle };
 }
 
 describe("resolveLangyPrompt", () => {

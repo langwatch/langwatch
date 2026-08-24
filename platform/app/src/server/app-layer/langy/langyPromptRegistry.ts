@@ -37,7 +37,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { PromptService } from "~/server/prompt-config/prompt.service";
+import type { PromptService } from "@langwatch/prompt-contract";
 
 const logger = createLogger("langwatch:langy:prompt-registry");
 
@@ -45,7 +45,7 @@ const logger = createLogger("langwatch:langy:prompt-registry");
  * Well-known handle SLUGS for Langy's registry prompts. Stored org-scoped, so the
  * fully-qualified handle the registry persists is `{organizationId}/{slug}` and
  * every project in the holding org can read it (see the ORGANIZATION scope branch
- * in `LlmConfigRepository.getConfigByIdOrHandleWithLatestVersion`). `getPromptByIdOrHandle`
+ * in `LlmConfigRepository.getConfigByIdOrHandleWithLatestVersion`). `tryGetPromptByIdOrHandle`
  * qualifies a bare slug with the caller's org/project context, so these bare
  * slugs are what both the seed and the loader use.
  */
@@ -100,7 +100,7 @@ export const LANGY_TURN_OVERRIDE_FALLBACK = [
 
 export interface ResolveLangyPromptParams {
   /** Only the read method is required — keeps this trivially fakeable in tests. */
-  promptService: Pick<PromptService, "getPromptByIdOrHandle">;
+  promptService: Pick<PromptService, "tryGetPromptByIdOrHandle">;
   /** The project that HOLDS the Langy registry rows (the internal system project). */
   projectId: string;
   /** One of `LANGY_PROMPT_HANDLES`. */
@@ -146,7 +146,7 @@ export async function resolveLangyPrompt(
   const tag = params.tag ?? LANGY_PROMPT_DEFAULT_TAG;
 
   try {
-    const versioned = await promptService.getPromptByIdOrHandle({
+    const versioned = await promptService.tryGetPromptByIdOrHandle({
       idOrHandle: handle,
       projectId,
       tag,

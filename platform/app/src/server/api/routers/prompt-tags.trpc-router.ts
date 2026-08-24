@@ -1,38 +1,12 @@
 import { TRPCError } from "@trpc/server";
-import { z } from "zod";
-import type { PrismaClient } from "~/generated/prisma/client";
+import { z } from "zod/v4";
 import {
   PromptTagConflictError,
   PromptTagNotFoundError,
   PromptTagProtectedError,
-  PromptTagService,
   PromptTagValidationError,
-} from "~/server/prompt-config/prompt-tag.service";
+} from "@langwatch/prompt-contract";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-
-/**
- * Resolves the organizationId from a projectId via the project → team chain.
- *
- * @throws {TRPCError} NOT_FOUND if the project does not exist
- */
-async function resolveOrganizationId(
-  prisma: PrismaClient,
-  projectId: string,
-): Promise<string> {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { team: { select: { organizationId: true } } },
-  });
-
-  if (!project?.team?.organizationId) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Project not found",
-    });
-  }
-
-  return project.team.organizationId;
-}
 
 /**
  * Maps domain errors from the PromptTagService to tRPC errors.
@@ -65,13 +39,11 @@ export const promptTagsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("prompts:view")
     .query(async ({ ctx, input }) => {
-      const organizationId = await resolveOrganizationId(
-        ctx.prisma,
+      const organizationId = await ctx.app.projects.getOrganizationId(
         input.projectId,
       );
 
-      const service = PromptTagService.create(ctx.prisma);
-      return service.getAll({ organizationId });
+      return ctx.app.prompts.listTags({ organizationId });
     }),
 
   /**
@@ -81,14 +53,12 @@ export const promptTagsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), name: z.string() }))
     .permission("prompts:manage")
     .mutation(async ({ ctx, input }) => {
-      const organizationId = await resolveOrganizationId(
-        ctx.prisma,
+      const organizationId = await ctx.app.projects.getOrganizationId(
         input.projectId,
       );
 
-      const service = PromptTagService.create(ctx.prisma);
       try {
-        return await service.create({
+        return await ctx.app.prompts.createTag({
           organizationId,
           name: input.name,
           createdById: ctx.session.user.id,
@@ -111,14 +81,12 @@ export const promptTagsRouter = createTRPCRouter({
     )
     .permission("prompts:manage")
     .mutation(async ({ ctx, input }) => {
-      const organizationId = await resolveOrganizationId(
-        ctx.prisma,
+      const organizationId = await ctx.app.projects.getOrganizationId(
         input.projectId,
       );
 
-      const service = PromptTagService.create(ctx.prisma);
       try {
-        return await service.rename({
+        return await ctx.app.prompts.renameTag({
           organizationId,
           oldName: input.oldName,
           newName: input.newName,
@@ -135,14 +103,12 @@ export const promptTagsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), name: z.string() }))
     .permission("prompts:manage")
     .mutation(async ({ ctx, input }) => {
-      const organizationId = await resolveOrganizationId(
-        ctx.prisma,
+      const organizationId = await ctx.app.projects.getOrganizationId(
         input.projectId,
       );
 
-      const service = PromptTagService.create(ctx.prisma);
       try {
-        const tag = await service.deleteByName({
+        const tag = await ctx.app.prompts.tryDeleteTagByName({
           organizationId,
           name: input.name,
         });
