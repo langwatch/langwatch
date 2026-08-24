@@ -42,7 +42,6 @@ import (
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
-	"github.com/langwatch/langwatch/services/nlpgo/app/engine/dsl"
 )
 
 func setupStackWithLLM_bedrockCustomerRepro(t *testing.T) *stack {
@@ -280,8 +279,3 @@ func TestSync_RealWorkflowEndToEnd_BedrockCustomerReproVerbatim(t *testing.T) {
 		t.Logf("output as string (UNEXPECTED — should be bool): %q", s)
 	}
 }
-
-// Ensure dsl import is used (we don't directly construct DSL types here,
-// the worker parses our JSON envelope; keeping the import for parity
-// with the sibling _test.go file's adapter).
-var _ = dsl.ParseWorkflow
