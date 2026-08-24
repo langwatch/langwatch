@@ -12,9 +12,8 @@ import type { JoinRequestEvent } from "./schemas/events";
  * The ONE place a join-request fact becomes a framework event: the guards
  * (`@langwatch/identity-server`) decide what a command states, and this
  * stamps the envelope from the command that produced it — the aggregate type
- * the store validates (#7406), the request as aggregate, the organization as
- * tenant, the command's business time, and the `commandId:index` idempotency
- * key.
+ * the store validates, the request as aggregate, the organization as tenant,
+ * the command's business time, and the `commandId:index` idempotency key.
  *
  * Both the pipeline's command handlers (the staged re-run) and the app's
  * ledger writer (the calling path) go through here, so the two legs cannot

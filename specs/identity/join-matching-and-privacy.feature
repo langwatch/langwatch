@@ -15,8 +15,6 @@ Feature: Which organization takes my address - matching rules and what they reve
   #           ──verified, domain d────────────► organizations where
   #                                              · at least one member holds a
   #                                                VERIFIED address on d
-  #                                              · the organization is not a
-  #                                                personal one
   #                                              · no ACTIVE SSO connection
   #                                                admits people already
   #                                              · joining is not turned off
@@ -24,6 +22,22 @@ Feature: Which organization takes my address - matching rules and what they reve
   # Everything outside that funnel answers with the same nothing. "No such
   # organization", "closed to you" and "you have not verified yet" are one
   # answer, because telling them apart is the leak.
+  #
+  # DECISION - the personal-organization exclusion is SUBSUMED, not dropped.
+  # This file used to require that personal organizations are never offered.
+  # There is no such thing in this schema: `Team.isPersonal` and
+  # `Project.isPersonal` mark a per-member workspace INSIDE an organization,
+  # and every organization the product creates is given a shared team, so a
+  # predicate for it is permanently false - a scenario that reads green while
+  # proving nothing. The privacy it was reaching for is held by the rules
+  # above instead: a consumer domain is structurally excluded, automatic
+  # joining needs an admin-named domain AND two verified members (which one
+  # person cannot be), and the request path ends with an administrator free to
+  # ignore it. What remains is the solo WORK organization, and offering that is
+  # the orphan-organization fix doing its job rather than a leak - the asker
+  # learns only that somebody at a domain they have already proved they hold
+  # uses LangWatch, and the person there decides. The scenario below states
+  # that outcome instead.
   #
   # DECISION - the matching threshold (epic Open Q8, settled here). Asking to
   # join needs ONE member holding a verified address on the domain: the ask
@@ -90,10 +104,12 @@ Feature: Which organization takes my address - matching rules and what they reve
     And this holds whether an organization on that domain asks for requests or automatic joining
 
   @unit
-  Scenario: Personal organizations are never offered to anybody
-    Given a colleague's personal organization holds a verified "acme.com" address
+  Scenario: A one-person organization is offered, because a person still decides
+    Given "acme" has exactly one member, holding a verified "acme.com" address
     When the organizations open to "sam@acme.com" are looked up
-    Then the personal organization is not among them
+    Then "acme" is among them
+    And nobody joins it without that member approving
+    And it cannot admit anybody automatically, whatever its setting says
 
   @unit
   Scenario: An organization whose identity provider already admits people is not offered

@@ -22,7 +22,7 @@ Because this decision now happens **before** workspace creation (D13's interstit
 
 # Requirements
 
-Aggregate `join_request` in the identity pipeline; projection `join_requests` (`id, userId, organizationId, domain, state, createdAt, resolvedAt, resolvedByType, resolvedById`):
+Aggregate `join_request` in its OWN pipeline (`join-requests`) beside the identity one; projection `join_requests` (`id, userId, organizationId, domain, state, createdAt, resolvedAt, resolvedByType, resolvedById`):
 
 ```mermaid
 stateDiagram-v2
@@ -37,9 +37,10 @@ stateDiagram-v2
 Auto-join reuses the same lifecycle: the request is created and immediately approved by policy (`resolvedBy = policy:domain-auto`), so the audit trail and metrics are identical to the admin path.
 
 - **Org setting `domainJoin`: `off` | `request` | `auto`.** Default `request` for cloud self-serve orgs; forced `off` for SSO-connected orgs (their connection's JIT handles it). `auto` is opt-in only, admin-set.
-- **The license gate holds `auto` and lets `request` through.** Auto-join is federation — the deployment decides who counts as a colleague and admits them with nobody in the loop — which is exactly what `sso-license-gating.feature` has always counted as SSO. Request-to-join is not: an administrator approves every one, no identity provider is involved, and gating it would recreate "my company is invisible" on precisely the self-hosted deployments that have no other way out. The privacy rules carry that path instead (verified email, domain match, no public email domains, no personal orgs). `sso-license-gating.feature`'s vocabulary was amended to name **auto**-join specifically; its `:182` enforced scenario is unchanged and still holds.
-- **Matching** (post-verification only): orgs with ≥1 member holding a VERIFIED identifier on the requester's domain, excluding personal orgs, excluding orgs with ACTIVE SSO connections, excluding orgs with `domainJoin = off`. **Public email domains (gmail.com, outlook.com, …) never match** — maintained deny-list; no domain feature exists for them in any mode. **`auto` needs more than `request` does** (Open Q8, settled in the spec): an administrator must have named that domain when turning `auto` on, *and* ≥2 members must hold verified identifiers on it. Nobody gates the automatic path, so one colleague with a company-looking address is not evidence a company owns a domain; the administrator saying so, plus corroboration, is. A domain matching more than one `auto` org auto-joins neither and falls back to asking.
-- **Privacy:** org existence/name revealed only after the requester's email is verified, only on domain match, never for personal orgs; member counts coarse ("12 of your colleagues").
+- **The license gate holds `auto` and lets `request` through.** Auto-join is federation — the deployment decides who counts as a colleague and admits them with nobody in the loop — which is exactly what `sso-license-gating.feature` has always counted as SSO. Request-to-join is not: an administrator approves every one, no identity provider is involved, and gating it would recreate "my company is invisible" on precisely the self-hosted deployments that have no other way out. The privacy rules carry that path instead (verified email, domain match, no public email domains). `sso-license-gating.feature`'s vocabulary was amended to name **auto**-join specifically; its `:182` enforced scenario is unchanged and still holds.
+- **Matching** (post-verification only): orgs with ≥1 member holding a VERIFIED identifier on the requester's domain, excluding orgs with ACTIVE SSO connections (the projection's ACTIVE state, and the legacy `Organization.ssoDomain` string too — until `SSOCONN_ROUTING` flips, the string is what actually admits people), excluding orgs with `domainJoin = off`. **Public email domains (gmail.com, outlook.com, …) never match** — maintained deny-list; no domain feature exists for them in any mode. **`auto` needs more than `request` does** (Open Q8, settled in the spec): an administrator must have named that domain when turning `auto` on, *and* ≥2 members must hold verified identifiers on it. Nobody gates the automatic path, so one colleague with a company-looking address is not evidence a company owns a domain; the administrator saying so, plus corroboration, is. A domain matching more than one `auto` org auto-joins neither and falls back to asking.
+- **Privacy:** org existence/name revealed only after the requester's email is verified, only on domain match; member counts coarse ("12 of your colleagues").
+- **No personal-org exclusion, and that is a decision** (settled during implementation). The schema has no personal ORGANIZATION: `Team.isPersonal` / `Project.isPersonal` are per-member workspaces *inside* an org, and `organization.prisma.repository.ts:561` gives every org a shared team, so any such predicate is permanently false — a scenario that reads green while proving nothing. The privacy it reached for is held by the other rules: consumer domains are structurally excluded, `auto` needs an admin-named domain **and** ≥2 verified members (which one person cannot be), and `request` ends with an admin free to ignore it. What remains is the solo *work* org, and offering it is the orphan-organization fix working: the asker learns only that somebody at a domain they have already proved they hold uses LangWatch, and that person decides.
 - **No role picker:** approval — admin or policy — always grants the org's default role (MEMBER); admins upgrade later. Least privilege by construction.
 - **Orphan-org prevention:** the interstitial runs **before** workspace creation (D13's sign-up flow); "join" is the primary action on a match and org creation is the explicit secondary choice. A user with a pending request lands on a "request pending" screen and may still create a workspace deliberately — but never gets one minted silently. Metric: orphaned-organization creation rate (orgs created by users who join another org on the same domain within 30 days).
 - **Anti-abuse:** one pending request per (user, org); requests rate-limited like auth endpoints; rejection is silent-ish ("not approved", no reason required); auto-join notifies all org admins after the fact (email + in-app) so a surprising join is visible immediately.
@@ -51,7 +52,7 @@ Auto-join reuses the same lifecycle: the request is created and immediately appr
 
 # Data structures
 
-Aggregate `join_request` in the identity pipeline; `tenantId = organizationId` (admins query by org), `aggregateId = joinRequestId`. Events carry ids, the domain, and enums — the requester's email never needs to appear; the domain is the fact (D01 payload rules):
+Aggregate `join_request` in its own pipeline (`join-requests`), NOT inside the identity pipeline; `tenantId = organizationId` (admins query by org), `aggregateId = joinRequestId`. The reason is the KEY, not the entity kind — distinct kinds can share an aggregate type where they share a key (`trace-processing` stamps `aggregateType: "trace"` on seven command families), but the identity aggregate is keyed and tenanted by USER while this is keyed by request and tenanted by org, and the aggregate id is what the queue shards on. Events carry ids, the domain, and enums — the requester's email never needs to appear; the domain is the fact (D01 payload rules):
 
 ```jsonc
 // lw.identity.join_requested
@@ -103,7 +104,7 @@ Projection `join_requests` (PG, fold-written): `id · userId · organizationId �
 
 - Request ≠ access — an admin gates every join, except where the org has deliberately opted into `auto`; that path still requires a verified email on a matching non-public domain and notifies admins immediately.
 - Public email domains are excluded from every mode — a gmail.com "domain match" must be structurally impossible, not just unlikely.
-- Reveal discipline: post-verification only, domain match only, never personal orgs, coarse counts.
+- Reveal discipline: post-verification only, domain match only, coarse counts.
 
 # Open Questions
 

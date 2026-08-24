@@ -109,6 +109,12 @@ export class PrismaJoinRequestReadRepository
  * how big those organizations are, and whether an identity provider already
  * admits the domain. Each is an index seek, and each is legible on its own —
  * a matching rule nobody can read is a matching rule nobody can audit.
+ *
+ * There is no fifth read asking whether an organization is "personal". This
+ * schema has no such thing: `Team.isPersonal` marks a per-member workspace
+ * INSIDE an organization, and every organization the product creates gets a
+ * shared team, so any predicate built on it would be permanently false. See
+ * `join-matching.ts` for what holds the privacy instead.
  */
 export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -177,52 +183,39 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
     domain: string;
     verifiedByOrganization: Map<string, Set<string>>;
   }): Promise<JoinCandidateOrganization[]> {
-    const [organizations, memberCounts, sharedTeams, connections] =
-      await Promise.all([
-        this.prisma.organization.findMany({
-          where: { id: { in: organizationIds } },
-          select: {
-            id: true,
-            name: true,
-            domainJoin: true,
-            joinDomains: true,
-            ssoDomain: true,
-          },
-        }),
-        // A second groupBy rather than a `_count` relation include: Prisma
-        // builds that as an uncorrelated join and the planner can re-run the
-        // aggregate once per listed row.
-        this.prisma.organizationUser.groupBy({
-          by: ["organizationId"],
-          where: { organizationId: { in: organizationIds }, disabledAt: null },
-          _count: { userId: true },
-        }),
-        // "Not a personal organization", structurally: one that has at least
-        // one SHARED team. A workspace whose only teams are personal is a
-        // place one person made for themselves, and offering a stranger their
-        // way into it is exactly the mistake this deliverable exists to stop.
-        this.prisma.team.findMany({
-          where: { organizationId: { in: organizationIds }, isPersonal: false },
-          select: { organizationId: true },
-          distinct: ["organizationId"],
-        }),
-        // An identity provider that already admits this domain is the way in,
-        // and joining is not offered beside it.
-        this.prisma.ssoConnection.findMany({
-          where: {
-            organizationId: { in: organizationIds },
-            state: "ACTIVE",
-            verifiedDomains: { has: domain },
-          },
-          select: { organizationId: true },
-        }),
-      ]);
+    const [organizations, memberCounts, connections] = await Promise.all([
+      this.prisma.organization.findMany({
+        where: { id: { in: organizationIds } },
+        select: {
+          id: true,
+          name: true,
+          domainJoin: true,
+          joinDomains: true,
+          ssoDomain: true,
+        },
+      }),
+      // A second groupBy rather than a `_count` relation include: Prisma
+      // builds that as an uncorrelated join and the planner can re-run the
+      // aggregate once per listed row.
+      this.prisma.organizationUser.groupBy({
+        by: ["organizationId"],
+        where: { organizationId: { in: organizationIds }, disabledAt: null },
+        _count: { userId: true },
+      }),
+      // An identity provider that already admits this domain is the way in,
+      // and joining is not offered beside it.
+      this.prisma.ssoConnection.findMany({
+        where: {
+          organizationId: { in: organizationIds },
+          state: "ACTIVE",
+          verifiedDomains: { has: domain },
+        },
+        select: { organizationId: true },
+      }),
+    ]);
 
     const memberCountByOrganization = new Map(
       memberCounts.map((row) => [row.organizationId, row._count.userId]),
-    );
-    const organizationsWithSharedTeam = new Set(
-      sharedTeams.map((row) => row.organizationId),
     );
     const admittedByConnection = new Set(
       connections.map((row) => row.organizationId),
@@ -232,7 +225,6 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
       organizationId: organization.id,
       name: organization.name,
       domainJoin: readDomainJoin(organization.domainJoin),
-      isPersonal: !organizationsWithSharedTeam.has(organization.id),
       // The legacy `ssoDomain` string counts too, and on purpose: until the
       // connection projection routes sign-in it is what actually admits
       // people, and an organization whose provider already lets colleagues in

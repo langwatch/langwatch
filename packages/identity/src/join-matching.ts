@@ -10,8 +10,6 @@ import { identifierDomain, normalizeIdentifierValue } from "./identifier";
  *           ──verified, domain d────────────► organizations where
  *                                              · at least one member holds a
  *                                                VERIFIED address on d
- *                                              · the organization is not a
- *                                                personal one
  *                                              · no ACTIVE SSO connection
  *                                                admits people already
  *                                              · joining is not turned off
@@ -20,6 +18,21 @@ import { identifierDomain, normalizeIdentifierValue } from "./identifier";
  * organization", "closed to you" and "you have not verified yet" are ONE
  * answer, because telling them apart is the leak — which is why this module
  * returns a decision and never a reason.
+ *
+ * There is deliberately NO "personal organization" exclusion, and its absence
+ * is a decision rather than an omission. This schema has no such concept —
+ * `Team.isPersonal` and `Project.isPersonal` are per-member workspaces INSIDE
+ * an organization, and every organization the product creates gets a shared
+ * team — so a predicate for it could only ever be inert. The privacy it was
+ * reaching for is held by the rules above instead: a consumer domain is
+ * structurally excluded, automatic joining needs an admin-named domain AND two
+ * verified members (which one person cannot be), and the request path ends
+ * with an administrator who is free to ignore it.
+ *
+ * What is left is the solo WORK organization — one person at a real company
+ * domain — and offering that is the orphan-organization fix doing its job. The
+ * asker learns only that somebody at a domain they have already proved they
+ * hold uses LangWatch, and the person there decides.
  *
  * Pure, like the rest of the package: the caller reads the organizations and
  * their verified-member counts, this decides. That split is what lets the
@@ -134,8 +147,6 @@ export interface JoinCandidateOrganization {
   organizationId: string;
   name: string;
   domainJoin: DomainJoinSetting;
-  /** A personal organization is never offered to anybody. */
-  isPersonal: boolean;
   /** True when an ACTIVE SSO connection already admits this domain. Its own
    *  provisioning is the way in, so joining is not offered beside it. */
   connectionAdmitsDomain: boolean;
@@ -259,7 +270,6 @@ export function organizationAdmitsDomain({
   domain: string;
 }): boolean {
   if (isPublicEmailDomain(domain)) return false;
-  if (organization.isPersonal) return false;
   if (organization.connectionAdmitsDomain) return false;
   if (organization.domainJoin === "off") return false;
   return (

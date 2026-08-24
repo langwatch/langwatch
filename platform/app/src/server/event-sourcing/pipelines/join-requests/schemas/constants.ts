@@ -6,14 +6,21 @@
  * support can read them in a single tenant scan.
  *
  * Why this is its own pipeline rather than a second aggregate inside the
- * identity one: a pipeline declares ONE aggregate type and the event store
- * refuses at append any event whose type differs from it (#7406). The
- * identity pipeline declares `user_identity` and is tenanted by the USER; a
- * join request is neither. So the aggregate lives beside it and keeps the
- * identity vocabulary — the events are `lw.identity.join_*`, the facts are
- * `@langwatch/identity`'s, the guards are `@langwatch/identity-server`'s.
- * What is separate is the storage partition, which is the only thing the
- * framework was ever going to let us share.
+ * identity one: the KEY, not the entity kind.
+ *
+ * Distinct entity kinds can share an aggregate type perfectly well —
+ * `trace-processing` stamps `aggregateType: "trace"` on seven different
+ * command families — but only when they share a key, because the aggregate id
+ * is what the queue shards on and what a fold loads by. A join request cannot:
+ * it is keyed by `joinRequestId` and tenanted by the organization, while the
+ * identity pipeline is keyed by user and tenanted by the user. Folding both
+ * through one pipeline would put two unrelated keyspaces in one lane and one
+ * tenant's requests under another tenant's stream.
+ *
+ * So the aggregate lives beside it and keeps the identity vocabulary — the
+ * events are `lw.identity.join_*`, the facts are `@langwatch/identity`'s, the
+ * guards are `@langwatch/identity-server`'s. What is separate is the storage
+ * partition and the lane, which is exactly what the key decides.
  *
  * Membership is never written from this pipeline. An approval dispatches an
  * attach on the grants ledger, exactly as accepting an invitation does, and

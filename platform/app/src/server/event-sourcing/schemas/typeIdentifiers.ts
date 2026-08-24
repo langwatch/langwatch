@@ -157,8 +157,9 @@ export const AGGREGATE_TYPE_IDENTIFIERS = [
   "sso_connection",
   // D12: a join request is its own aggregate, tenanted by the organization,
   // because the people who read one are its admins. Separate from
-  // `user_identity` for the same reason a connection is — one aggregate type
-  // per pipeline, validated at append (#7406).
+  // `user_identity` because of the KEY rather than the entity kind: it is
+  // keyed by `joinRequestId` where the identity aggregate is keyed by user,
+  // and the aggregate id is what the queue shards on.
   "join_request",
   "trigger",
   "trace",

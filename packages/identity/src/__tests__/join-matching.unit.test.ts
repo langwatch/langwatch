@@ -25,7 +25,6 @@ const acme: JoinCandidateOrganization = {
   organizationId: "org_acme",
   name: "Acme",
   domainJoin: "request",
-  isPersonal: false,
   connectionAdmitsDomain: false,
   verifiedMembersOnDomain: 3,
   memberCount: 117,
@@ -160,13 +159,6 @@ describe("given an address a public email provider issued", () => {
 
 describe("given organizations that are not open to the domain", () => {
   describe("when each is looked up", () => {
-    /** @scenario Personal organizations are never offered to anybody */
-    it("does not offer a personal organization", () => {
-      expect(lookup([{ ...acme, isPersonal: true }])).toEqual({
-        outcome: "none",
-      });
-    });
-
     /** @scenario An organization whose identity provider already admits people is not offered */
     it("does not offer an organization whose connection already admits the domain", () => {
       expect(lookup([{ ...acme, connectionAdmitsDomain: true }])).toEqual({
@@ -182,17 +174,62 @@ describe("given organizations that are not open to the domain", () => {
     });
 
     /** @scenario Refusing to offer never says why */
-    it("answers the three closed doors identically", () => {
+    it("answers every closed door identically", () => {
       const closed = [
-        lookup([{ ...acme, isPersonal: true }]),
         lookup([{ ...acme, domainJoin: "off" }]),
         lookup([{ ...acme, connectionAdmitsDomain: true }]),
+        lookup([{ ...acme, verifiedMembersOnDomain: 0 }]),
+        lookup([], { email: "sam@gmail.com" }),
         lookup([]),
       ];
 
       for (const decision of closed) {
         expect(decision).toEqual(closed[0]);
       }
+    });
+  });
+});
+
+describe("given a work organization with a single member", () => {
+  describe("when a verified colleague on the same domain looks it up", () => {
+    /** @scenario A one-person organization is offered, because a person still decides */
+    it("offers it, and an administrator still gates the outcome", () => {
+      const solo: JoinCandidateOrganization = {
+        ...acme,
+        verifiedMembersOnDomain: 1,
+        memberCount: 1,
+      };
+
+      // Offering this is the orphan-organization fix doing its job. The asker
+      // learns only that somebody at a domain they have ALREADY PROVED they
+      // hold uses LangWatch, and the one person there decides.
+      expect(lookup([solo])).toEqual({
+        outcome: "ask",
+        organizations: [
+          { organizationId: "org_acme", name: "Acme", colleagueCount: 1 },
+        ],
+      });
+    });
+
+    it("never lets a one-person organization admit anybody automatically", () => {
+      const solo: JoinCandidateOrganization = {
+        ...acme,
+        domainJoin: "auto",
+        autoJoinDomains: ["acme.com"],
+        verifiedMembersOnDomain: 1,
+        memberCount: 1,
+      };
+
+      // The corroboration threshold is what makes the automatic path safe
+      // without a personal-organization predicate: two verified members is
+      // something one person cannot be.
+      expect(lookup([solo]).outcome).toBe("ask");
+      expect(
+        organizationAdmitsDomainAutomatically({
+          organization: solo,
+          domain: "acme.com",
+        }),
+      ).toBe(false);
     });
   });
 });

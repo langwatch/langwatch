@@ -38,7 +38,6 @@ const acme: JoinCandidateOrganization = {
   organizationId: "org_acme",
   name: "Acme",
   domainJoin: "request",
-  isPersonal: false,
   connectionAdmitsDomain: false,
   verifiedMembersOnDomain: 3,
   memberCount: 117,
