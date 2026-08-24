@@ -288,20 +288,28 @@ func codexRequestBody(raw []byte, model string) ([]byte, error) {
 	if len(bytes.TrimSpace(body)) == 0 {
 		body = []byte("{}")
 	}
-	var refused []string
-	gjson.ParseBytes(body).ForEach(func(key, _ gjson.Result) bool {
-		if !codexAllowedFields[key.String()] {
-			refused = append(refused, key.String())
-		}
-		return true
-	})
+	// The outgoing body is BUILT from the accepted names, rather than the
+	// caller's body having the refused ones deleted out of it. A field name is
+	// data, and turning data into an sjson path is what let a name break the
+	// very call this filtering exists to save: ".", "*", "?" and ":" select
+	// something else, so ":input" deleted "input"; "|", "#" and "@" make the
+	// path complex, which DeleteBytes refuses; and an empty name has no path
+	// at all. Copying under our own fixed names cannot address anything but
+	// the field we mean, whatever the caller called theirs.
+	out := []byte("{}")
 	var err error
-	for _, field := range refused {
-		body, err = sjson.DeleteBytes(body, sjsonKey(field))
-		if err != nil {
-			return nil, fmt.Errorf("drop %s from codex body: %w", field, err)
+	gjson.ParseBytes(body).ForEach(func(key, value gjson.Result) bool {
+		name := key.String()
+		if !codexAllowedFields[name] {
+			return true
 		}
+		out, err = sjson.SetRawBytes(out, name, []byte(value.Raw))
+		return err == nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("build codex body: %w", err)
 	}
+	body = out
 	bare := strings.TrimPrefix(model, codexModelPrefix)
 	for _, set := range []struct {
 		path  string
@@ -317,25 +325,6 @@ func codexRequestBody(raw []byte, model string) ([]byte, error) {
 		}
 	}
 	return body, nil
-}
-
-// sjsonKey turns a top-level object key into an sjson path that means exactly
-// that key. sjson reads a path, not a name: ".", "*", "?" and ":" select
-// something else, and "|", "#" and "@" make the path "complex", which
-// DeleteBytes refuses outright and which would fail the caller's whole
-// request over a field name.
-//
-// Every byte is escaped rather than a chosen set, because sjson decides what
-// an operator is and its list can grow. An escape before an ordinary byte
-// means the byte itself, and a multi-byte character survives byte by byte, so
-// escaping everything is both correct and free of a list to keep in step.
-func sjsonKey(key string) string {
-	var escaped strings.Builder
-	for _, char := range []byte(key) {
-		escaped.WriteByte('\\')
-		escaped.WriteByte(char)
-	}
-	return escaped.String()
 }
 
 func (r *BifrostRouter) doCodexRequest(

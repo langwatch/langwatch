@@ -353,22 +353,29 @@ func TestCodexRequestBody_PinsInvariantsAndKeepsOnlyAcceptedFields(t *testing.T)
 }
 
 func TestCodexRequestBody_DropsAKeyThatLooksLikeAPath(t *testing.T) {
-	// sjson reads a path, not a name. Two ways a refused field's own name used
-	// to break the call it was supposed to save:
-	//   ".", "*" and ":" select something else, so ":input" deleted "input",
-	//   the one field a turn cannot go out without, and kept itself.
-	//   "|", "#" and "@" make the path complex, which DeleteBytes refuses, so
-	//   the whole request failed over a field name.
-	refused := []string{"a.b", "c*d", ":input", "e|f", "g#h", "i@j", "café"}
-	raw := []byte(`{"model":"openai_codex/gpt-5.6-terra","a.b":1,"c*d":2,":input":3,` +
-		`"e|f":4,"g#h":5,"i@j":6,"café":7,` +
+	// A field name used to become an sjson path, and three classes of name
+	// broke the call they rode on: "." "*" "?" and ":" select something else,
+	// so ":input" dropped "input", the one field a turn cannot go out without;
+	// "|" "#" and "@" make the path complex, which sjson refuses; and an empty
+	// name has no path at all. All three failed or corrupted the request over
+	// what the caller happened to call a field.
+	refused := []string{"a.b", "c*d", "e?f", ":input", "g|h", "i#j", "k@l", "", "café"}
+	raw := []byte(`{"model":"openai_codex/gpt-5.6-terra","a.b":1,"c*d":2,"e?f":3,` +
+		`":input":4,"g|h":5,"i#j":6,"k@l":7,"":8,"café":9,` +
 		`"reasoning":{"effort":"medium"},"input":[{"role":"user"}]}`)
 	body, err := codexRequestBody(raw, "openai_codex/gpt-5.6-terra")
 	if err != nil {
 		t.Fatalf("codexRequestBody: %v", err)
 	}
+	// Read the result's own top-level names rather than looking each one up by
+	// path: the names under test are exactly the ones a path cannot express.
+	kept := map[string]bool{}
+	gjson.ParseBytes(body).ForEach(func(key, _ gjson.Result) bool {
+		kept[key.String()] = true
+		return true
+	})
 	for _, key := range refused {
-		if got := gjson.GetBytes(body, sjsonKey(key)); got.Exists() {
+		if kept[key] {
 			t.Errorf("the refused key %q must be dropped: %s", key, body)
 		}
 	}
