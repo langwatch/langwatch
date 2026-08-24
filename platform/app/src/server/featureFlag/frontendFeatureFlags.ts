@@ -67,8 +67,8 @@ export const FRONTEND_FEATURE_FLAGS = [
   "release_ui_navigation_v2_enabled",
   // Governance: gates the personal-keys / admin oversight /
   // RoutingPolicy / IngestionSource UI surfaces. On by default
-  // (ADR-038 Decision 7); SaaS rollout and per-org kill switches live
-  // in PostHog. Distinct from `release_ui_ai_gateway_menu_enabled`
+  // (ADR-038 Decision 7); SaaS rollout and per-org kill switches are
+  // targeting rules at /ops/feature-flags. Distinct from `release_ui_ai_gateway_menu_enabled`
   // because the gateway product ships on its own flag.
   // Force off in dev: `RELEASE_UI_AI_GOVERNANCE_ENABLED=0`.
   "release_ui_ai_governance_enabled",
@@ -100,7 +100,7 @@ export const FRONTEND_FEATURE_FLAGS = [
   "release_webhook_automations",
   // Pins the Ops section into the main sidebar for a user who already has ops
   // access, so it shows on every route instead of only under /ops. Deliberately
-  // NOT a PostHog flag — it resolves false server-side (unknown flag) and is
+  // NOT registered — it resolves false server-side (unknown flag) and is
   // meant to be forced On locally from the hidden Feature Flags (Dev) drawer,
   // persisting in that browser via the local override. It never widens who can
   // see ops: the sidebar still gates on ops access, so a non-ops user forcing

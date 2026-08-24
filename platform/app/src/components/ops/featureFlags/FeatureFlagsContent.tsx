@@ -103,7 +103,7 @@ export function FeatureFlagsContent() {
 
       <ScopeSection
         heading="System"
-        description="Backend kill switches and pipeline toggles. Always resolved from postgres, env, or registry default. PostHog is never consulted."
+        description="Backend kill switches and pipeline toggles. Resolved from env, this postgres store, then the registry default."
         rows={grouped.system}
         canManage={canManage}
         isSaas={isSaas}
@@ -119,8 +119,8 @@ export function FeatureFlagsContent() {
         heading="Product"
         description={
           isSaas
-            ? "UI features and A/B tests. Source of truth is PostHog; postgres value here is an emergency override only."
-            : "UI features. On this self-hosted install, the postgres value here is the source of truth."
+            ? "Customer-facing features. The value here is the source of truth; set a targeting rule to reach a subset of organizations."
+            : "Customer-facing features. The value here is the source of truth."
         }
         rows={grouped.product}
         canManage={canManage}

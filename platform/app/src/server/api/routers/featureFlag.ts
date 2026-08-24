@@ -15,7 +15,8 @@ const frontendFeatureFlagSchema = z.enum([...FRONTEND_FEATURE_FLAGS] as [
 /**
  * tRPC router for feature flag checks.
  *
- * Uses PostHog for flag evaluation with optional project/organization targeting.
+ * Resolves through the in-code registry and the operator flag store, with
+ * optional project/organization targeting.
  * Results are cached server-side (5s TTL) and client-side (React Query).
  *
  * @see dev/docs/adr/005-feature-flags.md for architecture decisions
@@ -41,8 +42,8 @@ export const featureFlagRouter = createTRPCRouter({
       reason:
         "feature flags are read per authenticated user; no tenant data is exposed",
       allow: {
-        projectId: "for PostHog targeting, not resource access",
-        organizationId: "for PostHog targeting, not resource access",
+        projectId: "for flag targeting rules, not resource access",
+        organizationId: "for flag targeting rules, not resource access",
       },
     })
     .query(async ({ ctx, input }) => {

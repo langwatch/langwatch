@@ -8,7 +8,7 @@
 
 PR #7194 deleted `FeatureFlagServicePostHog` and the PostHog branch of `featureFlagService.isEnabled`. **Both scopes now resolve identically**, and PostHog is not consulted for any flag:
 
-```
+```text
 SYSTEM and PRODUCT:  env override -> FEATURE_FLAG_FORCE_ENABLE -> postgres store (targeting rules, then row value) -> registry default
 ```
 

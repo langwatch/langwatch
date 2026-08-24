@@ -48,9 +48,10 @@ const UNREGISTERED_GRANDFATHERED = ["ops_ui_ops_menu_pinned"];
 /**
  * Frontend-exposed flags that are SYSTEM on purpose: internal levers
  * (`envOverridable: false`, operator-store-only) that happen to gate a
- * product surface. Order matters — the assertion compares the resolved set
- * against this array, so a new such flag lands here as a visible edit next
- * to the one in FRONTEND_FEATURE_FLAGS.
+ * product surface. The assertion compares the resolved set against this
+ * array order-independently, so reordering FRONTEND_FEATURE_FLAGS stays a
+ * cosmetic edit; a new such flag still lands here as a visible one, next to
+ * the one in FRONTEND_FEATURE_FLAGS.
  */
 const FRONTEND_SYSTEM_FLAGS = [
   "release_langy_enabled",
@@ -59,6 +60,7 @@ const FRONTEND_SYSTEM_FLAGS = [
 
 describe("frontend feature flags", () => {
   describe("when a flag is exposed to the frontend via tRPC", () => {
+    /** @scenario a flag the web UI can read is registered, so operators keep the lever */
     it("resolves to a registry definition so operators can target it per organization", () => {
       const unregistered = FRONTEND_FEATURE_FLAGS.filter(
         (key) =>
@@ -71,18 +73,19 @@ describe("frontend feature flags", () => {
   });
 
   describe("when a frontend flag resolves to a SYSTEM-scoped definition", () => {
-    /** @scenario a flag the web UI can read is registered, so operators keep the lever */
+    /** @scenario a frontend flag classified SYSTEM is declared, not discovered */
     it("is one the register declares, so the classification stays reviewed", () => {
       const systemScoped = FRONTEND_FEATURE_FLAGS.filter(
         (key) => resolveFlagDefinition(key)?.scope === "SYSTEM",
       );
 
-      expect(systemScoped).toEqual(FRONTEND_SYSTEM_FLAGS);
+      expect([...systemScoped].sort()).toEqual(
+        [...FRONTEND_SYSTEM_FLAGS].sort(),
+      );
     });
   });
 
   describe("when the pinned lists are read", () => {
-    /** @scenario a frontend flag missing from the registry is caught before it ships */
     it("names exactly the keys each one covers", () => {
       expect(UNREGISTERED_GRANDFATHERED).toEqual(["ops_ui_ops_menu_pinned"]);
       expect(FRONTEND_SYSTEM_FLAGS).toEqual([

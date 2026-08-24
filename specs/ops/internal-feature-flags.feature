@@ -168,16 +168,19 @@ Feature: Internal feature flag system for system-level kill switches
     @unit
     Scenario: a flag the web UI can read is registered, so operators keep the lever
       Given a flag key is exposed to the frontend
-      When an operator opens /ops/feature-flags
-      Then the flag is listed there and can be targeted per organization
-      And this holds whether the flag is SYSTEM or PRODUCT scoped
+      Then it resolves to a registry entry, whether SYSTEM or PRODUCT scoped, so
+           /ops/feature-flags can list it and target it per organization
+      And an unregistered key is reported instead, because it would resolve from
+          the legacy in-memory path where the operator store cannot see it
+      And the one historical exception is named explicitly rather than counted
 
     @unit
-    Scenario: a frontend flag missing from the registry is caught before it ships
-      Given a flag key is exposed to the frontend but has no registry entry
-      Then the unregistered key is reported, because it would otherwise resolve
-           from the legacy in-memory path where the operator store cannot see it
-      And the one historical exception is named explicitly rather than counted
+    Scenario: a frontend flag classified SYSTEM is declared, not discovered
+      Given the flags exposed to the frontend that resolve to a SYSTEM-scoped definition
+      Then they match the declared register of such flags exactly
+      And a new SYSTEM classification therefore arrives as a visible edit for
+          review, because scope decides how /ops/feature-flags groups, badges
+          and warns on the flag even though it no longer decides resolution
 
   Rule: Operators manage flags from the Ops Feature Flags page
 
@@ -211,17 +214,20 @@ Feature: Internal feature flag system for system-level kill switches
       And the flag resolves to its registry default again
       And the page row shows source "registry default" and last edit "never"
 
-    Scenario: Ops page warns when a PRODUCT flag is being managed on a SaaS install
-      Given the installation is running in SaaS mode with PostHog enabled
+    @integration
+    Scenario: Ops page warns about the blast radius of a PRODUCT flag on a shared install
+      Given the installation is running in SaaS mode
       And the operator focuses a PRODUCT-scoped flag row
-      Then the page surfaces a note that PRODUCT flags should normally be
-          managed in PostHog so user targeting and A/B test rules apply
-      And the operator can still set a postgres override for emergency use
+      Then the page surfaces a note that the row-level value reaches every
+          organization no targeting rule matches, which on a shared install is
+          the whole fleet
+      And the note points the operator at a per-organization or per-project rule
+          for a rollout
 
   Rule: Self-hosted parity
 
-    Scenario: Self-hosted install with no PostHog can still flip kill switches
-      Given the installation is self-hosted with no PostHog configured
+    Scenario: Self-hosted install with no third-party flag service can still flip kill switches
+      Given the installation is self-hosted with no external flag service configured
       When an operator toggles a SYSTEM kill switch from the Ops UI
       Then the change persists in postgres
       And every pod observes the new value
