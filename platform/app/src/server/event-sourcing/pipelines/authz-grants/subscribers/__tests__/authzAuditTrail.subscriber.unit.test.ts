@@ -1,3 +1,4 @@
+import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { GRANT_EVENT_SOURCES } from "@langwatch/authz-server";
 import { describe, expect, it } from "vitest";
 import { createTenantId } from "../../../..";
@@ -239,6 +240,33 @@ describe("authz audit trail subscriber", () => {
       await deliver(store, event(type, { actor: USER_ACTOR }));
 
       expect(store.inserts[0]!.action).toBe(action);
+    });
+  });
+
+  describe("when a surface rather than a person revokes a grant", () => {
+    /** `grant_revoked` carries no `source`, so what makes a revocation
+     *  attributable is its actor plus its reason. Only the migration runner
+     *  is filtered by actor — a directory sync's de-enroll is a change the
+     *  customer's own directory made, and it belongs on their audit page.
+     *  @scenario "A revocation names the surface that made it without a source of its own" */
+    it("records the row, with the reason and no invented person", async () => {
+      const store = recordingStore();
+      await deliver(
+        store,
+        event(GRANT_REVOKED_EVENT_TYPE, {
+          grantId: "grant_1",
+          reason: "offboarded:user_dave",
+          actor: { type: "system", id: SYSTEM_ACTORS.scim },
+        }),
+      );
+
+      expect(store.inserts).toHaveLength(1);
+      expect(store.inserts[0]!.action).toBe("authz.grants.revoke");
+      expect(store.inserts[0]!.userId).toBeNull();
+      expect(store.inserts[0]!.metadata).toEqual({
+        grantId: "grant_1",
+        reason: "offboarded:user_dave",
+      });
     });
   });
 

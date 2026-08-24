@@ -520,10 +520,12 @@ Feature: Authorization grants
     And the platform is never an anonymous actor
 
   # ═══ Provenance ═══════════════════════════════════════════════════════
-  # WHERE a grant came from, which the actor cannot say: a directory sync
-  # and an approved request to join both act as the platform, and only the
-  # source separates them. The vocabulary is closed and shared, so a surface
-  # states which one it is rather than inventing a label.
+  # Two facts, not one. The SOURCE is which surface authored the grant, which
+  # the actor cannot say: a directory sync and an approved request to join
+  # both act as the platform. The ACTOR is who caused it, and for those same
+  # two surfaces that is nobody — a system principal, named from the closed
+  # registry. Both vocabularies are shared, so a surface states which entry
+  # it is rather than inventing a label.
 
   @unit
   Scenario: A grant states which surface authored it
@@ -543,6 +545,24 @@ Feature: Authorization grants
     When a grant arrives naming it
     Then the wire accepts it with no second list to edit
     And a source the vocabulary does not name is refused
+
+  @unit
+  Scenario: A write with no person behind it names the surface that made it
+    Given a grant write with no person or credential behind it
+    When the surface states the write
+    Then the fact names the surface from the closed registry
+    And a write made by a person still names that person
+
+  # A revocation carries no source of its own, and does not need one: the
+  # actor already names the surface and the reason carries the rest, so
+  # attributing an automated removal needs no new field on the fact.
+
+  @unit
+  Scenario: A revocation names the surface that made it without a source of its own
+    Given a surface removes access it granted earlier
+    When the revocation is stated
+    Then the fact names the surface as its actor
+    And the audit trail records it rather than treating it as backdated history
 
   # ═══ Audit ════════════════════════════════════════════════════════════
 

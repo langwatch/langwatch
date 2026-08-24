@@ -9,7 +9,11 @@
  * ./grant-validation.ts owns what a write must satisfy, and ./offboard.ts
  * owns the offboarding flow and its proof.
  */
-import type { LedgerActor } from "@langwatch/actor";
+import {
+  type Actor,
+  type LedgerActor,
+  toLedgerActor,
+} from "@langwatch/actor";
 import { type AuthzScopeRef, scopeOrganizationId } from "@langwatch/authz";
 import type { AuthzCollectorService } from "./authz-collector.service";
 import type {
@@ -56,7 +60,25 @@ export type GrantRole =
   | { builtin: "ADMIN" | "MEMBER" | "VIEWER" }
   | { customRoleId: string };
 
-type Actor = { userId: string };
+/**
+ * Who caused a grant write.
+ *
+ * Two shapes, and the second is the whole point of the union. `{ userId }`
+ * is what every boundary holding a raw session id already passes, and it
+ * stays valid unchanged. Everything else is the shared vocabulary from
+ * `@langwatch/actor` — which is how a write with no person behind it names
+ * the surface that made it: `{ type: "system", name: "scim" }` for a
+ * directory sync, `{ type: "system", name: "joinRequests" }` for a
+ * policy-driven approval. The name comes from that package's closed
+ * `SYSTEM_ACTORS` registry, so no call site here can invent a
+ * `"system:..."` string, and `toLedgerActor` stays the one seam that
+ * serializes either half.
+ *
+ * Taking the package's union OUTRIGHT would have invalidated every existing
+ * `{ userId }` call site, which is the one thing this must not do — so it is
+ * admitted alongside rather than in place of it.
+ */
+export type GrantActor = { userId: string } | Actor;
 
 /**
  * The app-owned effect seams, composed once in the app's runtime
@@ -113,7 +135,7 @@ export class GrantsService {
     where,
     source = "grants-service",
   }: {
-    actor: Actor;
+    actor: GrantActor;
     who: GrantPrincipal;
     role: GrantRole;
     where: AuthzScopeRef;
@@ -155,7 +177,7 @@ export class GrantsService {
     organizationId,
     role,
   }: {
-    actor: Actor;
+    actor: GrantActor;
     bindingId: string;
     organizationId: string;
     role: GrantRole;
@@ -189,7 +211,7 @@ export class GrantsService {
     bindingId,
     organizationId,
   }: {
-    actor: Actor;
+    actor: GrantActor;
     bindingId: string;
     organizationId: string;
   }): Promise<void> {
@@ -223,7 +245,7 @@ export class GrantsService {
     to,
     role,
   }: {
-    actor: Actor;
+    actor: GrantActor;
     who: GrantPrincipal;
     from: AuthzScopeRef;
     to: AuthzScopeRef;
@@ -277,7 +299,7 @@ export class GrantsService {
     userId,
     organizationId,
   }: {
-    actor: Actor;
+    actor: GrantActor;
     userId: string;
     organizationId: string;
   }): Promise<{
@@ -324,6 +346,14 @@ export class GrantsService {
 
 }
 
-function writeActor(actor: Actor): LedgerActor {
-  return { type: "user", id: actor.userId };
+/**
+ * The durable record, minted through the ONE seam that owns that mapping.
+ * The raw-id shape is lifted into the vocabulary first rather than
+ * shortcut to a literal, so both halves serialize by exactly the same rule
+ * — and a change to how an actor is stored stays a change in one file.
+ */
+function writeActor(actor: GrantActor): LedgerActor {
+  return toLedgerActor(
+    "userId" in actor ? { type: "user", id: actor.userId } : actor,
+  );
 }
