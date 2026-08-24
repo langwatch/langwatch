@@ -71,9 +71,6 @@ function harness(options?: {
       findHeads: async ({ userId }) => emptyIdentityHeads({ userId }),
       findActiveIdentifierByValue: async () => null,
       findIdentifierIdForAccount: async () => null,
-      findLiveIdentifierByProviderAccount: async () => null,
-      findLiveIdentifiers: async () => [],
-      findIdentifierById: async () => null,
     },
     { verifyIdentifier: verifyIdentifier as never },
     {

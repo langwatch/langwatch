@@ -242,59 +242,52 @@ Feature: The identifier model - identity as an event-sourced pipeline
     Then no identifier answers, so the legacy column stands
     And attaching an address can therefore never redirect "sam"'s mail
 
-  # ADR-116: the linkage half of the old Account row is the projection, and
-  # the credential half is AccountCredential. better-auth reads `account`
-  # through an adapter over the join; every other model keeps the stock one.
-  # The fallback to the legacy table IS the migration - a user with no
-  # identifiers has not been backfilled, and that table is still their truth.
-
-  @unit @integration
-  Scenario: better-auth reads an account from the identifiers
-    Given "sam"'s identifier backfill has finalized
-    When better-auth looks up an account by its provider and subject
-    Then the identifier answers who holds it
-    And the credential row answers what secrets it carries
-    And better-auth cannot tell the row moved
-
-  @unit @integration
-  Scenario: A tombstoned identifier can never sign anyone in
-    Given "sam" holds a DETACHED identifier for a provider subject
-    When better-auth looks that subject up
-    Then nothing answers, and no session is created from a tombstone
+  # ADR-116: `Account` is demoted from a source of truth to a PROJECTION of
+  # the event log, alongside `Identifier`. better-auth reads and writes it
+  # with the completely stock adapter - nothing intercepts it - and the fold
+  # owns its linkage columns. One truth, two projections.
 
   @unit
-  Scenario: An unmigrated user's accounts come from the legacy table
-    Given "sam"'s identifier backfill has not finalized
-    When better-auth looks up any of "sam"'s accounts
-    Then the projection answers nothing and the legacy Account row answers
-    And an operator rollback returns a finalized user to the same path
+  Scenario: better-auth reads an account through its own storage
+    Given "sam"'s organization has finalized
+    When better-auth signs "sam" in
+    Then its own joined read of the user and their accounts completes
+    And nothing sits in front of it to answer differently
 
-  @unit @integration
-  Scenario: A token refresh touches secrets and emits no event
-    Given "sam"'s identifier backfill has finalized
-    When an OAuth refresh rewrites the access token
-    Then only the credential row is written
-    And the fields the refresh did not name keep the values they had
-    And no identity command is dispatched, because a refresh is not a fact
+  @unit
+  Scenario: A password change states nothing, because a secret is not a fact
+    Given "sam"'s organization has finalized
+    When "sam" changes their password
+    Then better-auth rewrites its own row
+    And no identity command is dispatched
 
   @integration
-  Scenario: A retried sign-up stores one credential, not two
-    Given a sign-up ceremony has stored "sam"'s credential for a provider
-    When the same ceremony is retried and derives the same identifier
-    Then the credential already stored is left standing
-    And one identifier can never hold two credentials
+  Scenario: The fold projects the linkage columns of Account
+    Given "sam" holds a live identifier carrying an account id and a subject
+    When the identity fold stores the projection
+    Then the Account row carries the user, provider and subject the fact names
+    And the fold writes no other column
 
-  @unit
-  Scenario: The account adapter answers only the shapes it knows
-    When better-auth issues one of its account queries
-    Then the adapter recognises it and answers from the projection
+  @integration
+  Scenario: A replay never overwrites a credential the fold cannot know
+    Given an Account row holds an access token better-auth refreshed
+    When the fold re-asserts that row from the event log
+    Then the token is left exactly as it was
+    And a from-scratch replay therefore restores linkage but not secrets
 
-  @unit
-  Scenario: An unanswerable account query refuses instead of guessing
-    Given better-auth issues an account query shape the adapter cannot serve
-    When the adapter is asked to answer it
-    Then it throws naming the shape
-    And it never answers nothing, which would read as a missing sign-in method
+  @integration
+  Scenario: A tombstoned identifier projects to no Account row
+    Given "sam" holds a DETACHED identifier for a provider subject
+    When the identity fold stores the projection
+    Then the Account row that identifier projected to is gone
+    And no row is created for a tombstone
+
+  @integration
+  Scenario: The fold says nothing about a user who is gone
+    Given "sam" has been deleted, so their Account rows cascaded away
+    When the identity fold stores the projection
+    Then it creates no Account row
+    And the delete is not undone by a projection
 
   @unit
   Scenario: The gate costs nothing before anyone is enrolled

@@ -44,32 +44,6 @@ model Account {
   @@index([userId])
 }
 
-// The credential half of the old `Account` row (ADR-116). Row-truth, never
-// events: the payload rule forbids secrets in the event log, and OAuth
-// refresh rewrites these on a cadence events should never carry. The LINKAGE
-// half - who holds which sign-in method - is `Identifier`, built by the fold.
-//
-// `id` IS the old `Account.id`, and `Identifier.accountId` already points at
-// it, so nothing is re-keyed and better-auth's account id keeps its meaning.
-model AccountCredential {
-  id           String    @id
-  identifierId String
-  type         String    @default("oauth")
-  refreshToken String?   @db.Text
-  accessToken  String?   @db.Text
-  expiresAt    DateTime?
-  extExpiresIn Int?
-  tokenType    String?
-  scope        String?
-  idToken      String?   @db.Text
-  sessionState String?
-  password     String?   @db.Text
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @default(now()) @updatedAt
-
-  @@unique([identifierId])
-}
-
 model Session {
   id            String   @id @default(nanoid())
   sessionToken  String   @unique

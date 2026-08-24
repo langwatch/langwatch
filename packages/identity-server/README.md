@@ -33,10 +33,8 @@ package.
  identity-command-id           every form a command id takes, in one place
  identity-backfill-plan        what the legacy rows imply, as a pure plan
  ./better-auth                 IdentityCeremonies — the ceremonies the app binds
-                               to better-auth's databaseHooks; and
-                               IdentityAccountAdapter, which serves better-auth's
-                               `account` model from Identifier x AccountCredential
-                               (ADR-116) and delegates every other model
+                               to better-auth's databaseHooks, and the whole of
+                               this package's contact with the library
 ```
 
 Nothing here reads the environment or a database. The write gate, the
@@ -52,11 +50,17 @@ Server-only by construction: nothing in the browser reaches this package,
 and the app's frontend-boundary test fails the build if that changes, so
 `node:crypto` lives on the root entry rather than behind a subpath.
 
-better-auth appears only as a PEER, and only on the `./better-auth` subpath —
-`IdentityAccountAdapter` implements its `DBAdapter` contract for the
-`account` model (ADR-116). The root entry, and therefore every service, is
-free of it: the ceremonies take plain row shapes and never learn a hook
-called them.
+better-auth appears only as a PEER, and only on the `./better-auth` subpath.
+Even there the contact is thin: the ceremonies take plain row shapes and
+never learn that a hook called them, so the root entry — and therefore every
+service — is free of the library entirely.
+
+Nothing here implements a `DBAdapter`. ADR-116 tried that and it cannot
+work: better-auth satisfies its own `join: { account: true }` with a query
+issued *below* any wrapper, so wrapping a built adapter never intercepts a
+model completely. `Account` is instead a PROJECTION of the event log written
+by the fold, and better-auth reads it with the completely stock
+`prismaAdapter`.
 
 Spec: `specs/identity/identifier-model.feature`,
 `specs/identity/identity-packages.feature`.

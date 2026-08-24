@@ -18,8 +18,8 @@
  *                                identifiers for a finalized user
  *   identity-command-id          every form a command id takes, in one place
  *   identity-backfill-plan       what the legacy rows imply, as a pure plan
- *   ./better-auth                the routing facade over the stock adapter:
- *                                IdentityDatabase + its ceremony collaborators
+ *   ./better-auth                the ceremonies better-auth's databaseHooks
+ *                                call; no adapter, no storage (ADR-116)
  *
  * No storage engine lives here, no environment read, and no event-sourcing
  * framework: the heads, the ledger and the records are ports the app
@@ -63,11 +63,6 @@ export {
   establishUserEmailCommandId,
   newIdentityCommandId,
 } from "./identity-command-id";
-export type {
-  AccountCredentialPatch,
-  AccountCredentialRow,
-  AccountCredentialsRepository,
-} from "./account-credentials.repository";
 export type { IdentityHeadsRepository } from "./identity-heads.repository";
 export type { IdentityLedger } from "./identity-ledger";
 export type { IdentityUserGate } from "./identity-user-gate";

@@ -17,18 +17,11 @@ import {
   newIdentityCommandId,
   VerificationCeremonyService,
 } from "@langwatch/identity-server";
-import {
-  IdentityAccountAdapter,
-  IdentityAccountStore,
-  IdentityCeremonies,
-} from "@langwatch/identity-server/better-auth";
-import type { BetterAuthOptions, DBAdapter } from "better-auth";
-import { prismaAdapter } from "better-auth/adapters/prisma";
+import { IdentityCeremonies } from "@langwatch/identity-server/better-auth";
 import { prisma } from "../../db";
 import { PrismaSystemMigrationStateRepository } from "../system-migrations/repositories/system-migration-state.prisma.repository";
 import { IdentityIdentifierBackfillMigration } from "./identifier-backfill.migration";
 import { IdentityLedgerWriter } from "./ledger";
-import { PrismaAccountCredentialsRepository } from "./repositories/account-credentials.prisma.repository";
 import { PrismaIdentityBackfillRepository } from "./repositories/identity-backfill.prisma.repository";
 import { PrismaIdentityHeadsRepository } from "./repositories/identity-heads.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./repositories/identity-projection.prisma.repository";
@@ -38,7 +31,6 @@ import { isUserOnIdentityWrites } from "./write-gate";
 
 const identityHeads = new PrismaIdentityHeadsRepository(prisma);
 const identityUsers = new PrismaIdentityUsersRepository(prisma);
-const accountCredentials = new PrismaAccountCredentialsRepository(prisma);
 const migrationState = new PrismaSystemMigrationStateRepository(prisma);
 
 /** The per-user fork as the services take it: one closure, one state
@@ -95,28 +87,6 @@ export function identityBackfill(): IdentityBackfillService {
 /** The D01 backfill as the migrations runtime registers it (tenant = user). */
 export function identifierBackfillMigration(): IdentityIdentifierBackfillMigration {
   return new IdentityIdentifierBackfillMigration(identityBackfill());
-}
-
-/**
- * better-auth's `database` (ADR-116): the stock prismaAdapter for every model
- * except `account`, which identity serves from `Identifier` joined with
- * `AccountCredential`.
- *
- * The fork is per user and the fallback IS the migration: a user whose
- * backfill has not finalized holds no identifiers, so the projection answers
- * nothing and the read falls through to the legacy `Account` table — which is
- * still their truth, and their only one. Nothing changes for them until they
- * finalize, and the fallback goes when nobody is left on it.
- */
-export function identityDatabase(): (options: BetterAuthOptions) => DBAdapter {
-  const base = prismaAdapter(prisma, { provider: "postgresql" });
-  const accounts = new IdentityAccountStore(
-    identityHeads,
-    accountCredentials,
-    isLatched,
-  );
-  return (options: BetterAuthOptions): DBAdapter =>
-    new IdentityAccountAdapter(base(options), accounts);
 }
 
 /**

@@ -20,11 +20,10 @@ const { mockComplete } = vi.hoisted(() => ({
 }));
 
 // The router reaches the runtime for the ceremony; the module graph behind
-// it (auth -> better-auth) reaches the same module for the adapter and the
-// hooks, so the whole composition root is stubbed rather than a slice of it.
+// it (auth -> better-auth) reaches the same module for the hooks, so the
+// whole composition root is stubbed rather than a slice of it.
 vi.mock("~/server/app-layer/identity/runtime", () => ({
   verificationCeremony: () => ({ completeEmailVerification: mockComplete }),
-  identityDatabase: () => () => ({}),
   identityCeremonies: () => ({
     beforeAccountCreate: async () => undefined,
     beforeAccountDelete: async () => undefined,

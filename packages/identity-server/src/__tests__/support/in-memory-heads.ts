@@ -1,6 +1,5 @@
 import {
   emptyIdentityHeads,
-  isLiveIdentifierState,
   type IdentifierFact,
   type IdentifierProvider,
   type IdentityFact,
@@ -79,49 +78,6 @@ export class InMemoryHeads implements IdentityHeadsRepository {
       (head) => head.provider === provider && head.detachedAtMs === null,
     );
     return byProvider.length === 1 ? (byProvider[0]?.identifierId ?? null) : null;
-  }
-
-  async findLiveIdentifierByProviderAccount({
-    provider,
-    providerAccountId,
-  }: {
-    provider: IdentifierProvider;
-    providerAccountId: string;
-  }): Promise<IdentifierFact | null> {
-    for (const heads of this.heads.values()) {
-      for (const head of Object.values(heads.identifiers)) {
-        if (
-          head.provider === provider &&
-          head.providerAccountId === providerAccountId &&
-          isLiveIdentifierState(head.state)
-        ) {
-          return head;
-        }
-      }
-    }
-    return null;
-  }
-
-  async findIdentifierById({
-    identifierId,
-  }: {
-    identifierId: string;
-  }): Promise<IdentifierFact | null> {
-    for (const heads of this.heads.values()) {
-      const head = heads.identifiers[identifierId];
-      if (head) return head;
-    }
-    return null;
-  }
-
-  async findLiveIdentifiers({
-    userId,
-  }: {
-    userId: string;
-  }): Promise<IdentifierFact[]> {
-    return Object.values(this.heads.get(userId)?.identifiers ?? {}).filter(
-      (head) => isLiveIdentifierState(head.state),
-    );
   }
 
   /** Fold facts into a user's heads, the way the app's projection would. */

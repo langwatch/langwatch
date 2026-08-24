@@ -53,12 +53,178 @@ const fact = (id: string, state: "ATTACHED" | "VERIFIED" | "DETACHED") => ({
   detachedAtMs: state === "DETACHED" ? 1_690_000_002_000 : null,
 });
 
+/** A fact that projects to an `Account` row: it names the row it projects
+ *  to, and the provider subject that row is keyed by. */
+const linkedFact = (
+  id: string,
+  state: "ATTACHED" | "VERIFIED" | "DETACHED",
+  overrides?: { accountId?: string; providerAccountId?: string },
+) => ({
+  ...fact(id, state),
+  provider: "google" as const,
+  accountId: overrides?.accountId ?? `${namespace}-acc`,
+  providerAccountId: overrides?.providerAccountId ?? `${namespace}-sub`,
+});
+
+/** `Account.userId` is a real foreign key, so the user has to exist. */
+async function withUserRow() {
+  await prisma.user.upsert({
+    where: { id: USER },
+    create: { id: USER, email: `${USER}@acme.com` },
+    update: {},
+  });
+}
+
 afterEach(async () => {
   await prisma.identifier.deleteMany({ where: { userId: USER } });
   await prisma.identityProjectionCursor.deleteMany({ where: { userId: USER } });
+  await prisma.account.deleteMany({ where: { userId: USER } });
+  await prisma.user.deleteMany({ where: { id: USER } });
 });
 
 describe("PrismaIdentityProjectionRepository", () => {
+  describe("when the fold projects Account (ADR-116)", () => {
+    /** @scenario "The fold projects the linkage columns of Account" */
+    it("writes the linkage the fact names, and nothing else", async () => {
+      await withUserRow();
+      const id = `${namespace}-linked`;
+
+      await repository.store(
+        projection(
+          { [id]: linkedFact(id, "VERIFIED") },
+          { acceptedAt: 10, eventId: "evt_1" },
+        ),
+        context,
+      );
+
+      const row = await prisma.account.findUnique({
+        where: { id: `${namespace}-acc` },
+      });
+      expect(row).toMatchObject({
+        userId: USER,
+        provider: "google",
+        providerAccountId: `${namespace}-sub`,
+      });
+      // `type` is a legacy NextAuth column better-auth does not map. The
+      // fold leaves it to its default rather than guessing at a value.
+      expect(row?.type).toBe("oauth");
+    });
+
+    /** @scenario "A replay never overwrites a credential the fold cannot know" */
+    it("leaves every secret column exactly as it found it", async () => {
+      await withUserRow();
+      const id = `${namespace}-linked`;
+      const secrets = {
+        access_token: "at_refreshed",
+        refresh_token: "rt_refreshed",
+        id_token: "idt",
+        password: "hashed",
+        scope: "openid email",
+        token_type: "Bearer",
+        session_state: "state",
+        expires_at: new Date(1_700_000_000_000),
+        ext_expires_in: 3600,
+      };
+      await prisma.account.create({
+        data: {
+          id: `${namespace}-acc`,
+          userId: USER,
+          provider: "google",
+          providerAccountId: `${namespace}-sub`,
+          ...secrets,
+        },
+      });
+
+      await repository.store(
+        projection(
+          { [id]: linkedFact(id, "VERIFIED") },
+          { acceptedAt: 10, eventId: "evt_1" },
+        ),
+        context,
+      );
+
+      // The payload rule cuts both ways: secrets can never become events,
+      // so a replay must never claim to know them. Clobbering these would
+      // undo a token refresh that legitimately happened after the event.
+      const row = await prisma.account.findUnique({
+        where: { id: `${namespace}-acc` },
+      });
+      expect(row).toMatchObject(secrets);
+    });
+
+    /** @scenario "A tombstoned identifier projects to no Account row" */
+    it("removes the row a detached identifier projected to", async () => {
+      await withUserRow();
+      const id = `${namespace}-linked`;
+      await repository.store(
+        projection(
+          { [id]: linkedFact(id, "VERIFIED") },
+          { acceptedAt: 10, eventId: "evt_1" },
+        ),
+        context,
+      );
+      expect(
+        await prisma.account.findUnique({ where: { id: `${namespace}-acc` } }),
+      ).not.toBeNull();
+
+      await repository.store(
+        projection(
+          { [id]: linkedFact(id, "DETACHED") },
+          { acceptedAt: 20, eventId: "evt_2" },
+        ),
+        context,
+      );
+
+      expect(
+        await prisma.account.findUnique({ where: { id: `${namespace}-acc` } }),
+      ).toBeNull();
+    });
+
+    it("projects no row for an identifier that names no account", async () => {
+      await withUserRow();
+      const id = `${namespace}-unlinked`;
+
+      // The email adopted from `User.email` never had an `Account` behind
+      // it, so there is nothing to project onto.
+      await repository.store(
+        projection(
+          { [id]: fact(id, "VERIFIED") },
+          { acceptedAt: 10, eventId: "evt_1" },
+        ),
+        context,
+      );
+
+      expect(
+        await prisma.account.findMany({ where: { userId: USER } }),
+      ).toEqual([]);
+    });
+
+    /** @scenario "The fold says nothing about a user who is gone" */
+    it("creates nothing for a deleted user, rather than failing the fold", async () => {
+      const id = `${namespace}-linked`;
+
+      // No `User` row: the delete cascaded their accounts away, and
+      // recreating one would fail the foreign key rather than restore
+      // anything. The fold must still complete.
+      await repository.store(
+        projection(
+          { [id]: linkedFact(id, "VERIFIED") },
+          { acceptedAt: 10, eventId: "evt_1" },
+        ),
+        context,
+      );
+
+      expect(
+        await prisma.account.findUnique({ where: { id: `${namespace}-acc` } }),
+      ).toBeNull();
+      // The identifier head is still written: it is event truth, and does
+      // not depend on the legacy row surviving.
+      expect(
+        await prisma.identifier.findUnique({ where: { id } }),
+      ).not.toBeNull();
+    });
+  });
+
   describe("when no fold has ever stored the user", () => {
     it("loads null, so the fold starts from init", async () => {
       expect(await repository.load(USER, context)).toBeNull();

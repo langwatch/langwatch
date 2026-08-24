@@ -1,17 +1,17 @@
-# ADR-116: Account linkage is event-truth; better-auth reads a projection
+# ADR-116: `Account` is a projection of the event log, not a source of truth
 
 **Date:** 2026-08-24
 
 **Status:** Proposed (2026-08-24)
 
 **Builds on:** ADR-101 (the identity pipeline and identifiers — this ADR
-changes §2's seam for ONE model and the truth split for ONE table; the
-payload rule, the per-user gate, `tenantId = userId` and erasure all stand),
-ADR-110 (finishing the migration IS the switch, per tenant), ADR-115 (where
-the code lives).
+changes the *status* of one table and leaves §2's `databaseHooks` seam, the
+payload rule, the per-user gate, `tenantId = userId` and erasure exactly as
+they are), ADR-110 (finishing the migration IS the switch, per tenant),
+ADR-115 (where the code lives), ADR-022 (the event log is the source of
+truth).
 
-**Related:** PR #7333, ADR-022 (the event log is the source of truth),
-ADR-019 (repository / service layering).
+**Related:** PR #7333, ADR-019 (repository / service layering).
 
 ## Context
 
@@ -27,153 +27,202 @@ Two tables, two writers, one fact. That is why the backfill's parity check
 is **bidirectional** and why a user whose rows disagree is *held* — the
 proof exists because the duplication does.
 
-Nothing about the write seam caused this. The routing facade that ADR-101
-originally specified had the identical overlap: better-auth wrote its row
-and we mirrored the fact into an event. The `databaseHooks` seam that
-replaced it (ADR-101 §2, revised 2026-08-24) has it too. Changing where we
-intercept never changed how many copies exist.
+Nothing about the write seam caused this, and no seam fixes it. The routing
+facade ADR-101 originally specified had the identical overlap; so does the
+`databaseHooks` seam that replaced it. Changing where we intercept never
+changed how many copies exist.
+
+### What the first attempt at this ADR got wrong
+
+The first version of this decision tried to remove the copy by taking the
+`account` model away from better-auth: split `Account` into `Identifier`
+(linkage) plus a new `AccountCredential` (secrets), and put an adapter in
+front of better-auth's storage that served `account` from the join.
+
+It does not work, and the reason generalises:
+
+- better-auth's `findUserByEmail(email, { includeAccounts: true })` asks for
+  the user with `join: { account: true }`. Joins are **off by default**
+  (`advanced.database.joins`), and when they are off `createAdapterFactory`
+  satisfies the join *itself*, with a second query issued through the
+  adapter instance **the factory was built around**.
+- An adapter that wraps a finished `prismaAdapter` sits **above** that
+  factory, so it never sees that query. A migrated user's sign-in read the
+  legacy table, found nothing, and failed with "Credential account not
+  found".
+- Separately, better-auth runs sign-up inside `adapter.transaction`, and for
+  that request `transaction` is the **only** method it calls on the adapter.
+
+Both are instances of one rule: **wrapping a built adapter cannot intercept
+a model, because the factory's own traffic is below the wrapper.** Serving a
+model from other storage has to happen at or below the factory — which means
+owning better-auth's Prisma CRUD — and better-auth documents no per-model
+storage routing at all.
+
+Rather than fight the library's read paths, this ADR stops standing in front
+of them.
 
 ## Decision
 
-**`Identifier` becomes the only truth for linkage, and better-auth stops
-owning a copy of it.**
-
-### 1. The table splits along the truth line, physically
+**`Account` is demoted from a source of truth to a projection of the event
+log, alongside `Identifier`. better-auth keeps reading and writing it with
+the completely stock `prismaAdapter`.**
 
 ```text
-BEFORE                          AFTER
-Account                         Identifier            (event-truth, exists)
-  id                              id, userId, provider, providerAccountId,
-  userId          ─┐              value, state, lifecycle
-  provider         │ linkage
-  providerAccountId┘            AccountCredential     (row-truth, new)
-  access_token    ─┐              id            ← the old Account.id
-  refresh_token    │              identifierId  → Identifier.id
-  id_token         │ secrets      type
-  password         │              accessToken, refreshToken, idToken,
-  expires_at, …   ─┘              password, expiresAt, scope, …
+                    better-auth
+                   /           \
+      databaseHooks             stock prismaAdapter
+      (state a fact)            (reads + writes its own table)
+             |                            ^
+             v                            |
+        event_log  ───── fold ────────────┤
+        (TRUTH)            |              |
+                           v              |
+                       Identifier      Account
+                    (identity's view) (better-auth's view)
 ```
 
-`AccountCredential.id` **is** the old `Account.id`, and `Identifier.accountId`
-already points at it. Nothing has to be re-keyed, and better-auth's `id` for
-an account keeps meaning what it meant.
+One truth, two projections. `Account` stops being a peer of `Identifier` and
+becomes its sibling: nobody hand-edits it, the fold owns its linkage
+columns, and every better-auth join, transaction and query shape works by
+construction because nothing intercepts them.
 
-Column-scoped truth was considered and is still rejected: this is a physical
-split, not a rule about which columns of one table to believe. That
-carve-out was deleted from this programme once already and does not come
-back.
+### 1. There is no adapter
 
-### 2. Secrets are why "event sourcing only" has a floor
+`database:` is `prismaAdapter(prisma, { provider: "postgresql" })` and
+nothing else. `IdentityAccountAdapter`, `IdentityAccountStore`,
+`account-queries.ts` and `account-projection.ts` are deleted, and with them
+the enumerated query surface, the dual-read, the legacy-table fallback and
+the `UnsupportedAccountQueryError` a better-auth upgrade could trip.
 
-`access_token`, `refresh_token`, `id_token` and `password` can never enter
-the event log (ADR-101's payload rule, R11), and OAuth refresh rewrites them
-on a cadence events should never carry. So a row-truth credential store is
-not a compromise to be removed later — it is the correct home for that data
-forever. What this ADR removes is the duplicated **linkage**, which is the
-only part that was ever stated twice.
+The seam stays exactly where better-auth documents it — `databaseHooks` —
+and does exactly what it says: **better-auth calls event sourcing.**
 
-Sessions likewise stay row-truth (ADR-101 R12): the sign-in hot path emits
-no commands, and event-sourcing sessions would put every login through the
-queue for nothing.
+### 2. `Account` is a mixed-truth table, deliberately
 
-### 3. better-auth's `account` model is served by an adapter
+ADR-101's "no table mixes truths" rule is broken here on purpose, and this
+is the trade-off the whole decision rests on:
 
-`IdentityAccountAdapter` implements better-auth's `DBAdapter` for the
-`account` model and delegates every other model to the stock `prismaAdapter`
-untouched.
+| `Account` column | Owner | Truth |
+|---|---|---|
+| `id`, `userId`, `provider`, `providerAccountId` | the fold | event |
+| `access_token`, `refresh_token`, `id_token`, `password`, `expires_at`, `ext_expires_in`, `token_type`, `scope`, `session_state` | better-auth | row |
+| `type` | nobody | its default |
 
-**This is not the facade ADR-101 §2 removed.** That one kept better-auth's
-storage *and* emitted events, which is precisely what produced two writable
-copies — it was the worst of both. This one **replaces** storage for one
-model: better-auth has no `Account` table to write, its reads are a join of
-the two tables above, and its writes are commands.
+`type` belongs to neither: it is a legacy NextAuth column that better-auth's
+field map does not even mention, so the fold leaves it to its `@default`
+rather than deriving a value it would only be guessing at.
 
-Reads:
+The fold writes a **restricted column set** and must never touch a secret
+column: a replay that clobbered `access_token` would undo a token refresh
+that legitimately happened after the event. The list is
+`FOLD_OWNED_ACCOUNT_COLUMNS` in the projection store, and an integration
+test writes real secrets, re-asserts the row from the log, and fails if any
+of them moved.
 
-| better-auth call | served from |
-|---|---|
-| `findOne(account, [accountId, providerId])` | `Identifier` by `(provider, providerAccountId)` ⋈ credential |
-| `findOne(account, [id])` | credential ⋈ its `Identifier` |
-| `findMany(account, [userId])` | the user's live `Identifier`s ⋈ credentials |
-| `updateMany({password}, [userId, providerId])` | credential rows only |
-| `update([id], {tokens})` | credential row only — no event |
-| `create` / `delete` | see below |
+The consequence is stated plainly: **a from-scratch replay restores linkage,
+not secrets.** It cannot do otherwise — secrets are barred from events by
+ADR-101's payload rule, which is not a limitation to route around but the
+reason the rule exists. Recovering `Account` from the log alone yields rows
+that identify every sign-in method correctly and hold no credentials.
 
-**The adapter supports exactly the query shapes better-auth issues and
-throws, naming the shape, on anything else.** The routing table came back,
-and this time it is load-bearing rather than bookkeeping: an unsupported
-shape is a *correctness* bug — a silent wrong answer on the auth path — not
-an unclassified write. A better-auth upgrade that issues a new shape fails
-in CI against the coverage test rather than answering `null` in production.
+### 3. Why `AccountCredential` is gone
 
-Writes:
+The first version's split put secrets in their own table so the adapter
+could serve `account` from the join. With no adapter, that table is not
+optional — it is **unreachable**: better-auth's stock adapter writes tokens
+to `Account.access_token`, and it has no way to write them anywhere else.
+Keeping it would reintroduce the duplication this ADR removes, one table
+further along.
 
-- `create` → the attach ceremony's command, waited to the fold (the ledger's
-  bounded convergence wait, ADR-101 §2), then the credential row. Returns
-  the joined row better-auth expects.
-- `update` / `updateMany` → credential rows only. A token refresh is not a
-  domain event and never was.
-- `delete` → the detach command, then the credential row.
+The payload rule is enforced by the fold's restricted column set instead,
+which is where it belongs — it is a rule about what may become an event, not
+about how many tables exist.
 
-### 4. Cutover is per user, dual-read, on the existing gate
+### 4. What `Identifier` keeps, and what it now means
 
-The adapter is one instance; the fork is per user; and
-`findOne(account, [accountId, providerId])` does not know the user until it
-has found something. So reads try the projection **first** and fall through
-to the legacy `Account` table:
+Two columns change meaning rather than existence:
 
-- a finalized user has identifiers, so the projection answers and the legacy
-  row — stale from that point on — is never consulted;
-- an unmigrated user has no identifiers, the projection finds nothing, and
-  the legacy table answers exactly as it does today.
+- `providerAccountId` — the provider's own subject. Added by this ADR's
+  migration. It was already part of the derived identifier id but never
+  stated on the fact, so the projection could not reproduce
+  `Account.providerAccountId` without it.
+- `accountId` — was "the `Account` row this identifier **mirrors**", and is
+  now "the `Account` row this identifier **projects to**". Same column, same
+  values, opposite direction. That inversion is the whole ADR in one line.
 
-Writes fork on the same `finalized` status every other identity path uses.
-No new gate, no new switch, and the same rollback: `rolled_back` returns the
-user to the legacy table within the cache TTL.
+### 5. Convergence, not atomicity
 
-**Per user, one truth** — which is ADR-110's discipline, not a weaker
-version of this ADR's claim. The fleet holds two shapes only while a
-migration is in flight, which is what a migration is.
+The live ordering is **fact → row → fold**:
+
+1. `account.create.before` states the attach and waits for the fold.
+2. better-auth writes its own row through the stock adapter.
+3. A later fold re-asserts the linkage columns.
+
+All three write the same values, so the sequence is convergent. Between (1)
+and (2) the fact exists and the row does not; between (2) and (3) the row is
+better-auth's own write rather than a projected one. Neither window is
+observable as a wrong answer, because every writer agrees on the value.
+
+A `before` hook that refuses still vetoes the row write, so the guard
+contract is unchanged.
+
+### 6. Deletes
+
+Unlink deletes the row through the stock adapter, and `account.delete.before`
+states the detach first. The fold then reconciles a row that is already
+gone: a DETACHED identifier projects to **no** `Account` row, so the fold
+deletes one if it finds it and creates none. Erasure reaches the same state
+through the same path.
 
 ## Consequences
 
-- **Sign-up waits for the fold.** `create` must return the row, so
-  registration now costs append + stage + convergence wait, and a Redis
-  outage stops registrations. This is only acceptable because the Redis-loss
-  requirement (D02) was withdrawn on 2026-08-24 and identity took ADR-110's
-  "Redis down ⇒ writes down" position. If that requirement ever returns,
-  this decision has to be revisited with it.
-- **The backfill's parity proof keeps its job** for as long as any user is
-  unmigrated, and becomes dead weight once none are. It is what makes the
-  legacy fallback safe to delete.
-- **`Account`'s linkage columns become write-only for migrated users**, then
-  droppable once the fallback goes. That drop is the deliverable's real exit
-  gate, not the adapter landing.
-- **A better-auth upgrade is now a real review item** for the `account`
-  model: new query shapes fail loudly. Every other model is untouched and
-  upgrades as before.
-- The app reads `Account` directly in seven places outside generated code;
-  each becomes a read of the identity surface or of the credential
-  repository.
+- **better-auth works, entirely.** Joins, transactions, plugin tables and
+  every query shape — present and future — are the library's own, because
+  nothing sits in front of them. This is the consequence that motivated the
+  rewrite.
+- **Much less code.** Four modules and their suites are deleted; what
+  remains is the fold writing a second table.
+- **The duplication is gone in the sense that matters.** `Account` still
+  holds linkage columns, but it is no longer *authoritative* for them — it is
+  derived, like `Identifier`. There is one writer of record and one truth.
+- **`Account` mixes truths.** New, and the honest cost. It is contained: one
+  table, a fixed column list, and a test that fails if the fold's write set
+  grows.
+- **Replay is partial for one table.** Linkage returns, secrets do not. See
+  §2 — this is the payload rule doing its job.
+- **The backfill's bidirectional parity check can retire.** Once `Account`
+  is derived, "do the two tables agree?" stops being a question about two
+  authorities and becomes a question about whether the fold ran. That
+  simplification is follow-up work, not part of this change.
+- **Migration behaviour is unchanged.** The per-user gate still forks the
+  ceremonies and the legacy-email read; an unenrolled organization still
+  writes nothing extra, because the hooks still return having done nothing.
 
 ## Alternatives considered
 
-**Keep the split, rely on the parity proof (status quo).** Honest and
-already built, and the proof genuinely catches divergence. Rejected because
-"two writers, one fact, reconciled afterwards" is a design that needs a
-prover forever, and the prover holds users when it disagrees.
+**Own better-auth's Prisma CRUD (`createAdapterFactory`).** The documented
+way to serve a model from other storage: be the adapter the factory is built
+around, so join emulation lands on our `findMany`. Rejected for cost and
+coupling — it means absorbing and re-syncing better-auth's Prisma adapter on
+every upgrade, to keep a table we do not need to own.
 
-**Column-scoped truth on one `Account` table** — the fold owns the linkage
-columns, better-auth owns the secret columns. No migration, no adapter.
-Rejected: this programme deleted the column-truth carve-out once already,
-and a table whose rows have two writers is exactly what ADR-022 forbids,
-whichever columns they touch.
+**Intercept at the Prisma client instead of the adapter.** Hand the stock
+`prismaAdapter` a client whose `account` delegate is served from our tables.
+Rejected: it is the same interception one layer down, it trades better-auth's
+`Where[]` for Prisma's much larger argument surface, and it breaks silently
+the day anyone sets `advanced.database.joins`.
 
-**Rows are truth, events derived by outbox or CDC.** Simplest of all, and it
-does give one truth. Rejected because identity would no longer be
-event-sourced in any meaningful sense — D03's identifier-first router needs
-the projection to be authoritative, not a mirror.
+**A Postgres view for `account`.** Map better-auth's model onto a view over
+the identity tables. Rejected: writes need `INSTEAD OF` triggers, which puts
+domain rules in the database and out of the ceremonies' reach.
 
-**A Postgres view named `Account` over the join.** No adapter, reads just
-work. Rejected: writes then need triggers, which moves the ceremony into the
-database and out of the guards.
+**Leave `Account` authoritative and reconcile.** The status quo ante, and
+what the bidirectional parity check exists to police. Rejected because it is
+the duplication itself: two writers of the same fact, with a proof obligation
+attached forever.
+
+**Keep the storage-replacing adapter and intercept joins too.** Add
+`model === "user"` with an `account` join to the interception. Rejected: it
+guesses at the library's internal read paths, and the next one it adds is
+undetectable until a customer cannot sign in.
