@@ -115,6 +115,9 @@ function harness(options?: {
       storeUserHashKeyIfMissing: async (args) => {
         minted.push(args);
       },
+      // The backfill never reads it - the plan takes the email off the user
+      // row it already read - but the double is the whole port.
+      findEmail: async () => user?.email ?? null,
     },
     { attachIdentifier, verifyIdentifier, detachIdentifier },
     { now: () => 1_800_000_000_000 },

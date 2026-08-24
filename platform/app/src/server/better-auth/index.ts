@@ -16,11 +16,12 @@ import { createLogger } from "@langwatch/observability";
 import { RedisConfigService } from "@langwatch/redis-client";
 import { compare, hash } from "bcrypt";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
+import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError } from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { env } from "~/env.mjs";
 import { tryGetApp } from "~/server/app-layer/app";
-import { identityDatabase } from "~/server/app-layer/identity/runtime";
+import { identityCeremonies } from "~/server/app-layer/identity/runtime";
 import { prisma } from "~/server/db";
 import { fireActivityTrackingNurturing } from "../../../ee/billing/nurturing/hooks/activityTracking";
 import { ensureUserSyncedToCio } from "../../../ee/billing/nurturing/hooks/userSync";
@@ -215,15 +216,7 @@ export const auth = betterAuth({
           : []),
       ],
   secret: isBuildTime ? "build-time-only" : env.NEXTAUTH_SECRET,
-  /**
-   * The identity adapter (ADR-101 §2, R10): the routing facade over the
-   * stock prismaAdapter. Protocol behavior is byte-identical to the stock
-   * adapter; domain-significant writes additionally run identity ceremonies
-   * for users whose backfill has latched (the write gate ships closed, so
-   * deploying this changed nothing on its own). An unrouted better-auth
-   * write throws — composed in app-layer/identity/runtime.ts.
-   */
-  database: identityDatabase(),
+  database: prismaAdapter(prisma, { provider: "postgresql" }),
 
   /**
    * Tell BetterAuth's rate limiter (and session IP tracking) which
@@ -444,6 +437,20 @@ export const auth = betterAuth({
             prisma,
             user: user as { id: string; email: string; name: string },
           });
+          // ADR-101 §4: the new user's per-user HMAC key. Additive and
+          // best-effort inside the ceremony - a sign-up never fails on it.
+          await identityCeremonies().afterUserCreate(user);
+        },
+      },
+      delete: {
+        /**
+         * ADR-101 §2: a user delete is an ERASURE, and erasure is what wipes
+         * `Identifier.value` and `identifierHash`. Before the row goes, so a
+         * refused ceremony refuses the delete with it; a no-op for users
+         * whose backfill has not latched.
+         */
+        before: async (user) => {
+          await identityCeremonies().beforeUserDelete(user);
         },
       },
     },
@@ -458,6 +465,10 @@ export const auth = betterAuth({
               accountId: account.accountId,
             },
           });
+          // ADR-101 §2: the account row is an identifier attach. Returning
+          // the row data pins its id, which is what makes the live
+          // identifier id and the backfill's derived id the same id.
+          return identityCeremonies().beforeAccountCreate(account);
         },
         after: async (account) => {
           if (!account.userId || !account.providerId || !account.accountId)
@@ -487,6 +498,12 @@ export const auth = betterAuth({
               accountId: account.accountId as string,
             },
           });
+        },
+      },
+      delete: {
+        /** ADR-101 §2: an account row removed is an identifier detach. */
+        before: async (account) => {
+          await identityCeremonies().beforeAccountDelete(account);
         },
       },
     },

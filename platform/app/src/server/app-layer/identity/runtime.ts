@@ -1,9 +1,9 @@
 /**
  * The identity runtime: THE composition root (ADR-115 §4). The one place
- * Prisma, the better-auth row engine, the migration-state table and the
- * event-sourcing pipeline handle meet `@langwatch/identity-server`'s
- * services. Nothing else constructs an IdentityService, a guard, or a
- * ceremony; a consumer imports the composed instance from here or is wrong.
+ * Prisma, the migration-state table and the event-sourcing pipeline handle
+ * meet `@langwatch/identity-server`'s services. Nothing else constructs an
+ * IdentityService, a guard, or a ceremony; a consumer imports the composed
+ * instance from here or is wrong.
  *
  * Only server-only modules may import this file: its graph reaches
  * `~/server/db` at module scope. Every environment read the services need
@@ -13,11 +13,10 @@ import {
   IdentityBackfillService,
   IdentityGuards,
   IdentityService,
+  newIdentityCommandId,
   VerificationCeremonyService,
 } from "@langwatch/identity-server";
-import { createIdentityDatabase } from "@langwatch/identity-server/better-auth";
-import type { BetterAuthOptions, DBAdapter } from "better-auth";
-import { prismaAdapter } from "better-auth/adapters/prisma";
+import { IdentityCeremonies } from "@langwatch/identity-server/better-auth";
 import { prisma } from "../../db";
 import { PrismaSystemMigrationStateRepository } from "../system-migrations/repositories/system-migration-state.prisma.repository";
 import { IdentityIdentifierBackfillMigration } from "./identifier-backfill.migration";
@@ -42,7 +41,7 @@ export function isLatched({ userId }: { userId: string }): Promise<boolean> {
 /**
  * The write surface. Composed per call like `grantsService()`: the ledger
  * writer resolves the pipeline handle lazily, so a ceremony composed before
- * the App exists (better-auth builds its adapter at module load) still
+ * the App exists (better-auth builds its options at module load) still
  * appends once one does.
  */
 export function identityService(): IdentityService {
@@ -77,18 +76,19 @@ export function identifierBackfillMigration(): IdentityIdentifierBackfillMigrati
 }
 
 /**
- * better-auth's `database`: the routing facade over the stock prismaAdapter
- * (ADR-101 §2). Protocol behavior is byte-identical to the stock adapter;
- * domain-significant writes additionally run identity ceremonies for users
- * whose backfill has latched. The gate ships closed, so deploying this
- * changes nothing on its own.
+ * What better-auth's own `databaseHooks` call (ADR-101 §2). better-auth
+ * keeps the stock prismaAdapter; these four methods bind to
+ * `account.create.before`, `account.delete.before`, `user.create.after` and
+ * `user.delete.before` in `server/better-auth/index.ts`, and they run only
+ * for users whose backfill has latched. The gate ships closed, so wiring
+ * them changes nothing on its own.
  */
-export function identityDatabase(): (options: BetterAuthOptions) => DBAdapter {
-  return createIdentityDatabase({
-    base: prismaAdapter(prisma, { provider: "postgresql" }),
-    heads: identityHeads,
-    users: identityUsers,
-    identity: identityService(),
+export function identityCeremonies(): IdentityCeremonies {
+  return new IdentityCeremonies(
+    identityHeads,
+    identityUsers,
+    identityService(),
     isLatched,
-  });
+    { now: Date.now, newCommandId: newIdentityCommandId },
+  );
 }

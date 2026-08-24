@@ -1,0 +1,197 @@
+import { IdentityPrimaryMustDemoteFirstError } from "@langwatch/identity";
+import { describe, expect, it, vi } from "vitest";
+import { IdentityCeremonies } from "../better-auth/identity-ceremonies";
+import type { IdentityUsersRepository } from "../identity-users.repository";
+import { fact, InMemoryHeads, T0, USER } from "./support/in-memory-heads";
+
+function harness(options?: {
+  latched?: boolean;
+  email?: string | null;
+  identifierForAccount?: string | null;
+  attach?: () => Promise<never>;
+  detach?: () => Promise<never>;
+}) {
+  const heads = new InMemoryHeads();
+  if (options?.identifierForAccount !== undefined) {
+    heads.heads.set(USER, {
+      userId: USER,
+      identifiers:
+        options.identifierForAccount === null
+          ? {}
+          : {
+              [options.identifierForAccount]: fact({
+                identifierId: options.identifierForAccount,
+                accountId: "acc_1",
+                provider: "google",
+              }),
+            },
+    });
+  }
+
+  const users: IdentityUsersRepository = {
+    storeUserHashKeyIfMissing: vi.fn().mockResolvedValue(undefined),
+    findEmail: vi
+      .fn()
+      .mockResolvedValue(
+        options?.email === undefined ? "sam@acme.com" : options.email,
+      ),
+  };
+  const identity = {
+    attachIdentifier: vi.fn(options?.attach ?? (async () => [])),
+    detachIdentifier: vi.fn(options?.detach ?? (async () => [])),
+    eraseUser: vi.fn(async () => []),
+  };
+  let minted = 0;
+  const ceremonies = new IdentityCeremonies(
+    heads,
+    users,
+    identity as never,
+    async () => options?.latched ?? true,
+    { now: () => T0, newCommandId: () => `idcmd_${++minted}` },
+  );
+  return { ceremonies, identity, users, heads };
+}
+
+const accountRow = (overrides?: Record<string, unknown>) => ({
+  id: "acc_1",
+  userId: USER,
+  providerId: "google",
+  accountId: "gid_1",
+  createdAt: new Date(T0),
+  ...overrides,
+});
+
+describe("the identity ceremonies", () => {
+  describe("given a user whose backfill has not latched", () => {
+    /** @scenario "An unlatched user's ceremonies emit no identity events" */
+    it("emits nothing and leaves the row write untouched", async () => {
+      const { ceremonies, identity } = harness({ latched: false });
+
+      expect(await ceremonies.beforeAccountCreate(accountRow())).toBeUndefined();
+      await ceremonies.beforeAccountDelete(accountRow());
+      await ceremonies.beforeUserDelete({ id: USER });
+
+      expect(identity.attachIdentifier).not.toHaveBeenCalled();
+      expect(identity.detachIdentifier).not.toHaveBeenCalled();
+      expect(identity.eraseUser).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a latched user's account row is about to be created", () => {
+    /** @scenario "A new sign-in method attaches an identifier" */
+    it("attaches the identifier and pins the row id it derived from", async () => {
+      const { ceremonies, identity } = harness();
+
+      const result = await ceremonies.beforeAccountCreate(accountRow());
+
+      // The row keeps the id the ceremony saw, so the identifier id the
+      // backfill later derives from this row is the same id.
+      expect(result).toEqual({ data: { id: "acc_1" } });
+      expect(identity.attachIdentifier).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: USER,
+          accountId: "acc_1",
+          provider: "google",
+          providerAccountId: "gid_1",
+          value: "sam@acme.com",
+          occurredAtMs: T0,
+          ceremony: { flow: "better-auth" },
+        }),
+      );
+    });
+
+    it("mints the row id when better-auth supplied none", async () => {
+      const { ceremonies, identity } = harness();
+
+      const result = await ceremonies.beforeAccountCreate(
+        accountRow({ id: undefined }),
+      );
+
+      const minted = (result as { data: { id: string } }).data.id;
+      expect(minted).toBeTruthy();
+      expect(identity.attachIdentifier).toHaveBeenCalledWith(
+        expect.objectContaining({ accountId: minted }),
+      );
+    });
+
+    it("attaches nothing when the user carries no email value", async () => {
+      const { ceremonies, identity } = harness({ email: null });
+
+      expect(await ceremonies.beforeAccountCreate(accountRow())).toBeUndefined();
+      expect(identity.attachIdentifier).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A refused ceremony refuses the row write with it" */
+    it("propagates a guard refusal, so better-auth never writes the row", async () => {
+      const { ceremonies } = harness({
+        attach: async () => {
+          throw new IdentityPrimaryMustDemoteFirstError("refused");
+        },
+      });
+
+      await expect(
+        ceremonies.beforeAccountCreate(accountRow()),
+      ).rejects.toBeInstanceOf(IdentityPrimaryMustDemoteFirstError);
+    });
+  });
+
+  describe("when a latched user's account row is about to be deleted", () => {
+    it("detaches the identifier the row mirrors", async () => {
+      const { ceremonies, identity } = harness({
+        identifierForAccount: "idf_google",
+      });
+
+      await ceremonies.beforeAccountDelete(accountRow());
+
+      expect(identity.detachIdentifier).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: USER, identifierId: "idf_google" }),
+      );
+    });
+
+    /** @scenario "An Account row no identifier mirrors still deletes" */
+    it("detaches nothing when no identifier unambiguously mirrors the row", async () => {
+      const { ceremonies, identity } = harness({ identifierForAccount: null });
+
+      await ceremonies.beforeAccountDelete(accountRow());
+
+      expect(identity.detachIdentifier).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a latched user is about to be deleted", () => {
+    /** @scenario "Deleting a user erases their identifiers" */
+    it("erases the user before the row goes", async () => {
+      const { ceremonies, identity } = harness();
+
+      await ceremonies.beforeUserDelete({ id: USER });
+
+      expect(identity.eraseUser).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: USER, tenantId: USER }),
+      );
+    });
+  });
+
+  describe("when a user row has just been created", () => {
+    it("mints their hash key", async () => {
+      const { ceremonies, users } = harness();
+
+      await ceremonies.afterUserCreate({ id: "user_new" });
+
+      expect(users.storeUserHashKeyIfMissing).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: "user_new" }),
+      );
+    });
+
+    /** @scenario "A failed hash-key mint never fails a sign-up" */
+    it("swallows a mint failure: the sign-up must not fail on bookkeeping", async () => {
+      const { ceremonies, users } = harness();
+      (users.storeUserHashKeyIfMissing as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error("postgres unavailable"),
+      );
+
+      await expect(
+        ceremonies.afterUserCreate({ id: "user_new" }),
+      ).resolves.toBeUndefined();
+    });
+  });
+});
