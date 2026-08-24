@@ -220,6 +220,20 @@ function identityCustomAdapter({
       return typeof clause?.value === "string" ? clause.value : null;
     };
 
+    /** The record a `user` query names outright — the same narrowing
+     *  `namedUserId` applies, one field over, because on the `user` model the
+     *  user IS the record. */
+    const namedRecordId = (where: readonly AccountWhere[]): string | null => {
+      const clause = where.find(
+        (candidate) =>
+          candidate.field === "id" &&
+          (candidate.operator === undefined || candidate.operator === "eq") &&
+          (candidate.connector === undefined ||
+            candidate.connector.toUpperCase() === "AND"),
+      );
+      return typeof clause?.value === "string" ? clause.value : null;
+    };
+
     const secretsOf = (row: Row): IdentityAccountSecrets =>
       Object.fromEntries(
         SECRET_FIELDS.filter((field) => field in row).map((field) => [
@@ -470,6 +484,45 @@ function identityCustomAdapter({
       return born;
     };
 
+    /**
+     * A `user` update on the identity branch, with `email` taken out of it
+     * (ADR-116 §6) — or the update exactly as it arrived.
+     *
+     * `User.email` has ONE writer for a latched user: the fold, from their
+     * PRIMARY identifier. So the column write is REMOVED here and the
+     * address is stated as a command instead. Everything else in the same
+     * update — name, image, `lastLoginAt` — passes through untouched, which
+     * matters because most user updates carry no email at all and must not
+     * become a different kind of write just because this branch exists.
+     *
+     * A user the query does not NAME cannot be routed, and a population-wide
+     * update that set `email` would be a shape nothing issues; those fall
+     * through to the legacy branch, where they always were.
+     */
+    const withoutRoutedEmail = async ({
+      model,
+      where,
+      update,
+    }: {
+      model: string;
+      where: readonly CleanedWhere[] | undefined;
+      update: Row;
+    }): Promise<Row> => {
+      const canonical = toCanonicalKeys(model, update);
+      const email = canonical.email;
+      if (typeof email !== "string") return update;
+      const named = namedRecordId(canonicalWhere(model, where));
+      if (named === null || !(await routesToIdentity({ userId: named }))) {
+        return update;
+      }
+      await ceremonies.beforeEmailChange({ userId: named, email });
+      return Object.fromEntries(
+        Object.entries(update).filter(
+          ([field]) => getDefaultFieldName({ model, field }) !== "email",
+        ),
+      );
+    };
+
     const adapter: CustomAdapter = {
       create: async ({ model, data, select }) => {
         const canonical = toCanonicalKeys(model, data);
@@ -600,6 +653,30 @@ function identityCustomAdapter({
               : (toStorageKeys(model, { ...fresh }) as never);
           }
         }
+        if (modelOf(model) === "user") {
+          const remaining = await withoutRoutedEmail({
+            model,
+            where,
+            update: update as Row,
+          });
+          // An update that was ONLY the email has nothing left to write —
+          // the command is the whole change — so the row is READ back rather
+          // than written with an empty patch.
+          if (Object.keys(remaining).length === 0) {
+            const found = await legacy.findOne<Row>({ model, where });
+            return found === null
+              ? null
+              : (toStorageKeys(model, found) as never);
+          }
+          const updated = await legacy.update<Row>({
+            model,
+            where,
+            update: toCanonicalKeys(model, remaining),
+          });
+          return updated === null
+            ? null
+            : (toStorageKeys(model, updated) as never);
+        }
         const row = await legacy.update<Row>({
           model,
           where,
@@ -625,6 +702,15 @@ function identityCustomAdapter({
             });
             return rows.length;
           }
+        }
+        if (modelOf(model) === "user") {
+          const remaining = await withoutRoutedEmail({ model, where, update });
+          if (Object.keys(remaining).length === 0) return 1;
+          return legacy.updateMany({
+            model,
+            where,
+            update: toCanonicalKeys(model, remaining),
+          });
         }
         return legacy.updateMany({
           model,

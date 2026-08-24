@@ -115,6 +115,42 @@ export class IdentityCeremonies implements IdentityAccountCeremonies {
     return { data: { id: accountRowId } };
   }
 
+  /**
+   * A latched user's email is being changed: state it, never write it.
+   *
+   * The address arrives as an ATTACHED identifier — unverified, and
+   * therefore not yet `User.email`, which is the honest answer: nobody has
+   * proved this mailbox. Verification promotes it, and a primary switch is
+   * what finally moves the column, through the fold. Both of those already
+   * exist, and both run the guards, so this method's whole job is to put the
+   * address into the state machine rather than past it.
+   *
+   * No `Account` row backs it, so `accountId` and `providerAccountId` are
+   * null — an identifier without a protocol row is precisely what `Account`
+   * could never model and `Identifier` can.
+   */
+  async beforeEmailChange({
+    userId,
+    email,
+  }: {
+    userId: string;
+    email: string;
+  }): Promise<void> {
+    if (!(await this.isLatched({ userId }))) return;
+    await this.identity.attachIdentifier({
+      tenantId: userId,
+      userId,
+      commandId: this.clock.newCommandId(),
+      accountId: null,
+      provider: "email",
+      providerAccountId: null,
+      value: email,
+      occurredAtMs: this.clock.now(),
+      ceremony: { flow: "better-auth" },
+      actor: { type: "user", id: userId },
+    });
+  }
+
   /** An `Account` row is about to be deleted: detach what it mirrors. */
   async beforeAccountDelete(account: CeremonyAccountRow): Promise<void> {
     const { id, userId, providerId } = account;

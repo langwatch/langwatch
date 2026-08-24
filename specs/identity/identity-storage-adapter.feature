@@ -144,7 +144,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     Then the same secret values are mirrored onto "sam"'s Account row
     And a later gate outage that falls "sam" back to the legacy branch still verifies the new password
 
-  @unit @unimplemented
+  @unit
   Scenario: A secret written on the legacy branch after latch is healed
     Given a finalized user "olga" whose password change landed on the legacy branch during the gate's cache window
     When the heal pass runs
@@ -216,7 +216,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
 
   # ── One writer for User.email ──────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: An email change on the identity branch is a command, not a column write
     Given a finalized user "sam"
     When better-auth updates "sam"'s email
@@ -279,7 +279,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
 
   # ── Latching an existing user ──────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: Finalizing an existing user carries their secrets across once
     Given a user "olga" with Account rows holding a password and provider tokens
     When "olga"'s backfill finalizes

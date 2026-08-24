@@ -31,4 +31,21 @@ export interface IdentityAccountCeremonies {
     account: CeremonyAccountRow,
   ): Promise<{ data: { id: string } } | undefined>;
   beforeAccountDelete(account: CeremonyAccountRow): Promise<void>;
+  /**
+   * A `user` update that touches `email`, on the identity branch (ADR-116
+   * §6): stated as a command the guards evaluate, never written as a column.
+   *
+   * `User.email` gets ONE writer for a latched user — the fold, from their
+   * PRIMARY identifier. Letting better-auth's own `changeEmail` /
+   * `updateUser` write the column as well is the second-writer hole this
+   * closes: the two would disagree the moment a primary switch or a
+   * verification landed, and the column is what every other feature reads.
+   *
+   * So the address becomes an identifier ATTACHED to the user, and the rest
+   * of the state machine takes it from there: verify proves the mailbox,
+   * primary makes it the one `User.email` shows. Which also means the guard
+   * gets its say — an address another user already holds is refused by name
+   * rather than by a unique-constraint failure inside the fold.
+   */
+  beforeEmailChange(args: { userId: string; email: string }): Promise<void>;
 }

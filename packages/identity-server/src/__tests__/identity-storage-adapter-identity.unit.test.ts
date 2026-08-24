@@ -383,6 +383,72 @@ describe("better-auth over the identity storage adapter", () => {
       });
     });
 
+    describe("when better-auth updates the user's email", () => {
+      /** @scenario "An email change on the identity branch is a command, not a column write" */
+      it("dispatches it as an identity command and leaves User.email to the fold", async () => {
+        await signUp(stack.auth, EMAIL);
+        const userId = userIdOf(stack);
+        const context = await stack.auth.$context;
+
+        await context.adapter.update({
+          model: "user",
+          where: [{ field: "id", value: userId }],
+          update: { email: "sam@home.net" },
+        });
+
+        // Stated, not written. The address is now an ATTACHED identifier —
+        // unverified, so not yet anybody's `User.email`, which is the honest
+        // answer: nobody has proved this mailbox.
+        expect(
+          stack.commands
+            .filter((command) => command.type === "lw.identity.attach_identifier")
+            .map((command) => (command.data as { value: string }).value),
+        ).toContain("sam@home.net");
+        expect(
+          statedIdentifiers(stack).find(
+            (identifier) => identifier.value === "sam@home.net",
+          )?.state,
+        ).toBe("ATTACHED");
+
+        // The column is untouched: `User.email` has one writer on this
+        // branch, and it is the fold, from the PRIMARY identifier.
+        expect(stack.db.user?.[0]?.email).toBe(EMAIL);
+      });
+
+      it("passes a user update carrying no email through unchanged", async () => {
+        await signUp(stack.auth, EMAIL);
+        const userId = userIdOf(stack);
+        const statedBefore = stack.commands.length;
+        const context = await stack.auth.$context;
+
+        await context.adapter.update({
+          model: "user",
+          where: [{ field: "id", value: userId }],
+          update: { name: "Samantha" },
+        });
+
+        expect(stack.db.user?.[0]?.name).toBe("Samantha");
+        expect(stack.commands).toHaveLength(statedBefore);
+      });
+
+      it("writes the column for an unlatched user, exactly as before", async () => {
+        await signUp(stack.auth, EMAIL);
+        const userId = userIdOf(stack);
+        stack.gate.open = () => false;
+        const statedBefore = stack.commands.length;
+        const context = await stack.auth.$context;
+
+        await context.adapter.update({
+          model: "user",
+          where: [{ field: "id", value: userId }],
+          update: { email: "sam@home.net" },
+        });
+
+        expect(stack.db.user?.[0]?.email).toBe("sam@home.net");
+        expect(stack.commands).toHaveLength(statedBefore);
+      });
+    });
+
     describe("when better-auth issues an account query the branch has not enumerated", () => {
       /** @scenario "An account query shape the identity branch does not recognize fails loudly" */
       it("refuses with the handled code rather than answering wrongly", async () => {
