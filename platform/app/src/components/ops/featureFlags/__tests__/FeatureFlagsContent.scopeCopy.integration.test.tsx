@@ -108,13 +108,23 @@ function renderPage() {
  *  Kept as a list so adding a future vendor to the copy trips this too. */
 const EXTERNAL_FLAG_SERVICES = [/posthog/i, /launchdarkly/i, /split\.io/i];
 
+/**
+ * The section's own description, not the whole section: several registry
+ * entries still name the removed service in their historical descriptions,
+ * and those render inside this same box. Reading the sibling of the heading
+ * keeps the assertion on the copy this test is about, so a fixture that
+ * quotes a real description cannot fail it for the wrong reason.
+ */
+function sectionDescription(heading: string): string {
+  return screen.getByText(heading).nextElementSibling?.textContent ?? "";
+}
+
 describe("the Ops feature flags page", () => {
   describe("when an operator on a shared install reads the Product section", () => {
     it("is told this store decides the value, not an outside service", () => {
       renderPage();
 
-      const productSection = screen.getByText("Product").parentElement;
-      const copy = productSection?.textContent ?? "";
+      const copy = sectionDescription("Product");
 
       expect(copy).toMatch(/source of truth/i);
       for (const vendor of EXTERNAL_FLAG_SERVICES) {
@@ -125,8 +135,7 @@ describe("the Ops feature flags page", () => {
     it("is told the same about the System section, so the two cannot disagree", () => {
       renderPage();
 
-      const systemSection = screen.getByText("System").parentElement;
-      const copy = systemSection?.textContent ?? "";
+      const copy = sectionDescription("System");
 
       for (const vendor of EXTERNAL_FLAG_SERVICES) {
         expect(copy).not.toMatch(vendor);
