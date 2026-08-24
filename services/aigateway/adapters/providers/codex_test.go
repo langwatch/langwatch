@@ -400,6 +400,30 @@ func TestCodexRequestBody_EmptyBodyStillCarriesTheInvariants(t *testing.T) {
 	}
 }
 
+func TestCodexRequestBody_RejectsABodyThatIsNotAnObject(t *testing.T) {
+	// Only an object has fields to filter. Each of these read as no fields at
+	// all and was rebuilt into the pins alone, so a well-formed request with
+	// no turn in it went upstream and the caller paid a provider round trip
+	// to be told what the gateway could already see.
+	for _, raw := range []string{
+		"null",
+		"[]",
+		`[{"input":"hi"}]`,
+		`"a string"`,
+		"123",
+		`{"model":"m"} trailing`,
+		`{"input":[{"role":"user"}]`,
+		"not json at all",
+	} {
+		t.Run(raw, func(t *testing.T) {
+			body, err := codexRequestBody([]byte(raw), "openai_codex/gpt-5.6-terra")
+			if err == nil {
+				t.Errorf("a body that is not an object must be refused, got %s", body)
+			}
+		})
+	}
+}
+
 func TestCodex_WrongRequestTypeIsRejected(t *testing.T) {
 	router := codexTestRouter("http://unused.test", nil)
 	chatReq := codexRequest(`{}`)

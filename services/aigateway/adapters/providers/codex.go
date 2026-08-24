@@ -288,6 +288,17 @@ func codexRequestBody(raw []byte, model string) ([]byte, error) {
 	if len(bytes.TrimSpace(body)) == 0 {
 		body = []byte("{}")
 	}
+	// A Responses call is a JSON object, and only an object has fields to
+	// filter. Without this, anything else read as no fields at all and was
+	// rebuilt into the pins alone: a truncated body, an array, or plain text
+	// went upstream as a well-formed request with no turn in it, and the
+	// caller paid a provider round trip to be told what we could see here.
+	if !gjson.ValidBytes(body) {
+		return nil, errors.New("codex body is not valid JSON")
+	}
+	if !gjson.ParseBytes(body).IsObject() {
+		return nil, errors.New("codex body must be a JSON object")
+	}
 	// The outgoing body is BUILT from the accepted names, rather than the
 	// caller's body having the refused ones deleted out of it. A field name is
 	// data, and turning data into an sjson path is what let a name break the
