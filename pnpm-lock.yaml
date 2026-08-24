@@ -697,6 +697,9 @@ importers:
 
   packages/enterprise/features/governance/contract:
     dependencies:
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../../handled-error
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -713,6 +716,12 @@ importers:
       '@langwatch/enterprise-governance-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../../../../eventing
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       typescript:
         specifier: ^7.0.2
@@ -723,10 +732,43 @@ importers:
 
   packages/enterprise/features/governance/web:
     dependencies:
+      '@langwatch/design-system':
+        specifier: workspace:*
+        version: link:../../../../design-system
       '@langwatch/enterprise-governance-contract':
         specifier: workspace:*
         version: link:../contract
+      lucide-react:
+        specifier: ^1.22.0
+        version: 1.22.0(react@19.2.8)
     devDependencies:
+      '@chakra-ui/react':
+        specifier: ^3.36.0
+        version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@emotion/react':
+        specifier: ^11.14.0
+        version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
+      '@testing-library/react':
+        specifier: ^16.3.2
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@testing-library/user-event':
+        specifier: ^14.6.1
+        version: 14.6.1(@testing-library/dom@10.4.1)
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.4(@types/react@19.2.18)
+      jsdom:
+        specifier: ^30.0.1
+        version: 30.0.1(@noble/hashes@2.2.0)
+      react:
+        specifier: ^19.2.7
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.8(react@19.2.8)
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -1577,6 +1619,12 @@ importers:
       '@langwatch/enterprise-billing-web':
         specifier: workspace:*
         version: link:../../packages/enterprise/features/billing/web
+      '@langwatch/enterprise-governance-contract':
+        specifier: workspace:*
+        version: link:../../packages/enterprise/features/governance/contract
+      '@langwatch/enterprise-governance-server':
+        specifier: workspace:*
+        version: link:../../packages/enterprise/features/governance/server
       '@langwatch/enterprise-governance-web':
         specifier: workspace:*
         version: link:../../packages/enterprise/features/governance/web

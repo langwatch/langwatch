@@ -3,7 +3,7 @@
 import {
   GOVERNANCE_ATTR,
   isGovernanceOriginTrace,
-} from "@ee/governance/services/governanceAttributeKeys";
+} from "@langwatch/enterprise-governance-contract";
 import type {
   GovernanceKpiContribution,
   GovernanceKpisClickHouseRepository,

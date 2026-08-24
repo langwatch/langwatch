@@ -29,6 +29,10 @@ import {
   NotFoundError,
   ValidationError,
 } from "@langwatch/handled-error";
+import {
+  NON_ENTERPRISE_INGESTION_SOURCE_CAP,
+  unsupportedValue,
+} from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 import { createHash, randomBytes } from "crypto";
 import { env } from "~/env.mjs";
@@ -43,9 +47,7 @@ import {
   encryptParserConfigCredentials,
   isEncryptedCredentials,
 } from "./ingestionCredentials";
-import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "./ingestionSource.constants";
 import { assertPullDestinationAllowed } from "./pullDestination";
-import { unsupportedValue } from "./unsupportedValue";
 
 export type SourceType =
   | "otel_generic"

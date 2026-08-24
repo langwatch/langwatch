@@ -27,13 +27,21 @@ packages/features/<feature>/
 
 ```json
 {
-  "layoutVersion": 0
+  "layoutVersion": 0,
+  "subjects": ["example-operation", "example-resource"]
 }
 ```
 
 Every feature uses strict layout version 0. There is no legacy or migration
 layout: these packages are still in progress, so the first enforced format is
 version 0.
+
+`subjects` is optional for a small, single-purpose feature. Broad bounded
+contexts declare it as a sorted, duplicate-free list of the product concepts
+they intentionally own. Production contract and server filenames must match a
+declared subject. Adding a new subject therefore changes `feature.json`, the
+feature ADR, and its behavioural spec together; a broad feature name is not a
+licence to absorb adjacent infrastructure.
 
 Each code directory is a separate workspace package:
 

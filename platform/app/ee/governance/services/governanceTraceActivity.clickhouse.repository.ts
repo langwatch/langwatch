@@ -22,7 +22,7 @@ import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseCli
 import {
   GOVERNANCE_ATTR,
   GOVERNANCE_ORIGIN_KIND_VALUE,
-} from "./governanceAttributeKeys";
+} from "@langwatch/enterprise-governance-contract";
 
 export class GovernanceTraceActivityClickHouseRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}

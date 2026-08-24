@@ -27,6 +27,7 @@
  */
 
 import { randomBytes } from "node:crypto";
+import { PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE } from "@langwatch/enterprise-governance-contract";
 import { ActivityMonitorService } from "@ee/governance/services/activity-monitor/activityMonitor.service";
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { AiToolEntryService } from "@ee/governance/services/aiToolEntry.service";
@@ -43,7 +44,6 @@ import {
   RoutingPolicyHasNoProvidersError,
 } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
-import { PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE } from "@ee/governance/services/platformToolPolicy.service";
 import { GovernanceSetupStateService } from "@ee/governance/services/setupState.service";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";

@@ -167,6 +167,56 @@ function lintServer(pkg: ClassifiedPackage): ArchitectureViolation[] {
   return violations;
 }
 
+function lintDeclaredSubjects(pkg: ClassifiedPackage): ArchitectureViolation[] {
+  if (!pkg.subjects || (pkg.kind !== "contract" && pkg.kind !== "server")) {
+    return [];
+  }
+  const violations: ArchitectureViolation[] = [];
+  const files = walkFiles(`${pkg.root}/src`, (path) => /\.tsx?$/.test(path));
+  for (const file of files) {
+    const path = workspacePath(`${pkg.root}/src`, file);
+    if (path === "index.ts") continue;
+    const filename = path.slice(path.lastIndexOf("/") + 1, -3);
+    const candidates = filename
+      .split(".")
+      .filter(
+        (part) =>
+          ![
+            "adapter",
+            "api",
+            "commands",
+            "errors",
+            "events",
+            "mapper",
+            "migration",
+            "port",
+            "projection",
+            "repository",
+            "service",
+            "store",
+          ].includes(part),
+      );
+    const declared = candidates.some((candidate) =>
+      pkg.subjects!.some(
+        (subject) =>
+          candidate === subject ||
+          candidate.startsWith(`${subject}-`) ||
+          candidate.endsWith(`-${subject}`) ||
+          candidate.includes(`-${subject}-`),
+      ),
+    );
+    if (declared) continue;
+    violations.push({
+      policy: "feature-source-subject",
+      file,
+      message: `Source module ${JSON.stringify(path)} is outside the subjects declared by ${pkg.feature}/feature.json.`,
+      allowed:
+        "Move it to its owning feature, or deliberately expand feature.json, the feature boundary ADR, and its specification together.",
+    });
+  }
+  return violations;
+}
+
 export function lintFeatureLayouts(
   packages: ClassifiedPackage[],
 ): ArchitectureViolation[] {
@@ -174,6 +224,7 @@ export function lintFeatureLayouts(
   for (const pkg of packages) {
     if (pkg.layoutVersion !== 0) continue;
     violations.push(...lintSchemaImports(pkg));
+    violations.push(...lintDeclaredSubjects(pkg));
     if (pkg.kind === "contract") violations.push(...lintContract(pkg));
     if (pkg.kind === "server") violations.push(...lintServer(pkg));
   }

@@ -42,6 +42,7 @@ function featurePackage({
   source = "export const value = true;",
   enterprise = false,
   layoutVersion = 0,
+  subjects,
 }: {
   feature: string;
   role: "contract" | "server" | "web";
@@ -51,6 +52,7 @@ function featurePackage({
   source?: string;
   enterprise?: boolean;
   layoutVersion?: 0;
+  subjects?: string[];
 }): void {
   const prefix = enterprise
     ? `packages/enterprise/features/${feature}/${role}`
@@ -59,7 +61,10 @@ function featurePackage({
     ? `packages/enterprise/features/${feature}`
     : `packages/features/${feature}`;
   const adrName = "001-package-boundary.md";
-  write(`${featureRoot}/feature.json`, JSON.stringify({ layoutVersion }));
+  write(
+    `${featureRoot}/feature.json`,
+    JSON.stringify({ layoutVersion, ...(subjects ? { subjects } : {}) }),
+  );
   write(
     `${featureRoot}/adrs/${adrName}`,
     `# ADR-001: ${feature} package boundary
@@ -424,6 +429,45 @@ describe("strict feature source layout", () => {
       (policy) => policy === "feature-source-layout",
     );
     expect(layoutPolicies.length).toBeGreaterThanOrEqual(2);
+  });
+
+  /** @scenario Declared subjects make broad feature ownership explicit */
+  it("rejects contract and server modules outside declared feature subjects", () => {
+    featurePackage({
+      feature: "governance",
+      role: "contract",
+      subjects: ["governance", "ingestion-pull", "pulled-usage"],
+    });
+    write(
+      "packages/features/governance/contract/src/anomaly-rule.ts",
+      "export const anomalyRule = true;",
+    );
+    featurePackage({
+      feature: "governance",
+      role: "server",
+      subjects: ["governance", "ingestion-pull", "pulled-usage"],
+    });
+    write(
+      "packages/features/governance/server/src/services/ingestion-pull-process.service.ts",
+      "export class IngestionPullProcessService { static create() { return new IngestionPullProcessService(); } }",
+    );
+
+    const subjectViolations = lintWorkspace({
+      root,
+      declarations: false,
+    }).filter((violation) => violation.policy === "feature-source-subject");
+    expect(subjectViolations).toHaveLength(1);
+    expect(subjectViolations[0]?.file).toContain("anomaly-rule.ts");
+  });
+
+  it("rejects malformed subject declarations", () => {
+    featurePackage({
+      feature: "governance",
+      role: "contract",
+      subjects: ["pulled-usage", "ingestion-pull", "ingestion-pull"],
+    });
+
+    expect(policies()).toContain("feature-source-subject");
   });
 });
 

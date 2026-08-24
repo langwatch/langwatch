@@ -28,7 +28,7 @@ import {
   getStarterTemplate,
   isOttlEnabledSourceType,
   OTTL_ENABLED_SOURCE_TYPES,
-} from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
+} from "@langwatch/enterprise-governance-contract";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 

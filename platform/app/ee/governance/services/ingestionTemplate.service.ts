@@ -5,6 +5,10 @@ import {
   NotFoundError,
   ValidationError,
 } from "@langwatch/handled-error";
+import {
+  DEFAULT_GOVERNANCE_SURFACE,
+  type GovernanceCallSurface,
+} from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 import { customAlphabet } from "nanoid";
 /**
@@ -23,10 +27,6 @@ import { customAlphabet } from "nanoid";
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import { GovernanceAuditRepository } from "../repositories/governanceAudit.repository";
 import { IngestionTemplateRepository } from "../repositories/ingestionTemplate.repository";
-import {
-  DEFAULT_GOVERNANCE_SURFACE,
-  type GovernanceCallSurface,
-} from "./auditSurface";
 import { seedPlatformIngestionTemplates } from "./platformIngestionTemplates.seeds";
 
 const slugSuffixGenerator = customAlphabet(

@@ -214,19 +214,18 @@ const routes: RouteObject[] = [
       {
         path: "/governance/ingestion-sources",
         ...page(
-          () => import("@ee/governance/dashboard/pages/ingestion-sources"),
+          () => import("~/pages/governance/ingestion-sources.enterprise"),
         ),
       },
       {
         path: "/governance/ingestion-sources/:id",
         ...page(
-          () =>
-            import("@ee/governance/dashboard/pages/ingestion-source-detail"),
+          () => import("~/pages/governance/ingestion-source-detail.enterprise"),
         ),
       },
       {
         path: "/governance/anomaly-rules",
-        ...page(() => import("@ee/governance/dashboard/pages/anomaly-rules")),
+        ...page(() => import("~/pages/governance/anomaly-rules.enterprise")),
       },
       {
         path: "/governance/tool-catalog",

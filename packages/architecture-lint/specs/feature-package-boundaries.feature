@@ -19,6 +19,14 @@ Feature: Feature package boundary lint
     When architecture lint checks the workspace
     Then it fails with the expected package name and manifest path
 
+  @unit @architecture
+  Scenario: A broad feature cannot silently acquire a new subject
+    Given a feature declares the product subjects it owns in feature.json
+    And contract or server source introduces a filename outside those subjects
+    When architecture lint checks the workspace
+    Then it reports a feature-source-subject violation
+    And adding that subject requires an ordered feature.json change alongside the feature ADR and spec
+
   @unit @architecture @enterprise
   Scenario: Enterprise aggregate packages have fixed roles and names
     Given the portable enterprise root and API, worker and web composition packages

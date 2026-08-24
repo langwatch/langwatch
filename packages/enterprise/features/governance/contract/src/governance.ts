@@ -16,6 +16,8 @@ export const GOVERNANCE_SOURCE_TYPES = [
   "http_custom",
 ] as const;
 
+export const NON_ENTERPRISE_INGESTION_SOURCE_CAP = 3 as const;
+
 export const governanceSourceTypeSchema = z.enum(GOVERNANCE_SOURCE_TYPES);
 export type GovernanceSourceType = z.infer<typeof governanceSourceTypeSchema>;
 

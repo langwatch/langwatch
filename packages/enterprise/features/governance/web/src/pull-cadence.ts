@@ -68,7 +68,9 @@ export const MINUTE_INTERVALS = [5, 10, 15, 30] as const;
  * can resolve a source's recommended schedule without importing the page
  * it is rendered by.
  */
-export const PULL_ADAPTER_FOR_SOURCE: Partial<Record<GovernanceSourceType, string>> = {
+export const PULL_ADAPTER_FOR_SOURCE: Partial<
+  Record<GovernanceSourceType, string>
+> = {
   copilot_studio: "copilot_studio",
   openai_compliance: "openai_compliance",
   claude_compliance: "claude_compliance",
@@ -94,7 +96,9 @@ export const PULL_SCHEDULE_DEFAULTS: Record<string, string> = {
 
 /** The recommended schedule for a source type, or null when it has no
  *  pull adapter (push and s3 sources carry no cadence). */
-export function recommendedPullSchedule(sourceType: GovernanceSourceType): string | null {
+export function recommendedPullSchedule(
+  sourceType: GovernanceSourceType,
+): string | null {
   const adapter = PULL_ADAPTER_FOR_SOURCE[sourceType];
   if (!adapter) return null;
   return PULL_SCHEDULE_DEFAULTS[adapter] ?? "*/15 * * * *";
@@ -227,12 +231,31 @@ export function summarizePullCadence(parts: PullCadenceParts): string {
  */
 export function pullCadenceCronError(cron: string): string | null {
   if (cron.trim() === "") return "Enter a schedule.";
-  if (cron.trim().split(/\s+/).length !== 5) {
+  const fields = cron.trim().split(/\s+/);
+  if (fields.length !== 5) {
     return "A cron schedule has five fields: minute, hour, day of month, month, day of week.";
   }
-  return isValidPullSchedule(cron)
-    ? null
-    : "This schedule can't run as written. Minutes go 0-59, hours 0-23.";
+  if (isValidPullSchedule(cron)) return null;
+
+  const dayOfMonth = /^\d+$/.test(fields[2] ?? "") ? Number(fields[2]) : null;
+  const month = /^\d+$/.test(fields[3] ?? "") ? Number(fields[3]) : null;
+  if (
+    dayOfMonth !== null &&
+    month !== null &&
+    month >= 1 &&
+    month <= 12 &&
+    dayOfMonth >= 1 &&
+    dayOfMonth <= 31
+  ) {
+    // A leap year gives February its widest legitimate range. Anything
+    // still rolling into another month can never be reached by any year.
+    const widestCalendarDate = new Date(Date.UTC(2024, month - 1, dayOfMonth));
+    if (widestCalendarDate.getUTCMonth() !== month - 1) {
+      return "This schedule never comes around — it names a date that does not exist.";
+    }
+  }
+
+  return "This schedule can't run as written. Minutes go 0-59, hours 0-23.";
 }
 
 /**

@@ -4,7 +4,7 @@ import {
   getStarterTemplate,
   isOttlEnabledSourceType,
   OTTL_ENABLED_SOURCE_TYPES,
-} from "../ottlStarterTemplates";
+} from "@langwatch/enterprise-governance-contract";
 
 describe("OTTL_ENABLED_SOURCE_TYPES", () => {
   it("only enables OTTL for the custom catch-all (otel_generic)", () => {

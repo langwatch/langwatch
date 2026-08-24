@@ -126,9 +126,9 @@ vi.mock("~/utils/api", () => {
   return { api: node([]) };
 });
 
-import AnomalyRulesPage from "@ee/governance/dashboard/pages/anomaly-rules";
-import IngestionSourceDetailPage from "@ee/governance/dashboard/pages/ingestion-source-detail";
-import IngestionSourcesPage from "@ee/governance/dashboard/pages/ingestion-sources";
+import AnomalyRulesPage from "../anomaly-rules.enterprise";
+import IngestionSourceDetailPage from "../ingestion-source-detail.enterprise";
+import IngestionSourcesPage from "../ingestion-sources.enterprise";
 
 import DepartmentsPage from "../departments";
 import GovernanceOverviewPage from "../index";

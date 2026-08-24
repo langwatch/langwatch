@@ -25,7 +25,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import type { VirtualKeyWithScopes } from "~/server/gateway/virtualKey.repository";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 
-import { resolveGatewayBaseUrl } from "./gatewayUrl";
+import { resolveGatewayBaseUrl } from "@langwatch/enterprise-governance-contract";
 import { PersonalWorkspaceService } from "./personalWorkspace.service";
 import { RoutingPolicyService } from "./routingPolicy.service";
 

@@ -12,16 +12,17 @@
  * Spec: specs/ai-gateway/governance/anomaly-rules.feature
  */
 import { NotFoundError } from "@langwatch/handled-error";
+import {
+  unsupportedValue,
+  validateDestinationConfig,
+  validateThresholdConfig,
+} from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 import type {
   AnomalyRule,
   Prisma,
   PrismaClient,
 } from "~/generated/prisma/client";
-
-import { validateDestinationConfig } from "./destinationConfig.schema";
-import { validateThresholdConfig } from "./thresholdConfig.schema";
-import { unsupportedValue } from "./unsupportedValue";
 
 const logger = createLogger("langwatch:governance:anomaly-rule");
 

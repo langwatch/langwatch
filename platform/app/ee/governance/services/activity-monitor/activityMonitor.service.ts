@@ -28,6 +28,12 @@
  *     (single trace store, reserved namespaces)
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import {
+  GOVERNANCE_ATTR,
+  GOVERNANCE_ORIGIN_KIND_VALUE,
+  resolveTraceDepartmentId,
+  UNASSIGNED_DEPARTMENT,
+} from "@langwatch/enterprise-governance-contract";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 
@@ -36,14 +42,6 @@ import {
   nanoUsdToDecimalString,
   usdToNanoUsd,
 } from "~/server/gateway/wireMoney";
-import {
-  resolveTraceDepartmentId,
-  UNASSIGNED_DEPARTMENT,
-} from "../department/departmentAttribution";
-import {
-  GOVERNANCE_ATTR,
-  GOVERNANCE_ORIGIN_KIND_VALUE,
-} from "../governanceAttributeKeys";
 import { PROJECT_KIND } from "../governanceProject.service";
 
 export interface SummaryResult {

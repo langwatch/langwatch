@@ -11,7 +11,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { OttlEditor } from "@ee/governance/dashboard/components/OttlEditor";
+import { EnterpriseOttlEditor as OttlEditor } from "~/components/governance/OttlEditor.enterprise";
 import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Drawer } from "~/components/ui/drawer";

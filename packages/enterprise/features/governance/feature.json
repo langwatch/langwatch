@@ -1,3 +1,19 @@
 {
-  "layoutVersion": 0
+  "layoutVersion": 0,
+  "subjects": [
+    "anomaly-rule",
+    "canonical-cost",
+    "cost-attribution-policy",
+    "department",
+    "gateway-debit",
+    "governance",
+    "ingestion-credentials",
+    "ingestion-pull",
+    "ingestion-source",
+    "ottl",
+    "platform-tool-policy",
+    "pull-destination",
+    "pulled-usage",
+    "puller"
+  ]
 }

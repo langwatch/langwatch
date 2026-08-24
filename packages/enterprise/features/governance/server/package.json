@@ -20,7 +20,9 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@langwatch/enterprise-governance-contract": "workspace:*"
+    "@langwatch/enterprise-governance-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

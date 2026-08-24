@@ -79,6 +79,15 @@ Missing optional roles are valid. Unexpected directories containing a
 `package.json`, duplicate package names and a feature directory containing its
 own package manifest are errors.
 
+A broad bounded context may declare a sorted `subjects` array in its
+`feature.json`. Contract and server production filenames must correspond to one
+of those subjects after architectural suffixes such as `.service`, `.port`,
+`.adapter`, `.repository`, `.projection`, `.commands`, `.queries`, and
+`.events` are removed. Adding a subject is an architectural expansion: the
+feature ADR and behavioural spec must explain the ownership decision in the
+same change. This keeps a coherent product boundary possible without allowing
+its broad name to become a catch-all.
+
 ADR-111 adds four non-feature enterprise packages at fixed paths beneath one
 legal ownership root:
 

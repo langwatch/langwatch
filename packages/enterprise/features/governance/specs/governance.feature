@@ -1,5 +1,20 @@
 Feature: Enterprise governance package boundary
 
+  Rule: Governance is the Enterprise AI control plane
+
+    Scenario: Governance orchestrates rather than absorbs infrastructure
+      Given gateway, billing, webhook, automation and audit capabilities exist
+      When governance enforces an organizational AI policy
+      Then governance owns the policy decision and its governance facts
+      And technical execution is delegated through narrow capability ports
+      And governance does not own those features' transport or persistence engines
+
+    Scenario: A new governance subject is deliberate
+      Given the governance package has declared source subjects
+      When source for a new subject is added
+      Then architecture lint rejects it until feature.json declares the subject
+      And the boundary ADR and feature specification describe its ownership
+
   Scenario: A pull schedule is validated portably
     Given a five-field UTC cron schedule
     When the governance contract validates it

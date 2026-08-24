@@ -8,13 +8,13 @@ import {
 } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
-import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
   GOVERNANCE_ATTR,
   isGovernanceOriginTrace,
-} from "../services/governanceAttributeKeys";
+} from "@langwatch/enterprise-governance-contract";
+import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.foldProjection";
+import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 
 const logger = createLogger(
   "langwatch:trace-processing:governance-ocsf-events-sync",

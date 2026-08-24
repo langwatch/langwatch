@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { env } from "~/env.mjs";
+import {
+  resolveGatewayBaseUrl,
+  type PlatformToolPolicyMap,
+} from "@langwatch/enterprise-governance-contract";
 /**
  * CliBootstrapService - shared logic for the login-completion ceremony.
  * Returns the member's available AI tools (coding assistants they can run),
@@ -29,8 +33,6 @@ import {
 } from "~/server/gateway/budgetOverview.service";
 import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
 import { AiToolEntryService } from "./aiToolEntry.service";
-import { resolveGatewayBaseUrl } from "./gatewayUrl";
-import type { PlatformToolPolicyMap } from "./platformToolPolicy.service";
 
 export interface CliBootstrapResult {
   /**

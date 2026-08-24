@@ -124,6 +124,8 @@
     "@langwatch/enterprise-managed-providers-contract": "workspace:*",
     "@langwatch/enterprise-managed-providers-server": "workspace:*",
     "@langwatch/enterprise-managed-providers-web": "workspace:*",
+    "@langwatch/enterprise-governance-contract": "workspace:*",
+    "@langwatch/enterprise-governance-server": "workspace:*",
     "@langwatch/enterprise-governance-web": "workspace:*",
     "@langwatch/enterprise-saas-contract": "workspace:*",
     "@langwatch/enterprise-saas-web": "workspace:*",

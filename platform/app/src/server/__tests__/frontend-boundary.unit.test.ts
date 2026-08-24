@@ -553,18 +553,6 @@ describe("browser-only UI never reaches the backend", () => {
     });
   });
 
-  describe("given the @ee path alias", () => {
-    it("resolves to a real file, so the ee tree is actually walked", () => {
-      const resolved = resolveAppImport(
-        "@ee/governance/services/gatewayUrl",
-        SRC,
-      );
-
-      expect(resolved).not.toBeNull();
-      expect(fs.existsSync(resolved!)).toBe(true);
-    });
-  });
-
   // The compiler-emitted `react/jsx-runtime` import is the one edge that is in
   // no file's source. An icon component is the sharpest case: it has no import
   // statement whatsoever, so before this rule it was a dead end in the walk

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { createLogger } from "@langwatch/observability";
+import { SoftWarnPercent } from "@langwatch/enterprise-governance-contract";
 import type {
   GatewayBudget,
   PrismaClient,
@@ -22,7 +23,6 @@ import {
   budgetPeriodFloorMs,
   currentPeriodStart,
 } from "~/server/gateway/budgetPeriod";
-import { SoftWarnPercent } from "./governanceSignals.constants";
 
 const logger = createLogger("langwatch:governance:signals");
 

@@ -3,7 +3,8 @@
     "target": "es2022",
     "module": "preserve",
     "moduleResolution": "bundler",
-    "lib": ["es2022", "dom"],
+    "jsx": "react-jsx",
+    "lib": ["es2022", "dom", "dom.iterable"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noEmit": true,
@@ -14,5 +15,5 @@
       "@langwatch/enterprise-governance-contract": ["../contract/src/index.ts"]
     }
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "tests/**/*.tsx"]
 }

@@ -1,0 +1,127 @@
+export type OtlpAnyValue = {
+  stringValue?: string;
+  intValue?: string | number;
+  doubleValue?: number;
+  boolValue?: boolean;
+};
+export type OtlpKeyValue = { key?: string; value?: OtlpAnyValue };
+export type OtlpLogRecord = {
+  attributes?: OtlpKeyValue[];
+  timeUnixNano?: string | number;
+};
+export type OtlpLogsRequest = {
+  resourceLogs?: Array<{
+    resource?: { attributes?: OtlpKeyValue[] };
+    scopeLogs?: Array<{ logRecords?: OtlpLogRecord[] }>;
+  }>;
+};
+export type CanonicalCostEvent = {
+  costUsd: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  requestId: string;
+  occurredAt: Date;
+  userEmail: string | null;
+  teamIdHint: string | null;
+  raw: Record<string, unknown>;
+};
+
+const FIELD = {
+  costUsd: "langwatch.cost.usd",
+  requestId: "langwatch.request_id",
+  model: "langwatch.model",
+  inputTokens: "langwatch.input_tokens",
+  outputTokens: "langwatch.output_tokens",
+  cacheReadTokens: "langwatch.cache_read_tokens",
+  cacheCreationTokens: "langwatch.cache_creation_tokens",
+  principalEmail: "langwatch.principal.email",
+  teamIdHint: "langwatch.team.id_hint",
+} as const;
+
+export class CanonicalCostExtractorService {
+  static create(): CanonicalCostExtractorService {
+    return new CanonicalCostExtractorService();
+  }
+
+  extract(request: OtlpLogsRequest): CanonicalCostEvent[] {
+    const events: CanonicalCostEvent[] = [];
+    for (const resourceLog of request.resourceLogs ?? []) {
+      const resource = this.merge(resourceLog.resource?.attributes ?? []);
+      for (const scopeLog of resourceLog.scopeLogs ?? []) {
+        for (const record of scopeLog.logRecords ?? []) {
+          const parsed = this.parse(record, resource);
+          if (parsed) events.push(parsed);
+        }
+      }
+    }
+    return events;
+  }
+
+  private merge(values: OtlpKeyValue[]): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    for (const item of values) {
+      if (!item.key || !item.value) continue;
+      const value = item.value;
+      if (value.stringValue !== undefined) result[item.key] = value.stringValue;
+      else if (value.intValue !== undefined) {
+        result[item.key] =
+          typeof value.intValue === "string"
+            ? Number(value.intValue)
+            : value.intValue;
+      } else if (value.doubleValue !== undefined)
+        result[item.key] = value.doubleValue;
+      else if (value.boolValue !== undefined)
+        result[item.key] = value.boolValue;
+    }
+    return result;
+  }
+
+  private parse(
+    record: OtlpLogRecord,
+    resource: Record<string, unknown>,
+  ): CanonicalCostEvent | null {
+    const merged = { ...resource, ...this.merge(record.attributes ?? []) };
+    const requestId = this.string(merged[FIELD.requestId]);
+    const costUsd = this.cost(merged[FIELD.costUsd]);
+    if (!requestId || costUsd === null) return null;
+    return {
+      costUsd,
+      model: this.string(merged[FIELD.model]) ?? "unknown",
+      inputTokens: this.number(merged[FIELD.inputTokens]),
+      outputTokens: this.number(merged[FIELD.outputTokens]),
+      cacheReadTokens: this.number(merged[FIELD.cacheReadTokens]),
+      cacheCreationTokens: this.number(merged[FIELD.cacheCreationTokens]),
+      requestId,
+      occurredAt: this.date(record.timeUnixNano),
+      userEmail: this.string(merged[FIELD.principalEmail]),
+      teamIdHint: this.string(merged[FIELD.teamIdHint]),
+      raw: merged,
+    };
+  }
+
+  private string(value: unknown): string | null {
+    return typeof value === "string" && value.length > 0 ? value : null;
+  }
+
+  private number(value: unknown): number {
+    const parsed = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  private cost(value: unknown): string | null {
+    if (typeof value === "number" && Number.isFinite(value))
+      return String(value);
+    if (typeof value !== "string" || value.trim() === "") return null;
+    return Number.isFinite(Number(value)) ? value.trim() : null;
+  }
+
+  private date(value: string | number | undefined): Date {
+    if (value === undefined) return new Date();
+    const nanos =
+      typeof value === "string" ? BigInt(value) : BigInt(Math.floor(value));
+    return new Date(Number(nanos / 1_000_000n));
+  }
+}

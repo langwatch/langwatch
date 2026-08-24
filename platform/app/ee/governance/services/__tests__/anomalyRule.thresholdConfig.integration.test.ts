@@ -43,7 +43,7 @@ import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-import { safeParseSpendSpikeThresholdConfig } from "../activity-monitor/thresholdConfig.schema";
+import { safeParseSpendSpikeThresholdConfig } from "@langwatch/enterprise-governance-contract";
 
 const ns = `tcfg-${nanoid(8)}`;
 const enterprisePlan: PlanInfo = { ...FREE_PLAN, type: "ENTERPRISE" };

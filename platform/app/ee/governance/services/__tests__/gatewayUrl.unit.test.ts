@@ -6,7 +6,7 @@ import {
   LOCAL_GATEWAY_URL,
   resolveGatewayBaseUrl,
   SAAS_GATEWAY_URL,
-} from "../gatewayUrl";
+} from "@langwatch/enterprise-governance-contract";
 
 describe("resolveGatewayBaseUrl", () => {
   describe("given no explicit gateway env vars", () => {

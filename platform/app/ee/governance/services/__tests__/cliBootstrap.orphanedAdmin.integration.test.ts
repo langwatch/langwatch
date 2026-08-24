@@ -25,7 +25,7 @@ import {
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 
 import { CliBootstrapService } from "../cliBootstrap.service";
-import { PLATFORM_TOOL_SLUGS } from "../platformToolPolicy.service";
+import { PLATFORM_TOOL_SLUGS } from "@langwatch/enterprise-governance-contract";
 
 const suffix = nanoid(8);
 const MIXED_ORG_ID = `org-cbo-${suffix}`;

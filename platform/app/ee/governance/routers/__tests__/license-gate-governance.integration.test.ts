@@ -23,7 +23,7 @@
  * Spec: specs/ai-gateway/license-gate-governance.feature
  */
 
-import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "@ee/governance/services/activity-monitor/ingestionSource.constants";
+import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "@langwatch/enterprise-governance-contract";
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";

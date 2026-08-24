@@ -37,6 +37,7 @@ export type ClassifiedPackage = {
   feature?: string;
   featureRoot?: string;
   layoutVersion?: FeatureLayoutVersion;
+  subjects?: readonly string[];
   enterprise: boolean;
 };
 

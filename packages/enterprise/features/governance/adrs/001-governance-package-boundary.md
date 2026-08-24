@@ -1,4 +1,4 @@
-# ADR-001: Governance owns portable ingestion and usage contracts
+# ADR-001: Governance owns the Enterprise AI control plane
 
 **Status:** Accepted
 
@@ -6,15 +6,33 @@
 
 ## Context
 
-Governance UI, database queries, provider pullers, Eventing definitions, and
-transport handlers grew together below an application alias. That made the
-application itself the only place governance behavior could be composed.
+Governance is LangWatch's Enterprise AI control plane: it decides, records and
+enforces how an organisation's AI systems are used. Its UI, ingestion sources,
+provider pullers, attribution policy, departmental views, budget enforcement,
+anomaly rules, audit facts and transport handlers grew together below an
+application alias. That made the application itself the only place the product
+vertical could be composed.
 
 ## Decision
 
 Create portable governance contracts and separate server and web packages.
-The ingestion-pull and pulled-usage workflows belong to governance rather than
-to a generic Enterprise event-sourcing directory.
+Governance owns ingestion and normalisation, organisational attribution,
+governance policy and enforcement, governance anomalies and audit facts, and
+the operator surfaces that expose those decisions. The ingestion-pull and
+pulled-usage workflows therefore belong to governance rather than to a generic
+Enterprise event-sourcing directory.
+
+Gateway, Billing, Webhooks, Automations and the generic Audit Log retain their
+technical capabilities. Governance consumes gateway spend facts, delegates
+metering and invoicing, emits webhook delivery intents, delegates generic
+trigger execution and writes through audit capabilities using narrow ports. It
+does not absorb those features' transports, persistence engines or reusable
+frameworks.
+
+`feature.json` declares the accepted source subjects for this deliberately
+broad bounded context. A new subject must update that manifest, this ADR and
+the linked feature specification together; architecture lint rejects an
+undeclared source subject.
 
 ## Public surfaces and transports
 

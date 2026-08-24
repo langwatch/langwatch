@@ -2,6 +2,13 @@
 
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import {
+  PLATFORM_TOOL_POLICY_DEFAULTS,
+  PLATFORM_TOOL_SLUGS,
+  type PlatformToolPolicy,
+  type PlatformToolPolicyMap,
+  type PlatformToolSlug,
+} from "@langwatch/enterprise-governance-contract";
 /**
  * AiToolEntryService - owns the AI Tools Portal catalog (Phase 7).
  *
@@ -38,14 +45,6 @@ import { z } from "zod";
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 
 import { modelProviders as supportedModelProviders } from "~/server/modelProviders/registry";
-
-import {
-  PLATFORM_TOOL_POLICY_DEFAULTS,
-  PLATFORM_TOOL_SLUGS,
-  type PlatformToolPolicy,
-  type PlatformToolPolicyMap,
-  type PlatformToolSlug,
-} from "./platformToolPolicy.service";
 
 export const SUPPORTED_TILE_TYPES = [
   "coding_assistant",
