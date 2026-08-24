@@ -1314,13 +1314,34 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-vite-
 
-      # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
-      # its postinstall always falls back to `node-gyp rebuild`. With
-      # pnpm/action-setup v6's npm-bootstrap path, node-gyp isn't on PATH
-      # by default — install it globally before any install that hits
-      # mcp-server's onlyBuiltDependencies allowlist.
+      # node-pty ships prebuilds only for darwin and win32, so on Linux its
+      # postinstall always falls back to `node-gyp rebuild`. pnpm runs that
+      # rebuild with its OWN vendored node-gyp, whose `gyp/gyp_main.py` ships
+      # mode 644. That is harmless while make only compiles, but the moment
+      # make decides the generated Makefile is stale it re-runs gyp_main.py as
+      # a command and the build dies with "Permission denied" / error 126.
+      # Whether it decides that depends on file mtimes, so the failure comes
+      # and goes with how the concurrent native builds happen to interleave
+      # over the shared ~/.cache/node-gyp headers.
+      #
+      # Installing node-gyp globally is not enough on its own: pnpm exports
+      # `npm_config_node_gyp` pointing at its vendored copy, and that variable
+      # wins over PATH for every lifecycle script, so the global install sits
+      # unused. Point the variable at the published node-gyp, which ships
+      # gyp_main.py mode 755, and the landmine is gone for every later install
+      # in the job. npx-server-smoke.yml and sdk-javascript-ci.yml do the same.
       - name: Install node-gyp (for node-pty postinstall)
-        run: npm install -g node-gyp@12.3.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install -g node-gyp@12.3.0
+          gyp="$(npm root -g)/node-gyp/bin/node-gyp.js"
+          # Assert rather than trust: a wrong path here would not fail this
+          # step, it would fail whichever native build ran next, which reads
+          # as an unrelated compiler error.
+          test -f "$gyp"
+          test -x "$(dirname "$gyp")/../gyp/gyp_main.py"
+          echo "npm_config_node_gyp=$gyp" >> "$GITHUB_ENV"
 
       # One install. mcp-server is a workspace dependency of the app, so the
       # trailing `...` pulls it in — it used to be installed separately here

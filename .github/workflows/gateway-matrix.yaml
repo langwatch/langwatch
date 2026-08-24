@@ -208,8 +208,26 @@ jobs:
         # node-pty (in the app's closure via mcp-server) falls back to
         # `node-gyp rebuild` on linux, and this job bypasses the shared setup
         # action that puts node-gyp on PATH.
+        #
+        # Installing it globally is not enough on its own: pnpm exports
+        # `npm_config_node_gyp` pointing at its own vendored copy, whose
+        # `gyp/gyp_main.py` ships mode 644, and that variable wins over PATH
+        # for every lifecycle script. When make decides the generated Makefile
+        # is stale it re-runs gyp_main.py as a command, and the build dies with
+        # "Permission denied" / error 126. Export the variable at the published
+        # node-gyp, which ships gyp_main.py mode 755. npx-server-smoke.yml and
+        # sdk-javascript-ci.yml do the same.
+        shell: bash
         run: |
+          set -euo pipefail
           npm install -g node-gyp@12.3.0
+          gyp="$(npm root -g)/node-gyp/bin/node-gyp.js"
+          # Assert rather than trust: a wrong path here would not fail this
+          # line, it would fail the native build below, which reads as an
+          # unrelated compiler error.
+          test -f "$gyp"
+          test -x "$(dirname "$gyp")/../gyp/gyp_main.py"
+          export npm_config_node_gyp="$gyp"
           pnpm install --frozen-lockfile --filter "@langwatch/web..."
 
       - name: Apply DB migrations
