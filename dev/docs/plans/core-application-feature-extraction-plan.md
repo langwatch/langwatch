@@ -40,6 +40,8 @@ as a directory rename.
    records with Dataset, and spans and shares with Trace.
 3. A service receives its own private repositories and other feature services.
    It never receives another feature's repository.
+   Multiple access paths for the same feature are merged behind that service;
+   several stores do not automatically mean several public services.
 4. Another feature consumes only the canonical abstract service and portable
    Zod 4 values from the owning contract package.
 5. Ordinary service and repository methods return a value or throw. A nullable
@@ -81,10 +83,10 @@ as a directory rename.
 | `evaluator` | evaluator definitions, evaluator providers and evaluator configuration | `evaluators`, evaluator portion of `optimization`; `/api/evaluators` | `server/evaluators`, evaluator components | contract/server/web packages landed and the duplicate app service is deleted; copy/cascade transport orchestration remains |
 | `evaluation` | evaluation definitions, execution, runs, results and DSPy evaluation steps | `evaluations`, `batchRecord`; legacy evaluation REST | `server/evaluations`, `app-layer/evaluations`, `app-layer/dspy-steps`, evaluation UI | contract/server scaffold landed but is not integrated: its ClickHouse repository must first absorb the hardened production retention, deduplication, projection-id and write-cap behavior, then execution/Eventing/UI residue must move |
 | `monitor` | online monitor definition and lifecycle | `monitors`; `/api/monitors` | `app-layer/monitors`, monitor router and online-evaluation UI | contract/server packages and process App service landed; remaining dataset-provider and UI seams still need draining |
-| `experiment` | experiment definition and run history | `experiments`; `/api/experiments`, experiment-v3 REST | `server/experiments*`, experiment event pipeline and UI | definition contract/server and App transport migration landed; ClickHouse run history is the active package drain |
-| `scenario` | scenario definition, events and cancellation | `scenarios`; `/api/scenarios`, `/api/scenario-events`, scenario generation route | `server/scenarios`, scenario components/hooks | contract/server and request-App CRUD/runner/worker integration landed; cancellation, failure handling and browser coordination remain explicit execution seams |
-| `simulation` | simulation execution, batches and simulation-run results | simulation procedures currently nested below `scenarios`; `/api/simulation-runs` | `app-layer/simulations`, simulation event pipeline and UI | Zod 4 read contract/server landed; ClickHouse adapter and request-App integration are active, while Eventing execution remains separate |
-| `suite` | suite definition, run plan and suite-run history | `suites`; `/api/suites` | `server/suites`, `app-layer/suites`, suite event pipeline and UI | definition contract/server and request-App CRUD integration landed; run orchestration and archived-name resolution are the active drain |
+| `experiment` | experiment definition and run history | `experiments`; `/api/experiments`, experiment-v3 REST | `server/experiments*`, experiment event pipeline and UI | definition and ClickHouse history now use one canonical service; Eventing run commands are the active final drain |
+| `scenario` | scenario definition, events and cancellation | `scenarios`; `/api/scenarios`, `/api/scenario-events`, scenario generation route | `server/scenarios`, scenario components/hooks | definition persistence, run configuration and transports use one service; rebase the remaining legacy characterization tests, then remove the old duplicate service/repository; cancellation, failure handling and browser coordination remain execution seams |
+| `simulation` | simulation execution, batches and simulation-run results | simulation procedures currently nested below `scenarios`; `/api/simulation-runs` | Simulation feature package, simulation event pipeline and UI | ClickHouse reads and actual Eventing commands use one process-owned service; the legacy app service/repository is deleted; global Langy/onboarding access and UI relocation remain |
+| `suite` | suite definition, run plan and suite-run history | `suites`; `/api/suites` | Suite feature package, suite event pipeline and UI | definition, references, archived names and run planning use one process-owned service; the duplicate legacy definition service/repository is deleted; durable execution stays behind its injected port |
 
 ### Observability, analysis and collaboration
 

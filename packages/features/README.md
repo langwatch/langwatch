@@ -63,6 +63,14 @@ Each code directory is a separate workspace package:
 The feature root is an ownership directory, not a package. Do not put a
 `package.json` there.
 
+Feature-specific ADRs, Gherkin specs and developer notes live in `adrs/`,
+`specs/` and, only when needed, a concise feature README. Move the existing
+documents with the implementation, update them after the new boundary is
+working, and remove duplicated or diary-style prose. Preserve current facts,
+durable decisions and useful history; keep cross-cutting repository and
+application decisions in `dev/docs` rather than copying them into every
+feature.
+
 Enterprise code is grouped beneath one deliberate root:
 
 ```text
@@ -85,13 +93,16 @@ legal license and README move before any enterprise source so their
 directory-and-descendants scope remains intact. Product licensing uses the same
 strict `features/licensing/{contract,server,web}` layout as other features.
 Signed-license state feeds the provider-neutral
-[Entitlements capability](./entitlements/adrs/001-provider-neutral-plan-resolution.md)
+[Entitlement capability](./entitlement/adrs/001-provider-neutral-plan-resolution.md)
 rather than replacing it.
 
 Enterprise is a composition and legal grouping, not a catch-all feature.
-`ops` and `saas` are core feature roots. The Enterprise catalogue contains the
+`ops` is a core feature because back-office operation is required by every
+distribution. `saas` remains beneath Enterprise because its source is governed
+by the Enterprise license, even though SaaS activation is a separate runtime
+decision from an Enterprise entitlement. The Enterprise catalogue contains the
 singular `audit-log`, `billing`, `governance`, `licensing`, `managed-provider`,
-`scim`, `sso`, and `webhook` features.
+`saas`, `scim`, `sso`, and `webhook` features.
 
 During the physical application split in
 [ADR-111](../../dev/docs/adr/111-physical-application-workspaces.md), reusable
@@ -124,6 +135,9 @@ server/src/
 ├── stores/<subject>.store.ts
 ├── stores/<adapter>/<adapter>.<subject>.store.ts
 ├── projections/<subject>.projection.ts
+├── subscribers/<subject>.subscriber.ts
+├── processes/<subject>.process.ts
+├── intents/<subject>.intent.ts
 ├── ports/<subject>.port.ts
 ├── adapters/<adapter>.<subject>.adapter.ts
 ├── api/<surface>/<subject>.api.ts
@@ -185,9 +199,29 @@ validation, orchestration, and state transitions.
 A service:
 
 - receives repository, store, and external capability ports;
+- receives other feature behaviour through those features' contract services;
+- never imports a database client or recovers a global App;
 - never imports an API, migration, or concrete infrastructure adapter;
 - exposes construction through `static create`; and
 - keeps behaviour on the class instead of using standalone service factories.
+
+The contract service is the only cross-feature behavioural surface. A process
+constructs one implementation and injects that same instance into callers.
+Several private repositories are fine when the feature genuinely uses several
+stores; they do not justify parallel read, history, lifecycle, or command
+services for the same product capability. Merge those access paths behind the
+one service when doing so makes the boundary simpler. Split a second public
+service only for a materially different trust or process lifecycle documented
+in the feature ADR.
+
+Result semantics are consistent at every service, port, repository, and store
+boundary. An ordinary method returns a value or throws its own domain error.
+Only a `try*` method may return `null` or `undefined` (or use a caller-supplied
+default). `require*` is not part of the vocabulary. Add an optional `try*`
+method only when a real caller needs optional discovery; do not create
+speculative method pairs. Every class method in these boundary modules declares
+its result type so inference cannot hide absence. This rule has no
+persistence-layer exception.
 
 Private, pure module-local helpers may support the class. They are implementation
 details, not an alternative public behaviour surface.
@@ -236,10 +270,20 @@ An API class lives at `api/<surface>/<subject>.api.ts`. A surface can be
 `public`, `internal`, `legacy-rest`, or another deliberately named transport
 surface.
 
-API classes are thin adapters. They receive the contract service capability,
-validate transport input using contract schemas, delegate exactly once, and map
-handled errors. They do not import repositories, stores, projections,
-migrations, or infrastructure adapters.
+API classes are thin adapters. The process-composed application exposes the
+contract service as `context.app.<feature>` and the authenticated user as
+`context.actor()`. When validated input selects an additional permission, the
+handler calls `context.authorize(permission)`. API constructors may receive static transport configuration,
+but never a service resolver. A handler validates transport input using
+contract schemas, delegates exactly once, and maps handled errors. It does not
+import repositories, stores, projections, migrations, or infrastructure
+adapters.
+
+Project-scoped public RPC input includes `projectId`; the host authentication
+pipeline must authorize that exact project before dispatch. This preserves
+multi-project credentials without trusting a caller-selected tenant. A handler
+that declares input or returns data must declare the matching `withInput` or
+`withOutput` schema; `@langwatch/api` enforces both in TypeScript.
 
 REST and RPC are implementation choices at this layer. Existing app tRPC can
 remain a compatibility adapter over the same composed service; it is not a
@@ -250,6 +294,40 @@ second feature implementation.
 Use `projections/<subject>.projection.ts` only when state is actually derived
 from an event or log. A projection is a class with `static create`. Ordinary
 mutable table state does not need a projection merely because it is read often.
+
+Projection evolution is deterministic, synchronous, and bounded. A projection
+does not perform network calls, use timers, await work, or fabricate another
+durable event. It returns derived state or a deterministic write; the Eventing
+executor and injected projection store own persistence. Architecture lint
+enforces the statically visible part of this contract. Eventing's projection
+duration histogram exposes CPU-heavy evolution that static analysis cannot
+measure.
+
+### Subscriber
+
+Use `subscribers/<subject>.subscriber.ts` for a class that reacts to a durable
+event after it is published. The subscriber delegates idempotent side effects
+through injected services or ports; shared subscriber contracts belong under
+`ports/`, not beside the subscriber implementation.
+
+Subscribers run at least once. Queue deduplication is an optimization, not the
+effect's idempotency boundary. Each strict-package subscriber has a matching
+`tests/subscribers/<subject>.subscriber.redelivery.test.ts` that handles the
+same source event twice and proves one externally visible result. When a
+subscriber needs to produce another durable event, it invokes the owning
+feature command/pipeline; it never constructs or appends the event directly.
+
+### Process and intent
+
+Use `processes/<subject>.process.ts` for durable orchestration. Process
+evolution is synchronous and deterministic: it derives process state, a wake,
+and deterministically keyed intents. It does not perform external I/O.
+
+Use `intents/<subject>.intent.ts` for the retry-safe executor of those intents.
+The executor may perform network or persistence work. If that work must create
+a durable domain event, it calls the owning feature command so validation,
+telemetry, event registration, and append semantics stay on the canonical
+pipeline.
 
 ### Migration
 
@@ -273,11 +351,12 @@ Those runtime roots construct concrete adapters and services, then mount API or
 worker surfaces. A version-0 feature has no catch-all `composition`,
 `registration`, `lifecycle`, or `eventing` source directory.
 
-Each process constructs one canonical LangWatch App service graph. Hono reads
-it from `c.var.langwatchApp`, tRPC from `ctx.app`, and worker handlers from their
-composed runtime. A request handler never constructs a feature service or
-repository, and a feature service never uses a global Prisma client to recover
-its dependencies.
+Each process constructs one canonical LangWatch App service graph. Hono feature
+handlers read it directly from `context.app`, tRPC from `ctx.app`, and worker
+handlers from their composed runtime. Existing middleware may keep the Hono
+variable as a compatibility detail, but feature handlers do not. A request
+handler never constructs or resolves a feature service or repository, and a
+feature service never uses a global Prisma client to recover its dependencies.
 
 ## Classes and functions
 
@@ -296,6 +375,10 @@ Every package has an explicit `exports` map. Wildcard exports, source-directory
 exports, and public repository or Prisma subpaths are forbidden. Add a named
 server entry point only when the feature ADR identifies it as a supported
 composition surface.
+
+The server root barrel follows the same rule. It cannot re-export a repository,
+store, or projection through `"."` to disguise private persistence as a
+deliberate package surface.
 
 Dependency direction is:
 
@@ -338,7 +421,7 @@ pnpm lint:architecture
 ```
 
 The gate combines Oxlint source rules with the graph-aware architecture CLI. It
-checks:
+checks only durable structural facts:
 
 - singular feature registration and unique subject ownership in the central
   catalogue;
@@ -346,9 +429,35 @@ checks:
 - required classes and `static create` methods;
 - internal and cross-package dependency direction;
 - package names, dependencies, cycles, and explicit exports;
-- Prisma containment and public declaration leaks;
-- direct environment access and hidden server control flow; and
+- Prisma and database containment;
+- direct environment access, database containment, and explicit service result
+  contracts; and
 - required ADR and specification structure.
+
+It is intentionally not the formatter, a general dependency-upgrade policy, or
+a code-style review. It may reject an explicitly retired runtime or package
+entry point, such as Zod 3 in a feature package, because mixed runtimes violate
+the contract boundary. Retired package names are kept in one small exact map;
+this is not semver comparison or an “always latest” policy. Formatting,
+expression complexity, and routine package upgrades belong to their ordinary
+tools. Architecture lint stays fast and deterministic so it can run on every
+change.
+
+Public declaration emission and leak detection are a separate, heavier
+boundary check rather than work hidden inside the fast lint loop:
+
+```bash
+pnpm lint:architecture:declarations
+```
+
+The exact shrinking baseline for the temporary `platform/app` split is also a
+separate migration audit. New `@ee/*` and other retired entry points still fail
+the ordinary source lint immediately; this command only reconciles already
+tolerated legacy edges:
+
+```bash
+pnpm lint:architecture:migration
+```
 
 For focused architecture-lint development:
 
@@ -356,6 +465,8 @@ For focused architecture-lint development:
 pnpm --filter @langwatch/architecture-lint typecheck
 pnpm --filter @langwatch/architecture-lint test
 pnpm --filter @langwatch/architecture-lint lint
+pnpm --filter @langwatch/architecture-lint lint:declarations
+pnpm --filter @langwatch/architecture-lint lint:migration
 ```
 
 Also typecheck and test each changed physical feature package.

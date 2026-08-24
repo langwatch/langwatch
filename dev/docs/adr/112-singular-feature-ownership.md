@@ -6,8 +6,9 @@
 
 **Supersedes:** The local `feature.json` ownership-expansion mechanism in
 architecture-lint ADR-001 and Governance ADR-001. It also relocates the
-accepted Admin and SaaS package-boundary decisions from their temporary
-Enterprise roots without changing their behavioural contracts. ADR-101 is
+accepted Admin package-boundary decision from its temporary Enterprise root
+without changing its behavioural contract. SaaS remains in the Enterprise
+source-license tree. ADR-101 is
 amended in the same decision so its feature examples and scope are singular and
 catalogue-backed. The physical contract/server/web surfaces and strict layout
 from those decisions remain in force.
@@ -53,11 +54,12 @@ projection of project behaviour. The application needs one composed instance
 of each service for the process, not a global Prisma shortcut or a fresh object
 graph on every request.
 
-Finally, Enterprise is a legal and composition grouping rather than permission
-to group unrelated product domains. SaaS deployment integrations are not
-Enterprise-licensed. Platform administration and operational tooling are
-available to every installation and likewise do not belong beneath the
-Enterprise source license.
+Finally, Enterprise is first a source-license and composition boundary, not a
+claim that every package has the same runtime entitlement gate. SaaS-only
+vendor integrations are governed by the Enterprise source license even when
+deployment selection, rather than an Enterprise plan entitlement, activates
+them. Platform administration and operational tooling are available to every
+installation and do not belong beneath that source-license boundary.
 
 ## Decision
 
@@ -78,9 +80,11 @@ The initial core catalogue contains the following independently owned domains:
 | `annotation` | annotation and score lifecycle |
 | `api-key` | API credential issuance, rotation, restriction, and revocation |
 | `auth` | authentication, login, identity-provider, and session behaviour |
-| `authz` | permissions, grants, roles, bindings, and authorization decisions |
+| `authz` | permissions, grants, bindings, and authorization decisions |
 | `automation` | automation definitions and execution lifecycle |
 | `coding-agent` | coding-agent conversations and jobs |
+| `dashboard` | dashboards, graphs, saved workbench charts, and chart ordering |
+| `data-privacy` | scoped capture, redaction, and privacy policy |
 | `data-retention` | retention policy, pinning, metering, and retroactive work |
 | `dataset` | datasets, records, imports, and dataset file handling |
 | `entitlement` | provider-neutral plan and capability decisions |
@@ -88,6 +92,7 @@ The initial core catalogue contains the following independently owned domains:
 | `evaluator` | evaluator definitions, execution, and evaluator providers |
 | `experiment` | experiment definitions and execution history |
 | `gateway` | AI gateway policy, virtual keys, budgets, cache rules, and guardrails |
+| `github` | GitHub installations, webhooks, repositories, and pull-request linkage |
 | `langy` | Langy conversations, signals, and jobs |
 | `model-provider` | provider credentials, models, model metadata, and model costs |
 | `monitor` | online monitor definitions and lifecycle |
@@ -95,14 +100,16 @@ The initial core catalogue contains the following independently owned domains:
 | `ops` | backoffice administration, queues, replay, schedulers, and event/process operations |
 | `organization` | organizations, teams, groups, memberships, invites, and personal-workspace provisioning |
 | `project` | project lifecycle, settings, and project identity |
+| `role` | custom-role definitions and assignment policy |
 | `prompt` | prompts, versions, tags, and prompt configuration |
-| `saas` | SaaS deployment integrations and browser analytics |
+| `presence` | collaborative user presence and cursors |
 | `scenario` | scenario definitions and scenario lifecycle |
 | `secret` | project secret lifecycle and reserved-name policy |
 | `simulation` | simulation execution and batches |
 | `stored-object` | durable object metadata, upload, delivery, and migration |
 | `suite` | suite definitions, run plans, and suite run history |
 | `telemetry` | standards-compliant telemetry ingestion and collection |
+| `topic` | topic models, clustering runs, and clustering status |
 | `trace` | traces, spans, sharing, overlays, and trace querying |
 | `user` | user lifecycle, profile, preferences, deactivation, and avatar |
 | `workflow` | workflow definitions, versions, nodes, and execution-facing behaviour |
@@ -116,15 +123,16 @@ folder creation.
 Subordinate concepts stay with their owning feature. In particular, user avatar
 belongs to `user`; teams, groups, invites, and memberships belong to
 `organization`; dataset records belong to `dataset`; prompt versions and tags
-belong to `prompt`; and trace spans and shares belong to `trace`. Existing URL
-shapes do not alter that ownership. Compatibility routes such as `/user` and
-`/user/avatar` may coexist and delegate to the same User service until a future
-versioned API changes them.
+belong to `prompt`; trace spans, shares, edit overlays, and saved trace views
+belong to `trace`; and graphs and saved workbench charts belong to `dashboard`.
+Existing URL shapes do not alter that ownership. Compatibility routes such as
+`/user` and `/user/avatar` may coexist and delegate to the same User service
+until a future versioned API changes them.
 
 Related product nouns remain separate when callers can use one without owning
 the other's lifecycle. Evaluations and evaluators, scenarios and simulations,
-and projects and API keys therefore have separate contracts even when an API
-operation composes them.
+projects and API keys, Analytics and Dashboard, and Coding Agent and GitHub
+therefore have separate contracts even when an API operation composes them.
 
 ### The catalogue is the ownership authority
 
@@ -159,6 +167,13 @@ justified only by a materially different trust or runtime lifecycle and must be
 recorded in the feature ADR. Repository, store, projection, database, and
 provider-specific ports remain private to the owning server package.
 
+One feature may use several private repositories when it truly spans several
+stores, but repository count does not determine service count. Reads, history,
+commands, and lifecycle operations for the same product capability belong on
+the one service. Existing parallel services and repositories are merged while
+the feature moves when the result is a smaller, coherent boundary; unrelated
+lifecycles are not forced together merely to reduce a count.
+
 A feature that needs another feature imports that feature's contract and
 receives its service. It does not import the other feature's server package,
 construct a parallel repository, copy its schema, or publish a caller-prefixed
@@ -177,27 +192,29 @@ reach a global Prisma client.
 
 `ops` is a core feature under `packages/features/ops`. It absorbs the current
 platform-operations implementation and the platform-admin/backoffice code now
-under `packages/enterprise/features/admin`. Admin routes and UI names may remain
+under `packages/features/ops`. Admin routes and UI names may remain
 as compatibility transports, but there is no standalone `admin` feature and no
 Enterprise entitlement gate for this behaviour.
 
-`saas` is a core-classified feature under `packages/features/saas`. Its source
-is governed by the repository's root license rather than the Enterprise tree.
-It is installed only by SaaS composition, but deployment selection is not a
-source-license boundary.
+`saas` remains an Enterprise-classified feature under
+`packages/enterprise/features/saas`. Its third-party analytics, support, and
+hosted-deployment integrations are governed by the Enterprise source license.
+SaaS deployment selection is distinct from an Enterprise entitlement check,
+but that activation distinction does not relicense the implementation source.
 
 The Enterprise feature catalogue consequently contains only genuinely
 Enterprise-owned domains: `audit-log`, `billing`, `governance`, `licensing`,
-`managed-provider`, `scim`, `sso`, and `webhook`. Enterprise composition may
-consume core contracts and install compatible Enterprise extensions, but the
-portable Enterprise catalogue does not claim `ops` or `saas`.
+`managed-provider`, `saas`, `scim`, `sso`, and `webhook`. Enterprise
+composition may consume core contracts and install compatible Enterprise
+extensions, but the portable Enterprise catalogue does not claim `ops`.
 
 Governance owns governance policy and ingestion behaviour: ingestion sources
 and pulls, OTTL policy, anomaly rules, departments and cost attribution,
-quarantine, and governance delivery. It does not own project, user, personal
-workspace, virtual-key, model-provider or AI-tool catalogue implementations.
-Those move to their core owners and Governance consumes the canonical service
-contracts where required.
+quarantine, governance delivery, and the governed AI-tool catalogue lifecycle.
+It does not own project, user, personal workspace, virtual-key, or
+model-provider implementations. Those move to their core owners and Governance
+consumes the canonical service contracts where required, including Model
+Provider when building governed tool choices.
 
 ### Migration remains vertical and behaviour-preserving
 
@@ -207,16 +224,19 @@ The application inventory is migrated in dependency order:
 2. correct existing roots to singular names, including `agent`, `entitlement`,
    `stored-object`, `managed-provider`, and `webhook`, and remove the unfinished
    plural `projects` scaffold in favour of `project`;
-3. move SaaS to the core feature tree and merge Enterprise Admin plus existing
-   operational tooling into core `ops`;
+3. preserve SaaS in the Enterprise source-license tree and merge Enterprise
+   Admin plus existing operational tooling into core `ops`;
 4. extract the identity spine: `auth`, `authz`, `user`, `organization`,
    `project`, and `api-key`;
 5. extract independently owned product resources beginning with
    `model-provider`, `prompt`, and `dataset`, followed by the remaining
    catalogue in dependency order;
-6. reduce broad packages such as Governance to their declared domains and
-   replace caller-specific services with injected canonical contracts; and
-7. finish the physical `apps/ui`, `apps/api`, and `apps/worker` split only after
+6. extract the observability spine from Telemetry through Trace, then its
+   Annotation, Data Retention, Data Privacy, Analytics, Dashboard, and Topic
+   consumers;
+7. extract platform products including Gateway, GitHub, Coding Agent, Langy,
+   Automation, Notification, and Presence; and
+8. finish the physical `apps/ui`, `apps/api`, and `apps/worker` split only after
    their reusable behaviour belongs to features.
 
 Each vertical move includes contract, server, optional web, tests, ADR/spec,
@@ -241,9 +261,11 @@ was rejected because every copy becomes another source of validation,
 transaction, caching, and authorization behaviour. Narrow consumption is
 achieved through methods on the canonical Project service contract instead.
 
-Keeping Admin and SaaS under Enterprise was rejected because neither is gated
-by the Enterprise product license. Directory placement would incorrectly
-change their source-license and composition meaning.
+Keeping Admin under Enterprise was rejected because the generally available
+backoffice capability is not Enterprise source. Moving SaaS out of Enterprise
+was rejected for the opposite reason: its hosted-deployment integrations are
+Enterprise-licensed source even though they are selected by deployment mode
+rather than one uniform entitlement gate.
 
 Inferring ownership from filenames without a catalogue was rejected because
 singularity and domain meaning are not mechanically derivable from English.
@@ -257,8 +279,8 @@ authority.
 - Broad packages cannot claim adjacent subjects through a local manifest edit.
 - Cross-feature behaviour uses one composed service implementation and one
   persistence owner.
-- Admin and operational tooling become available core behaviour; SaaS source
-  is no longer covered by the Enterprise license.
+- Admin and operational tooling become available core behaviour; SaaS remains
+  governed by the Enterprise source license.
 - Existing plural package names require coordinated import, manifest, lockfile,
   Docker, CI, ADR, and spec migrations.
 - The catalogue requires deliberate maintenance when a genuinely new product
