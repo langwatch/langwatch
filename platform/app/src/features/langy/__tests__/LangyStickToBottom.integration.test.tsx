@@ -93,8 +93,25 @@ function grow(scroller: HTMLElement, to: number) {
   });
 }
 
-/** Move the scroller the way a user's wheel/trackpad would. */
+/**
+ * Move the scroller the way a person does: the gesture first, then the movement
+ * it caused. Dispatching the movement alone would be a different event entirely
+ * — see `layoutScrollTo`.
+ */
 function userScrollTo(scroller: HTMLElement, top: number) {
+  act(() => {
+    scroller.dispatchEvent(new Event("wheel"));
+    scroller.scrollTop = top;
+    scroller.dispatchEvent(new Event("scroll"));
+  });
+}
+
+/**
+ * Move the scroller the way the LAYOUT does: content was removed, the browser
+ * clamped the scroll position down to the new maximum, and nobody touched an
+ * input device. Identical geometry to `userScrollTo`, opposite meaning.
+ */
+function layoutScrollTo(scroller: HTMLElement, top: number) {
   act(() => {
     scroller.scrollTop = top;
     scroller.dispatchEvent(new Event("scroll"));
@@ -125,6 +142,7 @@ describe("given the Langy message column follows a stream", () => {
   });
 
   describe("when content grows while the viewport is at the bottom", () => {
+    /** @scenario "Anything that makes the column taller is followed" */
     it("follows the live edge, though nothing in `messages` changed", () => {
       const { scroller, pinned } = setup();
 
@@ -134,6 +152,7 @@ describe("given the Langy message column follows a stream", () => {
       expect(pinned()).toBe("true");
     });
 
+    /** @scenario "An answer that grows keeps its newest line in view" */
     it("keeps following each further growth", () => {
       const { scroller } = setup();
 
@@ -145,6 +164,7 @@ describe("given the Langy message column follows a stream", () => {
   });
 
   describe("when the user has scrolled up to read", () => {
+    /** @scenario "Scrolling up to read stops the column moving" */
     it("releases the pin", () => {
       const { scroller, pinned } = setup();
       grow(scroller, 500);
@@ -175,7 +195,40 @@ describe("given the Langy message column follows a stream", () => {
     });
   });
 
+  describe("when the column jumps upward with no gesture behind it", () => {
+    /** @scenario "The column rearranging itself does not stop the follow" */
+    it("keeps the pin, because the reader never scrolled", () => {
+      const { scroller, pinned, canScroll } = setup();
+      grow(scroller, 500);
+
+      // What the column does to itself: a turn finalises and its live parts are
+      // replaced by shorter recorded ones, the browser clamps scrollTop to the
+      // new maximum, and the column re-grows before the scroll event is
+      // dispatched. The same geometry as a reader scrolling up, and nobody
+      // touched an input device. Reading it as a reader left a "jump to latest"
+      // pill in front of someone who had not scrolled, and killed the follow
+      // for the rest of the conversation.
+      layoutScrollTo(scroller, 100);
+
+      expect(pinned()).toBe("true");
+      // Overflowing, so the pill is hidden by the pin alone.
+      expect(canScroll()).toBe("true");
+    });
+
+    /** @scenario "The follow survives the rearrangement" */
+    it("follows the next growth back to the live edge", () => {
+      const { scroller } = setup();
+      grow(scroller, 500);
+      layoutScrollTo(scroller, 100);
+
+      grow(scroller, 900);
+
+      expect(scroller.scrollTop).toBe(900);
+    });
+  });
+
   describe("when the user scrolls back down to the bottom", () => {
+    /** @scenario "Returning to the bottom resumes the follow" */
     it("re-engages auto-follow", () => {
       const { scroller, pinned } = setup();
       grow(scroller, 500);
@@ -192,6 +245,7 @@ describe("given the Langy message column follows a stream", () => {
   });
 
   describe("when our own smooth scroll is mid-glide toward the bottom", () => {
+    /** @scenario "The column's own movement does not stop the follow" */
     it("does not release the pin on its intermediate positions", () => {
       const { scroller, pinned } = setup();
 

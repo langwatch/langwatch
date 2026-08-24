@@ -23,6 +23,15 @@ import { useReducedMotion } from "~/hooks/useReducedMotion";
  * back to the bottom, we re-engage. `isPinned` + `canScroll` drive the
  * "jump to latest" affordance, which is the only way back to the live edge
  * without manual scrolling.
+ *
+ * ONLY THE READER RELEASES THE PIN: a scroll event says the scroller moved, and
+ * never says who moved it. The column rearranges itself constantly — a turn
+ * finalises and its live parts are replaced by recorded ones, a status line
+ * disappears, a card collapses — and a shrink the browser answers by clamping
+ * `scrollTop` looks, geometrically, exactly like a reader scrolling up. Reading
+ * it that way killed auto-follow for the rest of the conversation and left the
+ * reader with a "jump to latest" pill they never asked for. So an upward
+ * movement releases the pin only when a real scroll gesture is behind it.
  */
 
 /**
@@ -35,6 +44,26 @@ import { useReducedMotion } from "~/hooks/useReducedMotion";
  * followed rather than being surprised by a dead stream.
  */
 const BOTTOM_THRESHOLD_PX = 40;
+
+/**
+ * How long a scroll gesture keeps counting as the reader's own.
+ *
+ * Trackpad momentum keeps firing `wheel` long after the fingers leave, and a
+ * held key arrives as a burst, so this outlasts the gesture rather than trying
+ * to match it. Being generous costs nothing: the window only ever QUALIFIES an
+ * upward movement, and a downward gesture inside it still cannot release the
+ * pin.
+ */
+const USER_GESTURE_WINDOW_MS = 700;
+
+/** The input events that mean a person is driving the scroller. */
+const SCROLL_GESTURES = [
+  "wheel",
+  "touchstart",
+  "touchmove",
+  "pointerdown",
+  "keydown",
+] as const;
 
 export interface LangyStickToBottom {
   /** Attach to the scrolling element (`overflow-y: auto`). */
@@ -162,30 +191,52 @@ export function useLangyStickToBottom({
    * the very animation that was honouring it, and auto-follow would die after
    * the first token.
    *
-   * Direction is what actually separates the two cases. Our programmatic scroll
-   * only ever moves DOWN, toward the bottom; a user who wants out of the stream
-   * scrolls UP. So: moving up releases, reaching the bottom engages, and
-   * everything in between (including our own animation in flight) leaves the pin
-   * exactly as it was.
+   * Direction is what separates our own scrolling from the reader's. Our
+   * programmatic scroll only ever moves DOWN, toward the bottom; a user who
+   * wants out of the stream scrolls UP. So: moving up releases, reaching the
+   * bottom engages, and everything in between (including our own animation in
+   * flight) leaves the pin exactly as it was.
+   *
+   * Direction alone is not enough, because the column also moves up on its own.
+   * When content is removed the browser clamps `scrollTop` down to the new
+   * maximum, and if the column re-grows before the scroll event is dispatched,
+   * that event reads as a large upward jump far from the bottom. A gesture is
+   * what tells the two apart: a movement with no wheel, touch, key or pointer
+   * behind it is the page rearranging itself, and the pin survives it.
    */
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     let lastTop = el.scrollTop;
+    let lastGestureAt = 0;
+
+    const onGesture = () => {
+      lastGestureAt = Date.now();
+    };
 
     const onScroll = () => {
       const { atBottom, overflows } = measure(el);
       const movedUp = el.scrollTop < lastTop - 1;
       lastTop = el.scrollTop;
+      const readerDroveIt =
+        Date.now() - lastGestureAt <= USER_GESTURE_WINDOW_MS;
 
       setCanScroll(overflows);
       if (atBottom) setPinned(true);
-      else if (movedUp) setPinned(false);
+      else if (movedUp && readerDroveIt) setPinned(false);
     };
 
     onScroll();
+    for (const gesture of SCROLL_GESTURES) {
+      el.addEventListener(gesture, onGesture, { passive: true });
+    }
     el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
+    return () => {
+      for (const gesture of SCROLL_GESTURES) {
+        el.removeEventListener(gesture, onGesture);
+      }
+      el.removeEventListener("scroll", onScroll);
+    };
   }, [measure, setPinned]);
 
   // Content got taller (a token, a card, a status line, anything) — follow it,
