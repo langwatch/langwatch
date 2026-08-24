@@ -111,6 +111,13 @@ export function FrontDoorGround({
       ) : (
         <div className="lw-front-door-ambient-static" />
       )}
+      {protect === "left" ? (
+        // The site's dark-section texture under the headline half, so the
+        // reading side of a dark ground is a surface rather than a void.
+        // Stands down on light (the stylesheet shows it only on dark) and on
+        // the centred door, whose glow is the whole composition.
+        <div className="lw-front-door-signal-grid" />
+      ) : null}
       <div
         className="lw-front-door-ambient-protect"
         style={{ background: PROTECT_RADIAL[protect] }}

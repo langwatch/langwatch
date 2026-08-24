@@ -86,9 +86,10 @@
 	   the panel and reads as brown. This is the same red, lifted. */
 	--lw-front-door-danger: #e08573;
 	/* Details step up a stop, so a focus ring is visible on a dark field
-	   without lighting up like a solid button. */
-	--lw-front-door-detail: #ff8a3d;
-	--lw-front-door-focus-ring: rgba(255, 138, 61, 0.3);
+	   without lighting up like a solid button — and the border itself eases
+	   off, because a solid orange rectangle on ink reads as an alarm. */
+	--lw-front-door-detail: rgba(255, 138, 61, 0.75);
+	--lw-front-door-focus-ring: rgba(255, 138, 61, 0.22);
 	/* The site's `.text-gradient-dark`: the same pair, lifted to read on ink. */
 	--lw-front-door-accent-gradient: linear-gradient(
 		100deg,
@@ -218,6 +219,28 @@
 	/* A white veil is a light-mode instrument. The dark ground keeps its
 	   reading side clean by fading the glow out instead. */
 	display: none;
+}
+
+/*
+ * The site's dark-section texture, verbatim: a faint grid dissolving toward
+ * the glow, so the headline's side of a dark ground is a surface rather than
+ * a void. Light mode has the mesh for a ground and shows nothing here.
+ */
+.lw-front-door-signal-grid {
+	display: none;
+}
+
+.dark .lw-front-door-signal-grid {
+	display: block;
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background-image:
+		linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+		linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+	background-size: 72px 72px;
+	-webkit-mask-image: linear-gradient(to right, black, transparent 82%);
+	mask-image: linear-gradient(to right, black, transparent 82%);
 }
 
 /* The press: the button gives a little and springs back. */

@@ -61,8 +61,17 @@ export function FrontDoorValuePanel({
           fontFamily={HEADING_FONT}
           fontWeight={400}
           letterSpacing="-0.03em"
-          lineHeight="1.06"
-          css={{ textWrap: "balance" }}
+          lineHeight="0.98"
+          // The site's `.display` treatment, value for value: the subtle
+          // vertical stretch and the ligatures are what make Sentient read
+          // as the site's voice rather than merely the same file.
+          css={{
+            textWrap: "balance",
+            scale: "1 1.1",
+            fontVariantLigatures:
+              "common-ligatures discretionary-ligatures contextual",
+            fontKerning: "normal",
+          }}
           data-testid="front-door-headline"
         >
           <AccentedHeadline text={headline} accent={headlineAccent} />
