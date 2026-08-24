@@ -2,6 +2,7 @@ import { Box, Flex } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import "../authFrontDoor.css";
+import { FrontDoorMesh } from "./FrontDoorMesh";
 import { FrontDoorValuePanel } from "./FrontDoorValuePanel";
 import { LogoHandoff } from "./LogoHandoff";
 
@@ -18,10 +19,12 @@ import { LogoHandoff } from "./LogoHandoff";
  * card on the right behind a hairline. Below the split it collapses to the
  * headline above the card, because a tagline and a logo row stacked above a
  * log-in form on a phone are two screens of scrolling in front of the thing
- * the person came to do.
+ * the person came to do. A hosted screen with no case to make — log-in — is
+ * the centred card over the same band, so the two doors read as one place.
  *
- * Self-hosted is the plain centred card, on its own, with nothing sold beside
- * it.
+ * Self-hosted is the plain centred card on plain paper, with nothing sold
+ * beside it and nothing breathing behind it: an operator's door, not a
+ * funnel.
  */
 export function FrontDoorShell({
   headline,
@@ -48,7 +51,7 @@ export function FrontDoorShell({
     <Box
       className="lw-front-door"
       position="relative"
-      backgroundColor="bg.subtle"
+      backgroundColor="bg"
       minHeight="100vh"
       width="full"
       overflowX="hidden"
@@ -80,14 +83,19 @@ export function FrontDoorShell({
         </Flex>
       ) : (
         <Flex
+          position="relative"
           direction="column"
           align="center"
+          minHeight="100vh"
           width="full"
           paddingX={{ base: 0, sm: 4 }}
           paddingBottom={10}
           data-testid="front-door-card-column"
         >
-          {children}
+          {isHosted ? <FrontDoorMesh protect="center" /> : null}
+          <Box position="relative" zIndex={1} width="full">
+            {children}
+          </Box>
         </Flex>
       )}
     </Box>

@@ -1,6 +1,8 @@
 /*
- * The front door's surface: the brand's own orange, the website's mesh band,
- * and three small pieces of motion.
+ * The front door's surface: the website's own vocabulary, carried over value
+ * for value from the approved design board. The mesh band, the pill actions,
+ * the mono details and the one serif voice all come from the public site, so
+ * the first product screen a person sees is the site they arrived from.
  *
  * Both colour modes are declared here, keyed off the `.dark` class the app's
  * colour-mode provider puts on the document, so the toggle moves these screens
@@ -11,10 +13,21 @@
  * Every animation lives inside a no-preference query rather than being
  * switched off by one, so somebody who has asked for less motion gets a
  * completely static page rather than one that stops moving after it starts.
- *
- * CSS only, on purpose: an auth screen is the one page that has to paint on a
- * cold cache, and none of this is worth a JavaScript animation library.
  */
+
+/*
+ * The site's display face. The same files Langy's theme points at, declared
+ * again here because an auth screen must not depend on another feature's
+ * stylesheet having loaded. Same family name, same URL: the browser loads the
+ * file once.
+ */
+@font-face {
+	font-family: "Sentient";
+	src: url("/fonts/Sentient-Regular.woff2") format("woff2");
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
 
 :root {
 	--lw-front-door-action: #f56b1a;
@@ -23,13 +36,18 @@
 	--lw-front-door-tint: #fdece0;
 	--lw-front-door-on-action: #ffffff;
 	--lw-front-door-hairline: rgba(20, 20, 23, 0.12);
-	--lw-front-door-mesh-opacity: 0.5;
+	--lw-front-door-mesh-opacity: 0.36;
 	/* Refusals. The accent is not allowed to say "wrong", so this is the only
 	   other colour these screens carry. */
 	--lw-front-door-danger: #c53030;
 	/* Focus rings, badges, hairline accents: everything that is the brand
 	   without being the button. */
 	--lw-front-door-detail: #f56b1a;
+	/* The halo around a focused field, and the glow under a hovered action:
+	   the same orange, at reading strength and at lifting strength. */
+	--lw-front-door-focus-ring: rgba(245, 107, 26, 0.18);
+	--lw-front-door-glow: rgba(245, 107, 26, 0.3);
+	--lw-front-door-card-shadow: 0 4px 18px rgba(20, 20, 23, 0.05);
 }
 
 .dark {
@@ -47,14 +65,19 @@
 	/* Details step up a stop, so a focus ring is visible on a dark field
 	   without lighting up like a solid button. */
 	--lw-front-door-detail: #ff8a3d;
+	--lw-front-door-focus-ring: rgba(255, 138, 61, 0.28);
+	--lw-front-door-glow: rgba(255, 138, 61, 0.25);
+	--lw-front-door-card-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
 	/* The same band, far quieter: at full strength it is a light-mode wash
 	   sitting on top of a dark page. */
 	--lw-front-door-mesh-opacity: 0.16;
 }
 
 /*
- * The mesh band, in its cheap static form: one drifting diagonal wash, with a
- * soft radial over the middle so the card never sits on top of colour.
+ * The mesh band's static form: the shader's own palette painted as one
+ * diagonal wash. This is what the server, a reduced-motion visitor and a
+ * machine with no WebGL all see; the live shader in `FrontDoorMesh` replaces
+ * it, never adds to it.
  */
 .lw-front-door-ambient {
 	position: absolute;
@@ -63,64 +86,59 @@
 	overflow: hidden;
 	z-index: 0;
 	contain: layout paint;
-	background:
-		radial-gradient(
-			ellipse 60% 45% at 50% 38%,
-			rgba(255, 255, 255, 0.92) 0%,
-			rgba(255, 255, 255, 0.65) 45%,
-			transparent 75%
-		),
-		linear-gradient(135deg, #ffffff 0%, #ffaf6e 32%, #cddcf9 64%, #ffffff 100%);
-	opacity: var(--lw-front-door-mesh-opacity);
-	background-size:
-		100% 100%,
-		180% 180%;
-	background-position:
-		center,
-		0% 50%;
 }
 
-.dark .lw-front-door-ambient {
+.lw-front-door-ambient-static {
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(
+		135deg,
+		#ffffff 0%,
+		#ffaf6e 38%,
+		#cddcf9 72%,
+		#ffffff 100%
+	);
+	opacity: var(--lw-front-door-mesh-opacity);
+}
+
+.dark .lw-front-door-ambient-static {
 	/* No white veil on a dark ground: the band carries itself at low opacity. */
 	background: linear-gradient(
 		135deg,
 		transparent 0%,
-		#ffaf6e 32%,
-		#cddcf9 64%,
+		#ffaf6e 38%,
+		#cddcf9 72%,
 		transparent 100%
 	);
-	background-size: 180% 180%;
-	background-position: 0% 50%;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-	.lw-front-door-ambient {
-		animation: lw-front-door-drift 24s ease-in-out infinite alternate;
-	}
+/* The white radial that keeps one region clean for reading. On its own layer
+   so it sits over the live shader and the static band alike. */
+.lw-front-door-ambient-protect {
+	position: absolute;
+	inset: 0;
 }
 
-@keyframes lw-front-door-drift {
-	from {
-		background-position:
-			center,
-			0% 50%;
-	}
-	to {
-		background-position:
-			center,
-			100% 50%;
-	}
+.dark .lw-front-door-ambient-protect {
+	/* A white veil is a light-mode instrument. The dark band is quiet enough
+	   to read over. */
+	display: none;
 }
 
-/* The press: the button gives a little, and springs back. */
+/* The press: the button gives a little, springs back, and lifts a glow. */
 .lw-front-door-primary {
 	transition:
 		transform 120ms ease,
-		box-shadow 120ms ease;
+		box-shadow 250ms ease,
+		background-color 200ms ease;
+}
+
+.lw-front-door-primary:hover {
+	box-shadow: 0 4px 16px var(--lw-front-door-glow);
 }
 
 .lw-front-door-primary:active {
-	transform: scale(0.985);
+	transform: translateY(1px);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -132,11 +150,24 @@
 	}
 }
 
+/* The card itself: the board's 14px surface with its soft standing shadow. */
+.lw-front-door-card {
+	box-shadow: var(--lw-front-door-card-shadow);
+}
+
 /* The hairline either side of the word "or". */
 .lw-front-door-hairline {
 	flex: 1;
 	height: 1px;
 	background: var(--lw-front-door-hairline);
+}
+
+/* "Last used" floats on the shoulder of the method it belongs to. */
+.lw-front-door-badge-float {
+	position: absolute;
+	top: -9px;
+	right: 12px;
+	z-index: 1;
 }
 
 /* One ring, once, where something just worked. */
