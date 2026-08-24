@@ -8,7 +8,7 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 
-import { Box, Center, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { ScenarioCreateModal } from "~/components/scenarios/ScenarioCreateModal";
@@ -18,9 +18,12 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePreloadDrawer } from "~/hooks/usePreloadDrawer";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
+import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { AgentTestingHeader } from "./AgentTestingHeader";
+import { TestCasesTab } from "./cases/TestCasesTab";
+import { useOpenLiveRun } from "./cases/useOpenLiveRun";
 import { ResultsTab } from "./results/ResultsTab";
 import { useAgentTestingRouting } from "./useAgentTestingRouting";
 import { useAgentTestingStore } from "./useAgentTestingStore";
@@ -37,7 +40,22 @@ export function AgentTestingPage() {
 
   const routing = useAgentTestingRouting();
   const hydrateFromUrl = useAgentTestingStore((state) => state.hydrateFromUrl);
-  const [createCaseOpen, setCreateCaseOpen] = useState(false);
+  const [createCase, setCreateCase] = useState<{
+    open: boolean;
+    folderId: string | null;
+  }>({ open: false, folderId: null });
+
+  // The rail reads the same list, so this is the cached copy rather than a
+  // second read. It is only here to turn the address of a suite into its id.
+  const { data: folders } = api.suites.folders.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id },
+  );
+  const selectedSuiteSlug =
+    routing.selection.kind === "suite" ? routing.selection.slug : null;
+  const selectedFolderId = selectedSuiteSlug
+    ? (folders?.find((folder) => folder.slug === selectedSuiteSlug)?.id ?? null)
+    : null;
 
   // The view mode is the one piece of view state the address carries, so a
   // shared link opens the results the way they were shared.
@@ -73,7 +91,29 @@ export function AgentTestingPage() {
     openDrawer("suiteEditor");
   }, [openDrawer, setFlowCallbacks, handleSuiteSaved]);
 
-  const handleNewTestCase = useCallback(() => setCreateCaseOpen(true), []);
+  const handleNewTestCase = useCallback(
+    (folderId: string | null) => setCreateCase({ open: true, folderId }),
+    [],
+  );
+
+  // Save and Run inside the case editor keeps the person on this page. The
+  // run opens in the drawer instead of sending them to the v1 page.
+  const { openLiveRun } = useOpenLiveRun();
+  const setPendingBatchRunId = useAgentTestingStore(
+    (state) => state.setPendingBatchRunId,
+  );
+  useEffect(() => {
+    if (!project?.id) return;
+    setFlowCallbacks("scenarioEditor", {
+      onRunStarted: ({ batchRunId }: { batchRunId: string }) => {
+        setPendingBatchRunId(batchRunId);
+        void openLiveRun({
+          batchRunId,
+          scenarioSetId: getOnPlatformSetId(project.id),
+        });
+      },
+    });
+  }, [project?.id, setFlowCallbacks, setPendingBatchRunId, openLiveRun]);
 
   return (
     <NowProvider>
@@ -82,13 +122,13 @@ export function AgentTestingPage() {
           <AgentTestingHeader
             tab={routing.tab}
             onTabChange={routing.setTab}
-            onNewTestCase={handleNewTestCase}
+            onNewTestCase={() => handleNewTestCase(selectedFolderId)}
             onNewRunPlan={handleNewRunPlan}
           />
 
           <Box flex={1} width="full" minHeight={0} overflow="hidden">
             {routing.tab === "cases" ? (
-              <TestCasesShell />
+              <TestCasesTab onNewTestCase={handleNewTestCase} />
             ) : (
               <ResultsTab sseConnected={sseConnected} />
             )}
@@ -96,52 +136,12 @@ export function AgentTestingPage() {
         </VStack>
 
         <ScenarioCreateModal
-          open={createCaseOpen}
-          onClose={() => setCreateCaseOpen(false)}
+          open={createCase.open}
+          folderId={createCase.folderId}
+          variant="agent-testing"
+          onClose={() => setCreateCase({ open: false, folderId: null })}
         />
       </DashboardLayout>
     </NowProvider>
-  );
-}
-
-/**
- * The frame of the Test cases tab: the suites rail beside the cases table.
- * Both halves land with the rail and the table.
- */
-function TestCasesShell() {
-  return (
-    <HStack
-      width="full"
-      height="full"
-      gap={0}
-      alignItems="stretch"
-      data-testid="agent-testing-cases-tab"
-    >
-      <Box
-        width="260px"
-        flexShrink={0}
-        borderRightWidth="1px"
-        borderColor="border"
-        data-testid="agent-testing-suite-rail"
-      />
-      <Box
-        flex={1}
-        minWidth={0}
-        padding={4}
-        data-testid="agent-testing-cases-panel"
-      >
-        <PlaceholderNote>The test cases land here.</PlaceholderNote>
-      </Box>
-    </HStack>
-  );
-}
-
-function PlaceholderNote({ children }: { children: React.ReactNode }) {
-  return (
-    <Center height="full">
-      <Text fontSize="sm" color="fg.muted">
-        {children}
-      </Text>
-    </Center>
   );
 }

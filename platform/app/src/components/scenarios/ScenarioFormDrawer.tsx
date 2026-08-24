@@ -51,6 +51,7 @@ import { toaster } from "../ui/toaster";
 import { SaveAndRunMenu } from "./SaveAndRunMenu";
 import { ScenarioEditorSidebar } from "./ScenarioEditorSidebar";
 import {
+  type ScenarioFolderOption,
   ScenarioForm,
   type ScenarioFormData,
   type ScenarioInitialData,
@@ -64,7 +65,26 @@ export type ScenarioFormDrawerProps = {
   onClose?: () => void;
   onSuccess?: (scenario: Scenario) => void;
   scenarioId?: string;
+  /**
+   * Which interface opened the editor. "agent-testing" adds the line under
+   * the title, the test suite field and the plain Save button, and stays on
+   * the page after a run starts. Absent keeps the editor as v1 draws it.
+   */
+  variant?: ScenarioEditorVariant;
+  /** The suite a new case starts in, so a case made inside a suite lands in it. */
+  folderId?: string | null;
+  /**
+   * Called instead of leaving for the v1 simulations page once a run starts.
+   * Agent Testing stays where it is and opens the run in a drawer.
+   */
+  onRunStarted?: (params: { scenarioId: string; batchRunId: string }) => void;
 } & Partial<ScenarioInitialData>;
+
+export type ScenarioEditorVariant = "agent-testing";
+
+/** What the Agent Testing editor says a test case is for. */
+export const AGENT_TESTING_EDITOR_DESCRIPTION =
+  "Test your agent on a critical path or edge case";
 
 /**
  * Model overrides chosen in the run dialog. Omitted on a plain save so the
@@ -90,7 +110,13 @@ export function ScenarioFormDrawerFromUrl(
   // passed.  Fall back to checking the URL so the drawer actually opens.
   const open = props.open ?? drawerOpen("scenarioEditor");
   return (
-    <ScenarioFormDrawer {...props} open={open} scenarioId={params.scenarioId} />
+    <ScenarioFormDrawer
+      {...props}
+      open={open}
+      scenarioId={params.scenarioId}
+      folderId={props.folderId ?? params.folderId}
+      variant={props.variant ?? (params.variant as ScenarioEditorVariant)}
+    />
   );
 }
 
@@ -121,6 +147,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     projectSlug: project?.slug,
   });
   const scenarioId = props.scenarioId;
+  const isAgentTesting = props.variant === "agent-testing";
 
   // Target selection with localStorage persistence
   const { target: persistedTarget, setTarget: persistTarget } =
@@ -455,6 +482,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     ],
   );
 
+  const onRunStarted = props.onRunStarted;
   const confirmRunWithModels = useCallback(async () => {
     const form = formInstance;
     const target = pendingRunTarget;
@@ -489,6 +517,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         // Fire the run — no callbacks, simulations page picks up via SSE
         void runScenario({ scenarioId: savedScenario.id, target, batchRunId });
 
+        // Agent Testing stays on its page and opens the run in a drawer.
+        if (onRunStarted) {
+          onRunStarted({ scenarioId: savedScenario.id, batchRunId });
+          return;
+        }
+
         // Navigate to simulations — drawer closes implicitly via route change.
         // Intentionally NOT calling onClose() here: closeDrawer() does its
         // own router.push to strip drawer.* params, which would race with
@@ -511,6 +545,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     router,
     runSimulatorModel,
     runJudgeModel,
+    onRunStarted,
   ]);
   const handleSaveWithoutRunning = useCallback(async () => {
     const form = formInstance;
@@ -552,8 +587,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         parameters: parseScenarioParameterDefinitions(scenario.parameters),
       };
     }
+    // A new case made from inside a test suite starts filed in it.
+    if (props.folderId !== undefined && props.folderId !== null) {
+      return { ...(initialFormData ?? {}), folderId: props.folderId };
+    }
     return initialFormData ?? undefined;
-  }, [scenario, initialFormData]);
+  }, [scenario, initialFormData, props.folderId]);
 
   return (
     <Drawer.Root
@@ -567,9 +606,16 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           {/* Being pointed at a scenario is enough to be editing one. Keying
               this off the loaded record alone retitled the drawer "Create
               Scenario" for the whole of the read. */}
-          <Heading size="md">
-            {scenarioId || scenario ? "Edit Scenario" : "Create Scenario"}
-          </Heading>
+          <VStack align="start" gap={1}>
+            <Heading size="md">
+              {scenarioId || scenario ? "Edit Scenario" : "Create Scenario"}
+            </Heading>
+            {isAgentTesting && (
+              <Text fontSize="sm" color="fg.muted">
+                {AGENT_TESTING_EDITOR_DESCRIPTION}
+              </Text>
+            )}
+          </VStack>
         </Drawer.Header>
         <Drawer.Body padding={0} overflow="hidden">
           <Grid templateColumns="1fr 320px" height="full" overflow="hidden">
@@ -590,11 +636,19 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
               ) : (
                 <>
                   {formInstance && <FormServerError form={formInstance} />}
-                  <ScenarioForm
-                    key={scenarioId ?? "new"}
-                    defaultValues={defaultValues}
-                    formRef={setFormRef}
-                  />
+                  {isAgentTesting ? (
+                    <ScenarioFormWithSuites
+                      key={scenarioId ?? "new"}
+                      defaultValues={defaultValues}
+                      formRef={setFormRef}
+                    />
+                  ) : (
+                    <ScenarioForm
+                      key={scenarioId ?? "new"}
+                      defaultValues={defaultValues}
+                      formRef={setFormRef}
+                    />
+                  )}
                 </>
               )}
             </GridItem>
@@ -623,6 +677,16 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
                 and nothing to save at all once the read has failed: the body
                 is an error state, not a form. `handleSave` refuses either way,
                 so this is what says so rather than what enforces it. */}
+            {!hasReadFailed && isAgentTesting && (
+              <Button
+                variant="outline"
+                size="sm"
+                loading={isSubmitting}
+                onClick={() => void handleSaveWithoutRunning()}
+              >
+                Save
+              </Button>
+            )}
             {!hasReadFailed && (
               <SaveAndRunMenu
                 selectedTarget={selectedTarget}
@@ -686,6 +750,39 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         }}
       />
     </Drawer.Root>
+  );
+}
+
+/**
+ * The form with the test suite field filled from the project.
+ *
+ * Only the Agent Testing editor reads the folder list, and it reads it here
+ * rather than in the drawer, so every other surface never asks for it.
+ */
+function ScenarioFormWithSuites({
+  defaultValues,
+  formRef,
+}: {
+  defaultValues?: Partial<ScenarioFormData>;
+  formRef: (form: UseFormReturn<ScenarioFormData> | null) => void;
+}) {
+  const { project } = useOrganizationTeamProject();
+  const { data: folders } = api.suites.folders.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id },
+  );
+  const folderOptions: ScenarioFolderOption[] = useMemo(
+    () =>
+      (folders ?? []).map((folder) => ({ id: folder.id, name: folder.name })),
+    [folders],
+  );
+
+  return (
+    <ScenarioForm
+      defaultValues={defaultValues}
+      formRef={formRef}
+      folderOptions={folderOptions}
+    />
   );
 }
 

@@ -118,6 +118,13 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
     { enabled: !!project && isOpen },
   );
 
+  // A project that uses test suites reads its cases under the suite names in
+  // the picker. A project with no suite reads the flat list it always did.
+  const { data: folders } = api.suites.folders.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project && isOpen },
+  );
+
   const isEditMode = !!suiteId;
   const title = isEditMode ? "Edit Run Plan" : "New Run Plan";
 
@@ -371,6 +378,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
                     hasError={!!errors.selectedScenarioIds}
                     archivedIds={archivedScenariosWithNames}
                     onRemoveArchived={suiteForm.removeArchivedScenario}
+                    folders={folders}
                   />
                   {errors.selectedScenarioIds && (
                     <Text fontSize="xs" color="red.fg">

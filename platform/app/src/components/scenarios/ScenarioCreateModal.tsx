@@ -8,6 +8,7 @@ import { AICreateModal, type ExampleTemplate } from "../shared/AICreateModal";
 import { ModelProviderRequiredModal } from "./ModelProviderRequiredModal";
 import { ResolvedModelCaption } from "./ResolvedModelCaption";
 import type { ScenarioFormData, ScenarioInitialData } from "./ScenarioForm";
+import type { ScenarioEditorVariant } from "./ScenarioFormDrawer";
 import { generateScenarioWithAI } from "./services/scenarioGeneration";
 import { storePromptForScenario } from "./services/scenarioPromptStorage";
 import { getDefaultModelState } from "./utils/defaultModelState";
@@ -21,6 +22,13 @@ export interface ScenarioCreateModalProps {
   open: boolean;
   /** Called when modal is closed */
   onClose: () => void;
+  /**
+   * The test suite the new case is filed in. Absent leaves the case unfiled,
+   * which is what every surface outside Agent Testing wants.
+   */
+  folderId?: string | null;
+  /** Which editor the draft opens in. Absent opens the v1 editor. */
+  variant?: ScenarioEditorVariant;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -60,6 +68,8 @@ const EXAMPLE_TEMPLATES: ExampleTemplate[] = [
 export function ScenarioCreateModal({
   open,
   onClose,
+  folderId,
+  variant,
 }: ScenarioCreateModalProps) {
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
@@ -83,17 +93,21 @@ export function ScenarioCreateModal({
 
   const openEditorWithData = useCallback(
     (formData: Partial<ScenarioFormData>) => {
-      const initialData: ScenarioInitialData = { initialFormData: formData };
+      const initialData: ScenarioInitialData = {
+        initialFormData: folderId ? { ...formData, folderId } : formData,
+      };
       openDrawer(
         "scenarioEditor",
         {
           ...initialData,
+          ...(folderId ? { folderId } : {}),
+          ...(variant ? { variant } : {}),
         },
         { resetStack: true },
       );
       onClose();
     },
-    [openDrawer, onClose],
+    [openDrawer, onClose, folderId, variant],
   );
 
   const handleGenerate = useCallback(
