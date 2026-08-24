@@ -385,6 +385,7 @@ describe("simulationRunnerRouter.run", () => {
     });
 
     describe("when run is called without explicit setId", () => {
+      /** @scenario "A single test case run goes to the project internal run set" */
       it("dispatches queueRun command before scheduling", async () => {
         await caller.run(defaultInput);
 
@@ -398,6 +399,15 @@ describe("simulationRunnerRouter.run", () => {
             scenarioSetId: expectedSetId,
             occurredAt: expect.any(Number),
           }),
+        );
+      });
+
+      /** @scenario "A one-off batch carries the name of the test case that ran" */
+      it("stamps the scenario name onto the queued run", async () => {
+        await caller.run(defaultInput);
+
+        expect(mockQueueRun).toHaveBeenCalledWith(
+          expect.objectContaining({ name: "Test Scenario" }),
         );
       });
 

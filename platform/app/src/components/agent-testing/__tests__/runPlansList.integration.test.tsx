@@ -151,6 +151,27 @@ describe("the Test Runs list", () => {
     expect(plans[plans.length - 1]?.name).toBe("One-off runs");
   });
 
+  /** @scenario "The internal run set is pinned in the run set list" */
+  it("holds the internal set in a fixed place next to external sets", () => {
+    const plans = buildRunPlans({
+      projectId: PROJECT_ID,
+      suites: [makeSuite()],
+      suiteSummaries: {},
+      externalSets: [
+        { scenarioSetId: "ci-regression", lastRunTimestamp: NOW },
+        { scenarioSetId: "smoke-tests", lastRunTimestamp: NOW - 1000 },
+      ],
+      oneOffLastRun: {
+        passedCount: 1,
+        failedCount: 0,
+        settledCount: 1,
+        lastRunTimestamp: NOW - 10 * 86_400_000,
+      },
+    });
+
+    expect(plans[plans.length - 1]?.name).toBe("One-off runs");
+  });
+
   /** @scenario The v2 Test Runs list names the internal set "One-off runs" */
   it("names the internal set One-off runs and marks it as the one-off place", () => {
     const plans = buildRunPlans({
