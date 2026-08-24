@@ -437,9 +437,6 @@ export const auth = betterAuth({
             prisma,
             user: user as { id: string; email: string; name: string },
           });
-          // ADR-101 §4: the new user's per-user HMAC key. Additive and
-          // best-effort inside the ceremony - a sign-up never fails on it.
-          await identityCeremonies().afterUserCreate(user);
         },
       },
       delete: {

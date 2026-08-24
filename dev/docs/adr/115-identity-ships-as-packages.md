@@ -133,8 +133,8 @@ either.
  │                                               prove — one user)           │
  │  crypto       deriveIdentifierId, computeIdentifierHash, mintUserHashKey, │
  │               s256Challenge, sha256Hex, safeEqualHex   (node:crypto)      │
- │  ./better-auth   IdentityCeremonies — the four databaseHooks ceremonies   │
- │               (attach, detach, hash-key mint, erase)                      │
+ │  ./better-auth   IdentityCeremonies — the three databaseHooks ceremonies  │
+ │               (attach, detach, erase), every one of them gated            │
  └───────────────────────────────────────────────────────────────────────────┘
                                       ▲
  ┌────────────────────────────────────┴──────────────────────────────────────┐
@@ -153,7 +153,7 @@ either.
  │                                       package's payloads), THIN commands   │
  │                                       (reads → decide → envelope), fold    │
  │                                       projection over reduceIdentity       │
- │  better-auth/index.ts                 stock prismaAdapter + four           │
+ │  better-auth/index.ts                 stock prismaAdapter + three          │
  │                                       databaseHooks → identityCeremonies() │
  │  api/routers/identity.ts              the tRPC router: session → service   │
  └───────────────────────────────────────────────────────────────────────────┘
@@ -300,8 +300,8 @@ package has no default to fall back to, so the wiring is visible in one
 place.
 
 **`./better-auth`** (`@langwatch/identity-server/better-auth`): one class,
-`IdentityCeremonies`, holding the four methods the app binds to
-better-auth's own `databaseHooks` — attach, detach, hash-key mint, erase.
+`IdentityCeremonies`, holding the three methods the app binds to
+better-auth's own `databaseHooks` — attach, detach, erase.
 Its collaborators are the package's own ports and service plus two closures
 the app composes (the write gate and the clock).
 

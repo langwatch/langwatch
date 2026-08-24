@@ -46,7 +46,9 @@ as its row engine. That is withdrawn: better-auth keeps the stock adapter,
 and identity binds to its **`databaseHooks`** instead. §Rationale records why
 the original reasoning did not survive contact.
 
-Four hooks, four ceremonies (`IdentityCeremonies`, one class):
+Three hooks, three ceremonies (`IdentityCeremonies`, one class) — and all
+three are gated, so an organization nobody has enrolled behaves exactly as
+it did before any of this existed:
 
 ```text
                      better-auth (protocol engine)
@@ -57,8 +59,12 @@ Four hooks, four ceremonies (`IdentityCeremonies`, one class):
         │                                     (every row write, untouched)
         │  account.create.before  → attach the identifier, pin the row id
         │  account.delete.before  → detach what the row mirrors
-        │  user.create.after      → mint the user's HMAC hash key
         │  user.delete.before     → erase the user
+        │
+        │  (no user.create hook: the `userHashKey` mint lived there
+        │   ungated, so a sign-up on an unmigrated organization wrote a
+        │   column it otherwise would not have. The backfill mints the key
+        │   for every user it adopts, before it attaches anything.)
         │
         └── WRITE GATE (per user)
               latched   → identity COMMAND: guards veto while no row

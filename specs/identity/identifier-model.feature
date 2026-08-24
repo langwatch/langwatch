@@ -30,9 +30,12 @@ Feature: The identifier model - identity as an event-sourced pipeline
   # on its own.
   #
   # The ceremonies bind to better-auth's own databaseHooks - account
-  # create/delete and user create/delete - so better-auth keeps the stock
+  # create/delete and user delete - so better-auth keeps the stock
   # prismaAdapter. A `before` hook runs while no row exists and can refuse,
-  # which is what keeps veto-before-write true.
+  # which is what keeps veto-before-write true. All three are gated, and an
+  # unenrolled organization therefore behaves byte-for-byte as it did before
+  # any of this existed: no events, no extra reads of its own, no extra
+  # columns written.
 
   Background:
     Given the identity pipeline is registered with the event-sourcing framework
@@ -175,11 +178,11 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And the backfill's next pass detaches whatever the row's absence implies
 
   @unit
-  Scenario: A failed hash-key mint never fails a sign-up
-    Given minting the new user's userHashKey fails
-    When better-auth finishes creating the user row
-    Then the sign-up still succeeds
-    And that user's identifiers carry null hashes until the backfill mints the key
+  Scenario: Signing up on an unmigrated organization writes nothing extra
+    Given "sam"'s organization has not been enrolled
+    When better-auth creates "sam"'s user row
+    Then no identity ceremony runs and no identity column is written
+    And the backfill mints their userHashKey when it adopts them
 
   @unit
   Scenario: Email verification completes only with the ceremony's proof

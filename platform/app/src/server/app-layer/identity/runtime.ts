@@ -91,11 +91,11 @@ export function identifierBackfillMigration(): IdentityIdentifierBackfillMigrati
 
 /**
  * What better-auth's own `databaseHooks` call (ADR-101 §2). better-auth
- * keeps the stock prismaAdapter; these four methods bind to
- * `account.create.before`, `account.delete.before`, `user.create.after` and
- * `user.delete.before` in `server/better-auth/index.ts`, and they run only
- * for users whose backfill has latched. The gate ships closed, so wiring
- * them changes nothing on its own.
+ * keeps the stock prismaAdapter; these three methods bind to
+ * `account.create.before`, `account.delete.before` and `user.delete.before`
+ * in `server/better-auth/index.ts`, and every one of them returns having
+ * done nothing for a user whose backfill has not finalized. The gate ships
+ * closed, so wiring them changes nothing on its own.
  */
 export function identityCeremonies(): IdentityCeremonies {
   return new IdentityCeremonies(

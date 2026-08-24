@@ -183,27 +183,18 @@ describe("the identity ceremonies", () => {
     });
   });
 
-  describe("when a user row has just been created", () => {
-    it("mints their hash key", async () => {
-      const { ceremonies, users } = harness();
+  describe("when a user row is created on an unmigrated organization", () => {
+    /** @scenario "Signing up on an unmigrated organization writes nothing extra" */
+    it("has no hook to run: the backfill owns the hash-key mint", async () => {
+      const { ceremonies, users } = harness({ latched: false });
 
-      await ceremonies.afterUserCreate({ id: "user_new" });
-
-      expect(users.storeUserHashKeyIfMissing).toHaveBeenCalledWith(
-        expect.objectContaining({ userId: "user_new" }),
-      );
-    });
-
-    /** @scenario "A failed hash-key mint never fails a sign-up" */
-    it("swallows a mint failure: the sign-up must not fail on bookkeeping", async () => {
-      const { ceremonies, users } = harness();
-      (users.storeUserHashKeyIfMissing as ReturnType<typeof vi.fn>).mockRejectedValue(
-        new Error("postgres unavailable"),
-      );
-
-      await expect(
-        ceremonies.afterUserCreate({ id: "user_new" }),
-      ).resolves.toBeUndefined();
+      // There is deliberately no user.create ceremony. The mint used to live
+      // there ungated, which made a sign-up on an unmigrated organization
+      // write `User.userHashKey` it otherwise would not have.
+      expect(
+        (ceremonies as unknown as Record<string, unknown>).afterUserCreate,
+      ).toBeUndefined();
+      expect(users.storeUserHashKeyIfMissing).not.toHaveBeenCalled();
     });
   });
 });

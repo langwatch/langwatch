@@ -1,7 +1,6 @@
 import { identifierProviderFor } from "@langwatch/identity";
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
-import { mintUserHashKey } from "../crypto/user-hash-key";
 import type { IdentityHeadsRepository } from "../identity-heads.repository";
 import type { IdentityUsersRepository } from "../identity-users.repository";
 import type { IdentityUserGate } from "../identity-user-gate";
@@ -29,13 +28,21 @@ interface UserRow {
  * What a better-auth row write MEANS in identity terms (ADR-101 §2), bound
  * to better-auth's own `databaseHooks`.
  *
- * The app wires four hooks to the four methods here, and better-auth does
+ * The app wires three hooks to the three methods here, and better-auth does
  * the rest of the work this used to do by hand:
  *
  *   account.create.before → beforeAccountCreate   attach an identifier
  *   account.delete.before → beforeAccountDelete   detach it
- *   user.create.after     → afterUserCreate       mint the user's hash key
  *   user.delete.before    → beforeUserDelete      erase the user
+ *
+ * All three are GATED: an unlatched user's hook returns having done nothing
+ * and written nothing, so an organization nobody has enrolled behaves
+ * exactly as it did before any of this existed. There is deliberately no
+ * `user.create` hook — the `userHashKey` mint (ADR-101 §4) used to live
+ * there, ungated, which made a sign-up on an unmigrated organization write
+ * a column it otherwise would not have. The backfill mints the key for
+ * every user it adopts, before it attaches anything, so nothing was gained
+ * by minting early.
  *
  * `before` runs while no row exists, so a guard that refuses refuses the row
  * write with it — the veto-before-write contract, unchanged. better-auth
@@ -149,28 +156,6 @@ export class IdentityCeremonies {
       occurredAtMs: this.clock.now(),
       actor: { type: "user", id: userId },
     });
-  }
-
-  /**
-   * Mint the new user's `userHashKey` (ADR-101 §4), additively. A sign-up
-   * must not fail on it: a user without a key attaches identifiers with null
-   * hashes until the backfill (which mints missing keys) reaches them —
-   * which is why this is the one `after` hook of the four.
-   */
-  async afterUserCreate(user: UserRow): Promise<void> {
-    const { id } = user;
-    if (typeof id !== "string") return;
-    try {
-      await this.users.storeUserHashKeyIfMissing({
-        userId: id,
-        userHashKey: mintUserHashKey(),
-      });
-    } catch (error) {
-      logger.warn(
-        { userId: id, error },
-        "could not mint userHashKey at user creation; identifier hashes stay null until the backfill mints it",
-      );
-    }
   }
 
   /**
