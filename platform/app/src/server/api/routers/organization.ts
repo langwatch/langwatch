@@ -39,6 +39,7 @@ import {
   InviteNotFoundError,
   OrganizationNotFoundError,
 } from "../../invites/errors";
+import { buildInviteAcceptUrl } from "../../invites/invite-link";
 import {
   InviteService,
   resolveInviteDisplayStatus,
@@ -685,6 +686,21 @@ export const organizationRouter = createTRPCRouter({
         organizationId: input.organizationId,
         inviteId: input.inviteId,
       });
+    }),
+  resendInvite: protectedProcedure
+    .input(z.object({ inviteId: z.string(), organizationId: z.string() }))
+    .permission("organization:manage")
+    .mutation(async ({ input, ctx }) => {
+      const inviteService = InviteService.create(ctx.prisma);
+      const { invite, emailNotSent } = await inviteService.resendInvite({
+        organizationId: input.organizationId,
+        inviteId: input.inviteId,
+      });
+      return {
+        invite,
+        emailNotSent,
+        inviteUrl: buildInviteAcceptUrl(invite.inviteCode),
+      };
     }),
   getOrganizationPendingInvites: protectedProcedure
     .input(

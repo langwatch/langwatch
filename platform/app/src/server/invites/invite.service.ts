@@ -1086,6 +1086,70 @@ export class InviteService {
   }
 
   /**
+   * One-click resend (D11): a fresh invite code and a fresh 14-day expiry
+   * on the same row, and a new email out. Rotating the code IS the old
+   * link's revocation — a leaked stale link matches no row afterwards.
+   *
+   * Resend CLAIMS the row exactly as acceptance does: a conditional update
+   * on the (status, inviteCode) pair it read, so two admins racing a resend
+   * mint exactly one live code — the loser reads as not found and reloads.
+   * Only PENDING rows (including ones past their expiry, which is what
+   * resend exists for) can be resent; a revoked or accepted invitation
+   * stays what it is.
+   */
+  async resendInvite({
+    organizationId,
+    inviteId,
+  }: {
+    organizationId: string;
+    inviteId: string;
+  }): Promise<{ invite: OrganizationInvite; emailNotSent: boolean }> {
+    const existing = await this.prisma.organizationInvite.findFirst({
+      where: { id: inviteId, organizationId },
+      include: { organization: true },
+    });
+    if (!existing || existing.status !== "PENDING") {
+      throw new InviteNotFoundError("Invitation not found");
+    }
+    if (!existing.organization) {
+      throw new OrganizationNotFoundError();
+    }
+
+    const freshCode = nanoid();
+    const freshExpiration = new Date(Date.now() + INVITE_EXPIRATION_MS);
+    const claimed = await this.prisma.organizationInvite.updateMany({
+      where: {
+        id: existing.id,
+        organizationId,
+        status: "PENDING",
+        inviteCode: existing.inviteCode,
+      },
+      data: { inviteCode: freshCode, expiration: freshExpiration },
+    });
+    if (claimed.count === 0) {
+      throw new InviteNotFoundError("Invitation not found");
+    }
+
+    // Same contract as approval: an email failure never reverts the resend —
+    // the fresh link exists and is shown as the fallback.
+    const { emailNotSent } = await this.trySendInviteEmail({
+      email: existing.email,
+      organization: existing.organization,
+      inviteCode: freshCode,
+    });
+
+    const { organization: _organization, ...inviteRow } = existing;
+    return {
+      invite: {
+        ...inviteRow,
+        inviteCode: freshCode,
+        expiration: freshExpiration,
+      },
+      emailNotSent,
+    };
+  }
+
+  /**
    * The orchestrators open their own transaction, so they cannot run on a
    * `TransactionClient`; everything else in this service can.
    */

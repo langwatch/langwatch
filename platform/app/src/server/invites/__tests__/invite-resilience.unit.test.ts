@@ -161,6 +161,79 @@ describe("InviteService resilience", () => {
     });
   });
 
+  describe("given an expired invitation the inviter resends", () => {
+    beforeEach(() => {
+      mockPrisma.organizationInvite.findFirst.mockResolvedValue({
+        ...makePendingInvite(),
+        expiration: new Date(Date.now() - 1000),
+        organization: { id: "org-1", name: "Acme" },
+      });
+    });
+
+    describe("when the resend runs", () => {
+      /** @scenario "A leaked stale link dies on resend" */
+      it("claims the row on the code it read and mints a fresh one", async () => {
+        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
+          count: 1,
+        });
+
+        const { invite } = await service.resendInvite({
+          organizationId: "org-1",
+          inviteId: "inv-race-1",
+        });
+
+        // The claim names the OLD code — that conditionality is what makes
+        // the rotation a revocation: after it lands, the old link matches
+        // no row anywhere.
+        expect(mockPrisma.organizationInvite.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              status: "PENDING",
+              inviteCode: "code-race-1",
+            }),
+            data: expect.objectContaining({
+              inviteCode: expect.not.stringMatching(/^code-race-1$/),
+              expiration: expect.any(Date),
+            }),
+          }),
+        );
+        expect(invite.inviteCode).not.toBe("code-race-1");
+        expect(invite.expiration!.getTime()).toBeGreaterThan(
+          Date.now() + 13 * 24 * 60 * 60 * 1000,
+        );
+      });
+
+      it("loses quietly when another admin's resend claimed the row first", async () => {
+        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
+          count: 0,
+        });
+
+        await expect(
+          service.resendInvite({
+            organizationId: "org-1",
+            inviteId: "inv-race-1",
+          }),
+        ).rejects.toBeInstanceOf(InviteNotFoundError);
+      });
+
+      it("refuses to resend a revoked invitation", async () => {
+        mockPrisma.organizationInvite.findFirst.mockResolvedValue({
+          ...makePendingInvite(),
+          status: "REVOKED",
+          organization: { id: "org-1", name: "Acme" },
+        });
+
+        await expect(
+          service.resendInvite({
+            organizationId: "org-1",
+            inviteId: "inv-race-1",
+          }),
+        ).rejects.toBeInstanceOf(InviteNotFoundError);
+        expect(mockPrisma.organizationInvite.updateMany).not.toHaveBeenCalled();
+      });
+    });
+  });
+
   describe("given the states a person sees", () => {
     describe("when an invitation's expiry has passed", () => {
       it("derives EXPIRED from a PENDING row past its expiration", () => {
