@@ -1,15 +1,5 @@
-import {
-  Alert,
-  Box,
-  Button,
-  HStack,
-  IconButton,
-  Input,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Box, Button, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -22,7 +12,9 @@ import { attemptCredentialSignIn } from "../logic/attemptCredentialSignIn";
 import { BRAND, SHAPE } from "../logic/brand";
 import { describeRemainingWait } from "../logic/credentialSignIn";
 import { rememberLastUsedMethod } from "../logic/lastUsedMethod";
-import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "./FrontDoorField";
+import { EmailPill } from "./EmailPill";
+import { FrontDoorField } from "./FrontDoorField";
+import { PasswordInput } from "./PasswordInput";
 
 const credentialSchema = z.object({
   password: z.string().min(1, { message: "Enter your password" }),
@@ -97,7 +89,6 @@ export function CredentialSignInForm({
   const requestSignUpVerification =
     api.frontDoor.requestSignUpVerification.useMutation();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isRevealed, setIsRevealed] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const passwordField = useFocusWhenSettled();
   // The rate limiter's window, counted down where the person can see it. The
@@ -144,35 +135,12 @@ export function CredentialSignInForm({
             it reads as a field that failed to load rather than one that was
             never asked for. */}
         {email ? (
-          <HStack
-            width="full"
-            justify="space-between"
-            backgroundColor="bg.subtle"
-            borderWidth="1px"
-            borderRadius="full"
-            paddingX="14px"
-            paddingY="7px"
-          >
-            <Text
-              fontSize="13px"
-              color="fg.muted"
-              truncate
-              data-testid="routed-identifier"
-            >
-              {email}
-            </Text>
-            <Button
-              variant="plain"
-              size="xs"
-              fontSize="12px"
-              textDecoration="underline"
-              textUnderlineOffset="2px"
-              flexShrink={0}
-              onClick={onUseDifferentEmail}
-            >
-              Use a different email
-            </Button>
-          </HStack>
+          <EmailPill
+            email={email}
+            actionLabel="Use a different email"
+            onAction={onUseDifferentEmail}
+            testId="routed-identifier"
+          />
         ) : null}
         {/* The address the password belongs to, kept in the form so a password
             manager can save and fill the pair. Read-only above, carried here. */}
@@ -202,31 +170,12 @@ export function CredentialSignInForm({
           error={form.formState.errors.password}
         >
           {(id) => (
-            <HStack width="full" gap={2}>
-              <Input
-                id={id}
-                type={isRevealed ? "text" : "password"}
-                fontSize={{ base: "16px", md: "14px" }}
-                minHeight="44px"
-                borderRadius={SHAPE.field}
-                autoComplete="current-password"
-                {...FIELD_SURFACE}
-                _focusVisible={FIELD_FOCUS}
-                {...passwordRegistration}
-                ref={(node) => {
-                  passwordRegistration.ref(node);
-                  passwordField.current = node;
-                }}
-              />
-              <IconButton
-                variant="ghost"
-                size="sm"
-                aria-label={isRevealed ? "Hide password" : "Show password"}
-                onClick={() => setIsRevealed((revealed) => !revealed)}
-              >
-                {isRevealed ? <EyeOff size={16} /> : <Eye size={16} />}
-              </IconButton>
-            </HStack>
+            <PasswordInput
+              id={id}
+              autoComplete="current-password"
+              registration={passwordRegistration}
+              inputRef={passwordField}
+            />
           )}
         </FrontDoorField>
         {submitError ? (

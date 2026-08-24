@@ -19,6 +19,8 @@ function makeService({ registered = false }: { registered?: boolean } = {}) {
     [];
   const sent: Array<{ email: string; verificationUrl: string }> = [];
   const created: Array<{ email: string; passwordHash: string }> = [];
+  /** Addresses a spent link proved. The whole job of a link now. */
+  const confirmed: string[] = [];
   let addressIsTaken = registered;
 
   const service = new SignUpVerificationService({
@@ -45,6 +47,9 @@ function makeService({ registered = false }: { registered?: boolean } = {}) {
         created.push(account);
         addressIsTaken = true;
       },
+      markAddressConfirmed: async ({ email }) => {
+        confirmed.push(email);
+      },
     },
     buildVerificationUrl: ({ token }) =>
       `https://app.test/auth/signup?verify=${token}`,
@@ -57,6 +62,7 @@ function makeService({ registered = false }: { registered?: boolean } = {}) {
     issued,
     sent,
     created,
+    confirmed,
     takeAddress: () => {
       addressIsTaken = true;
     },
@@ -98,7 +104,11 @@ describe("given a sign-up address to confirm", () => {
 
       await expect(
         harness.service.completeVerification({ token: "token-1" }),
-      ).resolves.toEqual({ email: "sam@acme.com", accountCreated: false });
+      ).resolves.toEqual({
+        email: "sam@acme.com",
+        accountCreated: false,
+        accountExists: false,
+      });
 
       await expect(
         harness.service.completeVerification({ token: "token-1" }),
@@ -153,7 +163,11 @@ describe("given a sign-up address to confirm", () => {
 
       await expect(
         harness.service.completeVerification({ token: "token-1" }),
-      ).resolves.toEqual({ email: "sam@acme.com", accountCreated: false });
+      ).resolves.toEqual({
+        email: "sam@acme.com",
+        accountCreated: false,
+        accountExists: false,
+      });
       expect(harness.created).toHaveLength(0);
     });
   });
@@ -181,19 +195,34 @@ describe("given a sign-up address to confirm", () => {
 
       await expect(
         harness.service.completeVerification({ token: "link-in-flight" }),
-      ).resolves.toEqual({ email: "sam@acme.com", accountCreated: true });
+      ).resolves.toEqual({
+        email: "sam@acme.com",
+        accountCreated: true,
+        accountExists: true,
+      });
       expect(harness.created).toEqual([
         { email: "sam@acme.com", passwordHash: FAKE_PASSWORD_HASH },
       ]);
+      // Created AND proven: the link that made the account confirmed the
+      // address in the same breath.
+      expect(harness.confirmed).toEqual(["sam@acme.com"]);
     });
 
     it("creates nothing when the address gained an account meanwhile", async () => {
       seedLinkCarryingCredential(harness);
       harness.takeAddress();
 
+      // The link confirms an ADDRESS; it does not entitle it to overwrite
+      // whatever now answers for it. So the account stands and the address is
+      // still proven — which is the whole of what a link is for now.
       await expect(
         harness.service.completeVerification({ token: "link-in-flight" }),
-      ).resolves.toEqual({ email: "sam@acme.com", accountCreated: false });
+      ).resolves.toEqual({
+        email: "sam@acme.com",
+        accountCreated: false,
+        accountExists: true,
+      });
+      expect(harness.confirmed).toEqual(["sam@acme.com"]);
       expect(harness.created).toHaveLength(0);
     });
   });

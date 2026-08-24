@@ -209,14 +209,20 @@ describe("organization.acceptInvite", () => {
   describe("when the signed-in user is on identifiers", () => {
     /** @scenario "Acceptance requires verification and an exact normalized match" */
     it("accepts through any verified identifier matching the invite's normalized address", async () => {
-      // The invite targets the work address with the admin's casing and a
-      // plus tag; the user is signed in as their personal email, but a
-      // VERIFIED Google identifier holds the work address.
+      // The invite targets the work address with the admin's casing; the user
+      // is signed in as their personal email, but a VERIFIED Google identifier
+      // holds the work address. Casing folds away, and the plus tag does NOT:
+      // it is part of the address, so the identifier has to hold the same one
+      // the invite named.
       findUniqueMock.mockResolvedValue(
         makeInvite({ status: "PENDING", email: "Sam.J+team@Acme.com" }),
       );
       verifiedEmailsOfMock.mockResolvedValueOnce([
-        { identifierId: "idf_g", value: "sam.j@acme.com", provider: "google" },
+        {
+          identifierId: "idf_g",
+          value: "sam.j+team@acme.com",
+          provider: "google",
+        },
       ]);
 
       const caller = createCaller("sam@personal.net");

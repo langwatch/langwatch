@@ -16,7 +16,7 @@ import { buildMembersSettingsUrl } from "~/server/invites/invite-link";
 import { rateLimit } from "~/server/rateLimit";
 import { EmailAlreadyRegisteredError } from "~/server/users/errors";
 import { getClientIp } from "~/utils/getClientIp";
-import { createTRPCRouter, publicProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 
 /**
  * The unauthenticated front door (D13, ADR-117 §6).
@@ -111,6 +111,54 @@ export const frontDoorRouter = createTRPCRouter({
       }
 
       await verification.requestVerification({ email: input.email });
+      return { sent: true as const };
+    }),
+
+  /**
+   * Sends the confirmation link for the CALLER'S OWN address.
+   *
+   * Signing up creates the account and signs the person in; confirming the
+   * address follows them in rather than standing in front of them (ADR-117 §6,
+   * revised). This is what sends it, and what the app's "we have not confirmed
+   * this yet" nudge will resend from.
+   *
+   * Protected, unlike everything else on this router, and that is the design
+   * rather than an inconsistency. A public "send a confirmation to this
+   * address" is a mailer pointed at any address anybody types, and the guard
+   * that keeps `requestSignUpVerification` honest — refusing an address that
+   * already has an account — is exactly the guard this one cannot have, since
+   * by now the account is the whole point. Taking the address from the session
+   * instead of the request closes it completely: the only address anybody can
+   * send to is the one they are already signed in as.
+   */
+  sendMyAddressConfirmation: protectedProcedure
+    .input(z.object({}))
+    .noPermission({
+      reason:
+        "sends the session user's own address confirmation; no tenant scope is involved",
+    })
+    .mutation(async ({ ctx }) => {
+      const email = ctx.session.user.email;
+      if (!email) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This account has no email address to confirm.",
+        });
+      }
+
+      const limit = await rateLimit({
+        key: `frontDoor.sendMyAddressConfirmation:${ctx.session.user.id}`,
+        windowSeconds: 60 * 60,
+        max: 10,
+      });
+      if (!limit.allowed) {
+        throw new TRPCError({
+          code: "TOO_MANY_REQUESTS",
+          message: "Too many attempts. Please try again later.",
+        });
+      }
+
+      await signUpVerification().requestVerification({ email });
       return { sent: true as const };
     }),
 

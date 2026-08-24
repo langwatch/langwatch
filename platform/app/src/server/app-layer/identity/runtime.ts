@@ -337,6 +337,15 @@ export function signUpVerification(): SignUpVerificationService {
           passwordHash,
         });
       },
+      markAddressConfirmed: async ({ email }) => {
+        // Case-insensitive for the same reason the lookup beside it is: rows
+        // written before sign-up lowercased addresses may carry capitals, and
+        // an exact match would quietly confirm nothing.
+        await prisma.user.updateMany({
+          where: { email: { equals: email, mode: "insensitive" } },
+          data: { emailVerified: true },
+        });
+      },
     },
     buildVerificationUrl: ({ token }) => buildSignUpVerificationUrl(token),
   });

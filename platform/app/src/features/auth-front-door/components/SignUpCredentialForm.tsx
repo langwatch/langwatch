@@ -1,14 +1,9 @@
-import {
-  Alert,
-  Button,
-  HStack,
-  IconButton,
-  Input,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Button, Text, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff } from "lucide-react";
+import {
+  PASSWORD_REQUIREMENTS_HINT,
+  passwordProblem,
+} from "@langwatch/identity";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -16,6 +11,7 @@ import {
   applyHandledErrorToForm,
   FormServerError,
   HandledErrorAlert,
+  readHandledError,
 } from "~/features/errors";
 import { authFailureMessage } from "~/pages/auth/authFailureMessage";
 import { api } from "~/utils/api";
@@ -24,24 +20,27 @@ import { credentialSignInFailure } from "../logic/credentialSignIn";
 import { rememberLastUsedMethod } from "../logic/lastUsedMethod";
 import "../authFrontDoor.css";
 import { BRAND, SHAPE } from "../logic/brand";
-import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "./FrontDoorField";
+import { EmailPill } from "./EmailPill";
+import { FrontDoorField } from "./FrontDoorField";
+import { PasswordInput } from "./PasswordInput";
 
-/**
- * The strength rule the server enforces, said in the words the field shows.
- * One number in one place: a form that promised something looser than the
- * server would reject a password the person had already been told was fine.
- */
-const MINIMUM_PASSWORD_LENGTH = 8;
-
+// No name. Onboarding asks for it, in a place where it is worth asking —
+// putting it here charges a field at the one moment somebody has least
+// patience for one, to learn something the next screen learns anyway.
+//
+// The rules come from `@langwatch/identity`, which the mutation behind this
+// form reads too, so the form cannot accept what the server refuses. Asked as
+// a refinement rather than restated as zod constraints for the same reason:
+// restating them is how they drift.
 const signUpSchema = z
   .object({
-    name: z.string().min(1, { message: "Enter the name to call you by" }),
-    password: z.string().min(MINIMUM_PASSWORD_LENGTH, {
-      message: `Password must be at least ${MINIMUM_PASSWORD_LENGTH} characters`,
+    password: z.string().superRefine((value, ctx) => {
+      const problem = passwordProblem(value);
+      if (problem) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: problem });
+      }
     }),
-    confirmPassword: z.string().min(MINIMUM_PASSWORD_LENGTH, {
-      message: `Password must be at least ${MINIMUM_PASSWORD_LENGTH} characters`,
-    }),
+    confirmPassword: z.string(),
   })
   .refine((values) => values.password === values.confirmPassword, {
     message: "The two passwords are not the same",
@@ -59,24 +58,39 @@ const ACCOUNT_CREATED_FALLBACK =
   "Your account was created. Log in with your new details to carry on.";
 
 /**
- * Holding a password as the sign-in method for an address that has already
- * been confirmed.
+ * Choosing a password, which is the step that creates the account.
  *
- * The address is not asked for again and cannot be changed here: it was
- * confirmed by an emailed link, and letting this form carry a different one
- * would create an account for an address nobody proved. It rides along in a
- * hidden field all the same, so a password manager saves the pair.
+ * It registers, signs in, and sends the address confirmation after both — the
+ * confirmation follows somebody in rather than standing in front of them
+ * (ADR-117 §6, revised). The address is the one typed on the step before and
+ * is not asked for again: it rides along in a hidden field so a password
+ * manager saves the pair, and cannot be edited here, because the pair being
+ * saved has to be the pair that was registered.
+ *
+ * The password is typed twice and held to a length. That is the ONLY place
+ * either happens, on either door — the log-in form's single `current-password`
+ * field never becomes an account's password.
  *
  * A rejection lands on the field that caused it, in words that say what to
  * change. Validation runs on blur in the same words, so most of the time the
  * server never has to answer at all.
  */
 export function SignUpCredentialForm({
-  verifiedEmail,
+  email,
   callbackUrl,
+  onUseDifferentEmail,
+  onAddressAlreadyRegistered,
 }: {
-  verifiedEmail: string;
+  email: string;
   callbackUrl: string;
+  /** Back to the address step, for the address that was typed wrong. */
+  onUseDifferentEmail: () => void;
+  /**
+   * The address turned out to have an account. Not a refusal and not a field
+   * error — it is the wrong door, and the screen becomes the right one with
+   * the address already in it.
+   */
+  onAddressAlreadyRegistered?: () => void;
 }) {
   const form = useForm<SignUpValues>({
     resolver: zodResolver(signUpSchema),
@@ -99,8 +113,13 @@ export function SignUpCredentialForm({
     },
   });
   const register = api.user.register.useMutation();
+  // Sent once the session exists, and deliberately not waited on: confirming
+  // the address follows somebody in rather than standing in front of them, so
+  // a slow or failing mailer must not hold up the door it is following them
+  // through. A send that does not happen is recoverable from inside the app.
+  const sendConfirmation =
+    api.frontDoor.sendMyAddressConfirmation.useMutation();
   const [isSigningIn, setIsSigningIn] = useState(false);
-  const [isRevealed, setIsRevealed] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [serverErrorIsOnTheForm, setServerErrorIsOnTheForm] = useState(false);
 
@@ -108,12 +127,18 @@ export function SignUpCredentialForm({
     setSubmitError(null);
     setServerErrorIsOnTheForm(false);
     try {
-      await register.mutateAsync({
-        name: values.name,
-        email: verifiedEmail,
-        password: values.password,
-      });
+      await register.mutateAsync({ email, password: values.password });
     } catch (error) {
+      // An address that already has an account is a wrong door, not a bad
+      // field: the way on is to log in, with the address carried, and the
+      // screen says so instead of rejecting the form.
+      if (
+        onAddressAlreadyRegistered &&
+        readHandledError(error)?.code === "email_already_registered"
+      ) {
+        onAddressAlreadyRegistered();
+        return;
+      }
       // A rejected field belongs next to that field. Anything the form has no
       // input for falls through to the alert below.
       setServerErrorIsOnTheForm(
@@ -126,7 +151,7 @@ export function SignUpCredentialForm({
     let message: string | null = null;
     try {
       const response = await signIn("credentials", {
-        email: verifiedEmail,
+        email,
         password: values.password,
         callbackUrl,
       });
@@ -146,64 +171,48 @@ export function SignUpCredentialForm({
       return;
     }
     rememberLastUsedMethod({ id: "password" });
+    // Fire and forget, and swallow: the account is made and the person is
+    // signed in, so a mailer that is down is not their problem to solve on
+    // this screen.
+    sendConfirmation.mutate({});
   };
 
   return (
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
       <VStack width="full" align="stretch" gap="13px">
+        {/* The address this is for, and the way back to change it. It is the
+            last chance to notice a typo before it becomes an account. */}
+        <EmailPill
+          email={email}
+          actionLabel="Wrong email?"
+          onAction={onUseDifferentEmail}
+          testId="signup-identifier"
+        />
+        {/* Carried in the form as well as shown above it, so a password
+            manager saves the pair it was registered with. */}
         <input
           type="hidden"
           name="email"
-          value={verifiedEmail}
+          value={email}
           autoComplete="username"
           readOnly
         />
-        <FrontDoorField label="Name" error={form.formState.errors.name}>
-          {(id) => (
-            <Input
-              id={id}
-              autoComplete="name"
-              borderRadius={SHAPE.field}
-              fontSize={{ base: "16px", md: "14px" }}
-              minHeight="44px"
-              {...FIELD_SURFACE}
-              _focusVisible={FIELD_FOCUS}
-              {...form.register("name", blurJudged("name"))}
-            />
-          )}
-        </FrontDoorField>
         <FrontDoorField
           label="Password"
           labelEnd={
             <Text fontSize="12px" color="fg.muted">
-              At least {MINIMUM_PASSWORD_LENGTH} characters
+              {PASSWORD_REQUIREMENTS_HINT}
             </Text>
           }
           error={form.formState.errors.password}
         >
           {(id) => (
-            <HStack width="full" gap={2}>
-              <Input
-                id={id}
-                type={isRevealed ? "text" : "password"}
-                fontSize={{ base: "16px", md: "14px" }}
-                minHeight="44px"
-                borderRadius={SHAPE.field}
-                autoComplete="new-password"
-                {...FIELD_SURFACE}
-                _focusVisible={FIELD_FOCUS}
-                {...form.register("password", blurJudged("password"))}
-              />
-              <IconButton
-                variant="ghost"
-                size="sm"
-                aria-label={isRevealed ? "Hide password" : "Show password"}
-                onClick={() => setIsRevealed((revealed) => !revealed)}
-              >
-                {isRevealed ? <EyeOff size={16} /> : <Eye size={16} />}
-              </IconButton>
-            </HStack>
+            <PasswordInput
+              id={id}
+              autoComplete="new-password"
+              registration={form.register("password", blurJudged("password"))}
+            />
           )}
         </FrontDoorField>
         <FrontDoorField
@@ -211,16 +220,10 @@ export function SignUpCredentialForm({
           error={form.formState.errors.confirmPassword}
         >
           {(id) => (
-            <Input
+            <PasswordInput
               id={id}
-              type="password"
-              fontSize={{ base: "16px", md: "14px" }}
-              minHeight="44px"
-              borderRadius={SHAPE.field}
               autoComplete="new-password"
-              {...FIELD_SURFACE}
-              _focusVisible={FIELD_FOCUS}
-              {...form.register(
+              registration={form.register(
                 "confirmPassword",
                 blurJudged("confirmPassword"),
               )}

@@ -34,12 +34,19 @@ import { SuccessPulse } from "./SuccessPulse";
 const JOIN_BEFORE_CREATE_PATH = "/auth/join";
 
 /**
- * Sign-up, verification first (D13, ADR-117 §6).
+ * Sign-up (D13, ADR-117 §6, revised).
  *
- * The same funnel as log-in, entered from the other side: an address, then the
- * methods the router named for it. The address is confirmed before any method
- * is chosen, so nothing exists for an address nobody proved — an abandoned
- * sign-up leaves a token that expires and nothing else.
+ * The same funnel as log-in, entered from the other side: an address, then a
+ * password, and the account exists. Confirming the address FOLLOWS somebody in
+ * rather than standing in front of them — the link goes out once they are
+ * already through the door, because waiting on an inbox is a wall in front of
+ * the thing they came to do, and it is a wall that buys nothing. Everything
+ * that actually trusts the address is gated on the identifier being verified,
+ * not on the account existing; domain auto-join is the one that matters, and
+ * it already refuses an unverified address.
+ *
+ * An abandoned sign-up still leaves nothing: the address step sends no mail
+ * and creates no account, so it costs whoever typed it exactly nothing.
  *
  * An address that already has an account is not a wall (epic Q12 lets sign-up
  * acknowledge it). It is a person who came in the wrong door, so the screen
@@ -61,6 +68,9 @@ export function VerificationFirstSignUp() {
   const { decide } = routing;
 
   const [sentTo, setSentTo] = useState<string | null>(null);
+  // The address typed on the first step, on its way to the password step.
+  // Nothing has been created or sent yet — this is somebody mid-sign-up.
+  const [signingUpEmail, setSigningUpEmail] = useState<string | null>(null);
   const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null);
   const [accountIsReady, setAccountIsReady] = useState(false);
   const [welcomeBackEmail, setWelcomeBackEmail] = useState<string | null>(null);
@@ -83,9 +93,13 @@ export function VerificationFirstSignUp() {
     spent.current = true;
     completeVerification
       .mutateAsync({ token: verifyToken })
-      .then(async ({ email, accountCreated }) => {
+      .then(async ({ email, accountCreated, accountExists }) => {
         setVerifiedEmail(email);
-        setAccountIsReady(accountCreated);
+        // "Ready" means there is nothing left to choose. An account that was
+        // already there is just as ready as one this link created — sign-up
+        // made it and the link is the address catching up, so asking such a
+        // person to pick a sign-in method would be asking twice.
+        setAccountIsReady(accountCreated || accountExists);
         await decide({ identifier: email });
       })
       .catch(() => {
@@ -141,6 +155,7 @@ export function VerificationFirstSignUp() {
       accountIsReady,
       welcomeBackEmail,
       sentTo,
+      signingUpEmail,
     }),
   });
 
@@ -192,9 +207,28 @@ export function VerificationFirstSignUp() {
     return (
       <CheckYourEmail
         email={sentTo}
-        what="Open it to confirm the address, then choose a password."
+        what="Open it to confirm the address."
         onUseDifferentEmail={() => setSentTo(null)}
       />
+    );
+  }
+
+  // The password step, which is the step that creates the account. Confirming
+  // the address happens after it and does not gate anything.
+  if (signingUpEmail) {
+    return (
+      <AuthCard title="Choose a password" finePrint={<FrontDoorFinePrint />}>
+        <SignUpCredentialForm
+          email={signingUpEmail}
+          callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH}
+          onUseDifferentEmail={() => setSigningUpEmail(null)}
+          onAddressAlreadyRegistered={() => {
+            setSigningUpEmail(null);
+            setWelcomeBackEmail(signingUpEmail);
+            void decide({ identifier: signingUpEmail });
+          }}
+        />
+      </AuthCard>
     );
   }
 
@@ -220,7 +254,13 @@ export function VerificationFirstSignUp() {
         submitLabel="Continue"
         isSubmitting={requestVerification.isPending}
         defaultEmail={carriedEmail}
-        onSubmit={({ email }) => sendTo(email)}
+        // Straight to the password. Nothing is sent from this step any more:
+        // the account is created on the next one and the confirmation follows
+        // it out, so an address typed here costs nobody an email.
+        onSubmit={({ email }) => {
+          setSigningUpEmail(email);
+          return Promise.resolve();
+        }}
         footer={
           <LogInLink
             callbackUrl={callbackUrl}
@@ -369,14 +409,22 @@ function signUpDepth({
   accountIsReady,
   welcomeBackEmail,
   sentTo,
+  signingUpEmail,
 }: {
   verifiedEmail: string | null;
   accountIsReady: boolean;
   welcomeBackEmail: string | null;
   sentTo: string | null;
+  signingUpEmail: string | null;
 }): FrontDoorDepth {
   if (verifiedEmail && accountIsReady) return "settled";
-  if (verifiedEmail !== null || welcomeBackEmail !== null) return "credential";
+  if (
+    verifiedEmail !== null ||
+    welcomeBackEmail !== null ||
+    signingUpEmail !== null
+  ) {
+    return "credential";
+  }
   if (sentTo !== null) return "sent";
   return "entry";
 }
@@ -431,8 +479,12 @@ function MethodChoice({
             method.kind === "password" ? (
               <SignUpCredentialForm
                 key={method.id}
-                verifiedEmail={verifiedEmail}
+                email={verifiedEmail}
                 callbackUrl={callbackUrl}
+                // This address arrived on a link that has just been spent, so
+                // there is no step behind this one to go back to. Changing it
+                // means starting a sign-up over, which is what this does.
+                onUseDifferentEmail={() => hardRedirect("/auth/signup")}
               />
             ) : null
           }

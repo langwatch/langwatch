@@ -62,6 +62,15 @@ export interface SignUpAccountFactory {
     email: string;
     passwordHash: string;
   }): Promise<void>;
+  /**
+   * The link came back, so the address is proven.
+   *
+   * This is the whole job of a link now. Confirmation used to be implicit —
+   * the account did not exist until a link created it, so "has an account"
+   * and "proved the address" were one fact. Sign-up creates the account up
+   * front, so the two have come apart and the second has to be written down.
+   */
+  markAddressConfirmed(input: { email: string }): Promise<void>;
 }
 
 export interface SignUpVerificationDeps {
@@ -147,6 +156,7 @@ export class SignUpVerificationService {
   async completeVerification({ token }: { token: string }): Promise<{
     email: string;
     accountCreated: boolean;
+    accountExists: boolean;
   }> {
     const claimed = await this.deps.tokens.claim({ token, now: this.now() });
     const pending = claimed ? readPendingSignUp(claimed.identifier) : null;
@@ -155,22 +165,38 @@ export class SignUpVerificationService {
       throw new IdentityVerificationExpiredError();
     }
 
-    if (!pending.passwordHash) {
-      return { email: pending.email, accountCreated: false };
+    const alreadyRegistered = await this.addressIsRegistered({
+      email: pending.email,
+    });
+
+    // The ordinary case now: sign-up made the account and this link is the
+    // address catching up with it. Confirming is the whole job.
+    if (alreadyRegistered) {
+      await this.deps.accounts.markAddressConfirmed({ email: pending.email });
+      return {
+        email: pending.email,
+        accountCreated: false,
+        accountExists: true,
+      };
     }
 
-    // Between the link going out and coming back, the address may have gained
-    // an account by another door. The link confirms an ADDRESS; it does not
-    // entitle it to overwrite whatever now answers for it.
-    if (await this.addressIsRegistered({ email: pending.email })) {
-      return { email: pending.email, accountCreated: false };
+    // No account, and no credential to make one from: the link came from the
+    // log-in door, where a password is asked for once and never kept. The
+    // screen takes it from here.
+    if (!pending.passwordHash) {
+      return {
+        email: pending.email,
+        accountCreated: false,
+        accountExists: false,
+      };
     }
 
     await this.deps.accounts.createCredentialAccount({
       email: pending.email,
       passwordHash: pending.passwordHash,
     });
-    return { email: pending.email, accountCreated: true };
+    await this.deps.accounts.markAddressConfirmed({ email: pending.email });
+    return { email: pending.email, accountCreated: true, accountExists: true };
   }
 
   private async issueLink({

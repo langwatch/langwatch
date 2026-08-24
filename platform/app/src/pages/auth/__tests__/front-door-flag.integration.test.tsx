@@ -70,6 +70,14 @@ vi.mock("~/utils/api", () => ({
           error: null,
         }),
       },
+      sendMyAddressConfirmation: {
+        useMutation: () => ({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn(),
+          isPending: false,
+          error: null,
+        }),
+      },
     },
     user: {
       register: {

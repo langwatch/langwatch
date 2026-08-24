@@ -70,11 +70,30 @@ Feature: The first-party sign-in and sign-up screens - the front door is ours
 
   # ── Sign-up ────────────────────────────────────────────────────────────
 
+  # Confirming the address does NOT gate the app (revises ADR-117 §6, which
+  # had the link come first and the account exist only once it came back).
+  # Waiting on an inbox to get in is a wall in front of the thing somebody came
+  # to do, and it is a wall that pays for nothing: the address is still
+  # unproven either way, and everything that actually TRUSTS the address is
+  # gated on the identifier being verified rather than on the account existing.
+  # Domain auto-join is the one that matters, and it already refuses an
+  # unverified address (specs/identity/domain-auto-join.feature).
+  #
+  # So the account is made at sign-up and the confirmation follows it out.
   @integration
-  Scenario: Sign-up verifies the email before any method is chosen
-    When I start sign-up with my work email
-    Then I am asked to verify the address before choosing a method
-    And the method choice reuses the same picker the sign-in screen shows
+  Scenario: Sign-up creates the account and confirms the address afterwards
+    When I sign up with my work email and choose a password
+    Then my account is created and I am signed in
+    And a confirmation link is sent without my having to wait for it
+
+  # The nudge and its resend live in the signed-in shell rather than the front
+  # door, so they are a slice of their own. Tagged honestly until that slice
+  # lands: an untagged scenario would report itself bound and enforce nothing.
+  @unimplemented
+  Scenario: An unconfirmed address is named in the app, with a way to resend
+    Given I signed up and have not opened the confirmation link
+    Then the app tells me the address is unconfirmed
+    And it offers to send the link again
 
   # The interstitial's CONTRACT ships with D13 and is bound below (verified
   # email in, decision out, nothing rendered when there is nothing to offer).

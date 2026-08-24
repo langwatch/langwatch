@@ -5,6 +5,8 @@ import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtu
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { RoutingPolicyService } from "@ee/governance/services/routingPolicy.service";
 import { resolveAuthProvider } from "@ee/sso/sso-gate";
+import { ValidationError } from "@langwatch/handled-error";
+import { passwordProblem } from "@langwatch/identity";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
@@ -89,14 +91,16 @@ export const userRouter = createTRPCRouter({
   register: publicProcedure
     .input(
       z.object({
-        name: z.string().min(1, "Name is required"),
+        // Optional: the front door does not ask. Onboarding does, in a place
+        // where the question is worth a field. The legacy sign-up page still
+        // sends one, so it is taken when it comes.
+        name: z.string().min(1, "Name is required").optional(),
         email: z.string().email("Invalid email"),
-        // Match the strength requirement enforced by `changePassword`
-        // (min 8) and the signup form's client-side check (was min 6 —
-        // updated to align). Without this, the server accepted any
-        // password (even a single character) while the form rejected
-        // anything under 6, leading to a server/client validation gap.
-        password: z.string().min(8, "Password must be at least 8 characters"),
+        // Length only here; the POLICY is checked in the body so its refusal
+        // can carry `meta.fieldErrors` and land on the field the person is
+        // looking at. An input-schema rejection arrives as a tRPC parse error
+        // with no field to hang on.
+        password: z.string().min(1),
       }),
     )
     .noPermission({
@@ -104,6 +108,16 @@ export const userRouter = createTRPCRouter({
     })
     .mutation(async ({ ctx, input }) => {
       const { name, password } = input;
+
+      // The same rules the form ran, from the same module, so the two cannot
+      // drift into accepting different passwords. Carried as `fieldErrors` so
+      // the refusal lands on the password box rather than in a banner over it.
+      const problem = passwordProblem(password);
+      if (problem) {
+        throw new ValidationError(problem, {
+          meta: { fieldErrors: { password: [problem] } },
+        });
+      }
       // BetterAuth lowercases the email on every one of its lookups and
       // writes, and sign-in goes through BetterAuth. An account stored as
       // typed, capitals and all, is therefore one that sign-in can never find
@@ -156,7 +170,7 @@ export const userRouter = createTRPCRouter({
 
       const newUser = await createCredentialUser({
         prisma: ctx.prisma,
-        name,
+        name: name ?? null,
         email,
         passwordHash: await hash(password, 10),
       });

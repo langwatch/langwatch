@@ -380,6 +380,12 @@ export {
   signInProvedSecondFactor,
   TOTP_AMR,
 } from "./mfa-condition";
+export {
+  PASSWORD_MAXIMUM_BYTES,
+  PASSWORD_MINIMUM_LENGTH,
+  PASSWORD_REQUIREMENTS_HINT,
+  passwordProblem,
+} from "./password-policy";
 export { primaryEmailOf } from "./primary-email";
 export { reduceIdentity } from "./reduce";
 export {
