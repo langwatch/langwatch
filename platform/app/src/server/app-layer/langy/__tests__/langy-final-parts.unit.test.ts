@@ -375,6 +375,49 @@ describe("buildFinalAssistantParts", () => {
       ]);
     });
 
+    /** @scenario "A turn that ends on a call does not repeat what it already wrote" */
+    it("does not repeat its narration when the turn ended on a call", () => {
+      // A turn that goes quiet after its last call hands over its WHOLE
+      // narration as the reply, because there is no closing paragraph to hand
+      // over instead. Appending it after the account would print every
+      // paragraph a second time.
+      const parts = buildFinalAssistantParts({
+        text: "Reading the failed rows.\nNow running the candidate.",
+        toolCalls: twoCalls,
+        order: [
+          { kind: "text", text: "Reading the failed rows." },
+          { kind: "tool", id: "c1" },
+          { kind: "text", text: "Now running the candidate." },
+          { kind: "tool", id: "c2" },
+        ],
+      });
+
+      expect(parts.map((part) => part.type)).toEqual([
+        "text",
+        "tool-search",
+        "text",
+        "tool-run",
+      ]);
+      expect(parts.map((part) => ("text" in part ? part.text : null))).toEqual([
+        "Reading the failed rows.",
+        null,
+        "Now running the candidate.",
+        null,
+      ]);
+    });
+
+    /** @scenario "A turn that ends on a call does not repeat what it already wrote" */
+    it("keeps the reply when a turn ending on a call wrote no prose of its own", () => {
+      // Nothing was written between the calls, so `text` is the only prose
+      // there is and dropping it would record a turn that said nothing.
+      const parts = buildFinalAssistantParts({
+        text: "Annotation added.",
+        toolCalls: [twoCalls[0]!],
+        order: [{ kind: "tool", id: "c1" }],
+      });
+      expect(parts.map((part) => part.type)).toEqual(["tool-search", "text"]);
+    });
+
     it("drops a blank paragraph rather than recording an empty block", () => {
       const parts = buildFinalAssistantParts({
         text: "Done.",

@@ -113,3 +113,12 @@ Feature: Langy UI actions fall back to the backend and the page catches up
     When the tab's autosave sends its expected version
     Then the save is refused before anything is written
     And autosave stands down until the user reloads
+
+  # The refusal is the path a dirty tab reaches the banner by, so it is the
+  # path that most needs the name. The refusal itself says who holds the
+  # newer version.
+  @integration
+  Scenario: A refused save names who holds the newer version
+    Given Langy saved a newer version than this tab loaded
+    When the tab's autosave is refused
+    Then the banner names Langy rather than saying it happened somewhere else

@@ -195,7 +195,39 @@ describe("workbench versioning", () => {
           expect.unreachable("the save should have been refused");
         } catch (error) {
           const meta = HandledError.isHandled(error) ? error.meta : {};
-          expect(meta).toEqual({ currentVersion: version + 1 });
+          expect(meta).toEqual({
+            currentVersion: version + 1,
+            actorLabel: "user",
+          });
+        }
+      });
+
+      /** @scenario "A refused save names who holds the newer version" */
+      it("names Langy when Langy wrote the newer version", async () => {
+        const { experimentId, version } = await createEvaluation();
+        await service.saveWorkbenchState({
+          projectId: project.id,
+          id: experimentId,
+          state: stateNamed("Langy's candidate"),
+          expectedVersion: version,
+          actor: { label: "langy" },
+        });
+
+        try {
+          await service.saveWorkbenchState({
+            projectId: project.id,
+            id: experimentId,
+            state: stateNamed("The reader's own edit"),
+            expectedVersion: version,
+            actor: { label: "user" },
+          });
+          expect.unreachable("the save should have been refused");
+        } catch (error) {
+          const meta = HandledError.isHandled(error) ? error.meta : {};
+          expect(meta).toEqual({
+            currentVersion: version + 1,
+            actorLabel: "langy",
+          });
         }
       });
     });

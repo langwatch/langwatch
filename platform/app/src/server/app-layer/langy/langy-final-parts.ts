@@ -39,20 +39,17 @@ const cliEnvelope = LangyCliEnvelopeService.create();
  * (`streaming/langyTurnOrder`) — the parts are the paragraphs and the calls
  * interleaved the way the reader watched them arrive, so a refreshed page reads
  * the same as the turn did. Without one, the calls are recorded first and the
- * reply after them, which is what this always did and what a turn finalized
- * without a live account (the agent's own HTTP post, a turn whose buffer has
- * lapsed) can still say honestly.
+ * reply after them, which is what this always did and what a turn whose live
+ * account has lapsed can still say honestly.
  *
- * `text` stays authoritative for the REPLY: it is what the agent asked to keep,
- * and it lands as the turn's last text however the parts were assembled. The
- * order supplies only the paragraphs written BEFORE the last call, which exist
- * nowhere else. Nothing is written twice, and a turn that ended on a call still
- * gets its reply.
+ * `text` stays authoritative for the REPLY the agent asked to keep, and the
+ * order supplies the paragraphs written between the calls, which exist nowhere
+ * else. What `text` holds depends on how the turn ended, so `orderedParts`
+ * tells the two cases apart; nothing is written twice either way.
  *
- * Only one of the two finalize paths ever stores a turn (the event store dedupes
- * on turnId), so the two shapes never mix inside one message: a turn is either
- * recorded in its real order or in the calls-then-reply shape, never half of
- * each.
+ * The account is read by `ingestAgentTurnResult`, not by its callers, so both
+ * finalize paths assemble the same parts and the shape never depends on which
+ * of them landed first.
  *
  * The part shape matches the AI-SDK tool part the live stream emits, so the SAME
  * renderer draws them live and on reload.
@@ -112,15 +109,21 @@ export function buildFinalAssistantParts({
 
 /**
  * The parts of a turn whose order is known: its paragraphs and its calls, as
- * they happened, with the reply last.
+ * they happened.
  *
  * The account names calls by id, so a call it never mentions — one the harness
  * reported only at the end, one that arrived after the buffer lapsed — is not
  * dropped. It keeps the place it always had, before the reply.
  *
- * The last text segment of the account is the reply the agent was still writing
- * when the turn ended, and `text` is that same reply in its authoritative form,
- * so the account's copy is replaced rather than kept alongside it.
+ * What `text` holds depends on how the turn ended, and the two cases must be
+ * told apart or the account's paragraphs are written a second time:
+ *
+ *   - The turn ended on a paragraph. That paragraph IS `text`, in its
+ *     authoritative form, so the account's copy is replaced by it.
+ *   - The turn ended on a call and said nothing after it. Then `text` is the
+ *     whole narration the account already holds, in order, so appending it
+ *     would repeat every paragraph. The account is recorded as it stands, and
+ *     `text` is used only when the account carries no prose of its own.
  */
 function orderedParts({
   text,
@@ -133,13 +136,44 @@ function orderedParts({
   order: readonly LangyTurnSegment[];
   toolPartOf: (call: LangyFinalToolCall) => LangyMessagePart;
 }): LangyMessagePart[] {
-  const byId = new Map(toolCalls.map((call) => [call.id, call]));
-  const lastTextIndex = order.findLastIndex(
-    (segment) => segment.kind === "text",
-  );
+  const last = order.at(-1);
+  const endedOnAParagraph = last?.kind === "text" && last.text.trim() !== "";
+  const account = accountParts({
+    order,
+    toolCalls,
+    toolPartOf,
+    // The closing paragraph is appended once, below, from `text`.
+    skipIndex: endedOnAParagraph ? order.length - 1 : -1,
+  });
 
+  const unrecorded = toolCalls.filter((call) => !account.recorded.has(call.id));
+  const reply =
+    endedOnAParagraph || !account.wroteProse ? assistantTextParts(text) : [];
+  return [...account.parts, ...unrecorded.map(toolPartOf), ...reply];
+}
+
+/** The account walked in order: its parts, which calls it named, and whether
+ * it carried prose of its own. */
+function accountParts({
+  order,
+  toolCalls,
+  toolPartOf,
+  skipIndex,
+}: {
+  order: readonly LangyTurnSegment[];
+  toolCalls: LangyFinalToolCall[];
+  toolPartOf: (call: LangyFinalToolCall) => LangyMessagePart;
+  skipIndex: number;
+}): {
+  parts: LangyMessagePart[];
+  recorded: Set<string>;
+  wroteProse: boolean;
+} {
+  const byId = new Map(toolCalls.map((call) => [call.id, call]));
   const parts: LangyMessagePart[] = [];
   const recorded = new Set<string>();
+  let wroteProse = false;
+
   for (const [index, segment] of order.entries()) {
     if (segment.kind === "tool") {
       const call = byId.get(segment.id);
@@ -148,14 +182,12 @@ function orderedParts({
       parts.push(toolPartOf(call));
       continue;
     }
-    // The reply is appended once, below, from `text`.
-    if (index === lastTextIndex) continue;
-    if (segment.text.trim() === "") continue;
+    if (index === skipIndex || segment.text.trim() === "") continue;
+    wroteProse = true;
     parts.push(...assistantTextParts(segment.text));
   }
 
-  const unrecorded = toolCalls.filter((call) => !recorded.has(call.id));
-  return [...parts, ...unrecorded.map(toolPartOf), ...assistantTextParts(text)];
+  return { parts, recorded, wroteProse };
 }
 
 /**

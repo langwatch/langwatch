@@ -508,10 +508,9 @@ export class ExperimentService {
       throw new ExperimentTypeMismatchError();
     }
 
-    const [latest] = await this.repository.findVersions({
+    const actorLabel = await this.latestAuthorLabel({
       projectId,
       experimentId: row.id,
-      take: 1,
     });
 
     return {
@@ -521,10 +520,35 @@ export class ExperimentService {
       state: (row.workbenchState as PersistedEvaluationsV3State | null) ?? null,
       version: row.workbenchVersion,
       updatedAt: row.updatedAt,
-      ...(latest
-        ? { actorLabel: latest.authorLabel as WorkbenchActorLabel }
-        : {}),
+      ...(actorLabel ? { actorLabel } : {}),
     };
+  }
+
+  /**
+   * Who wrote the workbench's current version, when a version row says so.
+   *
+   * The reader is told a change came from "somewhere else" only because the
+   * page had no one to name. A change Langy made in the reader's own tab must
+   * read as Langy's, so both the version probe and a refused save carry this.
+   */
+  private async latestAuthorLabel(
+    {
+      projectId,
+      experimentId,
+    }: {
+      projectId: string;
+      experimentId: string;
+    },
+    // On the refusal path this runs inside the save's own transaction, so it
+    // reads on that connection rather than borrowing a second one from the pool
+    // while the first is held open.
+    options?: { tx?: Prisma.TransactionClient },
+  ): Promise<WorkbenchActorLabel | undefined> {
+    const [latest] = await this.repository.findVersions(
+      { projectId, experimentId, take: 1 },
+      options,
+    );
+    return latest ? (latest.authorLabel as WorkbenchActorLabel) : undefined;
   }
 
   /**
@@ -636,16 +660,23 @@ export class ExperimentService {
       throw new ExperimentTypeMismatchError();
     }
 
-    const stale = new StaleWorkbenchStateError({
-      currentVersion: row.workbenchVersion,
-    });
+    const refuseAsStale = async (): Promise<never> => {
+      const actorLabel = await this.latestAuthorLabel(
+        { projectId, experimentId: row.id },
+        { tx },
+      );
+      throw new StaleWorkbenchStateError({
+        currentVersion: row.workbenchVersion,
+        ...(actorLabel ? { actorLabel } : {}),
+      });
+    };
 
     // Refused before the write, not rolled back after it.
     if (
       expectedVersion !== undefined &&
       expectedVersion !== row.workbenchVersion
     ) {
-      throw stale;
+      await refuseAsStale();
     }
 
     const nextVersion = row.workbenchVersion + 1;
@@ -663,7 +694,7 @@ export class ExperimentService {
         { tx },
       );
     } catch (error) {
-      if (isRecordNotFoundError(error)) throw stale;
+      if (isRecordNotFoundError(error)) await refuseAsStale();
       throw error;
     }
 

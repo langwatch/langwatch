@@ -58,3 +58,34 @@ export function turnOrderFromStream(
 
   return order;
 }
+
+/** The live edge, as the order read needs it: the whole turn, from the start. */
+export interface LangyTurnStreamTail {
+  readTail(a: { conversationId: string; turnId: string }): Promise<{
+    reads: { entry: LangyStreamEntry }[];
+  }>;
+}
+
+/**
+ * Reads a turn's ordered account. Injected into the conversation service so
+ * BOTH finalize paths record the same shape: the relay's terminal frame and the
+ * agent's own HTTP post race each other, the ingest keeps whichever lands
+ * first, and a turn's order must not depend on who won.
+ */
+export interface LangyTurnOrderReader {
+  readTurnOrder(a: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<LangyTurnSegment[]>;
+}
+
+export function createLangyTurnOrderReader(
+  buffer: LangyTurnStreamTail,
+): LangyTurnOrderReader {
+  return {
+    async readTurnOrder(at) {
+      const { reads } = await buffer.readTail(at);
+      return turnOrderFromStream(reads.map(({ entry }) => entry));
+    },
+  };
+}

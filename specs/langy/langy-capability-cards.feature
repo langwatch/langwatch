@@ -343,14 +343,40 @@ Feature: Langy renders domain-capability cards for tool calls
       When the reader reloads the page
       Then the turn reads in the same order it did while it was happening
 
-    # A turn long enough to outlive its live buffer, or one finalized by the
-    # agent's own HTTP post rather than the relay, has no ordered account to
+    # A turn long enough to outlive its live buffer has no ordered account to
     # rebuild from. It records what it always did rather than guessing an order.
     @unit
     Scenario: A turn with no ordered account on hand records what it always did
       Given a finalized turn whose ordered account is not available
       When the turn is recorded
       Then the recorded parts are its calls followed by its reply
+
+    # A turn that goes quiet after its last call hands over its WHOLE narration
+    # as the reply, because there is no closing paragraph to hand over instead.
+    # Recording that reply after the account would print every paragraph a
+    # second time, below the cards it was written between.
+    @unit
+    Scenario: A turn that ends on a call does not repeat what it already wrote
+      Given a turn that wrote between its calls and said nothing after the last one
+      When the turn is recorded
+      Then each paragraph appears once, where it was written
+      And no closing paragraph is added after the last call
+
+    # Two paths finish a turn and race each other: the live relay's terminal
+    # frame, and the agent's own post over HTTP. The record keeps whichever
+    # lands first, so the order must not be read by one of them. It is read
+    # where the turn is recorded, once, for both.
+    @unit
+    Scenario: The order does not depend on which path finished the turn
+      Given a turn that wrote between its calls
+      When the turn is recorded by the path that posts the result directly
+      Then the recorded parts read in the same order as the relay would record them
+
+    @unit
+    Scenario: A turn whose order cannot be read is still recorded
+      Given a turn whose live account cannot be read back
+      When the turn is recorded
+      Then the reply and the calls are still recorded
 
   # The scenario library lives under Simulations, and a scenario's own page is
   # the library with that scenario open. Pointing at the Simulations index sent
