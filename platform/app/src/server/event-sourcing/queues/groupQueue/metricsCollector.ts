@@ -62,14 +62,14 @@ export class GroupQueueMetricsCollector {
    */
   private isCollecting = false;
 
-  /** ZSCAN cursor for the staging-depth rotation; "0" starts a new rotation. */
+  /** SSCAN cursor for the staging-depth rotation; "0" starts a new rotation. */
   private stagingCursor = "0";
   /** Deepest group seen so far in the rotation in progress. */
   private stagingDepthMax = 0;
   /**
    * Groups over the threshold in the rotation in progress, by id.
    *
-   * Ids rather than a counter because ZSCAN promises each member at least
+   * Ids rather than a counter because SSCAN promises each member at least
    * once, not exactly once: a group present across a rehash can be returned on
    * two pages, and counting sightings would report one hot group as several.
    * The max is immune to that, a count is not, and telling one deep group from
@@ -348,7 +348,11 @@ export class GroupQueueMetricsCollector {
    *
    * The running values reset when the cursor wraps, so a group that drained
    * stops being reported within one rotation rather than pinning the gauge at
-   * its high-water mark for ever.
+   * its high-water mark for ever. That makes both gauges saw-tooth by
+   * construction: they climb through a rotation and fall to zero at the wrap.
+   * An alarm on the instantaneous value would therefore clear once per
+   * rotation whatever the queue is doing, so alarm on the maximum over a
+   * window that covers at least one rotation instead.
    *
    * SSCAN's guarantee is the one this relies on: every member present for the
    * whole rotation is returned at least once. Members added or removed part

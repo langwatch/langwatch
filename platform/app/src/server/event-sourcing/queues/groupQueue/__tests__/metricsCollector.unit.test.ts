@@ -655,7 +655,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
     });
   });
 
-  describe("given a group ZSCAN returns on two pages", () => {
+  describe("given a group SSCAN returns on two pages", () => {
     describe("when the rotation counts groups over the threshold", () => {
       it("counts it once, because the scan promises at least once", async () => {
         const deep = STAGING_DEPTH_REPORT_FLOOR * 2;
@@ -704,7 +704,7 @@ describe("GroupQueueMetricsCollector, per-group staging depth", () => {
     });
   });
 
-  describe("given an empty ready set", () => {
+  describe("given an empty pending-groups index", () => {
     describe("when a cycle runs", () => {
       it("reports zero rather than leaving the last value standing", async () => {
         const redis = makeRedis({ readyZset: [] });
