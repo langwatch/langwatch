@@ -9,10 +9,13 @@ import Link from "~/utils/compat/next-link";
 import { useSearchParams } from "~/utils/compat/next-navigation";
 import { hardRedirect } from "~/utils/hardRedirect";
 import { useSignInRouting } from "../hooks/useSignInRouting";
+import type { FrontDoorDepth } from "../logic/groundPalette";
+import { usePublishFrontDoorStage } from "../logic/groundStage";
 import {
   readLastUsedMethodId,
   rememberPendingMethod,
 } from "../logic/lastUsedMethod";
+import { CheckYourEmail } from "./CheckYourEmail";
 import { CredentialSignInForm } from "./CredentialSignInForm";
 import { FrontDoorFinePrint } from "./FrontDoorFinePrint";
 import { IdentifierStepForm } from "./IdentifierStepForm";
@@ -122,6 +125,21 @@ export function VerificationFirstSignUp() {
     }
   };
 
+  // Told once, from the same state the returns below branch on, so the ground
+  // can never be showing a step other than the one drawn over it. A confirmed
+  // address being asked for a password is the same DEPTH as a log-in asking
+  // for one — the field does not care which door reached it, only how far in
+  // it is.
+  usePublishFrontDoorStage({
+    door: "signup",
+    depth: signUpDepth({
+      verifiedEmail,
+      accountIsReady,
+      welcomeBackEmail,
+      sentTo,
+    }),
+  });
+
   if (welcomeBackEmail) {
     return (
       <WelcomeBack
@@ -166,7 +184,14 @@ export function VerificationFirstSignUp() {
     );
   }
 
-  if (sentTo) return <LinkIsOnItsWay email={sentTo} />;
+  if (sentTo) {
+    return (
+      <CheckYourEmail
+        email={sentTo}
+        what="Open it to confirm the address and carry on."
+      />
+    );
+  }
 
   return (
     <AuthCard
@@ -238,6 +263,7 @@ function WelcomeBack({
           reasonCode={decision.reasonCode}
           lastUsedMethodId={lastUsedMethodId}
           onFederatedMethodChosen={onFederatedMethodChosen}
+          callbackUrl={callbackUrl}
           renderLocalMethod={(method) =>
             method.kind === "password" ? (
               <CredentialSignInForm
@@ -313,15 +339,26 @@ function LinkNoLongerWorks({
   );
 }
 
-function LinkIsOnItsWay({ email }: { email: string }) {
-  return (
-    <AuthCard title="Check your email">
-      <Text data-testid="verification-sent">
-        We sent a link to <b>{email}</b>. Open it to confirm the address and
-        carry on. The link expires in 1 hour.
-      </Text>
-    </AuthCard>
-  );
+/**
+ * Which of the sign-up door's steps the screen below is drawing, for the
+ * ground behind it. Read in the same order the returns are written in, so the
+ * two can only ever agree.
+ */
+function signUpDepth({
+  verifiedEmail,
+  accountIsReady,
+  welcomeBackEmail,
+  sentTo,
+}: {
+  verifiedEmail: string | null;
+  accountIsReady: boolean;
+  welcomeBackEmail: string | null;
+  sentTo: string | null;
+}): FrontDoorDepth {
+  if (verifiedEmail && accountIsReady) return "settled";
+  if (verifiedEmail !== null || welcomeBackEmail !== null) return "credential";
+  if (sentTo !== null) return "sent";
+  return "entry";
 }
 
 /**
@@ -352,10 +389,17 @@ function MethodChoice({
       </HStack>
       {decision ? (
         <SignInMethodPicker
-          methodSet={decision.methodSet}
+          // Every way in EXCEPT a passkey. This step belongs to an account
+          // being made: there is no credential on this device to find yet, so
+          // the ceremony would open a prompt with nothing in it. A passkey
+          // becomes an offer once there is one to enrol (D07).
+          methodSet={decision.methodSet.filter(
+            (method) => method.kind !== "passkey",
+          )}
           reasonCode={decision.reasonCode}
           lastUsedMethodId={lastUsedMethodId}
           onFederatedMethodChosen={onFederatedMethodChosen}
+          callbackUrl={callbackUrl}
           renderLocalMethod={(method) =>
             method.kind === "password" ? (
               <SignUpCredentialForm

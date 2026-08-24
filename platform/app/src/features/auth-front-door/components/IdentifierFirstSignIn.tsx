@@ -9,6 +9,8 @@ import { replaceLocation } from "~/utils/browserNavigation";
 import Link from "~/utils/compat/next-link";
 import { useSearchParams } from "~/utils/compat/next-navigation";
 import { useSignInRouting } from "../hooks/useSignInRouting";
+import type { FrontDoorDepth } from "../logic/groundPalette";
+import { usePublishFrontDoorStage } from "../logic/groundStage";
 import {
   promotePendingMethod,
   readLastUsedMethodId,
@@ -22,7 +24,6 @@ import { CheckYourEmail } from "./CheckYourEmail";
 import { CredentialSignInForm } from "./CredentialSignInForm";
 import { FrontDoorFinePrint } from "./FrontDoorFinePrint";
 import { IdentifierStepForm } from "./IdentifierStepForm";
-import { PasskeySignInButton } from "./PasskeySignInButton";
 import {
   AlternativeMethods,
   hasAlternativeMethods,
@@ -95,6 +96,28 @@ export function IdentifierFirstSignIn() {
     void signIn(method.id, { callbackUrl });
   };
 
+  const decision = routing.decision;
+  // An address that is present but blank is the same as no address: the
+  // password step it would render cannot sign anybody in — it posts an empty
+  // username and the server answers "Invalid email", which reads as a
+  // refusal of something the person never typed. Treated as absent, so they
+  // land back on the address step and can simply type it.
+  const submittedIdentifier = routing.identifier?.trim()
+    ? routing.identifier
+    : null;
+  // A failed decision falls back to the address form rather than showing a
+  // picker built from the decision before it: the methods on offer are the
+  // answer to a question that just failed to be answered.
+  const showPicker =
+    !routing.error && decision && (breakGlass || submittedIdentifier !== null);
+
+  // Told once, from the same state the returns below branch on, so the ground
+  // can never be showing a step other than the one drawn over it.
+  usePublishFrontDoorStage({
+    door: "signin",
+    depth: signInDepth({ signingUp, showPicker: Boolean(showPicker) }),
+  });
+
   if (signingUp) {
     return (
       <CheckYourEmail
@@ -111,16 +134,6 @@ export function IdentifierFirstSignIn() {
   // so would only flash on the way past.
   if (session) return null;
 
-  const decision = routing.decision;
-  // An address that is present but blank is the same as no address: the
-  // password step it would render cannot sign anybody in — it posts an empty
-  // username and the server answers "Invalid email", which reads as a
-  // refusal of something the person never typed. Treated as absent, so they
-  // land back on the address step and can simply type it.
-  const submittedIdentifier = routing.identifier?.trim()
-    ? routing.identifier
-    : null;
-
   if (decision?.outcome === "redirect_to_connection") {
     return (
       <RoutedToConnection
@@ -131,12 +144,6 @@ export function IdentifierFirstSignIn() {
     );
   }
 
-  // A failed decision falls back to the address form rather than showing a
-  // picker built from the decision before it: the methods on offer are the
-  // answer to a question that just failed to be answered.
-  const showPicker =
-    !routing.error && decision && (breakGlass || submittedIdentifier !== null);
-
   if (showPicker) {
     return (
       <AuthCard title="Log in to LangWatch">
@@ -145,15 +152,8 @@ export function IdentifierFirstSignIn() {
           reasonCode={decision.reasonCode}
           lastUsedMethodId={lastUsedMethodId}
           onFederatedMethodChosen={dialFederated}
+          callbackUrl={callbackUrl}
           renderLocalMethod={(method) => {
-            if (method.kind === "passkey") {
-              return (
-                <PasskeySignInButton
-                  key={method.id}
-                  callbackUrl={callbackUrl}
-                />
-              );
-            }
             if (method.kind !== "password") return null;
             return (
               <CredentialSignInForm
@@ -214,6 +214,23 @@ export function IdentifierFirstSignIn() {
       />
     </AuthCard>
   );
+}
+
+/**
+ * Which of the log-in door's steps the screen below is drawing, for the ground
+ * behind it. Read in the same order the returns are written in, so the two can
+ * only ever agree.
+ */
+function signInDepth({
+  signingUp,
+  showPicker,
+}: {
+  signingUp: string | null;
+  showPicker: boolean;
+}): FrontDoorDepth {
+  if (signingUp) return "sent";
+  if (showPicker) return "credential";
+  return "entry";
 }
 
 /**

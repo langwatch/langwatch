@@ -1,18 +1,11 @@
-import {
-  Alert,
-  Badge,
-  Box,
-  Button,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Badge, HStack, Text, VStack } from "@chakra-ui/react";
 import type { SignInMethod } from "@langwatch/identity";
 import type { ReactNode } from "react";
 import { signInMethodActionLabel } from "../logic/methodLabels";
 import { signInRoutingReasonCopy } from "../logic/routingReasonCopy";
 import "../authFrontDoor.css";
-import { BRAND, MONO_FONT, SHAPE } from "../logic/brand";
+import { BRAND, MONO_FONT } from "../logic/brand";
+import { MethodButton } from "./MethodButton";
 import { PasskeySignInButton } from "./PasskeySignInButton";
 import { SignInMethodIcon } from "./SignInMethodIcon";
 
@@ -55,6 +48,7 @@ export function SignInMethodPicker({
   lastUsedMethodId,
   onFederatedMethodChosen,
   renderLocalMethod,
+  callbackUrl,
 }: {
   methodSet: readonly SignInMethod[];
   reasonCode: string;
@@ -62,6 +56,8 @@ export function SignInMethodPicker({
   lastUsedMethodId?: string | null;
   onFederatedMethodChosen: (method: SignInMethod) => void;
   renderLocalMethod?: (method: SignInMethod) => ReactNode;
+  /** Where a completed ceremony lands. The passkey seat dials for itself. */
+  callbackUrl?: string;
 }) {
   const guidance = signInRoutingReasonCopy(reasonCode);
 
@@ -94,6 +90,7 @@ export function SignInMethodPicker({
           isLastUsed={lastUsedMethodId === method.id}
           onFederatedMethodChosen={onFederatedMethodChosen}
           renderLocalMethod={renderLocalMethod}
+          callbackUrl={callbackUrl}
         />
       ))}
     </VStack>
@@ -151,6 +148,19 @@ export function AlternativeMethods({
       gap={3}
       data-testid="alternative-methods"
     >
+      {/* First in the rail, and above the providers, because it is the only
+          way in that asks for NOTHING — no address here, none at the step
+          this rail sits under, and no second screen at the provider's end.
+          A passkey names the account by itself, so ordering it under three
+          hand-offs would be putting the longest routes in front of the
+          shortest. It stays under the address field rather than over it: the
+          address is what most people came to type. */}
+      {methodSet.some((method) => method.kind === "passkey") ? (
+        <PasskeySignInButton
+          callbackUrl={callbackUrl}
+          badge={lastUsedMethodId === "passkey" ? <LastUsedBadge /> : null}
+        />
+      ) : null}
       {methods.map((method) => (
         <FederatedMethodButton
           key={method.id}
@@ -159,13 +169,6 @@ export function AlternativeMethods({
           onChosen={onFederatedMethodChosen}
         />
       ))}
-      {/* A passkey belongs on THIS step, beside the providers, rather than
-          behind the address one: it names the account by itself, so asking
-          for an address first would be asking for something the ceremony
-          does not need and cannot use. */}
-      {methodSet.some((method) => method.kind === "passkey") ? (
-        <PasskeySignInButton callbackUrl={callbackUrl} />
-      ) : null}
     </VStack>
   );
 }
@@ -184,36 +187,12 @@ export function FederatedMethodButton({
   onChosen: (method: SignInMethod) => void;
 }) {
   return (
-    <Button
-      variant="outline"
-      width="full"
-      minHeight="44px"
-      position="relative"
-      fontSize="14px"
-      fontWeight={600}
-      borderRadius={SHAPE.action}
-      justifyContent="center"
-      overflow="visible"
-      borderColor="var(--lw-front-door-field-border)"
-      _hover={{
-        backgroundColor: "var(--lw-front-door-field-bg)",
-        borderColor: "fg.subtle",
-      }}
+    <MethodButton
+      icon={<SignInMethodIcon method={method} />}
+      label={signInMethodActionLabel(method)}
+      badge={isLastUsed ? <LastUsedBadge /> : null}
       onClick={() => onChosen(method)}
-    >
-      {/* Three seats: the mark on the left rail, the words in the middle,
-          the badge (if any) on the right rail. Every method's label centres
-          on the same axis whatever sits beside it. */}
-      <Box position="absolute" insetInlineStart="16px" display="flex">
-        <SignInMethodIcon method={method} />
-      </Box>
-      <Text>{signInMethodActionLabel(method)}</Text>
-      {isLastUsed ? (
-        <span className="lw-front-door-badge-float">
-          <LastUsedBadge />
-        </span>
-      ) : null}
-    </Button>
+    />
   );
 }
 
@@ -262,11 +241,13 @@ function MethodEntry({
   isLastUsed,
   onFederatedMethodChosen,
   renderLocalMethod,
+  callbackUrl,
 }: {
   method: SignInMethod;
   isLastUsed: boolean;
   onFederatedMethodChosen: (method: SignInMethod) => void;
   renderLocalMethod?: (method: SignInMethod) => ReactNode;
+  callbackUrl?: string;
 }) {
   if (method.kind === "federated") {
     return (
@@ -274,6 +255,19 @@ function MethodEntry({
         method={method}
         isLastUsed={isLastUsed}
         onChosen={onFederatedMethodChosen}
+      />
+    );
+  }
+
+  // A passkey is local — this deployment authenticates it — but it is a
+  // BUTTON, so it wears its badge floated on the seat the way the providers
+  // do rather than stacked above it like a form. Drawn here rather than by
+  // each door, so both doors offer it identically.
+  if (method.kind === "passkey") {
+    return (
+      <PasskeySignInButton
+        callbackUrl={callbackUrl}
+        badge={isLastUsed ? <LastUsedBadge /> : null}
       />
     );
   }

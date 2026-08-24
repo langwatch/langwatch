@@ -1,8 +1,11 @@
 import { MeshGradient, Warp } from "@paper-design/shaders-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useColorMode } from "~/components/ui/color-mode";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import "../authFrontDoor.css";
+import { useTweenedGround } from "../hooks/useTweenedGround";
+import { resolveGroundShift } from "../logic/groundPalette";
+import { useFrontDoorStage } from "../logic/groundStage";
 
 /**
  * The ground the whole front door stands on: one full-viewport field, in
@@ -12,13 +15,23 @@ import "../authFrontDoor.css";
  * blue, white) drifting across the whole page, with a soft white radial
  * keeping the reading side clean. Dark is the site's enterprise band: the
  * ink-950 field with the blue-into-amber warp glowing up the card's side and
- * dissolving toward the reading side.
+ * dissolving toward the reading side. They are different fields on purpose —
+ * each is the right answer for the ground it sits on, and neither is the
+ * other one tinted.
+ *
+ * What they share is a nudge. Moving a step deeper into a door — address to
+ * password, password to "go and open your email" — turns whichever field is up
+ * by a few degrees and slides it a little, over most of a second
+ * (`useTweenedGround`). It is small enough that nobody could tell you what
+ * moved, and it is the difference between a screen that changed and a screen
+ * that is alive.
  *
  * The static gradient in the same palette is ALWAYS painted underneath, and
  * the live shader fades in over it once its first frame exists: a visitor
  * sees colour that sharpens, never a blank page that suddenly acquires a
  * background. Everything that cannot run a shader at all — reduced motion, a
- * machine with no WebGL, jsdom — simply keeps the static field.
+ * machine with no WebGL, jsdom — simply keeps the static field, and the nudge
+ * stands down with the rest of the motion.
  */
 
 /** Light field, warm glow, cloud, light field: the site's mesh, verbatim. */
@@ -43,6 +56,7 @@ export function FrontDoorGround({
 }) {
   const reduceMotion = useReducedMotion();
   const { colorMode } = useColorMode();
+  const stage = useFrontDoorStage();
   // Probed once: the shaders throw where WebGL is unavailable (older
   // browsers, blocked GPUs, jsdom), and a thrown background takes the whole
   // door down with it.
@@ -54,6 +68,9 @@ export function FrontDoorGround({
       return false;
     }
   });
+
+  const target = useMemo(() => resolveGroundShift(stage), [stage]);
+  const shift = useTweenedGround(target, { instant: reduceMotion });
 
   const live = !reduceMotion && webglSupported;
   const centered = protect === "center";
@@ -78,13 +95,14 @@ export function FrontDoorGround({
           <MeshGradient
             colors={MESH_COLORS}
             distortion={0.66}
-            swirl={0}
+            swirl={shift.swirl}
             grainMixer={0}
             grainOverlay={0}
             speed={0.32}
-            rotation={100}
-            offsetX={0.28}
-            offsetY={-0.2}
+            rotation={100 + shift.rotation}
+            scale={1 + shift.scale}
+            offsetX={0.28 + shift.offsetX}
+            offsetY={-0.2 + shift.offsetY}
             style={{ width: "100%", height: "100%" }}
           />
         </div>
@@ -102,12 +120,14 @@ export function FrontDoorGround({
             proportion={0.5}
             softness={1.3}
             distortion={0.3}
-            swirl={0.12}
+            swirl={0.12 + shift.swirl}
             swirlIterations={4}
             shapeScale={0.3}
-            rotation={28}
+            rotation={28 + shift.rotation}
             speed={0.1}
-            scale={1.1}
+            scale={1.1 + shift.scale}
+            offsetX={shift.offsetX}
+            offsetY={shift.offsetY}
             shape="edge"
             style={{ width: "100%", height: "100%" }}
           />
