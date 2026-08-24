@@ -24,6 +24,12 @@
 	--lw-front-door-on-action: #ffffff;
 	--lw-front-door-hairline: rgba(20, 20, 23, 0.12);
 	--lw-front-door-mesh-opacity: 0.5;
+	/* Refusals. The accent is not allowed to say "wrong", so this is the only
+	   other colour these screens carry. */
+	--lw-front-door-danger: #c53030;
+	/* Focus rings, badges, hairline accents: everything that is the brand
+	   without being the button. */
+	--lw-front-door-detail: #f56b1a;
 }
 
 .dark {
@@ -31,10 +37,16 @@
 	   hover and the text-on-tint move to the website's lighter cut. */
 	--lw-front-door-action: #f56b1a;
 	--lw-front-door-action-hover: #ff8a3d;
-	--lw-front-door-ink: #ffb27a;
+	--lw-front-door-ink: #ff8a3d;
 	--lw-front-door-tint: rgba(245, 107, 26, 0.18);
 	--lw-front-door-on-action: #141417;
 	--lw-front-door-hairline: rgba(239, 238, 233, 0.14);
+	/* The light red is unreadable on a dark ground: it fails contrast against
+	   the panel and reads as brown. This is the same red, lifted. */
+	--lw-front-door-danger: #e08573;
+	/* Details step up a stop, so a focus ring is visible on a dark field
+	   without lighting up like a solid button. */
+	--lw-front-door-detail: #ff8a3d;
 	/* The same band, far quieter: at full strength it is a light-mode wash
 	   sitting on top of a dark page. */
 	--lw-front-door-mesh-opacity: 0.16;
@@ -153,5 +165,59 @@
 	}
 	to {
 		box-shadow: 0 0 0 14px rgba(245, 107, 26, 0);
+	}
+}
+
+/*
+ * The entrance: the mark arrives from where the loading screen left it, and
+ * the card comes up behind it.
+ *
+ * The overlay is inert and the card is live from the first frame - nothing
+ * here gates a keystroke, it only decides what is painted while the first one
+ * is being typed.
+ */
+.lw-front-door-handoff {
+	position: fixed;
+	top: 0;
+	left: 0;
+	z-index: 1300;
+	pointer-events: none;
+	transform-origin: top left;
+	will-change: transform, opacity;
+}
+
+/* The card's own mark, held back until the overlay lands on it. */
+.lw-front-door-logo-waiting {
+	visibility: hidden;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.lw-front-door-enter [data-auth-card-body] > * {
+		animation: lw-front-door-rise 120ms ease-out both;
+	}
+
+	/* Behind the mark, not with it: the first row starts as the mark settles. */
+	.lw-front-door-enter [data-auth-card-body] > *:nth-child(1) {
+		animation-delay: 380ms;
+	}
+	.lw-front-door-enter [data-auth-card-body] > *:nth-child(2) {
+		animation-delay: 420ms;
+	}
+	.lw-front-door-enter [data-auth-card-body] > *:nth-child(3) {
+		animation-delay: 460ms;
+	}
+	.lw-front-door-enter [data-auth-card-body] > *:nth-child(n + 4) {
+		animation-delay: 500ms;
+	}
+}
+
+@keyframes lw-front-door-rise {
+	from {
+		opacity: 0;
+		transform: translate3d(0, 8px, 0);
+	}
+	to {
+		opacity: 1;
+		transform: translate3d(0, 0, 0);
 	}
 }

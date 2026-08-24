@@ -1,4 +1,11 @@
-import { Card, Container, Heading, HStack, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Card,
+  Container,
+  Heading,
+  HStack,
+  VStack,
+} from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
 import { LogoIcon } from "../icons/LogoIcon";
@@ -45,7 +52,12 @@ export function AuthCard({
       >
         <Card.Header paddingBottom={2}>
           <HStack gap={4}>
-            <LogoIcon width={30.69} height={42} />
+            {/* Named so the front door's entrance can measure it and land the
+                mark it inherited from the loading screen here. Nothing else
+                reads it, and nothing about the card changes for it. */}
+            <Box data-auth-card-logo display="flex" alignItems="center">
+              <LogoIcon width={30.69} height={42} />
+            </Box>
             <Heading
               size="lg"
               as="h1"
@@ -61,7 +73,10 @@ export function AuthCard({
           </HStack>
         </Card.Header>
         <Card.Body>
-          <VStack width="full" align="stretch" gap={4}>
+          {/* Named for the same reason: the rows rise in behind the mark, and
+              the stagger is applied from the stylesheet rather than by giving
+              every screen an animation prop to pass down. */}
+          <VStack width="full" align="stretch" gap={4} data-auth-card-body>
             {children}
           </VStack>
         </Card.Body>

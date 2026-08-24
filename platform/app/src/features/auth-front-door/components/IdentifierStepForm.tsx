@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { HorizontalFormControl } from "~/components/HorizontalFormControl";
 import "../authFrontDoor.css";
+import { useFocusWhenSettled } from "../hooks/useFocusWhenSettled";
 import { BRAND, SHAPE } from "../logic/brand";
 import { MethodDivider } from "./SignInMethodPicker";
 
@@ -49,6 +50,8 @@ export function IdentifierStepForm({
   alternatives?: ReactNode;
   onSubmit: (values: IdentifierStepValues) => void | Promise<unknown>;
 }) {
+  const addressField = useFocusWhenSettled();
+
   const form = useForm<IdentifierStepValues>({
     resolver: zodResolver(identifierSchema),
     mode: "onBlur",
@@ -77,9 +80,15 @@ export function IdentifierStepForm({
               minHeight="44px"
               borderRadius={SHAPE.field}
               autoComplete="username webauthn"
-              // eslint-disable-next-line jsx-a11y/no-autofocus
-              autoFocus
+              _focusVisible={{
+                borderColor: BRAND.detail,
+                boxShadow: `0 0 0 1px ${BRAND.detail}`,
+              }}
               {...form.register("email")}
+              ref={(node) => {
+                form.register("email").ref(node);
+                addressField.current = node;
+              }}
             />
           </HorizontalFormControl>
           <VStack width="full" align="stretch" gap={3} paddingTop={2}>
