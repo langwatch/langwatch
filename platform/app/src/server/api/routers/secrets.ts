@@ -1,11 +1,5 @@
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
-import { RESERVED_PROJECT_SECRET_NAMES } from "~/server/projects/reserved-secret-names";
-import { encrypt } from "~/utils/encryption";
+import { z } from "zod/v4";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-
-const MAX_SECRETS_PER_PROJECT = 50;
 
 /**
  * Regex for valid secret names: uppercase letters, digits, underscores.
@@ -20,20 +14,6 @@ const secretNameSchema = z
     SECRET_NAME_REGEX,
     "Secret name must contain only uppercase letters, digits, and underscores, and must start with a letter",
   );
-
-/**
- * Fields to select when returning secrets to the client.
- * Deliberately excludes `encryptedValue` to prevent secret leakage.
- */
-const secretSelectWithoutValue = {
-  id: true,
-  projectId: true,
-  name: true,
-  createdAt: true,
-  updatedAt: true,
-  createdBy: { select: { name: true } },
-  updatedBy: { select: { name: true } },
-} as const;
 
 /**
  * Secrets router
@@ -52,16 +32,7 @@ export const secretsRouter = createTRPCRouter({
   list: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .permission("secrets:view")
-    .query(async ({ ctx, input }) => {
-      return ctx.prisma.projectSecret.findMany({
-        where: {
-          projectId: input.projectId,
-          name: { notIn: RESERVED_PROJECT_SECRET_NAMES },
-        },
-        select: secretSelectWithoutValue,
-        orderBy: { name: "asc" },
-      });
-    }),
+    .query(({ ctx, input }) => ctx.app.secrets.list(input)),
 
   /**
    * Create a new secret for a project.
@@ -79,55 +50,12 @@ export const secretsRouter = createTRPCRouter({
       }),
     )
     .permission("secrets:manage")
-    .mutation(async ({ ctx, input }) => {
-      // The uppercase-only name schema can never produce a reserved
-      // (lowercase) name today; this check pins the boundary rather than
-      // trusting that disjointness to hold forever.
-      if (RESERVED_PROJECT_SECRET_NAMES.includes(input.name)) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `The name "${input.name}" is reserved`,
-        });
-      }
-
-      const count = await ctx.prisma.projectSecret.count({
-        where: { projectId: input.projectId },
-      });
-
-      if (count >= MAX_SECRETS_PER_PROJECT) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: `Maximum of ${MAX_SECRETS_PER_PROJECT} secrets per project reached`,
-        });
-      }
-
-      const encryptedValue = encrypt(input.value);
-      const userId = ctx.session.user.id;
-
-      try {
-        return await ctx.prisma.projectSecret.create({
-          data: {
-            projectId: input.projectId,
-            name: input.name,
-            encryptedValue,
-            createdById: userId,
-            updatedById: userId,
-          },
-          select: secretSelectWithoutValue,
-        });
-      } catch (error) {
-        if (
-          error instanceof PrismaClientKnownRequestError &&
-          error.code === "P2002"
-        ) {
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: `A secret with the name "${input.name}" already exists in this project`,
-          });
-        }
-        throw error;
-      }
-    }),
+    .mutation(({ ctx, input }) =>
+      ctx.app.secrets.create({
+        ...input,
+        actorId: ctx.session.user.id,
+      }),
+    ),
 
   /**
    * Update a secret's value.
@@ -146,31 +74,12 @@ export const secretsRouter = createTRPCRouter({
     )
     .permission("secrets:manage")
     .mutation(async ({ ctx, input }) => {
-      const existing = await ctx.prisma.projectSecret.findFirst({
-        where: { id: input.secretId, projectId: input.projectId },
-        select: { id: true, name: true },
+      await ctx.app.secrets.update({
+        projectId: input.projectId,
+        id: input.secretId,
+        value: input.value,
+        actorId: ctx.session.user.id,
       });
-
-      // Reported as not-found rather than forbidden, so the response doesn't
-      // confirm the reserved row exists.
-      if (!existing || RESERVED_PROJECT_SECRET_NAMES.includes(existing.name)) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Secret not found",
-        });
-      }
-
-      const encryptedValue = encrypt(input.value);
-
-      await ctx.prisma.projectSecret.update({
-        where: { id: input.secretId, projectId: input.projectId },
-        data: {
-          encryptedValue,
-          updatedById: ctx.session.user.id,
-        },
-        select: { id: true },
-      });
-
       return { success: true };
     }),
 
@@ -187,24 +96,10 @@ export const secretsRouter = createTRPCRouter({
     )
     .permission("secrets:manage")
     .mutation(async ({ ctx, input }) => {
-      const existing = await ctx.prisma.projectSecret.findFirst({
-        where: { id: input.secretId, projectId: input.projectId },
-        select: { id: true, name: true },
+      await ctx.app.secrets.delete({
+        projectId: input.projectId,
+        id: input.secretId,
       });
-
-      // Reported as not-found rather than forbidden, so the response doesn't
-      // confirm the reserved row exists.
-      if (!existing || RESERVED_PROJECT_SECRET_NAMES.includes(existing.name)) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Secret not found",
-        });
-      }
-
-      await ctx.prisma.projectSecret.delete({
-        where: { id: input.secretId, projectId: input.projectId },
-      });
-
       return { success: true };
     }),
 });
