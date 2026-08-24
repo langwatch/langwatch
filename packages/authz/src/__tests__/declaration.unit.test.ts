@@ -3,6 +3,7 @@ import {
   declaredScopeId,
   isPlatformTierPermission,
   permissionGrantTiers,
+  resolveDeclaredScope,
 } from "../declaration";
 
 describe("permissionGrantTiers", () => {
@@ -106,6 +107,74 @@ describe("declaredScopeId", () => {
           input: { projectId: 42 as unknown as string },
         }),
       ).toBeNull();
+    });
+  });
+});
+
+describe("resolveDeclaredScope", () => {
+  describe("when the input names the scope field but leaves it empty", () => {
+    /** @scenario "A scope id the caller left blank is answered as invalid input" */
+    it("reports the blank field rather than a missing declaration", () => {
+      expect(
+        resolveDeclaredScope({
+          permission: "traces:view",
+          input: { projectId: "" },
+        }),
+      ).toEqual({
+        resolved: false,
+        unresolved: { reason: "blank", field: "projectId" },
+      });
+    });
+
+    /** @scenario "A blank scope id never shadows one the caller did fill in" */
+    it("keeps walking to a wider tier the caller did fill in", () => {
+      expect(
+        resolveDeclaredScope({
+          permission: "traces:view",
+          input: { projectId: "", organizationId: "org_1" },
+        }),
+      ).toEqual({
+        resolved: true,
+        scope: { tier: "organization", id: "org_1" },
+      });
+    });
+
+    /** @scenario "A scope id the caller left blank is answered as invalid input" */
+    it("names the blank via field when the declaration derives its scope", () => {
+      expect(
+        resolveDeclaredScope({
+          permission: "organization:manage",
+          input: { teamId: "" },
+          via: "teamId",
+        }),
+      ).toEqual({
+        resolved: false,
+        unresolved: { reason: "blank", field: "teamId" },
+      });
+    });
+  });
+
+  describe("when the input names no scope field the permission can use", () => {
+    /** @scenario "An input carrying no scope id at all is still a wiring bug" */
+    it("reports the declaration as miswired, not the caller as wrong", () => {
+      expect(
+        resolveDeclaredScope({ permission: "traces:view", input: {} }),
+      ).toEqual({ resolved: false, unresolved: { reason: "absent" } });
+    });
+
+    /**
+     * A tier the permission cannot be granted at is not a field the caller
+     * was asked to fill, so filling it badly is still our wiring, not theirs.
+     *
+     * @scenario "An input carrying no scope id at all is still a wiring bug"
+     */
+    it("ignores a blank id at a tier the permission cannot be granted at", () => {
+      expect(
+        resolveDeclaredScope({
+          permission: "governance:view",
+          input: { projectId: "" },
+        }),
+      ).toEqual({ resolved: false, unresolved: { reason: "absent" } });
     });
   });
 });

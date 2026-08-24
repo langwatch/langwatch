@@ -213,10 +213,75 @@ function scopesOf(permission: AuthzPermission): readonly string[] {
 export type DeclaredScopeId = { tier: BindingScopeTier; id: string };
 
 /**
+ * Why a declared check could not name a scope. The two are not the same
+ * failure and must not answer alike: `blank` is a request that named the
+ * field and left it empty — the caller's to fix — while `absent` is a
+ * declaration whose input has no scope field at all, which the types prevent
+ * and the runtime treats as a wiring bug.
+ */
+export type UnresolvedDeclaredScope =
+  | { reason: "blank"; field: ScopeTierField }
+  | { reason: "absent" };
+
+export type DeclaredScopeResolution =
+  | { resolved: true; scope: DeclaredScopeId }
+  | { resolved: false; unresolved: UnresolvedDeclaredScope };
+
+/** A usable scope id is a string with something in it. */
+const usableId = (value: unknown): value is string =>
+  typeof value === "string" && value.length > 0;
+
+/**
+ * Whether the input asked the caller for this field at all. Guarded rather
+ * than a bare `in`, which throws on the non-object input a bypassed type
+ * layer could still hand us — the very case this whole path exists to survive.
+ */
+const namesField = (input: unknown, field: string): boolean =>
+  typeof input === "object" && input !== null && field in input;
+
+/**
  * The scope a declared check runs at: the narrowest tier the permission is
- * grantable at whose id the input carries, or the `via` field's tier when
- * the declaration names one. Null when nothing usable is present — which the
- * types prevent, and the runtime treats as a wiring bug, not a denial.
+ * grantable at whose id the input carries, or the `via` field's tier when the
+ * declaration names one.
+ *
+ * A field the input carries but leaves empty never resolves and never blocks a
+ * wider tier that IS filled in — the walk keeps going, so an empty `projectId`
+ * alongside a real `organizationId` still checks at the organization. Only
+ * when no tier resolves does the emptiness become the answer.
+ */
+export function resolveDeclaredScope({
+  permission,
+  input,
+  via,
+}: {
+  permission: AuthzPermission;
+  input: Partial<Record<ScopeTierField, unknown>>;
+  via?: ScopeTierField;
+}): DeclaredScopeResolution {
+  const fields = via
+    ? [via]
+    : permissionGrantTiers(permission).map((tier) => SCOPE_TIER_FIELDS[tier]);
+
+  for (const field of fields) {
+    const id = input[field];
+    if (usableId(id)) {
+      return { resolved: true, scope: { tier: SCOPE_TIER_BY_FIELD[field], id } };
+    }
+  }
+
+  // Named the field and left it empty: the caller's mistake, not ours. The
+  // narrowest such field is the one to name back, matching the tier order the
+  // resolution walk itself prefers.
+  const blank = fields.find((field) => namesField(input, field));
+  return {
+    resolved: false,
+    unresolved: blank ? { reason: "blank", field: blank } : { reason: "absent" },
+  };
+}
+
+/**
+ * The resolved scope, or null when the input carries none. Kept for callers
+ * that only need the answer and not the reason for its absence.
  */
 export function declaredScopeId({
   permission,
@@ -227,15 +292,6 @@ export function declaredScopeId({
   input: Partial<Record<ScopeTierField, unknown>>;
   via?: ScopeTierField;
 }): DeclaredScopeId | null {
-  if (via) {
-    const id = input[via];
-    return typeof id === "string" && id.length > 0
-      ? { tier: SCOPE_TIER_BY_FIELD[via], id }
-      : null;
-  }
-  for (const tier of permissionGrantTiers(permission)) {
-    const id = input[SCOPE_TIER_FIELDS[tier]];
-    if (typeof id === "string" && id.length > 0) return { tier, id };
-  }
-  return null;
+  const resolution = resolveDeclaredScope({ permission, input, via });
+  return resolution.resolved ? resolution.scope : null;
 }
