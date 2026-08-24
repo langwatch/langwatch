@@ -121,21 +121,42 @@ function sectionDescription(heading: string): string {
 
 describe("the Ops feature flags page", () => {
   describe("when an operator on a shared install reads the Product section", () => {
-    it("is told this store decides the value, not an outside service", () => {
+    /** @scenario The Product section names this store as what customers actually get */
+    it("is told what this value reaches, and the two things that outrank it", () => {
       renderPage();
 
       const copy = sectionDescription("Product");
 
-      expect(copy).toMatch(/source of truth/i);
+      // Naming the store is not enough on its own: the resolver returns an
+      // env override before it ever reads this store, and a targeting rule
+      // before it reads the row-level value. Copy that claims "source of
+      // truth" without either caveat is wrong for any flag that has one.
+      expect(copy).toMatch(/no targeting rule matches/i);
+      expect(copy).toMatch(/env override/i);
+
       for (const vendor of EXTERNAL_FLAG_SERVICES) {
         expect(copy).not.toMatch(vendor);
       }
     });
+  });
 
-    it("is told the same about the System section, so the two cannot disagree", () => {
+  describe("when the same operator reads the System section", () => {
+    /** @scenario The System section names the same chain, so the two cannot disagree */
+    it("is given the same resolution chain, in the order the resolver uses", () => {
       renderPage();
 
       const copy = sectionDescription("System");
+
+      // Order is the assertion, not mere presence: the chain is env override,
+      // then this store, then the registry default, and copy that lists them
+      // in any other order teaches an operator the wrong precedence.
+      const env = copy.search(/\benv\b/i);
+      const store = copy.search(/postgres/i);
+      const fallback = copy.search(/registry default/i);
+
+      expect(env).toBeGreaterThanOrEqual(0);
+      expect(store).toBeGreaterThan(env);
+      expect(fallback).toBeGreaterThan(store);
 
       for (const vendor of EXTERNAL_FLAG_SERVICES) {
         expect(copy).not.toMatch(vendor);
@@ -145,14 +166,28 @@ describe("the Ops feature flags page", () => {
 
   describe("when a PRODUCT flag row is shown on a shared install", () => {
     /** @scenario Ops page warns about the blast radius of a PRODUCT flag on a shared install */
-    it("carries the fleet-reach warning that a self-hosted install does not", () => {
+    it("carries a fleet-reach warning that explains itself without a hover", () => {
       renderPage();
+
       expect(screen.getByText("All customers")).toBeDefined();
+
+      // The explanation used to live only in tooltip content, which Chakra
+      // does not render until hover — so the whole note could be replaced
+      // with "x" and this file stayed green. Mirroring it onto the badge's
+      // accessible label puts it in the DOM for a screen reader and for
+      // this assertion at the same time.
+      const note =
+        screen.getByLabelText(/whole fleet/i).getAttribute("aria-label") ?? "";
+
+      expect(note).toMatch(/no targeting rule matches/i);
+      expect(note).toMatch(/per-organization or per-project rule/i);
 
       cleanup();
       isSaas.mockReturnValue(false);
       renderPage();
+
       expect(screen.queryByText("All customers")).toBeNull();
+      expect(screen.queryByLabelText(/whole fleet/i)).toBeNull();
     });
   });
 });

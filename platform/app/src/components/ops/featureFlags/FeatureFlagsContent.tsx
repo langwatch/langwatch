@@ -119,8 +119,8 @@ export function FeatureFlagsContent() {
         heading="Product"
         description={
           isSaas
-            ? "Customer-facing features. The value here is the source of truth; set a targeting rule to reach a subset of organizations."
-            : "Customer-facing features. The value here is the source of truth."
+            ? "Customer-facing features. Customers get the value set here when no targeting rule matches and no env override is configured; set a targeting rule to reach a subset of organizations."
+            : "Customer-facing features. Customers get the value set here when no targeting rule matches and no env override is configured."
         }
         rows={grouped.product}
         canManage={canManage}
@@ -233,6 +233,17 @@ function ScopeSection({
   );
 }
 
+/**
+ * Blast-radius note for a PRODUCT flag on a shared install. Held as one
+ * constant because it is both the tooltip content and the badge's accessible
+ * label: tooltip content is not rendered until hover, so a note kept only
+ * there is out of reach of a screen reader — and out of reach of any
+ * assertion, which is how the previous wording survived being replaced
+ * wholesale with "x" while its bound test stayed green.
+ */
+const FLEET_REACH_NOTE =
+  "This flag gates a customer-facing feature, and a value set here applies to every organization that no targeting rule matches. On a shared install that is the whole fleet, so prefer a per-organization or per-project rule when rolling one out.";
+
 function FlagRowView({
   row,
   canManage,
@@ -337,8 +348,13 @@ function FlagRowView({
             </Text>
             <ScopeBadge scope={row.scope} />
             {showProductWarning && (
-              <Tooltip content="This flag gates a customer-facing feature, and a value set here applies to every organization no targeting rule matches. On a shared install that is the whole fleet, so prefer a per-organization or per-project rule when rolling one out.">
-                <Badge colorPalette="yellow" size="sm" variant="subtle">
+              <Tooltip content={FLEET_REACH_NOTE}>
+                <Badge
+                  colorPalette="yellow"
+                  size="sm"
+                  variant="subtle"
+                  aria-label={FLEET_REACH_NOTE}
+                >
                   All customers
                 </Badge>
               </Tooltip>
