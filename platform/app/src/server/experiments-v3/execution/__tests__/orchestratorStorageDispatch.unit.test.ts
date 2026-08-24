@@ -19,8 +19,8 @@
 import { describe, expect, it } from "vitest";
 import type { EvaluationsV3State } from "~/experiments-v3/types";
 import { nodeErrorToDomainError } from "~/optimization_studio/utils/nodeErrorDomain";
-import type { Agent as TypedAgent } from "@langwatch/agents-contract";
-import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import type { Agent as TypedAgent } from "@langwatch/agent-contract";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import {
   buildEvaluatorResultDispatch,
   buildTargetMetadata,

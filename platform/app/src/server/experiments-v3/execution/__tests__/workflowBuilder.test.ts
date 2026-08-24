@@ -9,8 +9,8 @@ import type {
   LlmPromptConfigComponent,
   SignatureComponentConfig,
 } from "~/optimization_studio/types/dsl";
-import type { Agent as TypedAgent } from "@langwatch/agents-contract";
-import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import type { Agent as TypedAgent } from "@langwatch/agent-contract";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import type { ExecutionCell } from "../types";
 import {
   buildCellWorkflow,

@@ -8,8 +8,8 @@ import {
   LATEST_SPEC_VERSION,
   type LlmPromptConfigComponent,
 } from "~/optimization_studio/types/dsl";
-import type { Agent as TypedAgent } from "@langwatch/agents-contract";
-import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import type { Agent as TypedAgent } from "@langwatch/agent-contract";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import type { ExecutionCell, WorkflowBuilderInput } from "../types";
 import {
   buildCellWorkflow,

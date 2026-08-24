@@ -11,17 +11,17 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { describeRoute, resolver } from "hono-openapi";
-import { z } from "zod";
+import { z } from "zod/v4";
 import {
   createInitialUIState,
   type EvaluationsV3State,
 } from "~/experiments-v3/types";
 import { persistedEvaluationsV3StateSchema } from "~/experiments-v3/types/persistence";
 import { ExperimentType } from "~/generated/prisma/client";
-import type { Agent as TypedAgent } from "@langwatch/agents-contract";
+import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import type { Permission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
@@ -30,16 +30,14 @@ import {
   enforceApiKeyCeiling,
   extractCredentials,
 } from "~/server/api-key/auth-middleware";
-import { TokenResolver } from "~/server/api-key/token-resolver";
+import { appFromContext } from "~/app/api/middleware/app-context";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
-import { prisma } from "~/server/db";
 import {
   ExperimentNotFoundError,
   InvalidExperimentConfigurationError,
   RunNotFoundError,
 } from "~/server/experiments/errors";
-import { ExperimentService } from "~/server/experiments/experiment.service";
 import { abortManager } from "~/server/experiments-v3/execution/abortManager";
 import { loadExecutionData } from "~/server/experiments-v3/execution/dataLoader";
 import { startPollingRun } from "~/server/experiments-v3/execution/experimentRunner";
@@ -54,9 +52,8 @@ import {
   executionRequestSchema,
   runInputsBodySchema,
 } from "~/server/experiments-v3/execution/types";
-import { ExperimentRunService } from "~/server/experiments-v3/services/experiment-run.service";
 import { trackServerEvent } from "~/server/posthog";
-import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { fireExperimentRanNurturing } from "../app-layer/billing/nurturing/featureAdoption";
 import {
@@ -109,13 +106,13 @@ const sessionAuth = handlerManagedAuth({
 // would report the coarser of the two for routes that only read.
 const apiKeyAuthRead = handlerManagedAuth({
   reason:
-    "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
+    "project API key resolved by context.app.apiKeys and checked with enforceApiKeyCeiling",
   permissions: ["evaluations:view"],
   credential: "apiKey",
 });
 const apiKeyAuthRun = handlerManagedAuth({
   reason:
-    "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling",
+    "project API key resolved by context.app.apiKeys and checked with enforceApiKeyCeiling",
   permissions: ["evaluations:create"],
   credential: "apiKey",
 });
@@ -134,8 +131,6 @@ legacyAliasApp.all("/*", (c) => {
 
 // ── helpers ──────────────────────────────────────────────────────────
 
-const tokenResolver = TokenResolver.create(prisma);
-
 /**
  * Authenticates a request via the unified API-key + legacy-key path and enforces
  * the given permission ceiling. Accepts any Hono-like context shape so this
@@ -147,7 +142,7 @@ const tokenResolver = TokenResolver.create(prisma);
  * (matches the route-owned pattern in `collector.ts`).
  */
 const authenticateRequest = async (
-  c: { req: { header: (name: string) => string | undefined } },
+  c: Context,
   permission: Permission,
 ) => {
   const credentials = extractCredentials((name) => c.req.header(name));
@@ -155,7 +150,8 @@ const authenticateRequest = async (
     return { error: "Missing credentials", status: 401 as const };
   }
 
-  const resolved = await tokenResolver.resolve({
+  const apiKeys = appFromContext(c).apiKeys;
+  const resolved = await apiKeys.tryResolveToken({
     token: credentials.token,
     projectId: credentials.projectId,
   });
@@ -179,7 +175,7 @@ const authenticateRequest = async (
 
   const markUsed = () => {
     if (resolved.type === "apiKey") {
-      tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
+      apiKeys.markUsed({ id: resolved.apiKeyId });
     }
   };
 
@@ -533,13 +529,11 @@ secured.access(apiKeyAuthRun).post(
     }
     const { project, markUsed } = authResult;
 
-    const experiment = await ExperimentService.create(prisma).findBySlugAndType(
-      {
+    const experiment = await c.app.experiments.tryGetBySlugAndType({
         projectId: project.id,
         slug,
         type: ExperimentType.EVALUATIONS_V3,
-      },
-    );
+      });
 
     if (!experiment) {
       throw new ExperimentNotFoundError(slug);
@@ -784,18 +778,19 @@ secured.access(apiKeyAuthRead).get(
       return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
     })();
 
-    const experimentRunService = ExperimentRunService.create(prisma);
-    const { experiment, runs, totalHits } =
-      await experimentRunService.listRunsForExperimentSlugPaginated({
+    const { experiment, runs, totalHits } = await c.app.experiments
+      .getRunsPageBySlug({
         projectId: project.id,
         experimentSlug,
         page,
         pageSize,
+      })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "experiment_not_found") {
+          throw new ExperimentNotFoundError(experimentSlug);
+        }
+        throw error;
       });
-
-    if (!experiment) {
-      throw new ExperimentNotFoundError(experimentSlug);
-    }
 
     const offset = (page - 1) * pageSize;
     await authResult.markUsed?.();
@@ -865,7 +860,7 @@ secured.access(apiKeyAuthRead).get(
     // cache for the rest of the 24h TTL. Without this, archive visibility
     // silently depends on run age.
     if (runState.experimentId) {
-      const stillLive = await ExperimentService.create(prisma).isActive({
+      const stillLive = await c.app.experiments.isActive({
         projectId: project.id,
         id: runState.experimentId,
       });
@@ -996,10 +991,10 @@ secured.access(apiKeyAuthRead).get(
 
     const experimentSlug = c.req.query("experimentSlug") ?? slugFromState;
     let experimentId = experimentIdFromState;
-    const experiments = ExperimentService.create(prisma);
+    const experiments = c.app.experiments;
 
     if (!experimentId && experimentSlug) {
-      const experiment = await experiments.findIdBySlug({
+      const experiment = await experiments.tryGetIdBySlug({
         projectId: project.id,
         slug: experimentSlug,
       });
@@ -1025,8 +1020,7 @@ secured.access(apiKeyAuthRead).get(
     }
 
     try {
-      const experimentRunService = ExperimentRunService.create(prisma);
-      const run = await experimentRunService.getRun({
+      const run = await c.app.experiments.tryGetRun({
         projectId: project.id,
         experimentId,
         runId,

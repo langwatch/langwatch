@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   experimentSchema,
+  experimentRunWithItemsSchema,
   experimentTypeSchema,
   saveExperimentInputSchema,
 } from "../src";
@@ -41,5 +42,18 @@ describe("Experiment contract", () => {
         workbenchState: null,
       }).success,
     ).toBe(false);
+  });
+
+  it("keeps run-history values portable JSON", () => {
+    const result = experimentRunWithItemsSchema.safeParse({
+      experimentId: "experiment_1",
+      runId: "run_1",
+      projectId: "project_1",
+      targets: [],
+      dataset: [{ index: 0, entry: { input: "hello" } }],
+      evaluations: [],
+      timestamps: { createdAt: 1, updatedAt: 1 },
+    });
+    expect(result.success).toBe(true);
   });
 });

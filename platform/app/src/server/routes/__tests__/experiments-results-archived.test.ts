@@ -13,6 +13,9 @@
  * experiments are not reachable regardless of which path resolves the id.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Hono } from "hono";
+import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
+import type { App } from "~/server/app-layer/app";
 
 vi.mock("~/server/auth", () => ({
   getServerAuthSession: vi.fn().mockResolvedValue({ user: { id: "user_1" } }),
@@ -44,13 +47,6 @@ vi.mock("~/server/db", () => ({
 }));
 
 const getRun = vi.fn();
-vi.mock("~/server/experiments-v3/services/experiment-run.service", () => ({
-  ExperimentRunService: {
-    create: () => ({
-      getRun: (...args: unknown[]) => getRun(...args),
-    }),
-  },
-}));
 
 const fakeProject = { id: "project_MINE", apiKey: "key_MINE" };
 const resolve = vi.fn().mockResolvedValue({
@@ -59,15 +55,6 @@ const resolve = vi.fn().mockResolvedValue({
   project: fakeProject,
 });
 const markUsed = vi.fn();
-vi.mock("~/server/api-key/token-resolver", () => ({
-  TokenResolver: {
-    create: () => ({
-      resolve: (...args: unknown[]) => resolve(...args),
-      markUsed: (...args: unknown[]) => markUsed(...args),
-    }),
-  },
-}));
-
 vi.mock("~/server/api-key/auth-middleware", async (importActual) => {
   const actual =
     await importActual<typeof import("~/server/api-key/auth-middleware")>();
@@ -81,7 +68,26 @@ vi.mock("~/server/api-key/auth-middleware", async (importActual) => {
 
 const get = async (path: string) => {
   const { app } = await import("../experiments-v3");
-  return app.request(path, {
+  const root = new Hono();
+  root.use(
+    "*",
+    appContextMiddlewareFor({
+      apiKeys: {
+        tryResolveToken: (...args: unknown[]) => resolve(...args),
+        markUsed: (...args: unknown[]) => markUsed(...args),
+      },
+      experiments: {
+        isActive: async ({ projectId, id }: { projectId: string; id: string }) =>
+          (await findFirst({
+            where: { id, projectId, archivedAt: null },
+            select: { id: true },
+          })) !== null,
+        tryGetRun: (...args: unknown[]) => getRun(...args),
+      },
+    } as App),
+  );
+  root.route("/", app);
+  return root.request(path, {
     method: "GET",
     headers: { "X-Auth-Token": "key_MINE" },
   });

@@ -6,18 +6,14 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { Agent } from "@langwatch/agents-contract";
-import type { Evaluator } from "~/generated/prisma/client";
+import type { Agent } from "@langwatch/agent-contract";
+import type { Evaluator } from "@langwatch/evaluator-contract";
 import type { Workflow } from "~/optimization_studio/types/dsl";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
 import { AgentsFeature } from "~/runtime/app/features/agents";
-import { getFullDataset } from "~/server/api/routers/datasetRecord.utils";
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
-import { EvaluatorService } from "~/server/evaluators/evaluator.service";
-import {
-  PromptService,
-  type VersionedPrompt,
-} from "~/server/prompt-config/prompt.service";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 
 const logger = createLogger("langwatch:experiments-v3:dataLoader");
 
@@ -139,18 +135,15 @@ export const loadDataset = async (
     // ADR-032 I-READY: a non-ready (uploading/processing/failed) s3_jsonl
     // dataset throws DatasetNotReadyError here — it must NOT be silently treated
     // as empty. The throw propagates as a clear run error; do not swallow it.
-    const fullDataset = await getFullDataset({
-      datasetId: dataset.datasetId,
+    const loadedDataset = await getApp().dataset.getDatasetWithRecords({
+      slugOrId: dataset.datasetId,
       projectId,
       entrySelection: "all",
+      limitMb: null,
     });
 
-    if (!fullDataset) {
-      return { error: "Dataset not found", status: 404 };
-    }
-
     columns = dataset.columns;
-    rows = fullDataset.datasetRecords.map(
+    rows = loadedDataset.records.map(
       (r) => r.entry as Record<string, unknown>,
     );
 
@@ -338,16 +331,14 @@ export const loadExecutionData = async (
   if (inputs?.data) {
     baseDataset = rowsFromInlineData(inputs.data);
   } else if (inputs?.datasetId) {
-    const fullDataset = await getFullDataset({
-      datasetId: inputs.datasetId,
+    const loadedDataset = await getApp().dataset.getDatasetWithRecords({
+      slugOrId: inputs.datasetId,
       projectId,
       entrySelection: "all",
+      limitMb: null,
     });
-    if (!fullDataset) {
-      return { error: `Dataset "${inputs.datasetId}" not found`, status: 404 };
-    }
     const columns = (
-      (fullDataset.columnTypes as unknown as Array<{
+      (loadedDataset.dataset.columnTypes as unknown as Array<{
         name: string;
         type: string;
       }>) ?? []
@@ -361,7 +352,7 @@ export const loadExecutionData = async (
     );
     baseDataset = {
       rows: parseJsonColumns(
-        fullDataset.datasetRecords.map(
+        loadedDataset.records.map(
           (r) => r.entry as Record<string, unknown>,
         ),
         jsonColumnKeys,
@@ -386,12 +377,12 @@ export const loadExecutionData = async (
 
   // Load prompts for prompt targets
   const loadedPrompts = new Map<string, VersionedPrompt>();
-  const promptService = new PromptService(prisma);
+  const promptService = getApp().prompts;
 
   for (const target of targets) {
     if (target.type === "prompt" && target.promptId) {
       try {
-        const prompt = await promptService.getPromptByIdOrHandle({
+        const prompt = await promptService.tryGetPromptByIdOrHandle({
           idOrHandle: target.promptId,
           projectId,
           version: target.promptVersionNumber ?? undefined,
@@ -526,8 +517,6 @@ export const loadExecutionData = async (
 
   // Load evaluators from DB (for both evaluator configs AND evaluator targets)
   const loadedEvaluators = new Map<string, Evaluator>();
-  const evaluatorService = EvaluatorService.create(prisma);
-
   // Collect all evaluator IDs to load
   const evaluatorIdsToLoad = new Set<string>();
 
@@ -547,13 +536,11 @@ export const loadExecutionData = async (
 
   // Load all evaluators
   for (const evaluatorId of evaluatorIdsToLoad) {
-    const dbEvaluator = await evaluatorService.getById({
+    const dbEvaluator = await getApp().evaluators.tryGetById({
       id: evaluatorId,
       projectId,
     });
-    if (dbEvaluator) {
-      loadedEvaluators.set(evaluatorId, dbEvaluator);
-    }
+    if (dbEvaluator) loadedEvaluators.set(evaluatorId, dbEvaluator);
   }
 
   return {

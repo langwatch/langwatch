@@ -1,20 +1,15 @@
 import { createLogger } from "@langwatch/observability";
+import type { Experiment, ExperimentService } from "@langwatch/experiment-contract";
 import { nanoid } from "nanoid";
-import { z } from "zod";
+import { z } from "zod/v4";
 import { fromZodError, type ZodError } from "zod-validation-error";
-import type {
-  Experiment,
-  ExperimentType,
-  Project,
-} from "~/generated/prisma/client";
+import type { ExperimentType, Project } from "~/generated/prisma/client";
 import {
   apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
   extractCredentials,
 } from "~/server/api-key/auth-middleware";
-import { TokenResolver } from "~/server/api-key/token-resolver";
-import { prisma } from "~/server/db";
-import { ExperimentService } from "~/server/experiments/experiment.service";
+import { getApp } from "~/server/app-layer/app";
 import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
@@ -60,8 +55,8 @@ export default async function handler(
     });
   }
 
-  const tokenResolver = TokenResolver.create(prisma);
-  const resolved = await tokenResolver.resolve({
+  const app = getApp();
+  const resolved = await app.apiKeys.tryResolveToken({
     token: credentials.token,
     projectId: credentials.projectId,
   });
@@ -100,6 +95,7 @@ export default async function handler(
   }
 
   const experiment = await findOrCreateExperiment({
+    experiments: app.experiments,
     project,
     experiment_slug: params.experiment_slug,
     experiment_type: params.experiment_type,
@@ -111,7 +107,7 @@ export default async function handler(
   // for a successful request. Fire-and-forget; a DB hiccup must not mask the
   // experiment creation.
   if (resolved.type === "apiKey") {
-    tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
+    app.apiKeys.markUsed({ id: resolved.apiKeyId });
   }
 
   return res.status(200).json({
@@ -121,6 +117,7 @@ export default async function handler(
 }
 
 export const findOrCreateExperiment = async ({
+  experiments,
   project,
   experiment_id,
   experiment_slug,
@@ -128,6 +125,7 @@ export const findOrCreateExperiment = async ({
   experiment_name,
   workflowId,
 }: {
+  experiments: ExperimentService;
   project: Project;
   experiment_id?: string | null;
   experiment_slug?: string | null;
@@ -136,16 +134,12 @@ export const findOrCreateExperiment = async ({
   workflowId?: string;
 }) => {
   let experiment: Experiment | null = null;
-  const experiments = ExperimentService.create(prisma);
 
   if (experiment_id) {
-    experiment = await experiments.findById({
+    experiment = await experiments.getById({
       projectId: project.id,
       id: experiment_id,
     });
-    if (!experiment) {
-      throw new Error("Experiment not found");
-    }
   }
 
   let slug_ = null;
@@ -155,7 +149,7 @@ export const findOrCreateExperiment = async ({
     // also have a `-archived-<nanoid>` slug, so they would not collide
     // even on a raw findUnique - we still go through the service so the
     // archive rule stays one source of truth.
-    experiment = await experiments.findBySlug({
+    experiment = await experiments.tryGetBySlug({
       projectId: project.id,
       slug: slug_,
     });
@@ -166,21 +160,27 @@ export const findOrCreateExperiment = async ({
   }
 
   if (!experiment && slug_) {
-    experiment = await prisma.experiment.create({
-      data: {
-        id: `experiment_${nanoid()}`,
-        name: experiment_name ?? experiment_slug,
-        slug: slug_,
-        projectId: project.id,
-        type: experiment_type,
-        workflowId: workflowId,
-      },
+    experiment = await experiments.save({
+      id: `experiment_${nanoid()}`,
+      name: experiment_name ?? experiment_slug ?? slug_,
+      requestedSlug: slug_,
+      slugMode: "deduplicate",
+      projectId: project.id,
+      type: experiment_type,
+      workflowId: workflowId ?? null,
+      workbenchState: null,
     });
   } else if (experiment) {
     if (!!experiment_name || !!workflowId) {
-      await prisma.experiment.update({
-        where: { id: experiment.id, projectId: project.id },
-        data: { name: experiment_name, workflowId: workflowId },
+      experiment = await experiments.save({
+        id: experiment.id,
+        name: experiment_name ?? experiment.name,
+        requestedSlug: experiment.slug,
+        slugMode: "preserve-existing",
+        projectId: project.id,
+        type: experiment.type,
+        workflowId: workflowId ?? experiment.workflowId,
+        workbenchState: experiment.workbenchState,
       });
     }
   } else {

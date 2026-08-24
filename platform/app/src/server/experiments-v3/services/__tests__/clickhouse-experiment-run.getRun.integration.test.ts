@@ -1,46 +1,12 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import { TupleParam, type ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
 
-// getRun resolves its ClickHouse client through getClickHouseClientForTenant;
-// point that at the testcontainer client so the real query path runs.
-let testClient: ClickHouseClient;
-vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => {
-  const actual =
-    await importOriginal<
-      typeof import("~/server/clickhouse/clickhouseClient")
-    >();
-  return {
-    ...actual,
-    getClickHouseClientForTenant: async () => testClient,
-  };
-});
-
-// The service resolves its client through getApp().clickhouse now (two-door
-// access); this App stub delegates to the clickhouseClient mock above, so
-// the suite's existing per-tenant wiring keeps working unchanged.
-vi.mock("~/server/app-layer/app", async () => {
-  const clients = await import("~/server/clickhouse/clickhouseClient");
-  const app = () => ({
-    clickhouse: {
-      enabled: true,
-      resolveClient: (tenantId: string) =>
-        clients.getClickHouseClientForTenant(tenantId),
-      resolveOrganizationClient: async () => {
-        throw new Error("no organization client in this suite");
-      },
-      allInstances: async () => [],
-    },
-  });
-  return { getApp: app, tryGetApp: app };
-});
-
-// Imported after the mock is registered.
-const { ExperimentRunService } = await import("../experiment-run.service");
+import { ClickHouseExperimentRunRepository } from "../../../../../../../packages/features/experiment/server/src/repositories/clickhouse/clickhouse.experiment-run.repository";
 
 const tenantId = `test-exp-getrun-${nanoid()}`;
 
@@ -136,13 +102,22 @@ async function insertTraceCost(
 }
 
 let ch: ClickHouseClient;
-let service: InstanceType<typeof ExperimentRunService>;
+let repository: ClickHouseExperimentRunRepository;
 
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  testClient = ch;
-  service = new ExperimentRunService({} as any);
+  repository = ClickHouseExperimentRunRepository.create({
+    database: { workflowVersion: { findMany: async () => [] } } as never,
+    resolveClient: async () => ch,
+    tupleParam: (values) => new TupleParam(values),
+    telemetry: {
+      trace: async (_input, operation) => operation(),
+      warnOldRuns: () => {},
+      error: () => {},
+      warn: () => {},
+    },
+  });
 }, 60_000);
 
 afterAll(async () => {
@@ -161,7 +136,7 @@ afterAll(async () => {
   await stopTestContainers();
 });
 
-describe("ExperimentRunService.getRun (integration)", () => {
+describe("ClickHouseExperimentRunRepository.tryGet (integration)", () => {
   describe("when a run has several versions", () => {
     it("returns the fields of the version with the greatest UpdatedAt", async () => {
       const experimentId = `exp-latest-${nanoid()}`;
@@ -188,7 +163,7 @@ describe("ExperimentRunService.getRun (integration)", () => {
         agoSec: 0,
       });
 
-      const result = await service.getRun({
+      const result = await repository.tryGet({
         projectId: tenantId,
         experimentId,
         runId,
@@ -215,7 +190,7 @@ describe("ExperimentRunService.getRun (integration)", () => {
       await insertTargetItem(ch, { experimentId, runId, traceId });
       await insertTraceCost(ch, { traceId, totalCost: 0.42 });
 
-      const result = await service.getRun({
+      const result = await repository.tryGet({
         projectId: tenantId,
         experimentId,
         runId,
@@ -230,7 +205,7 @@ describe("ExperimentRunService.getRun (integration)", () => {
 
   describe("when the run does not exist", () => {
     it("returns null", async () => {
-      const result = await service.getRun({
+      const result = await repository.tryGet({
         projectId: tenantId,
         experimentId: `exp-missing-${nanoid()}`,
         runId: `run-missing-${nanoid()}`,
@@ -252,7 +227,7 @@ describe("ExperimentRunService.getRun (integration)", () => {
         agoSec: 0,
       });
 
-      const result = await service.getRun({
+      const result = await repository.tryGet({
         projectId: tenantId,
         experimentId,
         runId,

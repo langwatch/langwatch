@@ -31,7 +31,7 @@ import type { EvaluationV3Event } from "../types";
 const hasNlpService =
   !!process.env.LANGWATCH_NLP_SERVICE && !!process.env.OPENAI_API_KEY;
 
-// `runOrchestrator` calls `getApp().experimentRuns`, which throws
+// `runOrchestrator` calls `getApp().experiments`, which throws
 // "App not initialized" unless the composition is booted first — so the whole
 // suite needs a real app singleton, not just the NLP service. We boot it in
 // beforeAll (idempotent: reuses an app another file already initialized) and

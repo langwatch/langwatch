@@ -28,12 +28,12 @@ type HttpNodeData = {
   parameters: Field[];
 };
 
-import type { Agent as TypedAgent } from "@langwatch/agents-contract";
+import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import { buildHttpNodeParameters } from "~/server/agents/http-node";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators";
-import { buildLLMConfig } from "~/server/prompt-config/llmConfigBuilder";
-import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import { buildLLMConfig } from "~/prompts/llmConfigBuilder";
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import type { ChatMessage } from "~/server/tracer/types";
 import type {
   ExecutionCell,

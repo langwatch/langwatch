@@ -1,27 +1,53 @@
 import {
+  completeExperimentRunInputSchema,
   ExperimentNotFoundError,
   ExperimentService as ExperimentServiceContract,
   experimentLookupSchema,
   experimentPageInputSchema,
   experimentSlugLookupSchema,
+  experimentRunListInputSchema,
+  experimentRunLookupSchema,
+  experimentRunPageInputSchema,
+  experimentRunSlugPageInputSchema,
   findOrCreateWorkflowExperimentInputSchema,
+  recordEvaluatorResultInputSchema,
+  recordTargetResultInputSchema,
   saveExperimentInputSchema,
+  startExperimentRunInputSchema,
   type Experiment,
   type ExperimentLookup,
   type ExperimentPage,
   type ExperimentPageInput,
   type ExperimentSlugLookup,
   type ExperimentType,
+  type ExperimentRun,
+  type ExperimentRunAggregate,
+  type ExperimentRunListInput,
+  type ExperimentRunLookup,
+  type ExperimentRunPageInput,
+  type ExperimentRunSlugPageInput,
+  type ExperimentRunWithItems,
+  type CompleteExperimentRunInput,
   type FindOrCreateWorkflowExperimentInput,
   type SaveExperimentInput,
+  type RecordEvaluatorResultInput,
+  type RecordTargetResultInput,
+  type StartExperimentRunInput,
 } from "@langwatch/experiment-contract";
 import {
   ArchivedExperimentWriteError,
 } from "../repositories/prisma/prisma.experiment.repository";
 import type { ExperimentRepository } from "../repositories/experiment.repository";
+import type { ExperimentRunRepository } from "../repositories/experiment-run.repository";
+import {
+  UnavailableExperimentExecutionPort,
+  type ExperimentExecutionPort,
+} from "../execution/experiment-execution.port";
 
 export type ExperimentServiceOptions = {
   repository: ExperimentRepository;
+  runRepository: ExperimentRunRepository;
+  execution?: ExperimentExecutionPort;
   slugify: (value: string) => string;
   newId: () => string;
   now?: () => Date;
@@ -38,8 +64,11 @@ export class ExperimentService extends ExperimentServiceContract {
     return new ExperimentService(options);
   }
 
+  private readonly execution: ExperimentExecutionPort;
+
   private constructor(private readonly options: ExperimentServiceOptions) {
     super();
+    this.execution = options.execution ?? new UnavailableExperimentExecutionPort();
   }
 
   async getById(input: ExperimentLookup): Promise<Experiment> {
@@ -203,6 +232,70 @@ export class ExperimentService extends ExperimentServiceContract {
     });
 
     return { success: true };
+  }
+
+  async startExperimentRun(input: StartExperimentRunInput): Promise<void> {
+    await this.execution.startExperimentRun(
+      startExperimentRunInputSchema.parse(input),
+    );
+  }
+
+  async recordTargetResult(input: RecordTargetResultInput): Promise<void> {
+    await this.execution.recordTargetResult(
+      recordTargetResultInputSchema.parse(input),
+    );
+  }
+
+  async recordEvaluatorResult(
+    input: RecordEvaluatorResultInput,
+  ): Promise<void> {
+    await this.execution.recordEvaluatorResult(
+      recordEvaluatorResultInputSchema.parse(input),
+    );
+  }
+
+  async completeExperimentRun(
+    input: CompleteExperimentRunInput,
+  ): Promise<void> {
+    await this.execution.completeExperimentRun(
+      completeExperimentRunInputSchema.parse(input),
+    );
+  }
+
+  listRuns(input: ExperimentRunListInput): Promise<Record<string, ExperimentRun[]>> {
+    return this.options.runRepository.list(experimentRunListInputSchema.parse(input));
+  }
+
+  getRunAggregates(input: ExperimentRunListInput): Promise<Record<string, ExperimentRunAggregate>> {
+    return this.options.runRepository.getAggregates(experimentRunListInputSchema.parse(input));
+  }
+
+  getRunsPage(input: ExperimentRunPageInput): Promise<{ runs: ExperimentRun[]; totalHits: number }> {
+    return this.options.runRepository.getPage(experimentRunPageInputSchema.parse(input));
+  }
+
+  tryGetRun(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null> {
+    return this.options.runRepository.tryGet(experimentRunLookupSchema.parse(input));
+  }
+
+  async getRunsPageBySlug(input: ExperimentRunSlugPageInput): Promise<{
+    experiment: { id: string; slug: string };
+    runs: ExperimentRun[];
+    totalHits: number;
+  }> {
+    const query = experimentRunSlugPageInputSchema.parse(input);
+    const experiment = await this.tryGetIdBySlug({
+      projectId: query.projectId,
+      slug: query.experimentSlug,
+    });
+    if (!experiment) throw new ExperimentNotFoundError(query.experimentSlug);
+    const page = await this.getRunsPage({
+      projectId: query.projectId,
+      experimentId: experiment.id,
+      page: query.page,
+      pageSize: query.pageSize,
+    });
+    return { experiment, ...page };
   }
 
   private async generateUniqueSlug(input: {

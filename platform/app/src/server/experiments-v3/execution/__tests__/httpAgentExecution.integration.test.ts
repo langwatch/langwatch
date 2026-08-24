@@ -91,7 +91,7 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
    */
   const createMockHttpAgent = (
     httpConfig: HttpConfig,
-  ): import("@langwatch/agents-contract").Agent => ({
+  ): import("@langwatch/agent-contract").Agent => ({
     id: "mock-agent-1",
     projectId: project?.id ?? "test-project",
     name: "Mock HTTP Agent",

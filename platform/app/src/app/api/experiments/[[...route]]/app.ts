@@ -14,13 +14,10 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import type { Experiment } from "@langwatch/experiment-contract";
 import { describeRoute, resolver } from "hono-openapi";
-import { z } from "zod";
-import type { Experiment } from "~/generated/prisma/client";
+import { z } from "zod/v4";
 import { createProjectApp, requires } from "~/server/api/security";
-import { prisma } from "~/server/db";
-import { ExperimentService } from "~/server/experiments/experiment.service";
-import { ExperimentRunService } from "~/server/experiments-v3/services/experiment-run.service";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { baseResponses } from "../../shared/base-responses";
 
@@ -151,9 +148,7 @@ secured.access(requires("experiments:view")).get(
       "Listing experiments",
     );
 
-    const { experiments: paged, totalHits } = await ExperimentService.create(
-      prisma,
-    ).getPage({
+    const { experiments: paged, totalHits } = await c.app.experiments.getPage({
       projectId: project.id,
       page,
       pageSize,
@@ -161,9 +156,7 @@ secured.access(requires("experiments:view")).get(
 
     const runAggregates =
       paged.length > 0
-        ? await ExperimentRunService.create(
-            prisma,
-          ).getRunAggregatesForExperimentIds({
+        ? await c.app.experiments.getRunAggregates({
             projectId: project.id,
             experimentIds: paged.map((e) => e.id),
           })
