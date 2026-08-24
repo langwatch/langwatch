@@ -1,14 +1,17 @@
 import {
   Alert,
+  Box,
   Button,
   Card,
   Container,
   Heading,
   HStack,
+  Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { useEffect } from "react";
+import { AuthCard } from "~/components/auth/AuthCard";
 import { isSameOrigin, useSession } from "~/utils/auth-client";
 import { hardNavigate } from "~/utils/browserNavigation";
 import Link from "~/utils/compat/next-link";
@@ -130,11 +133,32 @@ export default function Error() {
     return <SignInError error={error} />;
   }
 
+  // Reached with no error code to render: the effect above is already taking
+  // them back to the front door. It is a wait rather than a failure, so it is
+  // a card that says so — this branch used to be an unstyled line of text in
+  // the corner of a blank page, sitting there for the full five seconds.
   return (
-    <div style={{ padding: "12px" }}>
-      Auth Error: Redirecting back to Sign in... Click <a href="/">here</a> if
-      you are not redirected within 5 seconds.
-    </div>
+    <AuthCard title="Taking you back to sign in">
+      <VStack width="full" align="stretch" gap={4}>
+        <HStack gap={3}>
+          <Spinner size="sm" color="orange.500" />
+          <Text color="fg.muted">One moment.</Text>
+        </HStack>
+        <Text fontSize="13px" color="fg.muted">
+          If nothing happens,{" "}
+          <Box
+            asChild
+            color="fg"
+            fontWeight={600}
+            textDecoration="underline"
+            textUnderlineOffset="3px"
+          >
+            <a href="/auth/signin">go to sign in</a>
+          </Box>
+          .
+        </Text>
+      </VStack>
+    </AuthCard>
   );
 }
 
