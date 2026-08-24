@@ -1,41 +1,68 @@
 import type { Context, MiddlewareHandler } from "hono";
-import { type App, getApp, tryGetApp } from "~/server/app-layer/app";
+import type { App } from "~/server/app-layer/app";
 
-/**
- * The composed App is injected under its OWN key, never the bare `app` the
- * @langwatch/api pipeline uses for its per-request provider bag
- * (`{ ...BaseApp, ...providers }`). `createManagementService` mounts BOTH this
- * middleware and that pipeline, so sharing the key would let `appFromContext`
- * return the provider bag once the pipeline had set it — and
- * `.permissions.hasApiKeyPermission(...)` on a provider bag is a TypeError,
- * not the singleton fallback. Distinct keys keep the two apart.
- */
+declare module "hono" {
+  interface ContextVariableMap {
+    langwatchApp: App;
+  }
+
+  interface Context {
+    readonly app: App;
+  }
+}
+
+/** Stable Hono variable key for middleware that cannot use `context.app`. */
 const APP_CONTEXT_KEY = "langwatchApp";
 
 export type AppContextVariables = { [APP_CONTEXT_KEY]: App };
 
+function installAppContext(c: Context, app: App): void {
+  c.set(APP_CONTEXT_KEY, app);
+  Object.defineProperty(c, "app", {
+    configurable: true,
+    enumerable: false,
+    value: app,
+  });
+}
+
+/** Captures a process App for a transport root without consulting getApp(). */
+export function appContextMiddlewareFor(app: App): MiddlewareHandler {
+  return async (c, next) => {
+    installAppContext(c, app);
+    await next();
+  };
+}
+
 /**
- * Injects the composed App into the Hono context (`c.var.langwatchApp`).
+ * Injects the same process-composed App both as `context.app` for handlers and
+ * as `c.var.langwatchApp` for existing middleware.
  * Mounted by `SecuredApp` and the management-service factory, so every route
  * family's middlewares and handlers read the App from their request context
  * instead of resolving the singleton themselves.
  *
- * Injection tolerates absence (`tryGetApp`) so public routes on a family can
- * answer without an App; `appFromContext` is where absence becomes an error,
- * on the one path that actually needs a decision.
+ * The root router must already have installed the process App. Nested route
+ * families never recover it from a global singleton.
  */
 export const appContextMiddleware: MiddlewareHandler = async (c, next) => {
-  const app = tryGetApp();
-  if (app) c.set(APP_CONTEXT_KEY, app);
+  const app = c.get(APP_CONTEXT_KEY) as App | undefined;
+  if (!app) {
+    throw new Error(
+      "Application context is missing. Mount the route below appContextMiddlewareFor(app).",
+    );
+  }
+  installAppContext(c, app);
   await next();
 };
 
 /**
- * The App this request decides through: the injected `c.var.langwatchApp`, or
- * the process singleton for handlers mounted outside the secured frameworks.
- * Both are the same instance in production — the context variable exists so
- * a test can hand in a fake without mocking the App module.
+ * The process-owned App injected into this request by the transport root.
  */
 export function appFromContext(c: Context): App {
-  return (c.get(APP_CONTEXT_KEY) as App | undefined) ?? getApp();
+  const app = c.get(APP_CONTEXT_KEY) as App | undefined;
+  if (!app) {
+    throw new Error(
+      "Application context is missing. Mount the route below appContextMiddlewareFor(app).",
+    );
+  }
+  return app;
 }

@@ -1,4 +1,9 @@
 import "@testing-library/jest-dom/vitest";
+import { initializeEnvironmentConfig } from "./src/env.mjs";
+import {
+  createPublicAppConfigMetaTag,
+  PUBLIC_APP_CONFIG_META_NAME,
+} from "./src/runtime/public-config";
 
 // Browser bundles transitively touch `process.env` through `env-create.mjs`
 // (and other Node-shaped modules). Vitest's browser provider doesn't expose
@@ -15,4 +20,19 @@ if (typeof globalThis.process === "undefined") {
       SKIP_ENV_VALIDATION: "1",
     },
   };
+}
+initializeEnvironmentConfig(process.env);
+
+if (!document.querySelector(`meta[name="${PUBLIC_APP_CONFIG_META_NAME}"]`)) {
+  document.head.insertAdjacentHTML(
+    "beforeend",
+    createPublicAppConfigMetaTag({
+      appBaseUrl: "http://localhost:5560",
+      gatewayBaseUrl: "http://localhost:5560",
+      deployment: "self-hosted",
+      mode: "test",
+      telemetry: { browserTracing: false, sampleRatio: 1 },
+      capabilities: { email: false, nlp: false, langevals: false },
+    }),
+  );
 }

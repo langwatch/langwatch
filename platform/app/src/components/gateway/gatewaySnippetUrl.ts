@@ -1,4 +1,4 @@
-/** SaaS fallback shown during SSR / before the publicEnv query resolves. */
+/** SaaS fallback shown before the HTML boot configuration is available. */
 export const HOSTED_GATEWAY_URL = "https://gateway.langwatch.ai/v1";
 
 /**
@@ -7,10 +7,11 @@ export const HOSTED_GATEWAY_URL = "https://gateway.langwatch.ai/v1";
  * Priority:
  *   1. `override`: explicit prop (already a full base_url incl. `/v1`).
  *   2. `deploymentBaseUrl`: this deployment's own gateway URL from
- *      publicEnv (`GATEWAY_BASE_URL`), returned WITHOUT the `/v1` suffix the
+ *      HTML boot config (`GATEWAY_BASE_URL` compatibility view), returned
+ *      WITHOUT the `/v1` suffix the
  *      OpenAI `base_url` needs, so it is appended here. This is what makes
  *      self-hosted installs show their own ingress instead of the SaaS URL.
- *   3. SaaS fallback while publicEnv is still loading.
+ *   3. SaaS fallback when rendering outside the application shell.
  */
 export function resolveSnippetGatewayBaseUrl(
   override: string | undefined,

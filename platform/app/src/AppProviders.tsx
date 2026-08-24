@@ -70,8 +70,8 @@ export function InnerProviders({ children }: { children: ReactNode }) {
           })}
         >
           {/* Always wrap in PostHogProvider with the module singleton —
-              `usePostHog()` initializes it in an effect once publicEnv
-              resolves, so conditionally wrapping on that flip changes the
+              `usePostHog()` initializes it from the HTML boot configuration,
+              so conditionally wrapping on that initialization changes the
               element type at this position and React unmounts + remounts
               the ENTIRE routed page subtree shortly after boot. That
               remount wiped in-flight page state (#5550: /invite/accept

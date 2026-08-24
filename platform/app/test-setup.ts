@@ -5,6 +5,11 @@ import { cleanup } from "@testing-library/react";
 import dotenv from "dotenv";
 import { afterAll, afterEach, vi } from "vitest";
 import { TEST_PUBLIC_KEY } from "@langwatch/enterprise-licensing-server/testing";
+import { initializeEnvironmentConfig } from "./src/env.mjs";
+import {
+  createPublicAppConfigMetaTag,
+  PUBLIC_APP_CONFIG_META_NAME,
+} from "./src/runtime/public-config";
 
 dotenv.config({ path: ["../../.env", ".env"] });
 
@@ -32,6 +37,24 @@ process.env.LANGWATCH_LOCAL_STORAGE_PATH ??= path.join(
   os.tmpdir(),
   "langwatch-test-storage",
 );
+initializeEnvironmentConfig(process.env);
+
+if (
+  typeof document !== "undefined" &&
+  !document.querySelector(`meta[name="${PUBLIC_APP_CONFIG_META_NAME}"]`)
+) {
+  document.head.insertAdjacentHTML(
+    "beforeend",
+    createPublicAppConfigMetaTag({
+      appBaseUrl: "http://localhost:5560",
+      gatewayBaseUrl: "http://localhost:5560",
+      deployment: "self-hosted",
+      mode: "test",
+      telemetry: { browserTracing: false, sampleRatio: 1 },
+      capabilities: { email: false, nlp: false, langevals: false },
+    }),
+  );
+}
 
 // Any test that evaluates a PostHog-backed PRODUCT flag (e.g. resolveHome ->
 // featureFlagService.isEnabled) constructs the posthog-node client, whose

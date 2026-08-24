@@ -13,6 +13,19 @@ import { Readable } from "stream";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { serveStaticOrFallback } from "../static-handler";
+import {
+  readPublicAppConfig,
+  type PublicAppConfig,
+} from "../../runtime/public-config";
+
+const publicConfig: PublicAppConfig = {
+  appBaseUrl: "https://app.example.com",
+  gatewayBaseUrl: "https://gateway.example.com",
+  deployment: "self-hosted",
+  mode: "test",
+  telemetry: { browserTracing: false, sampleRatio: 1 },
+  capabilities: { email: false, nlp: false, langevals: false },
+};
 
 function rawRequest(
   port: number,
@@ -62,7 +75,12 @@ describe("serveStaticOrFallback", () => {
 
     server = createServer((req, res) => {
       const pathname = (req.url ?? "/").split("?")[0] ?? "/";
-      const handled = serveStaticOrFallback({ res, pathname, clientDistDir });
+      const handled = serveStaticOrFallback({
+        res,
+        pathname,
+        clientDistDir,
+        publicConfig,
+      });
       if (!handled) {
         res.statusCode = 404;
         res.end("Not Found");
@@ -140,6 +158,24 @@ describe("serveStaticOrFallback", () => {
       const res = await fetch(`${baseUrl}/`);
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toBe("text/html");
+    });
+
+    it("injects the allow-listed public config into the HTML response", async () => {
+      const res = await fetch(`${baseUrl}/`);
+      const body = await res.text();
+      expect(body).toContain('name="langwatch-public-config"');
+      expect(body).not.toContain("https://app.example.com");
+      const content = body.match(
+        /<meta name="langwatch-public-config" content="([A-Za-z0-9_-]+)">/,
+      )?.[1];
+      expect(
+        readPublicAppConfig({
+          querySelector: () =>
+            content
+              ? ({ getAttribute: () => content } as unknown as Element)
+              : null,
+        }),
+      ).toEqual(publicConfig);
     });
 
     it("serves the SPA shell with a revalidate Cache-Control so reloads pick up new chunks", async () => {

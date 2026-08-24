@@ -9,9 +9,9 @@ import { describe, expect, it } from "vitest";
  * `~/utils/api`, so a crash or eternal suspension in the client wiring blanks
  * every page in production while the whole jsdom suite stays green.
  *
- * The sign-in page renders `null` until `publicEnv` resolves, so this asserts
- * the page's form appears — which requires the tRPC query to at least FIRE
- * and settle (the test server serves the real API).
+ * Deployment configuration is already present in the HTML shell. The sign-in
+ * page still waits for its license-dependent sign-in capability, so this also
+ * proves that the small viewer-capability query fires and settles.
  */
 describe("app entry", () => {
   describe("when mounted at /auth/signin with the real provider stack", () => {
@@ -28,8 +28,9 @@ describe("app entry", () => {
         </OuterProviders>,
       );
 
-      // publicEnv has no live API here — success is the QUERY FIRING and the
-      // router tree staying mounted (not a client-side construction crash).
+      // The capability query has no live API here — success is the query
+      // firing and the router tree staying mounted (not a client-side
+      // construction crash).
       await new Promise((resolve) => setTimeout(resolve, 4000));
       expect(router.state.initialized).toBe(true);
       expect(container.innerHTML.length).toBeGreaterThan(0);

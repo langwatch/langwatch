@@ -3,6 +3,7 @@ import { createLogger } from "@langwatch/observability";
 import type { IncomingMessage, RequestListener, ServerResponse } from "http";
 import http from "http";
 import { register } from "prom-client";
+import type { App } from "~/server/app-layer/app";
 import { assertRedisReady } from "~/server/app-layer/redis-readiness";
 import { getWorkerMetricsPort, isMetricsAuthorized } from "~/server/metrics";
 
@@ -27,6 +28,8 @@ export interface StartWorkersOptions {
    * already serves the shared registry at `/metrics`.
    */
   shouldStartMetricsServer?: boolean;
+  /** The process-owned App captured by the worker runtime. */
+  app: App;
 }
 
 type ShutdownHandles = Array<() => Promise<void> | void>;
@@ -66,10 +69,8 @@ async function bootStorageStatsCollection(
 // never execute on this pod.
 async function bootScenarioProcessor(
   shutdownHandles: ShutdownHandles,
+  app: App,
 ): Promise<void> {
-  const { getScenarioExecutionPool } = await import(
-    "~/server/app-layer/presets"
-  );
   const { ScenarioExecutionPool } = await import(
     "~/server/scenarios/execution/execution-pool"
   );
@@ -82,7 +83,8 @@ async function bootScenarioProcessor(
   const scenarioPool = new ScenarioExecutionPool({
     concurrency: SCENARIO_WORKER.CONCURRENCY,
   });
-  getScenarioExecutionPool()?.set(scenarioPool);
+  const scenarioExecutionPool = app.commands.scenarioExecutionPool;
+  scenarioExecutionPool?.set(scenarioPool);
   const scenarioProcessor = await startScenarioProcessor({
     pool: scenarioPool,
   });
@@ -472,7 +474,9 @@ async function respondToLivenessThread(
  * worker-capable role — `initializeWorkerApp()` for the standalone deployment,
  * or `initializeInProcessApp()` for the dev single-process mode. Registers NO
  * process signal handlers: the caller owns the process lifecycle and invokes
- * the returned `shutdown()` on teardown.
+ * the returned `shutdown()` on teardown. The explicit worker executable also
+ * passes that same App through `options.app` so late-bound worker capabilities
+ * do not need to recover it from the process singleton.
  *
  * Each boot stage below is a small helper that lazily imports its own
  * dependencies and pushes its own teardown onto `shutdownHandles`. The
@@ -484,9 +488,9 @@ async function respondToLivenessThread(
  * imports as `await import()` for that reason.
  */
 export async function startWorkers(
-  options?: StartWorkersOptions,
+  options: StartWorkersOptions,
 ): Promise<WorkerHandle> {
-  const shouldStartMetricsServer = options?.shouldStartMetricsServer ?? true;
+  const shouldStartMetricsServer = options.shouldStartMetricsServer ?? true;
 
   // Resources that hold OS-level handles — child processes, sockets, timers,
   // Redis subscribers — and must be released on shutdown. Populated as each
@@ -501,7 +505,7 @@ export async function startWorkers(
     );
   };
 
-  await assertRedisReady();
+  await assertRedisReady({ app: options.app });
   await verifyDatabaseReady();
 
   try {
@@ -511,7 +515,7 @@ export async function startWorkers(
     // process outbox in the event-sourcing runtime own scheduling and
     // execution; there is no separate queue worker to boot.
     await bootStorageStatsCollection(shutdownHandles);
-    await bootScenarioProcessor(shutdownHandles);
+    await bootScenarioProcessor(shutdownHandles, options.app);
     // Langy turns self-drive: the process outbox dispatches to the Go manager,
     // which pushes signed frames to the relay. No in-process pool/executor to
     // boot; heartbeat recovery belongs to the direct liveness subscriber.

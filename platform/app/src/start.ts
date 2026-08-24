@@ -9,6 +9,8 @@ import {
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
 import { createSecureServer } from "http2";
 import path from "path";
+import type { AppBootConfig } from "./runtime/config";
+import type { PublicAppConfig } from "./runtime/public-config";
 import { resolveAppPackageRoot } from "./server/appPackageRoot";
 
 /**
@@ -26,16 +28,21 @@ import { resolveAppPackageRoot } from "./server/appPackageRoot";
  */
 async function loadDevHttpsCredentials(
   repoDir: string,
+  config: AppBootConfig,
 ): Promise<{ cert: Buffer; key: Buffer }> {
-  if (process.env.DEV_HTTPS_CERT && process.env.DEV_HTTPS_KEY) {
+  if (
+    config.developmentHttpsCertificatePath &&
+    config.developmentHttpsPrivateKeyPath
+  ) {
     return {
-      cert: readFileSync(process.env.DEV_HTTPS_CERT),
-      key: readFileSync(process.env.DEV_HTTPS_KEY),
+      cert: readFileSync(config.developmentHttpsCertificatePath),
+      key: readFileSync(config.developmentHttpsPrivateKeyPath),
     };
   }
 
   const cacheDir =
-    process.env.LANGWATCH_DEV_CERT_DIR ?? path.join(repoDir, ".dev-certs");
+    config.developmentCertificateDirectory ??
+    path.join(repoDir, ".dev-certs");
   const certPath = path.join(cacheDir, "dev.pem");
   const keyPath = path.join(cacheDir, "dev-key.pem");
 
@@ -76,7 +83,8 @@ import { createLogger } from "@langwatch/observability";
 import type { Hono } from "hono";
 import { register } from "prom-client";
 import { createMcpHandler } from "./mcp/handler";
-import { createApp } from "./runtime/app";
+import { createApp, createRequestAppServices } from "./runtime/app";
+import type { AppRuntime } from "./runtime/app";
 import { createApiRouter } from "./server/api-router";
 import {
   initializeInProcessApp,
@@ -138,13 +146,20 @@ export type StartAppOptions = {
   processRoot?: string;
   /** Built UI artifact supplied by image or self-host composition. */
   uiArtifactPath?: string;
+  /** Pre-composed App supplied by the explicit executable boot boundary. */
+  appRuntime?: AppRuntime;
+  /** Configuration already validated by executable boot. */
+  config: AppBootConfig;
+  /** Browser-safe configuration resolved once by executable boot. */
+  publicConfig: PublicAppConfig;
 };
 
-export const startApp = async (options: StartAppOptions = {}) => {
+export const startApp = async (options: StartAppOptions) => {
+  const config = options.config;
   const processRoot = options.processRoot ?? resolveAppPackageRoot();
   const uiArtifactPath =
     options.uiArtifactPath ?? path.join(processRoot, "dist/client");
-  const dev = process.env.NODE_ENV !== "production";
+  const dev = config.nodeEnv !== "production";
   const hostname = "0.0.0.0";
 
   // Dev-only single-process mode: host the background worker stack inside this
@@ -158,19 +173,23 @@ export const startApp = async (options: StartAppOptions = {}) => {
   // If they disagreed, an exotic NODE_ENV (e.g. "staging") would spawn BOTH the
   // standalone workers lane AND the in-process stack — duplicate consumers.
   const isInProcessWorkerModeEnabled =
-    process.env.NODE_ENV === "development" &&
-    (process.env.WORKERS_IN_PROCESS === "1" ||
-      process.env.WORKERS_IN_PROCESS === "true");
+    config.nodeEnv === "development" && config.workersInProcess;
 
   // Initialize the app-layer (services, repositories, event sourcing, etc.)
   // This was previously done by Next.js instrumentation hook. In-process mode
   // boots with the "all" role so the outbox consumer / drainer / heartbeat
   // scheduler wire up exactly as on a dedicated worker.
-  const appRuntime = await createApp({
-    initializeLegacy: isInProcessWorkerModeEnabled
-      ? initializeInProcessApp
-      : initializeWebApp,
-  });
+  const appRuntime =
+    options.appRuntime ??
+    (await createApp({
+      initializeLegacy: isInProcessWorkerModeEnabled
+        ? initializeInProcessApp
+        : initializeWebApp,
+    }));
+  // The explicit boot path supplies the composed runtime here. Starting it at
+  // this single seam keeps graph initialization ahead of readiness checks and
+  // listener binding while preserving the standalone startApp compatibility
+  // entrypoint.
   await appRuntime.start();
 
   // Fail fast if Redis is unreachable — better-auth uses it as secondary
@@ -181,7 +200,7 @@ export const startApp = async (options: StartAppOptions = {}) => {
   // process, and one that cannot reach Redis has nothing to serve. The probe
   // has already logged what and where (ADR-093).
   try {
-    await assertRedisReady();
+    await assertRedisReady({ app: appRuntime.legacy });
   } catch (err) {
     // Synchronous stderr before exiting, for the same reason the server error
     // handler below does it: the probe logs through pino, whose transports are
@@ -199,17 +218,15 @@ export const startApp = async (options: StartAppOptions = {}) => {
 
   // Partial-config assertion on LW_VIRTUAL_KEY_PEPPER /
   // LW_GATEWAY_INTERNAL_SECRET / LW_GATEWAY_JWT_SECRET now lives in
-  // env-create.mjs so workers.ts, CLI scripts, and every other entry
-  // point that imports env get it at import time (was server-only here).
+  // env-create.mjs so every executable checks it while explicitly resolving
+  // its selected environment source (rather than when a module is imported).
   //
   // Server-only dev hint: the AI Gateway menu is on by default, so if no
   // gateway secrets are set at all the UI renders but
   // /api/internal/gateway/* returns 503. That's a `pnpm dev` onboarding
   // confusion, so the warning stays here.
   const gwSecretsUnset =
-    !process.env.LW_VIRTUAL_KEY_PEPPER &&
-    !process.env.LW_GATEWAY_INTERNAL_SECRET &&
-    !process.env.LW_GATEWAY_JWT_SECRET;
+    !config.gatewaySecretsConfigured;
   if (gwSecretsUnset) {
     logger.warn(
       "AI Gateway menu is on by default but no gateway secrets are set. " +
@@ -221,18 +238,17 @@ export const startApp = async (options: StartAppOptions = {}) => {
   // Dev: API server on PORT+1000 (default 6560).
   //      Vite dev server runs separately on PORT (default 5560) and proxies /api/* here.
   // Prod: Single server on PORT (default 5560) serves API routes + static files.
-  const basePort = parseInt(process.env.PORT ?? "5560");
+  const basePort = config.port;
   // In portless (haven) mode the API binds an ephemeral loopback port that
   // Vite proxies `/api` to under the app origin (`app.<slug>.../api`);
   // otherwise PORT+1000.
-  const port = process.env.LANGWATCH_API_PORT
-    ? parseInt(process.env.LANGWATCH_API_PORT)
-    : dev
+  const port = config.apiPort ?? (dev
       ? basePort + 1000
-      : basePort;
+      : basePort);
 
   const mcpHandler = createMcpHandler();
-  const honoApp = createApiRouter();
+  const requestApp = createRequestAppServices(appRuntime.legacy);
+  const honoApp = createApiRouter(requestApp, appRuntime.legacy);
   // The Node→Hono bridge. `getRequestListener` streams request bodies through
   // (no buffering — the Langy ndjson relay depends on this) and streams the
   // response back. `overrideGlobalObjects: false`: never patch the process's
@@ -264,7 +280,7 @@ export const startApp = async (options: StartAppOptions = {}) => {
   //
   // Default off — `pnpm dev` keeps using plain HTTP/1.1 so nobody who
   // hasn't opted in sees a breaking change.
-  const useHttp2 = dev && process.env.LANGWATCH_DEV_HTTP2 === "1";
+  const useHttp2 = dev && config.developmentHttp2;
 
   // eslint-disable-next-line @typescript-eslint/no-misused-promises
   const handler = async (req: IncomingMessage, res: ServerResponse) => {
@@ -346,7 +362,12 @@ export const startApp = async (options: StartAppOptions = {}) => {
 
       // ---- Production: serve static assets + SPA fallback ----
       if (clientDistDir) {
-        const handled = serveStaticOrFallback({ res, pathname, clientDistDir });
+        const handled = serveStaticOrFallback({
+          res,
+          pathname,
+          clientDistDir,
+          publicConfig: options.publicConfig,
+        });
         if (handled) return;
       }
 
@@ -366,7 +387,7 @@ export const startApp = async (options: StartAppOptions = {}) => {
     | ReturnType<typeof createServer>
     | ReturnType<typeof createSecureServer>;
   if (useHttp2) {
-    const { cert, key } = await loadDevHttpsCredentials(processRoot);
+    const { cert, key } = await loadDevHttpsCredentials(processRoot, config);
     // Node's http2 compat-API hands us the same IncomingMessage /
     // ServerResponse shapes the http server uses, so the handler
     // body doesn't need to know which transport it's on.
@@ -525,7 +546,10 @@ export const startApp = async (options: StartAppOptions = {}) => {
       // shouldStartMetricsServer: false — in one process the worker prom
       // registry is this process's registry, already served at /metrics; no
       // second listener.
-      workerHandle = await startWorkers({ shouldStartMetricsServer: false });
+      workerHandle = await startWorkers({
+        shouldStartMetricsServer: false,
+        app: appRuntime.legacy,
+      });
       logger.info("in-process workers ready");
     } catch (error) {
       logger.error(

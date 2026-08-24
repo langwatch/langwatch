@@ -2,8 +2,8 @@
 
 **Date:** 2026-08-24
 
-**Status:** Accepted; implementation deferred until the application workspace
-split
+**Status:** Accepted; implementation in progress with the application
+workspace split
 
 **Related:** [ADR-093: Redis is an owned client](./093-redis-is-an-owned-client.md),
 [ADR-102: runtime composition roots](./102-runtime-composition-roots.md),
@@ -104,10 +104,12 @@ instance as `ctx.app`, and worker handlers receive it from their runtime. A
 request does not create a service graph, and application code does not fall back
 to a global `getApp()` once its transport has an injected App.
 
-The existing `env.mjs`, `env-create.mjs`, import-order comments, and global App
-fallbacks are migration inputs rather than compatibility APIs. They are removed
-incrementally as the physical app split creates the new boot roots. No second
-resolved-config singleton is introduced during that migration.
+During migration, `env.mjs` is an inert read bridge over the configuration that
+an executable explicitly validated and installed. Importing it performs no
+validation and reading it before boot fails with a direct boot-boundary error.
+`env-create.mjs` accepts the selected source explicitly; it does not choose
+`process.env`. Feature-local semantic config replaces this bridge incrementally,
+and no lazy second configuration source is introduced.
 
 ### Boot checks are explicit and testable
 

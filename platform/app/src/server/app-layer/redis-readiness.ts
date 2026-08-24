@@ -1,7 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { RedisReadinessService } from "@langwatch/redis-client";
-import { env } from "../../env.mjs";
-import { getApp } from "./app";
+import type { App } from "./app";
 
 const logger = createLogger("langwatch:redis");
 
@@ -19,10 +18,16 @@ const readiness = new RedisReadinessService({ logger });
  *
  * No-ops when the App has no Redis configured.
  */
-export async function assertRedisReady(timeoutMs?: number): Promise<void> {
+export async function assertRedisReady({
+  app,
+  timeoutMs,
+}: {
+  app: App;
+  timeoutMs?: number;
+}): Promise<void> {
   await readiness.ping({
-    connection: getApp().redis,
+    connection: app.redis,
     timeoutMs,
-    target: env.REDIS_CLUSTER_ENDPOINTS ?? env.REDIS_URL ?? "(unset)",
+    target: "App.redis",
   });
 }

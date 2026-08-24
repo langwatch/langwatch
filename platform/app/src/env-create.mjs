@@ -1,5 +1,5 @@
 import { createEnv } from "@t3-oss/env-core";
-import { z } from "zod";
+import { z } from "zod/v4";
 
 /**
  * Zod validators for the three AI Gateway secrets.
@@ -74,11 +74,6 @@ export const azureBlobAuthModeSchema = z
   .enum(["sharedKey", "workloadIdentity", "managedIdentity", "azureCli"])
   .optional();
 
-/** @param {import('zod').ZodTypeAny} schema */
-const optionalIfBuildTime = (schema) => {
-  return process.env.BUILD_TIME ? schema.optional() : schema;
-};
-
 /**
  * `BASE_HOST` / `NEXTAUTH_URL` are the app's own address. Every state-changing
  * `/api/auth/*` call is matched against it (`server/routes/auth.ts` via
@@ -105,10 +100,10 @@ const optionalIfBuildTime = (schema) => {
  * handler, the SSR API base, the scenario-events app) see the same address the
  * auth layer does.
  *
- * @param {Record<string, string | undefined>} [processEnv]
+ * @param {Record<string, string | undefined>} processEnv
  * @returns {{ name: string, from: string, to: string }[]} the vars it realigned
  */
-export function alignDevAuthUrlsToPort(processEnv = process.env) {
+export function alignDevAuthUrlsToPort(processEnv) {
   if (processEnv.NODE_ENV !== "development") return [];
 
   const port = processEnv.LANGWATCH_APP_PORT ?? processEnv.PORT;
@@ -137,18 +132,20 @@ export function alignDevAuthUrlsToPort(processEnv = process.env) {
   return realigned;
 }
 
-// Memoize so double calls (env.mjs root + createAppConfigFromEnv) only validate once
-/** @type {any} */
-let _env = null;
+/**
+ * Resolve the legacy application environment from an explicit source.
+ * Importing this module is inert; executable boot code chooses the source and
+ * invokes validation before it constructs the application graph.
+ *
+ * @param {Record<string, string | undefined>} source
+ */
+export function createEnvConfig(source) {
+  alignDevAuthUrlsToPort(source);
+  /** @param {import('zod/v4').ZodTypeAny} schema */
+  const optionalIfBuildTime = (schema) =>
+    source.BUILD_TIME ? schema.optional() : schema;
 
-export function createEnvConfig() {
-  if (_env) return _env;
-
-  // Runs before validation reads process.env below, and every entry point loads
-  // its .env files before the app graph (and therefore this module) evaluates.
-  alignDevAuthUrlsToPort();
-
-  _env = createEnv({
+  const environment = createEnv({
     // clientPrefix required by env-core to distinguish client/server vars
     // (env-nextjs set this to "NEXT_PUBLIC_" automatically)
     clientPrefix: "VITE_PUBLIC_",
@@ -162,7 +159,7 @@ export function createEnvConfig() {
         .optional()
         .transform((val) => {
           if (val) return val;
-          if (process.env.NODE_ENV === "production") {
+          if (source.NODE_ENV === "production") {
             console.warn(
               "ENVIRONMENT is not set in production. Defaulting to 'local'.",
             );
@@ -177,9 +174,9 @@ export function createEnvConfig() {
         z.preprocess(
           // This makes Vercel deployments not fail if you don't set NEXTAUTH_URL
           // Since NextAuth.js automatically uses the VERCEL_URL if present.
-          (str) => process.env.VERCEL_URL ?? str,
+          (str) => source.VERCEL_URL ?? str,
           // VERCEL_URL doesn't include `https` so it cant be validated as a URL
-          process.env.VERCEL ? z.string().min(1) : z.string().url(),
+          source.VERCEL ? z.string().min(1) : z.string().url(),
         ),
       ),
       AUTH0_CLIENT_ID: z.string().optional(),
@@ -370,6 +367,7 @@ export function createEnvConfig() {
       BLOCK_LOCAL_HTTP_CALLS: z.boolean().optional(),
       ALLOWED_PROXY_HOSTS: z.string().optional(),
       SHOW_OPS_IN_MAIN_SIDEBAR: z.string().optional(),
+      DISABLE_TOKENIZATION: z.boolean().optional(),
       // Post-2026-05-11 loop-prevention kill-switch. Set to "1" to
       // bypass the subscriber depth check; emergency rollback only.
       LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD: z.string().optional(),
@@ -572,210 +570,213 @@ export function createEnvConfig() {
     // No client-side env vars — use `publicEnv.ts` instead.
     // Runtime env values — must be destructured explicitly.
     runtimeEnv: {
-      DATABASE_URL: process.env.DATABASE_URL,
-      CLICKHOUSE_URL: process.env.CLICKHOUSE_URL,
-      NODE_ENV: process.env.NODE_ENV,
-      ENVIRONMENT: process.env.ENVIRONMENT,
-      BASE_HOST: process.env.BASE_HOST,
-      NEXTAUTH_PROVIDER: process.env.NEXTAUTH_PROVIDER ?? "email",
-      NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
-      NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-      LW_GATEWAY_INTERNAL_SECRET: process.env.LW_GATEWAY_INTERNAL_SECRET,
-      LW_GATEWAY_JWT_SECRET: process.env.LW_GATEWAY_JWT_SECRET,
-      LW_GATEWAY_BASE_URL: process.env.LW_GATEWAY_BASE_URL,
-      LW_GATEWAY_PUBLIC_URL: process.env.LW_GATEWAY_PUBLIC_URL,
-      LW_GATEWAY_INTERNAL_URL: process.env.LW_GATEWAY_INTERNAL_URL,
-      LW_VIRTUAL_KEY_PEPPER: process.env.LW_VIRTUAL_KEY_PEPPER,
-      AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID,
-      AUTH0_CLIENT_SECRET: process.env.AUTH0_CLIENT_SECRET,
-      AUTH0_ISSUER: process.env.AUTH0_ISSUER,
-      AUTH0_MGMT_CLIENT_ID: process.env.AUTH0_MGMT_CLIENT_ID,
-      AUTH0_MGMT_CLIENT_SECRET: process.env.AUTH0_MGMT_CLIENT_SECRET,
-      API_TOKEN_JWT_SECRET: process.env.API_TOKEN_JWT_SECRET,
-      REDIS_URL: process.env.REDIS_URL,
-      REDIS_CLUSTER_ENDPOINTS: process.env.REDIS_CLUSTER_ENDPOINTS,
-      REDIS_DB_INDEX: process.env.REDIS_DB_INDEX,
+      DATABASE_URL: source.DATABASE_URL,
+      CLICKHOUSE_URL: source.CLICKHOUSE_URL,
+      NODE_ENV: source.NODE_ENV,
+      ENVIRONMENT: source.ENVIRONMENT,
+      BASE_HOST: source.BASE_HOST,
+      NEXTAUTH_PROVIDER: source.NEXTAUTH_PROVIDER ?? "email",
+      NEXTAUTH_SECRET: source.NEXTAUTH_SECRET,
+      NEXTAUTH_URL: source.NEXTAUTH_URL,
+      LW_GATEWAY_INTERNAL_SECRET: source.LW_GATEWAY_INTERNAL_SECRET,
+      LW_GATEWAY_JWT_SECRET: source.LW_GATEWAY_JWT_SECRET,
+      LW_GATEWAY_BASE_URL: source.LW_GATEWAY_BASE_URL,
+      LW_GATEWAY_PUBLIC_URL: source.LW_GATEWAY_PUBLIC_URL,
+      LW_GATEWAY_INTERNAL_URL: source.LW_GATEWAY_INTERNAL_URL,
+      LW_VIRTUAL_KEY_PEPPER: source.LW_VIRTUAL_KEY_PEPPER,
+      AUTH0_CLIENT_ID: source.AUTH0_CLIENT_ID,
+      AUTH0_CLIENT_SECRET: source.AUTH0_CLIENT_SECRET,
+      AUTH0_ISSUER: source.AUTH0_ISSUER,
+      AUTH0_MGMT_CLIENT_ID: source.AUTH0_MGMT_CLIENT_ID,
+      AUTH0_MGMT_CLIENT_SECRET: source.AUTH0_MGMT_CLIENT_SECRET,
+      API_TOKEN_JWT_SECRET: source.API_TOKEN_JWT_SECRET,
+      REDIS_URL: source.REDIS_URL,
+      REDIS_CLUSTER_ENDPOINTS: source.REDIS_CLUSTER_ENDPOINTS,
+      REDIS_DB_INDEX: source.REDIS_DB_INDEX,
       GOOGLE_APPLICATION_CREDENTIALS:
-        process.env.GOOGLE_APPLICATION_CREDENTIALS,
+        source.GOOGLE_APPLICATION_CREDENTIALS,
       LANGWATCH_DISABLE_GOOGLE_DLP:
-        process.env.LANGWATCH_DISABLE_GOOGLE_DLP?.toLowerCase() === "true",
-      AZURE_OPENAI_ENDPOINT: process.env.AZURE_OPENAI_ENDPOINT,
-      AZURE_OPENAI_KEY: process.env.AZURE_OPENAI_KEY,
-      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-      SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
-      LANGWATCH_NLP_SERVICE: process.env.LANGWATCH_NLP_SERVICE,
-      LANGWATCH_ENDPOINT: process.env.LANGWATCH_ENDPOINT,
-      LANGEVALS_ENDPOINT: process.env.LANGEVALS_ENDPOINT,
+        source.LANGWATCH_DISABLE_GOOGLE_DLP?.toLowerCase() === "true",
+      AZURE_OPENAI_ENDPOINT: source.AZURE_OPENAI_ENDPOINT,
+      AZURE_OPENAI_KEY: source.AZURE_OPENAI_KEY,
+      OPENAI_API_KEY: source.OPENAI_API_KEY,
+      SENDGRID_API_KEY: source.SENDGRID_API_KEY,
+      LANGWATCH_NLP_SERVICE: source.LANGWATCH_NLP_SERVICE,
+      LANGWATCH_ENDPOINT: source.LANGWATCH_ENDPOINT,
+      LANGEVALS_ENDPOINT: source.LANGEVALS_ENDPOINT,
       LANGEVALS_STAGING_THRESHOLD_BYTES:
-        process.env.LANGEVALS_STAGING_THRESHOLD_BYTES,
-      LANGEVALS_STAGING_TTL_SECONDS: process.env.LANGEVALS_STAGING_TTL_SECONDS,
-      EVAL_MAX_PAYLOAD_BYTES: process.env.EVAL_MAX_PAYLOAD_BYTES,
+        source.LANGEVALS_STAGING_THRESHOLD_BYTES,
+      LANGEVALS_STAGING_TTL_SECONDS: source.LANGEVALS_STAGING_TTL_SECONDS,
+      EVAL_MAX_PAYLOAD_BYTES: source.EVAL_MAX_PAYLOAD_BYTES,
       TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES:
-        process.env.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
-      LANGWATCH_LICENSE_KEY: process.env.LANGWATCH_LICENSE_KEY,
-      TRIGGER_EMAIL_HOURLY_CAP: process.env.TRIGGER_EMAIL_HOURLY_CAP,
+        source.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
+      LANGWATCH_LICENSE_KEY: source.LANGWATCH_LICENSE_KEY,
+      TRIGGER_EMAIL_HOURLY_CAP: source.TRIGGER_EMAIL_HOURLY_CAP,
       TRIGGER_EMAIL_TENANT_DAILY_CAP:
-        process.env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
+        source.TRIGGER_EMAIL_TENANT_DAILY_CAP,
       TRIGGER_PERSIST_DAILY_CAP_FREE:
-        process.env.TRIGGER_PERSIST_DAILY_CAP_FREE,
+        source.TRIGGER_PERSIST_DAILY_CAP_FREE,
       TRIGGER_PERSIST_DAILY_CAP_PAID:
-        process.env.TRIGGER_PERSIST_DAILY_CAP_PAID,
+        source.TRIGGER_PERSIST_DAILY_CAP_PAID,
       TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE:
-        process.env.TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE,
-      DEMO_PROJECT_ID: process.env.DEMO_PROJECT_ID,
-      DEMO_PROJECT_USER_ID: process.env.DEMO_PROJECT_USER_ID,
-      DEMO_PROJECT_SLUG: process.env.DEMO_PROJECT_SLUG,
-      USE_AWS_SES: process.env.USE_AWS_SES,
-      AWS_REGION: process.env.AWS_REGION,
-      EMAIL_DEFAULT_FROM: process.env.EMAIL_DEFAULT_FROM,
-      EMAIL_PROVIDER: process.env.EMAIL_PROVIDER,
-      AWS_SES_ENDPOINT: process.env.AWS_SES_ENDPOINT,
-      SMTP_URL: process.env.SMTP_URL,
-      SMTP_HOST: process.env.SMTP_HOST,
-      SMTP_PORT: process.env.SMTP_PORT,
-      SMTP_USER: process.env.SMTP_USER,
-      SMTP_PASSWORD: process.env.SMTP_PASSWORD,
-      SMTP_SECURE: process.env.SMTP_SECURE,
-      RESEND_API_KEY: process.env.RESEND_API_KEY,
-      S3_KEY_SALT: process.env.S3_KEY_SALT,
+        source.TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE,
+      DEMO_PROJECT_ID: source.DEMO_PROJECT_ID,
+      DEMO_PROJECT_USER_ID: source.DEMO_PROJECT_USER_ID,
+      DEMO_PROJECT_SLUG: source.DEMO_PROJECT_SLUG,
+      USE_AWS_SES: source.USE_AWS_SES,
+      AWS_REGION: source.AWS_REGION,
+      EMAIL_DEFAULT_FROM: source.EMAIL_DEFAULT_FROM,
+      EMAIL_PROVIDER: source.EMAIL_PROVIDER,
+      AWS_SES_ENDPOINT: source.AWS_SES_ENDPOINT,
+      SMTP_URL: source.SMTP_URL,
+      SMTP_HOST: source.SMTP_HOST,
+      SMTP_PORT: source.SMTP_PORT,
+      SMTP_USER: source.SMTP_USER,
+      SMTP_PASSWORD: source.SMTP_PASSWORD,
+      SMTP_SECURE: source.SMTP_SECURE,
+      RESEND_API_KEY: source.RESEND_API_KEY,
+      S3_KEY_SALT: source.S3_KEY_SALT,
       IS_SAAS:
-        process.env.IS_SAAS === "1" ||
-        process.env.IS_SAAS?.toLowerCase() === "true",
+        source.IS_SAAS === "1" ||
+        source.IS_SAAS?.toLowerCase() === "true",
       // Blank means unset, so a templated .env line with no value cannot take
       // the whole deployment down over an optional credential.
       LANGWATCH_INSTANCE_ADMIN_API_KEY:
-        process.env.LANGWATCH_INSTANCE_ADMIN_API_KEY || undefined,
+        source.LANGWATCH_INSTANCE_ADMIN_API_KEY || undefined,
       RUM_ENABLED:
-        process.env.RUM_ENABLED === "1" ||
-        process.env.RUM_ENABLED?.toLowerCase() === "true",
-      RUM_SAMPLE_RATIO: process.env.RUM_SAMPLE_RATIO,
+        source.RUM_ENABLED === "1" ||
+        source.RUM_ENABLED?.toLowerCase() === "true",
+      RUM_SAMPLE_RATIO: source.RUM_SAMPLE_RATIO,
       BLOCK_LOCAL_HTTP_CALLS:
-        process.env.BLOCK_LOCAL_HTTP_CALLS === "1" ||
-        process.env.BLOCK_LOCAL_HTTP_CALLS?.toLowerCase() === "true",
-      ALLOWED_PROXY_HOSTS: process.env.ALLOWED_PROXY_HOSTS,
-      SHOW_OPS_IN_MAIN_SIDEBAR: process.env.SHOW_OPS_IN_MAIN_SIDEBAR,
+        source.BLOCK_LOCAL_HTTP_CALLS === "1" ||
+        source.BLOCK_LOCAL_HTTP_CALLS?.toLowerCase() === "true",
+      ALLOWED_PROXY_HOSTS: source.ALLOWED_PROXY_HOSTS,
+      SHOW_OPS_IN_MAIN_SIDEBAR: source.SHOW_OPS_IN_MAIN_SIDEBAR,
+      DISABLE_TOKENIZATION:
+        source.DISABLE_TOKENIZATION === "1" ||
+        source.DISABLE_TOKENIZATION?.toLowerCase() === "true",
       LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD:
-        process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD,
-      LANGWATCH_DISPATCH_TENANT_CAP: process.env.LANGWATCH_DISPATCH_TENANT_CAP,
+        source.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD,
+      LANGWATCH_DISPATCH_TENANT_CAP: source.LANGWATCH_DISPATCH_TENANT_CAP,
       LANGWATCH_DISPATCH_GLOBAL_BUDGET:
-        process.env.LANGWATCH_DISPATCH_GLOBAL_BUDGET,
+        source.LANGWATCH_DISPATCH_GLOBAL_BUDGET,
       USE_S3_STORAGE:
-        process.env.USE_S3_STORAGE === "1" ||
-        process.env.USE_S3_STORAGE?.toLowerCase() === "true",
-      S3_ENDPOINT: process.env.S3_ENDPOINT,
-      S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID,
-      S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY,
-      S3_SESSION_TOKEN: process.env.S3_SESSION_TOKEN,
-      S3_REGION: process.env.S3_REGION,
-      S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
-      LANGWATCH_LOCAL_STORAGE_PATH: process.env.LANGWATCH_LOCAL_STORAGE_PATH,
-      STORED_OBJECTS_BACKEND: process.env.STORED_OBJECTS_BACKEND,
-      AZURE_BLOB_ACCOUNT_NAME: process.env.AZURE_BLOB_ACCOUNT_NAME,
-      AZURE_BLOB_ACCOUNT_KEY: process.env.AZURE_BLOB_ACCOUNT_KEY,
-      AZURE_BLOB_ENDPOINT: process.env.AZURE_BLOB_ENDPOINT,
-      AZURE_BLOB_CONTAINER: process.env.AZURE_BLOB_CONTAINER,
-      AZURE_BLOB_AUTH_MODE: process.env.AZURE_BLOB_AUTH_MODE,
-      AZURE_BLOB_AUTHORITY_HOST: process.env.AZURE_BLOB_AUTHORITY_HOST,
-      AZURE_BLOB_TOKEN_AUDIENCE: process.env.AZURE_BLOB_TOKEN_AUDIENCE,
+        source.USE_S3_STORAGE === "1" ||
+        source.USE_S3_STORAGE?.toLowerCase() === "true",
+      S3_ENDPOINT: source.S3_ENDPOINT,
+      S3_ACCESS_KEY_ID: source.S3_ACCESS_KEY_ID,
+      S3_SECRET_ACCESS_KEY: source.S3_SECRET_ACCESS_KEY,
+      S3_SESSION_TOKEN: source.S3_SESSION_TOKEN,
+      S3_REGION: source.S3_REGION,
+      S3_BUCKET_NAME: source.S3_BUCKET_NAME,
+      LANGWATCH_LOCAL_STORAGE_PATH: source.LANGWATCH_LOCAL_STORAGE_PATH,
+      STORED_OBJECTS_BACKEND: source.STORED_OBJECTS_BACKEND,
+      AZURE_BLOB_ACCOUNT_NAME: source.AZURE_BLOB_ACCOUNT_NAME,
+      AZURE_BLOB_ACCOUNT_KEY: source.AZURE_BLOB_ACCOUNT_KEY,
+      AZURE_BLOB_ENDPOINT: source.AZURE_BLOB_ENDPOINT,
+      AZURE_BLOB_CONTAINER: source.AZURE_BLOB_CONTAINER,
+      AZURE_BLOB_AUTH_MODE: source.AZURE_BLOB_AUTH_MODE,
+      AZURE_BLOB_AUTHORITY_HOST: source.AZURE_BLOB_AUTHORITY_HOST,
+      AZURE_BLOB_TOKEN_AUDIENCE: source.AZURE_BLOB_TOKEN_AUDIENCE,
       AZURE_BLOB_SPOOL_RETENTION_CONFIRMED:
-        process.env.AZURE_BLOB_SPOOL_RETENTION_CONFIRMED === "1" ||
-        process.env.AZURE_BLOB_SPOOL_RETENTION_CONFIRMED?.toLowerCase() ===
+        source.AZURE_BLOB_SPOOL_RETENTION_CONFIRMED === "1" ||
+        source.AZURE_BLOB_SPOOL_RETENTION_CONFIRMED?.toLowerCase() ===
           "true",
       DATASET_STORAGE_LOCAL:
-        process.env.DATASET_STORAGE_LOCAL === "1" ||
-        process.env.DATASET_STORAGE_LOCAL?.toLowerCase() === "true",
-      CREDENTIALS_SECRET: process.env.CREDENTIALS_SECRET,
-      AZURE_AD_CLIENT_ID: process.env.AZURE_AD_CLIENT_ID,
-      AZURE_AD_CLIENT_SECRET: process.env.AZURE_AD_CLIENT_SECRET,
-      AZURE_AD_TENANT_ID: process.env.AZURE_AD_TENANT_ID,
-      COGNITO_CLIENT_ID: process.env.COGNITO_CLIENT_ID,
-      COGNITO_ISSUER: process.env.COGNITO_ISSUER,
-      COGNITO_CLIENT_SECRET: process.env.COGNITO_CLIENT_SECRET,
-      POSTHOG_KEY: process.env.POSTHOG_KEY,
-      POSTHOG_HOST: process.env.POSTHOG_HOST,
-      POSTHOG_FEATURE_FLAGS_KEY: process.env.POSTHOG_FEATURE_FLAGS_KEY,
+        source.DATASET_STORAGE_LOCAL === "1" ||
+        source.DATASET_STORAGE_LOCAL?.toLowerCase() === "true",
+      CREDENTIALS_SECRET: source.CREDENTIALS_SECRET,
+      AZURE_AD_CLIENT_ID: source.AZURE_AD_CLIENT_ID,
+      AZURE_AD_CLIENT_SECRET: source.AZURE_AD_CLIENT_SECRET,
+      AZURE_AD_TENANT_ID: source.AZURE_AD_TENANT_ID,
+      COGNITO_CLIENT_ID: source.COGNITO_CLIENT_ID,
+      COGNITO_ISSUER: source.COGNITO_ISSUER,
+      COGNITO_CLIENT_SECRET: source.COGNITO_CLIENT_SECRET,
+      POSTHOG_KEY: source.POSTHOG_KEY,
+      POSTHOG_HOST: source.POSTHOG_HOST,
+      POSTHOG_FEATURE_FLAGS_KEY: source.POSTHOG_FEATURE_FLAGS_KEY,
       POSTHOG_FEATURE_FLAGS_POLLING_INTERVAL_MS:
-        process.env.POSTHOG_FEATURE_FLAGS_POLLING_INTERVAL_MS,
+        source.POSTHOG_FEATURE_FLAGS_POLLING_INTERVAL_MS,
       DISABLE_USAGE_STATS:
-        process.env.DISABLE_USAGE_STATS === "1" ||
-        process.env.DISABLE_USAGE_STATS?.toLowerCase() === "true",
-      LANGWATCH_NLP_LAMBDA_CONFIG: process.env.LANGWATCH_NLP_LAMBDA_CONFIG,
-      GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
-      GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
-      GITHUB_LANGY_APP_ID: process.env.GITHUB_LANGY_APP_ID,
-      GITHUB_LANGY_PRIVATE_KEY: process.env.GITHUB_LANGY_PRIVATE_KEY,
-      GITHUB_LANGY_WEBHOOK_SECRET: process.env.GITHUB_LANGY_WEBHOOK_SECRET,
-      GITHUB_LANGY_APP_SLUG: process.env.GITHUB_LANGY_APP_SLUG,
-      GITHUB_LANGY_HOST: process.env.GITHUB_LANGY_HOST,
-      GITLAB_CLIENT_ID: process.env.GITLAB_CLIENT_ID,
-      GITLAB_CLIENT_SECRET: process.env.GITLAB_CLIENT_SECRET,
-      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
-      GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
-      OKTA_CLIENT_ID: process.env.OKTA_CLIENT_ID,
-      OKTA_CLIENT_SECRET: process.env.OKTA_CLIENT_SECRET,
-      OKTA_ISSUER: process.env.OKTA_ISSUER,
-      ONELOGIN_CLIENT_ID: process.env.ONELOGIN_CLIENT_ID,
-      ONELOGIN_CLIENT_SECRET: process.env.ONELOGIN_CLIENT_SECRET,
-      ONELOGIN_ISSUER: process.env.ONELOGIN_ISSUER,
-      OIDC_CLIENT_ID: process.env.OIDC_CLIENT_ID,
-      OIDC_CLIENT_SECRET: process.env.OIDC_CLIENT_SECRET,
-      OIDC_ISSUER: process.env.OIDC_ISSUER,
-      OTEL_EXPORTER_OTLP_ENDPOINT: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
-      CLICKHOUSE_CLUSTER: process.env.CLICKHOUSE_CLUSTER,
-      LANGWATCH_LICENSE_PUBLIC_KEY: process.env.LANGWATCH_LICENSE_PUBLIC_KEY,
-      LANGWATCH_LICENSE_PRIVATE_KEY: process.env.LANGWATCH_LICENSE_PRIVATE_KEY,
-      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
-      STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+        source.DISABLE_USAGE_STATS === "1" ||
+        source.DISABLE_USAGE_STATS?.toLowerCase() === "true",
+      LANGWATCH_NLP_LAMBDA_CONFIG: source.LANGWATCH_NLP_LAMBDA_CONFIG,
+      GITHUB_CLIENT_ID: source.GITHUB_CLIENT_ID,
+      GITHUB_CLIENT_SECRET: source.GITHUB_CLIENT_SECRET,
+      GITHUB_LANGY_APP_ID: source.GITHUB_LANGY_APP_ID,
+      GITHUB_LANGY_PRIVATE_KEY: source.GITHUB_LANGY_PRIVATE_KEY,
+      GITHUB_LANGY_WEBHOOK_SECRET: source.GITHUB_LANGY_WEBHOOK_SECRET,
+      GITHUB_LANGY_APP_SLUG: source.GITHUB_LANGY_APP_SLUG,
+      GITHUB_LANGY_HOST: source.GITHUB_LANGY_HOST,
+      GITLAB_CLIENT_ID: source.GITLAB_CLIENT_ID,
+      GITLAB_CLIENT_SECRET: source.GITLAB_CLIENT_SECRET,
+      GOOGLE_CLIENT_ID: source.GOOGLE_CLIENT_ID,
+      GOOGLE_CLIENT_SECRET: source.GOOGLE_CLIENT_SECRET,
+      OKTA_CLIENT_ID: source.OKTA_CLIENT_ID,
+      OKTA_CLIENT_SECRET: source.OKTA_CLIENT_SECRET,
+      OKTA_ISSUER: source.OKTA_ISSUER,
+      ONELOGIN_CLIENT_ID: source.ONELOGIN_CLIENT_ID,
+      ONELOGIN_CLIENT_SECRET: source.ONELOGIN_CLIENT_SECRET,
+      ONELOGIN_ISSUER: source.ONELOGIN_ISSUER,
+      OIDC_CLIENT_ID: source.OIDC_CLIENT_ID,
+      OIDC_CLIENT_SECRET: source.OIDC_CLIENT_SECRET,
+      OIDC_ISSUER: source.OIDC_ISSUER,
+      OTEL_EXPORTER_OTLP_ENDPOINT: source.OTEL_EXPORTER_OTLP_ENDPOINT,
+      CLICKHOUSE_CLUSTER: source.CLICKHOUSE_CLUSTER,
+      LANGWATCH_LICENSE_PUBLIC_KEY: source.LANGWATCH_LICENSE_PUBLIC_KEY,
+      LANGWATCH_LICENSE_PRIVATE_KEY: source.LANGWATCH_LICENSE_PRIVATE_KEY,
+      STRIPE_SECRET_KEY: source.STRIPE_SECRET_KEY,
+      STRIPE_WEBHOOK_SECRET: source.STRIPE_WEBHOOK_SECRET,
       STRIPE_LICENSE_PAYMENT_LINK_ID:
-        process.env.STRIPE_LICENSE_PAYMENT_LINK_ID,
+        source.STRIPE_LICENSE_PAYMENT_LINK_ID,
       STRIPE_LICENSE_PAYMENT_LINK_URL:
-        process.env.STRIPE_LICENSE_PAYMENT_LINK_URL,
-      ADMIN_EMAILS: process.env.ADMIN_EMAILS,
-      HUBSPOT_PORTAL_ID: process.env.HUBSPOT_PORTAL_ID,
-      HUBSPOT_REACHED_LIMIT_FORM_ID: process.env.HUBSPOT_REACHED_LIMIT_FORM_ID,
-      HUBSPOT_FORM_ID: process.env.HUBSPOT_FORM_ID,
-      CUSTOMER_IO_API_KEY: process.env.CUSTOMER_IO_API_KEY,
-      CUSTOMER_IO_REGION: process.env.CUSTOMER_IO_REGION,
-      SLACK_PLAN_LIMIT_CHANNEL: process.env.SLACK_PLAN_LIMIT_CHANNEL,
-      SLACK_BUG_REPORTS_BOT_TOKEN: process.env.SLACK_BUG_REPORTS_BOT_TOKEN,
-      SLACK_BUG_REPORTS_CHANNEL: process.env.SLACK_BUG_REPORTS_CHANNEL,
-      SLACK_CHANNEL_SIGNUPS: process.env.SLACK_CHANNEL_SIGNUPS,
-      SLACK_CHANNEL_SUBSCRIPTIONS: process.env.SLACK_CHANNEL_SUBSCRIPTIONS,
-      AUTH0_SCIM_WEBHOOK_SECRET: process.env.AUTH0_SCIM_WEBHOOK_SECRET,
+        source.STRIPE_LICENSE_PAYMENT_LINK_URL,
+      ADMIN_EMAILS: source.ADMIN_EMAILS,
+      HUBSPOT_PORTAL_ID: source.HUBSPOT_PORTAL_ID,
+      HUBSPOT_REACHED_LIMIT_FORM_ID: source.HUBSPOT_REACHED_LIMIT_FORM_ID,
+      HUBSPOT_FORM_ID: source.HUBSPOT_FORM_ID,
+      CUSTOMER_IO_API_KEY: source.CUSTOMER_IO_API_KEY,
+      CUSTOMER_IO_REGION: source.CUSTOMER_IO_REGION,
+      SLACK_PLAN_LIMIT_CHANNEL: source.SLACK_PLAN_LIMIT_CHANNEL,
+      SLACK_BUG_REPORTS_BOT_TOKEN: source.SLACK_BUG_REPORTS_BOT_TOKEN,
+      SLACK_BUG_REPORTS_CHANNEL: source.SLACK_BUG_REPORTS_CHANNEL,
+      SLACK_CHANNEL_SIGNUPS: source.SLACK_CHANNEL_SIGNUPS,
+      SLACK_CHANNEL_SUBSCRIPTIONS: source.SLACK_CHANNEL_SUBSCRIPTIONS,
+      AUTH0_SCIM_WEBHOOK_SECRET: source.AUTH0_SCIM_WEBHOOK_SECRET,
     },
     /**
      * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.
      * This is especially useful for Docker builds.
      */
-    skipValidation: !!process.env.SKIP_ENV_VALIDATION,
+    skipValidation: !!source.SKIP_ENV_VALIDATION,
   });
 
   // Server-side only: the validated env proxy from `createEnv()` throws
   // "Attempted to access a server-side environment variable on the client"
   // if we touch any of these keys from the browser bundle. Read from
-  // process.env directly and skip the guard entirely when we're being
+  // source directly and skip the guard entirely when we're being
   // imported into a client bundle (typeof window !== "undefined").
   if (
     typeof window === "undefined" &&
-    !process.env.SKIP_ENV_VALIDATION &&
-    !process.env.BUILD_TIME
+    !source.SKIP_ENV_VALIDATION &&
+    !source.BUILD_TIME
   ) {
     if (
-      (process.env.IS_SAAS === "1" ||
-        process.env.IS_SAAS?.toLowerCase() === "true") &&
+      (source.IS_SAAS === "1" ||
+        source.IS_SAAS?.toLowerCase() === "true") &&
       !(
-        process.env.BLOCK_LOCAL_HTTP_CALLS === "1" ||
-        process.env.BLOCK_LOCAL_HTTP_CALLS?.toLowerCase() === "true"
+        source.BLOCK_LOCAL_HTTP_CALLS === "1" ||
+        source.BLOCK_LOCAL_HTTP_CALLS?.toLowerCase() === "true"
       )
     ) {
       throw new Error(
         "IS_SAAS=true requires BLOCK_LOCAL_HTTP_CALLS=true to keep SSRF protections enabled",
       );
     }
-    assertGatewaySecretsAllOrNone(process.env);
+    assertGatewaySecretsAllOrNone(source);
   }
 
-  return _env;
+  return environment;
 }
 
 /**
@@ -785,10 +786,8 @@ export function createEnvConfig() {
  * surfaces minutes after startup when the first VK request hits
  * /api/internal/gateway/* and returns 503 auth_upstream_unavailable.
  *
- * Lives here instead of in start.ts so workers, CLI scripts, and every
- * other code path that imports env gets the same assertion at boot
- * (start.ts already ran this pre-a50e5266f; moving it here covers
- * workers.ts which otherwise boots through only verifyRedisReady).
+ * Lives in the shared resolver so each executable gets the same assertion
+ * when it explicitly initializes its selected source.
  *
  * @param {Record<string, unknown>} env
  */

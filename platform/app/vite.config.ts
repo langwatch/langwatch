@@ -8,6 +8,12 @@ import { shikiManualChunk } from "./src/features/traces-v2/components/TraceDrawe
 import { havenHmrGate } from "./vite/havenHmrGate";
 import { ASSET_URL_GLOBAL } from "./src/server/asset-base";
 import { ROOT_DISCOVERY_PROXY_PATTERN } from "./src/server/openapi/discovery-locations";
+import { createEnvConfig } from "./src/env-create.mjs";
+import {
+  injectPublicAppConfigIntoHtml,
+  type PublicAppConfig,
+} from "./src/runtime/public-config";
+import { PublicAppConfigService } from "./src/runtime/public-config.server";
 
 // Load `.env` into the Vite config's process environment. Vite normally
 // only exposes `VITE_*` vars to client code — but this config itself
@@ -135,8 +141,27 @@ function patchObjectInspectBrowserStub(): Plugin {
   };
 }
 
-export default defineConfig(async (): Promise<UserConfig> => {
+/**
+ * Production receives public configuration from the Node static handler. In
+ * development Vite owns the HTML shell, so it performs the same explicit boot
+ * mapping during its own executable config phase.
+ */
+function injectDevelopmentPublicConfig(config: PublicAppConfig): Plugin {
+  return {
+    name: "inject-development-public-config",
+    apply: "serve",
+    transformIndexHtml(html) {
+      return injectPublicAppConfigIntoHtml({ html, config });
+    },
+  };
+}
+
+export default defineConfig(async ({ command }): Promise<UserConfig> => {
   const devHttpsCredentials = await loadDevHttpsCredentials();
+  const publicConfig =
+    command === "serve"
+      ? new PublicAppConfigService().resolve(createEnvConfig(process.env))
+      : undefined;
 
   // Diagnostic: when Vite hot-restarts on a config change, the https block is
   // re-evaluated but in-process TLS state can land in a broken pair (server
@@ -154,7 +179,12 @@ export default defineConfig(async (): Promise<UserConfig> => {
   }
 
   return {
-  plugins: [react(), patchObjectInspectBrowserStub(), havenHmrGate()],
+  plugins: [
+    react(),
+    patchObjectInspectBrowserStub(),
+    ...(publicConfig ? [injectDevelopmentPublicConfig(publicConfig)] : []),
+    havenHmrGate(),
+  ],
   resolve: {
     alias: {
       // The generated Prisma client's `client.ts` entry hard-imports the node

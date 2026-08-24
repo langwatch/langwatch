@@ -116,6 +116,15 @@ Feature: App and worker runtime encapsulation
     And each feature receives only its narrow typed configuration
     And feature packages do not read process.env, import.meta.env or the app env module
 
+  @unit @environment
+  Scenario: Importing application configuration has no validation side effect
+    Given an executable has not started its boot path
+    When application environment and configuration modules are imported
+    Then no environment source is read or validated
+    And reading the transitional environment bridge refuses with a boot-boundary error
+    When executable boot initializes the bridge from its selected source
+    Then legacy readers observe that validated configuration without validating it again
+
   @architecture @environment
   Scenario: JavaScript runtimes share configuration mechanics but not one schema
     Given the app, worker, and standalone services have different configuration requirements
@@ -124,10 +133,12 @@ Feature: App and worker runtime encapsulation
     And no runtime is forced to declare another runtime's settings
     And no shared object grants features access to every environment value
 
-  @integration @rpc @environment
-  Scenario: Browser runtime configuration is semantic and allowlisted
+  @integration @environment
+  Scenario: Browser runtime configuration is semantic and embedded at page load
     Given the browser needs non-secret deployment configuration
-    When it calls the public runtime configuration RPC
-    Then the response contains only contract-defined semantic fields
+    When the app or development UI runtime serves the HTML shell
+    Then the shell embeds only contract-defined semantic fields as inert data
     And it exposes no secret or raw environment-variable name
-    And caller-specific capabilities are resolved by a separate authenticated query
+    And the browser renders without a configuration request
+    And caller-specific capabilities are resolved by a separate viewer query
+    And an anonymous authentication capability query exposes only the sign-in mode

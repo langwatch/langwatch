@@ -1,4 +1,4 @@
-import { createEnvConfig } from "../../env-create.mjs";
+import { getEnvironmentConfig } from "../../env.mjs";
 
 export type ProcessRole = "web" | "worker" | "migration" | "all";
 
@@ -78,13 +78,16 @@ export interface AppConfig {
 
   // Tokenization
   disableTokenization?: boolean;
+
+  // Viewer presentation policy resolved once at process composition.
+  opsSidebarEmails?: readonly string[];
 }
 
-/** Reads config from createEnvConfig() — the ONE place that owns the schema. */
+/** Maps the environment explicitly validated by executable boot. */
 export function createAppConfigFromEnv(overrides?: {
   processRole?: ProcessRole;
 }): AppConfig {
-  const env = createEnvConfig();
+  const env = getEnvironmentConfig();
 
   return {
     nodeEnv: env.NODE_ENV,
@@ -106,6 +109,9 @@ export function createAppConfigFromEnv(overrides?: {
     processRole: overrides?.processRole,
     isSaas: env.IS_SAAS,
     skipRedis: env.SKIP_REDIS,
-    disableTokenization: process.env.DISABLE_TOKENIZATION === "true",
+    disableTokenization: env.DISABLE_TOKENIZATION,
+    opsSidebarEmails: env.SHOW_OPS_IN_MAIN_SIDEBAR?.split(",")
+      .map((email: string) => email.trim().toLowerCase())
+      .filter(Boolean),
   };
 }

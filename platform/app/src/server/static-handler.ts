@@ -3,6 +3,10 @@ import type { ServerResponse } from "http";
 import path from "path";
 
 import { getAssetBase, injectAssetBaseIntoHtml } from "./asset-base";
+import {
+  injectPublicAppConfigIntoHtml,
+  type PublicAppConfig,
+} from "../runtime/public-config";
 
 const MIME_TYPES: Record<string, string> = {
   ".js": "application/javascript",
@@ -35,9 +39,9 @@ const HTML_REVALIDATE_CACHE = "no-cache";
  * how to 404).
  *
  * The HTML shell (the SPA fallback and any `.html` request) is read and
- * transformed to inject the runtime asset base (see src/server/asset-base.ts and
- * ADR-086), so it cannot be streamed raw like other static files. Everything
- * else is streamed straight off disk.
+ * transformed to inject the runtime asset base and validated public boot
+ * configuration (ADR-086 and ADR-104), so it cannot be streamed raw like other
+ * static files. Everything else is streamed straight off disk.
  *
  * Why missing /assets/* returns 404 instead of falling through to index.html:
  * Vite hashes asset filenames per build, so chunk URLs from a previous deploy
@@ -51,10 +55,12 @@ export function serveStaticOrFallback({
   res,
   pathname,
   clientDistDir,
+  publicConfig,
 }: {
   res: ServerResponse;
   pathname: string;
   clientDistDir: string;
+  publicConfig: PublicAppConfig;
 }): boolean {
   const normalizedRelative = path.normalize(pathname.slice(1));
   if (
@@ -68,7 +74,7 @@ export function serveStaticOrFallback({
 
   const staticPath = path.join(clientDistDir, normalizedRelative);
   if (path.extname(staticPath) === ".html") {
-    if (tryServeHtml({ res, htmlPath: staticPath })) {
+    if (tryServeHtml({ res, htmlPath: staticPath, publicConfig })) {
       return true;
     }
   } else if (tryServeFile({ res, filePath: staticPath, pathname })) {
@@ -86,6 +92,7 @@ export function serveStaticOrFallback({
   return tryServeHtml({
     res,
     htmlPath: path.join(clientDistDir, "index.html"),
+    publicConfig,
   });
 }
 
@@ -128,17 +135,19 @@ function tryServeFile({
 }
 
 /**
- * Read an HTML shell, inject the runtime asset base, and send it with a
- * revalidate cache. Held open via fd (atomic, no TOCTOU) while read. Returns
- * false only when the file doesn't exist or isn't a regular file, so the SPA
- * fallback can decide how to 404.
+ * Read an HTML shell, inject the runtime asset base and public configuration,
+ * and send it with a revalidate cache. Held open via fd (atomic, no TOCTOU)
+ * while read. Returns false only when the file doesn't exist or isn't a regular
+ * file, so the SPA fallback can decide how to 404.
  */
 function tryServeHtml({
   res,
   htmlPath,
+  publicConfig,
 }: {
   res: ServerResponse;
   htmlPath: string;
+  publicConfig: PublicAppConfig;
 }): boolean {
   let fd: number;
   try {
@@ -154,7 +163,16 @@ function tryServeHtml({
     const html = fs.readFileSync(fd, "utf8");
     res.setHeader("Content-Type", "text/html");
     res.setHeader("Cache-Control", HTML_REVALIDATE_CACHE);
-    res.end(injectAssetBaseIntoHtml({ html, base: getAssetBase() }));
+    const withAssetBase = injectAssetBaseIntoHtml({
+      html,
+      base: getAssetBase(),
+    });
+    res.end(
+      injectPublicAppConfigIntoHtml({
+        html: withAssetBase,
+        config: publicConfig,
+      }),
+    );
     return true;
   } finally {
     fs.closeSync(fd);

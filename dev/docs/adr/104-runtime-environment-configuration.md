@@ -152,20 +152,22 @@ Repository and infrastructure adapters may receive database, Redis,
 ClickHouse and provider connection settings from the runtime root. The adapter
 does not reach back into global configuration after construction.
 
-### The browser receives an allow-listed semantic runtime contract over RPC
+### The browser receives an allow-listed semantic contract in the HTML bootstrap
 
-There are no T3 client-side environment variables. The browser obtains
-deployment-time public configuration from an unauthenticated internal RPC
-query served by the app runtime. The output is validated by a dedicated,
-browser-safe schema and uses semantic property names rather than raw
+There are no T3 client-side environment variables. After boot validates the
+process configuration, the HTTP runtime derives a dedicated browser-safe value
+and injects it into the HTML shell as inert serialized data. The browser reads
+that value synchronously before rendering. The value is validated by a
+dedicated schema and uses semantic property names rather than raw
 environment-variable names:
 
 ```ts
 type PublicRuntimeConfig = {
   appBaseUrl: string;
-  gatewayBaseUrl?: string;
+  gatewayBaseUrl: string;
   deployment: "saas" | "self-hosted";
-  auth: { provider: "email" | "auth0" | "oidc" | "saml" };
+  mode: "development" | "test" | "production";
+  demoProjectSlug?: string;
   telemetry: {
     browserTracing: boolean;
     sampleRatio: number;
@@ -176,24 +178,30 @@ type PublicRuntimeConfig = {
     langevals: boolean;
     nlp: boolean;
   };
+  licensePaymentUrl?: string;
 };
 ```
 
-The procedure constructs this DTO field by field. It never spreads `env`, and
+The bootstrap resolver constructs this DTO field by field. It never spreads `env`, and
 adding a server variable does not expose it. Its declaration, tests and
 architecture checks reject secret-shaped fields and server-only imports. The
-client caches the response for the lifetime of the page because a running
-process's validated configuration is immutable; a restarted deployment causes
-a new page load and query.
+HTML serializer encodes the validated UTF-8 JSON as unpadded base64url in a
+`meta` element. Its alphabet cannot terminate the quoted attribute or create
+markup, and the browser decodes and validates the value again. It does not emit
+an executable inline script. A running process's validated configuration is
+immutable; a restarted deployment causes a new page load and bootstrap.
 
-The RPC is part of the product application's internal API, not the public
-OpenAPI surface. It is available before sign-in because authentication screens
-need it. A thin server-rendered bootstrap may use the same schema later to
-avoid the initial request, but it must produce exactly the same contract and
-must not introduce a second configuration source.
+The production server injects the value while serving `index.html`; the
+development UI server uses the same resolver and schema in its HTML transform.
+There is no public or internal deployment-configuration endpoint. Stable shell
+and feature UI can therefore render without waiting for a request, and
+production and development do not introduce different configuration sources.
+Authentication screens may still wait for their separately resolved sign-in
+capability because that value is license-dependent rather than configuration.
 
-Caller-specific UI decisions are returned by an authenticated viewer
-capabilities query. They are not fields in `PublicRuntimeConfig`, even when
+Caller-specific UI decisions are returned by a viewer-capabilities query (or,
+before sign-in, by the smallest anonymous capability query required to render
+authentication). They are not fields in `PublicRuntimeConfig`, even when
 their policy ultimately refers to an environment-defined allow-list. Feature
 web packages consume public runtime values or viewer capabilities through an
 injected client/provider; they do not import the app's tRPC router or an env
@@ -234,8 +242,8 @@ the composition root still supplies their input and chooses whether the service
 is installed.
 
 Returning public values from feature-specific endpoints would duplicate
-deployment configuration and create inconsistent caches. One app-level public
-runtime contract is the canonical source; feature APIs expose feature
+deployment configuration and create inconsistent caches. One app-level HTML
+bootstrap contract is the canonical source; feature APIs expose feature
 behaviour.
 
 ## Consequences
@@ -248,8 +256,8 @@ behaviour.
   deployments.
 - Every client-visible value requires an intentional schema and RPC change,
   making exposure reviewable.
-- Browser startup performs one cache-forever RPC unless the same contract is
-  supplied through a future server-rendered bootstrap.
+- Browser startup reads deployment configuration from the HTML it already
+  loads and performs no configuration request.
 - Mapping environment variables into typed runtime and feature configuration
   adds composition code, but removes parsing and global reads from the rest of
   the system.

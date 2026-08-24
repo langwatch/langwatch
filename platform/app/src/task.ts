@@ -1,17 +1,19 @@
-// Env files (.env + the .env.portless haven overlay) load as this import's
-// side effect, before any module that reads process.env at load time. Must
-// stay the first import: see src/env-load.ts.
-import "./env-load";
+// One-shot task executable boundary. Tasks intentionally do not use AppBoot:
+// most tasks have no application graph at all. They still load environment
+// sources explicitly before task modules that may construct one.
+void (async () => {
+  const { loadEnvironment } = await import("./env-load");
+  loadEnvironment();
 
-import { createLogger } from "@langwatch/observability";
-import { tryGetApp } from "./server/app-layer/app";
-import { TASKS } from "./tasks.generated";
+  const { initializeEnvironmentConfig } = await import("./env.mjs");
+  initializeEnvironmentConfig(process.env);
 
-const logger = createLogger("langwatch:task");
+  const { createLogger } = await import("@langwatch/observability");
+  const { tryGetApp } = await import("./server/app-layer/app");
+  const { TASKS } = await import("./tasks.generated");
+  const logger = createLogger("langwatch:task");
+  const args = process.argv.slice(2);
 
-const args = process.argv.slice(2);
-
-const runAsync = async () => {
   const taskName = args[0] ?? "";
   try {
     if (!taskName) {
@@ -19,8 +21,7 @@ const runAsync = async () => {
     }
     const load = TASKS[taskName];
     if (!load) {
-      // Inside the try so the finally below still disconnects Redis — a bare
-      // throw here used to leave the connection open and hang the process.
+      // Inside the try so the finally below still disconnects Redis.
       throw new Error(
         `Task "${taskName}" not found. Available tasks: ${Object.keys(TASKS)
           .sort()
@@ -30,18 +31,10 @@ const runAsync = async () => {
     logger.info({ taskName }, "running");
     const script = await load();
     await script.default(...args.slice(1));
-  } catch (e) {
-    logger.error({ error: e, taskName }, "failed");
-    throw e;
+  } catch (error) {
+    logger.error({ error, taskName }, "failed");
+    throw error;
   } finally {
-    // Only the tasks that initialize an App have anything open; closing it
-    // releases Redis along with everything else the task booted. `tryGetApp`,
-    // not `getApp`, because the question here is whether a task built one at
-    // all — and most do not.
-    // Caught, because a rejection raised from `finally` would replace the task
-    // error rethrown above — turning a diagnosable failure into a shutdown
-    // error about the wrong thing. Closing is best-effort; the process exits
-    // either way.
     try {
       await tryGetApp()?.close();
     } catch (closeError) {
@@ -51,11 +44,8 @@ const runAsync = async () => {
   }
 
   process.exit(0);
-};
-
-(async () => {
-  await runAsync();
-})().catch((err) => {
-  console.error(err);
-  throw err;
+})().catch((error: unknown) => {
+  const message = error instanceof Error ? error.stack ?? error.message : String(error);
+  process.stderr.write(`[langwatch:task] fatal task failure: ${message}\n`);
+  process.exit(1);
 });

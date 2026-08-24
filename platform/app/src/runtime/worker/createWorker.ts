@@ -23,7 +23,7 @@ export async function createWorker({
   ownsResources = true,
 }: {
   initializeLegacy: () => App;
-  startLegacy: () => Promise<WorkerHandle>;
+  startLegacy: (app: App) => Promise<WorkerHandle>;
   features?: readonly FeatureDefinition<Record<string, never>>[];
   resources?: ResourceScope;
   ownsResources?: boolean;
@@ -41,7 +41,7 @@ export async function createWorker({
     legacy,
     async start() {
       if (closed) throw new Error("Worker runtime is closed.");
-      handle ??= await startLegacy();
+      handle ??= await startLegacy(legacy);
     },
     async close() {
       if (closed) return;

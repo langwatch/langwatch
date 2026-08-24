@@ -22,6 +22,14 @@ vi.mock("~/env.mjs", () => ({
 
 vi.mock("~/runtime/app/features/sso", () => ({
   resolveAuthProvider: vi.fn(),
+  platformSSOAllowed: vi.fn(async () => false),
+  buildSocialProviders: vi.fn(() => ({})),
+  buildGenericOAuthConfigs: vi.fn(() => []),
+  ssoConfiguration: {
+    isSaas: false,
+    provider: "email",
+    baseUrl: "https://example.com",
+  },
 }));
 
 import { resolveAuthProvider } from "~/runtime/app/features/sso";
@@ -31,7 +39,12 @@ import { publicEnvRouter } from "../publicEnv";
 const testRouter = createTRPCRouter({ publicEnv: publicEnvRouter });
 
 const callPublicEnv = () => {
-  const ctx = createInnerTRPCContext({ session: null });
+  const ctx = createInnerTRPCContext({
+    session: null,
+    app: { config: { opsSidebarEmails: [] } } as unknown as Parameters<
+      typeof createInnerTRPCContext
+    >[0]["app"],
+  });
   return testRouter.createCaller(ctx).publicEnv({});
 };
 
@@ -43,7 +56,10 @@ describe("publicEnvRouter", () => {
       const result = await callPublicEnv();
 
       expect(resolveAuthProvider).toHaveBeenCalled();
-      expect(result.NEXTAUTH_PROVIDER).toBe("auth0");
+      expect(result).toEqual({
+        NEXTAUTH_PROVIDER: "auth0",
+        SHOW_OPS_IN_MAIN_SIDEBAR: false,
+      });
     });
   });
 

@@ -1,81 +1,94 @@
-// Env files (.env + the .env.portless haven overlay) load as this import's
-// side effect, BEFORE instrumentation and the app graph below evaluate — a
-// standalone workers lane must resolve the same hostnames, ports and
-// connection URLs as the app it serves, or the two halves of one stack
-// quietly talk to different infrastructure. Must stay the first import: see
-// src/env-load.ts for why inline dotenv.config() calls cannot do this.
-import "./env-load";
+// Worker executable boundary. Every runtime import that can reach the legacy
+// app graph is deferred until the selected environment source has loaded and
+// the narrow worker boot configuration has validated.
+void (async () => {
+  const { loadEnvironment } = await import("./env-load");
+  loadEnvironment();
 
-// OTel instrumentation MUST load before any module that creates spans —
-// without it the worker process has no registered tracer provider and every
-// getLangWatchTracer span becomes a non-recording no-op.
-// env-load stays first so instrumentation.node sees .env-provided config
-// (LANGWATCH_API_KEY, OTEL_EXPORTER_OTLP_ENDPOINT).
-import "./instrumentation.node";
-// Registers the Grafana trace-link builder with @langwatch/handled-error.
-import "./server/handled-error-wiring";
-import { setEnvironment } from "@langwatch/ksuid";
-import { createLogger } from "@langwatch/observability";
-import {
-  createWorker,
-  type WorkerRuntime,
-} from "./runtime/worker";
-import { SHUTDOWN_BUDGET } from "./server/shutdown/budget";
-import { installShutdownHandlers } from "./server/shutdown/runGracefulShutdown";
-import { startWorkers } from "./server/workers/startWorkers";
+  const { initializeEnvironmentConfig } = await import("./env.mjs");
+  initializeEnvironmentConfig(process.env);
 
-setEnvironment(process.env.ENVIRONMENT ?? "local");
+  const { AppBoot } = await import("./runtime/app/boot");
+  const { setEnvironment } = await import("@langwatch/ksuid");
+  const { createLogger } = await import("@langwatch/observability");
+  const { installShutdownHandlers } = await import(
+    "./server/shutdown/runGracefulShutdown"
+  );
+  const { SHUTDOWN_BUDGET } = await import("./server/shutdown/budget");
 
-// initializeWorkerApp loads the full app graph, which reads process.env at
-// module load — it must run AFTER setEnvironment() above. A static import
-// would hoist above that call and break env loading, so it's required here.
-const { initializeWorkerApp } = require("./server/app-layer/presets") as {
-  initializeWorkerApp: () => import("./server/app-layer/app").App;
-};
+  setEnvironment(process.env.ENVIRONMENT ?? "local");
 
-const logger = createLogger("langwatch:workers");
+  // OTel instrumentation MUST load before any module that creates spans.
+  await import("./instrumentation.node");
+  await import("./server/handled-error-wiring");
 
-logger.info("starting");
+  const logger = createLogger("langwatch:workers");
+  logger.info("starting");
 
-let workerRuntime: WorkerRuntime | undefined;
+  let booted:
+    | { close(): Promise<void> }
+    | undefined;
 
-installShutdownHandlers((signal) => ({
-  signal,
-  logger,
-  phases: [
-    {
-      name: "worker-runtime",
-      // App.close bounds the drain itself at appCloseMs; this leaves room on
-      // top for the transports to close. Deliberately BELOW the runner's
-      // watchdog (processDeadlineMs) — set equal to it, this bound could never
-      // fire first and would be decoration.
-      timeoutMs: SHUTDOWN_BUDGET.appCloseMs + 5_000,
-      run: async () => await workerRuntime?.close(),
+  installShutdownHandlers((signal) => ({
+    signal,
+    logger,
+    phases: [
+      {
+        name: "worker-runtime",
+        timeoutMs: SHUTDOWN_BUDGET.appCloseMs + 5_000,
+        run: async () => await booted?.close(),
+      },
+    ],
+  }));
+
+  const appBoot = new AppBoot({
+    compose: async (_config, resources) => {
+      // These imports are intentionally inside compose: config validation has
+      // completed before the legacy presets or worker transport evaluate.
+      const { createWorker } = await import("./runtime/worker");
+      const { startWorkers } = await import("./server/workers/startWorkers");
+      const { initializeWorkerApp } = (await import(
+        "./server/app-layer/presets"
+      )) as {
+        initializeWorkerApp: () => import("./server/app-layer/app").App;
+      };
+
+      const runtime = await createWorker({
+        initializeLegacy: initializeWorkerApp,
+        startLegacy: (app) =>
+          startWorkers({ shouldStartMetricsServer: true, app }),
+        resources,
+        ownsResources: false,
+      });
+
+      return {
+        start: () => runtime.start(),
+        close: () => runtime.close(),
+      };
     },
-  ],
-}));
+  });
 
-void createWorker({
-  initializeLegacy: initializeWorkerApp,
-  startLegacy: () => startWorkers({ shouldStartMetricsServer: true }),
-})
-  .then(async (runtime) => {
-    workerRuntime = runtime;
-    await runtime.start();
-  })
-  .catch((error) => {
+  try {
+    booted = await appBoot.boot(process.env);
+  } catch (error) {
     logger.error({ error }, "failed to start background workers");
+    throw error;
+  }
+
+  process.on("uncaughtException", (err) => {
+    logger.fatal({ error: err }, "uncaught exception detected");
     process.exit(1);
   });
 
-process.on("uncaughtException", (err) => {
-  logger.fatal({ error: err }, "uncaught exception detected");
+  process.on("unhandledRejection", (reason, promise) => {
+    logger.fatal(
+      { reason: reason instanceof Error ? reason : { value: reason }, promise },
+      "unhandled rejection detected",
+    );
+    process.exit(1);
+  });
+})().catch((error: unknown) => {
+  const message = error instanceof Error ? error.stack ?? error.message : String(error);
+  process.stderr.write(`[langwatch:workers] fatal boot failure: ${message}\n`);
   process.exit(1);
-});
-
-process.on("unhandledRejection", (reason, promise) => {
-  logger.fatal(
-    { reason: reason instanceof Error ? reason : { value: reason }, promise },
-    "unhandled rejection detected",
-  );
 });
