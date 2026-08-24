@@ -169,26 +169,51 @@ describe("outbox backlog drain under slow deliveries", () => {
       const result = await store.commit(commit(messages(1)));
       expect(result.outcome).toBe("committed");
 
+      // Two facts have to hold before the rival is allowed to run: the slow
+      // delivery holds the lease, and it is already past the lease-budget
+      // guard so it cannot be shed un-attempted. Waiting for its handler to be
+      // entered establishes both, because the guard runs before the handler
+      // does. Sleeping only hopes for both, and on a loaded runner the slow
+      // dispatcher can lease nothing at all or shed the message on the way to
+      // the handler, either of which reports an empty `fenced`.
+      let announceDeliveryStarted!: () => void;
+      const deliveryStarted = new Promise<void>((resolve) => {
+        announceDeliveryStarted = resolve;
+      });
       let releaseGate!: () => void;
       const gate = new Promise<void>((resolve) => {
         releaseGate = resolve;
       });
+      // Wide enough that the slow dispatcher cannot plausibly run out of lease
+      // budget between leasing and its handler. Nothing waits for this to
+      // expire: the lapse is produced by advancing the rival's clock.
+      const leaseDurationMs = 5_000;
       const slow = new OutboxDispatcherService({
         store,
         processNames: [processName],
-        leaseDurationMs: 100,
-        handlers: { "test.persist": () => gate },
+        leaseDurationMs,
+        handlers: {
+          "test.persist": () => {
+            announceDeliveryStarted();
+            return gate;
+          },
+        },
       });
       const fast = new OutboxDispatcherService({
         store,
         processNames: [processName],
-        leaseDurationMs: 100,
+        leaseDurationMs,
         handlers: { "test.persist": async () => undefined },
       });
 
       const slowRun = slow.runOnce({ now: Date.now() });
-      await sleep(150);
-      const fastReport = await fast.runOnce({ now: Date.now() });
+      await deliveryStarted;
+      // A lease is due again once `leasedUntil <= now`, and `now` is the
+      // caller's, so the rival sees a lapsed lease without the test sleeping
+      // through one.
+      const fastReport = await fast.runOnce({
+        now: Date.now() + leaseDurationMs + 1,
+      });
       expect(fastReport.dispatched).toEqual(["match-000"]);
 
       releaseGate();
