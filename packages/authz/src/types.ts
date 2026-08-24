@@ -103,8 +103,19 @@ export type CollectedGrants = {
   organizationId: string;
   /** Null for api-key principals and for users with no OrganizationUser row. */
   organizationRole: "ADMIN" | "MEMBER" | "EXTERNAL" | null;
-  /** True when an OrganizationUser row exists for a user principal. */
+  /**
+   * True when a user principal holds an ACTIVE OrganizationUser row. A row
+   * an admin disabled to free its seat is not one: see `membershipDisabled`.
+   */
   isOrgMember: boolean;
+  /**
+   * The membership row exists but an admin disabled it to stay within the
+   * licensed seat count, so it confers nothing (`isOrgMember` is false).
+   * Carried apart from `isOrgMember` for one reason: the denial can then
+   * tell the person their access was disabled - which they can act on -
+   * instead of telling a member they are not a member.
+   */
+  membershipDisabled: boolean;
   bindings: CollectedBinding[];
   /**
    * LEGACY-QUIRK(B): TeamUser rows, consulted only when `bindings` is empty
@@ -117,6 +128,7 @@ export type CollectedGrants = {
 
 export type AuthzDenialReason =
   | "no-membership"
+  | "membership-disabled"
   | "no-binding"
   | "lite-member-restricted"
   | "owner-ceiling";

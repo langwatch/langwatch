@@ -898,9 +898,9 @@ export class ExperimentRunService {
         },
       },
       async (span) => {
-        const experiment = await ExperimentService.create(
-          this.prisma,
-        ).findIdBySlug({
+        const experiment = await ExperimentService.create({
+          prisma: this.prisma,
+        }).findIdBySlug({
           projectId: params.projectId,
           slug: params.experimentSlug,
         });

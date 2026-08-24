@@ -99,9 +99,10 @@ describe("team.update", () => {
         count: organizationUserCount,
         // Current-org membership for the caller: the rbac resolver fails
         // closed without it.
-        findFirst: vi
-          .fn()
-          .mockResolvedValue({ role: OrganizationUserRole.ADMIN }),
+        findFirst: vi.fn().mockResolvedValue({
+          role: OrganizationUserRole.ADMIN,
+          disabledAt: null,
+        }),
       },
       groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
       roleBinding: {

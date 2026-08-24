@@ -151,6 +151,21 @@ Feature: Codex, the sign-in-with-OpenAI model provider
     Then the gateway drops the sampling options the codex backend refuses
     And the assist gets its title back instead of a failed request
 
+  # The codex backend keeps its own allowlist and answers 400 "Unsupported
+  # parameter" on anything outside it, before a token is generated. So the
+  # gateway keeps the body to what that backend accepts, rather than removing
+  # refused fields one at a time: a removal list costs one production outage
+  # per field, and it took two to learn it. Langy's worker sends both
+  # prompt_cache_retention and its own default max output tokens, so removing
+  # the first only uncovered the second, with the same dead card for the user.
+  @unit
+  Scenario: A codex request carries only what its backend accepts
+    Given a caller sends a Responses body with options the codex backend refuses
+    When the gateway forwards the call to the codex backend
+    Then the backend accepts the call and the user gets their answer
+    And what the user asked for is unchanged: the question, the tools and the reasoning all arrive
+    And an option we have not named is left out, so a caller adding one cannot fail their own call
+
   Scenario: Langy resolves its own feature key without breaking older setups
     Given Langy resolves its model through the langy.chat feature key
     When a project configured Langy before that key existed

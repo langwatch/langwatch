@@ -587,6 +587,18 @@ export type EvaluationsV3State = {
   // Metadata
   experimentId?: string;
   experimentSlug?: string;
+  /**
+   * The saved version this store loaded, echoed on every autosave so a
+   * concurrent writer turns the save into a 409 instead of a silent clobber.
+   * Not part of the persisted blob: it identifies the blob's revision.
+   */
+  workbenchVersion?: number;
+  /**
+   * Set when the server holds a newer version than this store and the
+   * workbench has unsaved edits, so reloading is the user's call. A clean
+   * workbench reloads silently and never sets this.
+   */
+  staleWorkbench?: { serverVersion: number; actorLabel?: string };
   name: string;
 
   // Multiple datasets with active selection
@@ -621,6 +633,10 @@ export type EvaluationsV3Actions = {
   setName: (name: string) => void;
   setExperimentId: (id: string) => void;
   setExperimentSlug: (slug: string) => void;
+  setWorkbenchVersion: (version: number | undefined) => void;
+  setStaleWorkbench: (
+    stale: { serverVersion: number; actorLabel?: string } | undefined,
+  ) => void;
 
   // Dataset management actions
   addDataset: (dataset: DatasetReference) => void;
@@ -670,8 +686,42 @@ export type EvaluationsV3Actions = {
 
   // Target actions
   addTarget: (target: TargetConfig) => void;
+  /**
+   * Copy a target, keeping its wiring: its own mappings and every evaluator's
+   * mappings for it. Returns the copy's id.
+   *
+   * `name` only lands for evaluator targets, the one kind that carries a name
+   * in workbench state; prompt, agent and workflow targets take their name from
+   * the entity they reference.
+   */
+  duplicateTarget: ({
+    targetId,
+    name,
+  }: {
+    targetId: string;
+    name?: string;
+  }) => string | undefined;
+  /**
+   * Run one transform-backed workbench action from `actions/manifest.ts`
+   * against the live store — the browser leg of the agent's UI-action channel
+   * (specs/langy/langy-ui-actions.feature). Parses the payload with the
+   * action's own schema, applies its transform in ONE `set` (one undo entry),
+   * and returns the transform's result. THROWS on an unknown or non-transform
+   * kind, an invalid payload, or a transform refusal — unlike the silent
+   * no-op UI actions, the caller here is a machine that needs the reason.
+   * Typed loosely because `types.ts` cannot import the manifest (its schemas
+   * import this file).
+   */
+  applyWorkbenchAction: (args: { kind: string; payload: unknown }) => unknown;
   updateTarget: (targetId: string, updates: Partial<TargetConfig>) => void;
   removeTarget: (targetId: string) => void;
+  /** Write a target's unsaved prompt draft, and the variables that came with it */
+  setTargetPrompt: (payload: {
+    targetId: string;
+    localPromptConfig: LocalPromptConfig;
+    inputs?: Field[];
+    outputs?: Field[];
+  }) => void;
   /** Set a mapping for a target input field for a specific dataset */
   setTargetMapping: (
     targetId: string,
@@ -820,6 +870,14 @@ export type TableMeta = {
   evaluatorsMap: Map<string, EvaluatorConfig>;
   openTargetEditor: (target: TargetConfig) => void;
   handleDuplicateTarget: (target: TargetConfig) => void;
+  /** Absent while the Langy UI-action channel is flagged off. */
+  handleOptimizeTarget?: ({
+    target,
+    name,
+  }: {
+    target: TargetConfig;
+    name: string;
+  }) => void;
   handleSwitchTarget: (target: TargetConfig) => void;
   handleRemoveTarget: (targetId: string) => void;
   handleAddEvaluator: () => void;

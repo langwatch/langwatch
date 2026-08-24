@@ -6,6 +6,7 @@ import { useCyclingVerb } from "~/features/traces-v2/components/ai/useCyclingVer
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import type { LangyThinkingTone } from "../logic/langyThinkingLine";
 import { langyThinkingLine } from "../logic/langyThinkingLine";
+import { useLangyStore } from "../stores/langyStore";
 import { langyThinkingShimmerStyles } from "./langyShimmer";
 import { LANGY_THINKING_VERBS } from "./langyThinkingVerbs";
 import { STATUS_LINE_ROW, StatusOrb } from "./StreamingStatusLine";
@@ -86,11 +87,17 @@ export function LangyThinkingLine({
     return () => clearInterval(id);
   }, []);
 
+  // What the page Langy is driving says it is doing. Subscribed, not read
+  // once: the report changes as rows come back, and the line is the only
+  // place that shows it.
+  const pageActivity = useLangyStore((state) => state.pageActivity);
+
   const line = langyThinkingLine({
     messages,
     elapsedMs,
     hasLiveReasoning,
     workerReady,
+    pageActivity,
   });
 
   // Whimsy ONLY where the truth signal permits it — i.e. the model is genuinely

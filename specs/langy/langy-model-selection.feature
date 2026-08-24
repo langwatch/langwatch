@@ -83,6 +83,17 @@ Feature: Langy runs on the model the project chose
     Then the composer's picker snaps to the newly resolved default without a reload
     And a model the user picked on purpose is never replaced
 
+  # "The user never picked" was read from the pill itself: an empty pick, or one
+  # equal to the resolved default. Accepting "make it the default" makes the
+  # pick EQUAL the default, so from that moment their choice reads as untouched,
+  # and the next default resolution or history landing puts the old model back
+  # in front of someone who had just chosen. The choice is tracked, not inferred.
+  @unit
+  Scenario: A pick that matches the default is still the user's pick
+    Given the user picks a model and accepts the offer to make it the default
+    When the defaults resolve again, or the conversation's history lands
+    Then the picker still holds the model they chose
+
   @unit
   Scenario: Picking a model offers to make it the default at the scope that holds it
     Given the Langy default is configured at a scope the user can manage

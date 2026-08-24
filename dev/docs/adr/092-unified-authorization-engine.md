@@ -1163,6 +1163,56 @@ deliberately out of scope.
   deliberate: this is the last rewrite of this flow, and correct beats
   expedient everywhere the two diverge.
 
+## Amendment 2026-08-24: a disabled membership is not a membership
+
+The membership gate reads `OrganizationUser`, and that row has carried a
+`disabledAt` column since seat reconciliation shipped: an admin over their
+licensed seats disables people to get back within them, and the row survives
+with its role, department and history so re-enabling restores everything
+(`specs/licensing/seat-reconciliation.feature`).
+
+Nothing on the authorization path read that column. The organization switcher
+filtered it, `getOrganizationWithMembers` filtered it, and the member list
+filtered it, so the organization vanished from a disabled person's UI — while
+`findOrganizationRole`, every binding fence, the API-key ceiling and the
+virtual-key membership set all read the row as if it were live. A disabled
+member kept every permission they had, reachable by direct URL, tRPC call or
+REST call. The legacy resolver had the same hole, so this is not a regression
+the engine introduced; it is one it inherited and now closes.
+
+**Decided.** Membership means ACTIVE membership, everywhere authorization asks:
+
+- The read port returns the row as a fact — `{ role, disabled }` — and the
+  collector applies the policy, setting `isOrgMember` false and
+  `organizationRole` null for a disabled row. Filtering in SQL would have made
+  a disabled membership indistinguishable from an absent one, and the denial
+  could then only have claimed the person was never here.
+- Binding reads keep filtering in SQL (`disabledAt: null` on the membership
+  fence), because those queries return grants and have no fact to hand back.
+- Denials say `membership-disabled`, not `no-membership`. We know the cause
+  and the person can act on it — an admin can return their seat — which is the
+  ADR-045 test for a named error rather than a generic one.
+- Disabling and re-enabling bump the organization's authz epoch. Disabling is
+  a plain column write, so nothing else retires the snapshots §12 caches, and
+  an admin's revocation must not wait out a cache.
+
+**Inventory reads are deliberately untouched.** The legacy-import migration
+still imports a disabled member's grants (they are preserved for re-enable),
+and the listing repositories still list them (an admin has to see somebody to
+re-enable them). Only reads that answer "may this principal act?" changed.
+
+**Consequence worth stating plainly:** the §9 owner ceiling means a disabled
+member's personal API keys stop working, because `effective(key) =
+grants(key) ∩ grants(owner)`. That is the point — a person cut off from an
+organization must not keep a live credential to it — but it reaches past their
+own session, so any automation running on their key stops with them. Service
+keys, which have no owner, are unaffected.
+
+**Write-side membership reads were left alone on purpose.**
+`assertUsersInOrganization` and `group.isUserInOrganization` still let a
+disabled user be *granted* access. That is inert: the grant confers nothing
+while the seat is off, and it is waiting for them when it comes back on.
+
 ## References
 
 - Supersedes: [ADR-001](./001-rbac.md) (its hierarchy + `resource:action` format live on).

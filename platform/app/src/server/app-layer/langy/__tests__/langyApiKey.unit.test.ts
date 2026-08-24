@@ -74,6 +74,8 @@ const ALL_CANDIDATES = [
   "workflows:create",
   "workflows:update",
   "experiments:view",
+  "experiments:create",
+  "experiments:update",
 ];
 
 beforeEach(() => {
@@ -355,12 +357,13 @@ describe("mintLangySessionApiKey", () => {
 
       // `experiments:view` is what `GET /api/experiments` asks for, and without
       // it `langwatch experiment list` — and `langwatch status`, which calls it
-      // — were refused a read every role in the project already holds. The
-      // family stops at the view because no route asks for anything finer:
-      // starting a run is gated by the evaluations family, and `:manage` is the
-      // only other action the family defines, which is the delete Langy must
-      // never hold.
-      it("reads the project's experiments but can never manage them", async () => {
+      // — were refused a read every role in the project already holds. The two
+      // write grains are the evaluations workbench, a document Langy edits on
+      // the user's behalf through the save seam. The family stops there:
+      // `:delete` and `:manage` (which implies delete) archive a user's
+      // evaluation, which Langy must never hold, and starting a run is gated by
+      // the evaluations family instead.
+      it("reads and edits the project's experiments but can never manage them", async () => {
         batchProjectPermissions.mockImplementation(
           (_ctx: unknown, args: { permissions: string[] }) =>
             Promise.resolve(args.permissions),
@@ -377,7 +380,11 @@ describe("mintLangySessionApiKey", () => {
         const experimentPermissions = (arg.permissions as string[]).filter(
           (p) => p.startsWith("experiments:"),
         );
-        expect(experimentPermissions).toEqual(["experiments:view"]);
+        expect(experimentPermissions).toEqual([
+          "experiments:view",
+          "experiments:create",
+          "experiments:update",
+        ]);
       });
 
       // Starting an experiment run creates a run row; it does not administer

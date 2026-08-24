@@ -35,7 +35,7 @@ export const batchRecordRouter = createTRPCRouter({
       const { projectId, experimentSlug } = input;
       const prisma = ctx.prisma;
 
-      const experiment = await ExperimentService.create(prisma).findBySlug({
+      const experiment = await ExperimentService.create({ prisma }).findBySlug({
         projectId,
         slug: experimentSlug,
       });

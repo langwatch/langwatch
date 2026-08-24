@@ -31,6 +31,7 @@ export {
 export type {
   AuthzReadRepository,
   CustomRolePermissionsRow,
+  OrganizationMembership,
   OrganizationRole,
   ScopeLineageRepository,
   ShareLinkRow,
@@ -64,6 +65,7 @@ export { GrantsService } from "./grants.service";
 export type {
   AuthzAuditWriter,
   AuthzEpochBumper,
+  GrantActor,
   GrantPrincipal,
   GrantRole,
   GrantsServiceDeps,

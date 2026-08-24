@@ -44,11 +44,13 @@ const organizationUsers = [
     userId: "user_member_of_project_a",
     organizationId: "org_a",
     role: "MEMBER",
+    disabledAt: null,
   },
   {
     userId: "user_other_project_admin",
     organizationId: "org_a",
     role: "MEMBER",
+    disabledAt: null,
   },
   { userId: "user_other_org_admin", organizationId: "org_b", role: "ADMIN" },
 ];

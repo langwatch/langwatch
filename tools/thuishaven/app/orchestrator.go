@@ -2,8 +2,11 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -153,7 +156,10 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	if err != nil {
 		return domain.Stack{}, nil, err
 	}
-	scheme, pport := o.proxy.Endpoint()
+	// Endpoint just reads portless's own local state files (proxy.port/proxy.tls);
+	// it never invokes the binary, so it is always safe to call, even under
+	// PORTLESS=0 with no proxy installed.
+	proxyScheme, proxyPort := o.proxy.Endpoint()
 	// ports[0..nSvc-1] back the routed services (app/gateway/nlp/langyagent, in
 	// PerWorktreeServices order); ports[nSvc] is the API backend behind app's /api,
 	// ports[nSvc+1] the worker metrics endpoint.
@@ -178,12 +184,12 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		LangyTier:            opts.LangyTier,
 		LangyImage:           opts.langyImageTag,
 		DisableGoogleDLP:     o.cfg.ShouldDisableGoogleDLP,
+		PortlessDisabled:     o.cfg.PortlessDisabled,
 	}
 	for i, r := range domain.PerWorktreeServices {
 		svc := domain.Service{
 			Name: r.Name, Role: r.Role, Port: ports[i],
 			Hostname: o.cfg.Naming.Hostname(r.Name, slug),
-			URL:      o.cfg.Naming.URL(r.Name, slug, scheme, pport),
 		}
 		// A service this worktree opts out of (gateway/nlp/langyagent) resolves to a
 		// live baseline stack's copy when one exists, so its URL stays defined. With
@@ -198,8 +204,17 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 				svc.Port = 0
 			}
 		}
+		// Portless enabled: the proxy routes every service through one shared
+		// scheme+port by hostname, so the URL is defined even for a dead route (a
+		// 502, by design — see above). Disabled: each service is reached directly
+		// on its own loopback port; a genuinely unavailable one has no port to
+		// reach it on, so it gets no URL either.
+		if !o.cfg.PortlessDisabled || svc.Port != 0 {
+			scheme, port := o.serviceEndpoint(proxyScheme, proxyPort, svc.Port)
+			svc.URL = o.cfg.Naming.URL(r.Name, slug, scheme, port)
+		}
 		st.Services = append(st.Services, svc)
-		if svc.Port != 0 {
+		if svc.Port != 0 && !o.cfg.PortlessDisabled {
 			if err := o.proxy.Register(svc.Name, slug, svc.Port); err != nil {
 				o.log.Warn("alias registration failed", zap.String("host", svc.Hostname), zap.Error(err))
 			}
@@ -219,8 +234,10 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		return domain.Stack{}, nil, err
 	}
 	cleanup := func() {
-		for _, s := range st.Services {
-			o.proxy.Remove(s.Name, slug)
+		if !o.cfg.PortlessDisabled {
+			for _, s := range st.Services {
+				o.proxy.Remove(s.Name, slug)
+			}
 		}
 		o.store.RemoveStack(slug)
 	}
@@ -257,18 +274,114 @@ func (o *Orchestrator) heartbeat(ctx context.Context, st domain.Stack) {
 	}
 }
 
-// Up is the launcher hook `make haven up` runs in portless mode.
-func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) error {
-	// Bootstrap is part of up, not a command: a fresh machine installs portless,
-	// trusts the CA, and starts the proxy right here (each step idempotent).
+// ensurePortlessProxy installs, trusts, and starts the portless proxy — part of
+// `up`'s bootstrap, not a separate command, so a fresh machine self-configures
+// on the first `haven up` (each step idempotent). PORTLESS=0 skips all of it:
+// the escape hatch for a machine where the proxy's TLS handshake won't come up
+// (#7117). Callers must then serve every service plain HTTP on its own loopback
+// port instead, with no proxy involved — see provision's use of
+// Config.PortlessDisabled.
+func (o *Orchestrator) ensurePortlessProxy() error {
+	if o.cfg.PortlessDisabled {
+		return nil
+	}
 	if !o.proxy.Installed() {
 		fmt.Println("portless is not installed — installing it (one time)…")
 		if err := o.proxy.Install(); err != nil {
 			return fmt.Errorf("could not install portless automatically (%w) — install it by hand (npm install -g portless) and re-run `haven up`", err)
 		}
 	}
+	if err := preflightPortlessCA(); err != nil {
+		return err
+	}
 	if err := o.proxy.EnsureReady(); err != nil {
 		return fmt.Errorf("could not start the portless proxy: %w", err)
+	}
+	return nil
+}
+
+// portlessCASerialPath is the CA serial openssl maintains while signing the
+// per-host certificates portless serves.
+func portlessCASerialPath(home string) string {
+	return filepath.Join(home, ".portless", "ca.srl")
+}
+
+// preflightPortlessCA stops the up when portless's CA serial file exists but
+// cannot be written.
+//
+// openssl WRITES the serial as it signs (`-CAserial`), so a ca.srl left
+// root-owned by an earlier sudo run makes every per-host signing fail — and
+// the failure is silent: portless leaves a ZERO-BYTE .pem behind instead of
+// erroring, the proxy then serves that hostname with no certificate at all,
+// and the handshake dies with "no peer certificate available".
+//
+// That symptom is indistinguishable from the SAN gap of #7117, which is
+// already fixed (per-stack SANs ship in the cert request). Without this check
+// the next person reads the dead handshake as that bug returning and goes
+// looking for a fix that is already in the tree. Naming the real cause here is
+// the whole point.
+//
+// Reporting only, never repairing: the file is root-owned because something
+// outside haven ran as root, and deleting another user's files is not a dev
+// tool's call. An unreadable home dir or any non-permission error is left to
+// portless to report — this check answers one question and stays quiet
+// otherwise.
+func preflightPortlessCA() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil
+	}
+	return preflightPortlessCAIn(home)
+}
+
+// preflightPortlessCAIn is preflightPortlessCA against an explicit home, so the
+// check can be exercised without touching the developer's own ~/.portless.
+func preflightPortlessCAIn(home string) error {
+	srl := portlessCASerialPath(home)
+	if _, err := os.Stat(srl); err != nil {
+		// No serial yet — portless creates one owned by whoever runs it.
+		return nil
+	}
+	f, err := os.OpenFile(srl, os.O_WRONLY, 0)
+	if err == nil {
+		_ = f.Close()
+		return nil
+	}
+	if !errors.Is(err, fs.ErrPermission) {
+		return nil
+	}
+	// The diagnostic line names the absolute path so there is no doubt WHICH
+	// file; the command lines below stay on `~` because they are meant to be
+	// pasted into a shell, and a home directory with a space in it (or any
+	// other shell metacharacter) would splice an interpolated absolute path
+	// into the wrong arguments. `~/.portless/ca.srl` IS this file — the path
+	// is always $HOME/.portless/ca.srl — so nothing is lost by the shorthand.
+	return fmt.Errorf(
+		"portless's CA serial is not writable by you: %s\n"+
+			"openssl writes it while signing, so every per-host certificate comes out EMPTY and the proxy serves no certificate at all — the handshake failure looks exactly like the SAN bug of #7117, which is already fixed.\n"+
+			"Clear the root-owned leftovers and the empty certs they produced, then re-run `haven up` (no sudo needed — the directory is yours):\n"+
+			"  rm -f ~/.portless/ca.srl ~/.portless/proxy.tls\n"+
+			"  find ~/.portless/host-certs -name '*.pem' -size 0 -delete",
+		srl)
+}
+
+// serviceEndpoint resolves how one routed service is actually reachable.
+// Portless enabled: every service shares the proxy's own scheme+port —
+// hostname routing (not the port) is what tells them apart. PORTLESS=0: there
+// is no proxy, so a service is reached directly on its own loopback port over
+// plain HTTP. The single decision point provision and ensureClickHouse both
+// resolve their service URL through.
+func (o *Orchestrator) serviceEndpoint(proxyScheme string, proxyPort, ownPort int) (scheme string, port int) {
+	if o.cfg.PortlessDisabled {
+		return "http", ownPort
+	}
+	return proxyScheme, proxyPort
+}
+
+// Up is the launcher hook `make haven up` runs, in either routing mode.
+func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) error {
+	if err := o.ensurePortlessProxy(); err != nil {
+		return err
 	}
 	slug, err := o.resolveSlug(p)
 	if err != nil {
@@ -277,14 +390,7 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	// Resolve the langy image tag before anything else: it is pure file hashing,
 	// and the reconcile guard needs it to notice a source edit under an
 	// unchanged selection (same services, new bytes — still a restart).
-	if opts.Selection.Langy && opts.LangyTier.RunsInContainer() {
-		if tag, err := langyImageTag(opts.RepoRoot); err == nil {
-			opts.langyImageTag = tag
-		} else {
-			o.log.Warn("could not derive the langy image tag — using the plain dev tag", zap.Error(err))
-			opts.langyImageTag = langyImage
-		}
-	}
+	o.resolveLangyImageTag(&opts)
 	// Serialize `up` per slug: two concurrent runs could both pass the
 	// already-running guard and then both register the same slug. The lock is
 	// held only through guard + registration — holding it across supervision
@@ -319,6 +425,32 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	endRegistration()
 	fmt.Printf("  %s\n\n", opts.Selection.Describe())
 
+	if err := o.prepareWorktree(ctx, p, st); err != nil {
+		return err
+	}
+	langyDockerHost := o.langyContainerHost(ctx, st, &opts)
+	o.sup.Supervise(ctx, o.planChildren(st, opts, p.LwDir, langyDockerHost))
+	return nil
+}
+
+// resolveLangyImageTag derives the content-addressed langy image tag for a
+// container-tier selection, falling back to the plain dev tag when the hash
+// cannot be computed. No-op when langy is deselected or running on the host.
+func (o *Orchestrator) resolveLangyImageTag(opts *PlanOptions) {
+	if !opts.Selection.Langy || !opts.LangyTier.RunsInContainer() {
+		return
+	}
+	if tag, err := langyImageTag(opts.RepoRoot); err == nil {
+		opts.langyImageTag = tag
+	} else {
+		o.log.Warn("could not derive the langy image tag — using the plain dev tag", zap.Error(err))
+		opts.langyImageTag = langyImage
+	}
+}
+
+// prepareWorktree runs the pre-boot lanes: dependency install, codegen,
+// migrations and the seed. Only a migration failure stops the up.
+func (o *Orchestrator) prepareWorktree(ctx context.Context, p UpParams, st domain.Stack) error {
 	// Stale dependencies install themselves before anything needs them. Lifecycle
 	// scripts (the repo's postinstall) run for the developer's own worktree and
 	// are suppressed for an untrusted one — `haven pr` sanitises the fork install
@@ -336,50 +468,102 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	if err := o.sup.RunOnce(ctx, "codegen", p.LwDir, "pnpm -s run start:prepare:files", env); err != nil {
 		o.log.Warn("codegen (start:prepare:files) failed (continuing)", zap.Error(err))
 	}
+	if err := o.ensureAPIBundle(ctx, p.LwDir, env); err != nil {
+		return err
+	}
 	// Migrations failing on an existing database is the one prep step that must
 	// STOP the up: continuing would boot the app onto a half-migrated schema,
 	// and silently dropping the data to get past it is never haven's call.
 	if err := o.sup.RunOnce(ctx, "prepare", p.LwDir, "pnpm -s run start:prepare:db", env); err != nil {
 		return fmt.Errorf("migrations failed — nothing was dropped; fix the migration, or run `haven db reset` for a fresh database: %w", err)
 	}
-	// Always seed. The seed is idempotent (a no-op once the stable local project +
-	// API key exist), so every `up` guarantees the same migrations AND the same
-	// seeded credential are in place — a freshly-provisioned DB is immediately
-	// usable with the well-known LANGWATCH_API_KEY, no manual sign-up.
-	//
-	// When haven manages Postgres the overlay carries a per-slug loopback
-	// DATABASE_URL (provably local) and the seed uses it. When it does not — DB
-	// management disabled, or Postgres failed to come up — the seed would inherit
-	// whatever DATABASE_URL is in .env, so guard that inherited URL exactly as
-	// `haven seed` does and skip (never seed a non-local database) rather than
-	// abort the up.
-	if hasEnvKey(env, "DATABASE_URL") {
-		if err := o.sup.RunOnce(ctx, "seed", p.LwDir, seedShell("pnpm -s run prisma:seed", env), env); err != nil {
-			o.log.Warn("seed failed (continuing)", zap.Error(err))
+	o.runSeed(ctx, p, env)
+	return nil
+}
+
+// apiBundleRelPath is what `start:app` executes: the PRODUCTION server bundle.
+// Kept as one constant because the check below and the error it prints must
+// name the same file the lane will look for.
+var apiBundleRelPath = filepath.Join("dist", "server", "server.cjs")
+
+// ensureAPIBundle builds the app bundle when it is missing.
+//
+// The api lane runs `start:app` -> `node dist/server/server.cjs`, but nothing
+// else in the up produces that file: codegen writes generated SOURCE, the
+// migration step only touches the database, and dist/ is gitignored — so a
+// freshly-created worktree has no bundle at all. Without this the lane
+// crash-loops on MODULE_NOT_FOUND while the app (vite) lane sits behind its
+// /api/health ready-probe and never serves the hostname. The stack reports
+// itself up and then answers nothing, which is a much worse failure than a
+// slow first boot.
+//
+// Only the missing case builds. An existing bundle is left alone: rebuilding
+// on every `up` would add a minute to a bring-up for a file that only
+// server-side edits invalidate, and those already require a manual rebuild.
+//
+// The contract is the whole point: when this returns nil, node has a file to
+// execute. So both ends are checked against that, not against a weaker proxy.
+// A REGULAR file, because `node <a directory>` is the same crash by another
+// name; and re-checked AFTER the build, because a build can exit 0 without
+// emitting the server bundle (a changed build script, a partial run) and
+// trusting the exit code would hand the lane the exact MODULE_NOT_FOUND
+// crash-loop this function exists to prevent — only now with no explanation.
+func (o *Orchestrator) ensureAPIBundle(ctx context.Context, lwDir string, env []string) error {
+	bundle := filepath.Join(lwDir, apiBundleRelPath)
+	if info, err := os.Stat(bundle); err == nil && info.Mode().IsRegular() {
+		return nil
+	}
+	fmt.Println("building the app bundle (missing — first `up` in this worktree)…")
+	if err := o.sup.RunOnce(ctx, "build", lwDir, "pnpm -s run build", env); err != nil {
+		return fmt.Errorf("the app bundle failed to build — the api lane runs %s and cannot start without it: %w", apiBundleRelPath, err)
+	}
+	if info, err := os.Stat(bundle); err != nil || !info.Mode().IsRegular() {
+		return fmt.Errorf("the app build reported success but left no %s behind — the api lane runs that file and cannot start without it", apiBundleRelPath)
+	}
+	return nil
+}
+
+// runSeed always seeds. The seed is idempotent (a no-op once the stable local
+// project + API key exist), so every `up` guarantees the same migrations AND
+// the same seeded credential are in place — a freshly-provisioned DB is
+// immediately usable with the well-known LANGWATCH_API_KEY, no manual sign-up.
+//
+// When haven manages Postgres the overlay carries a per-slug loopback
+// DATABASE_URL (provably local) and the seed uses it. When it does not — DB
+// management disabled, or Postgres failed to come up — the seed would inherit
+// whatever DATABASE_URL is in .env, so guard that inherited URL exactly as
+// `haven seed` does and skip (never seed a non-local database) rather than
+// abort the up.
+func (o *Orchestrator) runSeed(ctx context.Context, p UpParams, env []string) {
+	if !hasEnvKey(env, "DATABASE_URL") {
+		if err := o.guardInheritedSeedEnv(p.LwDir); err != nil {
+			o.log.Warn("skipping seed — inherited database URL is not local", zap.Error(err))
+			fmt.Printf("haven: %v — skipping seed\n", err)
+			return
 		}
-	} else if err := o.guardInheritedSeedEnv(p.LwDir); err != nil {
-		o.log.Warn("skipping seed — inherited database URL is not local", zap.Error(err))
-		fmt.Printf("haven: %v — skipping seed\n", err)
-	} else if err := o.sup.RunOnce(ctx, "seed", p.LwDir, seedShell("pnpm -s run prisma:seed", env), env); err != nil {
+	}
+	if err := o.sup.RunOnce(ctx, "seed", p.LwDir, seedShell("pnpm -s run prisma:seed", env), env); err != nil {
 		o.log.Warn("seed failed (continuing)", zap.Error(err))
 	}
-	// In the container tiers (the sandboxed default and container-unsafe), the
-	// langyagent worker runs on colima rather than the host. Bring the VM up and
-	// ensure its image before planning; on failure, fail closed — skip langy rather
-	// than silently dropping to the unsafe host runner — and tell the user the
-	// explicit opt-in for host mode.
-	langyDockerHost := ""
-	if opts.Selection.Langy && st.LangyTier.RunsInContainer() {
-		if dh, err := o.prepareLangyContainer(ctx, opts.RepoRoot, st.LangyImage, opts.ShouldRebuildImages); err != nil {
-			o.log.Warn("langyagent container unavailable — skipping it (set LANGY_UNSAFE_HOST_ACCESS=1 to run the worker on the host instead)",
-				zap.String("tier", st.LangyTier.String()), zap.Error(err))
-			opts.Selection.Langy = false
-		} else {
-			langyDockerHost = dh
-		}
+}
+
+// langyContainerHost prepares the colima-backed langy runtime for the
+// container tiers (the sandboxed default and container-unsafe), returning the
+// docker socket the worker container should run against. On failure it fails
+// closed — langy is deselected rather than silently dropped to the unsafe
+// host runner — and tells the user the explicit opt-in for host mode.
+func (o *Orchestrator) langyContainerHost(ctx context.Context, st domain.Stack, opts *PlanOptions) string {
+	if !opts.Selection.Langy || !st.LangyTier.RunsInContainer() {
+		return ""
 	}
-	o.sup.Supervise(ctx, o.planChildren(st, opts, p.LwDir, langyDockerHost))
-	return nil
+	dh, err := o.prepareLangyContainer(ctx, opts.RepoRoot, st.LangyImage, opts.ShouldRebuildImages)
+	if err != nil {
+		o.log.Warn("langyagent container unavailable — skipping it (set LANGY_UNSAFE_HOST_ACCESS=1 to run the worker on the host instead)",
+			zap.String("tier", st.LangyTier.String()), zap.Error(err))
+		opts.Selection.Langy = false
+		return ""
+	}
+	return dh
 }
 
 // prepareLangyContainer brings colima up and ensures the stack's
@@ -457,7 +641,13 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 	// re-running `up` after unsetting LANGY_UNSAFE_CONTAINER must actually put
 	// the UID sandbox back, not report a match.
 	tierMatches := st.LangyTier == opts.LangyTier
-	if !opts.ShouldForce && !opts.ShouldRebuildImages && selectionMatches && imageMatches && tierMatches {
+	// PORTLESS is a machine/run-level knob (Config, not PlanOptions), so it isn't
+	// covered by selectionMatches — compare it explicitly, or flipping PORTLESS=0
+	// on a stack that is already up silently keeps serving the old mode (through
+	// a proxy the operator just asked to bypass, defeating the whole escape
+	// hatch — see #7117).
+	portlessMatches := st.PortlessDisabled == o.cfg.PortlessDisabled
+	if !opts.ShouldForce && !opts.ShouldRebuildImages && selectionMatches && imageMatches && tierMatches && portlessMatches {
 		fmt.Printf("stack %q is already running (launcher pid %d) and matches the selection — nothing to do\n", slug, st.LauncherPID)
 		fmt.Printf("  bounce a service: haven restart [service] · restart everything: haven up -f · stop: haven down\n")
 		return false, nil
@@ -467,6 +657,8 @@ func (o *Orchestrator) reconcileRunningStack(p UpParams, opts PlanOptions) (proc
 		fmt.Printf("stack %q is running — replacing it (-f)\n", slug)
 	case opts.ShouldRebuildImages:
 		fmt.Printf("stack %q is running — replacing it to rebuild its images (--rebuild)\n", slug)
+	case !portlessMatches:
+		fmt.Printf("stack %q is running with a different PORTLESS setting — restarting it to match\n", slug)
 	case !tierMatches:
 		fmt.Printf("stack %q is running under a different langy isolation tier — restarting it with the requested one\n", slug)
 	case !imageMatches:
@@ -490,7 +682,8 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, force bool) error {
 	if err != nil {
 		return err
 	}
-	if st, ok := o.stackBySlug(slug); ok && st.LauncherPID != o.sys.Getpid() && o.sys.ProcessAlive(st.LauncherPID) {
+	st, ok := o.stackBySlug(slug)
+	if ok && st.LauncherPID != o.sys.Getpid() && o.sys.ProcessAlive(st.LauncherPID) {
 		if force {
 			// -f: no grace — SIGKILL the launcher's whole process group at once,
 			// for the stack that is wedged or just needs to be gone NOW.
@@ -502,11 +695,23 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, force bool) error {
 			fmt.Printf("stopped launcher (pid %d)\n", st.LauncherPID)
 		}
 	}
-	for _, r := range domain.PerWorktreeServices {
-		o.proxy.Remove(r.Name, slug)
+	// Use the mode the stack was actually provisioned under, not this run's
+	// PORTLESS — `PORTLESS=0 haven down` on a stack that registered its aliases
+	// under portless must still remove them, or they leak (dangling routes that
+	// can later point at a reused loopback port). No registry entry (already
+	// torn down, or never registered) leaves nothing to go on but this run's
+	// setting.
+	portlessDisabled := o.cfg.PortlessDisabled
+	if ok {
+		portlessDisabled = st.PortlessDisabled
 	}
-	o.proxy.Remove(domain.ClickHouseService, slug)
-	o.proxy.Remove(domain.PostgresService, slug)
+	if !portlessDisabled {
+		for _, r := range domain.PerWorktreeServices {
+			o.proxy.Remove(r.Name, slug)
+		}
+		o.proxy.Remove(domain.ClickHouseService, slug)
+		o.proxy.Remove(domain.PostgresService, slug)
+	}
 	o.store.RemoveStack(slug)
 	fmt.Printf("stack %q torn down (databases kept — `haven db reset` for fresh ones)\n", slug)
 	return nil
@@ -533,14 +738,17 @@ func (o *Orchestrator) ensureClickHouse(ctx context.Context, st *domain.Stack) {
 	}
 	st.ClickHouseHTTPPort = port
 	st.ClickHouseDatabase = db
-	scheme, pport := o.proxy.Endpoint()
+	proxyScheme, proxyPort := o.proxy.Endpoint()
+	scheme, epPort := o.serviceEndpoint(proxyScheme, proxyPort, port)
 	st.Services = append(st.Services, domain.Service{
 		Name: domain.ClickHouseService, Role: "ClickHouse (this stack's DB)", Port: port,
 		Hostname: o.cfg.Naming.Hostname(domain.ClickHouseService, st.Slug),
-		URL:      o.cfg.Naming.URL(domain.ClickHouseService, st.Slug, scheme, pport),
+		URL:      o.cfg.Naming.URL(domain.ClickHouseService, st.Slug, scheme, epPort),
 	})
-	if err := o.proxy.Register(domain.ClickHouseService, st.Slug, port); err != nil {
-		o.log.Warn("clickhouse alias registration failed", zap.Error(err))
+	if !o.cfg.PortlessDisabled {
+		if err := o.proxy.Register(domain.ClickHouseService, st.Slug, port); err != nil {
+			o.log.Warn("clickhouse alias registration failed", zap.Error(err))
+		}
 	}
 }
 

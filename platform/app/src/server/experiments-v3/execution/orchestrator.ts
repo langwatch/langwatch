@@ -134,6 +134,10 @@ export const resolveScopedRowIndices = ({
 }): number[] => {
   const allRows = () => Array.from({ length: rowCount }, (_, i) => i);
   const inRange = (i: number) => i >= 0 && i < rowCount;
+  // A row named twice is still one row. Kept as-sent otherwise, so the run
+  // covers the rows in the order the caller asked for.
+  const picked = (indices: number[]) =>
+    Array.from(new Set(indices.filter(inRange)));
 
   switch (scope.type) {
     case "full":
@@ -141,7 +145,9 @@ export const resolveScopedRowIndices = ({
     case "evaluator-all-rows":
       return allRows();
     case "rows":
-      return scope.rowIndices.filter(inRange);
+      return picked(scope.rowIndices);
+    case "target-rows":
+      return scope.rowIndices ? picked(scope.rowIndices) : allRows();
     case "cell":
     case "evaluator":
       return [scope.rowIndex].filter(inRange);
@@ -287,25 +293,28 @@ export const generateCells = (
         ? state.targets.map((t: TargetConfig) => t.id)
         : scope.type === "target"
           ? expandComparisonDeps(scope.targetId)
-          : scope.type === "cell"
-            ? expandComparisonDeps(scope.targetId)
-            : [];
+          : scope.type === "target-rows"
+            ? Array.from(new Set(scope.targetIds.flatMap(expandComparisonDeps)))
+            : scope.type === "cell"
+              ? expandComparisonDeps(scope.targetId)
+              : [];
 
-  const scopedComparisonDeps =
-    scope.type === "target" || scope.type === "cell"
-      ? new Set(
-          (() => {
-            const scopedTarget = state.targets.find(
-              (target) => target.id === scope.targetId,
-            );
-            if (!scopedTarget) return [];
-
-            return (toComparisonConfig(scopedTarget)?.variants ?? []).filter(
-              (variant): variant is string => !!variant,
-            );
-          })(),
-        )
-      : new Set<string>();
+  const scopedComparisonDeps = new Set(
+    (scope.type === "target" || scope.type === "cell"
+      ? [scope.targetId]
+      : scope.type === "target-rows"
+        ? scope.targetIds
+        : []
+    ).flatMap((scopedId) => {
+      const scopedTarget = state.targets.find(
+        (target) => target.id === scopedId,
+      );
+      if (!scopedTarget) return [];
+      return (toComparisonConfig(scopedTarget)?.variants ?? []).filter(
+        (variant): variant is string => !!variant,
+      );
+    }),
+  );
 
   // Generate cells, skipping empty rows
   for (const rowIndex of rowIndices) {
@@ -363,6 +372,41 @@ export const generateCells = (
 
   return cells;
 };
+
+/**
+ * How many cells a scope will dispatch, before the run starts.
+ *
+ * A polling run publishes its total when it registers, which is before the
+ * orchestrator has produced anything. Counting rows times every target
+ * overstates every scope that names a subset of the targets, and the run's
+ * progress then never reaches its own total. Counting the plan itself is the
+ * only count that cannot disagree with what runs, comparison dependencies
+ * included. Phase 1 only, as `runOrchestrator` starts from the same number and
+ * adds the comparison cells once it knows how many there are.
+ */
+export const countScopedCells = ({
+  state,
+  datasetRows,
+  scope,
+  seedTargetOutputs,
+}: {
+  state: Pick<
+    EvaluationsV3State,
+    "datasets" | "activeDatasetId" | "targets" | "evaluators"
+  >;
+  datasetRows: Array<Record<string, unknown>>;
+  scope: ExecutionScope;
+  seedTargetOutputs?: Record<
+    string,
+    { output: unknown; cost?: number; duration?: number }
+  >;
+}): number =>
+  generateCells(
+    state,
+    datasetRows,
+    scope,
+    seedTargetOutputs ? { seedTargetOutputs } : {},
+  ).length;
 
 /**
  * Phase 2 cell generator for comparison evaluators — the one column-vs-column

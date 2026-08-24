@@ -49,7 +49,9 @@ const { mockPrisma, mockRedis, SESSION } = vi.hoisted(() => {
       // org-level MEMBER role. The MEMBER org role alone grants no project-level
       // permission, so authorization still hinges on the TEAM binding below.
       organizationUser: {
-        findFirst: vi.fn().mockResolvedValue({ role: "MEMBER" }),
+        findFirst: vi
+          .fn()
+          .mockResolvedValue({ role: "MEMBER", disabledAt: null }),
       },
       // checkPermissionFromBindings: user belongs to no groups …
       groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
