@@ -70,7 +70,7 @@ Requirements are stated here at domain level; the normative, implementable versi
 
 ## Domain: Authorization consumption (not construction)
 
-- New permissions `sso:view`, `sso:manage`, `scim:view`, `scim:manage` are registered directly in `server/authz/registry.ts` (org-scope only). IT-admin custom role = `CustomRole` row holding only those permissions.
+- New permissions `sso:view`, `sso:manage`, `scim:view`, `scim:manage` are registered directly in `packages/authz/src/registry.ts` (org-scope only) — the shared registry package, not app code (`server/authz/registry.ts` does not exist; app-side authorization lives at `server/app-layer/authz`). IT-admin custom role = `CustomRole` row holding only those permissions.
 - All identity writes with authorization consequences go through `grants.*`. All UI gating uses `useCan`/`RequireCan`; all tRPC gating uses `.permission()`/`authz.require`.
 - PATs need nothing from this program: they are already edge-resolved principals with owner-ceiling intersection.
 

@@ -18,7 +18,7 @@ Enterprise SSO onboarding stops being a support ticket. Org admins register and 
 
 **Registry permissions (authz API, no seam):**
 
-- `sso:view`, `sso:manage`, `scim:view`, `scim:manage` registered in `server/authz/registry.ts` (org-scope only, org-exclusive like governance).
+- `sso:view`, `sso:manage`, `scim:view`, `scim:manage` registered in `packages/authz/src/registry.ts` (org-scope only, org-exclusive like governance). The registry is a shared package, not app code: `server/authz/registry.ts` does not exist and never did — app-side authorization (the tRPC middleware, the engine gate, the grants runtime) lives at `server/app-layer/authz`, and it consumes the registry rather than holding it.
 - IT-admin custom role = `CustomRole` row holding only those permissions, bound at org scope.
 - All tRPC gating via `.permission()`/`authz.require`; all UI gating via `useCan`/`RequireCan`.
 
@@ -68,6 +68,48 @@ Enterprise SSO onboarding stops being a support ticket. Org admins register and 
 - Surface separation is structural (routes, queries, scopes), not cosmetic.
 - Break-glass bindings expire by default; renewal is deliberate and audited.
 - Ops actions are commands with guards and audit events — no raw mutations.
+
+# Revision (2026-08-24) — three tiers, in priority order; SAML out
+
+Requirements above are reshaped by the specs written for this deliverable
+(`specs/identity/sso-onboarding-tiers.feature`,
+`specs/identity/platform-ops-identity-lookup.feature`,
+`specs/identity/org-admin-identity-surface.feature`). Four decisions, none of
+them re-opened by the implementation:
+
+1. **SAML is out of D05.** Self-serve is OIDC only. D04's aggregate is
+   protocol-agnostic on purpose, so SAML lands later as a port implementation
+   and the engine choice (ADR-117's named debt) moves to D09, where a named
+   customer's connection defines the requirement instead of a guess.
+
+2. **Onboarding is three separable tiers, built in this order.** Each tier
+   ships alone with green specs; a later tier adds a path, never a
+   precondition.
+
+   - **Tier 1 — ops-assisted (cloud).** A LangWatch operator registers,
+     verifies and activates a customer's connection from the back office in a
+     couple of minutes. This is the bulk of the value: it is what makes cloud
+     onboarding easy for *us*, and it is the safety net that ends DB surgery.
+   - **Tier 2 — self-hosted self-serve, licence-gated.** A self-hosted
+     customer cannot reach our operators at all, so they self-serve or they
+     have no SSO. **Their enterprise licence is the authorization**: no
+     domain-claim queue, no LangWatch approval step, no DNS TXT ceremony. The
+     licence-bound path (`license-token`, already in D04's ceremony
+     vocabulary) replaces all of it, which makes tier 2 genuinely simpler
+     than tier 3 rather than harder.
+   - **Tier 3 — cloud self-serve.** Domain claim, DNS TXT proof, and the ops
+     approval queue. Last, separable, and the only tier carrying the abuse
+     surface. It ships behind the same `SELF_SERVE_SSO` per-org flag and may
+     ship late or not at all — Open Q2 (queue staffing and SLA) is unresolved
+     and gates it, not the other two.
+
+3. **The permission registry is `packages/authz/src/registry.ts`.** Corrected
+   above; `server/authz/registry.ts` never existed.
+
+4. **The ops lookup's READ is a guarded, audited command surface, not a
+   query.** Resolving an address across organizations writes an audit record
+   naming the operator, the address and the time, whether or not anything is
+   then changed.
 
 # Open Questions
 
