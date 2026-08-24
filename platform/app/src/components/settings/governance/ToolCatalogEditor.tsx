@@ -240,12 +240,12 @@ export function ToolCatalogEditor({
       {(isCatalogEmpty || showImport) && (
         // Semantic orange, not the raw palette: `orange.50/300/600` are fixed
         // light-mode values, so in dark mode this panel kept a cream
-        // background while its text stayed on the semantic `fg`/`fg.muted`
-        // tokens that do flip — white-on-cream at 1.01:1. The semantic triple
-        // (_app.tsx) flips instead: subtle/emphasized/fg resolve to
-        // orange.900/700/200 in dark. Light mode shifts one step darker
-        // (50→100 bg, 300→400 border, 600→800 icon), which is the cost of
-        // dropping the hardcoded pair.
+        // background while its text stayed on the `fg`/`fg.muted` tokens that
+        // do flip — white on cream, 1.01:1. The semantic triple (_app.tsx)
+        // flips instead, taking the heading to 10.49:1 and the body to 7.39:1.
+        // Light mode is untouched to the eye: the fill moves orange.50 ->
+        // orange.100, which is 1.05:1 of difference, and the icon gets better
+        // (3.26:1 -> 8.16:1) because orange.fg is darker than orange.600.
         <Box
           borderWidth="1px"
           borderColor="orange.emphasized"
