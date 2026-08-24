@@ -51,7 +51,7 @@ import { AuthzCollectorService } from "./authz-collector.service";
 
 /**
  * The app-owned effect seams, composed once in the app's runtime
- * (platform/app/src/server/app-layer/authz/runtime.ts): the EE audit writer, the
+ * (the application AuthZ composition root): the audit writer, the
  * KSUID minter for binding ids, the redis-backed epoch bump, and the
  * collector factory the offboarding proof re-binds to its transaction
  * (injected rather than constructed so this module keeps no value import of

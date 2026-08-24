@@ -1,20 +1,20 @@
 import type { LedgerActor } from "@langwatch/actor";
 import { vi } from "vitest";
 import {
-  AuthzGrantsCommandDispatcher,
-  type AuthzGrantsCommandSenders,
   type AuthzLedgerDatabase,
   EventingAuthzLedgerAdapter,
 } from "../../src/adapters/eventing.authz-ledger.adapter";
+import {
+  AuthzGrantsCommandDispatcher,
+  type AuthzGrantsCommandSenders,
+} from "../../src/ports/authz-grants-command-dispatcher.port";
 import {
   AuthzCutoverFailureReporter,
   PostgresAuthzCutoverAdapter,
 } from "../../src/adapters/postgres.authz-cutover.adapter";
 import type { AuthzEpochPort } from "../../src/ports/authz-epoch.port";
-import {
-  AuthzRevocationTelemetry,
-  PrismaAuthzRevocationRepository,
-} from "../../src/repositories/prisma/prisma.authz-revocation.repository";
+import { AuthzRevocationTelemetry } from "../../src/ports/authz-revocation-telemetry.port";
+import { PrismaAuthzRevocationRepository } from "../../src/repositories/prisma/prisma.authz-revocation.repository";
 import { StubAuthzEpoch } from "./authz-epoch.stub";
 
 export const ORG_ID = "org_fork";

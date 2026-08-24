@@ -1,6 +1,6 @@
 /**
  * ADR-092 — the write port. Atomicity lives in the implementation
- * (platform/app/src/server/app-layer/authz/repositories/authz-grants.ledger.repository.ts)
+ * (the application-owned AuthZ composition adapter)
  * while validation, failure naming, and the offboarding proof stay in
  * GrantsService.
  */

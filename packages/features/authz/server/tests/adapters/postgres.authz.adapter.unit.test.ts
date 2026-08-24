@@ -6,21 +6,19 @@ import { describe, expect, it, vi } from "vitest";
 import {
   AuthzGrantsCommandDispatcher,
   type AuthzGrantsCommandSenders,
-} from "../../src/adapters/eventing.authz-ledger.adapter";
+} from "../../src/ports/authz-grants-command-dispatcher.port";
 import { AUTHZ_GRANT_PIPELINE_NAME } from "../../src/adapters/eventing.authz.adapter";
 import {
   AuthzCutoverFailureReporter,
   type AuthzCutoverReadFailure,
 } from "../../src/adapters/postgres.authz-cutover.adapter";
-import {
-  type PostgresAuthzDatabase,
-  PostgresAuthzAdapter,
-} from "../../src/adapters/postgres.authz.adapter";
+import { PostgresAuthzAdapter } from "../../src/adapters/postgres.authz.adapter";
+import type { PostgresAuthzDatabase } from "../../src/ports/postgres-authz-database.port";
 import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../src/migrations/legacy-import.authz-grant.migration";
 import {
-  AuthzRevocationTelemetry,
   type AuthzRevocationReason,
-} from "../../src/repositories/prisma/prisma.authz-revocation.repository";
+  AuthzRevocationTelemetry,
+} from "../../src/ports/authz-revocation-telemetry.port";
 
 class RecordingDispatcher extends AuthzGrantsCommandDispatcher {
   calls = 0;

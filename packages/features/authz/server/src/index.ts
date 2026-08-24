@@ -11,14 +11,16 @@ export {
   type AuthzPipeline,
   type PostgresAuthzAdapterOptions,
   type PostgresAuthzBuild,
-  type PostgresAuthzDatabase,
 } from "./adapters/postgres.authz.adapter";
 export {
   AuthzGrantsCommandDispatcher,
   AuthzLedgerUnavailableError,
   LEDGER_APP_HANDLE_WAIT_MS,
   type AuthzGrantsCommandSenders,
-} from "./adapters/eventing.authz-ledger.adapter";
+} from "./ports/authz-grants-command-dispatcher.port";
+export { AuthzRevocationTelemetry } from "./ports/authz-revocation-telemetry.port";
+export type { AuthzRevocationReason } from "./ports/authz-revocation-telemetry.port";
+export type { PostgresAuthzDatabase } from "./ports/postgres-authz-database.port";
 export {
   ObservabilityAuthzCutoverAdapter,
   type AuthzCutoverCounter,

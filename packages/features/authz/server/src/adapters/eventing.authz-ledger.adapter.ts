@@ -39,17 +39,17 @@
  */
 import type { LedgerActor } from "@langwatch/actor";
 import {
-  type AttachGrantCommandData,
-  type ChangeGrantRoleCommandData,
-  type ChangeRolePermissionsCommandData,
   type DefineRoleCommandData,
-  type DeleteRoleCommandData,
   type LedgerScopeType,
   type RevokeGrantCommandData,
   type TeamUserRole as AuthzTeamUserRole,
   roleKeyForTeamRole,
 } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
+import {
+  AuthzGrantsCommandDispatcher,
+  type AuthzGrantsCommandSenders,
+} from "../ports/authz-grants-command-dispatcher.port";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { AuthzCompatibilityLedgerPort } from "../ports/authz-compatibility-ledger.port";
@@ -84,63 +84,6 @@ export type LedgerWriteSource =
   | "scim"
   | "invite"
   | "read-through-mint";
-
-type Sender<T> = { send: (data: T) => Promise<unknown> };
-
-/**
- * One command per entity (ADR-110): a batch would straddle aggregates, so a
- * caller with many grants sends many commands. They are independent and
- * apply concurrently, which is the point.
- */
-export type AuthzGrantsCommandSenders = {
-  attachGrant: Sender<AttachGrantCommandData>;
-  changeGrantRole: Sender<ChangeGrantRoleCommandData>;
-  revokeGrant: Sender<RevokeGrantCommandData>;
-  defineRole: Sender<DefineRoleCommandData>;
-  changeRolePermissions: Sender<ChangeRolePermissionsCommandData>;
-  deleteRole: Sender<DeleteRoleCommandData>;
-};
-
-/** Runtime-owned command resolution; implementations may cache per instance. */
-export abstract class AuthzGrantsCommandDispatcher {
-  abstract commands(): Promise<{ commands: AuthzGrantsCommandSenders }>;
-}
-
-/**
- * The grants ledger cannot take a write right now: the App handle never
- * appeared inside the wait, or its event-sourcing stack is off.
- *
- * Handled and NAMED rather than a bare Error because the caller can act on it
- * — retry, or the operator brings the stack back — and because a grant write
- * that cannot append must not read to the customer as a validation failure.
- * `fault: "platform"`: this is ours, never theirs, so it pages rather than
- * being logged as routine 4xx noise. The detail (which of the two reasons)
- * goes to the log line; the message stays customer-safe.
- */
-export class AuthzLedgerUnavailableError extends HandledError {
-  declare readonly code: "authz_ledger_unavailable";
-
-  constructor() {
-    super(
-      "authz_ledger_unavailable",
-      "Access changes are temporarily unavailable. Try again in a moment.",
-      { httpStatus: 503, fault: "platform" },
-    );
-    this.name = "AuthzLedgerUnavailableError";
-  }
-}
-
-/**
- * How long a send waits for the App handle before refusing.
- *
- * Short on purpose. The only caller that legitimately arrives before the
- * handle exists is a boot-time write racing App composition, which takes
- * hundreds of milliseconds; anything longer is a stack that is not coming, and
- * blocking a request thread on it turns one broken dependency into a queue of
- * held connections. Failing fast with a typed 503 is what lets the caller
- * retry — the write never half-happened.
- */
-export const LEDGER_APP_HANDLE_WAIT_MS = 5_000;
 
 const CONVERGENCE_POLL_MS = 150;
 const CONVERGENCE_TIMEOUT_MS = 8_000;

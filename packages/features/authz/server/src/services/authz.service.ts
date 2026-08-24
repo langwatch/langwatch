@@ -1,7 +1,7 @@
 /**
  * ADR-092 §11 — the checking API, a service over the collector. The app
  * builds ONE instance in its composition root
- * (platform/app/src/server/app-layer/authz/runtime.ts) and everything asks it:
+ * (the application AuthZ composition root) and everything asks it:
  *
  *   authz.can({ principal, permission: "prompts:update", scope })
  *   authz.check({ ... })                → full AuthzDecision, never throws

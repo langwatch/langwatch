@@ -1,17 +1,11 @@
 import { createLogger } from "@langwatch/observability";
+import {
+  type AuthzRevocationReason,
+  AuthzRevocationTelemetry,
+} from "../../ports/authz-revocation-telemetry.port";
 import type { AuthzDatabase } from "../authz-read.repository";
 
 const logger = createLogger("langwatch:authz:revocation");
-
-export type AuthzRevocationReason = "revocation" | "offboard";
-
-export abstract class AuthzRevocationTelemetry {
-  abstract record(args: {
-    organizationId: string;
-    reason: AuthzRevocationReason;
-    grantCount: number;
-  }): void;
-}
 
 type RevocationDatabase = {
   grant: {

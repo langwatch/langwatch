@@ -3,7 +3,7 @@ import {
   AuthzGrantsCommandDispatcher,
   type AuthzGrantsCommandSenders,
   AuthzLedgerUnavailableError,
-} from "../../src/adapters/eventing.authz-ledger.adapter";
+} from "../../src/ports/authz-grants-command-dispatcher.port";
 import {
   ACTOR,
   ORG_ID,

@@ -9,6 +9,7 @@ import {
   AuthzGrantsCommandDispatcher,
   type AuthzGrantsCommandSenders,
   AuthzLedgerUnavailableError,
+  AuthzRevocationTelemetry,
   deriveAuthzGrantId,
   LEDGER_APP_HANDLE_WAIT_MS,
   ObservabilityAuthzCutoverAdapter,
@@ -69,7 +70,7 @@ class AppAuthzCommandDispatcher extends AuthzGrantsCommandDispatcher {
   }
 }
 
-class AppAuthzRevocationTelemetry {
+class AppAuthzRevocationTelemetry extends AuthzRevocationTelemetry {
   record({
     reason,
   }: {

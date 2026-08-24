@@ -3,6 +3,13 @@ import {
   type AuthzService as AuthzServiceContract,
 } from "@langwatch/authz-contract";
 import type { SystemMigration } from "@langwatch/system-migrations";
+import type { StaticPipelineDefinition } from "@langwatch/eventing";
+import type { AuthzRevocationTelemetry } from "../ports/authz-revocation-telemetry.port";
+import type { PostgresAuthzDatabase } from "../ports/postgres-authz-database.port";
+import type {
+  AuthzGrantsCommandDispatcher,
+  AuthzGrantsCommandSenders,
+} from "../ports/authz-grants-command-dispatcher.port";
 import {
   type AuthzEngineLedger,
   LegacyImportAuthzGrantMigration,
@@ -17,7 +24,6 @@ import type { AuthzAuditDatabase } from "../repositories/prisma/prisma.authz-aud
 import { PrismaAuthzAuditRepository } from "../repositories/prisma/prisma.authz-audit.repository";
 import { PrismaAuthzProjectionRepository } from "../repositories/prisma/prisma.authz-projection.repository";
 import { PrismaAuthzRevocationRepository } from "../repositories/prisma/prisma.authz-revocation.repository";
-import type { AuthzRevocationTelemetry } from "../repositories/prisma/prisma.authz-revocation.repository";
 import { RoutedAuthzListingRepository } from "../repositories/routed/routed.authz-listing.repository";
 import { RoutedAuthzReadRepository } from "../repositories/routed/routed.authz-read.repository";
 import { AuthzGrantsService } from "../services/authz-grants.service";
@@ -26,8 +32,6 @@ import {
   type AuthzServiceOptions,
 } from "../services/authz.service";
 import {
-  type AuthzGrantsCommandDispatcher,
-  type AuthzGrantsCommandSenders,
   type AuthzLedgerDatabase,
   type EventingAuthzLedgerAdapterOptions,
   EventingAuthzLedgerAdapter,
@@ -44,7 +48,7 @@ import {
  * may adapt a generated client to this type once at its composition boundary;
  * no generated database type crosses into the feature.
  */
-export type PostgresAuthzDatabase = AuthzLedgerDatabase &
+type InternalPostgresAuthzDatabase = AuthzLedgerDatabase &
   AuthzGrantWriteDatabase &
   AuthzMigrationDatabase &
   AuthzCutoverDatabase &
@@ -66,7 +70,7 @@ export type PostgresAuthzAdapterOptions = {
 };
 
 /** Public Eventing definition only; concrete projection/store types stay private. */
-export type AuthzPipeline = ReturnType<EventingAuthzAdapter["build"]>;
+export type AuthzPipeline = StaticPipelineDefinition<any, any, any>;
 
 export type PostgresAuthzBuild = Readonly<{
   authz: AuthzServiceContract;
@@ -164,20 +168,22 @@ export class PostgresAuthzAdapter {
   private constructor(private readonly options: PostgresAuthzAdapterOptions) {}
 
   build(): PostgresAuthzBuild {
+    const database = this.options
+      .database as unknown as InternalPostgresAuthzDatabase;
     const epoch = RedisAuthzEpochAdapter.create({ redis: this.options.redis });
     const cutover = PostgresAuthzCutoverAdapter.create({
-      database: this.options.database,
+      database,
       reporter: this.options.cutoverReporter,
     });
     const selectHead = (organizationId: string) =>
       cutover.isOn({ organizationId });
 
     const revocation = PrismaAuthzRevocationRepository.create({
-      database: this.options.database,
+      database,
       telemetry: this.options.revocationTelemetry,
     });
     const ledgerOptions: EventingAuthzLedgerAdapterOptions = {
-      database: this.options.database,
+      database,
       dispatcher: this.options.dispatcher,
       cutover,
       epoch,
@@ -190,18 +196,18 @@ export class PostgresAuthzAdapter {
     if (this.options.ledgerPoll) ledgerOptions.poll = this.options.ledgerPoll;
     const ledger = EventingAuthzLedgerAdapter.create(ledgerOptions);
     const grantRepository = EventingAuthzGrantRepository.create({
-      database: this.options.database,
+      database,
       writer: ledger,
       selectHead,
     });
 
     const authzOptions: AuthzServiceOptions = {
       repository: RoutedAuthzReadRepository.create({
-        database: this.options.database,
+        database,
         selectHead,
       }),
       listing: RoutedAuthzListingRepository.create({
-        database: this.options.database,
+        database,
         selectHead,
       }),
       epoch,
@@ -225,15 +231,11 @@ export class PostgresAuthzAdapter {
     });
 
     const pipeline = EventingAuthzAdapter.build({
-      authzGrantsWriteStore: PrismaAuthzProjectionRepository.create(
-        this.options.database,
-      ),
-      authzAuditTrailStore: PrismaAuthzAuditRepository.create(
-        this.options.database,
-      ),
+      authzGrantsWriteStore: PrismaAuthzProjectionRepository.create(database),
+      authzAuditTrailStore: PrismaAuthzAuditRepository.create(database),
     });
     const migration = LegacyImportAuthzGrantMigration.create({
-      store: PrismaAuthzMigrationRepository.create(this.options.database),
+      store: PrismaAuthzMigrationRepository.create(database),
       ledger: new DispatcherAuthzEngineLedger(this.options.dispatcher),
       now: this.options.now ?? Date.now,
     });
