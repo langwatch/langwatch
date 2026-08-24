@@ -207,7 +207,21 @@ describe("outbox backlog drain under slow deliveries", () => {
       });
 
       const slowRun = slow.runOnce({ now: Date.now() });
-      await deliveryStarted;
+      // If the delivery never starts there is no race to observe, and waiting
+      // on the signal alone would spend the whole 60s test timeout finding
+      // that out. Racing the run against the signal turns it into an
+      // assertion that names what went wrong instead. The rejection is
+      // absorbed here on purpose: `slowRun` is awaited again below, which is
+      // where a thrown error belongs.
+      const slowRunSettled = slowRun.then(
+        () => "settled without delivering" as const,
+        () => "settled without delivering" as const,
+      );
+      const raceSetUp = await Promise.race([
+        deliveryStarted.then(() => "delivery started" as const),
+        slowRunSettled,
+      ]);
+      expect(raceSetUp).toBe("delivery started");
       // A lease is due again once `leasedUntil <= now`, and `now` is the
       // caller's, so the rival sees a lapsed lease without the test sleeping
       // through one.
