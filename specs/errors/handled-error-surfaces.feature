@@ -290,3 +290,42 @@ Feature: Knowable failures reach the customer as themselves
     Given the platform rejects the credential itself
     When the SDK raises for that response
     Then the raised error says authentication failed
+
+  # ---------------------------------------------------------------------------
+  # What a handled failure costs the on-call engineer
+  #
+  # On 2026-08-24 a caller retried an invalid prompt body once a minute for
+  # ninety minutes. The API answered each one correctly — 400,
+  # `system_prompt_required` — and the request logger recorded each one at warn,
+  # as a customer fault should be. But the route's own catch block also called
+  # `logger.error` unconditionally, which put the cause under `error`, the field
+  # ingest derives `error_signature` from. A caller sending a bad body therefore
+  # minted a brand-new error signature and paged the team, twice-logging every
+  # failure on the way. The level a failure is recorded at is decided by whose
+  # fault it is, not by which catch block caught it.
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: A failure the caller caused does not page the team
+    Given a route catches a handled failure attributed to the customer
+    When the route records the failure
+    Then it is recorded as an expected failure, not an incident
+    And it does not mint a new error signature
+
+  @unit
+  Scenario: A failure the caller caused stays diagnosable
+    Given a route catches a handled failure attributed to the customer
+    When the route records the failure
+    Then the record still carries the cause, its type and the caller's context
+
+  @unit
+  Scenario: A failure the platform caused is still an incident
+    Given a route catches a handled failure attributed to the platform
+    When the route records the failure
+    Then it is recorded as an incident
+
+  @unit
+  Scenario: A failure nobody anticipated is still an incident
+    Given a route catches a failure that names no cause we recognise
+    When the route records the failure
+    Then it is recorded as an incident

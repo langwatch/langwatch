@@ -28,6 +28,7 @@ export {
   getLogLevelFromStatusCode,
   getStatusCodeFromError,
   hasAuthorizationToken,
+  logCaughtError,
   logHttpRequest,
   type RequestLogData,
 } from "./request/requestLogging";

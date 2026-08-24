@@ -209,3 +209,54 @@ export function hasAuthorizationToken(headers: {
 
   return false;
 }
+
+/**
+ * Logs an error caught at a call site (a route handler's `catch`) at the level
+ * its fault attribution deserves, using the same rule as the request boundary.
+ *
+ * A route that hand-rolls `logger.error(...)` in a catch logs EVERY failure as
+ * an incident, including the handled, customer-fault ones (an invalid body, a
+ * conflicting handle) that the request logger already recorded at warn. That
+ * costs twice:
+ *
+ *   - the failure is logged two times for one request, and
+ *   - the error-level record carries the cause under `error`, which is what
+ *     ingest derives `error_signature` from — so a caller sending a bad body
+ *     mints a "new error signature" and pages the team.
+ *
+ * A customer-fault handled error therefore logs at warn with the cause re-keyed
+ * to {@link REQUEST_CAUSE_FIELD}, exactly as `attachCause` does, so the record
+ * keeps its diagnostic content without claiming to be a failure of ours.
+ * Everything else — unhandled errors, and handled ones attributed to
+ * `platform` or `provider` — still logs at error.
+ */
+export function logCaughtError({
+  logger,
+  error,
+  message,
+  data,
+}: {
+  logger: Logger;
+  error: unknown;
+  message: string;
+  data?: Record<string, unknown>;
+}): void {
+  const fault = handledFaultOf(error);
+
+  if (fault !== "customer") {
+    logger.error({ ...(data ?? {}), error }, message);
+    return;
+  }
+
+  const name = (error as { name?: unknown }).name;
+  logger.warn(
+    {
+      ...(data ?? {}),
+      [REQUEST_CAUSE_FIELD]: error,
+      ...(typeof name === "string" ? { errorType: name } : {}),
+      handledErrorCode: (error as Record<string, unknown>).code,
+      handledErrorFault: fault,
+    },
+    message,
+  );
+}

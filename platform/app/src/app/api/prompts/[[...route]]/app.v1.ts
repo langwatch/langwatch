@@ -1,4 +1,4 @@
-import { createLogger } from "@langwatch/observability";
+import { createLogger, logCaughtError } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
@@ -763,7 +763,12 @@ export function registerPromptRoutes(
           }),
         });
       } catch (error: any) {
-        logger.error({ projectId: project.id, error }, "Error creating prompt");
+        logCaughtError({
+          logger,
+          error,
+          message: "Error creating prompt",
+          data: { projectId: project.id },
+        });
         if (error instanceof TagValidationError) {
           throw new HTTPException(422, {
             message: error.message,
@@ -880,10 +885,12 @@ export function registerPromptRoutes(
 
         return c.json(response);
       } catch (error: any) {
-        logger.error(
-          { projectId: project.id, promptId: id, error },
-          "Error syncing prompt",
-        );
+        logCaughtError({
+          logger,
+          error,
+          message: "Error syncing prompt",
+          data: { projectId: project.id, promptId: id },
+        });
 
         if (error.message.includes("No permission")) {
           throw new HTTPException(403, {
@@ -1025,10 +1032,12 @@ export function registerPromptRoutes(
           }),
         });
       } catch (error: any) {
-        logger.error(
-          { projectId, promptId: id, error },
-          "Error updating prompt",
-        );
+        logCaughtError({
+          logger,
+          error,
+          message: "Error updating prompt",
+          data: { projectId, promptId: id },
+        });
         if (error instanceof TagValidationError) {
           throw new HTTPException(422, {
             message: error.message,
