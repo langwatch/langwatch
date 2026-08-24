@@ -138,6 +138,37 @@ describe("useWorkbenchUpdateListener", () => {
       );
       expect(reloadFromServer).not.toHaveBeenCalled();
     });
+
+    /** @scenario "A tab whose autosave failed still hears the next version" */
+    it("banners after a failed save, because no answer is coming", async () => {
+      const reloadFromServer = vi.fn(async () => undefined);
+      // A save that failed for any reason other than a newer version leaves the
+      // workbench dirty and schedules no retry. Waiting for an answer that is
+      // not coming would keep the tab silent until the reader edits again.
+      act(() => {
+        useEvaluationsV3Store
+          .getState()
+          .setAutosaveStatus("evaluation", "error", "Network error");
+      });
+      renderHook(() =>
+        useWorkbenchUpdateListener({
+          projectId: "project-1",
+          experimentSlug: "my-exp",
+          isDirty: true,
+          reloadFromServer,
+        }),
+      );
+
+      emitSignal(6);
+
+      await waitFor(() =>
+        expect(useEvaluationsV3Store.getState().staleWorkbench).toEqual({
+          serverVersion: 6,
+          actorLabel: "langy",
+        }),
+      );
+      expect(reloadFromServer).not.toHaveBeenCalled();
+    });
   });
 
   describe("when the signal is not newer or not this experiment", () => {

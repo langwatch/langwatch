@@ -148,7 +148,7 @@ function orderedParts({
 
   const unrecorded = toolCalls.filter((call) => !account.recorded.has(call.id));
   const reply =
-    endedOnAParagraph || !account.wroteProse ? assistantTextParts(text) : [];
+    endedOnAParagraph || !account.hasProse ? assistantTextParts(text) : [];
   return [...account.parts, ...unrecorded.map(toolPartOf), ...reply];
 }
 
@@ -167,12 +167,12 @@ function accountParts({
 }): {
   parts: LangyMessagePart[];
   recorded: Set<string>;
-  wroteProse: boolean;
+  hasProse: boolean;
 } {
   const byId = new Map(toolCalls.map((call) => [call.id, call]));
   const parts: LangyMessagePart[] = [];
   const recorded = new Set<string>();
-  let wroteProse = false;
+  let hasProse = false;
 
   for (const [index, segment] of order.entries()) {
     if (segment.kind === "tool") {
@@ -183,11 +183,11 @@ function accountParts({
       continue;
     }
     if (index === skipIndex || segment.text.trim() === "") continue;
-    wroteProse = true;
+    hasProse = true;
     parts.push(...assistantTextParts(segment.text));
   }
 
-  return { parts, recorded, wroteProse };
+  return { parts, recorded, hasProse };
 }
 
 /**

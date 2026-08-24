@@ -93,6 +93,15 @@ Feature: Langy UI actions fall back to the backend and the page catches up
     When a newer version lands for this experiment
     Then no banner appears, and the tab's own save decides what happens next
 
+  # A save that failed leaves the workbench dirty and schedules no retry, so
+  # there is no answer to wait for. Waiting anyway kept the tab silent about
+  # every later version until the reader happened to type again.
+  @integration
+  Scenario: A tab whose autosave failed still hears the next version
+    Given the workbench has unsaved edits and its last save failed
+    When a newer version lands for this experiment
+    Then the stale banner appears and nothing reloads until the user asks
+
   # Langy drives the open page, so most versions it announces are its own work
   # on the reader's behalf. "Somewhere else" reads as a stranger.
   @integration

@@ -26,12 +26,17 @@ type ApplyServerVersion = (serverVersion: number, actorLabel?: string) => void;
  * "somewhere else" while Langy was driving THIS tab, seconds before their own
  * save landed and settled it.
  *
- * Once autosave has stood down (it refuses to run while the workbench is
- * already stale) nothing is coming, and the signal is the only word there is.
+ * An autosave that ERRORED is the case where nothing is coming. A failed
+ * attempt schedules no retry, so the workbench stays dirty with no answer on
+ * the way, and treating that as "wait" would leave the tab silent for as long
+ * as the reader makes no further edit. Once autosave has stood down the signal
+ * is the only word there is, whether it stood down on an error or on a refusal
+ * (which stands it down and marks the workbench stale).
  */
 function thisTabWillAnswerFirst(isDirty: boolean): boolean {
   const state = useEvaluationsV3Store.getState();
   if (state.ui.autosaveStatus.evaluation === "saving") return true;
+  if (state.ui.autosaveStatus.evaluation === "error") return false;
   return isDirty && !state.staleWorkbench;
 }
 
