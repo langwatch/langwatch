@@ -455,5 +455,29 @@ describe("Feature: Dashboard REST API", () => {
       // assertion would not catch if a later field carried it.
       expect(raw).not.toContain("leaked_marker_7f3a");
     });
+
+    /** @scenario "The list's graphCount matches what the detail response actually returns" */
+    it("does not count the workbench chart the detail response omits", async () => {
+      const dashboard = await createDashboard({ name: "Mixed" });
+      await createGraph(dashboard.id);
+      await createWorkbenchChart(dashboard.id);
+
+      const detailRes = await helpers.api.get(
+        `/api/dashboards/${dashboard.id}`,
+      );
+      const detailBody = await detailRes.json();
+
+      const listRes = await helpers.api.get("/api/dashboards");
+      const listBody = await listRes.json();
+      const listed = listBody.data.find(
+        (d: { id: string }) => d.id === dashboard.id,
+      );
+
+      // The list's count and the detail's array are two views of one
+      // resource — a caller that reads graphCount and then fetches the
+      // detail must see the same number of cards in both.
+      expect(listed.graphCount).toBe(detailBody.graphs.length);
+      expect(listed.graphCount).toBe(1);
+    });
   });
 });
