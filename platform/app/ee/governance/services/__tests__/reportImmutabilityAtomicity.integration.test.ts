@@ -169,7 +169,10 @@ describe("the report-immutability pin against Postgres", () => {
           organizationId,
           parserConfig: changeReportTo("cost"),
         }),
-      ).rejects.toThrow(/already pulled/i);
+      ).rejects.toMatchObject({
+        code: "validation_error",
+        httpStatus: 422,
+      });
 
       expect(await storedReport(id)).toBe("usage");
     });
@@ -233,13 +236,28 @@ describe("the report-immutability pin against Postgres", () => {
         clientThatLandsACursorAfterReading(id),
       );
 
-      await expect(
-        racing.updateSource({
+      const refusal = await racing
+        .updateSource({
           id,
           organizationId,
           parserConfig: changeReportTo("cost"),
-        }),
-      ).rejects.toThrow(/started pulling while the change was being saved/i);
+        })
+        .then(
+          () => null,
+          (err: unknown) => err,
+        );
+
+      expect(refusal).toMatchObject({
+        code: "validation_error",
+        httpStatus: 422,
+      });
+      // Both refusals in this file are `validation_error`, so the code alone
+      // would pass even if the guard had rejected for the ordinary
+      // already-pulled reason and the pin had never run. The message is the
+      // only thing separating them, so it is pinned here and nowhere else.
+      expect((refusal as Error).message).toMatch(
+        /while the change was being saved/i,
+      );
 
       expect(await storedReport(id)).toBe("usage");
     });
