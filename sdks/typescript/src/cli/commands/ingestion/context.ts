@@ -50,6 +50,7 @@ import {
   stateFilePath,
   writeFingerprint,
 } from "@/cli/utils/governance/hook-state";
+import { writeSpooledDeclaration } from "@/cli/utils/governance/session-context-spool";
 import {
   defaultClaudeSessionRegistryDir,
   readClaudeSessionName,
@@ -244,11 +245,28 @@ async function declare({
 
   const posted = await postSessionContext({ target, env, payload, fetchImpl });
   if (!posted) {
-    // The fingerprint stays unwritten on purpose: the next declaration or
-    // hook retries instead of assuming the context landed.
-    writeLine(
-      "LangWatch did not accept the declaration; it will be retried on the next one.",
-    );
+    // Under codex's default sandbox this shell has no network, so retrying
+    // from here would fail exactly the same way every time. The declaration
+    // is queued instead, for the session report to deliver: that runs from
+    // the agent's own process, outside the sandbox. The fingerprint stays
+    // unwritten, so nothing yet claims this context landed.
+    try {
+      writeSpooledDeclaration({
+        stateDir,
+        agent: session.agent,
+        sessionId: session.sessionId,
+        fingerprint,
+        payload,
+        now,
+      });
+      writeLine(
+        `Queued ${declared}; it will be sent when this session next reports.`,
+      );
+    } catch (error) {
+      writeLine(
+        `LangWatch did not accept the declaration and it could not be queued: ${(error as Error).message}`,
+      );
+    }
     return;
   }
 

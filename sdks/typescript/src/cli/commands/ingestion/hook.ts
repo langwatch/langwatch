@@ -61,6 +61,7 @@ import {
   stateFilePath,
   writeFingerprint,
 } from "@/cli/utils/governance/hook-state";
+import { drainSessionContextSpool } from "@/cli/utils/governance/session-context-spool";
 import {
   defaultClaudeSessionRegistryDir,
   readClaudeSessionName,
@@ -230,6 +231,60 @@ async function runHook({
     env,
   });
 
+  await postOwnSessionContext({
+    spec,
+    agent,
+    sessionId,
+    input,
+    env,
+    runGit,
+    fetchImpl,
+    now,
+    stateDir,
+    claudeRegistryDir,
+    target,
+  });
+
+  // Whatever this hook had to say about its own directory is said. Anything
+  // the agent declared from a shell that could not reach the collector goes
+  // out now, last, so the declared checkout is the session's current one.
+  await drainSessionContextSpool({
+    stateDir,
+    now,
+    post: (payload) => postSessionContext({ target, env, payload, fetchImpl }),
+  });
+}
+
+/**
+ * Post the context of the directory this hook runs in. Every reason not to
+ * post is a debug line and a return: a hook is never allowed to be why a
+ * session broke.
+ */
+async function postOwnSessionContext({
+  spec,
+  agent,
+  sessionId,
+  input,
+  env,
+  runGit,
+  fetchImpl,
+  now,
+  stateDir,
+  claudeRegistryDir,
+  target,
+}: {
+  spec: (typeof TOOLS)[string];
+  agent: string;
+  sessionId: string;
+  input: ReturnType<typeof parseHookInput>;
+  env: NodeJS.ProcessEnv;
+  runGit: GitRunner;
+  fetchImpl: typeof fetch;
+  now: () => number;
+  stateDir: string;
+  claudeRegistryDir?: string;
+  target: TelemetryTarget;
+}): Promise<void> {
   const projectDir = spec.projectDirVar ? env[spec.projectDirVar] : undefined;
   const directory = firstNonEmpty(input.cwd, projectDir) ?? process.cwd();
   // The session's own name, as claude itself holds it. The SessionStart

@@ -19,6 +19,10 @@ import {
 	harvestAndEmitCodexIO,
 	harvestCodexThread,
 } from "../codex-rollout-otlp";
+import {
+	readSpooledDeclarations,
+	writeSpooledDeclaration,
+} from "../session-context-spool";
 import { assertCodexTurnHarvest } from "../shell-rc";
 
 const THREAD = "019fc156-02e3-76a1-b462-14c38b450cb6";
@@ -339,12 +343,23 @@ describe("harvestCodexThread", () => {
 		};
 		let stateDir: string;
 
+		let tmpRoot: string;
+		let previousTmpdir: string | undefined;
+
 		beforeEach(() => {
 			stateDir = mkdtempSync(join(tmpdir(), "lw-codex-state-"));
+			// The fallback queue lives in the temp directory: give this suite its
+			// own rather than the one shared with the rest of the machine.
+			tmpRoot = mkdtempSync(join(tmpdir(), "lw-codex-tmp-"));
+			previousTmpdir = process.env.TMPDIR;
+			process.env.TMPDIR = tmpRoot;
 		});
 
 		afterEach(() => {
+			if (previousTmpdir === undefined) delete process.env.TMPDIR;
+			else process.env.TMPDIR = previousTmpdir;
 			rmSync(stateDir, { recursive: true, force: true });
+			rmSync(tmpRoot, { recursive: true, force: true });
 		});
 
 		describe("when the session is harvested", () => {
@@ -382,6 +397,70 @@ describe("harvestCodexThread", () => {
 				expect(attr("vcs.repository.name")).toBe("acme-app");
 				expect(attr("vcs.ref.head.name")).toBe("feat/pricing");
 				expect(urls).toContain("https://e/v1/traces");
+			});
+
+			describe("when a declaration is queued from a sandboxed shell", () => {
+				/** @scenario "The next session report sends the queued declaration" */
+				it("sends it after its own context, so it is the latest branch", async () => {
+					writeRollout(THREAD, [
+						sessionMeta(GIT),
+						taskStarted(TRACE),
+						userMessage("hi"),
+						agentFinal("hello"),
+					]);
+					writeSpooledDeclaration({
+						stateDir,
+						agent: "codex",
+						sessionId: THREAD,
+						fingerprint: "declared-fingerprint",
+						payload: {
+							resourceLogs: [
+								{
+									scopeLogs: [
+										{
+											logRecords: [
+												{
+													attributes: [
+														{
+															key: "vcs.ref.head.name",
+															value: { stringValue: "feat/declared" },
+														},
+													],
+												},
+											],
+										},
+									],
+								},
+							],
+						},
+						now: () => 1785654950000,
+					});
+					const { bodies, urls, impl } = recordingFetch();
+
+					await harvestCodexThread({
+						threadId: THREAD,
+						nowMs: 1785654950000,
+						endpoint: "https://e/v1/traces",
+						logsEndpoint: "https://e/v1/logs",
+						token: "sk-lw-test",
+						sessionsRoot: root,
+						stateDir,
+						fetchImpl: impl,
+					});
+
+					const branchOf = (body: any) =>
+						body.resourceLogs?.[0].scopeLogs[0].logRecords[0].attributes.find(
+							(a: any) => a.key === "vcs.ref.head.name",
+						)?.value?.stringValue;
+					const logBranches = bodies
+						.filter((_, index) => urls[index] === "https://e/v1/logs")
+						.map(branchOf);
+					expect(logBranches[0]).toBe("feat/pricing");
+					expect(logBranches[logBranches.length - 1]).toBe("feat/declared");
+					expect(
+						readSpooledDeclarations({ stateDir, now: () => 1785654950000 }),
+					).toEqual([]);
+				});
 			});
 
 			/** @scenario "The reported branch follows the checkout, not the session's first minute" */
@@ -543,12 +622,23 @@ describe("harvestCodexThread", () => {
 		});
 		let stateDir: string;
 
+		let tmpRoot: string;
+		let previousTmpdir: string | undefined;
+
 		beforeEach(() => {
 			stateDir = mkdtempSync(join(tmpdir(), "lw-codex-state-"));
+			// The fallback queue lives in the temp directory: give this suite its
+			// own rather than the one shared with the rest of the machine.
+			tmpRoot = mkdtempSync(join(tmpdir(), "lw-codex-tmp-"));
+			previousTmpdir = process.env.TMPDIR;
+			process.env.TMPDIR = tmpRoot;
 		});
 
 		afterEach(() => {
+			if (previousTmpdir === undefined) delete process.env.TMPDIR;
+			else process.env.TMPDIR = previousTmpdir;
 			rmSync(stateDir, { recursive: true, force: true });
+			rmSync(tmpRoot, { recursive: true, force: true });
 		});
 
 		const harvest = async (impl: typeof fetch) =>

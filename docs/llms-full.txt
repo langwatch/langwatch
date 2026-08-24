@@ -32725,7 +32725,7 @@ The command finds the session itself. Codex keeps the transcript of a session op
 
 If the process chain cannot be read, a restrictive sandbox being the usual reason, the command falls back to reading which session wrote to its transcript most recently. That reading cannot tell two sessions apart when both are working at the same moment, so in that case it declares nothing and prints one line asking you to name the session. `--agent codex --session-id <id>` names one exactly, and always wins over both.
 
-Codex's default sandbox blocks both readings of the process chain and network access, so under it the command falls back to the transcript reading and then cannot send the record, and it says so in one line and leaves the declaration for a later run. Standing agents, which is what this command is for, normally run with elevated permissions, where the process chain and the send both work.
+Codex's default sandbox blocks both the reading of the process chain and network access, so under it the command falls back to the transcript reading and cannot send the record itself. It queues the declaration instead and says so in one line. The next turn delivers it: Codex runs the LangWatch session report from its own process, outside the sandbox, so the report goes out even when the agent's shell has no network. A queued declaration is sent after the report's own directory, which makes the declared checkout the session's current one. It is dropped unsent if it waits more than an hour, since by then the agent has moved on.
 
 For the full per-turn traces of a review to land on the pull request too, a fresh `codex` session inside a worktree of the pull request's branch is still the most complete setup:
 

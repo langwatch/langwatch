@@ -13,6 +13,11 @@ import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { AncestorProbe } from "@/cli/utils/governance/codex-ancestor-session";
+import {
+  readSpooledDeclarations,
+  spoolDir,
+  spoolFilePath,
+} from "@/cli/utils/governance/session-context-spool";
 
 import { contextCommand } from "../context";
 import { hookCommand } from "../hook";
@@ -39,6 +44,8 @@ const CLAUDE_ENV = {
 
 let stateDir: string;
 let sessionsRoot: string;
+let tmpRoot: string;
+let previousTmpdir: string | undefined;
 const posted: PostedRequest[] = [];
 const lines: string[] = [];
 
@@ -57,12 +64,18 @@ beforeEach(() => {
   posted.length = 0;
   lines.length = 0;
   stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "lw-context-state-"));
+  tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lw-context-tmp-"));
+  previousTmpdir = process.env.TMPDIR;
+  process.env.TMPDIR = tmpRoot;
   sessionsRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lw-context-codex-"));
 });
 
 afterEach(() => {
+  if (previousTmpdir === undefined) delete process.env.TMPDIR;
+  else process.env.TMPDIR = previousTmpdir;
   fs.rmSync(stateDir, { recursive: true, force: true });
   fs.rmSync(sessionsRoot, { recursive: true, force: true });
+  fs.rmSync(tmpRoot, { recursive: true, force: true });
 });
 
 function writeRollout({
@@ -381,12 +394,43 @@ describe("the declare command's refusals", () => {
   });
 
   /** @scenario "A failed post does not record the fingerprint" */
-  it("keeps no fingerprint when the collector cannot be reached", async () => {
+  /** @scenario "A declaration that cannot be delivered is queued, not lost" */
+  it("queues the declaration and records no fingerprint", async () => {
     await runContext({ fetchImpl: unreachableCollector });
 
-    expect(fs.readdirSync(stateDir)).toEqual([]);
+    // Nothing claims the context landed: only the spool directory exists.
+    expect(fs.readdirSync(stateDir)).toEqual(["spool"]);
+    const queued = readSpooledDeclarations({ stateDir, now: () => NOW });
+    expect(queued).toHaveLength(1);
+    expect(queued[0]!.agent).toBe("claude_code");
+    expect(queued[0]!.sessionId).toBe(SESSION_ID);
     expect(lines).toHaveLength(1);
-    expect(lines[0]).toContain("retried");
+    expect(lines[0]).toContain("Queued");
+    expect(lines[0]).toContain("next reports");
+  });
+
+  /** @scenario "A successful declaration queues nothing" */
+  it("queues nothing when the collector accepts the declaration", async () => {
+    await runContext();
+
+    expect(posted).toHaveLength(1);
+    expect(fs.existsSync(spoolDir(stateDir))).toBe(false);
+  });
+
+  /** @scenario "A declaration that cannot be delivered is queued, not lost" */
+  it("keeps only the newest queued declaration for a session", async () => {
+    await runContext({ fetchImpl: unreachableCollector });
+    await runContext({
+      fetchImpl: unreachableCollector,
+      runGit: gitRunner({
+        ...WORKTREE_GIT,
+        "branch --show-current": "feat/another-branch",
+      }),
+    });
+
+    expect(
+      readSpooledDeclarations({ stateDir, now: () => NOW }),
+    ).toHaveLength(1);
   });
 });
 
@@ -438,5 +482,108 @@ describe("the declaration and the hooks share one fingerprint", () => {
     expect(attributesOf(posted[1]!)["vcs.ref.head.name"]).toBe(
       "fix/regression",
     );
+  });
+});
+
+describe("a queued declaration and the next session report", () => {
+  /** Drive the real claude hook seam, collecting every body it sends. */
+  const runHookSeam = ({
+    fetchImpl,
+    cwd = "/repo",
+  }: { fetchImpl?: typeof fetch; cwd?: string } = {}) =>
+    hookCommand({
+      tool: "claude-code",
+      env: { OTEL_EXPORTER_OTLP_ENDPOINT: ENDPOINT },
+      readInput: () =>
+        Promise.resolve(
+          JSON.stringify({ session_id: SESSION_ID, cwd }),
+        ),
+      runGit: gitRunner({
+        ...WORKTREE_GIT,
+        "branch --show-current": "main",
+        "rev-parse --show-toplevel": "/repo",
+      }),
+      fetchImpl: fetchImpl ?? collector(),
+      now: () => NOW,
+      stateDir,
+      claudeRegistryDir: path.join(stateDir, "claude-sessions"),
+      readCliConfig: () => ({}),
+    });
+
+  /** @scenario "The next session report sends the queued declaration" */
+  it("sends the queued declaration and leaves the spool empty", async () => {
+    await runContext({ fetchImpl: unreachableCollector });
+    expect(posted).toHaveLength(0);
+
+    await runHookSeam();
+
+    const branches = posted.map(
+      (request) => attributesOf(request)["vcs.ref.head.name"],
+    );
+    expect(branches).toContain("feat/session-context");
+    expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toEqual([]);
+  });
+
+  /** @scenario "The queued declaration is the session's latest branch" */
+  it("posts the declared context last, after the hook's own directory", async () => {
+    await runContext({ fetchImpl: unreachableCollector });
+
+    await runHookSeam();
+
+    // The hook reports /repo on main; the declaration reports the worktree.
+    // The declaration has to land last or the session keeps the hook branch.
+    expect(posted.length).toBeGreaterThanOrEqual(2);
+    expect(attributesOf(posted[0]!)["vcs.ref.head.name"]).toBe("main");
+    expect(
+      attributesOf(posted[posted.length - 1]!)["vcs.ref.head.name"],
+    ).toBe("feat/session-context");
+  });
+
+  /** @scenario "The next session report sends the queued declaration" */
+  it("records the declared fingerprint, so the next turn stays quiet", async () => {
+    await runContext({ fetchImpl: unreachableCollector });
+    await runHookSeam();
+    posted.length = 0;
+    lines.length = 0;
+
+    await runContext();
+
+    expect(posted).toHaveLength(0);
+    expect(lines[0]).toContain("already declared");
+  });
+
+  /** @scenario "An expired queued declaration is dropped without posting" */
+  it("drops a declaration queued more than an hour ago", async () => {
+    await runContext({ fetchImpl: unreachableCollector });
+    const entry = spoolFilePath({
+      stateDir,
+      agent: "claude_code",
+      sessionId: SESSION_ID,
+    });
+    const stale = JSON.parse(fs.readFileSync(entry, "utf8")) as Record<
+      string,
+      unknown
+    >;
+    stale.queued_at_ms = NOW - 61 * 60_000;
+    fs.writeFileSync(entry, JSON.stringify(stale));
+
+    await runHookSeam();
+
+    const branches = posted.map(
+      (request) => attributesOf(request)["vcs.ref.head.name"],
+    );
+    expect(branches).not.toContain("feat/session-context");
+    expect(fs.existsSync(entry)).toBe(false);
+  });
+
+  /** @scenario "A queued declaration survives a failed send" */
+  it("keeps the entry when the send fails again", async () => {
+    await runContext({ fetchImpl: unreachableCollector });
+
+    await runHookSeam({ fetchImpl: unreachableCollector });
+
+    expect(
+      readSpooledDeclarations({ stateDir, now: () => NOW }),
+    ).toHaveLength(1);
   });
 });

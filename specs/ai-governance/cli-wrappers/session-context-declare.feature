@@ -182,6 +182,70 @@ Rule: The agent can declare its working context itself
     Then the fingerprint is not written
     And the exit code is zero
 
+  # Under codex's default sandbox the agent's shell has no network, so the
+  # command can never deliver from there and retrying inside the sandbox is
+  # worthless. The session report can: codex spawns its notify program from
+  # its own process, outside the sandbox, and the claude hooks run outside it
+  # too. So a declaration that cannot be sent waits for a seam that can.
+  @unit
+  Scenario: A declaration that cannot be delivered is queued, not lost
+    Given a collector the declare command cannot reach
+    When the declare command runs
+    Then nothing is posted
+    And the declaration is queued for the next session report
+    And the fingerprint is not written
+    And the command says the declaration is queued
+    And the exit code is zero
+
+  # Codex's sandbox refuses every write under the home directory, including
+  # into a directory that already exists, and allows the temp directory. The
+  # queue has to reach wherever the agent is allowed to write, or it is empty
+  # in exactly the case it exists for.
+  @unit
+  Scenario: A sandboxed declaration is queued where the sandbox allows
+    Given a shell that cannot write the state directory
+    When the declare command queues a declaration
+    Then it is queued in the temp directory instead
+    And the next session report still finds and sends it
+
+  @unit
+  Scenario: A successful declaration queues nothing
+    Given a collector that accepts the post
+    When the declare command runs
+    Then nothing is left queued
+
+  @unit
+  Scenario: The next session report sends the queued declaration
+    Given a declaration queued for a session
+    When that session next reports its context
+    Then the queued declaration is posted
+    And the fingerprint records the declared context
+    And nothing is left queued
+
+  # The seam reports the directory its own process runs in, which is the one
+  # the declaration exists to correct, so the declared context has to be the
+  # last record written or the session keeps the seam's branch.
+  @unit
+  Scenario: The queued declaration is the session's latest branch
+    Given a declaration queued for a session working in another checkout
+    When that session next reports its context
+    Then the seam posts its own directory first
+    And the queued declaration is posted after it
+
+  @unit
+  Scenario: An expired queued declaration is dropped without posting
+    Given a declaration queued more than an hour ago
+    When that session next reports its context
+    Then the queued declaration is not posted
+    And it is removed from the queue
+
+  @unit
+  Scenario: A queued declaration survives a failed send
+    Given a declaration queued for a session
+    And a collector the session report cannot reach either
+    When that session next reports its context
+    Then the declaration stays queued for the next turn
+
 Rule: The agent is told when to declare
 
   The guidance is one short text with one source in the code, injected through
