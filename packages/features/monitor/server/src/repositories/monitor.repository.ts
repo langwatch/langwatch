@@ -18,5 +18,9 @@ export abstract class MonitorRepository {
   abstract create(input: MonitorCreateInput & { id: string; slug: string; mappings: MonitorMappingState }): Promise<Monitor>;
   abstract update(input: MonitorUpdateInput & { slug: string; mappings: MonitorMappingState }): Promise<Monitor>;
   abstract delete(input: { id: string; projectId: string }): Promise<void>;
+  abstract deleteForExperiment(input: {
+    projectId: string;
+    experimentId: string;
+  }): Promise<void>;
   abstract isNameAvailable(input: MonitorNameAvailabilityInput): Promise<boolean>;
 }

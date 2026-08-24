@@ -108,6 +108,13 @@ export class MonitorService extends MonitorServiceContract {
     return { success: true };
   }
 
+  async deleteForExperiment(input: {
+    projectId: string;
+    experimentId: string;
+  }): Promise<void> {
+    await this.options.repository.deleteForExperiment(input);
+  }
+
   async isNameAvailable(input: MonitorNameAvailabilityInput): Promise<{ available: boolean }> {
     const parsed = monitorNameAvailabilityInputSchema.parse(input);
     return { available: await this.options.repository.isNameAvailable(parsed) };

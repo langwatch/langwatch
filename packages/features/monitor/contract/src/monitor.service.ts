@@ -19,5 +19,9 @@ export abstract class MonitorService {
   abstract create(input: MonitorCreateInput): Promise<Monitor>;
   abstract update(input: MonitorUpdateInput): Promise<Monitor>;
   abstract delete(input: MonitorIdInput): Promise<{ success: true }>;
+  abstract deleteForExperiment(input: {
+    projectId: string;
+    experimentId: string;
+  }): Promise<void>;
   abstract isNameAvailable(input: MonitorNameAvailabilityInput): Promise<{ available: boolean }>;
 }

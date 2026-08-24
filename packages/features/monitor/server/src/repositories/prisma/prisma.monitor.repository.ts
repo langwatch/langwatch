@@ -147,6 +147,13 @@ export class PrismaMonitorRepository extends MonitorRepository {
     await this.database.monitor.delete({ where: { id: input.id, projectId: input.projectId } });
   }
 
+  async deleteForExperiment(input: {
+    projectId: string;
+    experimentId: string;
+  }): Promise<void> {
+    await this.database.monitor.deleteMany({ where: input });
+  }
+
   async isNameAvailable(input: MonitorNameAvailabilityInput): Promise<boolean> {
     const row = await this.database.monitor.findFirst({
       where: { projectId: input.projectId, name: input.name },

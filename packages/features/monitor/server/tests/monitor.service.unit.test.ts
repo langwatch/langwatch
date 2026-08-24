@@ -49,6 +49,7 @@ class FakeRepository extends MonitorRepository {
     return this.value;
   }
   async delete() { this.value = null; }
+  async deleteForExperiment() { this.value = null; }
   async isNameAvailable(input: { name: string }) { return input.name !== monitor.name; }
 }
 
