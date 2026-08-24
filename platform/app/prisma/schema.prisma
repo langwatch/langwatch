@@ -238,6 +238,64 @@ model SsoConnection {
   @@index([verifiedDomains], type: Gin)
 }
 
+/// The join-request pipeline's projection (ADR-117, D12 - see
+/// specs/identity/join-requests.feature). A pure event-truth head like
+/// `Identifier` and `SsoConnection`: every column is fold-written, rows are
+/// never deleted (a terminal state is a tombstone the admin panel stops
+/// listing, not an absence), and a replay rebuilds it whole-row from the
+/// event log.
+///
+/// The fold cursor lives on the row rather than in a sibling table, because
+/// one row IS one aggregate here - a request.
+///
+/// No relation to Organization or User on purpose, matching the two heads
+/// above: a projection is rebuilt from events, and a foreign key would make a
+/// replay depend on relational state the log does not carry.
+///
+/// Membership is NOT here. An approval dispatches an attach on the grants
+/// ledger, exactly as accepting an invitation does, and that ledger fact
+/// carries `source: "join-request"` as its provenance - which is what puts a
+/// join approval on the customer's audit page beside every other membership
+/// change rather than in a history of its own.
+///
+/// The requester's address is not here either: the DOMAIN is the fact, and it
+/// is the only part of an address a join decision may depend on.
+model JoinRequest {
+  id                String    @id
+  userId            String
+  organizationId    String
+  /// The normalized domain the match was made on.
+  domain            String
+  /// PENDING | APPROVED | REJECTED | EXPIRED | WITHDRAWN
+  state             String
+  /// How the domain was matched; `verified-identifier-domain` today.
+  matchedVia        String
+  /// While PENDING: when the day-14 wake lapses it. Null once resolved.
+  expiresAt         DateTime?
+  resolvedAt        DateTime?
+  /// user | policy | invite - who ended it. `policy` is domain auto-join's
+  /// own principal, deliberately not the one SSO auto-join uses.
+  resolvedByType    String?
+  /// The admin's user id, `domain-auto`, or the invitation id.
+  resolvedById      String?
+  /// user | invite-accepted, on a withdrawal.
+  withdrawalCause   String?
+  occurredAt        DateTime
+  lastEventId       String
+  acceptedAt        DateTime
+  projectionVersion String
+  /// Event-derived, not database-managed: `@default(now())` / `@updatedAt`
+  /// would make a replayed row differ from the row it rebuilds, which is
+  /// exactly the parity this projection has to keep.
+  createdAt         DateTime
+  updatedAt         DateTime
+
+  @@index([organizationId, state])
+  @@index([userId, state])
+  @@index([userId, organizationId])
+  @@index([domain])
+}
+
 enum TeamUserRole {
   ADMIN
   MEMBER
@@ -393,6 +451,20 @@ model Organization {
   sentPlanLimitAlert     DateTime?
   ssoDomain              String?              @unique
   ssoProvider            String?
+  /// How colleagues on a matching domain get in (D12, ADR-117):
+  /// `off` (invisible to them entirely) | `request` (they ask, an admin
+  /// approves) | `auto` (a verified colleague walks straight in).
+  ///
+  /// `request` is the default for a self-serve organization; `auto` is never
+  /// a default and never inferred - an administrator turns it on, names the
+  /// domain in `joinDomains` while doing it, and the licence gate holds that
+  /// value while letting `request` through.
+  domainJoin             String               @default("request")
+  /// The domains an administrator NAMED when turning automatic joining on.
+  /// Empty means automatic joining admits nobody whatever `domainJoin` says -
+  /// which is what keeps a setting left on from admitting a domain nobody
+  /// ever agreed to.
+  joinDomains            String[]
   presenceEnabled        Boolean              @default(true)
   /// Org-level trace-sharing kill switch. Off = trace share links cannot be
   /// created in ANY project of this org, and existing links stop resolving —

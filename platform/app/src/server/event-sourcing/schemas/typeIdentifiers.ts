@@ -12,6 +12,8 @@ import {
 import {
   IDENTITY_COMMAND_TYPES,
   IDENTITY_EVENT_TYPES,
+  JOIN_REQUEST_COMMAND_TYPES,
+  JOIN_REQUEST_EVENT_TYPES,
   SSO_CONNECTION_COMMAND_TYPES,
   SSO_CONNECTION_EVENT_TYPES,
 } from "@langwatch/identity";
@@ -89,6 +91,7 @@ export const EVENT_TYPE_IDENTIFIERS = [
   ...AUTHZ_GRANTS_EVENT_TYPES,
   ...IDENTITY_EVENT_TYPES,
   ...SSO_CONNECTION_EVENT_TYPES,
+  ...JOIN_REQUEST_EVENT_TYPES,
   ...AUTOMATIONS_EVENT_TYPES,
   ...TRACE_PROCESSING_EVENT_TYPES,
   ...METRIC_PROCESSING_EVENT_TYPES,
@@ -113,6 +116,7 @@ export const COMMAND_TYPE_IDENTIFIERS = [
   ...AUTHZ_GRANTS_COMMAND_TYPES,
   ...IDENTITY_COMMAND_TYPES,
   ...SSO_CONNECTION_COMMAND_TYPES,
+  ...JOIN_REQUEST_COMMAND_TYPES,
   ...AUTOMATIONS_COMMAND_TYPES,
   ...TRACE_PROCESSING_COMMAND_TYPES,
   ...METRIC_PROCESSING_COMMAND_TYPES,
@@ -151,6 +155,11 @@ export const AGGREGATE_TYPE_IDENTIFIERS = [
   // Separate from `user_identity` because a pipeline declares ONE aggregate
   // type and the store validates every append against it (#7406).
   "sso_connection",
+  // D12: a join request is its own aggregate, tenanted by the organization,
+  // because the people who read one are its admins. Separate from
+  // `user_identity` for the same reason a connection is — one aggregate type
+  // per pipeline, validated at append (#7406).
+  "join_request",
   "trigger",
   "trace",
   "metric",

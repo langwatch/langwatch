@@ -15,6 +15,8 @@ import {
   IdentityEmailService,
   IdentityGuards,
   IdentityService,
+  JoinRequestGuards,
+  JoinRequestService,
   newIdentityCommandId,
   ShadowComparingDomainRoutingRepository,
   SignInRouterService,
@@ -34,12 +36,24 @@ import { LocalDoorBreakGlassBinding } from "./break-glass-binding";
 import { InProcessBreakGlassLimiter } from "./break-glass-limiter";
 import { IdentitySsoConnectionGrandfatherMigration } from "./connection-grandfather.migration";
 import { IdentityIdentifierBackfillMigration } from "./identifier-backfill.migration";
+import {
+  EmailJoinRequestNotifier,
+  PrismaJoinMembership,
+  PrismaJoinSettings,
+} from "./join-request-adapters";
+import { JoinRequestLedgerWriter } from "./join-request-ledger";
+import { JoinRequestsService } from "./join-requests.service";
 import { IdentityLedgerWriter } from "./ledger";
 import { PrismaIdentityBackfillRepository } from "./repositories/identity-backfill.prisma.repository";
 import { PrismaIdentityHeadsRepository } from "./repositories/identity-heads.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./repositories/identity-projection.prisma.repository";
 import { PrismaIdentityUsersRepository } from "./repositories/identity-users.prisma.repository";
 import { PrismaIdentityVerificationRepository } from "./repositories/identity-verification.prisma.repository";
+import { PrismaJoinRequestProjectionRepository } from "./repositories/join-request-projection.prisma.repository";
+import {
+  PrismaJoinCandidateRepository,
+  PrismaJoinRequestReadRepository,
+} from "./repositories/join-request.prisma.repository";
 import { LegacySsoDomainRoutingRepository } from "./repositories/legacy-sso-domain.prisma.repository";
 import { PrismaLegacySsoOrganizationRepository } from "./repositories/legacy-sso-organization.prisma.repository";
 import {
@@ -215,6 +229,53 @@ export function ssoConnections(): SsoConnectionService {
       projectionStore: new PrismaSsoConnectionProjectionRepository(prisma),
     }),
   );
+}
+
+/**
+ * The join-request write surface (D12, ADR-117). Composed per call like the
+ * two above: the ledger writer resolves the pipeline handle lazily, so a
+ * command composed before the App exists still appends once one does.
+ *
+ * This is the ONLY way a request changes. The sign-up interstitial, the
+ * members panel, the auto-join policy and the expiry wake all call these
+ * verbs; nothing writes a `JoinRequest` row, because the row is a projection
+ * of this log.
+ */
+export function joinRequests(): JoinRequestService {
+  return new JoinRequestService(
+    new JoinRequestGuards({
+      requests: new PrismaJoinRequestReadRepository(prisma),
+    }),
+    new JoinRequestLedgerWriter({
+      projectionStore: new PrismaJoinRequestProjectionRepository(prisma),
+    }),
+  );
+}
+
+/**
+ * Everything AROUND the lifecycle: matching, the reveal discipline, the rate
+ * limits, the notifications, and how an approval becomes a membership.
+ *
+ * `autoJoinLicensed` and `enabled` arrive as closures rather than as reads
+ * inside the service, for the reason every other seam here does: the packages
+ * read no env, and the licence asymmetry — the gate holds `auto` and lets
+ * `request` through — is a decision this composition root states once.
+ */
+export function joinRequestsService(deps: {
+  grants: ConstructorParameters<typeof PrismaJoinMembership>[1];
+  autoJoinLicensed: () => Promise<boolean>;
+  enabled: (args: { userId: string }) => Promise<boolean>;
+}): JoinRequestsService {
+  return new JoinRequestsService({
+    requests: joinRequests(),
+    reads: new PrismaJoinRequestReadRepository(prisma),
+    candidates: new PrismaJoinCandidateRepository(prisma),
+    membership: new PrismaJoinMembership(prisma, deps.grants),
+    notifier: new EmailJoinRequestNotifier(prisma),
+    settings: new PrismaJoinSettings(prisma),
+    autoJoinLicensed: deps.autoJoinLicensed,
+    enabled: deps.enabled,
+  });
 }
 
 /** The D04 grandfather as the migrations runtime registers it (tenant =

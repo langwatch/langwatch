@@ -905,6 +905,12 @@ export function initializeDefaultApp(options?: {
     ssoConnectionStranding: new PrismaSsoConnectionStrandingRepository(prisma),
     ssoBreakGlassBindings: new LocalDoorBreakGlassBinding(),
     ssoConnectionTeardown: new SsoConnectionTeardownDispatcher(),
+    joinRequestProjection: new PrismaJoinRequestProjectionRepository(prisma),
+    joinRequestReads: new PrismaJoinRequestReadRepository(prisma),
+    joinRequestLifecycle: new JoinRequestLifecycleDispatcher(
+      prisma,
+      new EmailJoinRequestNotifier(prisma),
+    ),
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,
     ),

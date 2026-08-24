@@ -19,12 +19,14 @@ import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/
 import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/webhookDelivery.process";
 import type {
   IdentityHeadsRepository,
+  JoinRequestReadRepository,
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
 } from "@langwatch/identity-server";
 import {
   IdentityGuards,
+  JoinRequestGuards,
   SsoConnectionGuards,
 } from "@langwatch/identity-server";
 import type {
@@ -187,7 +189,10 @@ import type { SimulationRunStateRepository } from "./pipelines/simulation-proces
 import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
 import type { SimulationProcessingEvent } from "./pipelines/simulation-processing/schemas/events";
+import { createJoinRequestPipeline } from "./pipelines/join-requests/pipeline";
 import { createSsoConnectionPipeline } from "./pipelines/sso-connections/pipeline";
+import type { JoinRequestLifecyclePort } from "./pipelines/join-requests/process-manager/joinRequestLifecycle.process";
+import type { JoinRequestFoldState } from "./pipelines/join-requests/projections/joinRequestState.foldProjection";
 import type { ConnectionTeardownPort } from "./pipelines/sso-connections/process-manager/connectionTeardown.process";
 import type { SsoConnectionFoldState } from "./pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
@@ -381,6 +386,12 @@ export interface PipelineRepositories {
   ssoBreakGlassBindings: SsoBreakGlassBindingRepository;
   /** How the teardown grace wake dispatches its completion command. */
   ssoConnectionTeardown: ConnectionTeardownPort;
+  /** The join-request pipeline's `JoinRequest` head + cursor (D12). */
+  joinRequestProjection: StateProjectionStore<JoinRequestFoldState>;
+  /** Postgres reads the join-request guards run against (ADR-117, D12). */
+  joinRequestReads: JoinRequestReadRepository;
+  /** How the reminder and expiry wakes reach the world. */
+  joinRequestLifecycle: JoinRequestLifecyclePort;
 }
 
 export interface PipelineRegistryDeps {
@@ -704,6 +715,19 @@ export class PipelineRegistry {
           stranding: this.deps.repositories.ssoConnectionStranding,
         }),
         teardown: this.deps.repositories.ssoConnectionTeardown,
+      }),
+    );
+    // The join-request pipeline (ADR-117, D12). Ships dark: `JOIN_REQUESTS`
+    // defaults off, so nothing dispatches a join command, no interstitial
+    // renders and no admin panel appears — a deploy changes nothing on its
+    // own, and rollback is the flag.
+    this.deps.eventSourcing.register(
+      createJoinRequestPipeline({
+        joinRequestProjectionStore: this.deps.repositories.joinRequestProjection,
+        joinRequestGuards: new JoinRequestGuards({
+          requests: this.deps.repositories.joinRequestReads,
+        }),
+        lifecycle: this.deps.repositories.joinRequestLifecycle,
       }),
     );
 
