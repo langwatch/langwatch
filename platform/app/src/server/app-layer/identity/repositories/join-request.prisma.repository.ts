@@ -1,7 +1,7 @@
 import {
   DEFAULT_DOMAIN_JOIN_SETTING,
-  type DomainJoinSetting,
   DOMAIN_JOIN_SETTINGS,
+  type DomainJoinSetting,
   isPublicEmailDomain,
   type JoinCandidateOrganization,
   type JoinRequestAggregateState,

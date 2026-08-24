@@ -113,7 +113,9 @@ export interface JoinRequestLedgerWriterDeps {
 export class JoinRequestLedgerWriter implements JoinRequestLedger {
   private readonly projectionStore: StateProjectionStore<JoinRequestFoldState>;
   private readonly eventStore: () => Promise<EventStore<JoinRequestEvent>>;
-  private readonly stagedSender: (name: string) => JoinRequestStagedSender | null;
+  private readonly stagedSender: (
+    name: string,
+  ) => JoinRequestStagedSender | null;
   private readonly convergence: { timeoutMs: number; pollMs: number };
 
   constructor(deps: JoinRequestLedgerWriterDeps) {

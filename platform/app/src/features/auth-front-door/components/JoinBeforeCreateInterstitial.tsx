@@ -1,6 +1,6 @@
 import { Button, Text, VStack } from "@chakra-ui/react";
-import { useEffect } from "react";
 import type { JoinLookupDecision } from "@langwatch/identity";
+import { useEffect } from "react";
 import {
   type JoinableOrganization,
   resolveJoinBeforeCreate,

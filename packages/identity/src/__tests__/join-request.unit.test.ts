@@ -70,7 +70,7 @@ describe("given nobody has asked yet", () => {
 
 describe("given a pending request", () => {
   describe("when an administrator approves it", () => {
-    /** @scenario An administrator approves and the person becomes a member */
+    /** @scenario One click makes the requester a member */
     it("records who resolved it and clears the deadline", () => {
       const state = reduceJoinRequest({
         state: pending(),
@@ -118,7 +118,7 @@ describe("given a pending request", () => {
   });
 
   describe("when an administrator rejects it", () => {
-    /** @scenario An administrator rejects and nothing is revealed */
+    /** @scenario A rejection ends the request without asking for a reason */
     it("records the ending without a reason of any kind", () => {
       const state = reduceJoinRequest({
         state: pending(),
@@ -145,7 +145,7 @@ describe("given a pending request", () => {
   });
 
   describe("when the requester withdraws it", () => {
-    /** @scenario The requester withdraws while it is still pending */
+    /** @scenario The requester can withdraw and stop bothering anybody */
     it("records the cause so an invitation crossing it is distinguishable", () => {
       const byUser = reduceJoinRequest({
         state: pending(),

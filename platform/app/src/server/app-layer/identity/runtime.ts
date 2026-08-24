@@ -9,6 +9,8 @@
  * `~/server/db` at module scope. Every environment read the services need
  * is a closure passed from here — the packages read no env of their own.
  */
+
+import { platformSSOAllowed } from "@ee/sso/sso-gate";
 import type { SignInDomainRoutingPort } from "@langwatch/identity-server";
 import {
   IdentityBackfillService,
@@ -26,14 +28,13 @@ import {
   VerificationCeremonyService,
 } from "@langwatch/identity-server";
 import { IdentityCeremonies } from "@langwatch/identity-server/better-auth";
-import { platformSSOAllowed } from "@ee/sso/sso-gate";
 import { hash } from "bcrypt";
 import { env } from "~/env.mjs";
 import { prisma } from "../../db";
 import { featureFlagService } from "../../featureFlag";
-import { grantsLedgerWriter } from "../authz/ledger";
 import { sendSignUpVerificationEmail } from "../../mailer/signUpVerificationEmail";
 import { createCredentialUser } from "../../users/credential-user";
+import { grantsLedgerWriter } from "../authz/ledger";
 import { PrismaSystemMigrationStateRepository } from "../system-migrations/repositories/system-migration-state.prisma.repository";
 import { LocalDoorBreakGlassBinding } from "./break-glass-binding";
 import { InProcessBreakGlassLimiter } from "./break-glass-limiter";
@@ -52,11 +53,11 @@ import { PrismaIdentityHeadsRepository } from "./repositories/identity-heads.pri
 import { PrismaIdentityProjectionRepository } from "./repositories/identity-projection.prisma.repository";
 import { PrismaIdentityUsersRepository } from "./repositories/identity-users.prisma.repository";
 import { PrismaIdentityVerificationRepository } from "./repositories/identity-verification.prisma.repository";
-import { PrismaJoinRequestProjectionRepository } from "./repositories/join-request-projection.prisma.repository";
 import {
   PrismaJoinCandidateRepository,
   PrismaJoinRequestReadRepository,
 } from "./repositories/join-request.prisma.repository";
+import { PrismaJoinRequestProjectionRepository } from "./repositories/join-request-projection.prisma.repository";
 import { LegacySsoDomainRoutingRepository } from "./repositories/legacy-sso-domain.prisma.repository";
 import { PrismaLegacySsoOrganizationRepository } from "./repositories/legacy-sso-organization.prisma.repository";
 import {

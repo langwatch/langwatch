@@ -67,7 +67,7 @@ describe("given nobody has asked yet", () => {
   });
 
   describe("when somebody asks on a company domain", () => {
-    /** @scenario Somebody on the company domain asks to join */
+    /** @scenario A verified colleague asks to join and the admins are told */
     it("states the request with the normalized domain", async () => {
       const facts = await guards.requestJoin({
         ...command,
@@ -102,7 +102,7 @@ describe("given nobody has asked yet", () => {
   });
 
   describe("when the same person already has a request open", () => {
-    /** @scenario Asking twice is one request, not two */
+    /** @scenario One open request per person per organization */
     it("refuses the second ask", async () => {
       requests.pending = stateIn("PENDING");
 

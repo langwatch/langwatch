@@ -12,7 +12,10 @@ import {
 } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
-import { identityEmail } from "~/server/app-layer/identity/runtime";
+import {
+  identityEmail,
+  joinRequestsService,
+} from "~/server/app-layer/identity/runtime";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
 import { MemberSeatLimitReachedError } from "~/server/app-layer/organizations/errors";
 import { enrichTeamWithRoleBindings } from "~/server/app-layer/organizations/organization.service";
@@ -661,6 +664,33 @@ export const organizationRouter = createTRPCRouter({
       }
 
       if (created.invites.length > 0) {
+        // D11 x D12, invitation -> request: a formal invitation sent to
+        // somebody with an open request ANSWERS it. The invitation carries
+        // the role and the teams, which is the flow that owns them, so the
+        // request resolves as approved-by-invitation rather than staying
+        // open beside it. Silent when nothing is open, and never fatal — the
+        // invitation is the durable outcome here.
+        await Promise.all(
+          created.invites.map(async (record) => {
+            const invited = await ctx.prisma.user.findFirst({
+              where: { email: record.invite.email },
+              select: { id: true },
+            });
+            if (!invited) return;
+            try {
+              await joinRequestsService().resolveByInvitation({
+                userId: invited.id,
+                organizationId: record.invite.organizationId,
+                inviteId: record.invite.id,
+              });
+            } catch (error) {
+              captureException(toError(error), {
+                tags: { organizationId: record.invite.organizationId },
+              });
+            }
+          }),
+        );
+
         trackServerEvent({
           userId: ctx.session.user.id,
           event: "team_member_invited",
@@ -813,6 +843,22 @@ export const organizationRouter = createTRPCRouter({
         invite,
         viaIdentifierId,
       });
+
+      // D11 x D12, acceptance -> request: accepting an invitation withdraws
+      // the same person's open request for this organization, so the
+      // membership lands exactly once and the admins' panel empties itself.
+      // Never fatal — the membership is the durable outcome, and a request
+      // left open is answered by the next approval or by the expiry.
+      try {
+        await joinRequestsService().withdrawOnInvitationAccepted({
+          userId: session.user.id,
+          organizationId: invite.organizationId,
+        });
+      } catch (error) {
+        captureException(toError(error), {
+          tags: { organizationId: invite.organizationId },
+        });
+      }
 
       // Provision the user's Personal Workspace (Team.isPersonal +
       // Project.isPersonal) for this org. Idempotent — safe if a prior

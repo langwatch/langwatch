@@ -4,13 +4,13 @@ import {
   type DomainJoinSetting,
   isPublicEmailDomain,
   JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD,
-  type JoinLookupDecision,
-  type JoinOffer,
-  type JoinRequestAggregateState,
   JoinAutoConnectionAdmitsError,
   JoinAutoDomainUnprovenError,
   JoinAutoNotLicensedError,
+  type JoinLookupDecision,
   JoinNotAvailableError,
+  type JoinOffer,
+  type JoinRequestAggregateState,
   JoinRequestNotFoundError,
   JoinRequestThrottledError,
   joinDomainOf,
@@ -220,7 +220,10 @@ export class JoinRequestsService {
       organizationId,
       domain,
     });
-    if (!candidate || !organizationAdmitsDomain({ organization: candidate, domain })) {
+    if (
+      !candidate ||
+      !organizationAdmitsDomain({ organization: candidate, domain })
+    ) {
       // The same refusal an organization that does not exist produces.
       throw new JoinNotAvailableError(
         `organization ${organizationId} is not open to ${domain}`,
@@ -517,6 +520,15 @@ export class JoinRequestsService {
       joinDomains: domainJoin === "auto" ? normalized : [],
     });
     return { previous: current.domainJoin, next: domainJoin };
+  }
+
+  /** How this organization has set joining, for the settings card. */
+  async readJoining({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<{ domainJoin: DomainJoinSetting; joinDomains: string[] }> {
+    return this.deps.settings.read({ organizationId });
   }
 
   /** What is waiting on this organization. */

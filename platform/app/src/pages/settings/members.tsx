@@ -29,6 +29,9 @@ import { captureException } from "~/utils/posthogErrorCapture";
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import { CopyInput } from "../../components/CopyInput";
 import { InvitesTable } from "../../components/members/InvitesTable";
+import { DomainJoinCard } from "../../components/members/DomainJoinCard";
+import { JoinRequestsTable } from "../../components/members/JoinRequestsTable";
+import { useJoinRequests } from "../../components/members/useJoinRequests";
 import SettingsLayout from "../../components/SettingsLayout";
 import { DepartmentPicker } from "../../components/settings/DepartmentPicker";
 import { MemberDetailDialog } from "../../components/settings/MemberDetailDialog";
@@ -274,6 +277,15 @@ function MembersList({
     [pendingInvites.data],
   );
 
+  // One panel, two directions (D12): an invitation is the organization
+  // reaching out, a request is somebody reaching in, and an admin answers
+  // both in the same place. Renders nothing when nothing is waiting — which
+  // is also what the flag being off looks like from here.
+  const joinRequests = useJoinRequests({
+    organizationId: organization.id,
+    canManage: hasOrganizationManagePermission,
+  });
+
   return (
     <SettingsLayout>
       <VStack gap={6} width="full" align="start">
@@ -434,6 +446,24 @@ function MembersList({
             </Table.Root>
           </Card.Body>
         </Card.Root>
+
+        {hasOrganizationManagePermission && (
+          <DomainJoinCard
+            key={`${joinRequests.joining.domainJoin}:${joinRequests.joining.joinDomains.join(",")}`}
+            domainJoin={joinRequests.joining.domainJoin}
+            joinDomains={joinRequests.joining.joinDomains}
+            saving={joinRequests.savingJoining}
+            onSave={joinRequests.setJoining}
+          />
+        )}
+
+        <JoinRequestsTable
+          requests={joinRequests.requests}
+          isAdmin={hasOrganizationManagePermission}
+          answeringId={joinRequests.answeringId}
+          onApprove={joinRequests.approve}
+          onReject={joinRequests.reject}
+        />
 
         <InvitesTable
           invites={invites}

@@ -6,25 +6,25 @@ import {
 import { newJoinRequestCommandId } from "@langwatch/identity-server";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import { KSUID_RESOURCES } from "~/generated/ksuid-resources";
+import { env } from "~/env.mjs";
 import {
   OrganizationUserRole,
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
+import type { JoinRequestLifecyclePort } from "~/server/event-sourcing/pipelines/join-requests/process-manager/joinRequestLifecycle.process";
 import { buildMembersSettingsUrl } from "~/server/invites/invite-link";
 import {
   sendDomainAutoJoinedEmail,
   sendJoinRequestApprovedEmail,
   sendJoinRequestArrivedEmail,
   sendJoinRequestExpiredEmail,
-  sendJoinRequestReminderEmail,
   sendJoinRequestRejectedEmail,
+  sendJoinRequestReminderEmail,
 } from "~/server/mailer/joinRequestEmails";
-import { env } from "~/env.mjs";
-import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
-import type { JoinRequestLifecyclePort } from "~/server/event-sourcing/pipelines/join-requests/process-manager/joinRequestLifecycle.process";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import type {
   JoinMembershipPort,
   JoinRequestNotifier,
@@ -131,7 +131,9 @@ export class PrismaJoinSettings implements JoinSettingPort {
       select: { domainJoin: true, joinDomains: true },
     });
     return {
-      domainJoin: row ? readDomainJoin(row.domainJoin) : DEFAULT_DOMAIN_JOIN_SETTING,
+      domainJoin: row
+        ? readDomainJoin(row.domainJoin)
+        : DEFAULT_DOMAIN_JOIN_SETTING,
       joinDomains: row?.joinDomains ?? [],
     };
   }
@@ -414,7 +416,9 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
  * pipeline handle lazily off the App, which is what lets this be constructed
  * during composition and still append once the App exists.
  */
-export class JoinRequestLifecycleDispatcher implements JoinRequestLifecyclePort {
+export class JoinRequestLifecycleDispatcher
+  implements JoinRequestLifecyclePort
+{
   constructor(
     private readonly prisma: PrismaClient,
     private readonly notifier: JoinRequestNotifier,

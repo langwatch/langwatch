@@ -144,7 +144,7 @@ describe("given a request that nobody has answered", () => {
 
 describe("given a request that reached an ending", () => {
   describe("when the process sees the ending", () => {
-    /** @scenario The requester withdraws while it is still pending */
+    /** @scenario The requester can withdraw and stop bothering anybody */
     it("disarms, so no reminder and no expiry wake follows", () => {
       const evolution = onJoinResolved(armed(), {}, ctx(REQUESTED_AT) as never);
 

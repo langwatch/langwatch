@@ -223,8 +223,14 @@ import { NullGithubInstallationsRepository } from "./github/repositories/github-
 import { PrismaGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.prisma.repository";
 import { NullGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
 import { LocalDoorBreakGlassBinding } from "./identity/break-glass-binding";
+import {
+  EmailJoinRequestNotifier,
+  JoinRequestLifecycleDispatcher,
+} from "./identity/join-request-adapters";
 import { PrismaIdentityHeadsRepository } from "./identity/repositories/identity-heads.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./identity/repositories/identity-projection.prisma.repository";
+import { PrismaJoinRequestReadRepository } from "./identity/repositories/join-request.prisma.repository";
+import { PrismaJoinRequestProjectionRepository } from "./identity/repositories/join-request-projection.prisma.repository";
 import { PrismaSsoConnectionProjectionRepository } from "./identity/repositories/sso-connection-projection.prisma.repository";
 import {
   PrismaSsoConnectionReadRepository,

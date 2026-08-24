@@ -36,7 +36,9 @@ export class PrismaJoinRequestProjectionRepository
     key: string,
     _context: ProjectionStoreContext,
   ): Promise<StoredProjection<JoinRequestFoldState> | null> {
-    const row = await this.prisma.joinRequest.findUnique({ where: { id: key } });
+    const row = await this.prisma.joinRequest.findUnique({
+      where: { id: key },
+    });
     if (!row) return null;
     return {
       state: {

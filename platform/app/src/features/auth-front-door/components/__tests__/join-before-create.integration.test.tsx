@@ -103,17 +103,21 @@ describe("given a domain that admits verified colleagues automatically", () => {
   describe("when sign-up reaches the join-before-create step", () => {
     /** @scenario Automatic joining skips the step entirely */
     it("shows neither a join offer nor a workspace creation step", async () => {
-      const { container, onCreateWorkspace, onJoinOrganization, onAlreadyJoined } =
-        renderStep({
-          lookup: {
-            outcome: "auto",
-            organization: {
-              organizationId: "org_acme",
-              name: "Acme",
-              colleagueCount: 10,
-            },
+      const {
+        container,
+        onCreateWorkspace,
+        onJoinOrganization,
+        onAlreadyJoined,
+      } = renderStep({
+        lookup: {
+          outcome: "auto",
+          organization: {
+            organizationId: "org_acme",
+            name: "Acme",
+            colleagueCount: 10,
           },
-        });
+        },
+      });
 
       expect(container.innerHTML).toBe("");
       await waitFor(() => {
@@ -141,7 +145,9 @@ describe("given a request that is already waiting on the admins", () => {
       ).toBeInTheDocument();
       // Explicit, and never automatic: the request stays open either way.
       expect(
-        screen.getByRole("button", { name: /Create a new organization anyway/ }),
+        screen.getByRole("button", {
+          name: /Create a new organization anyway/,
+        }),
       ).toBeInTheDocument();
       expect(onCreateWorkspace).not.toHaveBeenCalled();
       // The ask is not offered a second time.

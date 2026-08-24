@@ -38,7 +38,7 @@ Feature: Join before create - the choice happens before an organization is minte
 
   # ── The order of the two offers ────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: Sign-up offers the team before offering a workspace
     Given an organization "acme" open to requests from "acme.com"
     When "sam" completes verification
@@ -46,20 +46,20 @@ Feature: Join before create - the choice happens before an organization is minte
     And creating a new organization is there as the explicit secondary choice
     And "acme" is named with a rounded count of colleagues, nothing more
 
-  @integration @unimplemented
+  @integration
   Scenario: With nothing to offer, sign-up continues exactly as before
     Given no organization is open to "acme.com"
     When "sam" completes verification
     Then the step renders nothing and "sam" continues to create a workspace
 
-  @integration @unimplemented
+  @integration
   Scenario: Automatic joining skips the step entirely
     Given "acme" admits verified colleagues on "acme.com" automatically
     When "sam" completes verification
     Then "sam" is already a member of "acme" when the next screen paints
     And no join offer and no workspace creation step is shown
 
-  @unit @unimplemented
+  @unit
   Scenario: The step never runs before the address is verified
     Given "sam" has typed the address but not verified it
     When the sign-up flow reaches this point
@@ -75,7 +75,7 @@ Feature: Join before create - the choice happens before an organization is minte
     Then "sam" belongs to no organization while the request is open
     And no workspace was created on "sam"'s behalf at any point
 
-  @integration @unimplemented
+  @integration
   Scenario: A waiting requester can still create a workspace, deliberately
     Given "sam" has a PENDING request to join "acme"
     When "sam" signs in

@@ -99,9 +99,10 @@ export const joinRequestsRouter = createTRPCRouter({
   withdraw: protectedProcedure
     .input(z.object({ joinRequestId: z.string().min(1) }))
     .noPermission({
+      // No `allow` map: `joinRequestId` is not a scope id, and the handler
+      // refuses a request that is not the caller's as if it did not exist.
       reason:
-        "the requester withdrawing their own request; the handler refuses a request that is not theirs as if it did not exist",
-      allow: { joinRequestId: "the caller's own request" },
+        "the requester withdrawing their own request, matched on the session's user id",
     })
     .mutation(async ({ ctx, input }) => {
       await joinRequestsService().withdraw({
@@ -115,13 +116,24 @@ export const joinRequestsRouter = createTRPCRouter({
   pending: protectedProcedure
     .input(z.object({ organizationId: z.string().min(1) }))
     .permission("organization:manage")
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const pending = await joinRequestsService().pendingForOrganization({
         organizationId: input.organizationId,
       });
+      // Who is asking, by name. The requester's ADDRESS is deliberately not
+      // returned: the domain is what was matched and what the admin is
+      // deciding on, and the local part is not the organization's business
+      // until the person is a member.
+      const names = await ctx.prisma.user.findMany({
+        where: { id: { in: pending.map((request) => request.userId) } },
+        select: { id: true, name: true },
+      });
+      const nameById = new Map(names.map((user) => [user.id, user.name]));
+
       return pending.map((request) => ({
         joinRequestId: request.joinRequestId,
         userId: request.userId,
+        name: nameById.get(request.userId) ?? "A colleague",
         domain: request.domain,
         requestedAt: new Date(request.createdAtMs),
         expiresAt:
@@ -168,6 +180,18 @@ export const joinRequestsRouter = createTRPCRouter({
         adminUserId: ctx.session.user.id,
       });
       return { success: true };
+    }),
+
+  /** How colleagues on a matching domain currently get in, for the settings
+   *  card. Behind `organization:manage` like the write: an organization's
+   *  joining posture is not a stranger's business. */
+  joining: protectedProcedure
+    .input(z.object({ organizationId: z.string().min(1) }))
+    .permission("organization:manage")
+    .query(async ({ input }) => {
+      return joinRequestsService().readJoining({
+        organizationId: input.organizationId,
+      });
     }),
 
   /** How colleagues on a matching domain get in. */
