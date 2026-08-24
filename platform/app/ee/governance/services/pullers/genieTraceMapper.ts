@@ -9,11 +9,14 @@
  * token estimation all come from the standard trace door — no parallel
  * pipeline.
  *
- * Identity (Decision 10): trace id = hash(conversation_id + message_id),
- * span ids = the same plus `auto_regenerate_count`. The event store is
- * first-write-wins per span id, so an unchanged re-pull is a durable no-op
- * and a REGENERATED answer (bumped count) lands as a new attempt entry
- * beside the original instead of being silently dropped.
+ * Identity (Decision 10): trace id = hash(ingestion_source_id +
+ * conversation_id + message_id), span ids = the same plus
+ * `auto_regenerate_count`, thread id = source + conversation. The source
+ * namespace is load-bearing — provider ids are unique per Genie workspace,
+ * not globally, and one destination project can take pulls from several
+ * sources. The event store is first-write-wins per span id, so an unchanged
+ * re-pull is a durable no-op and a REGENERATED answer (bumped count) lands as
+ * a new attempt entry beside the original instead of being silently dropped.
  *
  * Rendering contract (Decision 12, from the 35-message capture):
  *   user bubble      ← message.content            (langwatch.input)
@@ -266,6 +269,8 @@ interface GenieMessageFrame {
   messageId: string;
   regenCount: number;
   traceId: string;
+  /** `conversationId` namespaced by source — the explorer's grouping key. */
+  threadId: string;
   spanSeed: string;
   rootSpanId: string;
   startMs: number;
@@ -316,7 +321,18 @@ function frameOf(
     payload.auto_regenerate_count > 0
       ? payload.auto_regenerate_count
       : 0;
-  const spanSeed = `genie:${conversationId}:${messageId}:${regenCount}`;
+  // Every derived identity is namespaced by the ingestion source.
+  //
+  // `conversation_id` and `message_id` are unique WITHIN a Genie workspace, and
+  // one destination project can receive pulls from more than one source. Two
+  // sources are two independent identifier domains, so an unqualified seed
+  // gambles on their values never meeting — and the failure is silent in all
+  // three directions: equal span ids dedupe the second conversation away at
+  // `tenant:trace:span` (first write wins, permanently — the Redis gate is only
+  // the fast path), and an equal thread id interleaves two workspaces' turns
+  // into one rendered conversation.
+  const identityNamespace = `genie:${origin.ingestionSourceId}`;
+  const spanSeed = `${identityNamespace}:${conversationId}:${messageId}:${regenCount}`;
   // Both timestamp sources can be garbage (mapToOcsfRow guards the same
   // field). NaN here would serialize as "NaN000000" and fail spanSchema,
   // dropping the whole conversation — degrade to pull time instead.
@@ -331,7 +347,8 @@ function frameOf(
     conversationId,
     messageId,
     regenCount,
-    traceId: hashId(`genie:${conversationId}:${messageId}`, 32),
+    traceId: hashId(`${identityNamespace}:${conversationId}:${messageId}`, 32),
+    threadId: `${origin.ingestionSourceId}:${conversationId}`,
     spanSeed,
     rootSpanId: hashId(`${spanSeed}:root`, 16),
     startMs,
@@ -383,7 +400,7 @@ function rootAttributesOf(
   if (reasoning) assistantMessage.reasoning_content = reasoning;
   return [
     stringAttr("langwatch.span.type", "llm"),
-    stringAttr("langwatch.thread.id", frame.conversationId),
+    stringAttr("langwatch.thread.id", frame.threadId),
     stringAttr(
       "langwatch.input",
       JSON.stringify({

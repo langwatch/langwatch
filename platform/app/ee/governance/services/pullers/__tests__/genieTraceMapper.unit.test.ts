@@ -226,7 +226,7 @@ describe("given a completed Genie message from the capture shape", () => {
     expect(rootAttrs["langwatch.origin.kind"]).toBe("ingestion_source");
     expect(rootAttrs["langwatch.ingestion_source.id"]).toBe("source-1");
     expect(rootAttrs["langwatch.user.id"]).toBe("90210");
-    expect(rootAttrs["langwatch.thread.id"]).toBe("conv-1");
+    expect(rootAttrs["langwatch.thread.id"]).toBe("source-1:conv-1");
   });
 });
 
@@ -363,6 +363,44 @@ describe("given a message a sweep caught mid-answer", () => {
       );
       const request = mapGenieEventsToTraceRequest([statusless], ORIGIN);
       expect(request).not.toBeNull();
+    });
+  });
+});
+
+describe("given two ingestion sources routing into one destination project", () => {
+  // Provider ids are unique per Genie workspace, not globally. Two sources are
+  // two identifier domains; equal coordinates must stay distinct traces, or the
+  // `tenant:trace:span` first-write dedupe silently swallows the second.
+  const SECOND_ORIGIN = { ...ORIGIN, ingestionSourceId: "source-2" };
+  const message = completedMessage();
+
+  function rootOf(origin: typeof ORIGIN) {
+    const request = mapGenieEventsToTraceRequest([genieEvent(message)], origin);
+    const spans = request?.resourceSpans?.[0]?.scopeSpans?.[0]?.spans ?? [];
+    return spans.find((s) => s.name === GENIE_MESSAGE_SPAN_NAME)!;
+  }
+
+  describe("when both carry the same conversation and message ids", () => {
+    const first = rootOf(ORIGIN);
+    const second = rootOf(SECOND_ORIGIN);
+
+    it("keeps the traces distinct so neither dedupes the other away", () => {
+      expect(first.traceId).not.toBe(second.traceId);
+      expect(first.spanId).not.toBe(second.spanId);
+    });
+
+    it("keeps the conversations distinct so their turns do not interleave", () => {
+      expect(attrsOf(first)["langwatch.thread.id"]).toBe("source-1:conv-1");
+      expect(attrsOf(second)["langwatch.thread.id"]).toBe("source-2:conv-1");
+    });
+  });
+
+  describe("when one source re-pulls the same message", () => {
+    it("still produces identical ids, so the re-pull stays a durable no-op", () => {
+      const first = rootOf(ORIGIN);
+      const again = rootOf(ORIGIN);
+      expect(again.traceId).toBe(first.traceId);
+      expect(again.spanId).toBe(first.spanId);
     });
   });
 });
