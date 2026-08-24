@@ -38,7 +38,7 @@
  *   ANTHROPIC_API_KEY=... OPENAI_API_KEY=... \
  *     pnpm tsx scripts/seed-governance-refactor-dogfood.ts
  *
- * Take those keys from platform/app/.env, which is where this app's model
+ * Take those keys from .env, which is where this app's model
  * provider keys live. An env file from another repository drifts, and a
  * stale key is indistinguishable from a fresh one once it is stored.
  *

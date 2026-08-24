@@ -14,8 +14,8 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 // Resolve .env.example relative to this test file's location:
-// src/__tests__/ -> ../../ -> langwatch/ -> .env.example
-const ENV_EXAMPLE_PATH = path.join(__dirname, "../../.env.example");
+// platform/app/src/__tests__/ -> repository root -> .env.example
+const ENV_EXAMPLE_PATH = path.join(__dirname, "../../../../.env.example");
 
 const envExampleLines: string[] = readFileSync(ENV_EXAMPLE_PATH, "utf-8").split(
   "\n",
@@ -52,7 +52,7 @@ function getPrecedingLines(key: string, windowSize = 5): string[] {
   return envExampleLines.slice(start, idx);
 }
 
-describe("platform/app/.env.example", () => {
+describe(".env.example", () => {
   describe("when the gateway-secret declarations are inspected", () => {
     /** @scenario .env.example ships a sentinel placeholder for LW_VIRTUAL_KEY_PEPPER */
     it("declares a non-empty sentinel value for LW_VIRTUAL_KEY_PEPPER", () => {

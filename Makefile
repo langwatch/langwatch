@@ -95,7 +95,7 @@ setup-hooks:
 # Run a Go service via the mono-binary.
 # Usage: make service svc=aigateway
 #
-# Sources every var from platform/app/.env into the Go process's environment.
+# Sources every var from .env into the Go process's environment.
 # The gateway + control-plane intentionally share secrets (LW_GATEWAY_*,
 # LW_VIRTUAL_KEY_PEPPER etc.) — one flat .env is simpler than namespace
 # prefixes. Vars the Go service doesn't need are ignored.
@@ -119,7 +119,7 @@ setup-hooks:
 # the default port, and wrong everywhere else with no error anywhere: the
 # gateway still proxies LLM traffic and returns 200, it just ships spend,
 # budget and auth traffic to whichever control plane that port belongs to.
-DEV_ENV_FILE ?= platform/app/.env
+DEV_ENV_FILE ?= .env
 service:
 	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
 	@_snap=$$(export -p) && \
@@ -135,7 +135,7 @@ service:
 # Usage: make service-watch svc=aigateway
 service-watch:
 	@test -n "$(svc)" || (echo "usage: make watch svc=<name>" && exit 1)
-	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed platform/app/.env first" && exit 1)
+	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed .env first" && exit 1)
 	@which air > /dev/null 2>&1 || (echo "Installing air..." && go install github.com/air-verse/air@latest)
 	@_snap=$$(export -p) && \
 		set -a && . $(DEV_ENV_FILE) && set +a && \
@@ -152,10 +152,10 @@ service-watch:
 # all-local, all-local-nlp, dev-storage, dev-infra, frontend-only,
 # migration, full-local.
 
-# Refresh AWS SSO credentials in platform/app/.env so `make quickstart
+# Refresh AWS SSO credentials in .env so `make quickstart
 # dev-storage` can talk to runtime-storage-dev. SSO temporary tokens
 # expire ~hourly; this rotates the three S3_*_KEY/TOKEN lines in
-# platform/app/.env, leaving S3_BUCKET_NAME/S3_ENDPOINT/S3_REGION alone.
+# .env, leaving S3_BUCKET_NAME/S3_ENDPOINT/S3_REGION alone.
 refresh-dev-s3:
 	@bash platform/app/scripts/refresh-dev-s3-env.sh
 

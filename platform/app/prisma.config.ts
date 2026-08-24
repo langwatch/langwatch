@@ -1,8 +1,10 @@
 // Prisma 7 CLI configuration. The CLI no longer auto-loads .env, so dotenv
 // runs first; the runtime client gets its connection from the pg driver
 // adapter in src/server/db.ts, not from here.
-import "dotenv/config";
+import { config } from "dotenv";
 import { defineConfig } from "prisma/config";
+
+config({ path: ["../../.env", ".env"] });
 
 export default defineConfig({
   // Transitional monolith composition only. The canonical schema and

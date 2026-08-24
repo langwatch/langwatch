@@ -2,7 +2,7 @@
  * @vitest-environment node
  *
  * Tests for dev/scripts/lib/derive-gateway-base-url.sh, sourced the same way
- * `make service` / `make service-watch` source it: after platform/app/.env,
+ * `make service` / `make service-watch` source it: after .env,
  * so an explicit LW_GATEWAY_BASE_URL (inherited from the shell, or set in
  * .env) always wins over the derived one. Mirrors the PORT + 1000 rule
  * platform/app/scripts/start.sh already uses for `pnpm dev` (the API port
@@ -50,7 +50,7 @@ echo "__LW_GATEWAY_BASE_URL=\${LW_GATEWAY_BASE_URL:-}"
       stdio: ["pipe", "pipe", "pipe"],
       // Isolate the subprocess env. The helper reads PORT / LW_GATEWAY_BASE_URL,
       // so any of those present on the parent process (e.g. loaded from the
-      // developer's platform/app/.env) would leak in and make assertions
+      // developer's .env) would leak in and make assertions
       // depend on the local machine. Start from a bare PATH and let each
       // test's own export/unset lines be the single source of truth.
       env: { PATH: process.env.PATH ?? "" },

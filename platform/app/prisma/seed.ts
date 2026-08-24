@@ -9,7 +9,7 @@
  * Optional extras (all env-gated, all idempotent):
  *   - Model providers from the environment (HAVEN_SEED_MODEL_PROVIDERS=0
  *     disables): every registry provider whose API-key variable is set in the
- *     process env / platform/app/.env / repo-root .env gets an enabled,
+ *     process env / .env / repo-root .env gets an enabled,
  *     org-scoped ModelProvider row with those keys.
  *   - HAVEN_SEED_FIRST_MESSAGE=1|0 forces the project's firstMessage/
  *     integrated flags on or off, independent of HAVEN_SEED_PRESET=demo.
@@ -434,7 +434,7 @@ async function main() {
 // Model providers from the environment.
 //
 // For every provider in the registry whose primary API-key variable is set —
-// in the process env, platform/app/.env, or the repo-root .env — upsert an
+// in the process env, .env, or the repo-root .env — upsert an
 // enabled, ORGANIZATION-scoped ModelProvider carrying those keys (encrypted
 // exactly as modelProvider.repository does), so a fresh local stack can talk
 // to the providers the developer already has credentials for without pasting
@@ -446,17 +446,18 @@ async function main() {
 const MODEL_PROVIDER_ID_PREFIX = "local-dev-model-provider-";
 
 // loadSeedEnv merges the dotenv layers under the child's real precedence:
-// process env wins over platform/app/.env, which wins over the repo-root .env.
+// process env wins over the repository-root .env. The legacy app-local file
+// remains a migration fallback until platform/app is removed.
 // The seed always runs with cwd=platform/app/ (haven, CI, and the pnpm script
 // all invoke it there).
 function loadSeedEnv(): Record<string, string> {
   const merged: Record<string, string> = {};
-  for (const file of [path.join("..", ".env"), ".env"]) {
-    try {
-      Object.assign(merged, parseDotenv(fs.readFileSync(file)));
-    } catch {
-      // missing file — fine, the layer just doesn't exist
-    }
+  const rootEnv = path.join("..", "..", ".env");
+  const file = fs.existsSync(rootEnv) ? rootEnv : ".env";
+  try {
+    Object.assign(merged, parseDotenv(fs.readFileSync(file)));
+  } catch {
+    // missing file — fine, process configuration may be complete already
   }
   for (const [k, v] of Object.entries(process.env)) {
     if (v !== undefined) merged[k] = v;

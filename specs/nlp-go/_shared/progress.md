@@ -145,7 +145,7 @@ topic clustering on Python. Roll out per-project via feature flag.
    returns `410 Gone` with a friendly explanation. No DSPy, no optimization.
    See `feature-flag.feature`.
 9. **Tests, real ones.** Provider matrix tests with `//go:build live_<provider>`
-   tags vs real keys in `platform/app/.env`. Engine integration tests exercise the
+   tags vs real keys in `.env`. Engine integration tests exercise the
    engine end-to-end with a real HTTP gateway stub.
 
 ## Out of scope (this PR)

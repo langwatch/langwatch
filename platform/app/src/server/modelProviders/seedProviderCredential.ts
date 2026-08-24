@@ -11,7 +11,7 @@
  * So seeding fills a gap. A row with no usable credential gets one, a row
  * that already has one is left alone, and replacing takes `--force-keys`.
  *
- * Read the key from `platform/app/.env`, which is where the model provider
+ * Read the key from `.env`, which is where the model provider
  * keys for this app live. An env file from another repository drifts, and a
  * stale key from one is indistinguishable from a fresh one once it is in the
  * column.

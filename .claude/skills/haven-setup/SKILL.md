@@ -41,7 +41,7 @@ There is no separate setup step any more (ADR-064 deleted `haven setup`): `up` i
 
 ## Step 2: Decide which services haven should manage
 
-Read `platform/app/.env` for `DATABASE_URL`, `CLICKHOUSE_URL`, `REDIS_URL`. If they already point at `localhost`/`127.0.0.1` and those services are actually reachable (the user said so, or you verified with e.g. `pg_isready` / `redis-cli ping` / a ClickHouse HTTP ping), reuse them instead of letting haven spin up its own containers:
+Read `.env` for `DATABASE_URL`, `CLICKHOUSE_URL`, `REDIS_URL`. If they already point at `localhost`/`127.0.0.1` and those services are actually reachable (the user said so, or you verified with e.g. `pg_isready` / `redis-cli ping` / a ClickHouse HTTP ping), reuse them instead of letting haven spin up its own containers:
 
 ```bash
 LANGWATCH_HAVEN_CH=0     # reuse local ClickHouse (.env CLICKHOUSE_URL)
@@ -102,7 +102,7 @@ Add it to the Step 5 command alongside `LANGY_UNSAFE_HOST_ACCESS=1`. Verify by s
 `resolveWorkerCallbackUrl()` / `resolveWorkerGatewayBaseUrl()` (`platform/app/src/server/app-layer/langy/LangyCredentialService.ts`) check `LANGY_WORKER_CALLBACK_URL` / `LANGY_WORKER_GATEWAY_URL` **before** haven's own correctly-resolved URLs. If the user has previously run the stack via the `k8s` skill (Minikube), `.env` may have these hardcoded to `host.minikube.internal:<port>` — which doesn't resolve outside a Minikube VM and silently breaks **every** LLM call and turn-output callback under haven (symptom: chat sends, worker creates fine, but no reply ever arrives — no visible error to the user, just retries forever). Check:
 
 ```bash
-grep -n "LANGY_WORKER_CALLBACK_URL\|LANGY_WORKER_GATEWAY_URL" platform/app/.env
+grep -n "LANGY_WORKER_CALLBACK_URL\|LANGY_WORKER_GATEWAY_URL" .env
 ```
 
 If either is set to a `minikube`/`docker.internal`-style host and you're running under haven (not actually inside that k8s pod), comment both out (don't delete — the user may switch back to the k8s workflow later) with a one-line note why. Confirm the fix by checking for `lookup host.minikube.internal ... no such host` in the logs after a restart — that error should disappear.

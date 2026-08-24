@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# refresh-dev-s3-env.sh — rotate the S3 SSO credentials in platform/app/.env
+# refresh-dev-s3-env.sh — rotate the S3 SSO credentials in .env
 #
 # AWS SSO session tokens expire ~hourly. When `pnpm dev` against
 # runtime-storage-dev starts returning RequestExpired / InvalidToken,
 # run this script from anywhere — it logs into SSO, exports fresh
 # temporary credentials, and rewrites the S3_ACCESS_KEY_ID /
-# S3_SECRET_ACCESS_KEY / S3_SESSION_TOKEN lines in platform/app/.env in
+# S3_SECRET_ACCESS_KEY / S3_SESSION_TOKEN lines in .env in
 # place. The non-rotating lines (S3_BUCKET_NAME, S3_ENDPOINT,
 # S3_REGION) are left alone.
 #
@@ -20,10 +20,11 @@
 set -euo pipefail
 
 PROFILE="${AWS_PROFILE_OVERRIDE:-lw-dev-sso}"
-ENV_FILE="${ENV_FILE_OVERRIDE:-platform/app/.env}"
+REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+ENV_FILE="${ENV_FILE_OVERRIDE:-$REPO_ROOT/.env}"
 
 if [[ ! -f "$ENV_FILE" ]]; then
-  echo "ERROR: $ENV_FILE not found. Run from the repo root." >&2
+  echo "ERROR: $ENV_FILE not found. Copy $REPO_ROOT/.env.example first." >&2
   exit 1
 fi
 

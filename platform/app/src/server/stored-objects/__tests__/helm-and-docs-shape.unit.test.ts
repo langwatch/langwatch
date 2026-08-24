@@ -265,7 +265,7 @@ describe(".env.example carries the local storage path config", () => {
   describe("when the example env file is loaded", () => {
     /** @scenario ".env.example carries LANGWATCH_LOCAL_STORAGE_PATH with a sensible local default" */
     it("contains LANGWATCH_LOCAL_STORAGE_PATH with the make-quickstart default and a multi-pod warning", () => {
-      const example = readRepoFile("platform/app/.env.example");
+      const example = readRepoFile(".env.example");
 
       expect(example).toContain("LANGWATCH_LOCAL_STORAGE_PATH");
       // The default that maps to the LocalFilesystemDriver fallback in
@@ -285,7 +285,7 @@ describe(".env.example and self-hosting docs describe the Azure stored-objects b
   describe("when the example env file is loaded", () => {
     /** @scenario ".env.example and self-hosting docs describe the Azure stored-objects backend" */
     it("documents AZURE_BLOB_* as live config, no longer deferred, alongside STORED_OBJECTS_BACKEND and AZURE_BLOB_CONTAINER", () => {
-      const example = readRepoFile("platform/app/.env.example");
+      const example = readRepoFile(".env.example");
 
       expect(example).not.toMatch(/Azure Blob Storage.*DEFERRED/i);
       expect(example).toContain("STORED_OBJECTS_BACKEND");

@@ -4,7 +4,7 @@ import { configDefaults, defineConfig } from "vitest/config";
 
 import WeightBalancedSequencer from "./vitest.sequencer";
 
-config();
+config({ path: ["../../.env", ".env"] });
 
 // One switch for the CI-vs-laptop trade-offs below.
 const isCI = !!process.env.CI;

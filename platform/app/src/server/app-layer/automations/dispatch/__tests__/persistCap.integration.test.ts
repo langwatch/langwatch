@@ -71,7 +71,7 @@ beforeAll(() => {
   });
   if (!connection) {
     throw new Error(
-      "This suite needs Redis. Set LANGWATCH_TEST_REDIS_URL in platform/app/.env.",
+      "This suite needs Redis. Set LANGWATCH_TEST_REDIS_URL in .env.",
     );
   }
 });

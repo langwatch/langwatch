@@ -179,7 +179,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 
 	// Resolved through the operator's own .env, not the full dotenv layering: the
 	// overlay haven writes is loaded last with override:true, so a knob read only
-	// from the shell would let haven's default beat a platform/app/.env line that
+	// from the shell would let haven's default beat a .env line that
 	// says otherwise — and the opt-in would silently not work.
 	//
 	// It must exclude .env.portless specifically, because this is the one knob
@@ -757,7 +757,7 @@ func runUpgrade(ctx context.Context, d deps, _ invocation) error {
 }
 
 // devEnv reads one of haven's own knobs: the process environment first, then
-// the merged dotenv layers (platform/app/.env, then platform/app/.env.portless).
+// the merged dotenv layers (.env, then .env.portless).
 //
 // The same precedence Prisma and tsx give the app's settings, and for the same
 // reason: a preference like "never manage ClickHouse, this machine runs a
@@ -823,14 +823,14 @@ func dotenvKnobs() map[string]string {
 }
 
 // operatorEnvLookup is dotenvLookup restricted to files a human wrote: the
-// process environment and platform/app/.env, never the .env.portless overlay haven
+// process environment and .env, never the .env.portless overlay haven
 // generates. Use it for any knob haven also *writes*, so that reading a
 // preference cannot pick up haven's own last answer instead of the operator's.
 func operatorEnvLookup(key string) (string, bool) {
 	return resolveKnob(key, os.LookupEnv, operatorEnvKnobs)
 }
 
-// operatorEnvKnobs loads only platform/app/.env — deliberately not the overlay.
+// operatorEnvKnobs loads only .env — deliberately not the overlay.
 func operatorEnvKnobs() map[string]string {
 	operatorEnvOnce.Do(func() {
 		cwd, _ := os.Getwd()

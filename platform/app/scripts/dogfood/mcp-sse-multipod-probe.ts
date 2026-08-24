@@ -22,7 +22,7 @@
  *   cd platform/app
  *   LANGWATCH_API_KEY=<project apiKey> npx tsx scripts/dogfood/mcp-sse-multipod-probe.ts
  *
- * Requires REDIS_URL (read from platform/app/.env like the rest of the app)
+ * Requires REDIS_URL (read from .env like the rest of the app)
  * and a project whose apiKey is LANGWATCH_API_KEY.
  */
 import { createServer, request as httpRequest, type Server } from "node:http";

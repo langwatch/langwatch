@@ -133,7 +133,7 @@ The 2026-03 worktree-isolation amendment treated **every** volume as per-worktre
 
 ### Decision
 
-**The contributor's `platform/app/.env` is the source of truth.** A new `platform/app/.env.dev-up` overlay is loaded as `env_file` AFTER `.env` and contains only the URLs whose services are starting locally for the chosen mode. `x-common-env` no longer sets infrastructure URLs.
+**The contributor's `.env` is the source of truth.** A new `.env.dev-up` overlay is loaded as `env_file` AFTER `.env` and contains only the URLs whose services are starting locally for the chosen mode. `x-common-env` no longer sets infrastructure URLs.
 
 **`make quickstart` is the single entry point** with five intent-based modes:
 
@@ -159,7 +159,7 @@ Trade-off: only one worktree can have the same stateful container `up` at a time
 
 **Deprecated targets** (`make dev`, `dev-nlp`, `dev-scenarios`, `dev-test`, `dev-full`, and `dev-up` / `dev-down` / `dev-logs`) print a deprecation warning and forward to the corresponding `quickstart` mode for one release before being removed.
 
-**Fail-fast SSRF guard.** `dev/scripts/dev.sh` errors if `platform/app/.env` has `IS_SAAS=true` with `BLOCK_LOCAL_HTTP_CALLS=false`. (Compose's runtime always sets `BLOCK_LOCAL_HTTP_CALLS=true` via `x-common-env`, but workers running outside compose / lambdas would inherit the broken combo.)
+**Fail-fast SSRF guard.** `dev/scripts/dev.sh` errors if `.env` has `IS_SAAS=true` with `BLOCK_LOCAL_HTTP_CALLS=false`. (Compose's runtime always sets `BLOCK_LOCAL_HTTP_CALLS=true` via `x-common-env`, but workers running outside compose / lambdas would inherit the broken combo.)
 
 ### Migration
 
@@ -170,7 +170,7 @@ docker volume ls | grep -E '^local +lw-[0-9a-f]{8}-(db|redis|clickhouse)-data'
 docker volume rm <volume-name>   # one per worktree, after confirming you don't need the data
 ```
 
-If you previously relied on `x-common-env`'s implicit `DATABASE_URL` / `REDIS_URL` / `CLICKHOUSE_URL` overrides, those moved to `platform/app/.env.dev-up` written by `quickstart`. Running `make dev` (deprecated alias for `quickstart backend-shared`) keeps the same effective behavior.
+If you previously relied on `x-common-env`'s implicit `DATABASE_URL` / `REDIS_URL` / `CLICKHOUSE_URL` overrides, those moved to `.env.dev-up` written by `quickstart`. Running `make dev` (deprecated alias for `quickstart backend-shared`) keeps the same effective behavior.
 
 ## Amendment: In-process workers for local dev (2026-07)
 
@@ -243,7 +243,7 @@ application no longer imports or starts the worker application itself. The
 separate `dev:app`, `dev:worker` and `dev:concurrent` modes remain available.
 
 When `platform/app` is retired, the contributor source of truth moves from
-`platform/app/.env` to repository-root `.env`; quickstart and Haven write the
+`.env` to repository-root `.env`; quickstart and Haven write the
 generated overlay to repository-root `.env.dev-up`. Root tooling loads the
 source, while API and worker validate their own subsets independently. Existing
 path assertions remain truthful until that migration stage lands and must move

@@ -10,10 +10,10 @@
 # is the API port `pnpm dev` binds its Hono backend to, so a gateway started
 # either way ends up pointed at the same place. An explicit
 # LW_GATEWAY_BASE_URL, whether inherited from the calling shell or set in
-# platform/app/.env, always wins; this only fills the gap when nothing set
+# .env, always wins; this only fills the gap when nothing set
 # it at all.
 #
-# Usage from the Makefile, after platform/app/.env is sourced:
+# Usage from the Makefile, after .env is sourced:
 #
 #   . dev/scripts/lib/derive-gateway-base-url.sh
 #   derive_gateway_base_url

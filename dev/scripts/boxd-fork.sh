@@ -182,7 +182,7 @@ boxd_env_files() {
 # Default target: `<vm>.boxd.sh`.
 #
 # Output values are double-quoted for shell-safety, mirroring the format
-# in `platform/app/.env.example`.
+# in `.env.example`.
 boxd_rewrite_env() {
   local vm="${1-}"
   if [ -z "$vm" ]; then

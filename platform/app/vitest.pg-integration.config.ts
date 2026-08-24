@@ -6,7 +6,7 @@ import { config } from "dotenv";
 import { join } from "path";
 import { configDefaults, defineConfig } from "vitest/config";
 
-config();
+config({ path: ["../../.env", ".env"] });
 
 export default defineConfig({
   test: {

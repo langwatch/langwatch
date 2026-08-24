@@ -808,7 +808,7 @@ export function assertGatewaySecretsAllOrNone(env) {
       "========================================================================",
       "AI Gateway secrets are partially configured.",
       `  Missing: ${missing.join(", ")}`,
-      "  Either set ALL three secrets (see platform/app/.env.example) or UNSET",
+      "  Either set ALL three secrets (see .env.example) or UNSET",
       "  them all. Partial config leaves /api/internal/gateway/* returning",
       "  503 auth_upstream_unavailable at request time.",
       "  Generate each value with: openssl rand -hex 32",

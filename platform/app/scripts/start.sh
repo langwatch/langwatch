@@ -178,7 +178,7 @@ fi
 START_NLP_COMMAND=""
 if [[ "$NODE_ENV" = "development" && "$LANGWATCH_SKIP_NLP" != "1" ]]; then
   . "$(dirname "$0")/../../../dev/scripts/lib/resolve-nlp-service.sh"
-  resolve_nlp_service "$(dirname "$0")/.."
+  resolve_nlp_service "$(dirname "$0")/../../.."
   _NLP_PORT=""
   if [ -z "$LANGWATCH_NLP_SERVICE" ]; then
     _NLP_PORT=$((_APP_PORT + 1))

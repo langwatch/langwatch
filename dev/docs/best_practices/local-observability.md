@@ -67,7 +67,7 @@ stack keeps **no volume**, so stopping it reclaims every byte regardless. Overri
 | Metrics  | Prometheus | `OTEL_METRICS_ENABLED=true` (host/runtime) | Go runtime metrics via `OTEL_DEBUG_COLLECTOR_ENDPOINT` |
 | Profiles | Pyroscope  | `PYROSCOPE_SERVER_ADDRESS`              | `PYROSCOPE_SERVER_ADDRESS`                           |
 
-`make observability-connect` sets all of these in `platform/app/.env` for you
+`make observability-connect` sets all of these in `.env` for you
 (backing it up first). The Go services **dual-export**: their product/customer
 traces still go to the LangWatch app (dogfooding); their *own* operational
 telemetry additionally goes to the collector. Setting
@@ -241,5 +241,5 @@ haven down --all                 # stop everything haven runs, this included
 
 Either discards the telemetry collected so far — the stack keeps no volume.
 
-Restore your previous `platform/app/.env` from the `.env.bak.<timestamp>` that
+Restore your previous `.env` from the `.env.bak.<timestamp>` that
 `observability-connect` wrote, or just clear the OTLP vars.

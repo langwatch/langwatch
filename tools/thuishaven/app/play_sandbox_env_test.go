@@ -52,8 +52,8 @@ func TestStripInheritedEnvFilesRemovesUntrackedSecretsAndKeepsTheReposOwn(t *tes
 		checkout := t.TempDir()
 		gitInit(t, checkout)
 
-		mustWrite(t, filepath.Join(checkout, "platform", "app"), ".env.example", "OPENAI_API_KEY=\n")
-		gitAddCommit(t, checkout, "platform/app/.env.example")
+		mustWrite(t, checkout, ".env.example", "OPENAI_API_KEY=\n")
+		gitAddCommit(t, checkout, ".env.example")
 
 		// What the hook would have copied in.
 		mustWrite(t, filepath.Join(checkout, "platform", "app"), ".env", "OPENAI_API_KEY=sk-real-secret\n")
@@ -79,7 +79,7 @@ func TestStripInheritedEnvFilesRemovesUntrackedSecretsAndKeepsTheReposOwn(t *tes
 
 			// Tracked files are the repo's own content, not the developer's: removing
 			// them would dirty the checkout and change what the PR's code sees.
-			if _, err := os.Stat(filepath.Join(checkout, "platform", "app", ".env.example")); err != nil {
+			if _, err := os.Stat(filepath.Join(checkout, ".env.example")); err != nil {
 				t.Errorf("tracked .env.example was removed: %v", err)
 			}
 		})

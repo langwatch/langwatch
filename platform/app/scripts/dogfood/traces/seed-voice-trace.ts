@@ -152,7 +152,7 @@ async function assertWritableStorageRoot(projectId: string) {
     await access(destination.root, constants.W_OK);
   } catch {
     throw new Error(
-      `storage root ${destination.root} is not writable. Set LANGWATCH_LOCAL_STORAGE_PATH in platform/app/.env to a directory you own, then re-run. The app reads the same setting, so the seeded audio stays playable only while that directory does.`,
+      `storage root ${destination.root} is not writable. Set LANGWATCH_LOCAL_STORAGE_PATH in .env to a directory you own, then re-run. The app reads the same setting, so the seeded audio stays playable only while that directory does.`,
     );
   }
 }

@@ -20,7 +20,7 @@ teardown() {
   rm -rf "$TEST_DIR"
 }
 
-@test "exits 0 cleanly when platform/app/.env does not exist" {
+@test "exits 0 cleanly when .env does not exist" {
   run bash "$TEST_DIR/scripts/ensure-ai-gateway-secrets.sh"
   [ "$status" -eq 0 ]
   [ ! -f "$ENV_FILE" ]

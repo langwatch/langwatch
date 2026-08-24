@@ -15,11 +15,19 @@ import { ROOT_DISCOVERY_PROXY_PATTERN } from "./src/server/openapi/discovery-loc
 // The API server (`server.mts`) loads its own copy via `dotenv.config()`
 // the same way; doing it here keeps both processes reading from one
 // source of truth.
-dotenv.config({ path: path.resolve(__dirname, ".env"), quiet: true });
+const rootEnvPath = path.resolve(__dirname, "../../.env");
+const legacyEnvPath = path.resolve(__dirname, ".env");
+const rootOverlayPath = path.resolve(__dirname, "../../.env.portless");
+const legacyOverlayPath = path.resolve(__dirname, ".env.portless");
+
+dotenv.config({
+  path: existsSync(rootEnvPath) ? rootEnvPath : legacyEnvPath,
+  quiet: true,
+});
 // Portless (haven) overlay wins: loaded after .env with override so the
 // resolved app port + api hostname take effect. Absent in non-portless runs.
 dotenv.config({
-  path: path.resolve(__dirname, ".env.portless"),
+  path: existsSync(rootOverlayPath) ? rootOverlayPath : legacyOverlayPath,
   override: true,
   quiet: true,
 });

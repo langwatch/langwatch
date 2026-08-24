@@ -184,9 +184,9 @@ EXCLUDES=(
   --exclude=._*
   # EVERY dotenv variant, not just `.env` and `*.local`. This tarball is
   # PUBLIC, and the working tree carries dotenv files that are gitignored but
-  # very much present: haven writes platform/app/.env.portless (mode 0600, with
+  # very much present: haven writes .env.portless (mode 0600, with
   # the admin password and access tokens in it) and the quickstart picker
-  # writes platform/app/.env.dev-up. Listing the variants individually shipped
+  # writes .env.dev-up. Listing the variants individually shipped
   # .env.portless into a real tarball — deleting platform/app/.npmignore removed
   # the `.env*.local` rule that used to catch some of them, and because this
   # script also strips .gitignore/.npmignore from the staged tree, this array

@@ -18,7 +18,7 @@ import {
 import { graphLaneSelection } from "./src/test-utils/integrationModuleGraph";
 import WeightBalancedSequencer from "./vitest.sequencer";
 
-config();
+config({ path: ["../../.env", ".env"] });
 
 const { datastore } = partitionIntegrationFiles({
   root: __dirname,

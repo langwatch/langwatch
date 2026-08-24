@@ -3,7 +3,7 @@ import { join } from "path";
 import { configDefaults, defineConfig } from "vitest/config";
 
 // Load env vars before test files are imported (env.mjs validates on import)
-dotenv.config({ path: ".env" });
+dotenv.config({ path: ["../../.env", ".env"] });
 
 /**
  * Integration test config for tests that only need Prisma/Postgres.

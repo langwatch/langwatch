@@ -18,7 +18,7 @@ git clone https://github.com/langwatch/langwatch.git
 cd platform/app
 
 # Copy the example environment file
-cp platform/app/.env.example platform/app/.env
+cp .env.example .env
 
 # Start all services
 docker compose up
@@ -46,7 +46,7 @@ Docker Compose starts the following services:
 
 ## Configuration
 
-Edit `platform/app/.env` to customize your deployment. Key variables:
+Edit `.env` to customize your deployment. Key variables:
 
 ```bash
 # Required: generate a secret for each

@@ -36,7 +36,7 @@ Presets — pass as the first arg or pick interactively:
   dev-storage     Local CH + PG + Redis + workers. Stored-objects route to the
                   dev S3 bucket runtime-storage-dev in lw-dev (eu-central-1).
                   Real AWS S3 driver under test without polluting shared dev
-                  tables. Requires fresh AWS SSO credentials in platform/app/.env
+                  tables. Requires fresh AWS SSO credentials in .env
                   — run `bash platform/app/scripts/refresh-dev-s3-env.sh` first
                   if S3_SESSION_TOKEN is missing or stale.
 
@@ -51,7 +51,7 @@ Presets — pass as the first arg or pick interactively:
                   data in dev CH / dev PG.
 
   frontend-only   No compose. Pure `pnpm dev` against the URLs in your
-                  platform/app/.env. UI / design / static iteration. Workers
+                  .env. UI / design / static iteration. Workers
                   still run in-process via `pnpm dev`; set
                   START_WORKERS=false on the command line if you want pure
                   Vite with no background processing.
@@ -63,9 +63,9 @@ Presets — pass as the first arg or pick interactively:
   full-local      Kitchen-sink local: all-local-nlp + dedicated workers
                   container + ai-server. Slowest boot.
 
-URL-override model: each preset writes `platform/app/.env.dev-up` listing only
+URL-override model: each preset writes `.env.dev-up` listing only
 the URLs whose services start locally. compose loads this overlay AFTER
-platform/app/.env (your source of truth), so non-overridden URLs keep their
+.env (your source of truth), so non-overridden URLs keep their
 .env values. CREDENTIALS NEVER GO IN THE OVERLAY — only non-rotating
 infra shape (bucket/endpoint/region/connection-host).
 
@@ -103,9 +103,9 @@ LAST_CHOICE_FILE="/tmp/.langwatch-dev-last-choice-v4-${COMPOSE_PROJECT_NAME:-lan
 
 check_env_files() {
   local missing=0
-  if [ ! -f "platform/app/.env" ]; then
-    echo "WARNING: platform/app/.env not found"
-    echo "  → cp platform/app/.env.example platform/app/.env"
+  if [ ! -f ".env" ]; then
+    echo "WARNING: .env not found"
+    echo "  → cp .env.example .env"
     missing=1
   fi
   if [ $missing -eq 1 ]; then
@@ -120,13 +120,13 @@ check_env_files() {
 
 # Fail-fast on insecure SaaS-mode config.
 check_saas_ssrf_guard() {
-  if [ ! -f "platform/app/.env" ]; then return 0; fi
-  if ! grep -qE "^IS_SAAS[[:space:]]*=[[:space:]]*['\"]?true['\"]?[[:space:]]*$" platform/app/.env; then
+  if [ ! -f ".env" ]; then return 0; fi
+  if ! grep -qE "^IS_SAAS[[:space:]]*=[[:space:]]*['\"]?true['\"]?[[:space:]]*$" .env; then
     return 0
   fi
-  if ! grep -qE "^BLOCK_LOCAL_HTTP_CALLS[[:space:]]*=[[:space:]]*['\"]?(true|1|yes)['\"]?[[:space:]]*$" platform/app/.env; then
+  if ! grep -qE "^BLOCK_LOCAL_HTTP_CALLS[[:space:]]*=[[:space:]]*['\"]?(true|1|yes)['\"]?[[:space:]]*$" .env; then
     cat >&2 <<'EOF'
-ERROR: platform/app/.env has IS_SAAS=true but BLOCK_LOCAL_HTTP_CALLS is not
+ERROR: .env has IS_SAAS=true but BLOCK_LOCAL_HTTP_CALLS is not
        explicitly set to a truthy value. SaaS mode requires SSRF blocking;
        absence of the variable counts as disabled. Add:
          BLOCK_LOCAL_HTTP_CALLS=true
@@ -224,18 +224,18 @@ EOF
 # Skip with QUICKSTART_NO_REFRESH=1 if you want to manage creds manually
 # (e.g. you've pasted in an IAM-user access key instead of using SSO).
 check_dev_s3_credentials() {
-  if [ ! -f "platform/app/.env" ]; then
+  if [ ! -f ".env" ]; then
     return 0
   fi
   local has_token
-  has_token=$(grep -E "^S3_SESSION_TOKEN[[:space:]]*=[[:space:]]*['\"]?.+['\"]?[[:space:]]*$" platform/app/.env || true)
+  has_token=$(grep -E "^S3_SESSION_TOKEN[[:space:]]*=[[:space:]]*['\"]?.+['\"]?[[:space:]]*$" .env || true)
   if [ -n "$has_token" ]; then
     return 0
   fi
 
   if [ "${QUICKSTART_NO_REFRESH:-0}" = "1" ]; then
     cat >&2 <<'EOF'
-ERROR: dev-storage requires S3_SESSION_TOKEN in platform/app/.env but
+ERROR: dev-storage requires S3_SESSION_TOKEN in .env but
        QUICKSTART_NO_REFRESH=1 was set. Set the credentials manually
        (e.g. an IAM user's access key) or unset QUICKSTART_NO_REFRESH
        and let the launcher rotate SSO creds for you.
@@ -243,7 +243,7 @@ EOF
     exit 1
   fi
 
-  echo "No S3_SESSION_TOKEN in platform/app/.env — auto-refreshing AWS SSO credentials..."
+  echo "No S3_SESSION_TOKEN in .env — auto-refreshing AWS SSO credentials..."
   if ! bash platform/app/scripts/refresh-dev-s3-env.sh; then
     cat >&2 <<'EOF'
 ERROR: refresh-dev-s3-env.sh failed. Inspect the output above. Common causes:
@@ -278,13 +278,13 @@ ensure_prepared() {
 
 write_overrides() {
   local preset="$1"
-  local out="platform/app/.env.dev-up"
+  local out=".env.dev-up"
   write_dev_overrides "$preset" "$out"
   if [ -s "$out" ]; then
     echo "URL overrides for preset=$preset written to $out:"
     sed 's/^/  /' "$out" >&2
   else
-    echo "No URL overrides for preset=$preset — your platform/app/.env values are used as-is."
+    echo "No URL overrides for preset=$preset — your .env values are used as-is."
   fi
 }
 
@@ -333,7 +333,7 @@ run_dev_storage() {
   sanitize_localhost_dev_env
   write_overrides dev-storage
   echo "Starting: postgres + redis + clickhouse + app + workers (preset=dev-storage)"
-  echo "  Stored-objects route to s3://runtime-storage-dev/ via SSO credentials in platform/app/.env"
+  echo "  Stored-objects route to s3://runtime-storage-dev/ via SSO credentials in .env"
   $COMPOSE --profile workers up
 }
 
@@ -373,7 +373,7 @@ EOF
   echo "Starting: redis + workers compose services (preset=dev-infra)"
   echo "  App runs via 'pnpm dev' from platform/app/ on the host for hot-reload."
   echo "  Workers run in the compose 'workers' container (not in-process)."
-  echo "  DB / ClickHouse / NLP / S3 come from platform/app/.env (shared dev)."
+  echo "  DB / ClickHouse / NLP / S3 come from .env (shared dev)."
   $COMPOSE --profile workers up -d redis workers
   cat <<'EOF'
 
@@ -425,7 +425,7 @@ EOF
   fi
   echo "Preset: frontend-only — no app compose. Run 'pnpm dev' from platform/app/ to start."
   echo ""
-  echo "Tip: pure UI / design / static iteration. URLs come from platform/app/.env."
+  echo "Tip: pure UI / design / static iteration. URLs come from .env."
   echo "     For services on top: switch to all-local, all-local-nlp, or full-local."
   echo "     Pure Vite with no background processing: START_WORKERS=false pnpm dev."
   echo "     Stop redis with: dev/scripts/dev.sh down"
@@ -444,7 +444,7 @@ run_migration() {
   cat <<EOF
 
 Postgres: localhost:5432  Clickhouse: localhost:8123
-DATABASE_URL and CLICKHOUSE_URL pinned to localhost in platform/app/.env.dev-up.
+DATABASE_URL and CLICKHOUSE_URL pinned to localhost in .env.dev-up.
 
 Run migrations from your host shell:
 

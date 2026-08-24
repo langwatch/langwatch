@@ -19,7 +19,7 @@ If no feature file exists for your task, create one before writing code.
 
 ## Development Environment
 
-`make quickstart` is the single entry point. It asks what you're working on and starts only the services you need, overriding only the URLs whose services are local. Your `platform/app/.env` is the source of truth for everything else.
+`make quickstart` is the single entry point. It asks what you're working on and starts only the services you need, overriding only the URLs whose services are local. Your `.env` is the source of truth for everything else.
 
 ### Running with no container runtime
 
@@ -35,7 +35,7 @@ LANGWATCH_HAVEN_OBS=0         # skip the LGTM telemetry stack
 LANGY_UNSAFE_HOST_ACCESS=1    # run the langyagent worker on the host, not in colima
 ```
 
-haven resolves its own knobs from `platform/app/.env` (then `.env.portless`) as
+haven resolves its own knobs from `.env` (then `.env.portless`) as
 well as the shell, so these travel with the worktree; an exported variable still
 wins for a single run. Postgres and Redis stay haven-managed either way: it
 starts them through brew, not a container.
@@ -80,7 +80,7 @@ haven logs nlp -t       # tail one service's logs from any terminal
 Open `https://langwatch.localhost` for the cross-worktree dashboard;
 `observability.langwatch.localhost` proxies the local Grafana LGTM stack;
 `telemetry.langwatch.localhost` fans OTLP out to every running stack. haven's
-resolved config lands in `platform/app/.env.portless` (loaded last with
+resolved config lands in `.env.portless` (loaded last with
 `override: true` so it beats `.env`). Agent-driving haven? Add `--agent` (or
 `HAVEN_AGENT=1`) for plain, token-free output; `haven status --json` is
 machine-readable. See `tools/thuishaven/README.md`.
@@ -100,7 +100,7 @@ make service svc=aigateway             # Start the Go AI Gateway data plane on :
 make help                              # Full target list including boxd workflows
 ```
 
-The preset-picker writes `platform/app/.env.dev-up` listing only the URLs to override; everything else comes from your `platform/app/.env`. **Credentials never go in the overlay** — only non-rotating infrastructure shape (bucket / endpoint / region / connection-host). For `dev-storage`, refresh AWS SSO credentials in `.env` first via `bash platform/app/scripts/refresh-dev-s3-env.sh` (the launcher hard-fails without S3_SESSION_TOKEN).
+The preset-picker writes `.env.dev-up` listing only the URLs to override; everything else comes from your `.env`. **Credentials never go in the overlay** — only non-rotating infrastructure shape (bucket / endpoint / region / connection-host). For `dev-storage`, refresh AWS SSO credentials in `.env` first via `bash platform/app/scripts/refresh-dev-s3-env.sh` (the launcher hard-fails without S3_SESSION_TOKEN).
 
 The legacy `make dev` / `make dev-nlp` / `make dev-scenarios` / `make dev-test` / `make dev-full` aliases were removed in #4053. Use the preset names directly. `make dev-up` / `make dev-down` / `make dev-logs` still exist for per-worktree isolated stacks (the `dev-up.sh` use case — separate from `quickstart`).
 
@@ -140,9 +140,9 @@ make service svc=aigateway       # run once
 make service-watch svc=aigateway # live reload via air
 ```
 
-Requires `platform/app/.env` with `LW_GATEWAY_INTERNAL_SECRET`,
+Requires `.env` with `LW_GATEWAY_INTERNAL_SECRET`,
 `LW_GATEWAY_JWT_SECRET`, and `LW_GATEWAY_BASE_URL` set — see the
-"AI GATEWAY" block at the bottom of `platform/app/.env.example`. Generate
+"AI GATEWAY" block at the bottom of `.env.example`. Generate
 secrets with `openssl rand -hex 32`. The Go gateway and the TS
 control-plane both source the same `.env`, so each secret lives in
 exactly one place (no prefix duplication). Set

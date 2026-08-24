@@ -13,7 +13,7 @@ that unlocked the Enterprise feature surface without a signed license file.
 That was removed because:
 
 1. **It bakes the bypass into the codebase.** Any reader of `/dev/docs/`,
-   `platform/app/.env.example`, or `git log` learns how to skip licensing in one
+   `.env.example`, or `git log` learns how to skip licensing in one
    line. The friction protecting the Enterprise tier should be **getting a
    license**, not finding the env var.
 2. **It papers over real plan-resolution bugs.** When the bypass is on,
@@ -29,7 +29,7 @@ Used by every dogfood / QA / seed flow that needs Enterprise surfaces unlocked.
 
 ## Pre-requisites
 
-- `LANGWATCH_LICENSE_PRIVATE_KEY` set in `platform/app/.env` (RSA private key, paired with
+- `LANGWATCH_LICENSE_PRIVATE_KEY` set in `.env` (RSA private key, paired with
   the public key compiled into the verifier at
   `platform/app/ee/licensing/signing.ts`). Ask the maintainer for the dev key —
   it is **not** checked into the repo.

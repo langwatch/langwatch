@@ -14,11 +14,11 @@ Re-scoped 2026-05-06 after Drew's clarification:
 
 So #3860 AC2 / AC3 / AC6 are **back in scope**. The mental model:
 
-- **Contributor's `platform/app/.env` is the source of truth** for non-overridden URLs.
+- **Contributor's `.env` is the source of truth** for non-overridden URLs.
 - **Each mode is a URL-rewrite preset** — it controls (a) which compose services start and (b) which URLs in env get rewritten to localhost (overriding the `.env` value).
 - "default to remote" = "leave `.env` alone unless a mode explicitly overrides".
 
-Implementation: a `platform/app/.env.dev-up` overlay file is loaded LAST as `env_file` in the relevant services. Compose's `x-common-env` no longer hard-sets `DATABASE_URL` / `REDIS_URL` / `CLICKHOUSE_URL` / `LANGWATCH_NLP_SERVICE` / `LANGEVALS_ENDPOINT` — those come from `platform/app/.env` by default and are overridden by `.env.dev-up` when a mode wants the local container.
+Implementation: a `.env.dev-up` overlay file is loaded LAST as `env_file` in the relevant services. Compose's `x-common-env` no longer hard-sets `DATABASE_URL` / `REDIS_URL` / `CLICKHOUSE_URL` / `LANGWATCH_NLP_SERVICE` / `LANGEVALS_ENDPOINT` — those come from `.env` by default and are overridden by `.env.dev-up` when a mode wants the local container.
 
 Mode → (services, URL overrides):
 
@@ -275,8 +275,8 @@ One release of grace. Filing a follow-up to remove.
 
 ```bash
 # Inside ensure_prepared, before docker up:
-if grep -qE '^IS_SAAS\s*=\s*"?true"?\s*$' platform/app/.env 2>/dev/null \
-   && ! grep -qE '^BLOCK_LOCAL_HTTP_CALLS\s*=\s*"?true"?\s*$' platform/app/.env 2>/dev/null; then
+if grep -qE '^IS_SAAS\s*=\s*"?true"?\s*$' .env 2>/dev/null \
+   && ! grep -qE '^BLOCK_LOCAL_HTTP_CALLS\s*=\s*"?true"?\s*$' .env 2>/dev/null; then
   echo "ERROR: IS_SAAS=true requires BLOCK_LOCAL_HTTP_CALLS=true (SSRF guard)" >&2
   exit 1
 fi
@@ -329,7 +329,7 @@ fi
 | 3 (default = fastest path) | `frontend-only` mode = no compose, ~instant | done |
 | 4 (stateful shared volumes + collision detection) | `dev/compose.dev.yml`, `dev/scripts/dev.sh` | done |
 | 5 (redis singleton + host port) | `dev/compose.dev.yml` | done |
-| 6 (URL rewrite on profile flip) | `dev/scripts/dev.sh` writes `platform/app/.env.dev-up` per mode; `dev/compose.dev.yml` honours it via env_file overlay | done |
+| 6 (URL rewrite on profile flip) | `dev/scripts/dev.sh` writes `.env.dev-up` per mode; `dev/compose.dev.yml` honours it via env_file overlay | done |
 | 7 (idempotent + fail-fast IS_SAAS guard) | `dev/scripts/dev.sh` | done |
 | 8 (per-mode hints + `quickstart help`) | `dev/scripts/dev.sh` | done |
 | 9 (deprecation warnings on old paths) | `Makefile`, `CLAUDE.md`, `ADR-004` | done |

@@ -1,7 +1,7 @@
 # Development compose with profiles
 #
 # Setup:
-#   cp platform/app/.env.example platform/app/.env        # Add your keys
+#   cp .env.example .env        # Add your keys
 #
 # **Use `make quickstart` — not direct compose.** ADR-004 (2026-05, #3860)
 # established `make quickstart` as the single entry point for local dev. It
@@ -34,7 +34,7 @@
 #
 # AI Gateway (Go data plane) — NOT in this compose:
 #   The Go gateway runs on the host via `make service svc=aigateway`,
-#   binding :5563. Sourced from platform/app/.env (same secrets as the app).
+#   binding :5563. Sourced from .env (same secrets as the app).
 #   Start it in a second terminal alongside any compose profile above.
 #
 # Stop everything:
@@ -44,12 +44,12 @@ x-common-env: &common-env
   COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
   NODE_ENV: development
   SKIP_TIKTOKEN: 'true'
-  # Customer-egress policy is sourced from platform/app/.env. Do not override it
+  # Customer-egress policy is sourced from .env. Do not override it
   # here: local/self-hosted setups may intentionally use private HTTP endpoints.
   # NOTE: infrastructure URLs (DATABASE_URL, REDIS_URL, CLICKHOUSE_URL,
   # LANGWATCH_NLP_SERVICE, LANGEVALS_ENDPOINT) are NOT set here. The
-  # contributor's `platform/app/.env` is the source of truth — `quickstart`
-  # writes a per-mode overlay at `platform/app/.env.dev-up` that overrides
+  # contributor's `.env` is the source of truth — `quickstart`
+  # writes a per-mode overlay at `.env.dev-up` that overrides
   # only the URLs whose services are starting locally for that mode
   # (#3860 AC#2 / AC#6).
 
@@ -232,7 +232,7 @@ services:
       - "${APP_PORT:-5560}:5560"
     environment:
       <<: *common-env
-      # BASE_HOST/NEXTAUTH_URL intentionally override platform/app/.env so
+      # BASE_HOST/NEXTAUTH_URL intentionally override .env so
       # worktree-isolated dev gets the correct dynamic APP_PORT (each
       # worktree picks a different free port). Set shell vars to point at
       # a proxied URL (e.g. BASE_HOST=https://langwatch-main.boxd.sh) —
@@ -245,8 +245,8 @@ services:
       # Use email login for dev (no Auth0 dependency)
       NEXTAUTH_PROVIDER: "email"
     env_file:
-      - platform/app/.env
-      - path: platform/app/.env.dev-up
+      - .env
+      - path: .env.dev-up
         required: false
     depends_on:
       init:
@@ -307,8 +307,8 @@ services:
       PINO_LOG_LEVEL: ${PINO_LOG_LEVEL:-info}
       # To enable verbose scenario SDK logging, add: SCENARIO_VERBOSE: "true"
     env_file:
-      - platform/app/.env
-      - path: platform/app/.env.dev-up
+      - .env
+      - path: .env.dev-up
         required: false
     depends_on:
       init:
@@ -402,12 +402,12 @@ services:
       - "${AI_SERVER_PORT:-3456}:3456"
     environment:
       <<: *common-env
-      # LANGWATCH_API_KEY comes from platform/app/.env via env_file below
+      # LANGWATCH_API_KEY comes from .env via env_file below
       PINO_CONSOLE_LEVEL: "debug"
       LOG_LEVEL: "debug"
     env_file:
-      - platform/app/.env
-      - path: platform/app/.env.dev-up
+      - .env
+      - path: .env.dev-up
         required: false
     depends_on:
       init:

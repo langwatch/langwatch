@@ -34,11 +34,20 @@ import { keepProcessNodeEnv } from "./server/env-mode-guard";
 
 const quiet = process.env.NODE_ENV !== "development";
 const nodeEnvBeforeDotenv = process.env.NODE_ENV;
-dotenv.config({ override: true, quiet });
+const rootEnvPath = "../../.env";
+const legacyEnvPath = ".env";
+const rootOverlayPath = "../../.env.portless";
+const legacyOverlayPath = ".env.portless";
+const envPath = existsSync(rootEnvPath) ? rootEnvPath : legacyEnvPath;
+const overlayPath = existsSync(rootOverlayPath)
+  ? rootOverlayPath
+  : legacyOverlayPath;
+
+dotenv.config({ path: envPath, override: true, quiet });
 dotenv.config({
-  path: ".env.portless",
+  path: overlayPath,
   override: true,
-  quiet: quiet || !existsSync(".env.portless"),
+  quiet: quiet || !existsSync(overlayPath),
 });
 // NODE_ENV is a runtime mode, not configuration — enforce the "stays
 // shell-only" rule the comment above promises, so a NODE_ENV=development line

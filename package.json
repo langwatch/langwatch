@@ -31,6 +31,7 @@
     "langwatch-server": "packages/server/dist/cli.cjs"
   },
   "files": [
+    ".env.example",
     "packages/server/dist/",
     "packages/actor/",
     "packages/api/",

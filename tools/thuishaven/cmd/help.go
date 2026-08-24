@@ -72,7 +72,7 @@ Shared, machine-wide (one daemon, all worktrees):
 
 var envHelpText = `Environment variables.
 
-    Most of the knobs below also resolve from platform/app/.env (then
+    Most of the knobs below also resolve from .env (then
     .env.portless), so a lasting preference like "this machine runs native
     ClickHouse, never provision one" lives next to the URL it belongs with and
     travels into every new worktree. An exported variable still wins, for

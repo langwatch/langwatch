@@ -238,7 +238,7 @@ telemetry fan-out, holds the cross-worktree registry (`~/.langwatch/portless/
 registry/*.json`), and **reaps** stacks whose launcher has exited or whose
 heartbeat has gone stale (`HAVEN_IDLE_TTL`) — pulling routes down with them.
 
-The resolved config lands in `platform/app/.env.portless`, which every TS entry
+The resolved config lands in `.env.portless`, which every TS entry
 point loads **last with `override: true`** so it beats anything pinned in `.env`
 (that repo runs `dotenv.config({ override: true })`).
 

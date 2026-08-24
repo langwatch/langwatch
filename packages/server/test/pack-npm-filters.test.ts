@@ -75,7 +75,12 @@ function buildFixture(trackedPaths: string[]): string {
 			{
 				name: "@langwatch/server",
 				version: "0.0.0",
-				files: ["platform/app/", "packages/api/", "dev/scripts/"],
+				files: [
+					".env.example",
+					"platform/app/",
+					"packages/api/",
+					"dev/scripts/",
+				],
 			},
 			null,
 			2,
@@ -184,8 +189,8 @@ describe("npm pack staging filters", () => {
 		// tree is what says whether that ordering still holds, because the guard
 		// exempts every other dotenv file and so cannot report one.
 		const root = buildFixture([
-			"platform/app/.env.example",
-			"platform/app/.env.staging",
+			".env.example",
+			".env.staging",
 			"platform/app/src/server/config.ts",
 		]);
 		const stageDir = join(root, "_stage");
@@ -193,10 +198,10 @@ describe("npm pack staging filters", () => {
 		const { code } = runCheck({ root, extraArgs: ["--stage-to", stageDir] });
 
 		expect(code).toBe(0);
-		expect(staged({ stageDir, relPath: "platform/app/.env.example" })).toBe(
+		expect(staged({ stageDir, relPath: ".env.example" })).toBe(
 			true,
 		);
-		expect(staged({ stageDir, relPath: "platform/app/.env.staging" })).toBe(
+		expect(staged({ stageDir, relPath: ".env.staging" })).toBe(
 			false,
 		);
 	});

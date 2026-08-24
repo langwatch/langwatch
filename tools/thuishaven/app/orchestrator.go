@@ -669,7 +669,7 @@ func (o *Orchestrator) runIngestScript(ctx context.Context, p UpParams, retryCmd
 
 // liveSeedEnv returns the running stack's complete environment overlay plus a
 // loopback collector endpoint. The complete overlay matters for seeders that
-// write both Postgres and ClickHouse; inheriting platform/app/.env would silently
+// write both Postgres and ClickHouse; inheriting .env would silently
 // target the primary checkout instead of this worktree's isolated databases.
 func (o *Orchestrator) liveSeedEnv(p UpParams, retryCmd string) ([]string, error) {
 	slug, err := o.resolveSlug(p)

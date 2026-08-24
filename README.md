@@ -73,7 +73,7 @@ Prefer Docker? You can still use docker compose:
 ```bash
 git clone https://github.com/langwatch/langwatch.git
 cd platform/app
-cp platform/app/.env.example platform/app/.env
+cp .env.example .env
 docker compose up -d --wait --build
 ```
 Once running, LangWatch will be available at `http://localhost:5560`, where you can create your first project and API key.

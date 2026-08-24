@@ -48,7 +48,7 @@ Feature: AI Gateway control-plane target cannot silently default to the wrong wo
 
   @unit
   Scenario: make service leaves an explicit control-plane URL untouched
-    Given LW_GATEWAY_BASE_URL is already set, whether inherited from the shell or from platform/app/.env
+    Given LW_GATEWAY_BASE_URL is already set, whether inherited from the shell or from .env
     When "make service svc=aigateway" resolves its environment
     Then the explicit value is used unchanged
 

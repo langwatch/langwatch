@@ -177,7 +177,7 @@ func (c *leveledCore) With(fields []zapcore.Field) zapcore.Core {
 
 // Config controls logging setup. The env keys are shared with the TS app
 // (LOG_LEVEL / LOG_CONSOLE_LEVEL / LOG_OTEL_LEVEL) so one set of variables in
-// platform/app/.env configures logging for both Go and JS.
+// .env configures logging for both Go and JS.
 type Config struct {
 	Level  string `env:"LEVEL"`  // "debug", "info", "warn", "error"
 	Format string `env:"FORMAT"` // "json" (default), "pretty"

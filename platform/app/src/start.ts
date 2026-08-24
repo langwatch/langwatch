@@ -214,7 +214,7 @@ export const startApp = async (options: StartAppOptions = {}) => {
     logger.warn(
       "AI Gateway menu is on by default but no gateway secrets are set. " +
         "The UI will render but /api/internal/gateway/* will return 503. " +
-        "See platform/app/.env.example for the required block.",
+        "See .env.example for the required block.",
     );
   }
 

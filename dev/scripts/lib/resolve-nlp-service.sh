@@ -3,7 +3,7 @@
 # its engine on that port instead of one nothing talks to.
 #
 # platform/app/scripts/start.sh runs before any Node entry point, and the shell
-# never loads platform/app/.env. The app does, with `override: true`
+# never loads .env. The app does, with `override: true`
 # (platform/app/src/env-load.ts), so a LANGWATCH_NLP_SERVICE pinned in .env is
 # the address it dials and the launcher cannot see it. Without this the launcher
 # reads an unset variable, derives PORT+1, starts an engine there, and every

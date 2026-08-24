@@ -6,7 +6,7 @@ import dotenv from "dotenv";
 import { afterAll, afterEach, vi } from "vitest";
 import { TEST_PUBLIC_KEY } from "@langwatch/enterprise-licensing-server/testing";
 
-dotenv.config({ path: ".env" });
+dotenv.config({ path: ["../../.env", ".env"] });
 
 // Register React Testing Library's per-test unmount globally. vitest.config.ts
 // runs without `globals: true`, so RTL's automatic afterEach(cleanup) never

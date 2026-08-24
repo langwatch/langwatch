@@ -1,7 +1,7 @@
 Feature: Langy local dogfood doctor
 
   Running Langy locally needs five things wired at once: the Langy env block
-  in platform/app/.env (agent URL, shared secret, the no-sandbox dev flag,
+  in .env (agent URL, shared secret, the no-sandbox dev flag,
   writable session/workspace roots), the release flag force-enabled, the
   opencode binary on PATH, three live services (app, AI gateway, langyagent),
   and a model provider whose key actually works. Each missing piece fails a
@@ -14,7 +14,7 @@ Feature: Langy local dogfood doctor
 
   @unit
   Scenario: A fully wired setup passes every check
-    Given the Langy env block is present in platform/app/.env
+    Given the Langy env block is present in .env
     And the release flag is force-enabled
     And opencode is on PATH
     And the app, gateway, and langyagent are listening
@@ -24,7 +24,7 @@ Feature: Langy local dogfood doctor
 
   @unit
   Scenario: A missing env entry prints the exact lines to add
-    Given platform/app/.env has no LANGY_INTERNAL_SECRET
+    Given .env has no LANGY_INTERNAL_SECRET
     When the developer runs the doctor
     Then the check fails naming the missing keys
     And it prints a ready-to-paste env block, secret generation included
@@ -39,7 +39,7 @@ Feature: Langy local dogfood doctor
 
   @unit
   Scenario: A provider key that the provider rejects is caught before a turn wastes time on it
-    Given an OPENAI_API_KEY is present in platform/app/.env
+    Given an OPENAI_API_KEY is present in .env
     But the provider answers it with an auth failure
     When the developer runs the doctor
     Then the key check reports the rejection

@@ -4,7 +4,7 @@
  *
  *   1. OpenAI + ElevenLabs ModelProvider rows on the user's org (keys from
  *      OPENAI_API_KEY / ELEVENLABS_API_KEY in env; each skipped when unset).
- *      Read those from platform/app/.env, which is where this app's model
+ *      Read those from .env, which is where this app's model
  *      provider keys live. An env file from another repository drifts, and
  *      a stale key is indistinguishable from a fresh one once stored.
  *   2. An org-default routing policy carrying BOTH providers with NO model

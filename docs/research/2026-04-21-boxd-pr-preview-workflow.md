@@ -64,7 +64,7 @@ A real golden pipeline either (a) rebuilds the VM from scratch from a declarativ
 
 ### 3. The in-VM NEXTAUTH_URL quirk is the tip of a config-drift iceberg
 
-The golden's `platform/app/.env` pins `NEXTAUTH_URL` to the golden's hostname. Any fork fails Better Auth sign-in until overridden. `~/boxd-fork.sh` handles this for manual forks. CI needs the equivalent, and the same treatment will likely be needed for OAuth callback URLs, webhook destinations, CORS allowlists, email-link generation, and anything else with a hardcoded `*.boxd.sh` URL. These surface one at a time as "preview broken for feature X" bugs.
+The golden's `.env` pins `NEXTAUTH_URL` to the golden's hostname. Any fork fails Better Auth sign-in until overridden. `~/boxd-fork.sh` handles this for manual forks. CI needs the equivalent, and the same treatment will likely be needed for OAuth callback URLs, webhook destinations, CORS allowlists, email-link generation, and anything else with a hardcoded `*.boxd.sh` URL. These surface one at a time as "preview broken for feature X" bugs.
 
 ### 4. State contamination across PRs (resolved via no-direct-access policy)
 
@@ -114,7 +114,7 @@ Do **not** skip straight to writing workflow YAML. In order:
 2. **Time a `boxd fork` of `langwatch-main-golden-image` to domain-level health**, end-to-end, manually, from a cold cache. Instrument it. Numbers, not vibes. This is the load-bearing number for "is this CI-fast?"
 3. **Decide whether per-PR data isolation is actually required.** If UI review is the real goal, strategy F is 10× cheaper. If isolated data matters (testing migrations, seeding fixtures), strategies A/C/D/E are candidates.
 4. **If proceeding with Boxd (A/B/C/D): design golden refresh as a rebuild or snapshot, not a `git pull` on a live VM.** See finding §2.
-5. **Budget time for the NEXTAUTH_URL class of bugs.** Audit `platform/app/.env` and the golden's `.env` for any hardcoded `*.boxd.sh` host. Plan for an env-override phase in the fork boot script. See finding §3.
+5. **Budget time for the NEXTAUTH_URL class of bugs.** Audit `.env` and the golden's `.env` for any hardcoded `*.boxd.sh` host. Plan for an env-override phase in the fork boot script. See finding §3.
 6. **Build the reaper before the happy path, and wire FIFO eviction into the fork path.** Before every `boxd fork pr<N>`, list current `pr<N>` VMs and destroy the oldest if the soft cap (e.g. 4) would be exceeded. Separately: a scheduled workflow that lists all `pr<N>` VMs, checks each PR's state via `gh pr view --json state`, and destroys `CLOSED` / `MERGED` orphans. Both guards are needed — FIFO handles missed close events in the moment, the scheduled reaper handles the long tail.
 7. **Required secrets (all set at the repo/org level, owned by the bot identity — never tied to a personal account):** For A: `BOXD_TOKEN` (JWT issued via `ssh boxd.sh token create` from the bot's linked SSH session). For B: `BOXD_SSH_KEY` (ed25519 private key generated for the bot, public key paired once to the org Boxd account) plus `boxd.sh` entries in `known_hosts`. Already-existing repo secrets like `DOCKERHUB_TOKEN` / `SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL` are the pattern to follow for storage and access control.
 8. **Concurrency group:** `boxd-pr-${{ github.event.pull_request.number }}` with `cancel-in-progress: true`. Matches existing SDK-workflow convention in the repo.

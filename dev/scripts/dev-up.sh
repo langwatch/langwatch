@@ -48,9 +48,9 @@ sanitize_localhost_dev_env
 # ---------------------------------------------------------------------------
 # Ensure .env files exist
 # ---------------------------------------------------------------------------
-if [ ! -f "platform/app/.env" ] && [ -f "platform/app/.env.example" ]; then
-  echo "Creating platform/app/.env from example..."
-  cp platform/app/.env.example platform/app/.env
+if [ ! -f ".env" ] && [ -f ".env.example" ]; then
+  echo "Creating .env from example..."
+  cp .env.example .env
 fi
 
 # ---------------------------------------------------------------------------
@@ -81,7 +81,7 @@ fi
 # ---------------------------------------------------------------------------
 echo "Starting LangWatch (project=${COMPOSE_PROJECT_NAME}, app_port=${APP_PORT})..."
 
-# Write URL overrides into platform/app/.env.dev-up. Same shared helper as
+# Write URL overrides into .env.dev-up. Same shared helper as
 # dev/scripts/dev.sh — only the URLs whose services actually start for this
 # profile are overridden (#3860 AC#6). The helper honors each service's
 # compose profile membership: langwatch_nlp runs under [nlp, scenarios,
@@ -99,7 +99,7 @@ case "${PROFILE:-}" in
   nlp)                       DEV_UP_PRESET="all-local-nlp" ;;
   full|scenarios|workers)    DEV_UP_PRESET="full-local" ;;
 esac
-write_dev_overrides "$DEV_UP_PRESET" platform/app/.env.dev-up
+write_dev_overrides "$DEV_UP_PRESET" .env.dev-up
 
 $COMPOSE_CMD up -d
 

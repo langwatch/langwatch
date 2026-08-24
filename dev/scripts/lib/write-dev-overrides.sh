@@ -1,9 +1,9 @@
 #!/bin/bash
 # Shared write_overrides helper.
 #
-# Writes `platform/app/.env.dev-up` listing ONLY the URLs whose services
+# Writes `.env.dev-up` listing ONLY the URLs whose services
 # starting locally for the given preset. Compose loads the overlay AFTER
-# `platform/app/.env`, so non-overridden URLs keep their .env values — the
+# `.env`, so non-overridden URLs keep their .env values — the
 # contributor's `.env` is the source of truth.
 #
 # Credentials NEVER go in the overlay (only non-rotating infrastructure
@@ -35,7 +35,7 @@
 
 write_dev_overrides() {
   local preset="${1-}"
-  local out="${2:-platform/app/.env.dev-up}"
+  local out="${2:-.env.dev-up}"
 
   case "$preset" in
     all-local|all-local-nlp|dev-storage|dev-infra|frontend-only|migration|full-local) ;;

@@ -309,7 +309,7 @@ On the LLM gateway-call span specifically:
 
 - Unit tests for translators, parsers, DAG resolver — `tests/unit/`.
 - Integration tests for engine + each block — `tests/integration/`. **Real HTTP server**, real fixtures from `langwatch_nlp/tests/`. No mocks for cross-component flow.
-- Provider matrix tests (Ash) — `tests/matrix/` with `//go:build live_<provider>` tags, real keys from `platform/app/.env`.
+- Provider matrix tests (Ash) — `tests/matrix/` with `//go:build live_<provider>` tags, real keys from `.env`.
 - Each spec scenario in `specs/nlp-go/*.feature` MUST have at least one corresponding test. We do not ship without specs and tests aligned.
 
 ---
