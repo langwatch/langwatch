@@ -1,4 +1,4 @@
-import type { AgentConfig as AgentComponentConfig } from "@langwatch/agents-contract";
+import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
 import type { FieldMapping } from "~/components/variables";
 
 import type { CodeComponentConfig, Field } from "../types/dsl";

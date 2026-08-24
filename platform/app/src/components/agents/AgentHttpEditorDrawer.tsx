@@ -37,7 +37,7 @@ import type {
   HttpHeader,
   HttpMethod,
 } from "~/optimization_studio/types/dsl";
-import type { AgentConfig as AgentComponentConfig } from "@langwatch/agents-contract";
+import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
 import type { AgentWithFields } from "~/server/agents/agent-fields";
 import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
 import { api } from "~/utils/api";

@@ -2,4 +2,4 @@
 export {
   buildHttpNodeParameters,
   type HttpCallConfig,
-} from "@langwatch/agents-contract";
+} from "@langwatch/agent-contract";

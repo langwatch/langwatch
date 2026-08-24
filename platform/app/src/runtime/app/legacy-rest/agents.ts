@@ -1,4 +1,4 @@
-import { LegacyAgentsRestApi } from "@langwatch/agents-server/legacy-rest";
+import { LegacyAgentsRestApi } from "@langwatch/agent-server/legacy-rest";
 import type { AgentsRuntimeContext } from "../features/agents";
 import { AgentsFeature } from "../features/agents";
 

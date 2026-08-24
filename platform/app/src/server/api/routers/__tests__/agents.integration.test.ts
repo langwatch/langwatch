@@ -10,7 +10,7 @@ import type {
   HttpAgentConfig,
   SignatureAgentConfig,
   WorkflowAgentConfig,
-} from "@langwatch/agents-contract";
+} from "@langwatch/agent-contract";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { getTestUser } from "../../../../utils/testUtils";

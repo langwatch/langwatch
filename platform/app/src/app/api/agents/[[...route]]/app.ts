@@ -6,7 +6,7 @@ import {
   createAgentRequestSchema,
   listAgentsQuerySchema,
   updateAgentRequestSchema,
-} from "@langwatch/agents-contract";
+} from "@langwatch/agent-contract";
 import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi";
 import { nanoid } from "nanoid";

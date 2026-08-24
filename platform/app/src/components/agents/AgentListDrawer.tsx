@@ -31,7 +31,7 @@ import {
   useDrawer,
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { AgentWithFields as TypedAgent } from "@langwatch/agents-contract";
+import type { AgentWithFields as TypedAgent } from "@langwatch/agent-contract";
 import type { AgentWithFields } from "~/server/agents/agent-fields";
 import { api } from "~/utils/api";
 

@@ -7,7 +7,7 @@ import {
   createAgentCommandSchema,
   InvalidAgentConfigError,
   updateAgentCommandSchema,
-} from "@langwatch/agents-contract";
+} from "@langwatch/agent-contract";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -165,6 +165,7 @@ export const agentsRouter = createTRPCRouter({
           sourceAgentId: input.agentId,
           sourceProjectId: input.sourceProjectId,
           targetProjectId: input.projectId,
+          actorUserId: ctx.session.user.id,
           newAgentId: input.newAgentId,
         }),
       );

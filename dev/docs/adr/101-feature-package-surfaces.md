@@ -12,9 +12,9 @@ defined by [ADR-111](./111-physical-application-workspaces.md) and singular
 domain ownership defined by [ADR-112](./112-singular-feature-ownership.md).
 
 **Concrete boundaries:**
-[Agents](../../../packages/features/agents/adrs/001-package-boundary.md),
-[Entitlements](../../../packages/features/entitlements/adrs/001-provider-neutral-plan-resolution.md),
-[Stored Objects](../../../packages/features/stored-objects/adrs/001-package-boundary.md),
+[Agents](../../../packages/features/agent/adrs/001-package-boundary.md),
+[Entitlements](../../../packages/features/entitlement/adrs/001-provider-neutral-plan-resolution.md),
+[Stored Objects](../../../packages/features/stored-object/adrs/001-package-boundary.md),
 [the design system](../../../packages/design-system/adrs/001-design-system-boundary.md),
 [shared JavaScript configuration](../../../packages/config/adrs/001-shared-runtime-configuration.md),
 and [package-boundary enforcement](../../../packages/architecture-lint/adrs/001-feature-package-boundaries.md).
@@ -255,9 +255,10 @@ API transport.
 Service implementations are classes. A service exposes a static `create`
 method; it is not wrapped by a standalone `createXService` function. Service
 behaviour stays on the class rather than in neighbouring factory or helper
-functions. The contract exports the abstract service class so consumers can inject a fake
-without importing its implementation. Server code uses explicit control flow
-instead of nested ternaries and conditional object spreads.
+functions. The contract exports the abstract service class so consumers can
+inject a fake without importing its implementation. A service receives its own
+repositories and other features' contract services. It does not import a
+database client, recover a global App, or take another feature's repository.
 
 A singular service lookup either returns the requested contract value or
 throws a concrete domain error containing useful identifiers. It does not
@@ -378,17 +379,22 @@ and the authoritative feature catalogue. At minimum they reject:
 - deep imports that bypass a package export map; and
 - exported server declarations containing Prisma-generated types;
 - feature source reading environment variables directly;
-- service factory functions, service classes without static `create`, nested
-  ternaries and conditional object spreads; and
+- service factory functions and service classes without static `create`; and
 - a feature ownership root without an indexed boundary ADR and linked Gherkin
   spec covering public surfaces, dependencies, persistence, runtime,
   environment, errors and contract validation; and
 - an unregistered, duplicate, plural-alias, or wrong-owner product subject.
 
 Oxlint handles source and import rules in the ordinary fast lint path. The
-workspace checker handles manifests, cycles, emitted declarations and the
-structural completeness of ADRs/specs. A relative path, TypeScript path alias
-or `import type` cannot be used to bypass them.
+workspace checker handles manifests, cycles and the structural completeness of
+ADRs/specs. Public declaration emission is a separate heavier boundary check,
+not work hidden inside lint. A relative path, TypeScript path alias or `import
+type` cannot be used to bypass them. This architecture gate does not
+provide general dependency-upgrade policy or police formatting, expression
+complexity, or subjective style. It does reject explicitly retired runtimes
+and old package entry points whose coexistence would violate a contract
+boundary. Other concerns belong to the package manager, formatter, and normal
+hygiene tools.
 
 ## Alternatives considered
 

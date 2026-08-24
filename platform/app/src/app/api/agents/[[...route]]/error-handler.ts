@@ -1,7 +1,7 @@
 import {
   AgentNotFoundError,
   InvalidAgentConfigError,
-} from "@langwatch/agents-contract";
+} from "@langwatch/agent-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";

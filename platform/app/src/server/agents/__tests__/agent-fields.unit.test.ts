@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Workflow } from "~/optimization_studio/types/dsl";
-import type { AgentConfig as AgentComponentConfig } from "@langwatch/agents-contract";
+import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
 import { linkedWorkflowId, resolveAgentFields } from "../agent-fields";
 
 const dsl = (

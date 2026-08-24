@@ -3,7 +3,7 @@ import type {
   AgentFields as ContractAgentFields,
   AgentType,
   AgentWithFields as ContractAgentWithFields,
-} from "@langwatch/agents-contract";
+} from "@langwatch/agent-contract";
 import type { Field, Workflow } from "~/optimization_studio/types/dsl";
 import { getMappingSurfaceInputs } from "~/optimization_studio/utils/nodeUtils";
 import { getWorkflowEndInputs } from "~/optimization_studio/utils/workflowFields";

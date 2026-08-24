@@ -174,7 +174,7 @@ no import side effects and one sealed build phase.
 A feature server package may export separate, side-effect-free contributions:
 
 ```text
-@langwatch/agents-server
+@langwatch/agent-server
 ├── AgentService.create(...)
 ├── AgentsRpcApi.create(...)
 └── LegacyAgentsRestApi.create(...)

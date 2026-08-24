@@ -1,9 +1,9 @@
-import type { Agent } from "@langwatch/agents-contract";
+import type { Agent } from "@langwatch/agent-contract";
 import {
   AgentCard as PresentationalAgentCard,
   type AgentCardProps as PresentationalAgentCardProps,
-} from "@langwatch/agents-web";
-import type { AgentWithFields as TypedAgent } from "@langwatch/agents-contract";
+} from "@langwatch/agent-web";
+import type { AgentWithFields as TypedAgent } from "@langwatch/agent-contract";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { agentContextChip } from "~/features/langy/logic/langyContextChips";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";

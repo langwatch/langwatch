@@ -39,7 +39,7 @@ import {
   DEFAULT_CODE,
   getCodeFromConfig,
 } from "~/optimization_studio/utils/codeAgentConfig";
-import type { AgentConfig as AgentComponentConfig } from "@langwatch/agents-contract";
+import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
 import { api } from "~/utils/api";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { AgentComponent, Field as DslField } from "../../types/dsl";

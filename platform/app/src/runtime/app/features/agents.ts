@@ -1,22 +1,25 @@
 import type {
   AgentHistoryEntry,
   AgentWithFields,
-} from "@langwatch/agents-contract";
+} from "@langwatch/agent-contract";
 import {
   AgentService,
   PrismaAgentAdapter,
   type AgentsAuditLogPort,
   type AgentsDatabase,
   type AgentsWorkflowPort,
-} from "@langwatch/agents-server";
+} from "@langwatch/agent-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { Workflow } from "~/optimization_studio/types/dsl";
 import { workflowAgentFields } from "~/server/agents/agent-fields";
 import type { Session } from "~/server/auth";
+import type { WorkflowService } from "@langwatch/workflow-contract";
 
 export type AgentsRuntimeContext = {
   prisma: PrismaClient;
   session: Session | null;
+  /** Process-owned Workflow capability for cross-feature copy operations. */
+  workflows?: WorkflowService;
 };
 
 export class AgentsFeature {
@@ -58,11 +61,17 @@ export class AgentsFeature {
           select: { id: true, name: true },
         });
       },
-      async copy({ workflowId, sourceProjectId, targetProjectId }) {
+      async copy({
+        workflowId,
+        sourceProjectId,
+        targetProjectId,
+        actorUserId,
+      }) {
         return AgentsFeature.copyWorkflow(context, {
           workflowId,
           sourceProjectId,
           targetProjectId,
+          actorUserId,
         });
       },
       async archive({ workflowId, projectId }) {
@@ -124,56 +133,20 @@ export class AgentsFeature {
       workflowId: string;
       sourceProjectId: string;
       targetProjectId: string;
+      actorUserId: string;
     },
   ): Promise<{ workflowId: string }> {
-    if (!context.session) {
-      throw new Error(
-        "An authenticated session is required to copy a workflow agent.",
-      );
+    if (!context.workflows) {
+      throw new Error("Workflow service is not configured for agent copies.");
     }
-    const { prisma } = context;
-    const workflow = await prisma.workflow.findFirst({
-      where: {
-        id: input.workflowId,
-        projectId: input.sourceProjectId,
-        archivedAt: null,
-      },
-      include: { latestVersion: true },
-    });
-    if (!workflow?.latestVersion?.dsl) {
-      throw new Error("Workflow version not found.");
-    }
-    // This app-owned adapter still delegates to legacy workflow orchestration.
-    // Load it only when copying so the tRPC context can compose RequestApp
-    // without creating a module cycle back through the workflow router.
-    const { copyWorkflowWithDatasets, saveOrCommitWorkflowVersion } =
-      await import("~/server/api/routers/workflows");
-    const copied = await copyWorkflowWithDatasets({
-      ctx: { prisma, session: context.session },
-      workflow: {
-        id: workflow.id,
-        name: workflow.name,
-        icon: workflow.icon,
-        description: workflow.description,
-        isEvaluator: workflow.isEvaluator,
-        isComponent: workflow.isComponent,
-        latestVersion: { dsl: workflow.latestVersion.dsl },
-      },
+    const copied = await context.workflows.copy({
+      sourceWorkflowId: input.workflowId,
       targetProjectId: input.targetProjectId,
       sourceProjectId: input.sourceProjectId,
       copiedFromWorkflowId: input.workflowId,
+      authorId: input.actorUserId,
     });
-    await saveOrCommitWorkflowVersion({
-      ctx: { prisma, session: context.session },
-      input: {
-        projectId: input.targetProjectId,
-        workflowId: copied.workflowId,
-        dsl: copied.dsl,
-      },
-      autoSaved: false,
-      commitMessage: `Copied from ${workflow.name}`,
-    });
-    return { workflowId: copied.workflowId };
+    return { workflowId: copied.workflow.id };
   }
 
   private static async removeWorkflow(

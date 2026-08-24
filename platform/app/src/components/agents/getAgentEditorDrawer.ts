@@ -1,4 +1,4 @@
-import type { AgentType } from "@langwatch/agents-contract";
+import type { AgentType } from "@langwatch/agent-contract";
 
 type AgentEditorDrawerName =
   | "agentCodeEditor"

@@ -21,7 +21,7 @@ import {
   signatureAgentConfigSchema,
   type WorkflowAgentConfig,
   workflowAgentConfigSchema,
-} from "@langwatch/agents-contract";
+} from "@langwatch/agent-contract";
 import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 
@@ -29,7 +29,7 @@ import type { LocalPromptConfig } from "~/experiments-v3/types";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
-import { datasetColumnTypeSchema } from "../../server/datasets/types";
+import { datasetColumnTypeSchema } from "@langwatch/dataset-contract";
 import type { ChatMessage } from "../../server/tracer/types";
 
 export const FIELD_TYPES = AGENT_FIELD_TYPES;
@@ -412,7 +412,7 @@ export type ServerWorkflow = Omit<Workflow, "workflow_id"> & {
   secrets?: Record<string, string>;
 };
 
-// Agent authoring contracts are owned by packages/features/agents/contract.
+// Agent authoring contracts are owned by packages/features/agent/contract.
 // These names remain as aliases for the Studio graph while its
 // broader workflow vocabulary stays app-owned.
 export const fieldSchema = agentFieldSchema;

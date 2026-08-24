@@ -1,1 +1,1 @@
-export { agentHasDevTunnel, LocalTunnelBadge } from "@langwatch/agents-web";
+export { agentHasDevTunnel, LocalTunnelBadge } from "@langwatch/agent-web";
