@@ -24,7 +24,7 @@ import { credentialSignInFailure } from "../logic/credentialSignIn";
 import { rememberLastUsedMethod } from "../logic/lastUsedMethod";
 import "../authFrontDoor.css";
 import { BRAND, SHAPE } from "../logic/brand";
-import { FIELD_FOCUS, FrontDoorField } from "./FrontDoorField";
+import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "./FrontDoorField";
 
 /**
  * The strength rule the server enforces, said in the words the field shows.
@@ -151,6 +151,7 @@ export function SignUpCredentialForm({
               borderRadius={SHAPE.field}
               fontSize={{ base: "16px", md: "14px" }}
               minHeight="44px"
+              {...FIELD_SURFACE}
               _focusVisible={FIELD_FOCUS}
               {...form.register("name")}
             />
@@ -174,6 +175,7 @@ export function SignUpCredentialForm({
                 minHeight="44px"
                 borderRadius={SHAPE.field}
                 autoComplete="new-password"
+                {...FIELD_SURFACE}
                 _focusVisible={FIELD_FOCUS}
                 {...form.register("password")}
               />
@@ -200,6 +202,7 @@ export function SignUpCredentialForm({
               minHeight="44px"
               borderRadius={SHAPE.field}
               autoComplete="new-password"
+              {...FIELD_SURFACE}
               _focusVisible={FIELD_FOCUS}
               {...form.register("confirmPassword")}
             />

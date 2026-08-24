@@ -15,16 +15,17 @@
  * stylesheet has not loaded yet.
  */
 export const BRAND = {
-  /** The primary action. */
-  action: "var(--lw-front-door-action, #f56b1a)",
+  /** The primary action: the site's `btn-primary`, an ink pill. The brand
+   *  orange is the accent around it, never the button itself. */
+  action: "var(--lw-front-door-action, #141417)",
   /** The primary action, hovered. */
-  actionHover: "var(--lw-front-door-action-hover, #d65209)",
+  actionHover: "var(--lw-front-door-action-hover, #26261f)",
   /** Text on a tinted surface: readable where the tint alone is not. */
   ink: "var(--lw-front-door-ink, #a83e05)",
   /** The tint itself. */
   tint: "var(--lw-front-door-tint, #fdece0)",
   /** Text that sits on the action colour. */
-  onAction: "var(--lw-front-door-on-action, #ffffff)",
+  onAction: "var(--lw-front-door-on-action, #efeee9)",
   /**
    * Focus rings, badges and hairline accents: the brand without being the
    * button. It steps up a stop on dark, where the solid orange that reads as

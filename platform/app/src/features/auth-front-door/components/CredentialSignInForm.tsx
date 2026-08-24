@@ -22,7 +22,7 @@ import { attemptCredentialSignIn } from "../logic/attemptCredentialSignIn";
 import { BRAND, SHAPE } from "../logic/brand";
 import { describeRemainingWait } from "../logic/credentialSignIn";
 import { rememberLastUsedMethod } from "../logic/lastUsedMethod";
-import { FIELD_FOCUS, FrontDoorField } from "./FrontDoorField";
+import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "./FrontDoorField";
 
 const credentialSchema = z.object({
   password: z.string().min(1, { message: "Enter your password" }),
@@ -172,6 +172,7 @@ export function CredentialSignInForm({
                 minHeight="44px"
                 borderRadius={SHAPE.field}
                 autoComplete="current-password"
+                {...FIELD_SURFACE}
                 _focusVisible={FIELD_FOCUS}
                 {...form.register("password")}
                 ref={(node) => {

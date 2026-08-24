@@ -62,3 +62,13 @@ export const FIELD_FOCUS = {
   boxShadow: "0 0 0 3px var(--lw-front-door-focus-ring)",
   outline: "none",
 } as const;
+
+/**
+ * The surface every front-door input shares. The card is glass, so a field
+ * sits one step more solid than the card it is on — enough for the type to
+ * stay crisp with the ground moving underneath.
+ */
+export const FIELD_SURFACE = {
+  backgroundColor: "var(--lw-front-door-field-bg)",
+  borderColor: "var(--lw-front-door-field-border)",
+} as const;

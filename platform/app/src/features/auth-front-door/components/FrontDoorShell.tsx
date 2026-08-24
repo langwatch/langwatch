@@ -2,7 +2,7 @@ import { Box, Flex } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import "../authFrontDoor.css";
-import { FrontDoorMesh } from "./FrontDoorMesh";
+import { FrontDoorGround } from "./FrontDoorGround";
 import { FrontDoorValuePanel } from "./FrontDoorValuePanel";
 import { LogoHandoff } from "./LogoHandoff";
 
@@ -14,13 +14,12 @@ import { LogoHandoff } from "./LogoHandoff";
  * surrounds it, and that is composed here — a hosted signup has a case to
  * make, and a company's own installation does not.
  *
- * Hosted, on a desktop, that case gets its own half of the page: headline,
- * tagline and the trusted-by slot on the left, over the mesh band, with the
- * card on the right behind a hairline. Below the split it collapses to the
- * headline above the card, because a tagline and a logo row stacked above a
- * log-in form on a phone are two screens of scrolling in front of the thing
- * the person came to do. A hosted screen with no case to make — log-in — is
- * the centred card over the same band, so the two doors read as one place.
+ * On a hosted deployment the whole viewport is ONE field — the site's light
+ * mesh or its dark warp, depending on the colour mode — and everything sits
+ * over it: the headline reads off the ground's protected side, and the card
+ * is glass with the same ground moving through it. There is no border and no
+ * change of surface between the two halves, because there are no two
+ * surfaces; a seam down the middle of one field was the old layout's bug.
  *
  * Self-hosted is the plain centred card on plain paper, with nothing sold
  * beside it and nothing breathing behind it: an operator's door, not a
@@ -51,18 +50,28 @@ export function FrontDoorShell({
     <Box
       className="lw-front-door"
       position="relative"
-      backgroundColor="bg"
+      backgroundColor="var(--lw-front-door-ground)"
       minHeight="100vh"
       width="full"
       overflowX="hidden"
     >
       <LogoHandoff />
+      {isHosted ? (
+        <FrontDoorGround protect={headline ? "left" : "center"} />
+      ) : null}
       {isHosted && headline ? (
+        // Capped at the site's content width and centred, so a big monitor
+        // widens the field around the conversation rather than flinging the
+        // headline and the card to opposite edges of it.
         <Flex
+          position="relative"
+          zIndex={1}
           direction={{ base: "column", md: "row" }}
           align="stretch"
           minHeight="100vh"
           width="full"
+          maxWidth="1440px"
+          marginX="auto"
         >
           <FrontDoorValuePanel
             headline={headline}
@@ -84,18 +93,17 @@ export function FrontDoorShell({
       ) : (
         <Flex
           position="relative"
+          zIndex={1}
           direction="column"
           align="center"
+          justify={{ base: "flex-start", md: "center" }}
           minHeight="100vh"
           width="full"
           paddingX={{ base: 0, sm: 4 }}
           paddingBottom={10}
           data-testid="front-door-card-column"
         >
-          {isHosted ? <FrontDoorMesh protect="center" /> : null}
-          <Box position="relative" zIndex={1} width="full">
-            {children}
-          </Box>
+          {children}
         </Flex>
       )}
     </Box>

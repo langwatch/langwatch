@@ -145,7 +145,7 @@ describe("given the sign-up screen", () => {
         await screen.findByLabelText(/email/i),
         "sam@acme.com",
       );
-      await userEvent.click(screen.getByRole("button", { name: /continue/i }));
+      await userEvent.click(screen.getByRole("button", { name: "Continue" }));
 
       expect(await screen.findByTestId("verification-sent")).toHaveTextContent(
         /sam@acme\.com/,

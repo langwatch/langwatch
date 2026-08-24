@@ -1,4 +1,4 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@chakra-ui/react";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity";
 import { useEffect, useRef, useState } from "react";
 import { AuthCard } from "~/components/auth/AuthCard";
@@ -16,7 +16,8 @@ import {
 import { CredentialSignInForm } from "./CredentialSignInForm";
 import { IdentifierStepForm } from "./IdentifierStepForm";
 import {
-  FederatedMethodButton,
+  AlternativeMethods,
+  hasAlternativeMethods,
   SignInMethodPicker,
 } from "./SignInMethodPicker";
 import { SignUpCredentialForm } from "./SignUpCredentialForm";
@@ -187,19 +188,12 @@ export function VerificationFirstSignUp() {
           />
         }
         alternatives={
-          instanceMethods.length > 0 ? (
-            <VStack width="full" align="stretch" gap={3}>
-              {instanceMethods
-                .filter((method) => method.kind === "federated")
-                .map((method) => (
-                  <FederatedMethodButton
-                    key={method.id}
-                    method={method}
-                    isLastUsed={lastUsedMethodId === method.id}
-                    onChosen={dialFederated}
-                  />
-                ))}
-            </VStack>
+          hasAlternativeMethods(instanceMethods) ? (
+            <AlternativeMethods
+              methodSet={instanceMethods}
+              lastUsedMethodId={lastUsedMethodId}
+              onFederatedMethodChosen={dialFederated}
+            />
           ) : null
         }
       />

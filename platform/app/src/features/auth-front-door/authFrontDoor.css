@@ -1,14 +1,17 @@
 /*
- * The front door's surface: the website's own vocabulary, carried over value
- * for value from the approved design board. The mesh band, the pill actions,
- * the mono details and the one serif voice all come from the public site, so
- * the first product screen a person sees is the site they arrived from.
+ * The front door's surface: the website's own vocabulary, value for value.
  *
- * Both colour modes are declared here, keyed off the `.dark` class the app's
- * colour-mode provider puts on the document, so the toggle moves these screens
- * with everything else and no component holds a light-only value. The brand
- * accent is the same orange in both modes; what changes around it is the
- * ground it sits on and the tint it is read against.
+ * Each colour mode is one of the site's own grounds, whole. Light is the
+ * homepage hero: a white field with the mesh cloud drifting across all of it
+ * and a soft white radial keeping the reading side clean. Dark is the site's
+ * enterprise band: the ink-950 field with the blue-into-amber warp glowing up
+ * the right edge. The card is glass over whichever ground is up, the way the
+ * site's dark sections set their panels: a translucent surface, a hairline
+ * border, the ground blurring through.
+ *
+ * Both modes are declared here, keyed off the `.dark` class the app's
+ * colour-mode provider puts on the document, so the toggle moves these
+ * screens with everything else and no component holds a light-only value.
  *
  * Every animation lives inside a no-preference query rather than being
  * switched off by one, so somebody who has asked for less motion gets a
@@ -30,34 +33,54 @@
 }
 
 :root {
-	--lw-front-door-action: #f56b1a;
-	--lw-front-door-action-hover: #d65209;
+	/* The ground the whole viewport stands on: the site's paper. */
+	--lw-front-door-ground: #ffffff;
+	/* The primary action is the site's `btn-primary`: an ink pill, not an
+	   orange one. Orange is the accent here, never the button. */
+	--lw-front-door-action: #141417;
+	--lw-front-door-action-hover: #26261f;
+	--lw-front-door-on-action: #efeee9;
+	/* Text on a tinted surface, and the tint itself: the brand's own cuts. */
 	--lw-front-door-ink: #a83e05;
 	--lw-front-door-tint: #fdece0;
-	--lw-front-door-on-action: #ffffff;
 	--lw-front-door-hairline: rgba(20, 20, 23, 0.12);
-	--lw-front-door-mesh-opacity: 0.36;
 	/* Refusals. The accent is not allowed to say "wrong", so this is the only
 	   other colour these screens carry. */
 	--lw-front-door-danger: #c53030;
 	/* Focus rings, badges, hairline accents: everything that is the brand
 	   without being the button. */
 	--lw-front-door-detail: #f56b1a;
-	/* The halo around a focused field, and the glow under a hovered action:
-	   the same orange, at reading strength and at lifting strength. */
-	--lw-front-door-focus-ring: rgba(245, 107, 26, 0.18);
-	--lw-front-door-glow: rgba(245, 107, 26, 0.3);
-	--lw-front-door-card-shadow: 0 4px 18px rgba(20, 20, 23, 0.05);
+	--lw-front-door-focus-ring: rgba(245, 107, 26, 0.22);
+	/* The one gradient word: blue into warm orange, the site's `.text-gradient`. */
+	--lw-front-door-accent-gradient: linear-gradient(
+		100deg,
+		#2563eb 0%,
+		#d9531e 100%
+	);
+	/* The glass the card is made of: the site's light glass — a milky
+	   translucent surface with a bright hairline and an inner highlight, the
+	   ground blurring through it. */
+	--lw-front-door-card-bg: rgba(255, 255, 255, 0.58);
+	--lw-front-door-card-border: rgba(255, 255, 255, 0.8);
+	--lw-front-door-card-shadow:
+		inset 0 1px 1px rgba(255, 255, 255, 0.9),
+		inset 0 0 0 0.5px rgba(255, 255, 255, 0.5),
+		0 24px 48px -20px rgba(20, 20, 23, 0.28);
+	/* Fields sit a step more solid than the card, so type stays crisp. */
+	--lw-front-door-field-bg: rgba(255, 255, 255, 0.72);
+	--lw-front-door-field-border: rgba(20, 20, 23, 0.14);
 }
 
 .dark {
-	/* The accent holds; the deeper cuts do not survive a dark ground, so the
-	   hover and the text-on-tint move to the website's lighter cut. */
-	--lw-front-door-action: #f56b1a;
-	--lw-front-door-action-hover: #ff8a3d;
+	/* The site's dark band: ink-950, not the app panel grey. */
+	--lw-front-door-ground: #0a0a0c;
+	/* The action inverts the way the site's dark sections invert everything:
+	   a paper pill with ink text. */
+	--lw-front-door-action: #efeee9;
+	--lw-front-door-action-hover: #ffffff;
+	--lw-front-door-on-action: #0a0a0c;
 	--lw-front-door-ink: #ff8a3d;
 	--lw-front-door-tint: rgba(245, 107, 26, 0.18);
-	--lw-front-door-on-action: #141417;
 	--lw-front-door-hairline: rgba(239, 238, 233, 0.14);
 	/* The light red is unreadable on a dark ground: it fails contrast against
 	   the panel and reads as brown. This is the same red, lifted. */
@@ -65,19 +88,30 @@
 	/* Details step up a stop, so a focus ring is visible on a dark field
 	   without lighting up like a solid button. */
 	--lw-front-door-detail: #ff8a3d;
-	--lw-front-door-focus-ring: rgba(255, 138, 61, 0.28);
-	--lw-front-door-glow: rgba(255, 138, 61, 0.25);
-	--lw-front-door-card-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
-	/* The same band, far quieter: at full strength it is a light-mode wash
-	   sitting on top of a dark page. */
-	--lw-front-door-mesh-opacity: 0.16;
+	--lw-front-door-focus-ring: rgba(255, 138, 61, 0.3);
+	/* The site's `.text-gradient-dark`: the same pair, lifted to read on ink. */
+	--lw-front-door-accent-gradient: linear-gradient(
+		100deg,
+		#5fa3ff 0%,
+		#ffa24d 100%
+	);
+	/* The site's dark glass, verbatim: border-white/10 over bg-white/[0.03],
+	   nudged just enough for a form to sit on. */
+	--lw-front-door-card-bg: rgba(255, 255, 255, 0.045);
+	--lw-front-door-card-border: rgba(255, 255, 255, 0.1);
+	--lw-front-door-card-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.06),
+		0 24px 60px -24px rgba(0, 0, 0, 0.65);
+	--lw-front-door-field-bg: rgba(255, 255, 255, 0.06);
+	--lw-front-door-field-border: rgba(255, 255, 255, 0.14);
 }
 
 /*
- * The mesh band's static form: the shader's own palette painted as one
- * diagonal wash. This is what the server, a reduced-motion visitor and a
- * machine with no WebGL all see; the live shader in `FrontDoorMesh` replaces
- * it, never adds to it.
+ * The ground's static form: what the server, a reduced-motion visitor and a
+ * machine with no WebGL all see. The live shader in `FrontDoorGround`
+ * replaces it, never adds to it. Light is the site hero's own static
+ * gradient; dark is the site's WarpAccent fallback — two soft glows, blue
+ * high and warm low, anchored to the card's side of the page.
  */
 .lw-front-door-ambient {
 	position: absolute;
@@ -94,22 +128,83 @@
 	background: linear-gradient(
 		135deg,
 		#ffffff 0%,
-		#ffaf6e 38%,
+		#ffaf6e 35%,
 		#cddcf9 72%,
 		#ffffff 100%
 	);
-	opacity: var(--lw-front-door-mesh-opacity);
+	opacity: 0.55;
 }
 
 .dark .lw-front-door-ambient-static {
-	/* No white veil on a dark ground: the band carries itself at low opacity. */
-	background: linear-gradient(
-		135deg,
-		transparent 0%,
-		#ffaf6e 38%,
-		#cddcf9 72%,
-		transparent 100%
+	background:
+		radial-gradient(circle at 70% 22%, rgba(91, 141, 239, 0.4), transparent 38%),
+		radial-gradient(
+			circle at 86% 66%,
+			rgba(201, 123, 58, 0.26),
+			transparent 46%
+		);
+	opacity: 1;
+}
+
+/* The live dark shader sits in the site's own frame: anchored to the card's
+   side, full height, dissolving toward the reading side. */
+.lw-front-door-warp {
+	position: absolute;
+	top: -10%;
+	right: -10%;
+	width: 78%;
+	height: 120%;
+	opacity: 0.55;
+	-webkit-mask-image: linear-gradient(
+		to left,
+		black 0%,
+		black 30%,
+		rgba(0, 0, 0, 0.5) 56%,
+		transparent 84%
 	);
+	mask-image: linear-gradient(
+		to left,
+		black 0%,
+		black 30%,
+		rgba(0, 0, 0, 0.5) 56%,
+		transparent 84%
+	);
+}
+
+/* Where the card stands alone, the glow stands behind it instead of off to
+   one side: same shader, held in a centred pool. */
+.lw-front-door-warp--center {
+	top: -10%;
+	right: auto;
+	left: 50%;
+	transform: translateX(-50%);
+	width: 90%;
+	-webkit-mask-image: radial-gradient(
+		ellipse 62% 70% at 50% 42%,
+		black 0%,
+		rgba(0, 0, 0, 0.7) 55%,
+		transparent 85%
+	);
+	mask-image: radial-gradient(
+		ellipse 62% 70% at 50% 42%,
+		black 0%,
+		rgba(0, 0, 0, 0.7) 55%,
+		transparent 85%
+	);
+}
+
+.dark .lw-front-door-ambient--center .lw-front-door-ambient-static {
+	background:
+		radial-gradient(
+			circle at 50% 30%,
+			rgba(91, 141, 239, 0.35),
+			transparent 42%
+		),
+		radial-gradient(
+			circle at 58% 72%,
+			rgba(201, 123, 58, 0.22),
+			transparent 48%
+		);
 }
 
 /* The white radial that keeps one region clean for reading. On its own layer
@@ -120,21 +215,16 @@
 }
 
 .dark .lw-front-door-ambient-protect {
-	/* A white veil is a light-mode instrument. The dark band is quiet enough
-	   to read over. */
+	/* A white veil is a light-mode instrument. The dark ground keeps its
+	   reading side clean by fading the glow out instead. */
 	display: none;
 }
 
-/* The press: the button gives a little, springs back, and lifts a glow. */
+/* The press: the button gives a little and springs back. */
 .lw-front-door-primary {
 	transition:
 		transform 120ms ease,
-		box-shadow 250ms ease,
 		background-color 200ms ease;
-}
-
-.lw-front-door-primary:hover {
-	box-shadow: 0 4px 16px var(--lw-front-door-glow);
 }
 
 .lw-front-door-primary:active {
@@ -150,9 +240,14 @@
 	}
 }
 
-/* The card itself: the board's 14px surface with its soft standing shadow. */
+/* The card: glass over the ground. The blur is what makes it glass — the
+   ground's colour moves through it rather than stopping at it. */
 .lw-front-door-card {
+	background: var(--lw-front-door-card-bg) !important;
+	border-color: var(--lw-front-door-card-border) !important;
 	box-shadow: var(--lw-front-door-card-shadow);
+	-webkit-backdrop-filter: blur(22px) saturate(1.4);
+	backdrop-filter: blur(22px) saturate(1.4);
 }
 
 /* The hairline either side of the word "or". */
@@ -177,7 +272,7 @@
 	width: 8px;
 	height: 8px;
 	border-radius: 9999px;
-	background: var(--lw-front-door-action);
+	background: var(--lw-front-door-detail);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -200,45 +295,46 @@
 }
 
 /*
- * The entrance: the mark arrives from where the loading screen left it, and
- * the card comes up behind it.
+ * The entrance: the card and everything on it rises in once, gently, and the
+ * rows follow each other by a breath. No overlay, no flight — the loading
+ * screen's mark and the card's mark are the same glyphs in nearly the same
+ * place, and a soft dissolve between them reads as one thing settling where
+ * a flight read as three.
  *
- * The overlay is inert and the card is live from the first frame - nothing
- * here gates a keystroke, it only decides what is painted while the first one
- * is being typed.
+ * The card is live from the first frame: this animates opacity and a few
+ * pixels of translate, and gates nothing.
  */
-.lw-front-door-handoff {
-	position: fixed;
-	top: 0;
-	left: 0;
-	z-index: 1300;
-	pointer-events: none;
-	transform-origin: top left;
-	will-change: transform, opacity;
-}
-
-/* The card's own mark, held back until the overlay lands on it. */
-.lw-front-door-logo-waiting {
-	visibility: hidden;
-}
-
 @media (prefers-reduced-motion: no-preference) {
-	.lw-front-door-enter [data-auth-card-body] > * {
-		animation: lw-front-door-rise 120ms ease-out both;
+	.lw-front-door-enter [data-auth-card] {
+		animation: lw-front-door-settle 360ms ease-out both;
 	}
 
-	/* Behind the mark, not with it: the first row starts as the mark settles. */
+	.lw-front-door-enter [data-auth-card-body] > * {
+		animation: lw-front-door-rise 240ms ease-out both;
+	}
+
 	.lw-front-door-enter [data-auth-card-body] > *:nth-child(1) {
-		animation-delay: 380ms;
+		animation-delay: 120ms;
 	}
 	.lw-front-door-enter [data-auth-card-body] > *:nth-child(2) {
-		animation-delay: 420ms;
+		animation-delay: 170ms;
 	}
 	.lw-front-door-enter [data-auth-card-body] > *:nth-child(3) {
-		animation-delay: 460ms;
+		animation-delay: 220ms;
 	}
 	.lw-front-door-enter [data-auth-card-body] > *:nth-child(n + 4) {
-		animation-delay: 500ms;
+		animation-delay: 270ms;
+	}
+}
+
+@keyframes lw-front-door-settle {
+	from {
+		opacity: 0;
+		transform: translate3d(0, 6px, 0);
+	}
+	to {
+		opacity: 1;
+		transform: translate3d(0, 0, 0);
 	}
 }
 

@@ -6,14 +6,20 @@ import { FullLogo } from "../icons/FullLogo";
 
 /**
  * The card every unauthenticated screen is: the mark, one heading, one column
- * of content, all centred. The same component on every installation and at
- * every step, so a person moving between them sees one surface rather than a
- * series of pages that happen to look alike.
+ * of content. The same component on every installation and at every step, so
+ * a person moving between them sees one surface rather than a series of pages
+ * that happen to look alike.
  *
- * The shape is the design board's, value for value: a 14 pixel surface about
- * 400 pixels wide, standing on a soft shadow, with the wordmark centred over a
- * plain semibold heading. The serif display voice belongs to the value panel
- * beside the card, never to the card itself.
+ * The surface is glass: a translucent 14 pixel card whose border and fill
+ * come from the stylesheet's per-mode tokens, with the shell's ground
+ * blurring through it — the same panel treatment the site's dark sections
+ * use, and its light-glass counterpart on paper. The serif display voice
+ * belongs to the value panel beside the card, never to the card itself.
+ *
+ * Alignment is one rule, applied throughout: the identity block (mark and
+ * heading) is centred, and everything a person reads or operates below it is
+ * a full-width left-aligned column. Footers that are a single line of prose
+ * centre themselves; nothing else does.
  *
  * Responsive shape:
  *
@@ -33,7 +39,7 @@ export function AuthCard({
 }) {
   return (
     <Container
-      maxW={{ base: "100%", sm: "400px" }}
+      maxW={{ base: "100%", sm: "408px" }}
       paddingX={{ base: 0, sm: 2 }}
       // High enough on the page to be the first thing seen, low enough that a
       // phone keyboard opening under it does not push the fields off screen.
@@ -44,14 +50,12 @@ export function AuthCard({
         width="full"
         borderWidth={{ base: 0, sm: "1px" }}
         borderRadius={{ base: 0, sm: "14px" }}
-        backgroundColor="bg.panel"
+        data-auth-card
       >
-        <Card.Header paddingTop="28px" paddingX="26px" paddingBottom={0}>
-          <VStack gap="14px">
-            {/* Named so the front door's entrance can measure it and land the
-                mark it inherited from the loading screen here. The card's mark
-                is the same wordmark the loading screen shows, so the flight
-                ends on the very glyphs it started as. */}
+        <Card.Header paddingTop="30px" paddingX="28px" paddingBottom={0}>
+          <VStack gap="16px">
+            {/* Named so the entrance can address the identity block: the same
+                wordmark the loading screen shows, settling in place. */}
             <Box data-auth-card-logo display="flex" justifyContent="center">
               <FullLogo width={112} height={27.5} />
             </Box>
@@ -67,11 +71,11 @@ export function AuthCard({
             </Heading>
           </VStack>
         </Card.Header>
-        <Card.Body paddingX="26px" paddingTop="16px" paddingBottom="28px">
-          {/* Named for the same reason: the rows rise in behind the mark, and
+        <Card.Body paddingX="28px" paddingTop="18px" paddingBottom="30px">
+          {/* Named for the entrance: the rows rise in one after another, and
               the stagger is applied from the stylesheet rather than by giving
               every screen an animation prop to pass down. */}
-          <VStack width="full" align="stretch" gap="13px" data-auth-card-body>
+          <VStack width="full" align="stretch" gap="14px" data-auth-card-body>
             {children}
           </VStack>
         </Card.Body>

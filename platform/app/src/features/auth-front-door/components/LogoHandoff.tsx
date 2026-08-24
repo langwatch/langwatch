@@ -1,151 +1,72 @@
-import { useEffect, useRef, useState } from "react";
-import { FullLogo } from "~/components/icons/FullLogo";
+import { useEffect } from "react";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import "../authFrontDoor.css";
 import { beginEntrance, endEntrance } from "../logic/entrance";
 
 /**
- * The handoff: the mark the loading screen was showing walks into the top of
- * the auth card, and the card comes up behind it.
+ * The entrance: the card settles into place once, on arrival.
  *
- * It is the same mark, at the same size, in the same place it was already
- * being shown (`LoadingScreen` centres `FullLogo` at 155x38 scaled 1.2), so
- * the two screens read as one element moving rather than two elements
- * swapping. It lands on the card's own logo slot — the same wordmark, smaller
- * — and the closing cross-fade hands over to the card's own copy of it.
+ * The loading screen and the card both show the same wordmark, nearly
+ * centred, so a soft dissolve between the two screens already reads as one
+ * thing coming to rest. What this component adds is only the settle — the
+ * card rises a few pixels into place and its rows follow each other in by a
+ * breath — all of it declared in the stylesheet against the
+ * `lw-front-door-enter` class this component puts on the body.
  *
- * FLIP, with three rules:
+ * An earlier version flew the mark from the loading screen's centre into the
+ * card's logo slot (FLIP, overlay, cross-fade). At real speed the flight read
+ * as a flash — the mark vanished and reappeared rather than travelling — and
+ * a motion that has to be explained is worse than none. The dissolve keeps
+ * the continuity and drops the theatrics.
  *
- *   - transform only. No layout property is animated, so the browser never
- *     reflows mid-motion and the card underneath is composited, not repainted.
- *   - once per page load. A route change, a step change and the sign-up morph
- *     are all the same page continuing; replaying an arrival on each one would
- *     be a tic.
- *   - nothing waits on it. The overlay is `pointer-events: none`, the card is
- *     mounted and live from the first frame, and the only thing the motion
- *     gates is when focus is taken (`useEntranceSettled`).
+ * Three rules, unchanged from the flight it replaces:
  *
- * Under `prefers-reduced-motion` none of it runs: no overlay, no held-back
- * mark, and focus is taken immediately.
+ *   - once per page load. A route change, a step change and the sign-up
+ *     morph are all the same page continuing; replaying an arrival on each
+ *     one would be a tic.
+ *   - nothing waits on it. The card is mounted and live from the first
+ *     frame; the only thing the motion gates is when focus is taken
+ *     (`useEntranceSettled`).
+ *   - under `prefers-reduced-motion`, none of it runs and focus is taken
+ *     immediately.
  */
 
 /** Survives remounts on purpose: the arrival belongs to the page load. */
-let handoffHasPlayed = false;
+let entranceHasPlayed = false;
 
-/** The mark's flight. */
-const HANDOFF_MS = 550;
-const HANDOFF_EASING = "cubic-bezier(.2,.8,.2,1)";
-/** The tail, over which the overlay becomes the card's own mark. */
-const CROSSFADE_MS = 140;
-/** Long enough for the last staggered row to finish rising. */
-const STAGGER_TAIL_MS = 300;
+/** The card's settle, plus the last staggered row's rise. */
+const ENTRANCE_MS = 360 + 270;
 
-/** What `LoadingScreen` renders, to the pixel. */
-const LOADING_LOGO_WIDTH = 155 * 1.2;
-const LOADING_LOGO_HEIGHT = 38 * 1.2;
-
-const CARD_LOGO_SELECTOR = "[data-auth-card-logo]";
 const ENTER_CLASS = "lw-front-door-enter";
-const WAITING_CLASS = "lw-front-door-logo-waiting";
-
-type Phase = "ready" | "flying" | "done";
 
 export function LogoHandoff() {
   const reduceMotion = useReducedMotion();
-  const [phase, setPhase] = useState<Phase>("ready");
-  const overlay = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (reduceMotion || handoffHasPlayed) {
-      setPhase("done");
-      return;
-    }
+    if (reduceMotion || entranceHasPlayed) return;
+    entranceHasPlayed = true;
 
-    const slot = document.querySelector<HTMLElement>(CARD_LOGO_SELECTOR);
-    const node = overlay.current;
-    // `Element.animate` is not implemented in jsdom, and a browser that cannot
-    // find the slot has nothing to fly to. Both land on the same answer as
-    // reduced motion: the card is simply there.
-    if (!slot || !node || typeof node.animate !== "function") {
-      setPhase("done");
-      return;
-    }
-
-    handoffHasPlayed = true;
-
-    const target = slot.getBoundingClientRect();
-    const scale = target.height / LOADING_LOGO_HEIGHT;
-    const startX = (window.innerWidth - LOADING_LOGO_WIDTH) / 2;
-    const startY = (window.innerHeight - LOADING_LOGO_HEIGHT) / 2;
-    // The icon sits at the left of the wordmark, so landing the wordmark's
-    // left edge on the slot's left edge lands the icon on the icon.
-    const endTransform = `translate3d(${target.left}px, ${target.top}px, 0) scale(${scale})`;
-
-    slot.classList.add(WAITING_CLASS);
     document.body.classList.add(ENTER_CLASS);
     beginEntrance();
-    setPhase("flying");
 
-    const flight = node.animate(
-      [
-        {
-          transform: `translate3d(${startX}px, ${startY}px, 0) scale(1)`,
-          opacity: 1,
-        },
-        {
-          transform: endTransform,
-          opacity: 1,
-          offset: 1 - CROSSFADE_MS / HANDOFF_MS,
-        },
-        { transform: endTransform, opacity: 0 },
-      ],
-      { duration: HANDOFF_MS, easing: HANDOFF_EASING, fill: "forwards" },
-    );
-
-    let cleared: ReturnType<typeof setTimeout> | undefined;
-    const land = () => {
-      slot.classList.remove(WAITING_CLASS);
-      setPhase("done");
+    // The class comes off once the last row has risen, so a card mounted
+    // later in the session does not replay the entrance.
+    const settled = window.setTimeout(() => {
+      document.body.classList.remove(ENTER_CLASS);
       endEntrance();
-      // The stagger is finishing behind the mark; the class comes off once it
-      // has, so a card mounted later in the session does not replay it.
-      cleared = setTimeout(() => {
-        document.body.classList.remove(ENTER_CLASS);
-      }, STAGGER_TAIL_MS);
-    };
-    flight.onfinish = land;
-    // A backgrounded tab can leave the animation unfinished, and a mark that
-    // never lands is a card with no logo at all.
-    flight.oncancel = land;
-    const failsafe = window.setTimeout(land, HANDOFF_MS + 400);
+    }, ENTRANCE_MS);
 
     return () => {
-      window.clearTimeout(failsafe);
-      if (cleared) clearTimeout(cleared);
-      slot.classList.remove(WAITING_CLASS);
+      window.clearTimeout(settled);
       document.body.classList.remove(ENTER_CLASS);
       endEntrance();
     };
   }, [reduceMotion]);
 
-  if (phase === "done") return null;
-
-  return (
-    <div
-      ref={overlay}
-      className="lw-front-door-handoff"
-      aria-hidden="true"
-      data-testid="logo-handoff"
-      // Invisible until the flight's own first frame takes over, so the mark
-      // is never seen parked in the corner waiting to start.
-      style={{ opacity: phase === "ready" ? 0 : 1 }}
-    >
-      <FullLogo width={LOADING_LOGO_WIDTH} height={LOADING_LOGO_HEIGHT} />
-    </div>
-  );
+  return null;
 }
 
 /** Test seam: the arrival is per page load, and a suite is one long page. */
 export function _resetLogoHandoffForTests(): void {
-  handoffHasPlayed = false;
+  entranceHasPlayed = false;
 }

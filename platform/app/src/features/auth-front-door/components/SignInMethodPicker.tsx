@@ -5,6 +5,7 @@ import { signInMethodActionLabel } from "../logic/methodLabels";
 import { signInRoutingReasonCopy } from "../logic/routingReasonCopy";
 import "../authFrontDoor.css";
 import { BRAND, MONO_FONT, SHAPE } from "../logic/brand";
+import { METHOD_PREVIEWS_ENABLED, MethodPreviews } from "./MethodPreviews";
 import { SignInMethodIcon } from "./SignInMethodIcon";
 
 /**
@@ -70,6 +71,58 @@ export function SignInMethodPicker({
           renderLocalMethod={renderLocalMethod}
         />
       ))}
+    </VStack>
+  );
+}
+
+/**
+ * Whether the address step has anything to offer under its "or" at all. The
+ * divider is the caller's to draw, and a divider over nothing was the old
+ * layout's orphan "OR": ask this before passing `alternatives`, and pass
+ * nothing when the answer is no.
+ */
+export function hasAlternativeMethods(
+  methodSet: readonly SignInMethod[],
+): boolean {
+  return (
+    METHOD_PREVIEWS_ENABLED ||
+    methodSet.some((method) => method.kind === "federated")
+  );
+}
+
+/**
+ * The methods a person can take instead of typing an address: the instance's
+ * federated methods, plus the passkey method's reserved place while it is
+ * still a preview. Rendered under the address step's divider on both doors,
+ * so the two screens offer the same alternatives in the same order.
+ */
+export function AlternativeMethods({
+  methodSet,
+  lastUsedMethodId,
+  onFederatedMethodChosen,
+}: {
+  methodSet: readonly SignInMethod[];
+  lastUsedMethodId?: string | null;
+  onFederatedMethodChosen: (method: SignInMethod) => void;
+}) {
+  return (
+    <VStack
+      width="full"
+      align="stretch"
+      gap={3}
+      data-testid="alternative-methods"
+    >
+      {methodSet
+        .filter((method) => method.kind === "federated")
+        .map((method) => (
+          <FederatedMethodButton
+            key={method.id}
+            method={method}
+            isLastUsed={lastUsedMethodId === method.id}
+            onChosen={onFederatedMethodChosen}
+          />
+        ))}
+      <MethodPreviews offered={methodSet} />
     </VStack>
   );
 }
