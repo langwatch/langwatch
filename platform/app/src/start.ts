@@ -94,6 +94,7 @@ import { canonicalOtlpPath } from "./server/otel/otlpPathCanonicalisation";
 import { shutdownPostHog } from "./server/posthog";
 import { buildSecurityHeaders } from "./server/securityHeaders";
 import { SHUTDOWN_BUDGET } from "./server/shutdown/budget";
+import { createHttpServerClosePhase } from "./server/shutdown/httpServerClosePhase";
 import { installShutdownHandlers } from "./server/shutdown/runGracefulShutdown";
 import { serveStaticOrFallback } from "./server/static-handler";
 import { setupTRPCWebSocket } from "./server/websockets/trpc-ws";
@@ -428,7 +429,9 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
   // rather than a literal here: this handler used to force-exit after 5s,
   // which is inside the GroupQueue's own drain budget, so under the `all`
   // role (this process hosting the worker stack) a drain could never finish
-  // however long the queue was told it had.
+  // however long the queue was told it had. The http drain grace comes from
+  // the same place for the same reason — see createHttpServerClosePhase.
+
   installShutdownHandlers((signal) => ({
     signal,
     logger,
@@ -443,27 +446,11 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
           await wsHandle.close();
         },
       },
-      {
-        name: "http-server",
-        run: async () => {
-          // Stop accepting, then let requests already in flight finish.
-          // closeAllConnections() destroys active sockets, so calling it
-          // outright turned every rolling deploy into a burst of 502s for
-          // whatever was mid-request. Idle connections go immediately; the
-          // rest get the phase's budget and are only destroyed if they
-          // outlast it.
-          const closed = new Promise<void>((resolve) =>
-            server.close(() => resolve()),
-          );
-          if ("closeIdleConnections" in server) server.closeIdleConnections();
-          await mcpHandler.closeAllSessions();
-          try {
-            await closed;
-          } finally {
-            if ("closeAllConnections" in server) server.closeAllConnections();
-          }
-        },
-      },
+      createHttpServerClosePhase({
+        server,
+        closeSessions: () => mcpHandler.closeAllSessions(),
+        logger,
+      }),
       // Drain in-process workers (if any) before closing the shared App below,
       // so jobs stop accepting/draining before ClickHouse / Redis / Prisma go
       // away.
