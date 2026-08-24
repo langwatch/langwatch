@@ -45,7 +45,9 @@ vi.mock("../../governanceProject.service", () => ({
   ensureHiddenGovernanceProject: async () => ({ id: "proj_governance" }),
 }));
 vi.mock("../../activity-monitor/ingestionCredentials", () => ({
-  decryptCredentials: () => ({ token: "sk-admin" }),
+  AppIngestionCredentialsService: {
+    create: () => ({ decrypt: () => ({ token: "sk-admin" }) }),
+  },
 }));
 vi.mock("../index", async (importOriginal) => {
   const original = (await importOriginal()) as Record<string, unknown>;

@@ -10,14 +10,15 @@ vi.mock("~/utils/encryption", () => ({
 }));
 
 import {
-  decryptCredentials,
-  encryptParserConfigCredentials,
+  AppIngestionCredentialsService,
 } from "../ingestionCredentials";
+
+const credentials = AppIngestionCredentialsService.create();
 
 describe("ingestionCredentials", () => {
   describe("given a parserConfig with plaintext credentials", () => {
     it("encrypts the credentials subtree to a tagged string and leaves other keys", () => {
-      const out = encryptParserConfigCredentials({
+      const out = credentials.encryptParserConfig({
         ottlStatements: ["keep me"],
         credentials: {
           aws_access_key_id: "AKIA",
@@ -29,17 +30,17 @@ describe("ingestionCredentials", () => {
       expect(out.credentials as string).toMatch(/^enc:v1:/);
     });
 
-    it("round-trips back to the original object via decryptCredentials", () => {
+    it("round-trips back to the original object", () => {
       const creds = { token: "bearer-xyz" };
-      const out = encryptParserConfigCredentials({ credentials: creds })!;
-      expect(decryptCredentials(out.credentials)).toEqual(creds);
+      const out = credentials.encryptParserConfig({ credentials: creds })!;
+      expect(credentials.decrypt(out.credentials)).toEqual(creds);
     });
 
     it("is idempotent — an already-encrypted value is left untouched", () => {
-      const once = encryptParserConfigCredentials({
+      const once = credentials.encryptParserConfig({
         credentials: { token: "t" },
       })!;
-      const twice = encryptParserConfigCredentials(once)!;
+      const twice = credentials.encryptParserConfig(once)!;
       expect(twice.credentials).toBe(once.credentials);
     });
   });
@@ -47,24 +48,24 @@ describe("ingestionCredentials", () => {
   describe("given a parserConfig without credentials", () => {
     it("returns it unchanged", () => {
       const cfg = { ottlStatements: ["x"] };
-      expect(encryptParserConfigCredentials(cfg)).toEqual(cfg);
+      expect(credentials.encryptParserConfig(cfg)).toEqual(cfg);
     });
 
     it("passes null/undefined through", () => {
-      expect(encryptParserConfigCredentials(null)).toBeNull();
-      expect(encryptParserConfigCredentials(undefined)).toBeUndefined();
+      expect(credentials.encryptParserConfig(null)).toBeNull();
+      expect(credentials.encryptParserConfig(undefined)).toBeUndefined();
     });
   });
 
-  describe("given decryptCredentials reads a legacy plaintext object", () => {
+  describe("given the service reads a legacy plaintext object", () => {
     it("returns it as-is for backward compatibility", () => {
       const legacy = { aws_access_key_id: "AKIA" };
-      expect(decryptCredentials(legacy)).toEqual(legacy);
+      expect(credentials.decrypt(legacy)).toEqual(legacy);
     });
 
     it("returns an empty object for missing credentials", () => {
-      expect(decryptCredentials(undefined)).toEqual({});
-      expect(decryptCredentials(null)).toEqual({});
+      expect(credentials.decrypt(undefined)).toEqual({});
+      expect(credentials.decrypt(null)).toEqual({});
     });
   });
 });

@@ -31,7 +31,7 @@ import {
   toError,
   withScope,
 } from "~/utils/posthogErrorCapture";
-import { decryptCredentials } from "../activity-monitor/ingestionCredentials";
+import { AppIngestionCredentialsService } from "../activity-monitor/ingestionCredentials";
 import {
   type GovernanceOcsfEventInput,
   OCSF_ACTIVITY,
@@ -174,7 +174,9 @@ export async function runIngestionPull(params: {
     throw error;
   }
 
-  const credentials = decryptCredentials(pullConfig.credentials);
+  const credentials = AppIngestionCredentialsService.create().decrypt(
+    pullConfig.credentials,
+  );
 
   let result: PullResult;
   try {

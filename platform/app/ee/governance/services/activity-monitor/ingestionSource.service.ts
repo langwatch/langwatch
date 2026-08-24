@@ -44,12 +44,10 @@ import type {
 } from "~/generated/prisma/client";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { getApp } from "~/server/app-layer/app";
-import {
-  encryptParserConfigCredentials,
-  isEncryptedCredentials,
-} from "./ingestionCredentials";
+import { AppIngestionCredentialsService } from "./ingestionCredentials";
 
 const pullDestination = PullDestinationService.create();
+const ingestionCredentials = AppIngestionCredentialsService.create();
 
 export type SourceType =
   | "otel_generic"
@@ -369,7 +367,7 @@ export class IngestionSourceService {
       ...(input.parserConfig ?? {}),
     };
     pullDestination.assertAllowed(requestedParserConfig);
-    const mergedParserConfig = encryptParserConfigCredentials(
+    const mergedParserConfig = ingestionCredentials.encryptParserConfig(
       requestedParserConfig,
     )!;
     const source = await this.prisma.ingestionSource.create({
@@ -413,7 +411,7 @@ export class IngestionSourceService {
       // honouring it would let a caller keep a secret it cannot read while
       // pointing the source somewhere new. Rotating means sending a new secret.
       const incoming = { ...input.parserConfig };
-      if (isEncryptedCredentials(incoming.credentials)) {
+      if (ingestionCredentials.isEncrypted(incoming.credentials)) {
         throw new ValidationError(
           "Credentials cannot be submitted in their stored form. Re-enter the secret to change this source, or omit it to keep the current one.",
         );
@@ -433,7 +431,7 @@ export class IngestionSourceService {
         }
       }
       pullDestination.assertAllowed(incoming);
-      data.parserConfig = encryptParserConfigCredentials(
+      data.parserConfig = ingestionCredentials.encryptParserConfig(
         incoming,
       ) as Prisma.InputJsonValue;
     }
@@ -469,7 +467,7 @@ export class IngestionSourceService {
     const newHash = hashIngestSecret(newSecret);
     const priorParser =
       (existing.parserConfig as Record<string, unknown>) ?? {};
-    const merged = encryptParserConfigCredentials({
+    const merged = ingestionCredentials.encryptParserConfig({
       ...priorParser,
       _rotation: {
         priorHash: existing.ingestSecretHash,

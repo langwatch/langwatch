@@ -11,7 +11,7 @@
  * choice. The obvious version of this test encrypts the config itself and then
  * writes the row with `prisma.ingestionSource.create`; it passes whether or not
  * production still encrypts anything, because the only encryption it exercises
- * is its own. Deleting the `encryptParserConfigCredentials` call from
+ * is its own. Deleting the credentials service call from
  * `createSource` was verified to leave that shape green.
  *
  * So nothing here encrypts. The test hands `createSource` a plaintext token,
@@ -34,7 +34,9 @@ import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
 import { cleanupTestRows, requireAssigned } from "~/test-utils/cleanupTestRows";
-import { decryptCredentials } from "../ingestionCredentials";
+import { AppIngestionCredentialsService } from "../ingestionCredentials";
+
+const ingestionCredentials = AppIngestionCredentialsService.create();
 
 const ns = `tok-rest-${nanoid(8)}`;
 // Enterprise so the source cap cannot reject the create for a reason that has
@@ -139,7 +141,9 @@ describe("given an admin saves a Genie source carrying a workspace token", () =>
       expect(stored.credentials as string).toMatch(/^enc:v1:/);
 
       // Encrypted is not the same as lost — the puller still resolves it.
-      expect(decryptCredentials(stored.credentials)).toEqual({ token });
+      expect(ingestionCredentials.decrypt(stored.credentials)).toEqual({
+        token,
+      });
     }, 60_000);
   });
 });
@@ -183,7 +187,7 @@ describe("given an admin saves a Genie source carrying a client id and secret", 
       expect(stored.credentials as string).toMatch(/^enc:v1:/);
 
       // Encrypted is not the same as lost — the puller still signs in with it.
-      expect(decryptCredentials(stored.credentials)).toEqual({
+      expect(ingestionCredentials.decrypt(stored.credentials)).toEqual({
         clientId,
         clientSecret,
       });
