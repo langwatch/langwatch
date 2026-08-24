@@ -55,7 +55,7 @@ Rule: The agent can declare its working context itself
     Then the record declares claude_code with that session id
 
   @unit
-  Scenario: A codex session is resolved from the newest recently-active rollout
+  Scenario: A codex session is resolved from the one active rollout
     Given no claude environment and a codex rollout active within the last fifteen minutes
     When the declare command runs with no flags
     Then the record declares codex with the session id of that rollout
@@ -73,11 +73,37 @@ Rule: The agent can declare its working context itself
     When the declare command runs with an explicit agent and session id
     Then the record declares exactly that agent and session id
 
+  # Nothing on disk says which of two simultaneously active sessions spawned
+  # the process running the command, so it names neither. A session mid-turn
+  # wrote its rollout seconds ago, which is what tells a second running
+  # session apart from a session that ended when codex was restarted.
   @unit
-  Scenario: Two recently-active rollouts resolve to the newest
-    Given two codex rollouts active within the window
+  Scenario: Two simultaneously active codex sessions declare nothing
+    Given two codex rollouts each written within the last minute
     When the declare command runs with no flags
-    Then the record carries the session id of the most recently written rollout
+    Then nothing is posted
+    And the command prints one line saying to name the session with the flags
+    And the exit code is zero
+
+  @unit
+  Scenario: The session in the middle of a turn wins over an idle one
+    Given one codex rollout written within the last minute
+    And other codex rollouts written earlier inside the fifteen minute window
+    When the declare command runs with no flags
+    Then the record declares codex with the session id of the rollout written within the last minute
+
+  @unit
+  Scenario: A codex restart still resolves without flags
+    Given the rollout of a session that ended on restart, still inside the window
+    And the rollout of the running session, written within the last minute
+    When the declare command runs with no flags
+    Then the record declares codex with the session id of the running session
+
+  @unit
+  Scenario: Explicit flags name a session while two are active
+    Given two codex rollouts each written within the last minute
+    When the declare command runs with an explicit agent and session id
+    Then the record declares exactly that agent and session id
 
   @unit
   Scenario: A stale rollout does not resolve

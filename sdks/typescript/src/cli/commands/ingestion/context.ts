@@ -20,8 +20,10 @@
  *      `CLAUDECODE` and `CLAUDE_CODE_SESSION_ID` into every shell it spawns.
  *      Checked first so a codex started inside a claude session declares for
  *      the claude session actually doing the work.
- *   3. The codex session most recently active on this machine, from the
- *      rollout transcripts (codex exports nothing about itself).
+ *   3. The codex session active on this machine, from the rollout transcripts
+ *      (codex exports nothing about itself). With two codex sessions active
+ *      at once nothing on disk says which one asked, so the command declares
+ *      nothing and asks for the flags rather than name the wrong session.
  *
  * Unlike the hooks this command talks to whoever ran it: its stdout is the
  * agent's tool result, so it says in one line what it declared or why it
@@ -322,8 +324,18 @@ async function resolveSession({
     sessionsRoot: codexSessionsRoot,
     nowMs: now(),
   });
-  if (live) {
-    return { agent: "codex", sessionId: live.sessionId, codexMeta: live.meta };
+  if (live.kind === "session") {
+    return {
+      agent: "codex",
+      sessionId: live.session.sessionId,
+      codexMeta: live.session.meta,
+    };
+  }
+  if (live.kind === "ambiguous") {
+    writeLine(
+      "Multiple active codex sessions; run with --agent codex --session-id <id>.",
+    );
+    return null;
   }
 
   writeLine(

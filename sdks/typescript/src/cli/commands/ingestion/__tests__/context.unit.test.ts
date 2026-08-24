@@ -28,6 +28,7 @@ import {
 
 const NOW = 1_700_000_000_000;
 const CODEX_SESSION = "0199a1f4-2c5e-7a10-9f61-2d7f0a3b5c33";
+const OTHER_CODEX_SESSION = "0199a1f4-2c5e-7a10-9f61-2d7f0a3b5c44";
 
 const CLAUDE_ENV = {
   CLAUDECODE: "1",
@@ -115,8 +116,8 @@ describe("the declare command's session resolution", () => {
     });
   });
 
-  /** @scenario "A codex session is resolved from the newest recently-active rollout" */
-  it("declares for the newest active codex rollout when there is no claude environment", async () => {
+  /** @scenario "A codex session is resolved from the one active rollout" */
+  it("declares for the active codex rollout when there is no claude environment", async () => {
     writeRollout();
 
     await runContext({ env: { OTEL_EXPORTER_OTLP_ENDPOINT: ENDPOINT } });
@@ -152,6 +153,70 @@ describe("the declare command's session resolution", () => {
 
   it("asks for both flags when only one is passed", async () => {
     await runContext({ sessionId: "half-a-session" });
+
+    expect(posted).toHaveLength(0);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain("--agent");
+  });
+
+  /** @scenario "Two simultaneously active codex sessions declare nothing" */
+  it("declares nothing when two codex sessions are mid-turn at once", async () => {
+    writeRollout({ sessionId: CODEX_SESSION, agoMs: 5_000 });
+    writeRollout({ sessionId: OTHER_CODEX_SESSION, agoMs: 20_000 });
+
+    await runContext({
+      env: { OTEL_EXPORTER_OTLP_ENDPOINT: ENDPOINT },
+      fetchImpl: unreachableCollector,
+    });
+
+    expect(posted).toHaveLength(0);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain("--session-id");
+  });
+
+  /** @scenario "The session in the middle of a turn wins over an idle one" */
+  it("declares for the mid-turn session, not the idle one", async () => {
+    writeRollout({ sessionId: OTHER_CODEX_SESSION, agoMs: 6 * 60_000 });
+    writeRollout({ sessionId: CODEX_SESSION, agoMs: 5_000 });
+
+    await runContext({ env: { OTEL_EXPORTER_OTLP_ENDPOINT: ENDPOINT } });
+
+    expect(posted).toHaveLength(1);
+    expect(attributesOf(posted[0]!)["session.id"]).toBe(CODEX_SESSION);
+  });
+
+  /** @scenario "A codex restart still resolves without flags" */
+  it("declares for the running session when a restart left a recent dead rollout", async () => {
+    writeRollout({ sessionId: OTHER_CODEX_SESSION, agoMs: 3 * 60_000 });
+    writeRollout({ sessionId: CODEX_SESSION, agoMs: 2_000 });
+
+    await runContext({ env: { OTEL_EXPORTER_OTLP_ENDPOINT: ENDPOINT } });
+
+    expect(posted).toHaveLength(1);
+    expect(attributesOf(posted[0]!)["session.id"]).toBe(CODEX_SESSION);
+  });
+
+  /** @scenario "Explicit flags name a session while two are active" */
+  it("declares for the named session even while two are mid-turn", async () => {
+    writeRollout({ sessionId: CODEX_SESSION, agoMs: 5_000 });
+    writeRollout({ sessionId: OTHER_CODEX_SESSION, agoMs: 20_000 });
+
+    await runContext({
+      env: { OTEL_EXPORTER_OTLP_ENDPOINT: ENDPOINT },
+      agent: "codex",
+      sessionId: OTHER_CODEX_SESSION,
+    });
+
+    expect(posted).toHaveLength(1);
+    expect(attributesOf(posted[0]!)["session.id"]).toBe(OTHER_CODEX_SESSION);
+  });
+
+  it("rejects a session id that is only whitespace", async () => {
+    await runContext({
+      agent: "codex",
+      sessionId: "   ",
+      fetchImpl: unreachableCollector,
+    });
 
     expect(posted).toHaveLength(0);
     expect(lines).toHaveLength(1);
