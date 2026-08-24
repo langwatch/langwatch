@@ -62,7 +62,11 @@ export default function SignUp() {
       // card itself is the same on every installation. The trust strip is a
       // slot with nothing true to put in it yet, so it stays empty rather than
       // carrying a logo nobody agreed to.
-      <FrontDoorShell headline="Your first trace is just a sign-up away.">
+      <FrontDoorShell
+        headline="See what your agents are actually doing."
+        headlineAccent="actually"
+        tagline="traces · evaluations · online monitoring"
+      >
         <VerificationFirstSignUp />
       </FrontDoorShell>
     );

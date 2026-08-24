@@ -44,6 +44,9 @@ export default function SignIn() {
   if (!frontDoor.isResolved) return null;
   if (frontDoor.enabled) {
     return (
+      // Log-in has no case to make: the person already has an account and is
+      // trying to get to it. The panel appears on the hosted sign-up, where a
+      // first-time visitor is deciding.
       <FrontDoorShell>
         <IdentifierFirstSignIn />
       </FrontDoorShell>

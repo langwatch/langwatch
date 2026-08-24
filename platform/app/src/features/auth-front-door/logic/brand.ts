@@ -25,6 +25,18 @@ export const BRAND = {
   tint: "var(--lw-front-door-tint, #fdece0)",
   /** Text that sits on the action colour. */
   onAction: "var(--lw-front-door-on-action, #ffffff)",
+  /**
+   * Focus rings, badges and hairline accents: the brand without being the
+   * button. It steps up a stop on dark, where the solid orange that reads as
+   * an action on white disappears into a dark field as a ring.
+   */
+  detail: "var(--lw-front-door-detail, #f56b1a)",
+  /**
+   * Refusals. A dark ground needs a lighter red than a white one: the light
+   * cut fails contrast there and reads as brown, which is not a colour anybody
+   * reads as "wrong".
+   */
+  danger: "var(--lw-front-door-danger, #c53030)",
 } as const;
 
 /**
@@ -35,6 +47,13 @@ export const BRAND = {
  */
 export const HEADING_FONT =
   '"Sentient", ui-serif, Georgia, "Times New Roman", serif';
+
+/**
+ * The tagline under the headline is set in the mono face, the way the site
+ * sets its small technical lines. It is the one place these screens use it.
+ */
+export const MONO_FONT =
+  'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace';
 
 /** The shapes: pills for actions, a soft radius for fields, 14px for the card. */
 export const SHAPE = {
