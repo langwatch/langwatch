@@ -158,6 +158,14 @@ Feature: /me credentials just work - CLI credential resolution after device logi
     And the presented access token is revoked
 
   @bdd @cli-onboarding @credentials @tenancy @integration
+  Scenario: a disabled member's session cannot be renewed
+    Given a device session started while the user was an active member of an organization
+    And an admin then disables that membership to free its seat
+    When the CLI presents the refresh token to POST /api/auth/cli/refresh
+    Then the response is 401 and no new token pair is issued
+    And the presented refresh token is revoked
+
+  @bdd @cli-onboarding @credentials @tenancy @integration
   Scenario: a deactivated user's token cannot mint or return a personal key
     Given a device-session token for a user whose account is deactivated
     When the CLI calls GET /api/auth/cli/personal-project with that token

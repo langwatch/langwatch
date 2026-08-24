@@ -788,6 +788,9 @@ secured.access(CLI_POLICY).post("/exchange", async (c: Context) => {
     if (!activeMembership) {
       await redis.del(deviceCodeKey(device_code));
       await redis.del(userCodeKey(record.user_code));
+      // The poll-rate key too: consumed means the next poll learns the code
+      // is gone (408), not that it polled too soon (429).
+      await redis.del(pollRateKey(device_code));
       return c.json(
         {
           error: "access_denied",
@@ -1142,6 +1145,36 @@ secured.access(CLI_POLICY).post("/refresh", async (c: Context) => {
         401,
       );
     }
+  }
+
+  // Rotation mints a new credential pair, so it re-derives membership the way
+  // the other minting endpoints do: a member whose seat an admin disabled
+  // (or who was removed) after the session started must not be able to
+  // renew it. Bearer-only routes still honour the access token already in
+  // hand until it expires (one hour), the same window a removed member has;
+  // this is what stops that window from rolling forward for ninety days.
+  const activeMembership = await prisma.organizationUser.findFirst({
+    where: {
+      userId: record.user_id,
+      organizationId: record.organization_id,
+      disabledAt: null,
+    },
+    select: { userId: true },
+  });
+  if (!activeMembership) {
+    await redis.del(refreshTokenKey(refresh_token));
+    logger.info(
+      { userId: record.user_id, organizationId: record.organization_id },
+      "rejecting refresh: caller is not an active member of the organization",
+    );
+    return c.json(
+      {
+        error: "invalid_grant",
+        error_description:
+          "Your access to this organization is no longer active. Please run `langwatch login` to start a new session.",
+      },
+      401,
+    );
   }
 
   // Rotate: mint new pair, invalidate old. (Sliding-window rotation —

@@ -565,13 +565,14 @@ describe("CLI login personal-project guards", () => {
           expect(first.status).toBe(410);
           expect(await first.text()).not.toContain(SHARED_API_KEY);
 
-          // Consumed: the record is gone from Redis, so a CLI still polling
-          // is told the code expired rather than left waiting on an approval
-          // that will never be honoured. Asserted on the store, because an
-          // immediate second poll meets the exchange throttle (429) first.
+          // Consumed: the record is gone from Redis, and a CLI still polling
+          // is told the code expired rather than that it polled too soon or
+          // left waiting on an approval that will never be honoured.
           expect(
             await redisConnection!.get(`lwcli:device:${dc.device_code}`),
           ).toBeNull();
+          const second = await exchange();
+          expect(second.status).toBe(408);
         } finally {
           await prisma.organizationUser.updateMany({
             where: { userId: USER_ID, organizationId: ORG_ID },

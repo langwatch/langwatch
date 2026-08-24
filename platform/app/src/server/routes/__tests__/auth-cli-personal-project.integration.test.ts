@@ -502,6 +502,42 @@ describe("/me credentials delivery, given a token whose user is no longer an act
     }
   });
 
+  /** @scenario a disabled member's session cannot be renewed */
+  it("refuses to rotate a disabled member's refresh token, and revokes it", async () => {
+    // A session started while active; the seat is disabled afterwards.
+    // Rotation mints a new pair, so it re-derives membership like every
+    // other minting endpoint — otherwise the hour-long access token would
+    // roll forward for ninety days.
+    const flow = await runDeviceFlow();
+    expect(flow.exchangeStatus).toBe(200);
+    const refreshToken = flow.exchange.refresh_token;
+
+    await prisma.organizationUser.updateMany({
+      where: { userId: USER_ID, organizationId: ORG_ID },
+      data: { disabledAt: new Date() },
+    });
+    try {
+      const res = await app.request("/api/auth/cli/refresh", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+
+      expect(res.status).toBe(401);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body.error).toBe("invalid_grant");
+      expect(body.access_token).toBeUndefined();
+      expect(
+        await redisConnection!.get(`lwcli:refresh:${refreshToken}`),
+      ).toBeNull();
+    } finally {
+      await prisma.organizationUser.updateMany({
+        where: { userId: USER_ID, organizationId: ORG_ID },
+        data: { disabledAt: null },
+      });
+    }
+  });
+
   /** @scenario a deactivated user's token cannot mint or return a personal key */
   it("refuses a deactivated user even while org membership lingers", async () => {
     const deactId = `usr-deact-${suffix}`;
