@@ -12,6 +12,8 @@ import {
 import {
   IDENTITY_COMMAND_TYPES,
   IDENTITY_EVENT_TYPES,
+  SSO_CONNECTION_COMMAND_TYPES,
+  SSO_CONNECTION_EVENT_TYPES,
 } from "@langwatch/identity";
 import {
   LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES,
@@ -86,6 +88,7 @@ const TEST_EVENT_TYPES = ["test.integration.event"] as const;
 export const EVENT_TYPE_IDENTIFIERS = [
   ...AUTHZ_GRANTS_EVENT_TYPES,
   ...IDENTITY_EVENT_TYPES,
+  ...SSO_CONNECTION_EVENT_TYPES,
   ...AUTOMATIONS_EVENT_TYPES,
   ...TRACE_PROCESSING_EVENT_TYPES,
   ...METRIC_PROCESSING_EVENT_TYPES,
@@ -109,6 +112,7 @@ export const EVENT_TYPE_IDENTIFIERS = [
 export const COMMAND_TYPE_IDENTIFIERS = [
   ...AUTHZ_GRANTS_COMMAND_TYPES,
   ...IDENTITY_COMMAND_TYPES,
+  ...SSO_CONNECTION_COMMAND_TYPES,
   ...AUTOMATIONS_COMMAND_TYPES,
   ...TRACE_PROCESSING_COMMAND_TYPES,
   ...METRIC_PROCESSING_COMMAND_TYPES,
@@ -143,6 +147,10 @@ export const AGGREGATE_TYPE_IDENTIFIERS = [
   "authz_grant",
   "authz_role",
   "user_identity",
+  // D04: a connection is its own aggregate, tenanted by the organization.
+  // Separate from `user_identity` because a pipeline declares ONE aggregate
+  // type and the store validates every append against it (#7406).
+  "sso_connection",
   "trigger",
   "trace",
   "metric",

@@ -17,8 +17,16 @@ import {
 } from "@ee/governance/subscribers/governanceOcsfEventsSync.subscriber";
 import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
 import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/webhookDelivery.process";
-import type { IdentityHeadsRepository } from "@langwatch/identity-server";
-import { IdentityGuards } from "@langwatch/identity-server";
+import type {
+  IdentityHeadsRepository,
+  SsoBreakGlassBindingRepository,
+  SsoConnectionReadRepository,
+  SsoConnectionStrandingRepository,
+} from "@langwatch/identity-server";
+import {
+  IdentityGuards,
+  SsoConnectionGuards,
+} from "@langwatch/identity-server";
 import type {
   LangyConversationStateData,
   LangyConversationTurnData,
@@ -179,6 +187,9 @@ import type { SimulationRunStateRepository } from "./pipelines/simulation-proces
 import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
 import type { SimulationProcessingEvent } from "./pipelines/simulation-processing/schemas/events";
+import { createSsoConnectionPipeline } from "./pipelines/sso-connections/pipeline";
+import type { ConnectionTeardownPort } from "./pipelines/sso-connections/process-manager/connectionTeardown.process";
+import type { SsoConnectionFoldState } from "./pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
@@ -360,6 +371,16 @@ export interface PipelineRepositories {
   identityProjection: StateProjectionStore<IdentityFoldState>;
   /** Postgres reads the identity guards run against (ADR-101 §2). */
   identityHeads: IdentityHeadsRepository;
+  /** The connection pipeline's `SsoConnection` head + cursor (D04). */
+  ssoConnectionProjection: StateProjectionStore<SsoConnectionFoldState>;
+  /** Postgres reads the connection guards run against (ADR-117 §5). */
+  ssoConnectionReads: SsoConnectionReadRepository;
+  /** Who a teardown would strand, read over the identity heads. */
+  ssoConnectionStranding: SsoConnectionStrandingRepository;
+  /** Activation's break-glass precondition (D05 hardens it). */
+  ssoBreakGlassBindings: SsoBreakGlassBindingRepository;
+  /** How the teardown grace wake dispatches its completion command. */
+  ssoConnectionTeardown: ConnectionTeardownPort;
 }
 
 export interface PipelineRegistryDeps {
@@ -665,6 +686,24 @@ export class PipelineRegistry {
         identityGuards: new IdentityGuards(
           this.deps.repositories.identityHeads,
         ),
+      }),
+    );
+    // The SSO connection pipeline (ADR-117 §5, D04). Ships dark:
+    // `SSOCONN_ROUTING` defaults to `off`, so nothing routes off its
+    // projection and no `Organization.ssoDomain` write stops. Its only
+    // production writer until D05 is the grandfather migration, which is
+    // paced by per-organization enrollment like every other in-place
+    // migration — a deploy changes nothing on its own.
+    this.deps.eventSourcing.register(
+      createSsoConnectionPipeline({
+        connectionProjectionStore:
+          this.deps.repositories.ssoConnectionProjection,
+        connectionGuards: new SsoConnectionGuards({
+          connections: this.deps.repositories.ssoConnectionReads,
+          breakGlass: this.deps.repositories.ssoBreakGlassBindings,
+          stranding: this.deps.repositories.ssoConnectionStranding,
+        }),
+        teardown: this.deps.repositories.ssoConnectionTeardown,
       }),
     );
 

@@ -24,7 +24,10 @@ import {
 } from "../authz/authz-engine.migration";
 import { authzGrantsCommands } from "../authz/ledger";
 import { PrismaAuthzMigrationRepository } from "../authz/repositories/authz-migration.prisma.repository";
-import { identifierBackfillMigration } from "../identity/runtime";
+import {
+  connectionGrandfatherMigration,
+  identifierBackfillMigration,
+} from "../identity/runtime";
 import {
   migrationRunsOnThisInstallation,
   organizationMigrates,
@@ -128,6 +131,10 @@ export function registeredMigrations(): SystemMigration[] {
       ledger: authzEngineLedger,
       now: () => Date.now(),
     }),
+    // D04 (ADR-117 §5): the organization's legacy SSO strings become
+    // connection history, proved by routing. Dark — the connection projection
+    // decides nothing until `SSOCONN_ROUTING` is flipped.
+    connectionGrandfatherMigration(),
   ];
 }
 

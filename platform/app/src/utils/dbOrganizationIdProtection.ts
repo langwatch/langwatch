@@ -455,6 +455,15 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   "PlatformToolPolicy",
   "PromptTag",
   "ScimToken",
+  // The D04 SSO connection projection (ADR-117 §5). Org-bearing, and
+  // deliberately not org-CONSTRAINED: it is addressed by connection id (the
+  // fold's load and store), and two of its reads are cross-organization on
+  // purpose — "who already verified this domain", which is what makes first
+  // verifier own globally on SaaS, and the self-hosted sole-connection list.
+  // A guard demanding organizationId would refuse exactly the queries the
+  // ownership rule is made of. It holds no customer content: ids, domains,
+  // enums and credential references.
+  "SsoConnection",
   "Subscription",
 ];
 

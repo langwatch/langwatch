@@ -25,6 +25,7 @@ import {
   SubscriptionStatus,
 } from "~/generated/prisma/client";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { assertLegacySsoStringWriteAllowed } from "~/server/app-layer/identity/legacy-sso-string-writes";
 import { getServerAuthSession } from "~/server/auth";
 import { auth as betterAuth } from "~/server/better-auth";
 import { prisma } from "~/server/db";
@@ -524,14 +525,19 @@ secured.access(adminAuth).post("/admin/:resource", async (c) => {
     }
   }
 
-  // Normalize ssoDomain to lowercase
+  // The legacy SSO strings: normalized while they still decide sign-in, and
+  // refused once the connection projection does (ADR-117 §5). Inert until
+  // `SSOCONN_ROUTING` reaches `enforce` — every connection change already has
+  // a guarded command with the actor on it, and after the flip these two
+  // columns are derived rather than settings.
   if (
     body.resource === "organization" &&
     (body.method === "create" || body.method === "update")
   ) {
     const params = body.params as
-      | { data?: { ssoDomain?: string | null } }
+      | { data?: Record<string, unknown> }
       | undefined;
+    assertLegacySsoStringWriteAllowed({ data: params?.data });
     const ssoDomain = params?.data?.ssoDomain;
     if (typeof ssoDomain === "string" && ssoDomain.trim() !== "") {
       params!.data!.ssoDomain = ssoDomain.trim().toLowerCase();

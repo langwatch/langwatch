@@ -183,6 +183,61 @@ model IdentityProjectionCursor {
   updatedAt         DateTime @default(now()) @updatedAt
 }
 
+/// The SSO connection pipeline's projection (ADR-117 §5, D04 - see
+/// specs/identity/sso-connection-lifecycle.feature). A pure event-truth head
+/// like `Identifier`: every column is fold-written, rows are never deleted
+/// (TORN_DOWN is a tombstone), and a replay rebuilds it whole-row from the
+/// event log.
+///
+/// The fold cursor lives on the row rather than in a sibling table, because
+/// one row IS one aggregate here - a connection - so there is nothing for a
+/// separate cursor table to key on that this row does not already key on.
+///
+/// No relation to Organization on purpose, matching `Identifier`: a
+/// projection is rebuilt from events, and a foreign key would make a replay
+/// depend on relational state the log does not carry. `idpMetadata` holds
+/// endpoints and credential REFERENCES; no secret is ever stored here or in
+/// any event.
+model SsoConnection {
+  id                  String    @id
+  organizationId      String
+  /// oidc | saml
+  type                String
+  /// DRAFT | CLAIMED | APPROVED | REJECTED | DISCARDED |
+  /// VERIFICATION_PENDING | VERIFIED | ACTIVE | SUSPENDED |
+  /// TEARDOWN_PENDING | TORN_DOWN
+  state               String
+  claimedDomains      String[]
+  approvedDomains     String[]
+  /// The only domains that ever route, and only while state is ACTIVE.
+  verifiedDomains     String[]
+  /// { domain, method, tokenHash } while a ceremony is in flight.
+  pendingVerification Json?
+  idpMetadata         Json
+  allowsJit           Boolean   @default(false)
+  /// self-serve | legacy-grandfathered
+  source              String
+  testLoginAccountId  String?
+  /// { domain, note } - the last ops rejection, read back on a re-claim.
+  rejection           Json?
+  createdBy           String?
+  /// While TEARDOWN_PENDING: when the process manager's wake completes it.
+  tearDownAfter       DateTime?
+  occurredAt          DateTime
+  lastEventId         String
+  acceptedAt          DateTime
+  projectionVersion   String
+  /// Event-derived, not database-managed: `@default(now())` / `@updatedAt`
+  /// would make a replayed row differ from the row it rebuilds, which is
+  /// exactly the parity this projection has to keep.
+  createdAt           DateTime
+  updatedAt           DateTime
+
+  @@index([organizationId])
+  @@index([state])
+  @@index([verifiedDomains], type: Gin)
+}
+
 enum TeamUserRole {
   ADMIN
   MEMBER
