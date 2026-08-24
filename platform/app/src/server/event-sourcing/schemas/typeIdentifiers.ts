@@ -148,8 +148,12 @@ export const AGGREGATE_TYPE_IDENTIFIERS = [
   "authz_role",
   "user_identity",
   // D04: a connection is its own aggregate, tenanted by the organization.
-  // Separate from `user_identity` because a pipeline declares ONE aggregate
-  // type and the store validates every append against it (#7406).
+  // Separate from `user_identity` because it is keyed by a DIFFERENT thing —
+  // an organization, not a person — so it cannot share that aggregate's id.
+  // (Not because a pipeline may hold only one aggregate type: `trace` carries
+  // spans, logs and annotations, and `user_identity` carries two-step
+  // verification alongside identifiers. `storeEvents` takes the aggregate
+  // type per call and validates a batch against it, #7406.)
   "sso_connection",
   "trigger",
   "trace",

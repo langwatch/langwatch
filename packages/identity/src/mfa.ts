@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { userTenantedCommandSchema } from "./facts";
+import { userTenantedCommandSchema } from "./command-envelope";
 import { identityActorSchema } from "./vocabulary";
 
 /**
@@ -402,3 +402,24 @@ export const recordMfaVerificationFailureCommandDataSchema =
 export type RecordMfaVerificationFailureCommandData = z.infer<
   typeof recordMfaVerificationFailureCommandDataSchema
 >;
+
+export type MfaCommand =
+  | { type: typeof ENROLL_MFA_COMMAND_TYPE; data: EnrollMfaCommandData }
+  | { type: typeof CONFIRM_MFA_COMMAND_TYPE; data: ConfirmMfaCommandData }
+  | {
+      type: typeof EXPIRE_MFA_ENROLLMENT_COMMAND_TYPE;
+      data: ExpireMfaEnrollmentCommandData;
+    }
+  | { type: typeof DISABLE_MFA_COMMAND_TYPE; data: DisableMfaCommandData }
+  | {
+      type: typeof CONSUME_BACKUP_CODE_COMMAND_TYPE;
+      data: ConsumeBackupCodeCommandData;
+    }
+  | {
+      type: typeof REGENERATE_BACKUP_CODES_COMMAND_TYPE;
+      data: RegenerateBackupCodesCommandData;
+    }
+  | {
+      type: typeof RECORD_MFA_VERIFICATION_FAILURE_COMMAND_TYPE;
+      data: RecordMfaVerificationFailureCommandData;
+    };

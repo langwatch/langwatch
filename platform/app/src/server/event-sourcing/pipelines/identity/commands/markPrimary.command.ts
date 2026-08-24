@@ -29,7 +29,7 @@ export class MarkPrimaryCommand
     command: Command<MarkPrimaryCommandData>,
   ): Promise<IdentityEvent[]> {
     const facts = await this.guards.markPrimary(command.data);
-    return identityEventsFor({
+    return identityEventsFor<IdentityEvent>({
       command: { type: MARK_PRIMARY_COMMAND_TYPE, data: command.data },
       facts,
     });

@@ -8,6 +8,7 @@ import { createTenantId, EventUtils } from "../..";
 import { eventIdempotencyKey } from "../../commands/idempotencyKey";
 import { USER_IDENTITY_AGGREGATE_TYPE } from "./schemas/constants";
 import type { IdentityEvent } from "./schemas/events";
+import type { MfaEvent } from "./schemas/mfaEvents";
 
 /**
  * The ONE place an identity fact becomes a framework event: the guards
@@ -18,14 +19,26 @@ import type { IdentityEvent } from "./schemas/events";
  * the pipeline's command handlers (the staged re-run) and the app's ledger
  * writer (the calling path) go through here, so the two legs cannot stamp
  * a fact differently.
+ *
+ * It stamps two-step verification's facts too (D06). They ride the same
+ * aggregate — same person, same key — so they must ride the same envelope:
+ * a parallel one stamping `user_identity` is precisely the divergence this
+ * comment exists to rule out.
+ *
+ * The caller names which family it is stamping (`identityEventsFor<MfaEvent>`)
+ * because the facts it passes decide that, and nothing in the signature can
+ * infer it from an array. That is the one unchecked step, and it is here
+ * rather than at seven call sites.
  */
-export function identityEventsFor({
+export function identityEventsFor<
+  E extends IdentityEvent | MfaEvent = IdentityEvent | MfaEvent,
+>({
   command,
   facts,
 }: {
   command: IdentityCommand;
   facts: IdentityFactInput[];
-}): IdentityEvent[] {
+}): E[] {
   const { userId, tenantId, commandId, occurredAtMs } = command.data;
   // The ceremony context the adapter stamped (ADR-101 §2: why the row was
   // written) rides as metadata on the attach - never in the fact itself.
@@ -50,6 +63,6 @@ export function identityEventsFor({
         metadata,
         occurredAt: occurredAtMs,
         idempotencyKey: eventIdempotencyKey({ commandId, index }),
-      }) as IdentityEvent,
+      }) as E,
   );
 }

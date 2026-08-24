@@ -33,7 +33,7 @@ export class ProposeLinkCommand
     command: Command<ProposeLinkCommandData>,
   ): Promise<IdentityEvent[]> {
     const facts = await this.guards.proposeLink(command.data);
-    return identityEventsFor({
+    return identityEventsFor<IdentityEvent>({
       command: { type: PROPOSE_LINK_COMMAND_TYPE, data: command.data },
       facts,
     });

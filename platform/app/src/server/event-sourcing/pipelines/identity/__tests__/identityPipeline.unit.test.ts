@@ -98,6 +98,10 @@ describe("identity pipeline", () => {
         createIdentityPipeline({
           identityProjectionStore: store,
           identityGuards: new IdentityGuards(new ProjectionHeads(store)),
+          // Two-step verification rides this same pipeline (D06); this test
+          // exercises the identifier half, so its store is never reached.
+          mfaProjectionStore: new InMemoryStateStore() as never,
+          mfaGuards: null as never,
         }),
       );
       try {

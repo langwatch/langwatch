@@ -225,6 +225,8 @@ import { NullGithubPullRequestsRepository } from "./github/repositories/github-p
 import { LocalDoorBreakGlassBinding } from "./identity/break-glass-binding";
 import { PrismaIdentityHeadsRepository } from "./identity/repositories/identity-heads.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./identity/repositories/identity-projection.prisma.repository";
+import { PrismaMfaEnrollmentRepository } from "./identity/repositories/mfa-enrollment.prisma.repository";
+import { PrismaMfaEnrollmentProjectionRepository } from "./identity/repositories/mfa-enrollment-projection.prisma.repository";
 import { PrismaSsoConnectionProjectionRepository } from "./identity/repositories/sso-connection-projection.prisma.repository";
 import {
   PrismaSsoConnectionReadRepository,
@@ -898,6 +900,8 @@ export function initializeDefaultApp(options?: {
     authzAuditTrail: new PrismaAuthzAuditTrailRepository(prisma),
     identityProjection: new PrismaIdentityProjectionRepository(prisma),
     identityHeads: new PrismaIdentityHeadsRepository(prisma),
+    mfaProjection: new PrismaMfaEnrollmentProjectionRepository(prisma),
+    mfaEnrollments: new PrismaMfaEnrollmentRepository(prisma),
     ssoConnectionProjection: new PrismaSsoConnectionProjectionRepository(
       prisma,
     ),
