@@ -127,6 +127,45 @@ Feature: Worker graceful shutdown does not sever in-flight ClickHouse work
     Then it is abandoned and logged
     And the later phases, including the queue drain, still run
 
+  # Closing the listener is not the same as ending the connections on it. The
+  # first cut destroyed every socket outright, which turned each rolling deploy
+  # into a burst of 502s for whatever was mid-request; the cut after that put
+  # the destroy behind a wait that a stuck stream never ended, so it never ran
+  # and the phase timed out on every deploy instead.
+
+  @unit @shutdown-http
+  Scenario: A request in flight when the listener closes is allowed to finish
+    Given a connection that finishes inside the drain grace
+    When the http server phase runs
+    Then the connection is never destroyed
+    And the phase completes on its own
+
+  @unit @shutdown-http
+  Scenario: A connection outliving the grace is destroyed inside the phase
+    Given a connection that never ends on its own
+    When the drain grace passes
+    Then the leftover connections are destroyed and the reason is logged
+    And the phase completes rather than being abandoned
+
+  @unit @shutdown-http
+  Scenario: The drain grace is spent on requests, not on session teardown
+    Given extra session teardown that takes its own time
+    When the http server phase runs
+    Then the teardown does not come out of the grace in-flight requests were given
+
+  @unit @shutdown-http
+  Scenario: Session teardown that fails still leaves the connections reaped
+    Given extra session teardown that throws
+    When the http server phase runs
+    Then the failure is logged
+    And the leftover connections are still destroyed
+
+  @unit @shutdown-http
+  Scenario: The phase outwaits its own drain grace
+    Given the shutdown budget
+    Then the http phase ceiling is longer than the grace it hands out
+    So that the runner never abandons the phase before the destroy it exists to perform
+
   @unit @shutdown-runner
   Scenario: A second signal during shutdown does not start a second teardown
     Given a shutdown already running from SIGTERM

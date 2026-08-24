@@ -1348,6 +1348,15 @@ const presentations = {
     describe: () =>
       "Check the role, the scope, and whether an equivalent binding already exists, then try again.",
   },
+  health_check_failed: {
+    // Raised by /api/health/* probes when the canary work they exercise
+    // (trace ingestion, evaluation, workflow) does not complete. Read by
+    // monitoring bots far more often than people; the copy exists for the
+    // human who follows the alert in.
+    title: "A health check failed",
+    describe: () =>
+      "Part of LangWatch didn't respond to its own health probe. We're on it — no action is needed from you.",
+  },
   offboard_incomplete: {
     // The offboarding transaction proves the member's access resolves to
     // nothing before committing; when the proof fails everything rolls back,
