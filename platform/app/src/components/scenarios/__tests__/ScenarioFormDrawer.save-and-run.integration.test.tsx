@@ -286,6 +286,7 @@ describe("<ScenarioFormDrawer /> save-and-run data-loss regression", () => {
         mocks.mockRunScenario.mockResolvedValue(undefined);
       });
 
+      /** @scenario "The v1 page still sends the person to the run after a single run" */
       it("calls update mutation and navigates to simulations page", async () => {
         const user = userEvent.setup();
         renderEditModeDrawer();

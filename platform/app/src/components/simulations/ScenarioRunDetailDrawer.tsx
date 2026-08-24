@@ -9,7 +9,14 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ChevronsDownUp, ChevronsUpDown, Inbox } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { z } from "zod";
 import { CopyButton } from "~/components/CopyButton";
 import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
@@ -47,6 +54,17 @@ import {
 } from "./scenario-run-status.utils";
 import { SimulationConsole } from "./simulation-console/SimulationConsole";
 
+/**
+ * The Agent Testing variant: wider, side by side when the width allows, and
+ * able to open on a run that has no id yet. Lazy so the classic drawer's
+ * chunk does not grow for v1 readers.
+ */
+const AgentTestingRunDrawer = lazy(() =>
+  import("~/components/agent-testing/drawers/AgentTestingRunDrawer").then(
+    (module) => ({ default: module.AgentTestingRunDrawer }),
+  ),
+);
+
 export interface ScenarioRunDetailDrawerProps {
   open?: boolean;
 }
@@ -69,16 +87,24 @@ const secretParameterNamesSchema = z.array(z.string());
  */
 const SECRET_VALUE_MASK = "••••••••";
 
-export function ScenarioRunDetailDrawer({
+/**
+ * Everything the run detail drawer knows about one run: the live state, the
+ * streamed messages, the scenario record, and the actions on it. Shared by
+ * the classic drawer and the Agent Testing variant so the two layouts read
+ * the same run the same way.
+ */
+export function useScenarioRunDetail({
+  scenarioRunId,
   open,
-}: ScenarioRunDetailDrawerProps) {
-  const { closeDrawer, openDrawer } = useDrawer();
-  const params = useDrawerParams();
+}: {
+  scenarioRunId: string | undefined;
+  open: boolean;
+}) {
+  const { openDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
   const [runModalOpen, setRunModalOpen] = useState(false);
   const [scenarioEditorOpen, setScenarioEditorOpen] = useState(false);
 
-  const scenarioRunId = params.scenarioRunId;
   const dejaView = useDejaViewLink({
     aggregateId: scenarioRunId,
     tenantId: project?.id,
@@ -273,6 +299,96 @@ export function ScenarioRunDetailDrawer({
     hasConversation,
     hasError: Boolean(scenarioState?.results?.error),
   });
+
+  return {
+    project,
+    openDrawer,
+    scenarioState,
+    runStateError,
+    streamingMessages,
+    scenarioId,
+    batchRunId,
+    scenarioData,
+    displayTitle,
+    isRunning,
+    runModalOpen,
+    setRunModalOpen,
+    scenarioEditorOpen,
+    setScenarioEditorOpen,
+    persistedTarget,
+    handleRunAgain,
+    handleRunAgainClick,
+    firstTraceId,
+    handleOpenInTraces,
+    dejaView,
+    timeAgo,
+    copyableIds,
+    criteria,
+    parameters,
+    secretParameterNames,
+    hasConversation,
+    conversationCount,
+    showNoResponse,
+  };
+}
+
+export type ScenarioRunDetail = ReturnType<typeof useScenarioRunDetail>;
+
+export { formatResultsForCopy, SECRET_VALUE_MASK };
+
+/**
+ * The run detail drawer. The Agent Testing pages open the same registry key
+ * with `variant: "agent-testing"`, which renders the wide variant; without it
+ * the drawer renders exactly as v1 always has.
+ */
+export function ScenarioRunDetailDrawer(props: ScenarioRunDetailDrawerProps) {
+  const params = useDrawerParams();
+  if (params.variant === "agent-testing") {
+    return (
+      <Suspense fallback={null}>
+        <AgentTestingRunDrawer open={props.open} />
+      </Suspense>
+    );
+  }
+  return <ClassicScenarioRunDetailDrawer {...props} />;
+}
+
+function ClassicScenarioRunDetailDrawer({
+  open,
+}: ScenarioRunDetailDrawerProps) {
+  const { closeDrawer } = useDrawer();
+  const params = useDrawerParams();
+  const scenarioRunId = params.scenarioRunId;
+
+  const {
+    project,
+    openDrawer,
+    scenarioState,
+    runStateError,
+    streamingMessages,
+    scenarioId,
+    scenarioData,
+    displayTitle,
+    isRunning,
+    runModalOpen,
+    setRunModalOpen,
+    scenarioEditorOpen,
+    setScenarioEditorOpen,
+    persistedTarget,
+    handleRunAgain,
+    handleRunAgainClick,
+    firstTraceId,
+    handleOpenInTraces,
+    dejaView,
+    timeAgo,
+    copyableIds,
+    criteria,
+    parameters,
+    secretParameterNames,
+    hasConversation,
+    conversationCount,
+    showNoResponse,
+  } = useScenarioRunDetail({ scenarioRunId, open: !!open });
 
   const [openSections, setOpenSections] = useState<string[]>([
     "conversation",
@@ -616,7 +732,7 @@ export function ScenarioRunDetailDrawer({
 }
 
 /** One name and what the run recorded for it. */
-function ParameterRow({
+export function ParameterRow({
   name,
   value,
   muted = false,

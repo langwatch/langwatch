@@ -11,6 +11,7 @@
 import type { RunGroupSummary } from "~/components/suites/run-history-transforms";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioLastResultSummary } from "~/server/scenarios/scenario-event.types";
+import type { SuiteTarget } from "~/server/suites/types";
 
 /** The group that holds every case filed in no test suite. */
 export const UNFILED_GROUP_ID = "__unfiled__" as const;
@@ -25,6 +26,8 @@ export type TestCase = {
   createdAt: Date;
   /** The person who last saved the case, when the project knows their name. */
   lastUpdatedById: string | null;
+  /** The stored version of the case; each save moves it up by one. */
+  version?: number;
 };
 
 /** A test suite as the rail and the table read it. */
@@ -33,6 +36,11 @@ export type TestSuiteEntry = {
   name: string;
   slug: string;
   caseCount: number;
+  /**
+   * The agents the last run of this suite chose, persisted on the suite row
+   * so the run dialog preselects them.
+   */
+  targets?: SuiteTarget[];
 };
 
 /** A set that a code run writes into. It is read-only in the platform. */

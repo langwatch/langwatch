@@ -78,6 +78,8 @@ function makeResult(overrides: Partial<CaseLastResult> = {}): CaseLastResult {
     lastRunAt: new Date("2026-07-08T09:30:00.000Z").getTime(),
     batchRunId: "batch_1",
     scenarioSetId: "__internal__suite_refunds__suite",
+    durationInMs: null,
+    totalCost: null,
     ...overrides,
   };
 }
@@ -100,13 +102,13 @@ function panelProps(
     allLabels: [],
     activeLabels: [],
     onToggleLabel: vi.fn(),
-    targetOf: () => null,
     onRunSet: vi.fn(),
     onNewTestCase: vi.fn(),
     onSelectSuite: vi.fn(),
     onRowClick: vi.fn(),
-    onRun: vi.fn(),
+    onRunCase: vi.fn(),
     onEdit: vi.fn(),
+    onHistory: vi.fn(),
     onDuplicate: vi.fn(),
     onMoveToSuite: vi.fn(),
     onOpenLastRun: vi.fn(),
@@ -369,6 +371,7 @@ describe("the test cases table", () => {
       "Duplicate",
       "Move to suite",
       "Open last run",
+      "History",
       "Archive",
     ]);
   });
@@ -510,8 +513,7 @@ describe("the test cases table", () => {
     expect(props.onRowClick).toHaveBeenCalledWith(testCase);
   });
 
-  /** @scenario "Clicking the Run button does not open the row" */
-  it("opens the run dialog from the Run button and not the row", async () => {
+  it("hands the Run button to the run dialog and not to the row", async () => {
     const user = userEvent.setup();
     const { props } = renderPanel({
       groups: groupCasesByFolder({ cases: [makeCase()], suites: [REFUNDS] }),
@@ -520,8 +522,7 @@ describe("the test cases table", () => {
 
     await user.click(screen.getByRole("button", { name: "Run Double charge" }));
 
-    expect(await screen.findByTestId("run-case-dialog")).toBeInTheDocument();
-    expect(screen.getByText("Agent to be tested")).toBeInTheDocument();
+    expect(props.onRunCase).toHaveBeenCalledWith(makeCase());
     expect(props.onRowClick).not.toHaveBeenCalled();
   });
 

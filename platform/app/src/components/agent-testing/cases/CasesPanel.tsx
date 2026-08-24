@@ -22,7 +22,6 @@ import {
 import { format } from "date-fns";
 import { FlaskConical, FolderCode, Play, Plus } from "lucide-react";
 import { LabelFilterDropdown } from "~/components/scenarios/LabelFilterDropdown";
-import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import { RunMetricsSummary } from "~/components/suites/RunMetricsSummary";
 import type { AgentTestingSelection } from "../useAgentTestingRouting";
 import {
@@ -68,15 +67,15 @@ export type CasesPanelProps = {
   allLabels: string[];
   activeLabels: string[];
   onToggleLabel: (label: string) => void;
-  targetOf: (caseId: string) => TargetValue;
   runningCaseId?: string | null;
   isRunningSet?: boolean;
   onRunSet: () => void;
   onNewTestCase: () => void;
   onSelectSuite: (suiteId: string) => void;
   onRowClick: (testCase: TestCase) => void;
-  onRun: (testCase: TestCase, target: TargetValue) => void;
+  onRunCase: (testCase: TestCase) => void;
   onEdit: (testCase: TestCase) => void;
+  onHistory: (testCase: TestCase) => void;
   onDuplicate: (testCase: TestCase) => void;
   onMoveToSuite: (testCase: TestCase, suiteId: string | null) => void;
   onOpenLastRun: (testCase: TestCase) => void;
@@ -192,12 +191,12 @@ export function CasesPanel(props: CasesPanelProps) {
             authorNameById={props.authorNameById}
             suites={props.suites}
             canManage={canManage}
-            targetOf={props.targetOf}
             runningCaseId={props.runningCaseId}
             onSelectSuite={props.onSelectSuite}
             onRowClick={props.onRowClick}
-            onRun={props.onRun}
+            onRunCase={props.onRunCase}
             onEdit={props.onEdit}
+            onHistory={props.onHistory}
             onDuplicate={props.onDuplicate}
             onMoveToSuite={props.onMoveToSuite}
             onOpenLastRun={props.onOpenLastRun}

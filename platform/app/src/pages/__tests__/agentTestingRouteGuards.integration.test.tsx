@@ -76,7 +76,21 @@ vi.mock("~/utils/api", () => ({
       suites: { getSummaries: { invalidate: vi.fn() } },
       scenarios: { getExternalSetSummaries: { invalidate: vi.fn() } },
     }),
+    suites: {
+      folders: {
+        getAll: { useQuery: () => ({ data: [], isLoading: false }) },
+      },
+    },
   },
+}));
+
+// The tabs read the project's data through their own queries; the guard is
+// what is under test here, so they stand in as empty shells.
+vi.mock("~/components/agent-testing/cases/TestCasesTab", () => ({
+  TestCasesTab: () => <div data-testid="cases-tab-stub" />,
+}));
+vi.mock("~/components/agent-testing/results/ResultsTab", () => ({
+  ResultsTab: () => <div data-testid="results-tab-stub" />,
 }));
 
 vi.mock("~/utils/compat/next-router", () => ({
@@ -90,6 +104,8 @@ vi.mock("~/utils/compat/next-router", () => ({
   }),
 }));
 
+import { resolveSimulationsRedirect } from "~/components/suites/useSuiteRouting";
+import { legacyRedirectRoutes } from "~/legacyRedirects";
 import AgentTestingRoute from "../[project]/agent-testing/[[...path]]";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -146,6 +162,34 @@ describe("the Agent Testing address", () => {
         ).toBeNull();
         expect(screen.getByText("Access Restricted")).toBeInTheDocument();
       });
+    });
+
+    /** @scenario "Old simulations addresses keep working" */
+    it("keeps every saved simulations address on the v1 pages", () => {
+      // The v1 catch-all resolves its own addresses; none of them may point
+      // at Agent Testing while the flag is on.
+      const savedAddresses: string[][] = [
+        [],
+        ["scenarios"],
+        ["suites"],
+        ["run-plans", "checkout"],
+        ["my-set", "batch_1", "run_1"],
+      ];
+      for (const segments of savedAddresses) {
+        const redirect = resolveSimulationsRedirect({
+          projectSlug: "demo",
+          segments,
+          query: {},
+        });
+        if (redirect !== null) {
+          expect(redirect).toMatch(/^\/demo\/simulations/);
+        }
+      }
+
+      // And no legacy redirect sends a simulations address there either.
+      for (const route of legacyRedirectRoutes) {
+        expect(route.path ?? "").not.toContain("agent-testing");
+      }
     });
   });
 });

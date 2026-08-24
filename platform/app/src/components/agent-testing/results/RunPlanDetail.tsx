@@ -253,10 +253,15 @@ export function RunPlanDetail({
   const handleScenarioRunClick = useCallback(
     (scenarioRun: ScenarioRunData) => {
       openDrawer("scenarioRunDetail", {
-        urlParams: { scenarioRunId: scenarioRun.scenarioRunId },
+        urlParams: {
+          variant: "agent-testing",
+          scenarioRunId: scenarioRun.scenarioRunId,
+          batchRunId: scenarioRun.batchRunId,
+          scenarioSetId: plan.scenarioSetId,
+        },
       });
     },
-    [openDrawer],
+    [openDrawer, plan.scenarioSetId],
   );
 
   const handleViewModeChange = useCallback(

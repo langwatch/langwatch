@@ -9,25 +9,24 @@
  */
 
 import { Button, HStack, Input, VStack } from "@chakra-ui/react";
-import { generate } from "@langwatch/ksuid";
 import { useCallback, useMemo, useState } from "react";
 import { usePeriodSelector } from "~/components/PeriodSelector";
 import { ScenarioArchiveDialog } from "~/components/scenarios/ScenarioArchiveDialog";
-import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import { Dialog } from "~/components/ui/dialog";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useCan } from "~/hooks/useCan";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useRunScenario } from "~/hooks/useRunScenario";
-import {
-  readScenarioTarget,
-  writeScenarioTarget,
-} from "~/hooks/useScenarioTarget";
+import { readScenarioTarget } from "~/hooks/useScenarioTarget";
+import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
 import { api } from "~/utils/api";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { toExternalPlanSlug } from "../results/run-plans";
+import {
+  RunDialog,
+  type RunDialogSubject,
+  type RunStartedInfo,
+} from "../run/RunDialog";
 import { useAgentTestingRouting } from "../useAgentTestingRouting";
 import { useAgentTestingStore } from "../useAgentTestingStore";
 import { CasesPanel } from "./CasesPanel";
@@ -195,74 +194,80 @@ export function TestCasesTab({ onNewTestCase }: TestCasesTabProps) {
   });
 
   // --- Runs --------------------------------------------------------------
+  //
+  // Every run entry opens the run dialog; the dialog owns the target choice,
+  // the note, the overrides, and the run itself.
 
-  const runSuite = api.suites.run.useMutation({
-    onSuccess: (result) => {
-      setPendingBatchRunId(result.batchRunId);
-      toaster.create({
-        title: `Run scheduled (${result.jobCount} jobs)`,
-        type: "success",
-      });
-    },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't run the test suite" }),
-  });
+  const [runSubject, setRunSubject] = useState<RunDialogSubject | null>(null);
+  const lastRunTarget = useAgentTestingStore((state) => state.lastRunTarget);
 
-  const runAll = api.suites.runAll.useMutation({
-    onSuccess: (result) => {
-      setPendingBatchRunId(result.batchRunId);
-      toaster.create({
-        title: `Run scheduled (${result.jobCount} jobs)`,
-        type: "success",
-      });
+  const subjectForSuite = useCallback(
+    (suite: TestSuiteEntry): RunDialogSubject => {
+      const persisted = suite.targets?.[0];
+      return {
+        kind: "suite",
+        suiteId: suite.id,
+        name: suite.name,
+        scenarioIds: cases
+          .filter((testCase) => testCase.folderId === suite.id)
+          .map((testCase) => testCase.id),
+        initialTarget: persisted
+          ? { type: persisted.type, id: persisted.referenceId }
+          : null,
+      };
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't run the test cases" }),
-  });
-
-  const { runScenario } = useRunScenario({
-    projectId: project?.id,
-    projectSlug: project?.slug,
-    onRunComplete: (result) => {
-      setRunningCaseId(null);
-      void openLiveRun({
-        batchRunId: result.batchRunId,
-        scenarioSetId: result.setId,
-        scenarioRunId: result.scenarioRunId,
-      });
-    },
-    onRunFailed: (result) => {
-      setRunningCaseId(null);
-      void openLiveRun({
-        batchRunId: result.batchRunId,
-        scenarioSetId: result.setId,
-        scenarioRunId: result.scenarioRunId,
-      });
-    },
-  });
+    [cases],
+  );
 
   const handleRunCase = useCallback(
-    (testCase: TestCase, target: TargetValue) => {
-      if (!target) return;
-      const batchRunId = generate(KSUID_RESOURCES.SCENARIO_BATCH).toString();
-      writeScenarioTarget({ projectId, scenarioId: testCase.id, target });
-      setRunningCaseId(testCase.id);
-      setPendingBatchRunId(batchRunId);
-      // The page stays where it is. The run opens in the drawer once it has an
-      // id of its own.
-      void runScenario({ scenarioId: testCase.id, target, batchRunId });
+    (testCase: TestCase) => {
+      setRunSubject({
+        kind: "case",
+        scenarioId: testCase.id,
+        name: testCase.name,
+        initialTarget: readScenarioTarget({
+          projectId,
+          scenarioId: testCase.id,
+        }),
+      });
     },
-    [runScenario, setPendingBatchRunId, projectId],
+    [projectId],
   );
 
   const handleRunSet = useCallback(() => {
-    const idempotencyKey = generate(KSUID_RESOURCES.SCENARIO_BATCH).toString();
     if (selection.kind === "suite" && selectedSuite) {
-      runSuite.mutate({ projectId, id: selectedSuite.id, idempotencyKey });
+      setRunSubject(subjectForSuite(selectedSuite));
       return;
     }
-    runAll.mutate({ projectId, idempotencyKey });
-  }, [selection, selectedSuite, projectId, runSuite, runAll]);
+    setRunSubject({ kind: "all", initialTarget: lastRunTarget });
+  }, [selection, selectedSuite, subjectForSuite, lastRunTarget]);
+
+  const handleRunSuiteById = useCallback(
+    (suiteId: string) => {
+      const suite = suites.find((entry) => entry.id === suiteId);
+      if (suite) setRunSubject(subjectForSuite(suite));
+    },
+    [suites, subjectForSuite],
+  );
+
+  const handleRunStarted = useCallback(
+    (info: RunStartedInfo) => {
+      setPendingBatchRunId(info.batchRunId);
+      if (!info.scenarioId) {
+        toaster.create({ title: "Run scheduled", type: "success" });
+        return;
+      }
+      // A one-off run opens in the drawer right away and streams into it.
+      setRunningCaseId(info.scenarioId);
+      openLiveRun({
+        batchRunId: info.batchRunId,
+        scenarioSetId: info.scenarioSetId ?? getOnPlatformSetId(projectId),
+        scenarioId: info.scenarioId,
+        targetId: info.targetId,
+      });
+    },
+    [setPendingBatchRunId, openLiveRun, projectId],
+  );
 
   // --- Opening things ----------------------------------------------------
 
@@ -276,11 +281,20 @@ export function TestCasesTab({ onNewTestCase }: TestCasesTabProps) {
     [openDrawer],
   );
 
+  const handleOpenHistory = useCallback(
+    (testCase: TestCase) => {
+      openDrawer("scenarioVersionHistory", {
+        urlParams: { scenarioId: testCase.id },
+      });
+    },
+    [openDrawer],
+  );
+
   const handleOpenLastRun = useCallback(
     (testCase: TestCase) => {
       const lastResult = lastResults.get(testCase.id);
       if (!lastResult) return;
-      void openLiveRun({
+      openLiveRun({
         batchRunId: lastResult.batchRunId,
         scenarioSetId: lastResult.scenarioSetId,
         scenarioId: testCase.id,
@@ -336,13 +350,7 @@ export function TestCasesTab({ onNewTestCase }: TestCasesTabProps) {
         onSelect={selectSuite}
         onCreateSuite={(name) => createFolder.mutate({ projectId, name })}
         onNewTestCase={(suiteId) => onNewTestCase(suiteId)}
-        onRunSuite={(suiteId) =>
-          runSuite.mutate({
-            projectId,
-            id: suiteId,
-            idempotencyKey: generate(KSUID_RESOURCES.SCENARIO_BATCH).toString(),
-          })
-        }
+        onRunSuite={handleRunSuiteById}
         onEditSuite={(suiteId) =>
           setSuiteToRename(suites.find((suite) => suite.id === suiteId) ?? null)
         }
@@ -375,11 +383,7 @@ export function TestCasesTab({ onNewTestCase }: TestCasesTabProps) {
           allLabels={collectLabels(cases)}
           activeLabels={activeLabels}
           onToggleLabel={handleToggleLabel}
-          targetOf={(caseId) =>
-            readScenarioTarget({ projectId, scenarioId: caseId })
-          }
           runningCaseId={runningCaseId}
-          isRunningSet={runSuite.isPending || runAll.isPending}
           onRunSet={handleRunSet}
           onNewTestCase={() => onNewTestCase(selectedSuite?.id ?? null)}
           onSelectSuite={(suiteId) => {
@@ -387,8 +391,9 @@ export function TestCasesTab({ onNewTestCase }: TestCasesTabProps) {
             if (suite) selectSuite({ kind: "suite", slug: suite.slug });
           }}
           onRowClick={handleRowClick}
-          onRun={handleRunCase}
+          onRunCase={handleRunCase}
           onEdit={openEditor}
+          onHistory={handleOpenHistory}
           onDuplicate={(testCase) =>
             duplicateScenario.mutate({ projectId, scenarioId: testCase.id })
           }
@@ -406,6 +411,13 @@ export function TestCasesTab({ onNewTestCase }: TestCasesTabProps) {
           }
         />
       </VStack>
+
+      <RunDialog
+        subject={runSubject}
+        onClose={() => setRunSubject(null)}
+        onRunStarted={handleRunStarted}
+        onCaseRunSettled={() => setRunningCaseId(null)}
+      />
 
       <ScenarioArchiveDialog
         open={!!caseToArchive}

@@ -12,6 +12,7 @@
 import { useMemo } from "react";
 import type { Period } from "~/components/PeriodSelector";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { parseSuiteTargets } from "~/server/suites/types";
 import { api } from "~/utils/api";
 import type { CaseLastResult } from "./CasesTable";
 import type { ExternalSetEntry, TestCase, TestSuiteEntry } from "./test-cases";
@@ -78,6 +79,7 @@ export function useTestCasesData({
         folderId: scenario.folderId,
         createdAt: new Date(scenario.createdAt),
         lastUpdatedById: scenario.lastUpdatedById,
+        version: scenario.version,
       })),
     [scenarios],
   );
@@ -96,6 +98,7 @@ export function useTestCasesData({
       name: folder.name,
       slug: folder.slug,
       caseCount: countByFolder.get(folder.id) ?? 0,
+      targets: parseSuiteTargets(folder.targets ?? []),
     }));
   }, [folders, cases]);
 

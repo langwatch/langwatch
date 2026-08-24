@@ -118,7 +118,11 @@ function makeRun(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {
     description: null,
     metadata: null,
     status: ScenarioRunStatus.SUCCESS,
-    results: { verdict: Verdict.SUCCESS, metCriteria: ["a"], unmetCriteria: [] },
+    results: {
+      verdict: Verdict.SUCCESS,
+      metCriteria: ["a"],
+      unmetCriteria: [],
+    },
     messages: [],
     timestamp: NOW,
     durationInMs: 6300,
@@ -146,7 +150,11 @@ function threeBatches(): ScenarioRunData[] {
       scenarioRunId: "run_1",
       timestamp: NOW - 2 * 86_400_000,
       status: ScenarioRunStatus.FAILED,
-      results: { verdict: Verdict.FAILURE, metCriteria: [], unmetCriteria: ["a"] },
+      results: {
+        verdict: Verdict.FAILURE,
+        metCriteria: [],
+        unmetCriteria: ["a"],
+      },
     }),
   ];
 }
@@ -432,7 +440,11 @@ describe("<RunPlanDetail/>", () => {
       makeRun({
         scenarioRunId: "run_live",
         status: ScenarioRunStatus.SUCCESS,
-        results: { verdict: Verdict.SUCCESS, metCriteria: ["a"], unmetCriteria: [] },
+        results: {
+          verdict: Verdict.SUCCESS,
+          metCriteria: ["a"],
+          unmetCriteria: [],
+        },
       }),
     ]);
     view.rerender(
@@ -597,6 +609,7 @@ describe("<RunPlanDetail/>", () => {
   });
 
   /** @scenario "Each run under One-off runs is named for the test case that ran" */
+  /** @scenario "The finished one-off run is listed under One-off runs" */
   it("names a one-off run after the test case that ran", async () => {
     const user = userEvent.setup();
     setRuns([
@@ -643,7 +656,12 @@ describe("<RunPlanDetail/>", () => {
     await user.click(screen.getByText("Angry refund request"));
 
     expect(mockOpenDrawer).toHaveBeenCalledWith("scenarioRunDetail", {
-      urlParams: { scenarioRunId: "run_a" },
+      urlParams: {
+        variant: "agent-testing",
+        scenarioRunId: "run_a",
+        batchRunId: "batch_3",
+        scenarioSetId: SUITE_SET_ID,
+      },
     });
   });
 

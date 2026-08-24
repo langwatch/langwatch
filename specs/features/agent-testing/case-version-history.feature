@@ -73,7 +73,7 @@ Feature: Test case history in the interface
 
   # --- Restore ---
 
-  @integration @unimplemented
+  @integration
   Scenario: Restore writes a new version and closes the drawer on the new one
     Given the history drawer with a test case at version 5
     When version 2 is restored
@@ -81,14 +81,14 @@ Feature: Test case history in the interface
     And the editor reads the content of version 2
     And version 5 is still listed
 
-  @integration @unimplemented
+  @integration
   Scenario: Restore asks for confirmation before it writes
     Given the history drawer with an older version chosen
     When Restore is chosen
     Then a confirmation names the version being restored
     And leaving the confirmation writes nothing
 
-  @integration @unimplemented
+  @integration
   Scenario: A viewer sees history but no Restore control
     Given a person with read-only access to the project
     When they open the history drawer

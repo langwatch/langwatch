@@ -20,13 +20,13 @@ import {
 } from "@chakra-ui/react";
 import { format } from "date-fns";
 import { MoreVertical } from "lucide-react";
-import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import { RunMetricsSummary } from "~/components/suites/RunMetricsSummary";
 import { ListTable } from "~/components/ui/ListTable";
 import { Menu } from "~/components/ui/menu";
 import { TagList } from "~/components/ui/TagList";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { ScenarioLastResultSummary } from "~/server/scenarios/scenario-event.types";
+import { CaseVersionChip } from "../shared/CaseVersionChip";
 import { FolderHeaderRow } from "../shared/FolderHeaderRow";
 import { LastResultLabel } from "../shared/LastResultLabel";
 import { ResultMetricsInline } from "../shared/ResultMetricsInline";
@@ -40,15 +40,8 @@ import {
   UNFILED_GROUP_ID,
 } from "./test-cases";
 
-/**
- * The last result of a case. The duration and the cost are read from the run
- * when the summary carries them; the aggregate answers with the verdict alone
- * today, so a cell without them reads the verdict.
- */
-export type CaseLastResult = ScenarioLastResultSummary & {
-  durationInMs?: number | null;
-  totalCost?: number | null;
-};
+/** The last result of a case, as the aggregate answers it. */
+export type CaseLastResult = ScenarioLastResultSummary;
 
 const COLUMN_COUNT = 4;
 
@@ -64,13 +57,14 @@ export type CasesTableProps = {
   /** The test suites a case can be moved into. */
   suites: TestSuiteEntry[];
   canManage: boolean;
-  /** The agent each case last ran against, so the Run dialog opens on it. */
-  targetOf: (caseId: string) => TargetValue;
   runningCaseId?: string | null;
   onSelectSuite: (suiteId: string) => void;
   onRowClick: (testCase: TestCase) => void;
-  onRun: (testCase: TestCase, target: TargetValue) => void;
+  /** Opens the run dialog for the case. */
+  onRunCase: (testCase: TestCase) => void;
   onEdit: (testCase: TestCase) => void;
+  /** Opens the version history drawer of the case. */
+  onHistory: (testCase: TestCase) => void;
   onDuplicate: (testCase: TestCase) => void;
   onMoveToSuite: (testCase: TestCase, suiteId: string | null) => void;
   onOpenLastRun: (testCase: TestCase) => void;
@@ -85,12 +79,12 @@ export function CasesTable({
   authorNameById,
   suites,
   canManage,
-  targetOf,
   runningCaseId,
   onSelectSuite,
   onRowClick,
-  onRun,
+  onRunCase,
   onEdit,
+  onHistory,
   onDuplicate,
   onMoveToSuite,
   onOpenLastRun,
@@ -117,12 +111,12 @@ export function CasesTable({
             authorNameById={authorNameById}
             suites={suites}
             canManage={canManage}
-            targetOf={targetOf}
             runningCaseId={runningCaseId}
             onSelectSuite={onSelectSuite}
             onRowClick={onRowClick}
-            onRun={onRun}
+            onRunCase={onRunCase}
             onEdit={onEdit}
+            onHistory={onHistory}
             onDuplicate={onDuplicate}
             onMoveToSuite={onMoveToSuite}
             onOpenLastRun={onOpenLastRun}
@@ -147,12 +141,12 @@ function CaseGroupRows({
   authorNameById,
   suites,
   canManage,
-  targetOf,
   runningCaseId,
   onSelectSuite,
   onRowClick,
-  onRun,
+  onRunCase,
   onEdit,
+  onHistory,
   onDuplicate,
   onMoveToSuite,
   onOpenLastRun,
@@ -194,11 +188,11 @@ function CaseGroupRows({
           }
           suites={suites}
           canManage={canManage}
-          target={targetOf(testCase.id)}
           isRunning={runningCaseId === testCase.id}
           onRowClick={onRowClick}
-          onRun={onRun}
+          onRunCase={onRunCase}
           onEdit={onEdit}
+          onHistory={onHistory}
           onDuplicate={onDuplicate}
           onMoveToSuite={onMoveToSuite}
           onOpenLastRun={onOpenLastRun}
@@ -217,11 +211,11 @@ function CaseRow({
   authorName,
   suites,
   canManage,
-  target,
   isRunning,
   onRowClick,
-  onRun,
+  onRunCase,
   onEdit,
+  onHistory,
   onDuplicate,
   onMoveToSuite,
   onOpenLastRun,
@@ -234,11 +228,11 @@ function CaseRow({
   authorName?: string;
   suites: TestSuiteEntry[];
   canManage: boolean;
-  target: TargetValue;
   isRunning: boolean;
   onRowClick: (testCase: TestCase) => void;
-  onRun: (testCase: TestCase, target: TargetValue) => void;
+  onRunCase: (testCase: TestCase) => void;
   onEdit: (testCase: TestCase) => void;
+  onHistory: (testCase: TestCase) => void;
   onDuplicate: (testCase: TestCase) => void;
   onMoveToSuite: (testCase: TestCase, suiteId: string | null) => void;
   onOpenLastRun: (testCase: TestCase) => void;
@@ -256,6 +250,7 @@ function CaseRow({
           <Text fontSize="sm" fontWeight="medium" truncate>
             {testCase.name}
           </Text>
+          <CaseVersionChip version={testCase.version} />
           <TagList labels={testCase.labels} tone="pastel" />
         </HStack>
       </Table.Cell>
@@ -277,9 +272,8 @@ function CaseRow({
           {canManage && (
             <RunCaseButton
               caseName={testCase.name}
-              initialTarget={target}
               isRunning={isRunning}
-              onRun={(chosen) => onRun(testCase, chosen)}
+              onOpen={() => onRunCase(testCase)}
             />
           )}
           <CaseRowActionsMenu
@@ -288,6 +282,7 @@ function CaseRow({
             canManage={canManage}
             hasLastRun={!!lastResult}
             onEdit={onEdit}
+            onHistory={onHistory}
             onDuplicate={onDuplicate}
             onMoveToSuite={onMoveToSuite}
             onOpenLastRun={onOpenLastRun}
@@ -360,6 +355,7 @@ function CaseRowActionsMenu({
   canManage,
   hasLastRun,
   onEdit,
+  onHistory,
   onDuplicate,
   onMoveToSuite,
   onOpenLastRun,
@@ -370,6 +366,7 @@ function CaseRowActionsMenu({
   canManage: boolean;
   hasLastRun: boolean;
   onEdit: (testCase: TestCase) => void;
+  onHistory: (testCase: TestCase) => void;
   onDuplicate: (testCase: TestCase) => void;
   onMoveToSuite: (testCase: TestCase, suiteId: string | null) => void;
   onOpenLastRun: (testCase: TestCase) => void;
@@ -453,6 +450,15 @@ function CaseRowActionsMenu({
             Open last run
           </Menu.Item>
         )}
+        <Menu.Item
+          value="history"
+          onClick={(event) => {
+            stop(event);
+            onHistory(testCase);
+          }}
+        >
+          History
+        </Menu.Item>
         {canManage && (
           <Menu.Item
             value="archive"

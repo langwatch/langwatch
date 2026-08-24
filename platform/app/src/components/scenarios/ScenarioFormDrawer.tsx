@@ -11,7 +11,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { generate } from "@langwatch/ksuid";
-import { Lock } from "lucide-react";
+import { History, Lock } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   type FieldErrors,
@@ -19,10 +19,12 @@ import {
   useFormState,
   useWatch,
 } from "react-hook-form";
+import { CaseVersionChip } from "~/components/agent-testing/shared/CaseVersionChip";
 import {
   applyHandledErrorToForm,
   FormServerError,
   HandledErrorState,
+  readHandledError,
   showErrorToast,
 } from "~/features/errors";
 import type { Scenario } from "~/generated/prisma/client";
@@ -149,6 +151,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const scenarioId = props.scenarioId;
   const isAgentTesting = props.variant === "agent-testing";
 
+  // A save that lost a race: somebody else stored a newer version while this
+  // form held an older one. The editor offers the reload; nothing is written.
+  const [staleVersion, setStaleVersion] = useState<number | null>(null);
+  // Remounts the form after a stale reload so it reads the fresh record.
+  const [reloadNonce, setReloadNonce] = useState(0);
+
   // Target selection with localStorage persistence
   const { target: persistedTarget, setTarget: persistTarget } =
     useScenarioTarget(scenarioId);
@@ -233,6 +241,10 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   // stays as it is rather than being replaced by an error with their edits
   // inside it.
   const hasReadFailed = !!scenarioId && isScenarioReadFailed && !scenario;
+  // The version this form is editing. A save sends it as the expected
+  // version, so a save over somebody else's newer save is refused rather
+  // than written.
+  const loadedVersion = scenario?.version ?? null;
   const createMutation = api.scenarios.create.useMutation({
     onSuccess: (data: Scenario) => {
       void utils.scenarios.getAll.invalidate({ projectId: project?.id ?? "" });
@@ -261,6 +273,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       props.onSuccess?.(data);
     },
     onError: (error) => {
+      const handled = readHandledError(error);
+      if (handled?.code === "scenario_stale_version") {
+        const current = handled.meta.currentVersion;
+        setStaleVersion(typeof current === "number" ? current : 0);
+        return;
+      }
       if (
         formInstance &&
         applyHandledErrorToForm({
@@ -314,6 +332,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           id: scenarioId,
           ...data,
           ...(models ?? {}),
+          // Only the Agent Testing editor guards against a lost race; the
+          // other write surfaces save over whatever is there, as they always
+          // did.
+          ...(isAgentTesting && loadedVersion !== null
+            ? { expectedVersion: loadedVersion }
+            : {}),
         });
       } catch {
         // Error toast already surfaced by updateMutation.onError; return null
@@ -321,7 +345,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         return null;
       }
     },
-    [updateMutation],
+    [updateMutation, isAgentTesting, loadedVersion],
   );
 
   const createScenario = useCallback(
@@ -607,9 +631,18 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
               this off the loaded record alone retitled the drawer "Create
               Scenario" for the whole of the read. */}
           <VStack align="start" gap={1}>
-            <Heading size="md">
-              {scenarioId || scenario ? "Edit Scenario" : "Create Scenario"}
-            </Heading>
+            {isAgentTesting ? (
+              <HStack gap={2}>
+                <Heading size="md">
+                  {scenarioId || scenario ? "Edit Scenario" : "Create Scenario"}
+                </Heading>
+                <CaseVersionChip version={scenario?.version} />
+              </HStack>
+            ) : (
+              <Heading size="md">
+                {scenarioId || scenario ? "Edit Scenario" : "Create Scenario"}
+              </Heading>
+            )}
             {isAgentTesting && (
               <Text fontSize="sm" color="fg.muted">
                 {AGENT_TESTING_EDITOR_DESCRIPTION}
@@ -636,15 +669,27 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
               ) : (
                 <>
                   {formInstance && <FormServerError form={formInstance} />}
+                  {staleVersion !== null && (
+                    <StaleVersionNotice
+                      currentVersion={staleVersion}
+                      onReload={() => {
+                        void (async () => {
+                          await refetchScenario();
+                          setStaleVersion(null);
+                          setReloadNonce((nonce) => nonce + 1);
+                        })();
+                      }}
+                    />
+                  )}
                   {isAgentTesting ? (
                     <ScenarioFormWithSuites
-                      key={scenarioId ?? "new"}
+                      key={`${scenarioId ?? "new"}-${reloadNonce}`}
                       defaultValues={defaultValues}
                       formRef={setFormRef}
                     />
                   ) : (
                     <ScenarioForm
-                      key={scenarioId ?? "new"}
+                      key={`${scenarioId ?? "new"}-${reloadNonce}`}
                       defaultValues={defaultValues}
                       formRef={setFormRef}
                     />
@@ -670,6 +715,21 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
             </HStack>
           )}
           <HStack gap={2} flexShrink={0}>
+            {isAgentTesting && scenarioId && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  openDrawer("scenarioVersionHistory", {
+                    urlParams: { scenarioId },
+                  })
+                }
+                data-testid="editor-history"
+              >
+                <History size={14} />
+                History
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={onClose}>
               Cancel
             </Button>
@@ -783,6 +843,47 @@ function ScenarioFormWithSuites({
       formRef={formRef}
       folderOptions={folderOptions}
     />
+  );
+}
+
+/**
+ * Says the case changed since it was loaded, and offers the reload.
+ *
+ * The refused save wrote nothing, so reloading is safe; the person reads the
+ * newer version and applies their change over it.
+ *
+ * @see specs/scenarios/scenario-versioning.feature
+ */
+function StaleVersionNotice({
+  currentVersion,
+  onReload,
+}: {
+  currentVersion: number;
+  onReload: () => void;
+}) {
+  return (
+    <VStack
+      align="start"
+      gap={2}
+      borderWidth="1px"
+      borderColor="orange.solid"
+      borderRadius="lg"
+      padding={3}
+      marginBottom={4}
+      data-testid="scenario-stale-version"
+    >
+      <Text fontSize="sm" fontWeight="medium">
+        This test case changed since it was opened
+      </Text>
+      <Text fontSize="xs" color="fg.muted">
+        Somebody else saved{" "}
+        {currentVersion > 0 ? `version ${currentVersion}` : "a newer version"}{" "}
+        while this one was open. Nothing was written.
+      </Text>
+      <Button size="xs" variant="outline" onClick={onReload}>
+        Reload the newer version
+      </Button>
+    </VStack>
   );
 }
 

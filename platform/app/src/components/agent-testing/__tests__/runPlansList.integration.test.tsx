@@ -151,7 +151,7 @@ describe("the Test Runs list", () => {
     expect(plans[plans.length - 1]?.name).toBe("One-off runs");
   });
 
-  /** @scenario "The v2 Test Runs list names the internal set \"One-off runs\"" */
+  /** @scenario The v2 Test Runs list names the internal set "One-off runs" */
   it("names the internal set One-off runs and marks it as the one-off place", () => {
     const plans = buildRunPlans({
       projectId: PROJECT_ID,

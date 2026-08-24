@@ -553,7 +553,6 @@ const LEGACY_INERT: string[] = [
   // phase. Every scenario is @unimplemented on purpose, which is why the file
   // enforces none. Remove this entry when the restore path lands and the
   // scenarios take their @unit / @integration tags.
-  "specs/scenarios/scenario-version-restore.feature",
   "specs/secrets/secrets-manager.feature",
   // Helm chart behaviour, verified by charts/langwatch/tests/e2e-overlays.sh.
   // The checker now scans that directory (DEFAULT_SHELL_TEST_ROOTS), so these

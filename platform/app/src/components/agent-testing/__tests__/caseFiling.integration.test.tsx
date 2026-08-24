@@ -81,6 +81,7 @@ vi.mock("~/utils/api", () => ({
         archive: { useMutation: mutation(vi.fn()) },
       },
       getSummaries: { useQuery: emptyQuery },
+      update: { useMutation: mutation(vi.fn()) },
       run: { useMutation: mutation(vi.fn()) },
       runAll: { useMutation: mutation(mockRunAll) },
     },
@@ -94,6 +95,10 @@ vi.mock("~/utils/api", () => ({
 
 vi.mock("~/hooks/useRunScenario", () => ({
   useRunScenario: () => ({ runScenario: mockRunScenario, isRunning: false }),
+}));
+
+vi.mock("~/hooks/useModelProvidersSettings", () => ({
+  useModelProvidersSettings: () => ({ hasEnabledProviders: true }),
 }));
 
 vi.mock("~/hooks/useCan", () => ({
@@ -246,9 +251,8 @@ describe("the Test cases tab", () => {
 
     await user.click(screen.getByRole("button", { name: "Run Double charge" }));
     const dialog = await screen.findByTestId("run-case-dialog");
-    await user.click(within(dialog).getByText("Select a prompt or agent..."));
-    await user.click(await screen.findByText("prod-agent"));
-    await user.click(within(dialog).getByRole("button", { name: "Start run" }));
+    await user.click(within(dialog).getByTestId("run-dialog-agent-agent_1"));
+    await user.click(within(dialog).getByTestId("run-dialog-run"));
 
     // A single case run goes through scenarios.run, which writes into the
     // project's own internal set. That set is what the Test Runs list reads as
