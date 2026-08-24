@@ -1663,6 +1663,67 @@ const presentations = {
     title: "Only a verified sign-in method can be primary",
     describe: () => "Verify this sign-in method first, then make it primary.",
   },
+  identity_detach_strands_user: {
+    // Covers both shapes of the same problem: nothing verified left at all,
+    // and nothing left that a recovery message could reach. The remedy is
+    // the same either way, so the copy names the one that always works.
+    title: "You'd have no way back into your account",
+    describe: () =>
+      "This is your last way in, or the last one we could reach you at. Add a verified email address first, then remove this one.",
+  },
+  identity_mfa_code_invalid: {
+    // Deliberately says nothing about whether two-step verification is even
+    // set up on this account. A wrong code and a code for an enrollment
+    // nobody holds read identically here, on purpose.
+    title: "That code didn't work",
+    describe: () =>
+      "Check your authenticator app for the current code and enter it again.",
+  },
+  identity_mfa_enrollment_expired: {
+    title: "That setup took too long",
+    describe: () =>
+      "Start setting up two-step verification again, and scan the new code.",
+  },
+  identity_mfa_locked_out: {
+    title: "Too many incorrect codes",
+    describe: () =>
+      "Wait a few minutes and try again. If you've lost your authenticator, use a backup code or ask an administrator to reset it.",
+  },
+  identity_mfa_backup_codes_exhausted: {
+    title: "You've used every backup code",
+    describe: () =>
+      "Sign in with your authenticator app and generate a new set, or ask an administrator to reset two-step verification for you.",
+  },
+  identity_mfa_required_by_organization: {
+    title: "An organization you belong to requires two-step verification",
+    describe: () =>
+      "You can't turn it off while you're a member. Ask an administrator to lift the requirement, or leave the organization first.",
+  },
+  identity_mfa_enrollment_required: {
+    // Not an authentication failure: nobody is signed out and every other
+    // organization still works. The copy has to make that obvious, or people
+    // read it as a session problem and try signing in again.
+    title: "This organization requires two-step verification",
+    describe: () =>
+      "Set up two-step verification to continue here. You're still signed in, and your other organizations are unaffected.",
+  },
+  identity_passkey_ceremony_failed: {
+    title: "That passkey attempt didn't finish",
+    describe: () =>
+      "It may have been cancelled or timed out. Try again, or use another way to sign in.",
+  },
+  identity_passkey_not_recognized: {
+    // Same answer whether the credential belongs to somebody else or to
+    // nobody: this endpoint does not tell callers which passkeys exist.
+    title: "We couldn't use that passkey",
+    describe: () =>
+      "Try again, or sign in another way and check which passkeys are on your account.",
+  },
+  cannot_impersonate_without_second_factor: {
+    title: "Set up two-step verification first",
+    describe: () =>
+      "This organization requires two-step verification, so viewing it as another person requires it on your own account too.",
+  },
   sso_connection_invalid_transition: {
     title: "This single sign-on connection has moved on",
     describe: () =>
