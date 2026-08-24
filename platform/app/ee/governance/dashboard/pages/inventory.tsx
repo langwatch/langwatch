@@ -9,6 +9,7 @@ import {
   Heading,
   HStack,
   Input,
+  NativeSelect,
   Spacer,
   Spinner,
   Tabs,
@@ -1455,6 +1456,119 @@ interface FieldDef {
    * every advanced field untouched must always produce a working source.
    */
   advanced?: boolean;
+  /**
+   * How the field is rendered. Absent means a text input.
+   *
+   * A field only earns a `select` when its domain is closed and small enough
+   * that showing it beats describing it — the point is to move the domain out
+   * of the hint and into the control, so a wrong value is unreachable rather
+   * than merely rejected. `date` is for values the admin thinks of as a day.
+   */
+  control?: "select" | "date";
+  /**
+   * The choices, for `control: "select"`.
+   *
+   * Takes the sibling field values because a domain can depend on them: the
+   * Anthropic cost report accepts no bucket width at all, and offering one
+   * there would offer a value the builder refuses.
+   */
+  options?: (values: Record<string, string>) => readonly FieldOption[];
+  /**
+   * A hint that replaces `hint` for some sibling-field states. Same reason as
+   * `options` — "cost is always daily" is only true on a cost source.
+   */
+  contextHint?: (values: Record<string, string>) => string | undefined;
+}
+
+/** One entry in a `control: "select"` field's list. */
+export interface FieldOption {
+  value: string;
+  label: string;
+}
+
+/**
+ * What to render for a field, once its sibling values are known.
+ *
+ * Kept separate from `parserFieldPresentation`, which answers the create-vs-edit
+ * question and needs no sibling context. This one answers "what control, with
+ * what choices", and is the only place a select's option list comes from — the
+ * render, the staleness check in `reconcileParserValues` and the tests all read
+ * the same list, so a domain cannot drift between what is offered and what is
+ * accepted.
+ */
+export type FieldControl =
+  | { kind: "text"; hint?: string }
+  | { kind: "date"; hint?: string }
+  | { kind: "select"; options: readonly FieldOption[]; hint?: string };
+
+export function fieldControl({
+  field,
+  values,
+}: {
+  field: FieldDef;
+  values: Record<string, string>;
+}): FieldControl {
+  const hint = field.contextHint?.(values);
+  if (field.control === "date") return { kind: "date", hint };
+  if (field.control === "select") {
+    return { kind: "select", options: field.options?.(values) ?? [], hint };
+  }
+  return { kind: "text", hint };
+}
+
+/**
+ * The composer values with any select field cleared whose held value is not
+ * among the choices its own control offers.
+ *
+ * The case this exists for: an admin picks a bucket width of `1h`, then
+ * switches the report to `cost`. The width is now a value `validBucketWidth`
+ * refuses outright — not ignores — so leaving it in place would reject the
+ * whole save for a field the form no longer even offers. Clearing it is the
+ * only outcome that matches what the admin is being shown.
+ *
+ * Deliberately narrow: text and date fields are never touched, because their
+ * domains are not enumerable and "not in the list" means nothing there.
+ */
+export function reconcileParserValues({
+  sourceType,
+  values,
+}: {
+  sourceType: SourceType;
+  values: Record<string, string>;
+}): Record<string, string> {
+  let next = values;
+  for (const field of PARSER_FIELDS[sourceType] ?? []) {
+    const held = values[field.key];
+    if (!held) continue;
+    const control = fieldControl({ field, values });
+    if (control.kind !== "select") continue;
+    if (control.options.some((option) => option.value === held)) continue;
+    if (next === values) next = { ...values };
+    next[field.key] = "";
+  }
+  return next;
+}
+
+/**
+ * The `YYYY-MM-DD` an `<input type="date">` can display for a stored value.
+ *
+ * Every backfill start that reaches storage has been through
+ * `normalizeStartingAt`, which returns an ISO instant — so the edit form always
+ * seeds an instant, never a bare date, and a date input handed one renders
+ * blank. Blank reads as "no backfill start configured", and saving from there
+ * would drop a setting the admin never touched.
+ *
+ * Truncating to the UTC calendar date is display-only: the held value is left
+ * alone until the admin picks a different day, so an instant that carries a
+ * time of day survives an edit to any other field.
+ */
+export function dateInputValue(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  const parsed = Date.parse(trimmed);
+  if (Number.isNaN(parsed)) return "";
+  return new Date(parsed).toISOString().slice(0, 10);
 }
 
 /**
@@ -1464,6 +1578,49 @@ interface FieldDef {
  * one". Everything else — validation, masking, storage routing — is shared.
  */
 export type ParserConfigMode = "create" | "edit";
+
+/**
+ * The bucket widths Anthropic's usage report accepts, newest-grained first.
+ *
+ * One list, read by both the picker and `validBucketWidth`, so the form cannot
+ * offer a width the builder then refuses. The adapter's own
+ * `anthropicAdminPullConfigSchema` declares the same domain server-side and the
+ * unit test asserts the two still agree — that cross-check is what keeps this
+ * from becoming a second source of truth rather than a projection of the first.
+ */
+const ANTHROPIC_BUCKET_WIDTHS = ["1m", "1h", "1d"] as const;
+
+const ANTHROPIC_BUCKET_WIDTH_LABELS: Record<string, string> = {
+  "1m": "1m — per minute",
+  "1h": "1h — hourly",
+  "1d": "1d — daily",
+};
+
+/**
+ * The bucket widths offered for the report currently selected.
+ *
+ * The cost report gets the default entry alone. Not politeness: the puller
+ * pins `COST_REPORT_BUCKET_WIDTH` and ignores `config.bucketWidth`, so
+ * `validBucketWidth` rejects any width on a cost source — offering one would
+ * offer a value whose only effect is to fail the save.
+ */
+function anthropicBucketWidthOptions(
+  values: Record<string, string>,
+): readonly FieldOption[] {
+  const isUsage = (values.report ?? "").trim().toLowerCase() === "usage";
+  const fallback: FieldOption = {
+    value: "",
+    label: isUsage ? "Default (1d — daily)" : "1d — daily",
+  };
+  if (!isUsage) return [fallback];
+  return [
+    fallback,
+    ...ANTHROPIC_BUCKET_WIDTHS.map((width) => ({
+      value: width,
+      label: ANTHROPIC_BUCKET_WIDTH_LABELS[width] ?? width,
+    })),
+  ];
+}
 
 export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
   // No parser-config fields for generic OTel sources today - the
@@ -1576,22 +1733,39 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
     },
     {
       key: "report",
-      label: "Report (usage or cost)",
-      placeholder: "cost",
+      label: "Report",
+      placeholder: "",
       hint: "Exactly one per source. `cost` carries Anthropic's own reported spend (Priority Tier usage is excluded, so it is close to but not the invoice); `usage` pulls token counts that we price ourselves. Never create both reports for the same organization — the same spend would be counted twice.",
       required: true,
+      control: "select",
+      // The empty first entry is load-bearing, not decorative: a controlled
+      // <select> holding "" with no "" option displays its first real option,
+      // so the admin would be shown a report they never chose on a field the
+      // form marks required.
+      options: () => [
+        { value: "", label: "Select a report…" },
+        { value: "usage", label: "Usage — token counts, priced by us" },
+        { value: "cost", label: "Cost — Anthropic's reported spend" },
+      ],
     },
     {
       key: "bucketWidth",
-      label: "Bucket width (optional, usage report only)",
-      placeholder: "1d",
-      hint: "1m, 1h or 1d. Only affects the usage report; cost is always daily. Default 1d.",
+      label: "Bucket width",
+      placeholder: "",
+      hint: "How finely the usage report is bucketed. Only the usage report reads this; cost is always daily.",
+      control: "select",
+      options: anthropicBucketWidthOptions,
+      contextHint: (values) =>
+        (values.report ?? "").trim().toLowerCase() === "cost"
+          ? "The cost report is always daily — Anthropic buckets it that way and the puller pins it, so there is nothing to choose here."
+          : undefined,
     },
     {
       key: "startingAt",
       label: "Backfill start (optional)",
-      placeholder: "2026-08-01",
-      hint: "The date the first run reads from: `2026-08-01`, or an instant carrying a timezone (`2026-08-01T00:00:00Z`). A time without a timezone is rejected rather than read as yours. Empty = 3 calendar days back at midnight UTC for cost, 1 calendar day back at midnight UTC for usage.",
+      placeholder: "",
+      hint: "The day the first run reads from. Later runs follow the cursor instead. Empty = 3 calendar days back at midnight UTC for cost, 1 calendar day back at midnight UTC for usage.",
+      control: "date",
     },
   ],
   databricks_genie: [
@@ -1902,7 +2076,9 @@ function validBucketWidth(
 ): string | null | undefined {
   if (!raw) return undefined;
   if (report !== "usage") return null;
-  return ["1m", "1h", "1d"].includes(raw) ? raw : null;
+  return (ANTHROPIC_BUCKET_WIDTHS as readonly string[]).includes(raw)
+    ? raw
+    : null;
 }
 
 /** Whether y-m-d is a date that exists, rather than one Date would roll forward. */
@@ -2060,6 +2236,102 @@ export function parserFieldPresentation({
   };
 }
 
+/**
+ * The input itself, chosen by control kind.
+ *
+ * Split from `ParserConfigField` so the label, the required marker and the hint
+ * are decided in one place and the control in another — the two were growing a
+ * shared ternary chain, which is how a field ends up rendering one control and
+ * labelling another.
+ */
+function ParserFieldInput({
+  control,
+  isMultiline,
+  isSecret,
+  placeholder,
+  readOnly,
+  value,
+  onChange,
+}: {
+  control: FieldControl;
+  isMultiline: boolean;
+  isSecret: boolean;
+  placeholder: string;
+  readOnly: boolean;
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  if (isMultiline) {
+    return (
+      <Textarea
+        size="sm"
+        rows={6}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        fontFamily="mono"
+        readOnly={readOnly}
+      />
+    );
+  }
+
+  if (control.kind === "select") {
+    // A native select has no readOnly — HTML ignores the attribute there, and
+    // `disabled` is the only thing that would stop the change, at the cost of
+    // dropping the field out of the tab order. So a locked choice is shown as
+    // its own label in a readOnly input instead: genuinely unchangeable, and
+    // still reachable and readable, which is the rule the branches below keep.
+    if (readOnly) {
+      const chosen = control.options.find((option) => option.value === value);
+      return <Input size="sm" value={chosen?.label ?? value} readOnly />;
+    }
+    return (
+      <NativeSelect.Root size="sm">
+        <NativeSelect.Field
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          {control.options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </NativeSelect.Field>
+        <NativeSelect.Indicator />
+      </NativeSelect.Root>
+    );
+  }
+
+  if (control.kind === "date") {
+    return (
+      <Input
+        size="sm"
+        type="date"
+        // Display-only truncation — see `dateInputValue`. The held value stays
+        // whatever was stored until the admin picks a different day.
+        value={dateInputValue(value)}
+        onChange={(e) => onChange(e.target.value)}
+        readOnly={readOnly}
+      />
+    );
+  }
+
+  return (
+    <Input
+      size="sm"
+      type={isSecret ? "password" : "text"}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      // readOnly, never disabled: a locked field is shown precisely so the
+      // admin can read what it holds, and `disabled` drops it out of the tab
+      // order where a keyboard or screen-reader user cannot reach it. The
+      // Textarea branch above says the same thing.
+      readOnly={readOnly}
+    />
+  );
+}
+
 function ParserConfigField({
   field,
   values,
@@ -2075,9 +2347,8 @@ function ParserConfigField({
 }) {
   const { isSecret, isMultiline, isRequired, hint, placeholder } =
     parserFieldPresentation({ field, mode });
-  const value = values[field.key] ?? "";
-  const handleChange = (next: string) =>
-    onChange({ ...values, [field.key]: next });
+  const control = fieldControl({ field, values });
+  const shownHint = control.hint ?? hint;
 
   return (
     <VStack align="stretch" gap={1}>
@@ -2089,33 +2360,18 @@ function ParserConfigField({
           </Text>
         )}
       </Text>
-      {isMultiline ? (
-        <Textarea
-          size="sm"
-          rows={6}
-          value={value}
-          onChange={(e) => handleChange(e.target.value)}
-          placeholder={placeholder}
-          fontFamily="mono"
-          readOnly={readOnly}
-        />
-      ) : (
-        <Input
-          size="sm"
-          type={isSecret ? "password" : "text"}
-          value={value}
-          onChange={(e) => handleChange(e.target.value)}
-          placeholder={placeholder}
-          // readOnly, never disabled: a locked field is shown precisely so the
-          // admin can read what it holds, and `disabled` drops it out of the
-          // tab order where a keyboard or screen-reader user cannot reach it.
-          // The Textarea branch above says the same thing.
-          readOnly={readOnly}
-        />
-      )}
-      {hint && (
+      <ParserFieldInput
+        control={control}
+        isMultiline={isMultiline}
+        isSecret={isSecret}
+        placeholder={placeholder}
+        readOnly={readOnly}
+        value={values[field.key] ?? ""}
+        onChange={(next) => onChange({ ...values, [field.key]: next })}
+      />
+      {shownHint && (
         <Text fontSize="xs" color="fg.muted">
-          {hint}
+          {shownHint}
         </Text>
       )}
     </VStack>
@@ -2141,6 +2397,16 @@ export function ParserConfigFields({
    */
   readOnlyKeys?: readonly string[];
 }) {
+  // A held value can stop being offered without the admin touching its field —
+  // switching the Anthropic report to `cost` retires every bucket width. Left
+  // in place it would reject the save for a field the form no longer shows a
+  // choice for, so the correction is pushed back up rather than rendered
+  // around.
+  useEffect(() => {
+    const reconciled = reconcileParserValues({ sourceType, values });
+    if (reconciled !== values) onChange(reconciled);
+  }, [sourceType, values, onChange]);
+
   const fields = PARSER_FIELDS[sourceType];
   const primaryFields = fields.filter((f) => !f.advanced);
   const advancedFields = fields.filter((f) => f.advanced);
