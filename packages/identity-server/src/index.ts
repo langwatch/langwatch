@@ -73,6 +73,16 @@ export type {
   IdentityVerificationRepository,
 } from "./identity-verification.repository";
 export { IdentityService } from "./identity.service";
+export {
+  type SignInBreakGlassLimiter,
+  type SignInDomainRoutingPort,
+  type SignInMethodPolicyPort,
+  type SignInRouteRequest,
+  SignInRouterService,
+  type SignInRouterDeps,
+  type SignInRoutingRecord,
+  type SignInRoutingRecorder,
+} from "./signin-router.service";
 export type {
   IdentityAdoptionWrites,
   IdentityCeremonyWrites,

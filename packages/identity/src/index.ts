@@ -76,6 +76,28 @@ export {
 export { primaryEmailOf } from "./primary-email";
 export { reduceIdentity } from "./reduce";
 export {
+  compareToLegacy,
+  isLocalSignInMethod,
+  legacyProviderOf,
+  type RoutableConnection,
+  type RoutingDecision,
+  type RoutingIdentifier,
+  type RoutingInput,
+  routeSignIn,
+  routingIdentifierOf,
+  SIGNIN_METHOD_KINDS,
+  SIGNIN_ROUTING_OUTCOMES,
+  SIGNIN_ROUTING_REASON_CODES,
+  SSO_CONNECTION_ROUTING_STATES,
+  type ShadowComparison,
+  type SignInMethod,
+  type SignInMethodKind,
+  type SignInMethodPolicy,
+  type SignInRoutingOutcome,
+  type SignInRoutingReasonCode,
+  type SsoConnectionRoutingState,
+} from "./signin-routing";
+export {
   arrivalStateForProvider,
   IDENTIFIER_LIFECYCLE_STATES,
   IDENTIFIER_PROVIDERS,
