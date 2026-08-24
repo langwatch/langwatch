@@ -2,8 +2,11 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -288,10 +291,72 @@ func (o *Orchestrator) ensurePortlessProxy() error {
 			return fmt.Errorf("could not install portless automatically (%w) — install it by hand (npm install -g portless) and re-run `haven up`", err)
 		}
 	}
+	if err := preflightPortlessCA(); err != nil {
+		return err
+	}
 	if err := o.proxy.EnsureReady(); err != nil {
 		return fmt.Errorf("could not start the portless proxy: %w", err)
 	}
 	return nil
+}
+
+// portlessCASerialPath is the CA serial openssl maintains while signing the
+// per-host certificates portless serves.
+func portlessCASerialPath(home string) string {
+	return filepath.Join(home, ".portless", "ca.srl")
+}
+
+// preflightPortlessCA stops the up when portless's CA serial file exists but
+// cannot be written.
+//
+// openssl WRITES the serial as it signs (`-CAserial`), so a ca.srl left
+// root-owned by an earlier sudo run makes every per-host signing fail — and
+// the failure is silent: portless leaves a ZERO-BYTE .pem behind instead of
+// erroring, the proxy then serves that hostname with no certificate at all,
+// and the handshake dies with "no peer certificate available".
+//
+// That symptom is indistinguishable from the SAN gap of #7117, which is
+// already fixed (per-stack SANs ship in the cert request). Without this check
+// the next person reads the dead handshake as that bug returning and goes
+// looking for a fix that is already in the tree. Naming the real cause here is
+// the whole point.
+//
+// Reporting only, never repairing: the file is root-owned because something
+// outside haven ran as root, and deleting another user's files is not a dev
+// tool's call. An unreadable home dir or any non-permission error is left to
+// portless to report — this check answers one question and stays quiet
+// otherwise.
+func preflightPortlessCA() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil
+	}
+	return preflightPortlessCAIn(home)
+}
+
+// preflightPortlessCAIn is preflightPortlessCA against an explicit home, so the
+// check can be exercised without touching the developer's own ~/.portless.
+func preflightPortlessCAIn(home string) error {
+	srl := portlessCASerialPath(home)
+	if _, err := os.Stat(srl); err != nil {
+		// No serial yet — portless creates one owned by whoever runs it.
+		return nil
+	}
+	f, err := os.OpenFile(srl, os.O_WRONLY, 0)
+	if err == nil {
+		_ = f.Close()
+		return nil
+	}
+	if !errors.Is(err, fs.ErrPermission) {
+		return nil
+	}
+	return fmt.Errorf(
+		"portless's CA serial is not writable by you: %s\n"+
+			"openssl writes it while signing, so every per-host certificate comes out EMPTY and the proxy serves no certificate at all — the handshake failure looks exactly like the SAN bug of #7117, which is already fixed.\n"+
+			"Clear the root-owned leftovers and the empty certs they produced, then re-run `haven up` (no sudo needed — the directory is yours):\n"+
+			"  rm -f %s ~/.portless/proxy.tls\n"+
+			"  find ~/.portless/host-certs -name '*.pem' -size 0 -delete",
+		srl, srl)
 }
 
 // serviceEndpoint resolves how one routed service is actually reachable.
@@ -397,6 +462,9 @@ func (o *Orchestrator) prepareWorktree(ctx context.Context, p UpParams, st domai
 	if err := o.sup.RunOnce(ctx, "codegen", p.LwDir, "pnpm -s run start:prepare:files", env); err != nil {
 		o.log.Warn("codegen (start:prepare:files) failed (continuing)", zap.Error(err))
 	}
+	if err := o.ensureAPIBundle(ctx, p.LwDir, env); err != nil {
+		return err
+	}
 	// Migrations failing on an existing database is the one prep step that must
 	// STOP the up: continuing would boot the app onto a half-migrated schema,
 	// and silently dropping the data to get past it is never haven's call.
@@ -404,6 +472,36 @@ func (o *Orchestrator) prepareWorktree(ctx context.Context, p UpParams, st domai
 		return fmt.Errorf("migrations failed — nothing was dropped; fix the migration, or run `haven db reset` for a fresh database: %w", err)
 	}
 	o.runSeed(ctx, p, env)
+	return nil
+}
+
+// apiBundleRelPath is what `start:app` executes: the PRODUCTION server bundle.
+// Kept as one constant because the check below and the error it prints must
+// name the same file the lane will look for.
+var apiBundleRelPath = filepath.Join("dist", "server", "server.cjs")
+
+// ensureAPIBundle builds the app bundle when it is missing.
+//
+// The api lane runs `start:app` -> `node dist/server/server.cjs`, but nothing
+// else in the up produces that file: codegen writes generated SOURCE, the
+// migration step only touches the database, and dist/ is gitignored — so a
+// freshly-created worktree has no bundle at all. Without this the lane
+// crash-loops on MODULE_NOT_FOUND while the app (vite) lane sits behind its
+// /api/health ready-probe and never serves the hostname. The stack reports
+// itself up and then answers nothing, which is a much worse failure than a
+// slow first boot.
+//
+// Only the missing case builds. An existing bundle is left alone: rebuilding
+// on every `up` would add a minute to a bring-up for a file that only
+// server-side edits invalidate, and those already require a manual rebuild.
+func (o *Orchestrator) ensureAPIBundle(ctx context.Context, lwDir string, env []string) error {
+	if _, err := os.Stat(filepath.Join(lwDir, apiBundleRelPath)); err == nil {
+		return nil
+	}
+	fmt.Println("building the app bundle (missing — first `up` in this worktree)…")
+	if err := o.sup.RunOnce(ctx, "build", lwDir, "pnpm -s run build", env); err != nil {
+		return fmt.Errorf("the app bundle failed to build — the api lane runs %s and cannot start without it: %w", apiBundleRelPath, err)
+	}
 	return nil
 }
 
