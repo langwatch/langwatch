@@ -1,13 +1,20 @@
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
+import type { Session } from "~/server/auth";
 import { featureFlagService } from "../../featureFlag";
 import { FRONTEND_FEATURE_FLAGS } from "../../featureFlag/frontendFeatureFlags";
 import type { FeatureFlagKey } from "../../featureFlag/registry";
-import { isCurrentOrganizationMember } from "../rbac";
+import {
+  isCurrentOrganizationMember,
+  isCurrentProjectOrganizationMember,
+} from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const logger = createLogger("langwatch:feature-flag-router");
+
+/** What both membership filters need off the request, and nothing more. */
+type TargetingContext = { prisma: PrismaClient; session: Session };
 
 /**
  * The targeting identifiers the caller is actually allowed to be evaluated
@@ -36,10 +43,13 @@ const logger = createLogger("langwatch:feature-flag-router");
  * cost more than it buys. The cross-tenant answer is the one that mattered,
  * and that one is closed.
  */
-async function allowedTargeting(
-  ctx: { prisma: PrismaClient; session: { user: { id: string } } },
-  input: { projectId?: string; organizationId?: string },
-): Promise<{ projectId?: string; organizationId?: string }> {
+async function allowedTargeting({
+  ctx,
+  input,
+}: {
+  ctx: TargetingContext;
+  input: { projectId?: string; organizationId?: string };
+}): Promise<{ projectId?: string; organizationId?: string }> {
   const userId = ctx.session.user.id;
 
   const [organizationId, projectId] = await Promise.all([
@@ -52,7 +62,9 @@ async function allowedTargeting(
         }).then((member) => (member ? input.organizationId : undefined)),
     input.projectId === undefined
       ? Promise.resolve(undefined)
-      : allowedProjectId(ctx, userId, input.projectId),
+      : isCurrentProjectOrganizationMember(ctx, input.projectId).then(
+          (member) => (member ? input.projectId : undefined),
+        ),
   ]);
 
   return {
@@ -70,11 +82,15 @@ async function allowedTargeting(
  * multiple orgs. Resolve per-id; the user's org count is bounded by their
  * workspace list.
  */
-async function filterToMemberships(
-  ctx: { prisma: PrismaClient },
-  userId: string,
-  organizationIds: string[],
-): Promise<string[]> {
+async function filterToMemberships({
+  ctx,
+  userId,
+  organizationIds,
+}: {
+  ctx: { prisma: PrismaClient };
+  userId: string;
+  organizationIds: string[];
+}): Promise<string[]> {
   const memberships = await Promise.all(
     organizationIds.map((organizationId) =>
       isCurrentOrganizationMember({
@@ -85,29 +101,6 @@ async function filterToMemberships(
     ),
   );
   return organizationIds.filter((_, i) => memberships[i]);
-}
-
-/** The project id back, or `undefined` if the caller cannot be targeted by it. */
-async function allowedProjectId(
-  ctx: { prisma: PrismaClient },
-  userId: string,
-  projectId: string,
-): Promise<string | undefined> {
-  const project = await ctx.prisma.project.findUnique({
-    where: { id: projectId },
-    select: { team: { select: { organizationId: true } } },
-  });
-
-  const organizationId = project?.team.organizationId;
-  if (!organizationId) return undefined;
-
-  return (await isCurrentOrganizationMember({
-    prisma: ctx.prisma,
-    userId,
-    organizationId,
-  }))
-    ? projectId
-    : undefined;
 }
 
 const frontendFeatureFlagSchema = z.enum([...FRONTEND_FEATURE_FLAGS] as [
@@ -161,7 +154,7 @@ export const featureFlagRouter = createTRPCRouter({
     })
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
-      const targeting = await allowedTargeting(ctx, input);
+      const targeting = await allowedTargeting({ ctx, input });
 
       // Both the ids asked for and the ids that survived, because they are
       // different questions. Logging only the survivors makes a caller probing
@@ -256,11 +249,11 @@ export const featureFlagRouter = createTRPCRouter({
         return { enabled: false };
       }
 
-      const allowedOrganizationIds = await filterToMemberships(
+      const allowedOrganizationIds = await filterToMemberships({
         ctx,
         userId,
-        input.organizationIds,
-      );
+        organizationIds: input.organizationIds,
+      });
 
       if (allowedOrganizationIds.length === 0) {
         return { enabled: false };
@@ -313,11 +306,11 @@ export const featureFlagRouter = createTRPCRouter({
         return { enabledByOrganizationId: {} as Record<string, boolean> };
       }
 
-      const allowedOrganizationIds = await filterToMemberships(
+      const allowedOrganizationIds = await filterToMemberships({
         ctx,
         userId,
-        input.organizationIds,
-      );
+        organizationIds: input.organizationIds,
+      });
 
       const entries = await Promise.all(
         allowedOrganizationIds.map(

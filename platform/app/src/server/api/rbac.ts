@@ -1116,6 +1116,31 @@ export async function isCurrentOrganizationMember(args: {
   return (await getCurrentOrganizationRole(args)) !== null;
 }
 
+/**
+ * Whether the user is a current member of the organization that owns the
+ * project, with no regard for whether they could open the project.
+ *
+ * The tenancy half of a project check on its own: the same resolution
+ * {@link resolveProjectPermission} runs before it reads a single binding, and
+ * deliberately without the binding walk that decides actual access. For the
+ * targeting-input caller described on {@link isCurrentOrganizationMember},
+ * tenancy is the boundary that matters and a permission walk per call is not
+ * worth its cost.
+ *
+ * Shares {@link resolveProjectPermissionContext} rather than repeating the
+ * project -> team -> organization lookup, so an unknown project, a disabled
+ * seat, and a non-member all keep answering the same way here as they do on
+ * every permission path.
+ */
+export async function isCurrentProjectOrganizationMember(
+  ctx: { prisma: PrismaClient; session: Session | null },
+  projectId: string,
+): Promise<boolean> {
+  return !(
+    "refused" in (await resolveProjectPermissionContext(ctx, projectId))
+  );
+}
+
 /** A denial reached before any binding was read. */
 function refused(denialReason?: AuthzDenialReason): PermissionResult {
   return {

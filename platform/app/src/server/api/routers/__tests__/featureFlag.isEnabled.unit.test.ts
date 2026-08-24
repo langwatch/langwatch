@@ -77,10 +77,13 @@ const PROJECT_OWNER: Record<string, string> = {
  * outlives that, so a check that only asks whether the row exists still reads
  * a disabled seat as membership.
  */
-function buildMockPrisma(
-  memberOf: Set<string>,
+function buildMockPrisma({
+  memberOf,
   disabledIn = new Set<string>(),
-) {
+}: {
+  memberOf: Set<string>;
+  disabledIn?: Set<string>;
+}) {
   return {
     organizationUser: {
       findFirst: vi.fn(({ where }: any) => {
@@ -97,8 +100,14 @@ function buildMockPrisma(
     project: {
       findUnique: vi.fn(({ where }: any) => {
         const organizationId = PROJECT_OWNER[where.id];
+        // Both fields the real `select` asks for: the shared tenancy resolve
+        // refuses a project whose team it cannot name, so a mock that returns
+        // only the organization would drop every project id and make these
+        // tests pass for the wrong reason.
         return Promise.resolve(
-          organizationId ? { team: { organizationId } } : null,
+          organizationId
+            ? { team: { id: `team_of_${where.id}`, organizationId } }
+            : null,
         );
       }),
     },
@@ -136,7 +145,9 @@ describe("featureFlag.isEnabled", () => {
 
   describe("when the caller targets an organization they belong to", () => {
     it("evaluates the flag against it", async () => {
-      const caller = buildCaller(buildMockPrisma(new Set([OWN_ORG])));
+      const caller = buildCaller(
+        buildMockPrisma({ memberOf: new Set([OWN_ORG]) }),
+      );
       mockIsEnabled.mockResolvedValue(true);
 
       const result = await caller.isEnabled({
@@ -152,7 +163,9 @@ describe("featureFlag.isEnabled", () => {
   describe("when the caller targets an organization they do not belong to", () => {
     /** @scenario The single-flag check refuses to be targeted by someone else's ids */
     it("evaluates the flag without that organization, never passing it on", async () => {
-      const caller = buildCaller(buildMockPrisma(new Set([OWN_ORG])));
+      const caller = buildCaller(
+        buildMockPrisma({ memberOf: new Set([OWN_ORG]) }),
+      );
 
       await caller.isEnabled({ flag: FLAG, organizationId: FOREIGN_ORG });
 
@@ -164,10 +177,10 @@ describe("featureFlag.isEnabled", () => {
       mockIsEnabled.mockResolvedValue(false);
 
       const outsider = await buildCaller(
-        buildMockPrisma(new Set([OWN_ORG])),
+        buildMockPrisma({ memberOf: new Set([OWN_ORG]) }),
       ).isEnabled({ flag: FLAG, organizationId: FOREIGN_ORG });
       const member = await buildCaller(
-        buildMockPrisma(new Set([OWN_ORG])),
+        buildMockPrisma({ memberOf: new Set([OWN_ORG]) }),
       ).isEnabled({ flag: FLAG, organizationId: OWN_ORG });
 
       expect(outsider).toEqual(member);
@@ -179,7 +192,10 @@ describe("featureFlag.isEnabled", () => {
     /** @scenario A disabled seat is not a membership for flag targeting */
     it("drops the organization, though the membership row still exists", async () => {
       const caller = buildCaller(
-        buildMockPrisma(new Set([OWN_ORG]), new Set([OWN_ORG])),
+        buildMockPrisma({
+          memberOf: new Set([OWN_ORG]),
+          disabledIn: new Set([OWN_ORG]),
+        }),
       );
 
       await caller.isEnabled({ flag: FLAG, organizationId: OWN_ORG });
@@ -190,7 +206,9 @@ describe("featureFlag.isEnabled", () => {
 
   describe("when the caller targets a project", () => {
     it("keeps one owned by an organization they belong to", async () => {
-      const caller = buildCaller(buildMockPrisma(new Set([OWN_ORG])));
+      const caller = buildCaller(
+        buildMockPrisma({ memberOf: new Set([OWN_ORG]) }),
+      );
 
       await caller.isEnabled({ flag: FLAG, projectId: OWN_PROJECT });
 
@@ -198,7 +216,9 @@ describe("featureFlag.isEnabled", () => {
     });
 
     it("drops one owned by an organization they do not belong to", async () => {
-      const caller = buildCaller(buildMockPrisma(new Set([OWN_ORG])));
+      const caller = buildCaller(
+        buildMockPrisma({ memberOf: new Set([OWN_ORG]) }),
+      );
 
       await caller.isEnabled({ flag: FLAG, projectId: FOREIGN_PROJECT });
 
@@ -206,7 +226,9 @@ describe("featureFlag.isEnabled", () => {
     });
 
     it("drops one that does not exist, rather than passing the id through", async () => {
-      const caller = buildCaller(buildMockPrisma(new Set([OWN_ORG])));
+      const caller = buildCaller(
+        buildMockPrisma({ memberOf: new Set([OWN_ORG]) }),
+      );
 
       await caller.isEnabled({ flag: FLAG, projectId: UNKNOWN_PROJECT });
 
@@ -223,7 +245,9 @@ describe("featureFlag.isEnabled", () => {
      * completely. That pair is what the membership filter is for.
      */
     it("drops both, so a consistent pair buys the caller nothing", async () => {
-      const caller = buildCaller(buildMockPrisma(new Set([OWN_ORG])));
+      const caller = buildCaller(
+        buildMockPrisma({ memberOf: new Set([OWN_ORG]) }),
+      );
 
       await caller.isEnabled({
         flag: FLAG,
@@ -241,7 +265,7 @@ describe("featureFlag.isEnabled", () => {
 
   describe("when the caller sends no targeting identifiers", () => {
     it("evaluates the flag without reading any membership", async () => {
-      const prisma = buildMockPrisma(new Set([OWN_ORG]));
+      const prisma = buildMockPrisma({ memberOf: new Set([OWN_ORG]) });
       const caller = buildCaller(prisma);
 
       const result = await caller.isEnabled({ flag: FLAG });

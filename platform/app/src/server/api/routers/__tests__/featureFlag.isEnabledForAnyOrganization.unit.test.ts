@@ -68,10 +68,13 @@ const FLAG = "release_ui_ai_governance_enabled" as const;
  * survives that, which is the whole point of the distinction: a membership
  * check that only asks whether the row exists still says yes.
  */
-function buildMockPrisma(
-  memberOf: Set<string>,
+function buildMockPrisma({
+  memberOf,
   disabledIn = new Set<string>(),
-) {
+}: {
+  memberOf: Set<string>;
+  disabledIn?: Set<string>;
+}) {
   return {
     organizationUser: {
       findFirst: vi.fn(({ where }: any) => {
@@ -109,7 +112,7 @@ describe("featureFlag.isEnabledForAnyOrganization", () => {
   describe("when the user is a member of every input organization", () => {
     it("evaluates the flag for those organizations", async () => {
       const caller = buildCaller(
-        buildMockPrisma(new Set([OWN_ORG_A, OWN_ORG_B])),
+        buildMockPrisma({ memberOf: new Set([OWN_ORG_A, OWN_ORG_B]) }),
       );
       mockIsEnabled.mockImplementation(
         async (_flag, opts: any) => opts.organizationId === OWN_ORG_B,
@@ -131,7 +134,9 @@ describe("featureFlag.isEnabledForAnyOrganization", () => {
   describe("when the input mixes member and non-member organizations", () => {
     /** @scenario The cross-org flag check rejects arbitrary organization ids */
     it("silently filters non-member ids before evaluating the flag", async () => {
-      const caller = buildCaller(buildMockPrisma(new Set([OWN_ORG_A])));
+      const caller = buildCaller(
+        buildMockPrisma({ memberOf: new Set([OWN_ORG_A]) }),
+      );
       mockIsEnabled.mockImplementation(
         async (_flag, opts: any) => opts.organizationId === OWN_ORG_A,
       );
@@ -152,7 +157,7 @@ describe("featureFlag.isEnabledForAnyOrganization", () => {
 
   describe("when the user is a member of none of the input organizations", () => {
     it("returns enabled:false without evaluating the flag", async () => {
-      const caller = buildCaller(buildMockPrisma(new Set()));
+      const caller = buildCaller(buildMockPrisma({ memberOf: new Set() }));
 
       const result = await caller.isEnabledForAnyOrganization({
         flag: FLAG,
@@ -164,8 +169,12 @@ describe("featureFlag.isEnabledForAnyOrganization", () => {
     });
 
     it("returns the same shape as a member with the flag off, so the response cannot oracle membership", async () => {
-      const nonMemberCaller = buildCaller(buildMockPrisma(new Set()));
-      const memberCaller = buildCaller(buildMockPrisma(new Set([OWN_ORG_A])));
+      const nonMemberCaller = buildCaller(
+        buildMockPrisma({ memberOf: new Set() }),
+      );
+      const memberCaller = buildCaller(
+        buildMockPrisma({ memberOf: new Set([OWN_ORG_A]) }),
+      );
       mockIsEnabled.mockResolvedValue(false);
 
       const nonMemberResult = await nonMemberCaller.isEnabledForAnyOrganization(
@@ -187,7 +196,10 @@ describe("featureFlag.isEnabledForAnyOrganization", () => {
   describe("when the user's seat in the organization has been disabled", () => {
     it("does not evaluate the flag there, though the membership row still exists", async () => {
       const caller = buildCaller(
-        buildMockPrisma(new Set([OWN_ORG_A, OWN_ORG_B]), new Set([OWN_ORG_B])),
+        buildMockPrisma({
+          memberOf: new Set([OWN_ORG_A, OWN_ORG_B]),
+          disabledIn: new Set([OWN_ORG_B]),
+        }),
       );
       mockIsEnabled.mockResolvedValue(true);
 
@@ -206,7 +218,7 @@ describe("featureFlag.isEnabledForAnyOrganization", () => {
 
   describe("when the input list is empty", () => {
     it("returns enabled:false without touching prisma or featureFlagService", async () => {
-      const prisma = buildMockPrisma(new Set([OWN_ORG_A]));
+      const prisma = buildMockPrisma({ memberOf: new Set([OWN_ORG_A]) });
       const caller = buildCaller(prisma);
 
       const result = await caller.isEnabledForAnyOrganization({
