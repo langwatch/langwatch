@@ -15,11 +15,13 @@ import {
   IdentityGuards,
   IdentityService,
   newIdentityCommandId,
+  SignInRouterService,
   VerificationCeremonyService,
 } from "@langwatch/identity-server";
 import { IdentityCeremonies } from "@langwatch/identity-server/better-auth";
 import { prisma } from "../../db";
 import { PrismaSystemMigrationStateRepository } from "../system-migrations/repositories/system-migration-state.prisma.repository";
+import { InProcessBreakGlassLimiter } from "./break-glass-limiter";
 import { IdentityIdentifierBackfillMigration } from "./identifier-backfill.migration";
 import { IdentityLedgerWriter } from "./ledger";
 import { PrismaIdentityBackfillRepository } from "./repositories/identity-backfill.prisma.repository";
@@ -27,6 +29,11 @@ import { PrismaIdentityHeadsRepository } from "./repositories/identity-heads.pri
 import { PrismaIdentityProjectionRepository } from "./repositories/identity-projection.prisma.repository";
 import { PrismaIdentityUsersRepository } from "./repositories/identity-users.prisma.repository";
 import { PrismaIdentityVerificationRepository } from "./repositories/identity-verification.prisma.repository";
+import { LegacySsoDomainRoutingRepository } from "./repositories/legacy-sso-domain.prisma.repository";
+import {
+  resolveFederatedMethod,
+  signInMethodPolicyPort,
+} from "./signin-method-policy";
 import { isUserOnIdentityWrites } from "./write-gate";
 
 const identityHeads = new PrismaIdentityHeadsRepository(prisma);
@@ -87,6 +94,32 @@ export function identityBackfill(): IdentityBackfillService {
 /** The D01 backfill as the migrations runtime registers it (tenant = user). */
 export function identifierBackfillMigration(): IdentityIdentifierBackfillMigration {
   return new IdentityIdentifierBackfillMigration(identityBackfill());
+}
+
+/**
+ * The break-glass budget is per PROCESS, so it is a module singleton — a
+ * per-call limiter would count to one forever and limit nothing.
+ */
+const breakGlassLimiter = new InProcessBreakGlassLimiter();
+
+/**
+ * The identifier-first sign-in router (D03, ADR-117), composed here from its
+ * two ports: today's `Organization.ssoDomain` strings for the domain lookup,
+ * and the instance method policy that owns ADR-027's frozen license gate. D04
+ * swaps the first line for the `SsoConnection` projection behind
+ * `SSOCONN_ROUTING` and touches nothing else.
+ *
+ * A singleton rather than a per-call composition: it holds no request state,
+ * and the break-glass budget above must not be reset by composing it again.
+ */
+const signInRouterService = new SignInRouterService({
+  domains: new LegacySsoDomainRoutingRepository(prisma, resolveFederatedMethod),
+  policy: signInMethodPolicyPort,
+  breakGlass: breakGlassLimiter,
+});
+
+export function signInRouter(): SignInRouterService {
+  return signInRouterService;
 }
 
 /**

@@ -288,6 +288,17 @@ export function createEnvConfig() {
       // ADR-027: instance-level license, bootstraps + recovers SSO on
       // self-hosted deployments without requiring an in-DB org license.
       LANGWATCH_LICENSE_KEY: z.string().optional(),
+      // ADR-117 §7: the one flag covering the identifier-first router (D03)
+      // and the screens that render its decisions (D13). Three-valued and
+      // shipped `off`, because the front door is the highest-risk flip in the
+      // identity program: `shadow` computes the router's decision on every
+      // live login and logs how it compares against the legacy outcome
+      // WITHOUT changing anything, `enforce` is the flip, and `off` leaves the
+      // legacy path byte-for-byte untouched. Rollback is this value.
+      IDENTITY_ROUTER_V2: z
+        .enum(["off", "shadow", "enforce"])
+        .optional()
+        .default("off"),
       // ADR-031: per-trigger hourly hard cap on dispatched trigger emails.
       // Counts dispatches (one digest of N traces = 1), not traces or
       // recipients. Only ever bites immediate-cadence triggers; digest
@@ -613,6 +624,7 @@ export function createEnvConfig() {
       TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES:
         process.env.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
       LANGWATCH_LICENSE_KEY: process.env.LANGWATCH_LICENSE_KEY,
+      IDENTITY_ROUTER_V2: process.env.IDENTITY_ROUTER_V2,
       TRIGGER_EMAIL_HOURLY_CAP: process.env.TRIGGER_EMAIL_HOURLY_CAP,
       TRIGGER_EMAIL_TENANT_DAILY_CAP:
         process.env.TRIGGER_EMAIL_TENANT_DAILY_CAP,

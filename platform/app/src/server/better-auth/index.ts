@@ -36,6 +36,7 @@ import {
   beforeUserCreate,
 } from "./hooks";
 import { revokeAllSessionsForUser } from "./revokeSessions";
+import { runSignInRouterShadow } from "./signInRouterShadow";
 
 const logger = createLogger("langwatch:better-auth");
 
@@ -573,11 +574,18 @@ export const auth = betterAuth({
   hooks: {
     before: async (ctx) => {
       const url = ctx.request?.url ?? "";
+      const pathname = normalizedRequestPathname(url);
+
+      // ADR-117 §7: shadow mode's entire live-path footprint. It runs before
+      // the email-mode early return on purpose — an email-mode deployment is a
+      // routing decision the router has to agree with too, and it is the
+      // commonest one in the fleet. With the flag off it returns having read
+      // nothing, computed nothing and logged nothing.
+      await runSignInRouterShadow({ pathname, url, body: ctx.body });
+
       // Email-mode deployments never register an IdP, so the gate is moot —
       // leave every route untouched (zero behavior change from `main`).
       if (env.NEXTAUTH_PROVIDER === "email") return;
-
-      const pathname = normalizedRequestPathname(url);
 
       // Credential-mutation block: keyed off the CONFIGURED mode, blocked in
       // every gate state (ADR-027 Constants table). The password-reset pair
