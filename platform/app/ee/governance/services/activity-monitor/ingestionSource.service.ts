@@ -367,6 +367,44 @@ export class IngestionSourceService {
     });
   }
 
+  /**
+   * Of the trace destinations these sources point at, the ones that are
+   * still live projects of this organization — the same three conditions
+   * {@link assertTraceDestinationIsOwnLiveProject} writes under and the
+   * puller re-checks at every run.
+   *
+   * The presentation layer needs the complement: a destination missing from
+   * this set has stopped routing, and an admin has to be told that rather
+   * than shown an empty picker. It cannot work that out from the project
+   * list it already has, because a project outside the reader's own teams is
+   * also absent from that list and is not archived at all.
+   *
+   * One query for the whole page, keyed on the ids actually in use, so
+   * listing sources never becomes a per-row lookup.
+   */
+  async liveTraceProjectIds(
+    sources: Array<{ traceProjectId: string | null }>,
+    organizationId: string,
+  ): Promise<Set<string>> {
+    const wanted = [
+      ...new Set(
+        sources
+          .map((s) => s.traceProjectId)
+          .filter((id): id is string => id !== null),
+      ),
+    ];
+    if (wanted.length === 0) return new Set();
+    const live = await this.prisma.project.findMany({
+      where: {
+        id: { in: wanted },
+        archivedAt: null,
+        team: { organizationId },
+      },
+      select: { id: true },
+    });
+    return new Set(live.map((p) => p.id));
+  }
+
   async findById(
     id: string,
     organizationId: string,

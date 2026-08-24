@@ -55,26 +55,38 @@ const statusSchema = z.enum(["active", "disabled", "awaiting_first_event"]);
  * knew and post it there. The UI has no use for it either way; it collects a
  * fresh secret when one is being set and sends nothing when it is not.
  */
-function toDto(row: {
-  id: string;
-  organizationId: string;
-  teamId: string | null;
-  sourceType: string;
-  name: string;
-  description: string | null;
-  parserConfig: unknown;
-  // Required, not optional: if a future `select` clause stops fetching this,
-  // `hasPollerCursor` would silently answer false for every source and the
-  // edit form would offer a backfill start that cannot take effect. Better a
-  // compile error than a setting that quietly does nothing.
-  pollerCursor: unknown;
-  status: string;
-  traceProjectId: string | null;
-  lastEventAt: Date | null;
-  archivedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-  createdById: string | null;
+export function toIngestionSourceDto({
+  row,
+  liveTraceProjectIds,
+}: {
+  row: {
+    id: string;
+    organizationId: string;
+    teamId: string | null;
+    sourceType: string;
+    name: string;
+    description: string | null;
+    parserConfig: unknown;
+    // Required, not optional: if a future `select` clause stops fetching this,
+    // `hasPollerCursor` would silently answer false for every source and the
+    // edit form would offer a backfill start that cannot take effect. Better a
+    // compile error than a setting that quietly does nothing.
+    pollerCursor: unknown;
+    status: string;
+    traceProjectId: string | null;
+    lastEventAt: Date | null;
+    archivedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+    createdById: string | null;
+  };
+  /**
+   * Of the destinations these rows point at, the ones still live in this
+   * org. Anything else is archived, deleted, or was never ours — all three
+   * mean the puller has stopped routing (`pullerWorker.ts:387-396`), which
+   * is the one thing the drawer must say and cannot work out for itself.
+   */
+  liveTraceProjectIds: ReadonlySet<string>;
 }) {
   const parser = (row.parserConfig as Record<string, unknown>) ?? {};
   const safeParser = Object.fromEntries(
@@ -104,12 +116,28 @@ function toDto(row: {
     hasPollerCursor: hasPollerCursor(row.pollerCursor),
     status: row.status,
     traceProjectId: row.traceProjectId,
+    traceProjectArchived: row.traceProjectId
+      ? !liveTraceProjectIds.has(row.traceProjectId)
+      : false,
     lastEventAt: row.lastEventAt,
     archivedAt: row.archivedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     createdById: row.createdById,
   };
+}
+
+/** {@link toIngestionSourceDto} for a single row, resolving its destination. */
+async function dtoForRow(
+  service: IngestionSourceService,
+  row: Parameters<typeof toIngestionSourceDto>[0]["row"],
+  organizationId: string,
+) {
+  const liveTraceProjectIds = await service.liveTraceProjectIds(
+    [row],
+    organizationId,
+  );
+  return toIngestionSourceDto({ row, liveTraceProjectIds });
 }
 
 export const ingestionSourcesRouter = createTRPCRouter({
@@ -120,7 +148,13 @@ export const ingestionSourcesRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const service = IngestionSourceService.create(ctx.prisma);
       const rows = await service.list(input.organizationId);
-      return rows.map(toDto);
+      const liveTraceProjectIds = await service.liveTraceProjectIds(
+        rows,
+        input.organizationId,
+      );
+      return rows.map((row) =>
+        toIngestionSourceDto({ row, liveTraceProjectIds }),
+      );
     }),
 
   /** Get a single source by id (org-scoped). */
@@ -136,7 +170,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
         // client has to sniff out of the tRPC envelope.
         throw new IngestionSourceNotFoundError(input.id);
       }
-      return toDto(row);
+      return dtoForRow(service, row, input.organizationId);
     }),
 
   /**
@@ -174,7 +208,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
         actorUserId: ctx.session.user.id,
       });
       return {
-        source: toDto(created.source),
+        source: await dtoForRow(service, created.source, input.organizationId),
         ingestSecret: created.ingestSecret,
       };
     }),
@@ -207,7 +241,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
         pullSchedule: input.pullSchedule,
         traceProjectId: input.traceProjectId,
       });
-      return toDto(updated);
+      return dtoForRow(service, updated, input.organizationId);
     }),
 
   /**
@@ -224,7 +258,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
         input.organizationId,
       );
       return {
-        source: toDto(rotated.source),
+        source: await dtoForRow(service, rotated.source, input.organizationId),
         ingestSecret: rotated.ingestSecret,
       };
     }),
@@ -235,7 +269,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = IngestionSourceService.create(ctx.prisma);
       const archived = await service.archive(input.id, input.organizationId);
-      return toDto(archived);
+      return dtoForRow(service, archived, input.organizationId);
     }),
 
   /**

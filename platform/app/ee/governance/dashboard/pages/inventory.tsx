@@ -20,6 +20,7 @@ import {
 import { AddIngestionSourceMenu } from "@ee/governance/dashboard/components/AddIngestionSourceMenu";
 import {
   groupForMode,
+  routesConversations,
   SOURCE_GROUP_META,
   SOURCE_TYPE_LABEL,
   SOURCE_TYPE_OPTIONS,
@@ -29,6 +30,7 @@ import {
 } from "@ee/governance/dashboard/components/ingestionSourceCatalog";
 import { OttlEditor } from "@ee/governance/dashboard/components/OttlEditor";
 import { PullCadenceField } from "@ee/governance/dashboard/components/PullCadenceField";
+import { TraceDestinationField } from "@ee/governance/dashboard/components/TraceDestinationField";
 import {
   composerCadenceError,
   PULL_ADAPTER_FOR_SOURCE,
@@ -49,7 +51,7 @@ import {
   RotateCw,
   Trash2,
 } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { ToolCatalogPanel } from "~/components/governance/ToolCatalogPanel";
@@ -71,7 +73,13 @@ import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useActivePlan } from "~/hooks/useActivePlan";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api, type RouterOutputs } from "~/utils/api";
+import { api } from "~/utils/api";
+import {
+  type DestinationContext,
+  type Source,
+  useDestinationContext,
+  useSourceEditForm,
+} from "./ingestionSourceForms";
 
 /**
  * Admin CRUD for IngestionSources - the per-platform fleet config that
@@ -82,7 +90,6 @@ import { api, type RouterOutputs } from "~/utils/api";
  * Spec: specs/ai-gateway/governance/ingestion-sources.feature
  */
 
-type Source = RouterOutputs["ingestionSources"]["list"][number];
 /** The one-time secret reveal, shown after a create or a rotate. */
 type SecretDetails = {
   title: string;
@@ -124,6 +131,14 @@ export interface ComposerState {
    * for push/webhook source types.
    */
   pullSchedule: string;
+  /**
+   * The project this source's conversations land in, or null for "don't
+   * route" — which is also where it starts, deliberately. Where one team's
+   * conversations become readable to another is a choice someone makes, not
+   * a default they inherit. Only conversation-bearing source types offer it
+   * (ADR-088 Decision 8); for the rest it stays null.
+   */
+  traceProjectId: string | null;
 }
 
 const blankComposer = (): ComposerState => ({
@@ -133,6 +148,7 @@ const blankComposer = (): ComposerState => ({
   parserConfig: {},
   ottlStatements: [],
   pullSchedule: "",
+  traceProjectId: null,
 });
 
 function fmtRelative(date: Date | string | null): string {
@@ -391,6 +407,13 @@ export function buildCreateInput({
         PULL_SCHEDULE_DEFAULTS[pullAdapter] ||
         null
       : null,
+    // Read through `routesConversations` rather than sending whatever the
+    // draft holds: a type switched mid-compose would otherwise carry a
+    // destination its adapter never reads, and a dead column is how a
+    // customer comes to believe routing is on.
+    traceProjectId: routesConversations(composer.sourceType)
+      ? composer.traceProjectId
+      : null,
   };
 }
 
@@ -496,6 +519,8 @@ function useIngestionSourcesPage() {
   // The Catalog pane's own grant — decides the inventory default tab.
   const canManageCatalog = hasAnyPermission("aiTools:manage");
 
+  const destinationCtx = useDestinationContext(organization);
+
   const sourcesQuery = api.ingestionSources.list.useQuery(
     { organizationId: orgId },
     { enabled: !!orgId && canRead, refetchOnWindowFocus: false },
@@ -543,6 +568,7 @@ function useIngestionSourcesPage() {
 
   return {
     orgId,
+    destinationCtx,
     isEnterprise,
     canRead,
     canManage,
@@ -652,79 +678,81 @@ function InventoryTabs({
   );
 }
 
+/**
+ * The two tabs and everything under the sources one: the actions row an admin
+ * only sees with the manage grant, and the list itself.
+ */
+function InventorySourcesTab({
+  page,
+}: {
+  page: ReturnType<typeof useIngestionSourcesPage>;
+}) {
+  const { orgId, sourcesQuery, mutations } = page;
+  return (
+    <InventoryTabs
+      defaultTab={page.canManageCatalog ? "catalog" : "sources"}
+      sourcesActions={
+        page.canManage ? (
+          <SourcesActionsRow
+            isEnterprise={page.isEnterprise}
+            sourceCount={sourcesQuery.data?.length ?? 0}
+            onAdd={page.startComposer}
+          />
+        ) : undefined
+      }
+    >
+      <IngestionSourceList
+        canRead={page.canRead}
+        canManage={page.canManage}
+        isLoading={sourcesQuery.isLoading}
+        error={sourcesQuery.error}
+        grouped={page.grouped}
+        rotatingId={pendingId(mutations.rotate)}
+        archivingId={pendingId(mutations.archive)}
+        onEdit={page.setEditingSourceId}
+        onRotate={(id) =>
+          mutations.rotate.mutate({ organizationId: orgId, id })
+        }
+        onArchive={(id) =>
+          mutations.archive.mutate({ organizationId: orgId, id })
+        }
+      />
+    </InventoryTabs>
+  );
+}
+
 function InventoryPage() {
-  const {
-    orgId,
-    isEnterprise,
-    canRead,
-    canManage,
-    canManageCatalog,
-    startComposer,
-    closeComposer,
-    sourcesQuery,
-    grouped,
-    composing,
-    composer,
-    setComposer,
-    editingSourceId,
-    setEditingSourceId,
-    secretModal,
-    setSecretModal,
-    mutations,
-    onSubmit,
-  } = useIngestionSourcesPage();
+  const page = useIngestionSourcesPage();
+  const { orgId, destinationCtx, sourcesQuery, mutations } = page;
 
   return (
     <GovernanceLayout pageTitle="Inventory · Governance · LangWatch">
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
         <InventoryHeader />
         <SourceComposerDrawer
-          isOpen={composing}
+          isOpen={page.composing}
           organizationId={orgId}
-          composer={composer}
-          setComposer={setComposer}
+          destinationCtx={destinationCtx}
+          composer={page.composer}
+          setComposer={page.setComposer}
           isPending={mutations.create.isPending}
-          onSubmit={onSubmit}
-          onClose={closeComposer}
+          onSubmit={page.onSubmit}
+          onClose={page.closeComposer}
         />
 
-        <InventoryTabs
-          defaultTab={canManageCatalog ? "catalog" : "sources"}
-          sourcesActions={
-            canManage ? (
-              <SourcesActionsRow
-                isEnterprise={isEnterprise}
-                sourceCount={sourcesQuery.data?.length ?? 0}
-                onAdd={startComposer}
-              />
-            ) : undefined
-          }
-        >
-          <IngestionSourceList
-            canRead={canRead}
-            canManage={canManage}
-            isLoading={sourcesQuery.isLoading}
-            error={sourcesQuery.error}
-            grouped={grouped}
-            rotatingId={pendingId(mutations.rotate)}
-            archivingId={pendingId(mutations.archive)}
-            onEdit={setEditingSourceId}
-            onRotate={(id) =>
-              mutations.rotate.mutate({ organizationId: orgId, id })
-            }
-            onArchive={(id) =>
-              mutations.archive.mutate({ organizationId: orgId, id })
-            }
-          />
-        </InventoryTabs>
+        <InventorySourcesTab page={page} />
       </VStack>
 
-      <SecretModal details={secretModal} onClose={() => setSecretModal(null)} />
+      <SecretModal
+        details={page.secretModal}
+        onClose={() => page.setSecretModal(null)}
+      />
 
       <EditingSourceDrawer
         orgId={orgId}
-        editingSourceId={editingSourceId}
-        setEditingSourceId={setEditingSourceId}
+        destinationCtx={destinationCtx}
+        editingSourceId={page.editingSourceId}
+        setEditingSourceId={page.setEditingSourceId}
         sourcesQuery={sourcesQuery}
         update={mutations.update}
       />
@@ -735,12 +763,14 @@ function InventoryPage() {
 /** The edit drawer, resolved from the id the list put in page state. */
 function EditingSourceDrawer({
   orgId,
+  destinationCtx,
   editingSourceId,
   setEditingSourceId,
   sourcesQuery,
   update,
 }: {
   orgId: string;
+  destinationCtx: DestinationContext;
   editingSourceId: string | null;
   setEditingSourceId: (id: string | null) => void;
   sourcesQuery: ReturnType<typeof useIngestionSourcesPage>["sourcesQuery"];
@@ -749,6 +779,7 @@ function EditingSourceDrawer({
   return (
     <SourceEditDrawer
       organizationId={orgId}
+      destinationCtx={destinationCtx}
       source={
         editingSourceId
           ? (sourcesQuery.data?.find((s) => s.id === editingSourceId) ?? null)
@@ -923,6 +954,7 @@ function SourceRow({
 function SourceComposerDrawer({
   isOpen,
   organizationId,
+  destinationCtx,
   composer,
   setComposer,
   isPending,
@@ -931,6 +963,7 @@ function SourceComposerDrawer({
 }: {
   isOpen: boolean;
   organizationId: string;
+  destinationCtx: DestinationContext;
   composer: ComposerState;
   setComposer: (next: ComposerState) => void;
   isPending: boolean;
@@ -1021,6 +1054,16 @@ function SourceComposerDrawer({
                 setComposer({ ...composer, pullSchedule })
               }
             />
+
+            <TraceDestinationField
+              sourceType={composer.sourceType}
+              value={composer.traceProjectId}
+              onChange={(traceProjectId) =>
+                setComposer({ ...composer, traceProjectId })
+              }
+              mode="create"
+              {...destinationCtx}
+            />
           </VStack>
         </Drawer.Body>
         <Drawer.Footer>
@@ -1053,7 +1096,7 @@ function SourceComposerDrawer({
 
 /**
  * The edit form's local state, seeded from the row each time the drawer opens
- * on a different source.
+ * on a different source, including the trace destination.
  *
  * Split out from the drawer because seeding is the half with the reasoning in
  * it — which fields the row can answer, and which the DTO deliberately cannot
@@ -1066,6 +1109,14 @@ function useSourceEditForm(source: Source | null) {
   const [statements, setStatements] = useState<string[]>([]);
   const [parserConfig, setParserConfig] = useState<Record<string, string>>({});
   const [pullSchedule, setPullSchedule] = useState("");
+  /**
+   * `undefined` until the admin touches the picker — see
+   * {@link buildEditSubmission} for why an untouched destination must not be
+   * echoed back to a server that would re-validate it.
+   */
+  const [destination, setDestination] = useState<string | null | undefined>(
+    undefined,
+  );
 
   // Sync local state when the drawer opens for a new source - drives
   // the form fields off whatever the row carries on the wire.
@@ -1073,6 +1124,7 @@ function useSourceEditForm(source: Source | null) {
     if (!source) return;
     setName(source.name);
     setDescription(source.description ?? "");
+    setDestination(undefined);
     const parser = (source.parserConfig as Record<string, unknown>) ?? {};
     const raw = parser.ottlStatements;
     setStatements(
@@ -1104,6 +1156,8 @@ function useSourceEditForm(source: Source | null) {
     setParserConfig,
     pullSchedule,
     setPullSchedule,
+    destination,
+    setDestination,
   };
 }
 
@@ -1350,6 +1404,7 @@ export function SourceEditDrawer({
       parserConfig: form.parserConfig,
       ottlStatements: form.statements,
       pullSchedule: form.pullSchedule,
+      destination: form.destination,
     });
     // null is a form that is not saveable — an empty name, or a pull field the
     // adapter cannot parse, which has already told the admin which one.
@@ -1399,6 +1454,31 @@ export function SourceEditDrawer({
               statements={form.statements}
               onChange={form.setStatements}
               enabled={isOttlEnabledSourceType(source.sourceType)}
+            />
+
+            <TraceDestinationField
+              sourceType={source.sourceType as SourceType}
+              // Both props describe `value`, so both have to move together. An
+              // untouched picker shows the stored destination and the archived
+              // notice that describes it; the moment a replacement is picked,
+              // the flag stops applying — it described the project that has
+              // just been replaced, not the one now on screen. Left true, the
+              // picker seeds empty (`ScopeChipPicker.tsx:759` is fully
+              // controlled), so the admin picks a project, sees nothing
+              // selected under an unchanged warning, and concludes the control
+              // is dead.
+              value={
+                form.destination === undefined
+                  ? (source.traceProjectId ?? null)
+                  : form.destination
+              }
+              onChange={form.setDestination}
+              mode="edit"
+              destinationArchived={
+                form.destination === undefined &&
+                (source.traceProjectArchived ?? false)
+              }
+              {...destinationCtx}
             />
 
             <Text fontSize="xs" color="fg.muted">
@@ -2674,6 +2754,20 @@ export interface EditSubmission {
   description: string | null;
   parserConfig: Record<string, unknown>;
   pullSchedule?: string | null;
+  /**
+   * Absent means "leave the stored destination alone".
+   *
+   * Three-valued on purpose, mirroring what `updateSource` does with it
+   * (`ingestionSource.service.ts:529-539`): absent = the admin never touched
+   * the picker, `null` = they cleared it and routing stops, an id = they
+   * picked one and it is re-validated as create would.
+   *
+   * Echoing the stored id back on every save instead would look identical
+   * until the destination project is archived — at which point the
+   * write-time guard rejects it and the admin can no longer rename the
+   * source, or repoint the destination, or do anything else in this drawer.
+   */
+  traceProjectId?: string | null;
 }
 
 /**
@@ -2696,6 +2790,7 @@ export function buildEditSubmission({
   parserConfig,
   ottlStatements,
   pullSchedule,
+  destination,
 }: {
   organizationId: string;
   source: { id: string; sourceType: string; parserConfig: unknown };
@@ -2704,6 +2799,8 @@ export function buildEditSubmission({
   parserConfig: Record<string, string>;
   ottlStatements: string[];
   pullSchedule: string;
+  /** `undefined` = untouched, `null` = cleared, an id = picked. */
+  destination: string | null | undefined;
 }): EditSubmission | null {
   const trimmedName = name.trim();
   if (!trimmedName) return null;
@@ -2724,6 +2821,10 @@ export function buildEditSubmission({
         parserConfig,
         ottlStatements,
         pullSchedule,
+        // The destination is not part of the adapter's pull config — it only
+        // decides where routed conversations land afterwards. Null here so
+        // this literal satisfies ComposerState without implying otherwise.
+        traceProjectId: null,
       },
       { shouldRequireCredentials: false },
     );
@@ -2761,6 +2862,13 @@ export function buildEditSubmission({
             pullSchedule.trim() || recommendedPullSchedule(sourceType),
         }
       : {}),
+    // Same guard as create: a type that routes nothing must never carry a
+    // destination, even one left in drawer state from before a type change.
+    // An untouched picker sends nothing at all, so renaming a source cannot
+    // drag a since-archived destination back through the write-time guard.
+    ...(destination === undefined || !routesConversations(sourceType)
+      ? {}
+      : { traceProjectId: destination }),
   };
 }
 
