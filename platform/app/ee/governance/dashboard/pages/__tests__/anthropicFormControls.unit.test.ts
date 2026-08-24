@@ -55,6 +55,9 @@ const composerWith = (parserConfig: Record<string, string>): ComposerState => ({
   parserConfig: { credentialsToken: "sk-ant-admin-test", ...parserConfig },
   pullSchedule: "0 * * * *",
   ottlStatements: [],
+  // A pull source carries no conversations, so it never offers a
+  // destination (ADR-088 Decision 8).
+  traceProjectId: null,
 });
 
 describe("Anthropic composer controls", () => {

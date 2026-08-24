@@ -63,6 +63,14 @@ export interface SourceTypeOption {
   mode: SourceMode;
   blurb: string;
   icon: React.ReactNode;
+  /**
+   * True when this source's events are conversations that can be read in
+   * the trace explorer, so a trace destination is worth offering.
+   *
+   * Read `routesConversations` rather than this field — it enforces the
+   * push-mode exclusion the flag alone cannot. See ADR-088 Decision 8.
+   */
+  routesConversations?: boolean;
 }
 
 // `satisfies` (not a type annotation) so each entry's `value` keeps its
@@ -138,6 +146,7 @@ export const SOURCE_TYPE_OPTIONS = [
     blurb:
       "Records who asked what in Genie and the SQL it ran against your warehouse. Sign in with a Databricks service principal holding Can Manage on every Genie space you want covered — anything less returns only its own conversations.",
     icon: <Databricks />,
+    routesConversations: true,
   },
   {
     value: "s3_custom",
@@ -171,6 +180,40 @@ void _catalogIsComplete;
 export const SOURCE_TYPE_LABEL: Record<SourceType, string> = Object.fromEntries(
   SOURCE_TYPE_OPTIONS.map((o) => [o.value, o.label]),
 ) as Record<SourceType, string>;
+
+// Compile-time guard: routing runs inside `writePulledEvents`
+// (`pullers/pullerWorker.ts:325`), which nothing on the push path ever calls.
+// A push-mode entry claiming `routesConversations` would put a picker in the
+// drawer that changes nothing a customer can observe, so it stops the build
+// here rather than shipping a dead control. Bracketed so the `never` case
+// does not go vacuously true.
+type PushTypeClaimingConversations = Extract<
+  (typeof SOURCE_TYPE_OPTIONS)[number],
+  { mode: "push"; routesConversations: true }
+>;
+const _noPushTypeRoutesConversations: [PushTypeClaimingConversations] extends [
+  never,
+]
+  ? true
+  : never = true;
+void _noPushTypeRoutesConversations;
+
+/**
+ * Whether a source of this type produces conversations that land in a trace
+ * destination — and therefore whether the drawers should offer a destination
+ * picker at all.
+ *
+ * Today the answer is Genie alone, because the worker routes only events
+ * whose action is `genie_query` (`pullers/genieTraceMapper.ts:239`). That gate
+ * lives in server code this bundle must not import, so the two are kept in
+ * step by declaration plus test rather than by a shared constant — see
+ * `__tests__/conversationRoutingSourceTypes.unit.test.ts`. An adapter that
+ * starts emitting conversations must flip its entry here in the same change.
+ */
+export function routesConversations(sourceType: SourceType): boolean {
+  const option = SOURCE_TYPE_OPTIONS.find((o) => o.value === sourceType);
+  return option?.routesConversations === true;
+}
 
 export interface GatedSourceTypeOption extends SourceTypeOption {
   /** Locked types render in the menu but cannot be picked. */
