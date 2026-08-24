@@ -31,7 +31,12 @@ import {
  *  Missing and extra rows are not diffs: they are `outstanding` — the fold
  *  has not caught up with what this pass stated or revoked. */
 export type AuthzEngineDiff = {
-  kind: "grant_revoked" | "grant_changed" | "role_changed" | "resource_changed";
+  kind:
+    | "grant_revoked"
+    | "grant_changed"
+    | "role_changed"
+    | "role_deleted"
+    | "resource_changed";
   id: string;
   field?: string;
   expected?: string | null;
@@ -104,10 +109,24 @@ export function checkRoleHeads({
       outstanding.push(role.roleId);
       continue;
     }
+    // A buried head is not agreement, and it is not lag either: the fold has
+    // no un-delete — `role.upsert` never touches `deletedAt`, and the delete
+    // moved the row's business time past anything a restatement could carry —
+    // so the disagreement is named for an operator rather than waited on. The
+    // `grant_revoked` treatment, one tier over.
+    if (head.deleted) {
+      diffs.push({ kind: "role_deleted", id: role.roleId });
+      continue;
+    }
     diffs.push(...roleDiffs({ role, head }));
   }
   for (const head of heads.roleHeads) {
-    if (!expectedRoleIds.has(head.id)) {
+    // An extra is a head whose legacy row is gone, waiting on the deletion
+    // this pass sent. A head ALREADY deleted is that deletion applied, and it
+    // never leaves this read — the name a role took stays taken, so the
+    // tombstone is permanent — which makes counting it outstanding a hold no
+    // later pass can clear.
+    if (!head.deleted && !expectedRoleIds.has(head.id)) {
       outstanding.push(head.id);
     }
   }
@@ -164,6 +183,43 @@ export function roleDrifted({
       role.permissions.join(",") ||
     (head.kind === "system_api_key" ? "system_api_key" : "custom") !== role.kind
   );
+}
+
+/**
+ * Whether a live head already disagrees with the fact the migration would
+ * state. This is the staging filter's question, and deliberately the same
+ * field comparison the check reports on: a fact whose head already matches
+ * is one `attachGrant` would restate identically, so "safe to skip" and
+ * "neither outstanding nor a diff" must be the SAME condition, or a pass
+ * could skip work it then holds the organization for.
+ */
+export function grantDrifted({
+  fact,
+  head,
+}: {
+  fact: GrantFact;
+  head: GrantHeadRow;
+}): boolean {
+  return grantDiffs({ fact, head }).length > 0;
+}
+
+/**
+ * The same question for a share link against its RESOURCE head. Only the
+ * named diffs count: a head whose `viewCount` merely lags the legacy row is
+ * `outstanding`, and the budget it waits on rides `seedResourceGrantUsage`
+ * on every pass rather than the attach, so restating the attach would not
+ * carry it anyway.
+ */
+export function shareLinkDrifted({
+  organizationId,
+  link,
+  head,
+}: {
+  organizationId: string;
+  link: ExpectedShareLink;
+  head: ResourceGrantRow;
+}): boolean {
+  return resourceDiffs({ organizationId, link, head }).diffs.length > 0;
 }
 
 /** Field equality for one stated fact against its head row — against what
@@ -240,13 +296,19 @@ function roleDiffs({
  * the database's uppercase), so the comparison is against what the import
  * said, mapped to that spelling.
  *
- * The view budget cuts both ways and the two directions mean different
- * things. A head BEHIND the legacy count is convergence lag — views land
- * legacy-side between passes and the monotonic seed raises the usage row
- * next pass — so it is `outstanding`, not a disagreement; reporting it as
- * one made an actively-viewed link re-hold the organization forever. A
- * head AHEAD of the legacy count is a budget that grew back, which nothing
- * legitimate produces, so that is the named diff.
+ * The view budget cuts both ways. A head BEHIND the legacy count is lag, not
+ * a disagreement — reporting it as one made an actively-viewed link re-hold
+ * the organization forever — and `migrateTenant` hands the budget over before
+ * taking this read, so it should find nothing. A head AHEAD is a budget that
+ * grew back, which nothing legitimate produces, so that is a named diff.
+ *
+ * Two `projectId`s are in play and only one is checked: `head.projectId` is
+ * the GRANT row's and the table below compares it; `GrantUsage.projectId` is
+ * the budget row's, which `findResourceGrantRows` does not select. So a
+ * budget row on the wrong project but at the right count reads as agreement.
+ * Deliberate: the seed will not move that row, it fails toward fewer views
+ * (the consume fences on the same columns and misses), and holding on it
+ * would be a hold no pass could clear.
  *
  * Tokens are bearer credentials and the report is persisted and rendered
  * on the ops page, so a token disagreement reports fingerprints, never the

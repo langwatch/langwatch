@@ -135,12 +135,13 @@ func modelLane(model string) workerModelConfig {
 	case strings.HasPrefix(model, "openai_codex/"):
 		lane.API = "openai-responses"
 		lane.Reasoning = true
-		lane.Compat = map[string]any{
-			"supportsStore": false,
-			// With retention long, pi sets prompt_cache_retention "24h" on
-			// the Responses lane; OpenAI charges no write premium for it.
-			"supportsLongCacheRetention": true,
-		}
+		// NO supportsLongCacheRetention here: the ChatGPT codex backend
+		// answers 400 "Unsupported parameter: prompt_cache_retention" on the
+		// field the flag makes pi send (the API-key Responses endpoint
+		// accepts it, which is how it slipped past the spike). The gateway
+		// also strips the field on the codex route, so this is belt and
+		// braces on the same invariant.
+		lane.Compat = map[string]any{"supportsStore": false}
 	case strings.HasPrefix(model, "openai/"):
 		lane.API = "openai-responses"
 		lane.Reasoning = true
@@ -167,6 +168,22 @@ func skillsDir(workspaceRoot string) string {
 // and a session file still owned by the dead worker's UID would be unreadable,
 // silently breaking the resume it exists for.
 func provisionSessionDir(in ProvisionInput) error {
+	// The stash parent (`<sessionsRoot>/.pi-sessions`) is shared by every
+	// conversation and owned by the manager; a sandboxed worker only passes
+	// THROUGH it to its own chowned leaf. Mode 0711 grants exactly that
+	// traversal — without the execute bit a per-conversation UID gets EACCES
+	// opening its own session store and the wrapper dies before its ready
+	// handshake — while the absent read bit keeps sibling conversation ids
+	// unlistable. Chmod unconditionally: a stash an earlier build created
+	// 0700 (MkdirAll on the leaf used to mint the parent with the leaf's own
+	// mode) must be repaired, and deployed volumes still hold that mode.
+	stashParent := filepath.Dir(in.SessionDir)
+	if err := os.MkdirAll(stashParent, 0o711); err != nil {
+		return fmt.Errorf("mkdir session stash: %w", err)
+	}
+	if err := os.Chmod(stashParent, 0o711); err != nil {
+		return fmt.Errorf("chmod session stash: %w", err)
+	}
 	if err := os.MkdirAll(in.SessionDir, 0o700); err != nil {
 		return fmt.Errorf("mkdir sessions: %w", err)
 	}
@@ -380,6 +397,10 @@ func buildWorkerEnv(in SpawnInput) []string {
 		// anthropic stamps ttl "1h" on its cache_control breakpoints, the
 		// Responses lane asks for 24h prompt_cache_retention.
 		"PI_CACHE_RETENTION=long",
+		// The CLI's `ui call` names the conversation it is driving with this.
+		// It is a claim, not a credential: the control plane verifies the id
+		// belongs to the session key's owning user before doing anything.
+		"LANGY_CONVERSATION_ID="+in.ConversationID,
 	)
 	for _, c := range in.Capabilities {
 		env = append(env, c.Contribute()...)

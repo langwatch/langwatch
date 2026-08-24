@@ -993,6 +993,19 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     promptCmd
+      .command("get <handle>")
+      .description("Show one prompt, with its model and messages")
+      .option("--version <version>", "Read a specific version instead of the latest")
+      .option("--tag <name>", "Read the version this tag points at")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (handle: string, options: { version?: string; tag?: string }) => {
+      const { promptGetCommand: impl } = await import("./commands/prompt/get.js");
+      return impl(handle, options);
+    },
+  );
+
+  emitsResult(
+    promptCmd
       .command("versions <handle>")
       .description("List all versions of a prompt")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
@@ -1442,8 +1455,19 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .command("status <experiment>")
       .description("Check the status of an experiment run (defaults to the latest run)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table")
-      .option("--run-id <id>", "Specific run id to check (defaults to the latest run)"),
-    async (experiment: string, options: { runId?: string }) => {
+      .option("--run-id <id>", "Specific run id to check (defaults to the latest run)")
+      .option(
+        "--wait",
+        "Keep reading until the run finishes, or until the limit is up. Answers with the progress either way",
+      )
+      .option(
+        "--timeout <seconds>",
+        "How long --wait waits before answering with the progress so far (default: 60)",
+      ),
+    async (
+      experiment: string,
+      options: { runId?: string; wait?: boolean; timeout?: string },
+    ) => {
       const { experimentStatusCommand: impl } = await import("./commands/experiment/status.js");
       return impl(experiment, options);
     },
@@ -1491,6 +1515,70 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
+  emitsResult(
+    experimentCmd
+      .command("create")
+      .description("Create an experiment")
+      .option("--name <name>", "Name for the experiment")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (options: { name?: string }) => {
+      const { experimentCreateCommand: impl } = await import("./commands/experiment/create.js");
+      return impl(options);
+    },
+  );
+
+  emitsResult(
+    experimentCmd
+      .command("get-state <experiment>")
+      .description("Read an experiment's setup, with the version to save it back at")
+      .option("--fields <fields>", "Set to `version` to read the version only, without the setup")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (experiment: string, options: { fields?: string }) => {
+      const { experimentGetStateCommand: impl } = await import("./commands/experiment/get-state.js");
+      return impl(experiment, options);
+    },
+  );
+
+  emitsResult(
+    experimentCmd
+      .command("set-state <experiment>")
+      .description("Save an experiment's setup from a file, or from stdin with --file -")
+      .option("--file <path>", "File holding the setup as JSON, or - to read stdin")
+      .option("--expected-version <n>", "Refuse the save if someone else already wrote on top of this version")
+      .option("--message <text>", "Name this version in the history")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      experiment: string,
+      options: { file?: string; expectedVersion?: string; message?: string },
+    ) => {
+      const { experimentSetStateCommand: impl } = await import("./commands/experiment/set-state.js");
+      return impl(experiment, options);
+    },
+  );
+
+  emitsResult(
+    experimentCmd
+      .command("versions <experiment>")
+      .description("List the saved versions of an experiment's setup")
+      .option("--limit <n>", "Maximum versions to fetch (default 50, max 100)", "50")
+      .option("--cursor <version>", "The nextCursor of the previous page")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (experiment: string, options: { limit?: string; cursor?: string }) => {
+      const { experimentVersionsCommand: impl } = await import("./commands/experiment/versions.js");
+      return impl(experiment, options);
+    },
+  );
+
+  emitsResult(
+    experimentCmd
+      .command("restore <experiment> <version>")
+      .description("Restore an experiment to one of its saved versions")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (experiment: string, version: string) => {
+      const { experimentRestoreCommand: impl } = await import("./commands/experiment/restore.js");
+      return impl(experiment, version);
+    },
+  );
 
   // Add workflow command group
   const workflowCmd = program
@@ -3225,6 +3313,70 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       const { navigateOpenCommand: impl } = await import("./commands/navigate/open.js");
       await impl(resourceId);
     });
+
+  // Drive the page the user has open with typed UI actions. Agent plumbing
+  // like `navigate`: only works mid-turn, when the platform can reach the
+  // page over the turn's live stream. See specs/langy/langy-ui-actions.feature.
+  const uiCmd = program
+    .command("ui")
+    .description("Drive the page the user has open with typed actions");
+
+  emitsResult(
+    uiCmd
+      .command("call <kind>")
+      .description("Dispatch one UI action to the open page and print its result")
+      .option("--payload <json>", "The action's payload as JSON (default: {})")
+      .option(
+        "--payload-file <path>",
+        "Read the payload from a file, or from stdin with -. Use this for prompts and any other text a shell would mangle",
+      )
+      .option(
+        "--experiment <slug>",
+        "Experiment for the backend fallback to apply the action to when no page answers",
+      )
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      kind: string,
+      options: { payload?: string; payloadFile?: string; experiment?: string },
+    ) => {
+      const { uiCallCommand: impl } = await import("./commands/ui/call.js");
+      return impl(kind, options);
+    },
+  );
+
+  emitsResult(
+    uiCmd
+      .command("actions")
+      .description("List the UI actions pages accept, with their schemas")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { uiActionsCommand: impl } = await import("./commands/ui/actions.js");
+      return impl();
+    },
+  );
+
+  const workbenchCmd = program
+    .command("workbench")
+    .description("Work with the evaluations workbench the user has open");
+
+  emitsResult(
+    workbenchCmd
+      .command("get-state [experiment]")
+      .description(
+        "Read the open workbench as the user sees it, unsaved edits included; with the experiment named it answers from the saved state when no page is open",
+      )
+      .option("--no-include-results", "Leave the results summary out")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      experiment: string | undefined,
+      options: { includeResults?: boolean },
+    ) => {
+      const { workbenchGetStateCommand: impl } = await import(
+        "./commands/workbench/get-state.js"
+      );
+      return impl(experiment, options);
+    },
+  );
 
   // Add dataset command group
   const datasetCmd = program

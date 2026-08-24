@@ -67,7 +67,19 @@ function labelize(key: string): string {
 }
 
 /** A row/document's human name, checked in the order a reader would want. */
-const NAME_KEYS = ["name", "title", "displayName", "label", "handle", "slug"];
+// `kind` sits last: it is a discriminator, not a title, so it only names a row
+// that has no better name. It earns its place because a catalog keyed by kind
+// (the UI actions a page accepts) otherwise rendered as "UI action 1",
+// "UI action 2", which tells the reader nothing about any of them.
+const NAME_KEYS = [
+  "name",
+  "title",
+  "displayName",
+  "label",
+  "handle",
+  "slug",
+  "kind",
+];
 /** A row/document's id, however this endpoint spelled it. */
 const ROW_ID_KEYS = ["id", "trace_id", "traceId", "runId", "slug", "key"];
 
@@ -112,6 +124,13 @@ const FACT_PRIORITY = [
 ];
 
 /**
+ * Ids that only correlate two log lines. A reader cannot open one, search for
+ * one, or act on one, so a card that spends a row on it spends the row on
+ * nothing.
+ */
+const CORRELATION_ONLY_KEYS = new Set(["actionId", "action_id"]);
+
+/**
  * The label→value pairs a single resource is worth summarising with. A fact
  * whose value the card already shows as its title is skipped — "Faithfulness"
  * twice in one card says nothing new.
@@ -129,6 +148,7 @@ function factsOf(
 
   const push = (key: string) => {
     if (seen.has(key) || facts.length >= MAX_FACTS) return;
+    if (CORRELATION_ONLY_KEYS.has(key)) return;
     const value = displayValue(record[key]);
     if (value === null || value === omitValue) return;
     seen.add(key);
@@ -758,5 +778,29 @@ function readTitle({
     }
     return capitalize(noun.plural);
   }
-  return name ?? id ?? capitalize(noun.singular);
+  return (
+    dispatchedActionTitle(document) ?? name ?? id ?? capitalize(noun.singular)
+  );
+}
+
+/**
+ * A page action is titled by the action it carried out.
+ *
+ * `ui call` answers with a dispatch outcome: which action, where it ran, and
+ * what it changed. None of that is a resource with a name, so the resource
+ * noun titled every one of them "UI action" and a reader watching Langy
+ * duplicate a column, rewrite its prompt and run it saw the same three words
+ * three times. The kind is the one field that says what happened, so it
+ * becomes the title, in words: `workbench.duplicateTarget` reads as "Duplicate
+ * target". `executedVia` is what marks the payload as a dispatch outcome
+ * rather than some other document that happens to carry a `kind`.
+ */
+function dispatchedActionTitle(document: unknown): string | null {
+  if (!document || typeof document !== "object") return null;
+  const record = document as Record<string, unknown>;
+  if (typeof record.executedVia !== "string") return null;
+  const kind = record.kind;
+  if (typeof kind !== "string" || kind.trim() === "") return null;
+  const action = kind.slice(kind.lastIndexOf(".") + 1);
+  return action === "" ? null : capitalize(labelize(action));
 }

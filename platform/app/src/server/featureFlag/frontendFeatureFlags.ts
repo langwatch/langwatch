@@ -64,8 +64,17 @@ export const FRONTEND_FEATURE_FLAGS = [
   // because the gateway product ships on its own flag.
   // Force off in dev: `RELEASE_UI_AI_GOVERNANCE_ENABLED=0`.
   "release_ui_ai_governance_enabled",
+  // The Costs and Billed placeholder pages + their governance nav items.
+  // Composed ON TOP of `release_ui_ai_governance_enabled` (never instead
+  // of it): the section flag off still hides everything. Off by default —
+  // the pages are empty shells shipped ahead of the spend views. See
+  // specs/ai-gateway/governance/governance-home-routing.feature.
+  "release_ui_governance_billed_cost_enabled",
   "release_langy_enabled",
   "release_langy_promo_enabled",
+  // Gates the Optimize this prompt menu item alongside the UI-action channel
+  // it hands off to; the server-side dispatch checks the same flag.
+  "release_langy_ui_actions",
   // The Langy home composition (the lit block leads, with a real composer in
   // it). Rolls out on its own schedule ON TOP of `release_langy_enabled`:
   // having Langy is necessary but not sufficient, so the panel can ship to a

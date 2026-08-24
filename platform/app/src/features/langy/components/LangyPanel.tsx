@@ -63,7 +63,7 @@ import { useReducedMotion } from "~/hooks/useReducedMotion";
 // drifted, `safeParse` silently dropped `pageContext` on every single turn and
 // nobody found out for weeks.
 import type { LangyResourceContext } from "~/server/app-layer/langy/langyTurnContext.schema";
-import { api } from "~/utils/api";
+import { api, trpcClient } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { useLangyConversationCommands } from "../data/useLangyConversationCommands";
 import { useLangyConversationList } from "../data/useLangyConversationList";
@@ -130,6 +130,7 @@ import {
   resolvePeekTranslate,
   SIDEBAR_PEEK_NEAR_PX,
 } from "../logic/langyPeekDock";
+import { langyPlan } from "../logic/langyPlan";
 import { resolveLangyStopTarget } from "../logic/langyStopTarget";
 import {
   currentTurnAssistant,
@@ -147,6 +148,8 @@ import {
   type LangyPanelMode,
   useLangyStore,
 } from "../stores/langyStore";
+import { executeUiAction } from "../uiActions/executeUiAction";
+import type { LangyUiActionHandlers } from "../uiActions/types";
 import { AnimatedConversationTitle } from "./AnimatedConversationTitle";
 import { Composer } from "./Composer";
 import {
@@ -155,6 +158,7 @@ import {
 } from "./ConversationSkeleton";
 import { EmptyState } from "./EmptyState";
 import { LangyGitHubConnectCard } from "./github/LangyGitHubConnectCard";
+import { LangyCardBoundary } from "./LangyCardBoundary";
 import { LangyCardGallery } from "./LangyCardGallery";
 import { LangyContextTargetLayer } from "./LangyContextTargetLayer";
 import { LangyDevDrawer } from "./LangyDevDrawer";
@@ -162,6 +166,7 @@ import { LangyError } from "./LangyError";
 import { LangyExternalLinkDialog } from "./LangyExternalLinkDialog";
 import { LangyMakeDefaultDialog } from "./LangyMakeDefaultDialog";
 import { LangyMark, LangyMarkGradientDefs } from "./LangyMark";
+import { LangyPlanCard } from "./LangyPlanCard";
 import { LangyRecoveringLine } from "./LangyRecoveringLine";
 import { LangyThinkingLine } from "./LangyThinkingLine";
 import { toPendingCapabilities } from "./LangyToolActivity";
@@ -300,11 +305,73 @@ function onLangyProfilerRender(
   }
 }
 
-interface LangySidecarProps {
-  proposalHandlersRef?: React.RefObject<ProposalHandlers>;
+/**
+ * Carry out one typed UI action the agent asked THIS page for.
+ *
+ * Every decision (dedup, claim, schema re-parse, handler run, completion)
+ * lives in `executeUiAction`; this supplies the live ids and the tRPC legs.
+ * A failure is swallowed the way a dropped claim is: the dispatch side has its
+ * own timeout and reports to the agent, so a failed claim call must not crash
+ * the stream.
+ */
+function dispatchUiActionToPage({
+  entry,
+  projectId,
+  seen,
+  handlers,
+}: {
+  entry: { actionId: string; kind: string; payload: unknown };
+  projectId: string | undefined;
+  seen: Set<string>;
+  handlers: LangyUiActionHandlers;
+}): void {
+  const store = useLangyStore.getState();
+  const conversationId = store.activeConversationId;
+  // The turn is local bookkeeping only: it keys the replay dedup below. The
+  // server does not ask for it, because the page and the dispatch learn the
+  // current turn from two records that settle at different moments.
+  const turnId = store.activeTurnId;
+  if (!projectId || !conversationId) return;
+
+  void executeUiAction({
+    entry,
+    turnId,
+    seen,
+    handlers,
+    claim: ({ actionId }) =>
+      trpcClient.langy.claimUiAction.mutate({
+        projectId,
+        conversationId,
+        actionId,
+      }),
+    complete: ({ actionId, ok, result, errorCode }) =>
+      trpcClient.langy.completeUiAction.mutate({
+        projectId,
+        conversationId,
+        actionId,
+        ok,
+        ...(result !== undefined ? { result } : {}),
+        ...(errorCode ? { errorCode } : {}),
+      }),
+    onHandlerError: ({ kind }) => {
+      toaster.create({
+        title: "Langy's change didn't apply",
+        description: `The page could not carry out ${kind}. Nothing else was affected.`,
+        type: "error",
+      });
+    },
+  }).catch(() => undefined);
 }
 
-export function LangySidecar({ proposalHandlersRef }: LangySidecarProps) {
+interface LangySidecarProps {
+  proposalHandlersRef?: React.RefObject<ProposalHandlers>;
+  actionHandlersRef?: React.RefObject<LangyUiActionHandlers>;
+}
+
+export function LangySidecar({
+  proposalHandlersRef,
+  actionHandlersRef,
+}: LangySidecarProps) {
   const isOpen = useLangyStore((s) => s.isOpen);
   const toggle = useLangyStore((s) => s.togglePanel);
   const openPanel = useLangyStore((s) => s.openPanel);
@@ -330,6 +397,7 @@ export function LangySidecar({ proposalHandlersRef }: LangySidecarProps) {
       <LangyContextTargetLayer />
       <LangyPanel
         proposalHandlersRef={proposalHandlersRef}
+        actionHandlersRef={actionHandlersRef}
         peekEnabled={peekDock.enabled}
         onOpen={openPanel}
       />
@@ -448,10 +516,12 @@ function LangyLauncher({
 
 function LangyPanel({
   proposalHandlersRef,
+  actionHandlersRef,
   peekEnabled,
   onOpen,
 }: {
   proposalHandlersRef?: React.RefObject<ProposalHandlers>;
+  actionHandlersRef?: React.RefObject<LangyUiActionHandlers>;
   /**
    * Minimising slides this panel down to a sliver of its own header instead
    * of hiding it outright (`release_ui_langy_peek_dock_enabled`). Flag off,
@@ -701,6 +771,26 @@ function LangyPanel({
   // "a double-fire must not repeat the effect" shape.
   const navigatedInstructionsRef = useRef<Set<string>>(new Set());
 
+  // UI actions already claimed or dropped on this client, keyed by
+  // turnId+actionId (`uiActionDedupKey`) — the same replay problem, and the
+  // same per-turn reset, as the navigate dedup above.
+  const uiActionSeenRef = useRef<Set<string>>(new Set());
+
+  // The rollback lever for agent-driven page control: with the flag off this
+  // page ignores `ui` stream entries, so switching it off during a live turn
+  // stops the page changing under the user. Read through a ref because the
+  // transport below is memoised once (`[]`), the same reason `routerRef` has
+  // one. Only a RESOLVED off closes the channel: an unanswered flag query
+  // means "not known yet", and dropping actions there would break the feature
+  // for the first turn after every reload.
+  const uiActionsFlag = useFeatureFlag("release_langy_ui_actions", {
+    projectId,
+    organizationId,
+  });
+  const isUiActionChannelClosedRef = useRef(false);
+  isUiActionChannelClosedRef.current =
+    !uiActionsFlag.isLoading && !uiActionsFlag.enabled;
+
   // `router` (from react-router underneath) gets a new identity on every
   // route change; the transport below is memoised once (`[]`), so it reads
   // through a ref the render keeps fresh rather than closing over a router
@@ -728,6 +818,7 @@ function LangyPanel({
           useLangyStore.getState().beginTurn({ conversationId, turnId });
           // A fresh turn — clear the previous turn's navigate dedup too.
           navigatedInstructionsRef.current = new Set();
+          uiActionSeenRef.current = new Set();
         },
         onNavigate: (entry) => {
           // Internal-target guard, mirroring MessageContent's isInternalHref:
@@ -745,6 +836,15 @@ function LangyPanel({
           // mounted, so the in-flight response keeps streaming right through
           // the move.
           void routerRef.current.push(entry.href);
+        },
+        onUiAction: (entry) => {
+          if (isUiActionChannelClosedRef.current) return;
+          dispatchUiActionToPage({
+            entry,
+            projectId: turnContextRef.current?.projectId,
+            seen: uiActionSeenRef.current,
+            handlers: actionHandlersRef?.current ?? {},
+          });
         },
         onSignal: (signal) => {
           const store = useLangyStore.getState();
@@ -2128,6 +2228,18 @@ function LangyPanel({
   // the current turn has provable output; statuses the agent reports mid-turn
   // are untouched.
   const currentTurnMessage = currentTurnAssistant(displayMessages);
+  // The plan of the turn that is running, if it kept one. The same gate the
+  // message uses for `isStreaming`, so exactly one of the two renders a plan:
+  // held above the composer while the turn works, back inside the message the
+  // moment it settles, fails, or the reader stops it.
+  const turnPlanItems = useLangyStore((s) => s.turnPlan);
+  const streamingMessage =
+    displayBusy && displayMessages.at(-1)?.role === "assistant"
+      ? displayMessages.at(-1)
+      : undefined;
+  const pinnedPlan = streamingMessage
+    ? langyPlan(streamingMessage, { overrideItems: turnPlanItems })
+    : null;
   const turnHasVisibleOutput =
     !!runningTool(currentTurnMessage) ||
     hasTokens(currentTurnMessage) ||
@@ -3021,6 +3133,27 @@ function LangyPanel({
                     onClick={jumpToLatest}
                   />
                 </Box>
+                {/* The plan the running turn is following. Held here, between
+            the conversation and the composer, because a plan is a promise
+            about the rest of the turn and rendered inside the message it
+            scrolled away the moment the turn wrote more than a screen — which
+            is exactly the turn long enough to want a plan. A row of the column,
+            never an overlay, so it cannot cover the conversation above it; it
+            scrolls inside itself when the plan is long. It leaves when the turn
+            does, and the message renders the plan it reached from then on. */}
+                {pinnedPlan ? (
+                  <Box
+                    paddingX={floating ? "19px" : "14px"}
+                    paddingBottom="8px"
+                    maxHeight="34%"
+                    overflowY="auto"
+                    flexShrink={0}
+                  >
+                    <LangyCardBoundary scope="the plan">
+                      <LangyPlanCard plan={pinnedPlan} isStreaming />
+                    </LangyCardBoundary>
+                  </Box>
+                ) : null}
                 {/* "One turn at a time" is a WAIT, not a failure: it rides here, a
             dismissable notice attached above the composer, and the draft the user
             just tried to send stays in the field (restored in `send`) rather than

@@ -7,7 +7,7 @@ import {
   buildParserConfig,
   isSecretFieldKey,
   PARSER_FIELDS,
-} from "../ingestion-sources";
+} from "../inventory";
 
 // Every FieldDef declared `secret: true` across every source type, flattened
 // for iteration. This is the same shape `isSecretFieldKey` builds its

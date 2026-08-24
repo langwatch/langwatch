@@ -22,6 +22,7 @@ import {
   LuGlobe,
   LuPencil,
   LuPlay,
+  LuSparkles,
   LuSquare,
   LuTrash2,
   LuWorkflow,
@@ -59,6 +60,14 @@ const pulseAnimation = keyframes`
 
 type TargetHeaderProps = {
   target: TargetConfig;
+  /** Hands the prompt to Langy for the improvement loop. Prompt targets only. */
+  onOptimize?: ({
+    target,
+    name,
+  }: {
+    target: TargetConfig;
+    name: string;
+  }) => void;
   onEdit?: (target: TargetConfig) => void;
   onDuplicate?: (target: TargetConfig) => void;
   onSwitch?: (target: TargetConfig) => void;
@@ -84,6 +93,7 @@ type TargetHeaderProps = {
  */
 export const TargetHeader = memo(function TargetHeader({
   target,
+  onOptimize,
   onEdit,
   onDuplicate,
   onSwitch,
@@ -443,6 +453,12 @@ export const TargetHeader = memo(function TargetHeader({
             flexShrink={1}
             className="group"
             data-testid="target-header-button"
+            // The name the reader sees, published for anything that has to
+            // refer to this column in words. Every candidate here carries the
+            // same prompt handle, so only the disambiguated form tells them
+            // apart, and deriving it a second time elsewhere is how the panel
+            // ends up naming a different column than the header does.
+            data-target-name={headerName}
           >
             <ColorfulBlockIcon
               color={getTargetColor()}
@@ -528,6 +544,18 @@ export const TargetHeader = memo(function TargetHeader({
           </Button>
         </Menu.Trigger>
         <Menu.Content minWidth="200px">
+          {onOptimize && target.type === "prompt" && (
+            <Menu.Item
+              value="optimize"
+              onClick={() => onOptimize({ target, name: headerName })}
+              data-testid="target-optimize-menu-item"
+            >
+              <HStack gap={2}>
+                <LuSparkles size={14} />
+                <Text>Optimize this prompt</Text>
+              </HStack>
+            </Menu.Item>
+          )}
           <Menu.Item value="edit" onClick={() => onEdit?.(target)}>
             <HStack gap={2}>
               <LuPencil size={14} />

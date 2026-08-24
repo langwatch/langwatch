@@ -155,6 +155,10 @@ export const KNOWN_LANGY_ERROR_KINDS = [
   // promoteCodexAgentError. Spec: specs/model-providers/codex-account-provider.feature
   "langy_codex_session_expired",
   "langy_codex_plan_limit",
+  // The model selected for Langy has no credential this project can reach.
+  // Promoted off the agent-errored reason chain — see
+  // promoteModelUnavailableError.
+  "langy_model_unavailable",
 ] as const;
 
 /**
@@ -207,6 +211,98 @@ const PLAN_LIMIT_REASONS: ReadonlySet<string> = new Set([
   "insufficient_quota",
   "billing_hard_limit_reached",
 ]);
+
+/**
+ * The proxy's upstream-status reasons (llmproxy.go `upstreamReasonCodes`).
+ * They say the call to the MODEL PROVIDER failed and which way, which is a
+ * different fact from "Langy's reply failed" and carries a different next
+ * step: wait out a rate limit, fix a credential, pick another model.
+ *
+ * `llm_upstream_error` already writes one sentence per group, so promoting to
+ * it reuses that copy rather than restating it here.
+ */
+const UPSTREAM_PROVIDER_REASONS: ReadonlySet<string> = new Set([
+  "upstream_stream_error",
+  "upstream_bad_request",
+  "upstream_unauthorized",
+  "upstream_forbidden",
+  "upstream_not_found",
+  "upstream_timeout",
+  "upstream_conflict",
+  "upstream_unprocessable_entity",
+  "upstream_rate_limited",
+  "upstream_unavailable",
+  "upstream_http_error",
+]);
+
+/**
+ * A turn that died because the model provider refused the call reads as the
+ * provider failure it was, not as a nameless "Langy hit an error".
+ *
+ * Same rule as `promoteCodexAgentError`: promote by EXACT reason-code match,
+ * never by sniffing the provider's message. Runs after it, so the codex codes
+ * keep their more specific cards.
+ */
+export function promoteUpstreamProviderError(
+  domain: LangyDomainError,
+): LangyDomainError {
+  if (domain.code !== "langy_agent_errored") return domain;
+  return hasReasonKind(domain.reasons, UPSTREAM_PROVIDER_REASONS)
+    ? { ...domain, code: "llm_upstream_error" }
+    : domain;
+}
+
+/**
+ * The gateway's reasons for "this key cannot serve that model at all".
+ *
+ * `model_provider_not_bound` means the model named a provider the project has
+ * no credential for; `model_not_recognized` means no bound provider declares
+ * the model; `model_provider_disabled` means the credential exists but is
+ * turned off. One remediation covers all three: choose a model the project can
+ * reach, or connect the provider that serves this one.
+ *
+ * Their registry entries are written for whoever configures a virtual key, and
+ * say to bind the provider to the key or drop the prefix from the model name.
+ * That is the right advice at the gateway and the wrong advice in the panel,
+ * where the model came from a menu and there is no key or prefix to edit. So
+ * these promote to a Langy code with Langy's own copy, rather than reusing the
+ * gateway's.
+ */
+const MODEL_UNAVAILABLE_REASONS: ReadonlySet<string> = new Set([
+  "model_provider_not_bound",
+  "model_not_recognized",
+  "model_provider_disabled",
+]);
+
+/**
+ * A turn that died because the chosen model is not reachable says so, and
+ * offers the model settings.
+ *
+ * Distinct from `promoteUpstreamProviderError`: there the provider was reached
+ * and refused the call, so waiting or retrying can work. Here there is nothing
+ * to reach, and the same request fails the same way forever, so the card
+ * offers the setting instead of a retry.
+ */
+export function promoteModelUnavailableError(
+  domain: LangyDomainError,
+): LangyDomainError {
+  if (domain.code !== "langy_agent_errored") return domain;
+  return hasReasonKind(domain.reasons, MODEL_UNAVAILABLE_REASONS)
+    ? { ...domain, code: "langy_model_unavailable" }
+    : domain;
+}
+
+/** Does any reason in the chain, at any depth, carry one of these kinds? */
+function hasReasonKind(
+  reasons: LangySerializedReason[] | undefined,
+  kinds: ReadonlySet<string>,
+): boolean {
+  for (const reason of reasons ?? []) {
+    if (kinds.has(reason.kind)) return true;
+    if (hasReasonKind(reason.reasons, kinds)) return true;
+  }
+  return false;
+}
 
 /*
  * `firstReasonMessage` used to live here: it walked the reason chain for the
@@ -364,6 +460,28 @@ const REGISTRY_CODE_ALIASES: Record<string, string> = {
  * are dropped: the registry never reads them, and Langy's parsed form is its
  * own.
  */
+/**
+ * A Langy reason carries only `kind`; the registry matches on `code` OR
+ * `kind`, so the one name fills both. Nothing is read out of a reason except
+ * membership of an enumerated set, so no upstream prose can ride along.
+ *
+ * Returns the mutable element array rather than the readonly one the shape
+ * declares: a nested `reasons` field is `SerializedReason[]`, so the recursive
+ * step has to produce that to build the chain. A caller reading the whole
+ * result as readonly still works, since mutable widens to readonly.
+ */
+type RegistryReason = HandledErrorShape["reasons"][number];
+
+function toRegistryReasons(
+  reasons: LangySerializedReason[] | undefined,
+): RegistryReason[] {
+  return (reasons ?? []).map((reason) => ({
+    code: reason.kind,
+    kind: reason.kind,
+    reasons: toRegistryReasons(reason.reasons),
+  }));
+}
+
 function registryCopy(domain: LangyDomainError) {
   return explainHandledError({
     code: REGISTRY_CODE_ALIASES[domain.code] ?? domain.code,
@@ -373,7 +491,11 @@ function registryCopy(domain: LangyDomainError) {
     tips: domain.tips ?? [],
     docsUrl: domain.docsUrl,
     traceId: domain.traceId,
-    reasons: [],
+    // The chain is passed on so an entry that varies its sentence on a reason
+    // discriminant can do it (`llm_upstream_error` says which way the provider
+    // failed). This is the sanctioned way for copy to vary on an upstream:
+    // matching an enumerated code, never reading its message.
+    reasons: toRegistryReasons(domain.reasons),
   });
 }
 
@@ -434,7 +556,12 @@ export function isStaleLangyHistoryRead({
 export function explainLangyError(
   received: LangyDomainError,
 ): LangyErrorPresentation {
-  const domain = promoteCodexAgentError(received);
+  // Order matters: the narrower promotions run first, so a codex session that
+  // also carries an upstream status keeps its own card. "Not reachable at all"
+  // is checked before "reached and refused" for the same reason.
+  const domain = promoteUpstreamProviderError(
+    promoteModelUnavailableError(promoteCodexAgentError(received)),
+  );
   // Always carried through for debugging, regardless of the matched case.
   const debug = {
     meta: Object.keys(domain.meta).length > 0 ? domain.meta : undefined,
@@ -523,6 +650,18 @@ export function explainLangyError(
       // allowlist is the only runnable-set gate: any model on it runs, so the
       // fix is setting or swapping the model. `meta.model` rides along so the
       // user sees which one was rejected.
+      return {
+        ...copy,
+        render: "card",
+        action: { label: "Configure model", kind: "configure-model" },
+        ...debug,
+      };
+
+    case "langy_model_unavailable":
+      // A model IS chosen, and the project cannot serve it. Deterministic, so
+      // the card offers the model settings rather than a retry that would fail
+      // the same way. Sits beside `langy_model_not_configured`, which is the
+      // other half: there nothing is chosen at all.
       return {
         ...copy,
         render: "card",

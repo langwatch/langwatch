@@ -35,8 +35,8 @@
  * itself and a derived fact — whose legacy representation is the membership
  * or credential row it came from — creates no binding row at all.
  *
- * Two disagreements are named rather than repaired, deliberately — each
- * holds the organization with a diff an operator reads, and both fail
+ * Three disagreements are named rather than repaired, deliberately — each
+ * holds the organization with a diff an operator reads, and all of them fail
  * toward LESS access, never more:
  *
  * - A DERIVED fact whose head was revoked and whose legacy source came back
@@ -49,6 +49,17 @@
  *   `changeGrantRole`, because that event clears `legacyRole` (the
  *   escalation rule in the projection) while the expected fact still
  *   carries it; the check names the `legacyRole` disagreement instead.
+ * - A role head the fold has BURIED, whose legacy CustomRole row came back
+ *   under the same id, reports `role_deleted` each pass: the projection has
+ *   no un-delete, so nothing a restatement could carry would raise it.
+ *
+ * Deletion is also why the role head read returns tombstones and says so
+ * (`RoleHeadRow.deleted`) rather than fencing them out. A role's name stays
+ * taken after a delete, so its row stays for good; a read that dropped it
+ * would make a buried head indistinguishable from one the fold has not
+ * written yet, and the check would count a permanent tombstone as
+ * `outstanding` on every pass. One API key deleted between two passes was
+ * enough to hold an organization forever.
  *
  * @see specs/migration/authz-grants-rollout.feature
  * @see dev/docs/adr/110-grant-aggregates-are-grants.md
@@ -79,8 +90,10 @@ import {
   checkGrantHeads,
   checkResourceHeads,
   checkRoleHeads,
+  grantDrifted,
   type HeadState,
   roleDrifted,
+  shareLinkDrifted,
 } from "./authz-engine.check";
 import {
   assembleFacts,
@@ -211,9 +224,22 @@ export class AuthzEngineMigration implements SystemMigration {
   // Finalizing changes who answers permission checks for the organization,
   // so an operator action on it takes the typed destructive confirmation.
   readonly requiresOperatorConfirmation = true;
-  // Cloud soaks first (per-organization enrollment); a later release flips
-  // this once it has. Flipping it IS the self-hosted release act.
-  readonly runsAutomaticallyOnSelfHosted = false;
+  // RELEASED FOR SELF-HOSTED. Cloud soaked it first, per organization, by
+  // enrollment. Flipping this IS the self-hosted release act — there is no
+  // enrollment off cloud, so from the release that carries this line every
+  // self-hosted installation migrates every organization it has,
+  // automatically, at worker boot.
+  //
+  // It stays true. This is the prerequisite for removing the legacy
+  // authorization path altogether: that removal cannot be safe until every
+  // installation that might upgrade into it has already had a release that
+  // runs this migration, and this is that release.
+  //
+  // The first pass after an upgrade states an organization's whole fact set,
+  // because its projection heads start empty — unavoidable, and the only
+  // time it happens. Every later pass states only what the heads do not
+  // already carry (#7429), so this does not repeat at each boot.
+  readonly runsAutomaticallyOnSelfHosted = true;
 
   constructor(private readonly deps: AuthzEngineMigrationDeps) {}
 
@@ -228,20 +254,12 @@ export class AuthzEngineMigration implements SystemMigration {
     const inventory = await this.readInventory(organizationId);
     const expected = assembleFacts({ organizationId, inventory });
 
-    // The projection, read ONCE per pass (the spec's own words) — before
-    // anything is stated, so nothing here waits on a fold. Reconcile and the
-    // check both walk this read: what this pass states is invisible to it by
-    // construction, lands as `outstanding`, and the NEXT pass sees it folded
-    // and finalizes. Holding a first pass to finalize a later one is the
-    // design, not a shortcut.
-    const heads = await this.readHeads(organizationId);
-
-    await this.state({ organizationId, expected, signal });
-    await this.reconcileStale({ organizationId, expected, heads, signal });
-    await this.repairDrift({ organizationId, expected, heads, signal });
-    // The budget handover rides every pass, monotonically upward: legacy
-    // keeps counting views while the organization is held, and the proof
-    // compares counts exactly, so re-seeding is what lets it heal.
+    // The budget handover, BEFORE the read below on purpose. It is a direct
+    // write, not a fact the pass states and waits on, so the read that
+    // follows simply sees it. Seeding after that read compared a PRE-seed
+    // count against legacy, so a link viewed between one pass's seed and the
+    // next pass's read counted `outstanding` again and an organization whose
+    // links are viewed at all could never finalize.
     await this.deps.store.seedResourceGrantUsage({
       organizationId,
       seeds: expected.shareLinks.map((link) => ({
@@ -250,6 +268,18 @@ export class AuthzEngineMigration implements SystemMigration {
         viewCount: link.row.viewCount,
       })),
     });
+
+    // The projection, read ONCE per pass (the spec's own words) — before
+    // anything is STATED, so nothing here waits on a fold. Reconcile and the
+    // check both walk this read: what this pass states is invisible to it by
+    // construction, lands as `outstanding`, and the NEXT pass sees it folded
+    // and finalizes. Holding a first pass to finalize a later one is the
+    // design, not a shortcut.
+    const heads = await this.readHeads(organizationId);
+
+    await this.state({ organizationId, expected, heads, signal });
+    await this.reconcileStale({ organizationId, expected, heads, signal });
+    await this.repairDrift({ organizationId, expected, heads, signal });
 
     const { outstanding, diffs } = this.check({
       organizationId,
@@ -326,17 +356,57 @@ export class AuthzEngineMigration implements SystemMigration {
   }
 
   /** Roles before grants: a custom binding's roleKey names its role. */
+  /**
+   * State every fact the heads do not ALREADY carry identically.
+   *
+   * Restating a fact the head already matches is a no-op — the command id is
+   * content-derived, so the event store swallows it — but that dedupe happens
+   * downstream of the queue, which has already paid to enqueue, dispatch and
+   * fold-check it. A grant is its own aggregate since ADR-101, so a held
+   * organization re-drives one group per grant on every pass, and a pass runs
+   * on every worker boot. The organization that made this necessary restaged
+   * ~900k commands per pass, indefinitely, to converge on nothing.
+   *
+   * The filter is the check's own predicate, not a second opinion: a fact
+   * skipped here is exactly a fact `check` counts as neither `outstanding`
+   * nor a diff, so the pass's report is unchanged by the skipping. Anything
+   * the heads lack, hold revoked, or disagree with is still stated, so the
+   * first pass over an organization stages everything as before and drift
+   * repair is untouched. A projection that is behind under-reports the
+   * heads, which restates a fact needlessly — the pre-existing cost, and
+   * still idempotent.
+   */
   private async state({
     organizationId,
     expected,
+    heads,
     signal,
   }: {
     organizationId: string;
     expected: ExpectedFacts;
+    heads: HeadState;
     signal?: AbortSignal;
   }): Promise<void> {
+    const roleHeadById = new Map(
+      heads.roleHeads.map((head) => [head.id, head]),
+    );
+    const grantHeadById = new Map(heads.grantRows.map((row) => [row.id, row]));
+    const resourceHeadById = new Map(
+      heads.resourceRows.map((row) => [row.grantId, row]),
+    );
     await this.each({
-      items: expected.roles,
+      items: expected.roles.filter((role) => {
+        const head = roleHeadById.get(role.roleId);
+        if (head === undefined) return true;
+        // A buried head is the one place this filter is not the check's
+        // predicate: the check names `role_deleted` and this states nothing,
+        // because nothing it could state would land. `role.upsert` leaves
+        // `deletedAt` alone by design, so the row would stay buried however
+        // many times the fact were restated — and the delete already moved
+        // the row's business time past the fact's own.
+        if (head.deleted) return false;
+        return roleDrifted({ role, head });
+      }),
       signal,
       send: (role) =>
         this.deps.ledger.defineRole({
@@ -350,13 +420,28 @@ export class AuthzEngineMigration implements SystemMigration {
           actor: ACTOR,
         }),
     });
-    const grants = [
+    const nonResourceGrants = [
       ...expected.bindingFacts,
       ...expected.teamFacts,
       ...expected.organizationFacts,
       ...expected.credentialFacts,
-      ...expected.shareLinks.map((link) => link.fact),
-    ];
+    ].filter((fact) => {
+      const head = grantHeadById.get(fact.grantId);
+      if (head === undefined) return true;
+      // A revoked head is not agreement: the fact says the grant is live, so
+      // it must be restated to bring the head back.
+      return head.revoked || grantDrifted({ fact, head });
+    });
+    // Share links are checked against the RESOURCE heads, keyed by the link's
+    // own id, so their filter cannot share the grant-head map above.
+    const shareLinkGrants = expected.shareLinks
+      .filter((link) => {
+        const head = resourceHeadById.get(link.row.id);
+        if (head === undefined) return true;
+        return shareLinkDrifted({ organizationId, link, head });
+      })
+      .map((link) => link.fact);
+    const grants = [...nonResourceGrants, ...shareLinkGrants];
     await this.each({
       items: grants,
       signal,
@@ -448,7 +533,13 @@ export class AuthzEngineMigration implements SystemMigration {
       // finalizes, and until then every role head — `system_api_key`
       // included — mirrors a legacy CustomRole row, so a head with no such
       // row is stale whatever its kind.
-      .filter((head) => !expectedRoleIds.has(head.id))
+      //
+      // A head already deleted is not a candidate, for the reason a revoked
+      // grant is not one: the deny has landed. Its tombstone stays in the
+      // head read forever, so re-sending the delete would append one event
+      // per pass, for every pass there will ever be, to bury a row that is
+      // already buried.
+      .filter((head) => !head.deleted && !expectedRoleIds.has(head.id))
       .map((head) => head.id)
       .sort();
     await this.each({
@@ -537,7 +628,7 @@ export class AuthzEngineMigration implements SystemMigration {
     );
     const redefines = expected.roles.flatMap((role) => {
       const head = roleHeadById.get(role.roleId);
-      if (!head || !roleDrifted({ role, head })) return [];
+      if (!head || head.deleted || !roleDrifted({ role, head })) return [];
       return [{ ...role, occurredAtMs }];
     });
     await this.each({

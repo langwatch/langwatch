@@ -275,6 +275,24 @@ interface LangyState extends TurnPhaseState {
   homeAskOpen: boolean;
   setHomeAskOpen: (open: boolean) => void;
 
+  /**
+   * What the page Langy is driving is doing this second, in the page's own
+   * words, or null when it is doing nothing.
+   *
+   * The status line may only say true things, so with no tool running and no
+   * tokens arriving it falls back to a verb that claims nothing ("Cooking…").
+   * That was honest and useless: while Langy runs a column the page knows
+   * which one and how many rows are back, and nothing carried that the few
+   * feet from the table to the panel. This is that channel, and the page that
+   * writes it is the page that is doing the work, so the line stays true.
+   *
+   * Session-only, never persisted: it describes this second. A page that
+   * reloaded into "running 12 of 20 rows" would be claiming work no one is
+   * doing, which is the whole failure this exists to avoid.
+   */
+  pageActivity: string | null;
+  setPageActivity: (activity: string | null) => void;
+
   // Active conversation (a pointer into React Query server state)
   activeConversationId: string | null;
   /**
@@ -753,6 +771,9 @@ export const useLangyStore = create<LangyState>()(
 
       homeAskOpen: false,
       setHomeAskOpen: (homeAskOpen) => set({ homeAskOpen }),
+
+      pageActivity: null,
+      setPageActivity: (pageActivity) => set({ pageActivity }),
 
       activeConversationId: null,
       activeConversationScope: null,

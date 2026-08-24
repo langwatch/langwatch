@@ -11,6 +11,7 @@
  * emitted event's shape would have passed throughout.
  */
 import { describe, expect, it } from "vitest";
+import { validateEventAggregateType } from "../../../stores/eventStoreUtils";
 import {
   AttachGrantCommand,
   ChangeGrantRoleCommand,
@@ -19,10 +20,8 @@ import {
   DeleteRoleCommand,
   RevokeGrantCommand,
 } from "../commands/grantsLedgerCommands";
-import {
-  AUTHZ_GRANT_AGGREGATE_TYPE,
-  AUTHZ_ROLE_AGGREGATE_TYPE,
-} from "../schemas/constants";
+import { createAuthzGrantsPipeline } from "../pipeline";
+import { AUTHZ_GRANT_AGGREGATE_TYPE } from "../schemas/constants";
 
 const ORG = "org_acme";
 const ACTOR = { type: "user", id: "user_admin" } as const;
@@ -125,7 +124,66 @@ describe("authz command aggregate identity", () => {
 
       expect(event?.aggregateId).toBe("role_1");
       expect(event?.aggregateId).not.toBe(ORG);
-      expect(event?.aggregateType).toBe(AUTHZ_ROLE_AGGREGATE_TYPE);
+      // The aggregate TYPE is the pipeline's, not a per-family label: see
+      // the append guard below for why a role event stamping its own type
+      // could never be stored.
+      expect(event?.aggregateType).toBe(AUTHZ_GRANT_AGGREGATE_TYPE);
+    });
+  });
+
+  /**
+   * The regression this file previously could not catch. Both families ride
+   * the `authz_grant` pipeline, and the event store validates every event's
+   * aggregate type against the one its pipeline declares — so a role event
+   * stamping `authz_role` was rejected at index 0 of the very first batch,
+   * which parked the whole ADR-110 migration before a single fact landed.
+   *
+   * Asserting each command's constant against itself is what let that ship.
+   * This asserts against the pipeline's OWN declared type, run through the
+   * store's real validator, so the two cannot drift apart again.
+   */
+  describe("when the store validates a command's events on append", () => {
+    /** @scenario "A role's aggregate is the role" */
+    it.each([
+      {
+        label: "attach",
+        handler: new AttachGrantCommand(),
+        data: { ...identity, grant: GRANT },
+      },
+      {
+        label: "define role",
+        handler: new DefineRoleCommand(),
+        data: { ...identity, role: ROLE, actor: ACTOR },
+      },
+      {
+        label: "change permissions",
+        handler: new ChangeRolePermissionsCommand(),
+        data: {
+          ...identity,
+          roleId: "role_1",
+          permissions: ["traces:view"],
+          actor: ACTOR,
+          occurredAtMs: AT,
+        },
+      },
+      {
+        label: "delete role",
+        handler: new DeleteRoleCommand(),
+        data: { ...identity, roleId: "role_1", actor: ACTOR, occurredAtMs: AT },
+      },
+    ])("accepts every event $label emits", async ({ handler, data }) => {
+      const declared = createAuthzGrantsPipeline({
+        authzGrantsWriteStore: {} as never,
+        authzAuditTrailStore: {} as never,
+      }).metadata.aggregateType;
+      const events = await emit(handler as never, data);
+
+      expect(events.length).toBeGreaterThan(0);
+      for (const [index, event] of events.entries()) {
+        expect(() =>
+          validateEventAggregateType(event as never, declared, index),
+        ).not.toThrow();
+      }
     });
   });
 

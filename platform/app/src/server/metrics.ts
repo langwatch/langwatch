@@ -1068,7 +1068,10 @@ export const incrementEsProcessIntentsSuppressed = ({
 // --- Topic clustering domain metrics (ADR-051/ADR-054) ---
 // Run-page outcomes as the domain sees them, not just generic es_* counters:
 // `failed_final` is the alertable one (retries exhausted, run_failed
-// recorded); `failed_retryable` is expected noise under provider hiccups.
+// recorded); `failed_retryable` is expected noise under provider hiccups;
+// `failed_customer` is a run the customer's own configuration stopped —
+// recorded with its remediation, never retried, and deliberately outside
+// the alertable series (ADR-054 §4).
 register.removeSingleMetric("topic_clustering_page_total");
 const topicClusteringPageTotal = new Counter({
   name: "topic_clustering_page_total",
@@ -1079,7 +1082,12 @@ const topicClusteringPageTotal = new Counter({
 export const incrementTopicClusteringPageTotal = ({
   outcome,
 }: {
-  outcome: "completed" | "skipped" | "failed_retryable" | "failed_final";
+  outcome:
+    | "completed"
+    | "skipped"
+    | "failed_retryable"
+    | "failed_final"
+    | "failed_customer";
 }) => topicClusteringPageTotal.labels(outcome).inc();
 
 register.removeSingleMetric("topic_clustering_page_duration_milliseconds");

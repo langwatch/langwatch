@@ -1,3 +1,5 @@
+import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import type {
   Experiment,
@@ -5,20 +7,115 @@ import type {
   PrismaClient,
 } from "~/generated/prisma/client";
 import { ExperimentType } from "~/generated/prisma/client";
+import type { PersistedEvaluationsV3State } from "../../experiments-v3/types/persistence";
+import { KSUID_RESOURCES } from "../../utils/constants";
 import { slugify } from "../../utils/slugify";
-import { isUniqueConstraintError } from "../utils/prismaErrors";
-import { ExperimentNotFoundError } from "./errors";
+import {
+  isRecordNotFoundError,
+  isUniqueConstraintError,
+  uniqueConstraintTargets,
+} from "../utils/prismaErrors";
+import {
+  ExperimentNotFoundError,
+  ExperimentTypeMismatchError,
+  ExperimentVersionNotFoundError,
+  InvalidExperimentConfigurationError,
+  StaleWorkbenchStateError,
+  WorkbenchMissingReferenceError,
+} from "./errors";
 import { ExperimentRepository } from "./experiment.repository";
+import { WorkbenchReferenceRepository } from "./workbenchReference.repository";
+import {
+  collectWorkbenchReferences,
+  parseWorkbenchState,
+  stripResults,
+  toJsonValue,
+} from "./workbenchValidation";
+
+const logger = createLogger("langwatch:experiments:service");
+
+/** Who a workbench write is attributed to. */
+export type WorkbenchActorLabel = "user" | "langy" | "api";
+
+export interface WorkbenchActor {
+  userId?: string;
+  label: WorkbenchActorLabel;
+}
+
+/** What a caller reads before it edits. `version` is what it saves back. */
+export interface WorkbenchStateView {
+  experimentId: string;
+  slug: string;
+  name: string | null;
+  state: PersistedEvaluationsV3State | null;
+  version: number;
+  updatedAt: Date;
+}
+
+export interface WorkbenchSaveResult {
+  experimentId: string;
+  slug: string;
+  version: number;
+}
+
+export interface WorkbenchVersionSummary {
+  version: number;
+  autoSaved: boolean;
+  commitMessage: string | null;
+  authorId: string | null;
+  authorLabel: string;
+  createdAt: Date;
+}
+
+/**
+ * The one thing the seam needs from the broadcaster. Narrow on purpose: the
+ * service publishes a single event type and must not be able to reach the
+ * rest of the tenant channel.
+ */
+export interface ExperimentBroadcaster {
+  broadcastToTenant(
+    tenantId: string,
+    event: string,
+    eventType: "experiment_updated",
+  ): Promise<void>;
+}
+
+export interface ExperimentServiceOptions {
+  broadcaster?: ExperimentBroadcaster | null;
+}
+
+/** Default page size for the version list, and the ceiling a caller can ask. */
+const DEFAULT_VERSION_PAGE_SIZE = 50;
+const MAX_VERSION_PAGE_SIZE = 100;
+
+/** The schema version every state written by this build carries. */
+const WORKBENCH_SCHEMA_VERSION = "1";
 
 /**
  * Service layer for experiment business logic.
  * Owns slug generation, draft naming, lookups, and P2002 retry strategy.
+ *
+ * It also owns every write to the evaluations workbench state. That is the
+ * point of the seam: validation, the version compare-and-set, the version row
+ * and the invalidation signal happen once here, so a tRPC caller, a REST
+ * caller and the agent executor cannot each get a different subset of them.
  */
 export class ExperimentService {
-  constructor(private readonly repository: ExperimentRepository) {}
+  constructor(
+    private readonly repository: ExperimentRepository,
+    private readonly references: WorkbenchReferenceRepository,
+    private readonly options: ExperimentServiceOptions = {},
+  ) {}
 
-  static create(prisma: PrismaClient): ExperimentService {
-    return new ExperimentService(new ExperimentRepository(prisma));
+  static create({
+    prisma,
+    broadcaster,
+  }: { prisma: PrismaClient } & ExperimentServiceOptions): ExperimentService {
+    return new ExperimentService(
+      new ExperimentRepository(prisma),
+      new WorkbenchReferenceRepository(prisma),
+      { broadcaster },
+    );
   }
 
   async getBySlug({
@@ -161,10 +258,28 @@ export class ExperimentService {
     });
 
     if (existing) {
-      await this.repository.updateById({
+      const updated = await this.repository.updateById({
         id: existing.id,
         projectId,
-        data: { workbenchState: workbenchStateJson },
+        data: {
+          workbenchState: workbenchStateJson,
+          // The state changed, so the counter has to move even though this
+          // write is the platform refreshing a workflow's own evaluation
+          // rather than a person editing it. A client holding the old version
+          // must still be told it is behind. No version row: there is nothing
+          // here a person would want to restore.
+          workbenchVersion: { increment: 1 },
+        },
+      });
+      // Same signal every other write sends. Without it an open workbench sits
+      // on the old state until its next focus or visibility probe, which is
+      // minutes of showing a dataset and a target the evaluation no longer uses.
+      await this.publishExperimentUpdated({
+        projectId,
+        experimentId: existing.id,
+        slug: existing.slug,
+        version: updated.workbenchVersion,
+        actorLabel: "api",
       });
       return existing;
     }
@@ -359,6 +474,656 @@ export class ExperimentService {
       throw new ExperimentNotFoundError(id);
     }
     return { success: true };
+  }
+
+  // -------------------------------------------------------------------------
+  // Workbench state: the server-owned write seam.
+  // -------------------------------------------------------------------------
+
+  /**
+   * Reads an evaluations workbench, with the version a writer must send back.
+   * Archived rows read as missing and a row of another experiment type is
+   * refused, the same two answers the workbench route has always given.
+   */
+  async getWorkbenchState({
+    projectId,
+    id,
+    slug,
+  }: {
+    projectId: string;
+    id?: string;
+    slug?: string;
+  }): Promise<WorkbenchStateView> {
+    const row = await this.repository.findWorkbenchRow({ projectId, id, slug });
+    if (!row) {
+      throw new ExperimentNotFoundError(id ?? slug ?? "");
+    }
+    if (row.type !== ExperimentType.EVALUATIONS_V3) {
+      throw new ExperimentTypeMismatchError();
+    }
+
+    return {
+      experimentId: row.id,
+      slug: row.slug,
+      name: row.name,
+      state: (row.workbenchState as PersistedEvaluationsV3State | null) ?? null,
+      version: row.workbenchVersion,
+      updatedAt: row.updatedAt,
+    };
+  }
+
+  /**
+   * Writes a workbench state, or refuses.
+   *
+   * The order matters and is the whole contract: the state is parsed and its
+   * references are checked BEFORE the transaction opens, then one transaction
+   * reads the row, compares the caller's expected version with the stored one,
+   * updates under a compare-and-set, and records the new version row. Nothing
+   * is written for a save that fails any of those, so a refused save leaves
+   * the reader's own copy the only copy that changed.
+   *
+   * With no id and no slug this creates a new experiment, which is what the
+   * "new evaluation" buttons do.
+   */
+  async saveWorkbenchState({
+    projectId,
+    id,
+    slug,
+    state,
+    expectedVersion,
+    actor,
+    commitMessage,
+  }: {
+    projectId: string;
+    id?: string;
+    slug?: string;
+    state: unknown;
+    expectedVersion?: number;
+    actor: WorkbenchActor;
+    commitMessage?: string;
+  }): Promise<WorkbenchSaveResult> {
+    const parsed = parseWorkbenchState(state);
+    await this.assertWorkbenchReferencesExist({ projectId, state: parsed });
+
+    const existingId = await this.resolveWorkbenchTargetId({
+      projectId,
+      id,
+      slug,
+    });
+
+    if (!existingId) {
+      return await this.createEvaluationsV3({
+        projectId,
+        id,
+        state: parsed,
+        actor,
+        commitMessage,
+        validated: true,
+      });
+    }
+
+    // Resolved outside the transaction: naming a draft reads the project's
+    // other experiments, which has no business holding a row lock.
+    const name = parsed.name || (await this.findNextDraftName({ projectId }));
+
+    const saved = await this.repository.runInTransaction((tx) =>
+      this.writeWorkbenchState({
+        tx,
+        projectId,
+        experimentId: existingId,
+        name,
+        state: parsed,
+        expectedVersion,
+        actor,
+        commitMessage,
+      }),
+    );
+
+    await this.publishExperimentUpdated({
+      projectId,
+      ...saved,
+      actorLabel: actor.label,
+    });
+
+    return saved;
+  }
+
+  /**
+   * The transactional half of a save: read, compare versions, update under the
+   * compare-and-set, record the version row. Every throw here is a refusal
+   * that leaves the row exactly as it was.
+   */
+  private async writeWorkbenchState({
+    tx,
+    projectId,
+    experimentId,
+    name,
+    state,
+    expectedVersion,
+    actor,
+    commitMessage,
+  }: {
+    tx: Prisma.TransactionClient;
+    projectId: string;
+    experimentId: string;
+    name: string;
+    state: PersistedEvaluationsV3State;
+    expectedVersion?: number;
+    actor: WorkbenchActor;
+    commitMessage?: string;
+  }): Promise<WorkbenchSaveResult> {
+    const row = await this.repository.findWorkbenchRow(
+      { projectId, id: experimentId },
+      { tx },
+    );
+    if (!row) throw new ExperimentNotFoundError(experimentId);
+    if (row.type !== ExperimentType.EVALUATIONS_V3) {
+      throw new ExperimentTypeMismatchError();
+    }
+
+    const stale = new StaleWorkbenchStateError({
+      currentVersion: row.workbenchVersion,
+    });
+
+    // Refused before the write, not rolled back after it.
+    if (
+      expectedVersion !== undefined &&
+      expectedVersion !== row.workbenchVersion
+    ) {
+      throw stale;
+    }
+
+    const nextVersion = row.workbenchVersion + 1;
+
+    try {
+      await this.repository.casUpdateWorkbenchState(
+        {
+          id: row.id,
+          projectId,
+          expectedVersion: row.workbenchVersion,
+          nextVersion,
+          name,
+          workbenchState: toJsonValue(state),
+        },
+        { tx },
+      );
+    } catch (error) {
+      if (isRecordNotFoundError(error)) throw stale;
+      throw error;
+    }
+
+    await this.writeVersionRow({
+      tx,
+      projectId,
+      experimentId: row.id,
+      version: nextVersion,
+      state,
+      actor,
+      commitMessage,
+    });
+
+    return { experimentId: row.id, slug: row.slug, version: nextVersion };
+  }
+
+  /**
+   * Creates an evaluations workbench at version 1, with a numbered version row
+   * so its history starts where the experiment does.
+   *
+   * `state` is required: the shape a blank workbench starts from is the
+   * client's to decide (it is what the "new evaluation" buttons build), and a
+   * server-side guess at it would be a second definition of the same thing.
+   * `name` is the fallback when the state does not carry one.
+   */
+  async createEvaluationsV3({
+    projectId,
+    id,
+    name,
+    state,
+    actor,
+    commitMessage,
+    validated = false,
+  }: {
+    projectId: string;
+    id?: string;
+    name?: string;
+    state: unknown;
+    actor: WorkbenchActor;
+    commitMessage?: string;
+    /** Set by `saveWorkbenchState`, which has already parsed and checked. */
+    validated?: boolean;
+  }): Promise<WorkbenchSaveResult> {
+    const parsed = validated
+      ? (state as PersistedEvaluationsV3State)
+      : parseWorkbenchState(state);
+    if (!validated) {
+      await this.assertWorkbenchReferencesExist({ projectId, state: parsed });
+    }
+
+    const experimentId = id ?? generate(KSUID_RESOURCES.EXPERIMENT).toString();
+    const resolvedName =
+      parsed.name || name || (await this.findNextDraftName({ projectId }));
+    const baseSlug = parsed.experimentSlug ?? experimentId.slice(-8);
+    const initialSlug = await this.generateUniqueSlug({
+      baseSlug,
+      projectId,
+    });
+
+    const { slug } = await this.createWithSlugRetry({
+      id,
+      initialSlug,
+      baseSlug,
+      projectId,
+      execute: (candidateSlug) =>
+        this.repository.runInTransaction(async (tx) => {
+          await this.repository.create(
+            {
+              data: {
+                id: experimentId,
+                projectId,
+                name: resolvedName,
+                slug: candidateSlug,
+                type: ExperimentType.EVALUATIONS_V3,
+                workbenchState: toJsonValue(parsed),
+                workbenchVersion: 1,
+              },
+            },
+            { tx },
+          );
+          await this.repository.createVersion(
+            {
+              data: {
+                experimentId,
+                projectId,
+                version: 1,
+                autoSaved: false,
+                commitMessage: commitMessage ?? null,
+                authorId: actor.userId ?? null,
+                authorLabel: actor.label,
+                state: toJsonValue(stripResults(parsed)),
+                schemaVersion: WORKBENCH_SCHEMA_VERSION,
+              },
+            },
+            { tx },
+          );
+        }),
+    });
+
+    const created = { experimentId, slug, version: 1 };
+    await this.publishExperimentUpdated({
+      projectId,
+      ...created,
+      actorLabel: actor.label,
+    });
+    return created;
+  }
+
+  /**
+   * Reads the current state, hands it to `transform`, and saves the result
+   * back at the version it was read at. This is the one entry point an
+   * automated editor needs: it cannot skip validation, cannot skip the version
+   * check, and cannot write a state the workbench would refuse to load.
+   */
+  async applyWorkbenchTransform({
+    projectId,
+    id,
+    slug,
+    expectedVersion,
+    actor,
+    commitMessage,
+    transform,
+  }: {
+    projectId: string;
+    id?: string;
+    slug?: string;
+    expectedVersion?: number;
+    actor: WorkbenchActor;
+    commitMessage?: string;
+    transform: (
+      state: PersistedEvaluationsV3State,
+    ) => PersistedEvaluationsV3State | Promise<PersistedEvaluationsV3State>;
+  }): Promise<{ version: number; state: PersistedEvaluationsV3State }> {
+    const current = await this.getWorkbenchState({ projectId, id, slug });
+    if (!current.state) {
+      throw new InvalidExperimentConfigurationError(current.slug);
+    }
+
+    const next = await transform(current.state);
+    const saved = await this.saveWorkbenchState({
+      projectId,
+      id: current.experimentId,
+      state: next,
+      expectedVersion: expectedVersion ?? current.version,
+      actor,
+      commitMessage,
+    });
+
+    return { version: saved.version, state: parseWorkbenchState(next) };
+  }
+
+  /**
+   * Snapshots the live state as a numbered version. The state does not change;
+   * only the version advances, which is what puts a named entry in the list.
+   */
+  async commitWorkbenchVersion({
+    projectId,
+    id,
+    commitMessage,
+    actor,
+  }: {
+    projectId: string;
+    id: string;
+    commitMessage: string;
+    actor: WorkbenchActor;
+  }): Promise<WorkbenchSaveResult> {
+    const current = await this.getWorkbenchState({ projectId, id });
+    if (!current.state) {
+      throw new InvalidExperimentConfigurationError(current.slug);
+    }
+
+    return await this.saveWorkbenchState({
+      projectId,
+      id: current.experimentId,
+      state: current.state,
+      expectedVersion: current.version,
+      actor,
+      commitMessage,
+    });
+  }
+
+  /** The version list, newest first. `cursor` is the version to page below. */
+  async listWorkbenchVersions({
+    projectId,
+    id,
+    limit,
+    cursor,
+  }: {
+    projectId: string;
+    id: string;
+    limit?: number;
+    cursor?: number;
+  }): Promise<{
+    versions: WorkbenchVersionSummary[];
+    nextCursor: number | null;
+  }> {
+    const row = await this.repository.findWorkbenchRow({ projectId, id });
+    if (!row) throw new ExperimentNotFoundError(id);
+
+    const take = Math.min(
+      Math.max(limit ?? DEFAULT_VERSION_PAGE_SIZE, 1),
+      MAX_VERSION_PAGE_SIZE,
+    );
+    const versions = await this.repository.findVersions({
+      projectId,
+      experimentId: row.id,
+      take,
+      beforeVersion: cursor,
+    });
+
+    const last = versions[versions.length - 1];
+    return {
+      versions,
+      nextCursor: versions.length === take && last ? last.version : null,
+    };
+  }
+
+  /**
+   * Brings an old version back by writing it FORWARD as a new save. History is
+   * never rewritten: the version you restored from is still there, and the
+   * restore itself is one more entry in the list.
+   *
+   * The current run's results ride across unchanged. A snapshot carries the
+   * setup only, so writing one back on its own would clear every output cell
+   * and evaluator score on the live row, and history never held them to bring
+   * back. A restore changes what the evaluation will run, not what it ran.
+   */
+  async restoreWorkbenchVersion({
+    projectId,
+    id,
+    version,
+    actor,
+  }: {
+    projectId: string;
+    id: string;
+    version: number;
+    actor: WorkbenchActor;
+  }): Promise<WorkbenchSaveResult> {
+    const current = await this.getWorkbenchState({ projectId, id });
+    const found = await this.repository.findVersionByNumber({
+      projectId,
+      experimentId: current.experimentId,
+      version,
+    });
+    if (!found) {
+      throw new ExperimentVersionNotFoundError({
+        experimentId: current.experimentId,
+        version,
+      });
+    }
+
+    const restored = parseWorkbenchState(found.state);
+    const liveResults = current.state?.results;
+
+    return await this.saveWorkbenchState({
+      projectId,
+      id: current.experimentId,
+      state: liveResults ? { ...restored, results: liveResults } : restored,
+      expectedVersion: current.version,
+      actor,
+      commitMessage: `Restored from v${version}`,
+    });
+  }
+
+  /**
+   * `saveWithSlugRetry` with one extra answer.
+   *
+   * A create can hit a unique violation for two very different reasons. On the
+   * slug it is a race between two people naming an evaluation the same thing,
+   * and regenerating the slug is the fix. On the primary key it means the
+   * caller named an id that exists OUTSIDE this project, and no retry helps:
+   * that row is not theirs to write, which is the same answer as a row that
+   * does not exist, said without confirming which ids other tenants hold.
+   */
+  private async createWithSlugRetry({
+    id,
+    initialSlug,
+    baseSlug,
+    projectId,
+    execute,
+  }: {
+    id?: string;
+    initialSlug: string;
+    baseSlug: string;
+    projectId: string;
+    execute: (slug: string) => Promise<void>;
+  }): Promise<{ slug: string }> {
+    try {
+      const { slug } = await this.saveWithSlugRetry({
+        initialSlug,
+        execute,
+        regenerateSlug: () => this.generateUniqueSlug({ baseSlug, projectId }),
+      });
+      return { slug };
+    } catch (error) {
+      const targets = uniqueConstraintTargets(error).map((target) =>
+        target.toLowerCase(),
+      );
+      const isSlugClash = targets.some((target) => target.includes("slug"));
+      if (id && isUniqueConstraintError(error) && !isSlugClash) {
+        throw new ExperimentNotFoundError(id, { reasons: [error as Error] });
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Resolves which existing row a save targets, or null when there is none to
+   * update. An archived row is refused rather than resurrected: from outside
+   * it is gone, and a stale client autosaving into it must not bring it back.
+   */
+  private async resolveWorkbenchTargetId({
+    projectId,
+    id,
+    slug,
+  }: {
+    projectId: string;
+    id?: string;
+    slug?: string;
+  }): Promise<string | null> {
+    if (id) {
+      const status = await this.repository.getRowStatusById({ id, projectId });
+      if (!status.exists) return null;
+      if (status.archived) throw new ExperimentNotFoundError(id);
+      return id;
+    }
+
+    if (slug) {
+      const row = await this.repository.findWorkbenchRow({ projectId, slug });
+      if (!row) throw new ExperimentNotFoundError(slug);
+      return row.id;
+    }
+
+    return null;
+  }
+
+  /**
+   * One lookup per kind of reference, and the first one that is missing stops
+   * the save. Naming the kind and the id lets a client point at the offending
+   * target instead of asking the person to hunt for it.
+   */
+  private async assertWorkbenchReferencesExist({
+    projectId,
+    state,
+  }: {
+    projectId: string;
+    state: PersistedEvaluationsV3State;
+  }): Promise<void> {
+    for (const [refType, ids] of collectWorkbenchReferences(state)) {
+      const existing = await this.references.findExistingIds({
+        refType,
+        ids,
+        projectId,
+      });
+      const missing = ids.find((refId) => !existing.has(refId));
+      if (missing) {
+        throw new WorkbenchMissingReferenceError({ refType, refId: missing });
+      }
+    }
+  }
+
+  /**
+   * Records the version row for an accepted write.
+   *
+   * A person typing gets ONE rolling row, updated in place: the workbench
+   * autosaves constantly and a row per keystroke would bury the versions that
+   * mean something. Everything else (a named commit, an agent write, a
+   * restore) inserts a numbered row, because each of those is an event
+   * somebody will want to find again.
+   */
+  private async writeVersionRow({
+    tx,
+    projectId,
+    experimentId,
+    version,
+    state,
+    actor,
+    commitMessage,
+  }: {
+    tx: Prisma.TransactionClient;
+    projectId: string;
+    experimentId: string;
+    version: number;
+    state: PersistedEvaluationsV3State;
+    actor: WorkbenchActor;
+    commitMessage?: string;
+  }): Promise<void> {
+    const snapshot = toJsonValue(stripResults(state));
+    const isRollingAutosave = actor.label === "user" && !commitMessage;
+
+    if (isRollingAutosave) {
+      const rolling = await this.repository.findRollingAutosaveVersion(
+        { projectId, experimentId },
+        { tx },
+      );
+      if (rolling) {
+        await this.repository.updateVersionById(
+          {
+            id: rolling.id,
+            projectId,
+            data: {
+              version,
+              state: snapshot,
+              authorId: actor.userId ?? null,
+              authorLabel: actor.label,
+              commitMessage: null,
+              schemaVersion: WORKBENCH_SCHEMA_VERSION,
+            },
+          },
+          { tx },
+        );
+        return;
+      }
+    }
+
+    await this.repository.createVersion(
+      {
+        data: {
+          experimentId,
+          projectId,
+          version,
+          autoSaved: isRollingAutosave,
+          commitMessage: commitMessage ?? null,
+          authorId: actor.userId ?? null,
+          authorLabel: actor.label,
+          state: snapshot,
+          schemaVersion: WORKBENCH_SCHEMA_VERSION,
+        },
+      },
+      { tx },
+    );
+  }
+
+  /**
+   * Tells the tenant an experiment moved. The payload carries no state: every
+   * client refetches, so a signal that outran its own transaction still costs
+   * one query and never shows stale content.
+   *
+   * A failed publish is logged and swallowed. Freshness is a convenience; the
+   * save is already durable and losing the signal must not undo it.
+   */
+  private async publishExperimentUpdated({
+    projectId,
+    experimentId,
+    slug,
+    version,
+    actorLabel,
+  }: {
+    projectId: string;
+    experimentId: string;
+    slug: string;
+    version: number;
+    actorLabel: WorkbenchActorLabel;
+  }): Promise<void> {
+    const broadcaster = this.options.broadcaster;
+    if (!broadcaster) return;
+
+    try {
+      await broadcaster.broadcastToTenant(
+        projectId,
+        JSON.stringify({
+          event: "experiment_updated",
+          experimentId,
+          slug,
+          version,
+          actorLabel,
+        }),
+        "experiment_updated",
+      );
+    } catch (error) {
+      logger.warn(
+        { projectId, experimentId, version, error },
+        "Failed to broadcast experiment update",
+      );
+    }
   }
 
   /**
