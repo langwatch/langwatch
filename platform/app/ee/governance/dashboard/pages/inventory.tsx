@@ -51,7 +51,7 @@ import {
   RotateCw,
   Trash2,
 } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { ToolCatalogPanel } from "~/components/governance/ToolCatalogPanel";
@@ -1356,12 +1356,19 @@ export function isEditSaveBlocked({
 
 export function SourceEditDrawer({
   organizationId,
+  destinationCtx,
   source,
   onClose,
   onSubmit,
   isPending,
 }: {
   organizationId: string;
+  /**
+   * The teams and projects a destination can be picked from, passed in rather
+   * than derived here so this drawer and the create composer offer the same
+   * list — see `useDestinationContext` in `ingestionSourceForms.ts`.
+   */
+  destinationCtx: DestinationContext;
   source: Source | null;
   onClose: () => void;
   onSubmit: (input: EditSubmission) => void;
@@ -1375,7 +1382,6 @@ export function SourceEditDrawer({
   // than throwing — which is the behaviour we want for a row written by a
   // newer deploy than the one serving this page.
   const sourceType = source?.sourceType as SourceType | undefined;
-  const isPullMode = isEditablePullSource(sourceType);
 
   // A source holding no cursor has its backfill start genuinely still in play.
   // Once one exists the usage cursor never rewinds, so the setting would be
@@ -1428,64 +1434,14 @@ export function SourceEditDrawer({
           </Heading>
         </Drawer.Header>
         <Drawer.Body>
-          <VStack align="stretch" gap={3}>
-            <SourceIdentityFields
-              name={form.name}
-              onNameChange={form.setName}
-              description={form.description}
-              onDescriptionChange={form.setDescription}
-            />
-
-            {isPullMode && (
-              <PullConfigEditFields
-                sourceType={sourceType}
-                parserConfig={form.parserConfig}
-                onParserConfigChange={form.setParserConfig}
-                pullSchedule={form.pullSchedule}
-                onPullScheduleChange={form.setPullSchedule}
-                hasPulled={hasPulled}
-              />
-            )}
-
-            <OttlEditor
-              organizationId={organizationId}
-              sourceType={source.sourceType}
-              statements={form.statements}
-              onChange={form.setStatements}
-              enabled={isOttlEnabledSourceType(source.sourceType)}
-            />
-
-            <TraceDestinationField
-              sourceType={source.sourceType as SourceType}
-              // Both props describe `value`, so both have to move together. An
-              // untouched picker shows the stored destination and the archived
-              // notice that describes it; the moment a replacement is picked,
-              // the flag stops applying — it described the project that has
-              // just been replaced, not the one now on screen. Left true, the
-              // picker seeds empty (`ScopeChipPicker.tsx:759` is fully
-              // controlled), so the admin picks a project, sees nothing
-              // selected under an unchanged warning, and concludes the control
-              // is dead.
-              value={
-                form.destination === undefined
-                  ? (source.traceProjectId ?? null)
-                  : form.destination
-              }
-              onChange={form.setDestination}
-              mode="edit"
-              destinationArchived={
-                form.destination === undefined &&
-                (source.traceProjectArchived ?? false)
-              }
-              {...destinationCtx}
-            />
-
-            <Text fontSize="xs" color="fg.muted">
-              {isPullMode
-                ? "Source type is immutable after create — archive and recreate to change it."
-                : "Source type and ingest secret are immutable after create. Use “Rotate secret” for the secret; archive + recreate to change source type."}
-            </Text>
-          </VStack>
+          <SourceEditBody
+            form={form}
+            source={source}
+            sourceType={sourceType}
+            hasPulled={hasPulled}
+            organizationId={organizationId}
+            destinationCtx={destinationCtx}
+          />
         </Drawer.Body>
         <Drawer.Footer>
           <HStack gap={3} width="full">
@@ -1511,6 +1467,93 @@ export function SourceEditDrawer({
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+/**
+ * The fields an edit drawer shows, in order. Split from the drawer because the
+ * drawer above is a shell — open state, submit gate, footer — while this is the
+ * part that decides what an admin can actually change about a source, and which
+ * of those fields the source's type even offers.
+ */
+function SourceEditBody({
+  form,
+  source,
+  sourceType,
+  hasPulled,
+  organizationId,
+  destinationCtx,
+}: {
+  form: ReturnType<typeof useSourceEditForm>;
+  source: Source;
+  sourceType: SourceType | undefined;
+  hasPulled: boolean;
+  organizationId: string;
+  destinationCtx: DestinationContext;
+}) {
+  // Derived here rather than passed in: `isEditablePullSource` is a type guard,
+  // and narrowing `sourceType` is what lets the pull fields below take it as a
+  // `SourceType` instead of re-asserting one.
+  const isPullMode = isEditablePullSource(sourceType);
+
+  return (
+    <VStack align="stretch" gap={3}>
+      <SourceIdentityFields
+        name={form.name}
+        onNameChange={form.setName}
+        description={form.description}
+        onDescriptionChange={form.setDescription}
+      />
+
+      {isPullMode && (
+        <PullConfigEditFields
+          sourceType={sourceType}
+          parserConfig={form.parserConfig}
+          onParserConfigChange={form.setParserConfig}
+          pullSchedule={form.pullSchedule}
+          onPullScheduleChange={form.setPullSchedule}
+          hasPulled={hasPulled}
+        />
+      )}
+
+      <OttlEditor
+        organizationId={organizationId}
+        sourceType={source.sourceType}
+        statements={form.statements}
+        onChange={form.setStatements}
+        enabled={isOttlEnabledSourceType(source.sourceType)}
+      />
+
+      <TraceDestinationField
+        sourceType={source.sourceType as SourceType}
+        // Both props describe `value`, so both have to move together. An
+        // untouched picker shows the stored destination and the archived
+        // notice that describes it; the moment a replacement is picked, the
+        // flag stops applying — it described the project that has just been
+        // replaced, not the one now on screen. Left true, the picker seeds
+        // empty (`ScopeChipPicker.tsx:759` is fully controlled), so the admin
+        // picks a project, sees nothing selected under an unchanged warning,
+        // and concludes the control is dead.
+        value={
+          form.destination === undefined
+            ? (source.traceProjectId ?? null)
+            : form.destination
+        }
+        onChange={form.setDestination}
+        mode="edit"
+        destinationArchived={
+          form.destination === undefined &&
+          (source.traceProjectArchived ?? false)
+        }
+        {...destinationCtx}
+      />
+
+      <Text fontSize="xs" color="fg.muted">
+        {isPullMode
+          ? "Source type is immutable after create — archive and recreate to change it."
+          : "Source type and ingest secret are immutable after create. Use “Rotate secret” for the secret; archive + recreate to change source type."}
+      </Text>
+    </VStack>
   );
 }
 

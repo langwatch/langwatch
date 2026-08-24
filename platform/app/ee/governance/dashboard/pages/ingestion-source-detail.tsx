@@ -60,6 +60,7 @@ import {
   useSourceEventsPager,
 } from "../components/useSourceEventsPager";
 import type { PageRequest } from "../logic/eventsPager";
+import { useDestinationContext } from "./ingestionSourceForms";
 import { SourceEditDrawer } from "./inventory";
 
 /**
@@ -419,6 +420,9 @@ function useIngestionSourceDetailPage() {
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
+  // Same derivation the inventory page uses, so the drawer offers the same
+  // destinations whichever surface opened it.
+  const destinationCtx = useDestinationContext(organization);
   const canRead = hasAnyPermission("ingestionSources:view");
   const canReadActivity = hasAnyPermission("activityMonitor:view");
 
@@ -473,6 +477,7 @@ function useIngestionSourceDetailPage() {
   return {
     sourceId,
     orgId,
+    destinationCtx,
     canRead,
     canManage: hasAnyPermission("ingestionSources:manage"),
     canReadActivity,
@@ -493,6 +498,7 @@ function IngestionSourceDetailPage() {
   const {
     sourceId,
     orgId,
+    destinationCtx,
     canRead,
     canManage,
     canReadActivity,
@@ -549,6 +555,7 @@ function IngestionSourceDetailPage() {
       pageTitle={pageTitle}
       source={source}
       orgId={orgId}
+      destinationCtx={destinationCtx}
       canManage={canManage}
       canReadActivity={canReadActivity}
       healthQuery={healthQuery}
@@ -574,6 +581,7 @@ function LoadedSourceDetail({
   pageTitle,
   source,
   orgId,
+  destinationCtx,
   canManage,
   canReadActivity,
   healthQuery,
@@ -591,6 +599,7 @@ function LoadedSourceDetail({
   orgId: string;
 } & Pick<
   ReturnType<typeof useIngestionSourceDetailPage>,
+  | "destinationCtx"
   | "canManage"
   | "canReadActivity"
   | "healthQuery"
@@ -624,6 +633,7 @@ function LoadedSourceDetail({
             drift into offering different edits of the same row. */}
         <SourceEditDrawer
           organizationId={orgId}
+          destinationCtx={destinationCtx}
           source={isEditing ? source : null}
           onClose={() => setIsEditing(false)}
           onSubmit={(input) => updateMutation.mutate(input)}
