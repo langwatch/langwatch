@@ -879,26 +879,15 @@ describe("better-auth over the identity storage adapter", () => {
       });
 
       /**
-       * SKIPPED BECAUSE IT FAILS: the reproduction for a defect this branch
-       * found and did not fix, kept executable for whoever does.
-       *
-       * The lookup folds `auth0` and `okta` to `oidc` and matches on THAT
-       * (`identity-storage-adapter.ts` `byProviderSubject`, and the
-       * `provider` predicates in `identity-resolution.prisma.repository.ts`
-       * and `identity-accounts.prisma.repository.ts`). `Identifier.providerId`
-       * holds the verbatim id and no query reads it, so two IdPs minting the
-       * same subject collapse onto one identifier - and production resolves
-       * with `ORDER BY attachedAt ASC LIMIT 1`, so the OLDER user wins and
-       * the other is signed in as them. Nothing prevents the collision
-       * either: `Identifier` has an index but no unique constraint on
-       * `(provider, providerAccountId)`, and the attach guard locks the
-       * address, not the subject. The legacy branch does not have this -
-       * `Account` is unique on the VERBATIM provider.
-       *
-       * Un-skip when the queries key on `providerId`. The spec scenario is
-       * tagged @unimplemented to declare the same gap.
+       * The cross-tenant sign-in this branch found and fixed. The lookup
+       * used to fold `auth0` and `okta` into `oidc` and match on THAT, so
+       * two IdPs minting the same subject collapsed onto one identifier and
+       * production's `ORDER BY attachedAt ASC LIMIT 1` signed the second
+       * customer in as the first. Keyed on the verbatim `providerId` now,
+       * the same pair `Account` is unique by, with a partial unique index
+       * behind it.
        */
-      it.skip("resolves each IdP's subject to its own user when the subject strings collide", async () => {
+      it("resolves each IdP's subject to its own user when the subject strings collide", async () => {
         // One subject string, two different enterprise IdPs, two different
         // customers. `sub` is only unique WITHIN an issuer, and plenty of
         // OIDC deployments mint small integers, sequential ids or the user's

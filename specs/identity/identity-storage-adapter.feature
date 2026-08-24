@@ -428,12 +428,10 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     Then the identity tables resolve the user
     And the answer carries the provider id the IdP is configured under, not the folded vocabulary
 
-  # DECLARED GAP, not a passing test. The lookup matches on the FOLDED
-  # vocabulary and ignores `Identifier.providerId`, so two enterprise IdPs
-  # that mint the same subject string resolve to whichever user attached
-  # first. The covering test is written and skipped; see the report on the
-  # branch that added it.
-  @unit @unimplemented
+  # A provider subject is unique only WITHIN an issuer, so the lookup keys on
+  # the verbatim provider id — the pair Account is unique by — and never on
+  # the folded vocabulary that collapses every enterprise IdP into one.
+  @unit
   Scenario: Two enterprise IdPs sharing a subject resolve to different users
     Given two latched users at different customers
     And each holds an identifier from a different enterprise IdP carrying the same subject string

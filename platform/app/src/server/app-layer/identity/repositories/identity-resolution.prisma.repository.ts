@@ -1,7 +1,4 @@
-import {
-  type IdentifierProvider,
-  LIVE_IDENTIFIER_STATES,
-} from "@langwatch/identity";
+import { LIVE_IDENTIFIER_STATES } from "@langwatch/identity";
 import type {
   IdentityResolution,
   IdentityResolutionPort,
@@ -52,23 +49,40 @@ export class PrismaIdentityResolutionRepository
     );
   }
 
+  /**
+   * The IdP callback, keyed on better-auth's own `providerId` and NOT on the
+   * folded `provider` vocabulary: auth0, okta and every custom OIDC
+   * connection collapse into `oidc`, and a provider subject is unique only
+   * WITHIN an issuer, so matching the fold would let one enterprise IdP's
+   * subject resolve another IdP's user. This is the pair `Account` is unique
+   * by, and a partial unique index enforces it here too.
+   */
   async resolveByProviderSubject({
-    provider,
+    providerId,
     providerAccountId,
   }: {
-    provider: IdentifierProvider;
+    providerId: string;
     providerAccountId: string;
   }): Promise<IdentityResolution | null> {
     return this.resolve(
-      Prisma.sql`i."provider" = ${provider} AND i."providerAccountId" = ${providerAccountId} AND i."state" IN (${Prisma.join([...LIVE_IDENTIFIER_STATES])})`,
+      Prisma.sql`i."providerId" = ${providerId} AND i."providerAccountId" = ${providerAccountId} AND i."state" IN (${Prisma.join([...LIVE_IDENTIFIER_STATES])})`,
     );
   }
 
   private async resolve(match: Prisma.Sql): Promise<IdentityResolution | null> {
-    // `ORDER BY` fixes which row answers when more than one matches. The
-    // command-time uniqueness guard means that should not happen, but a
-    // resolution that picked differently between two reads would be a
-    // sign-in that works only sometimes.
+    // `ORDER BY` fixes which row answers when more than one matches, so a
+    // resolution can never pick differently between two reads - that would
+    // be a sign-in that works only sometimes.
+    //
+    // For the provider-subject lookup a second match should now be
+    // impossible: a partial unique index on
+    // `(providerId, providerAccountId)` over the live states enforces it in
+    // the database. The command-time guard does NOT - it locks the
+    // normalized ADDRESS, not the provider subject, so it never constrained
+    // this path and the ordering is what stands behind the index. The
+    // by-value lookup genuinely can match several rows (one user may hold
+    // the same address through several providers), and there the ordering
+    // is the whole answer.
     const rows = await this.prisma.$queryRaw<ResolutionRow[]>`
       SELECT i."userId" AS "userId", s."status" AS "status"
       FROM "Identifier" i

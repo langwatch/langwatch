@@ -1,8 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
-import {
-  identifierProviderFor,
-  normalizeIdentifierValue,
-} from "@langwatch/identity";
+import { normalizeIdentifierValue } from "@langwatch/identity";
 import { createLogger } from "@langwatch/observability";
 import type { BetterAuthOptions } from "better-auth";
 import { APIError } from "better-auth/api";
@@ -327,15 +324,22 @@ function identityCustomAdapter({
           // resolved user is finalized (ADR-116 §2). A miss, or a held
           // user, falls through to the legacy row that is still their
           // truth.
-          const provider = identifierProviderFor(query.providerId);
+          //
+          // Keyed on better-auth's own `providerId`, verbatim - NOT on the
+          // folded identifier vocabulary. `identifierProviderFor` collapses
+          // auth0, okta and every custom OIDC connection into `oidc`, and a
+          // provider subject is unique only WITHIN an issuer, so matching on
+          // the fold lets one enterprise IdP's subject resolve another IdP's
+          // user. `Account` is unique on this same pair; the identity branch
+          // namespaces identically.
           const resolved = await resolution.resolveByProviderSubject({
-            provider,
+            providerId: query.providerId,
             providerAccountId: query.accountId,
           });
           if (!resolved?.finalized) return null;
           const row = await accounts.findByProviderSubject({
             userId: resolved.userId,
-            provider,
+            providerId: query.providerId,
             providerAccountId: query.accountId,
           });
           return row === null ? null : [row];

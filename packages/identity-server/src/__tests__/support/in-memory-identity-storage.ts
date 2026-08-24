@@ -1,8 +1,4 @@
-import {
-  type IdentifierFact,
-  type IdentifierProvider,
-  isLiveIdentifierState,
-} from "@langwatch/identity";
+import { type IdentifierFact, isLiveIdentifierState } from "@langwatch/identity";
 import type {
   IdentityAccountRow,
   IdentityAccountSecrets,
@@ -75,17 +71,17 @@ export class InMemoryIdentityStorage
 
   async findByProviderSubject({
     userId,
-    provider,
+    providerId,
     providerAccountId,
   }: {
     userId: string;
-    provider: IdentifierProvider;
+    providerId: string;
     providerAccountId: string;
   }): Promise<IdentityAccountRow | null> {
     const identifier = this.linkedIdentifiers().find(
       (candidate) =>
         candidate.userId === userId &&
-        candidate.provider === provider &&
+        candidate.providerId === providerId &&
         candidate.providerAccountId === providerAccountId,
     );
     return identifier === undefined ? null : this.assemble(identifier);
@@ -187,15 +183,15 @@ export class InMemoryIdentityStorage
   }
 
   async resolveByProviderSubject({
-    provider,
+    providerId,
     providerAccountId,
   }: {
-    provider: IdentifierProvider;
+    providerId: string;
     providerAccountId: string;
   }): Promise<IdentityResolution | null> {
     return this.resolve(
       (identifier) =>
-        identifier.provider === provider &&
+        identifier.providerId === providerId &&
         identifier.providerAccountId === providerAccountId &&
         isLiveIdentifierState(identifier.state),
     );

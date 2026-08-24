@@ -406,6 +406,51 @@ registry with the adapter. On the change-email path the guard refusal runs
 **before** the verification proof is consumed, so a refusal never burns the
 token.
 
+### 6b. A provider subject is unique per connection
+
+The IdP callback's lookup keys on better-auth's own `providerId`, verbatim,
+paired with the provider's subject — never on `Identifier.provider`, which is
+the FOLDED vocabulary that collapses auth0, okta and every custom OIDC
+connection into `oidc`. An OIDC `sub` is unique only *within* an issuer, so
+matching the fold let one enterprise IdP's subject resolve another IdP's
+user: a cross-tenant sign-in, and a regression against legacy, where
+`Account` has always been unique on the verbatim pair. A partial unique index
+on `(providerId, providerAccountId)` over the live states now enforces the
+same guarantee on `Identifier`.
+
+It is unique where `value` is not, and the asymmetry is not an oversight. One
+user legitimately holds several proven identifiers carrying the same
+*address* — a password sign-in and a Google sign-in are two rows with one
+email — which is why address uniqueness lives in `IdentifierReservation`
+rather than in a column constraint. A provider *subject* names exactly one
+account at exactly one IdP, so two live identifiers sharing one are always
+either a duplicate or a takeover.
+
+**The forward constraint, which is load-bearing.** The real invariant is that
+a subject is unique **per connection**. `providerId` stands in for the
+connection today only because there is exactly one connection per configured
+provider — `auth0`, `okta`, `cognito`, `onelogin`, `oidc`. That is about to
+stop being a safe assumption: Auth0 is a broker today, and it namespaces
+every enterprise customer behind one `providerId: "auth0"`, which is why
+collisions are currently rare. After the exit (D09/D10) each customer
+connects to us directly, minting subjects however their own IdP does —
+sequential integers and email addresses included — and the count of distinct
+connections goes from a handful to one per enterprise customer.
+
+So when connections become data (D04), **every connection MUST get its own
+distinct provider id, or the index MUST be extended to include
+`connectionId`.** A world in which many customer connections share one
+provider id — `oidc`, built from the `OIDC_*` env vars, is the one to watch —
+re-opens exactly the cross-tenant sign-in this closes. Until then the
+invariant is pinned by a test asserting that no two configured providers
+collapse onto the same provider id.
+
+The fold stays total if the constraint is ever violated anyway: the incumbent
+keeps the subject, the newcomer is parked with a WARN naming both identifier
+ids and both users, and the parked user simply cannot pass the backfill's
+parity proof — so they stay HELD with a report, which is the system's own way
+of saying "not right yet", rather than the projection stopping for everybody.
+
 ### 7. Upgrade discipline — the honest cost
 
 We own the mapping from better-auth's `account` and `user` models onto our

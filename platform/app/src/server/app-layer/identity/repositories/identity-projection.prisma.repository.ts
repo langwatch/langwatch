@@ -1,8 +1,11 @@
 import type { IdentifierFact } from "@langwatch/identity";
-import { isLiveIdentifierState } from "@langwatch/identity";
+import {
+  isLiveIdentifierState,
+  LIVE_IDENTIFIER_STATES,
+} from "@langwatch/identity";
 import type { IdentityReservationRepository } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "~/generated/prisma/client";
+import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import type { IdentityFoldState } from "~/server/event-sourcing/pipelines/identity/projections/identityState.foldProjection";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import type {
@@ -137,19 +140,86 @@ export class PrismaIdentityProjectionRepository
   /**
    * One identifier row, upserted whole.
    *
-   * No database constraint arbitrates a collision here, and none can: ONE user
-   * legitimately holds several proven identifiers carrying the same address —
-   * a credential sign-in and a Google sign-in are two rows with one email,
-   * both VERIFIED. "One USER per proven address" is not a row-level rule, so
-   * it lives in `IdentifierReservation`, claimed before any fact is stated.
+   * No database constraint arbitrates an ADDRESS collision here, and none
+   * can: ONE user legitimately holds several proven identifiers carrying the
+   * same address — a credential sign-in and a Google sign-in are two rows
+   * with one email, both VERIFIED. "One USER per proven address" is not a
+   * row-level rule, so it lives in `IdentifierReservation`, claimed before
+   * any fact is stated.
+   *
+   * A provider SUBJECT is arbitrated, by the partial unique index on
+   * `(providerId, providerAccountId)` over the live states (migration
+   * 20260824120004). That collision should be unreachable — every subject
+   * comes from an `Account` row, and `Account` is unique on the same pair —
+   * so reaching it means an invariant broke upstream, and the fold's job is
+   * to say so without dying.
    */
   private async writeIdentifier(fact: IdentifierFact): Promise<void> {
     const { id, ...columns } = factToRow(fact);
-    await this.prisma.identifier.upsert({
-      where: { id },
-      create: { id, ...columns },
-      update: columns,
+    try {
+      await this.prisma.identifier.upsert({
+        where: { id },
+        create: { id, ...columns },
+        update: columns,
+      });
+    } catch (error) {
+      if (!(await this.parkedOnSubjectCollision({ fact, error }))) throw error;
+    }
+  }
+
+  /**
+   * A subject already held by another live identifier: park this one and keep
+   * folding. True when that is what happened, so the caller rethrows anything
+   * else.
+   *
+   * The INCUMBENT keeps the subject and the newcomer is skipped, rather than
+   * either row being rewritten — a fold for one user must not reach across
+   * and demote another user's projection, and the losing fact is not lost
+   * either way: it stays in the log, and its user simply cannot pass the
+   * backfill's parity proof, so they stay HELD with a report. That is the
+   * system's own way of saying "this user is not right yet", and it is a far
+   * better outcome than a projection that stops folding for everybody.
+   *
+   * Both identifier ids are named in the line, because the interesting fact
+   * is the PAIR — one of them is a duplicate or a takeover, and neither id
+   * alone says which.
+   */
+  private async parkedOnSubjectCollision({
+    fact,
+    error,
+  }: {
+    fact: IdentifierFact;
+    error: unknown;
+  }): Promise<boolean> {
+    if (
+      !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+      error.code !== "P2002" ||
+      fact.providerAccountId === null
+    ) {
+      return false;
+    }
+    const incumbent = await this.prisma.identifier.findFirst({
+      where: {
+        providerId: fact.providerId,
+        providerAccountId: fact.providerAccountId,
+        state: { in: [...LIVE_IDENTIFIER_STATES] },
+        id: { not: fact.identifierId },
+      },
+      select: { id: true, userId: true },
     });
+    // No incumbent means P2002 came from somewhere else entirely.
+    if (incumbent === null) return false;
+    logger.warn(
+      {
+        providerId: fact.providerId,
+        parkedIdentifierId: fact.identifierId,
+        parkedUserId: fact.userId,
+        holdingIdentifierId: incumbent.id,
+        holdingUserId: incumbent.userId,
+      },
+      "two live identifiers claim one provider subject; the incumbent keeps it and this one is parked, so its user stays held rather than the fold stopping",
+    );
+    return true;
   }
 
   /**

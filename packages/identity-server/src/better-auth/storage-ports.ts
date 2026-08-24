@@ -69,10 +69,18 @@ export interface IdentityAccountsPort {
   findByAccountIds(args: {
     accountIds: readonly string[];
   }): Promise<IdentityAccountRow[]>;
-  /** The IdP callback's lookup, once resolution has named the user. */
+  /**
+   * The IdP callback's lookup, once resolution has named the user.
+   *
+   * Keyed on the VERBATIM `providerId`, never on the folded `provider`:
+   * auth0, okta and every custom OIDC connection collapse into `oidc`, so
+   * matching on the fold would let one enterprise IdP's subject answer for
+   * another's. `Account` is unique on exactly this pair, and the identity
+   * branch has to namespace the same way.
+   */
   findByProviderSubject(args: {
     userId: string;
-    provider: IdentifierProvider;
+    providerId: string;
     providerAccountId: string;
   }): Promise<IdentityAccountRow | null>;
   /**
@@ -138,9 +146,15 @@ export interface IdentityResolutionPort {
   resolveByIdentifierValue(args: {
     normalizedValue: string;
   }): Promise<IdentityResolution | null>;
-  /** The OAuth callback's `(provider, subject)` lookup. */
+  /**
+   * The OAuth callback's lookup, on the pair `Account` is unique by:
+   * better-auth's own provider id, verbatim, and the provider's subject.
+   * The folded `provider` vocabulary must never be the match key here -
+   * two enterprise IdPs both fold to `oidc`, and a subject is unique only
+   * WITHIN an issuer.
+   */
   resolveByProviderSubject(args: {
-    provider: IdentifierProvider;
+    providerId: string;
     providerAccountId: string;
   }): Promise<IdentityResolution | null>;
 }

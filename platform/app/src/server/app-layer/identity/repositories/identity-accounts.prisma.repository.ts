@@ -1,7 +1,4 @@
-import {
-  type IdentifierProvider,
-  LIVE_IDENTIFIER_STATES,
-} from "@langwatch/identity";
+import { LIVE_IDENTIFIER_STATES } from "@langwatch/identity";
 import type {
   IdentityAccountRow,
   IdentityAccountSecrets,
@@ -136,19 +133,24 @@ export class PrismaIdentityAccountsRepository implements IdentityAccountsPort {
     );
   }
 
+  /**
+   * Keyed on better-auth's own `providerId`, verbatim - the folded
+   * `provider` vocabulary collapses every enterprise IdP into `oidc` and a
+   * subject is unique only WITHIN an issuer, so it cannot be the match key.
+   */
   async findByProviderSubject({
     userId,
-    provider,
+    providerId,
     providerAccountId,
   }: {
     userId: string;
-    provider: IdentifierProvider;
+    providerId: string;
     providerAccountId: string;
   }): Promise<IdentityAccountRow | null> {
     const identifier = await this.prisma.identifier.findFirst({
       where: {
         userId,
-        provider,
+        providerId,
         providerAccountId,
         state: { in: [...LIVE_IDENTIFIER_STATES] },
         accountId: { not: null },

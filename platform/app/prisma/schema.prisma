@@ -218,6 +218,29 @@ model Identifier {
   @@index([domain])
   @@index([provider, providerAccountId])
   @@index([accountId])
+  // A PARTIAL UNIQUE INDEX on (providerId, providerAccountId), over the live
+  // states only, is added by migration 20260824120004 - Prisma cannot express
+  // a partial index, so it is raw SQL there and this comment is its home in
+  // the model.
+  //
+  // Unique where `value` is not, and the difference is what the columns mean.
+  // One user legitimately holds several proven identifiers carrying the same
+  // ADDRESS, so address uniqueness is not a row-level rule. A provider
+  // SUBJECT is different: it names exactly one account at exactly one IdP, so
+  // two live identifiers sharing it are always either a duplicate or a
+  // takeover. `Account` has enforced exactly this globally all along; the
+  // identity branch dropped the guarantee until this index restored it.
+  //
+  // FORWARD CONSTRAINT, and it is load-bearing: the real invariant is that a
+  // subject is unique PER CONNECTION. `providerId` stands in for the
+  // connection today only because there is exactly one connection per
+  // configured provider (auth0, okta, cognito, onelogin, oidc). When
+  // connections become data (D04, and the Auth0 exit is what brings it), every
+  // connection MUST get its own distinct provider id, or this index MUST be
+  // extended to include `connectionId`. Many customer connections sharing one
+  // provider id - `oidc` being the one to watch - re-opens a cross-tenant
+  // sign-in, because subjects are then customer-chosen and collide.
+  //
   // Deliberately no unique constraint on `value`: ONE user legitimately holds
   // several proven identifiers carrying the same address (a credential
   // sign-in and a Google sign-in are two rows with one email, both VERIFIED),
