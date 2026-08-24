@@ -238,15 +238,23 @@ export function ToolCatalogEditor({
         </HStack>
       )}
       {(isCatalogEmpty || showImport) && (
+        // Semantic orange, not the raw palette: `orange.50/300/600` are fixed
+        // light-mode values, so in dark mode this panel kept a cream
+        // background while its text stayed on the semantic `fg`/`fg.muted`
+        // tokens that do flip — white-on-cream at 1.01:1. The semantic triple
+        // (_app.tsx) flips instead: subtle/emphasized/fg resolve to
+        // orange.900/700/200 in dark. Light mode shifts one step darker
+        // (50→100 bg, 300→400 border, 600→800 icon), which is the cost of
+        // dropping the hardcoded pair.
         <Box
           borderWidth="1px"
-          borderColor="orange.300"
+          borderColor="orange.emphasized"
           borderRadius="md"
-          backgroundColor="orange.50"
+          backgroundColor="orange.subtle"
           padding={4}
         >
           <HStack alignItems="start" gap={3}>
-            <Box color="orange.600" paddingTop="2px">
+            <Box color="orange.fg" paddingTop="2px">
               <PackageOpen size={20} />
             </Box>
             <VStack align="start" gap={2} flex={1} minWidth={0}>
