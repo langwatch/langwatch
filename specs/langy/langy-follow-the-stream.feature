@@ -11,8 +11,9 @@ Feature: The Langy conversation follows the stream
   When content is removed the browser clamps the scroll position down to the
   new maximum, and that looks exactly like a reader scrolling up. Reading it as
   one stopped the follow for the rest of the conversation and left a pill in
-  front of a reader who never scrolled. Only a real scroll gesture, a wheel, a
-  touch, a key or the scrollbar, stops the follow.
+  front of a reader who never scrolled. Only input that can move the column up,
+  a wheel turned up, an up key, a finger dragging up, or the scrollbar, stops
+  the follow.
 
   Background:
     Given I am signed in with access to a project that has Langy
@@ -61,6 +62,31 @@ Feature: The Langy conversation follows the stream
       Given the column jumped upward with no scroll gesture behind it
       When the answer grows again
       Then the column follows it and the newest line stays in view
+
+    # A reader already at the live edge who flicks further DOWN moves nothing,
+    # and it is the commonest gesture in a streaming column. Counting it as
+    # input excuses the finalisation clamp that lands next, which is the same
+    # failure again, reached by the ordinary path instead of the rare one.
+    @integration
+    Scenario: A gesture that cannot move the column up does not stop the follow
+      Given the Langy panel is open and scrolled to the bottom
+      When I scroll further down, and then the column jumps upward on its own
+      Then the column keeps following, and offers nothing to jump to
+
+    @integration
+    Scenario: Dragging the column up with a finger stops the follow
+      Given the Langy panel is open and an answer is streaming
+      When I drag the column up with a finger
+      Then the column stops following, and offers to jump to the latest
+
+    # The scrollbar is the one gesture with no direction to read, so it gets the
+    # benefit of the doubt: the column is following the hand, and pulling it
+    # back to the live edge mid-drag would be fighting the reader.
+    @integration
+    Scenario: Dragging the scrollbar up stops the column moving
+      Given the Langy panel is open and an answer is streaming
+      When I drag the scrollbar up
+      Then the column stops following, and offers to jump to the latest
 
     # Following is a smooth scroll, and a smooth scroll reports every position
     # it passes through. Each one is "not at the bottom yet", so reading them as
