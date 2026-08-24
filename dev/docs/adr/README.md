@@ -68,7 +68,8 @@ Reusable framework decisions live with their packages:
 | [104](./104-runtime-environment-configuration.md)                      | Runtime roots validate environment and inject semantic configuration                                                       | Accepted                  |
 | [105](./105-mcp-access-via-discover-catalogues.md)                     | RPC services are MCP-accessible through one adapter over the rpc.discover catalogues                                       | Proposed                  |
 | [110](./110-grant-aggregates-are-grants.md)                            | A grant aggregate is a grant, not an organization                                                                          | Proposed                  |
-| [111](./111-physical-application-workspaces.md)                        | Physical application workspaces preserve the current deployment topology                                                   | Proposed                  |
+| [111](./111-physical-application-workspaces.md)                        | Physical application workspaces preserve the current deployment topology                                                   | Accepted                  |
+| [112](./112-singular-feature-ownership.md)                             | Product domains use singular feature ownership                                                                             | Accepted                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)

@@ -2,6 +2,10 @@
 
 **Status:** Accepted
 
+**Placement amended by:**
+[ADR-112: singular feature ownership](../../../../../dev/docs/adr/112-singular-feature-ownership.md).
+The behaviour in this record moves to core `saas`; it is not Enterprise-licensed.
+
 **Behavioural contract:** [SaaS browser integrations](../specs/saas.feature)
 
 ## Context

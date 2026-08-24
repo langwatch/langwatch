@@ -9,7 +9,9 @@ decisions remain the source of truth:
 
 - [Feature package boundaries](../architecture-lint/adrs/001-feature-package-boundaries.md)
 - [Strict versioned source layout](../architecture-lint/adrs/002-versioned-strict-feature-layout.md)
-- [Agents](./agents/) is a strict-layout reference feature.
+- [Singular feature ownership](../../dev/docs/adr/112-singular-feature-ownership.md)
+- `agent` is the target strict-layout reference feature; existing plural roots
+  are migration paths, not naming precedents.
 
 ## Start a feature
 
@@ -27,8 +29,7 @@ packages/features/<feature>/
 
 ```json
 {
-  "layoutVersion": 0,
-  "subjects": ["example-operation", "example-resource"]
+  "layoutVersion": 0
 }
 ```
 
@@ -36,12 +37,20 @@ Every feature uses strict layout version 0. There is no legacy or migration
 layout: these packages are still in progress, so the first enforced format is
 version 0.
 
-`subjects` is optional for a small, single-purpose feature. Broad bounded
-contexts declare it as a sorted, duplicate-free list of the product concepts
-they intentionally own. Production contract and server filenames must match a
-declared subject. Adding a new subject therefore changes `feature.json`, the
-feature ADR, and its behavioural spec together; a broad feature name is not a
-licence to absorb adjacent infrastructure.
+The ownership root is the singular identifier registered in the planned
+`packages/features/catalogue.json`. That repository-wide catalogue maps every
+core and Enterprise subject to exactly one feature; `feature.json` selects only
+the strict source-layout version and cannot broaden ownership locally.
+Production contract and server filenames must match an owned catalogue
+subject. Adding a feature or subject changes the central catalogue, the owning
+feature ADR, and its behavioural spec together.
+
+Do not create a package per endpoint or table. A subordinate behaviour stays
+with its product owner: avatar belongs to `user`, teams and invites to
+`organization`, records to `dataset`, tags and versions to `prompt`, and spans
+to `trace`. Independently useful durable domains such as `project`, `api-key`,
+`model-provider`, `prompt`, and `dataset` remain separate features even when a
+single use case combines them.
 
 Each code directory is a separate workspace package:
 
@@ -78,6 +87,11 @@ strict `features/licensing/{contract,server,web}` layout as other features.
 Signed-license state feeds the provider-neutral
 [Entitlements capability](./entitlements/adrs/001-provider-neutral-plan-resolution.md)
 rather than replacing it.
+
+Enterprise is a composition and legal grouping, not a catch-all feature.
+`ops` and `saas` are core feature roots. The Enterprise catalogue contains the
+singular `audit-log`, `billing`, `governance`, `licensing`, `managed-provider`,
+`scim`, `sso`, and `webhook` features.
 
 During the physical application split in
 [ADR-111](../../dev/docs/adr/111-physical-application-workspaces.md), reusable
@@ -157,7 +171,10 @@ not contain repositories, stores, adapters, projections, migrations, or API
 implementations.
 
 The contract root export is the supported vocabulary other packages consume.
-Cross-feature collaboration always uses the owning feature's contract.
+Cross-feature collaboration always uses the owning feature's abstract service
+from its contract. Consumers do not create caller-specific versions of that
+service or import its repository, store, projection, or concrete server
+implementation.
 
 ### Service
 
@@ -256,6 +273,12 @@ Those runtime roots construct concrete adapters and services, then mount API or
 worker surfaces. A version-0 feature has no catch-all `composition`,
 `registration`, `lifecycle`, or `eventing` source directory.
 
+Each process constructs one canonical LangWatch App service graph. Hono reads
+it from `c.var.langwatchApp`, tRPC from `ctx.app`, and worker handlers from their
+composed runtime. A request handler never constructs a feature service or
+repository, and a feature service never uses a global Prisma client to recover
+its dependencies.
+
 ## Classes and functions
 
 Exported services, repositories, stores, adapters, projections, APIs, and
@@ -317,6 +340,8 @@ pnpm lint:architecture
 The gate combines Oxlint source rules with the graph-aware architecture CLI. It
 checks:
 
+- singular feature registration and unique subject ownership in the central
+  catalogue;
 - layout versions, directories, and filenames;
 - required classes and `static create` methods;
 - internal and cross-package dependency direction;

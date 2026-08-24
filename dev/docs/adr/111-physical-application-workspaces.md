@@ -14,7 +14,9 @@
 [ADR-093: Redis client ownership](./093-redis-is-an-owned-client.md),
 [ADR-101: feature package surfaces](./101-feature-package-surfaces.md),
 [ADR-102: runtime composition roots](./102-runtime-composition-roots.md), and
-[ADR-104: runtime environment configuration](./104-runtime-environment-configuration.md).
+[ADR-104: runtime environment configuration](./104-runtime-environment-configuration.md),
+with product ownership and singular feature names defined by
+[ADR-112](./112-singular-feature-ownership.md).
 The physical move of SSO also preserves the licensing boundary fixed by
 [ADR-027](./027-license-gated-sso.md), while repository-wide lint and format
 cutover is owned by
@@ -105,6 +107,12 @@ transport boundary, realtime transports, observability bootstrap, and static
 asset delivery. `packages/api` remains the reusable `@langwatch/api` Hono
 framework; the executable is named `@langwatch/platform-api` to keep those two
 responsibilities distinct.
+
+The API constructs one canonical LangWatch App service graph for the process.
+Hono handlers receive it through `c.var.langwatchApp`, and tRPC handlers receive
+that same object through `ctx.app`. Routes do not construct feature services or
+repositories per request, and feature services do not recover application
+dependencies through a global Prisma client.
 
 `apps/worker` owns background process composition, Eventing and Group Queue
 consumers, process managers, schedulers, and one-shot product tasks. It imports
@@ -198,6 +206,14 @@ contract/server/web, class, filename, public-export and repository rules as core
 feature packages. Enterprise status changes optional composition and
 distribution, not package quality or dependency direction. Core packages may
 define extension contracts but never import enterprise implementations.
+
+Enterprise is a legal and composition group, not a broad product feature.
+ADR-112's singular ownership catalogue applies inside it. The Enterprise
+catalogue contains `audit-log`, `billing`, `governance`, `licensing`,
+`managed-provider`, `scim`, `sso`, and `webhook`. SaaS deployment integrations
+move to core `packages/features/saas`, and platform administration moves with
+operational tooling to core `packages/features/ops`; neither is covered by the
+Enterprise source license or listed by the portable Enterprise catalogue.
 
 There is no replacement `ee` alias, `apps/*/ee` tree, catch-all enterprise
 implementation package or permanent enterprise legacy root. The portable root
@@ -316,11 +332,14 @@ The repository migrates in dependency order:
    packages; update workspace discovery and staging for those paths in the same
    stage; then extract `platform/app/ee` feature by feature into
    `packages/enterprise/features`, replacing `@ee/*` imports with package
-   exports;
-4. extract remaining reusable core product behaviour feature by feature. Each
-   vertical move includes its contract, server and optional web surfaces plus
-   route, consumer or task installers, while the still-runnable monolith switches
-   to those package exports;
+   exports. Move non-Enterprise SaaS to core and merge platform Admin into core
+   Ops rather than carrying their temporary Enterprise locations forward;
+4. establish ADR-112's singular ownership catalogue and lint before further
+   product extraction. Correct existing plural roots, then extract the identity
+   spine and remaining core product behaviour feature by feature. Each vertical
+   move includes its contract, server and optional web surfaces plus route,
+   consumer or task installers, while the still-runnable monolith switches to
+   those package exports;
 5. extract the browser bootstrap, router, application shell and static build to
    `apps/ui`; product screens come from feature web packages and static assets
    remain an explicit build artifact;

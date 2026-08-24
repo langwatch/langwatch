@@ -10,6 +10,7 @@
 **Related:**
 [ADR-001: feature package boundaries](./001-feature-package-boundaries.md),
 [ADR-101: feature package surfaces](../../../dev/docs/adr/101-feature-package-surfaces.md),
+[ADR-112: singular feature ownership](../../../dev/docs/adr/112-singular-feature-ownership.md),
 and [ADR-102: runtime composition roots](../../../dev/docs/adr/102-runtime-composition-roots.md).
 
 ## Context
@@ -20,7 +21,7 @@ split across `composition`, `registration`, `lifecycle`, and transport folders;
 repositories and migrations can acquire one-off names; and a thin class can
 hide most behaviour in free functions or parallel orchestration objects.
 
-The Agents feature provides the useful shape: portable contract, concrete
+The Agent feature provides the useful shape: portable contract, concrete
 service, private repository port and adapter, and thin API classes. That shape
 needs mechanical enforcement. It also needs an explicit evolution mechanism so
 that improving the convention later does not silently reinterpret every old
@@ -157,6 +158,7 @@ shared while allowing deliberate future migrations.
 
 - New feature source has one predictable place and name for each artifact.
 - A layout rule cannot change underneath a package without a version change.
-- Agents, Entitlements, and Stored Objects use the same version-0 layout.
+- Agent, Entitlement, and Stored Object use the same version-0 layout after
+  their singular ownership-root migrations.
 - Architecture lint gains filesystem checks as well as AST import and class
   checks.

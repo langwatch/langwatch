@@ -34,10 +34,13 @@ trigger execution and writes through audit capabilities using narrow ports. It
 does not absorb those features' transports, persistence engines or reusable
 frameworks.
 
-`feature.json` declares the accepted source subjects for this deliberately
-broad bounded context. A new subject must update that manifest, this ADR and
-the linked feature specification together; architecture lint rejects an
-undeclared source subject.
+The repository feature catalogue declares the accepted Governance subjects.
+`feature.json` selects only the strict source-layout version and cannot expand
+ownership. A new subject must update the central catalogue, this ADR and the
+linked feature specification together; architecture lint rejects both an
+undeclared subject and a subject owned by another feature. Project, user,
+personal-workspace, virtual-key and model-provider behaviour is consumed
+through its core owning service contract rather than reimplemented here.
 
 ## Public surfaces and transports
 

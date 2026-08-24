@@ -8,7 +8,8 @@
 [ADR-102: runtime composition roots](./102-runtime-composition-roots.md), and
 [ADR-104: runtime environment configuration](./104-runtime-environment-configuration.md),
 with physical composition and the Prisma infrastructure export exception
-defined by [ADR-111](./111-physical-application-workspaces.md).
+defined by [ADR-111](./111-physical-application-workspaces.md) and singular
+domain ownership defined by [ADR-112](./112-singular-feature-ownership.md).
 
 **Concrete boundaries:**
 [Agents](../../../packages/features/agents/adrs/001-package-boundary.md),
@@ -75,10 +76,12 @@ server and web surfaces. The choice affects dependency installation,
 declaration emit, public naming, boundary linting and how optional surfaces are
 represented.
 
-This ADR will decide that physical feature-package model, its dependency
-direction, its public exports, its relationship to Prisma and enterprise code,
-and the allowed forms of cross-feature collaboration. It will not assign every
-existing directory to a feature or prescribe a migration sequence.
+This ADR decides the physical feature-package model, its dependency direction,
+its public exports, its relationship to Prisma and enterprise code, and the
+allowed forms of cross-feature collaboration. ADR-112 assigns the existing
+product domains to singular feature owners and prescribes the migration
+sequence; that ownership catalogue is part of this package model rather than a
+separate optional classification.
 
 ## Decision
 
@@ -112,77 +115,78 @@ The workspace configuration will explicitly discover these nested packages.
 Package names remain flat within the `@langwatch` npm scope because npm does
 not support another package-name hierarchy below the scope.
 
-### Canonical example: evaluations
+`<feature>` is the singular identifier registered in
+`packages/features/catalogue.json`. The catalogue is authoritative for both
+core and Enterprise feature roots and their subjects. A local manifest cannot
+claim a subject owned by another feature. The granularity rule, initial domain
+catalogue, and subordinate-behaviour examples are fixed by ADR-112.
 
-Evaluations exercises all three surfaces and both API transports, so it is a
+### Canonical example: evaluation
+
+useful full example. The names below describe ownership, not mandatory
+boilerplate: a smaller feature contains only the files and packages it needs.
+Evaluation exercises all three surfaces and both API transports, so it is a
+useful full example. The names below describe ownership, not mandatory
+boilerplate: a smaller feature contains only the files and packages it needs.
 useful full example. The names below describe ownership, not mandatory
 boilerplate: a smaller feature contains only the files and packages it needs.
 
 ```text
 packages/
 ├── features/
-│   └── evaluations/                         # feature ownership boundary
+│   └── evaluation/                          # feature ownership boundary
 │       ├── contract/                        # physical workspace package
-│       │   ├── package.json                 # @langwatch/evaluations-contract
+│       │   ├── package.json                 # @langwatch/evaluation-contract
 │       │   ├── tsconfig.json
 │       │   ├── src/
-│       │   │   ├── domain/
-│       │   │   │   ├── evaluation.ts       # domain values and status
-│       │   │   │   └── evaluationId.ts
-│       │   │   ├── schemas/
-│       │   │   │   └── evaluationInput.ts  # portable validation schemas
-│       │   │   ├── events/
-│       │   │   │   └── evaluationEvents.ts # product event definitions
-│       │   │   ├── services/
-│       │   │   │   └── evaluationService.ts # interface + request/result DTOs
-│       │   │   ├── errors.ts               # portable domain failures
+│       │   │   ├── evaluation.service.ts   # abstract service capability
+│       │   │   ├── evaluation.commands.ts  # Zod 4 write inputs
+│       │   │   ├── evaluation.queries.ts   # Zod 4 read inputs/results
+│       │   │   ├── evaluation.events.ts    # portable product events
+│       │   │   ├── evaluation.errors.ts    # portable domain failures
+│       │   │   ├── evaluation.ts           # domain values and identifiers
 │       │   │   └── index.ts                # the complete public surface
 │       │   └── tests/
-│       │       └── public-contract.test-d.ts
+│       │       └── evaluation-contract.unit.test.ts
 │       │
 │       ├── server/                          # physical workspace package
-│       │   ├── package.json                 # @langwatch/evaluations-server
+│       │   ├── package.json                 # @langwatch/evaluation-server
 │       │   ├── tsconfig.json
 │       │   ├── src/
 │       │   │   ├── services/
-│       │   │   │   ├── evaluationService.ts
-│       │   │   │   └── evaluationService.test.ts
+│       │   │   │   └── evaluation.service.ts
 │       │   │   ├── repositories/           # package-private persistence
-│       │   │   │   ├── evaluationRepository.ts
+│       │   │   │   ├── evaluation.repository.ts
 │       │   │   │   └── prisma/
-│       │   │   │       ├── evaluationMapper.ts
-│       │   │   │       └── prismaEvaluationRepository.ts
+│       │   │   │       ├── prisma.evaluation.mapper.ts
+│       │   │   │       └── prisma.evaluation.repository.ts
 │       │   │   ├── api/                    # thin transport adapters
 │       │   │   │   ├── internal/
-│       │   │   │   │   └── evaluationRouter.ts      # tRPC fragment
+│       │   │   │   │   └── evaluation.api.ts       # tRPC/RPC adapter
 │       │   │   │   └── public/
-│       │   │   │       └── evaluationHandlers.ts    # OpenAPI REST/RPC
-│       │   │   ├── eventing/               # product Eventing definitions
-│       │   │   │   ├── evaluationPipeline.ts
-│       │   │   │   ├── projections/
-│       │   │   │   ├── subscribers/
-│       │   │   │   └── processManagers/
-│       │   │   ├── registration/           # imported only by app roots
-│       │   │   │   ├── internalApi.ts
-│       │   │   │   ├── publicApi.ts
-│       │   │   │   └── worker.ts
+│       │   │   │       └── evaluation.api.ts       # OpenAPI REST/RPC
+│       │   │   ├── projections/
+│       │   │   │   └── evaluation.projection.ts
+│       │   │   ├── adapters/
+│       │   │   │   └── eventing.evaluation.adapter.ts
 │       │   │   └── index.ts                # deliberate supported exports
 │       │   └── tests/
-│       │       ├── integration/
-│       │       └── public-boundary.test-d.ts
+│       │       ├── evaluation.service.unit.test.ts
+│       │       └── evaluation.api.integration.test.ts
 │       │
 │       ├── web/                             # physical workspace package
-│       │   ├── package.json                 # @langwatch/evaluations-web
+│       │   ├── package.json                 # @langwatch/evaluation-web
 │       │   ├── tsconfig.json
 │       │   ├── src/
 │       │   │   ├── client/
-│       │   │   │   └── evaluationsClient.ts # typed browser API adapter
+│       │   │   │   └── evaluationClient.ts # typed browser API adapter
 │       │   │   ├── hooks/
 │       │   │   ├── components/
 │       │   │   ├── screens/
 │       │   │   └── index.ts
 │       │   └── tests/
 │       │
+│       ├── feature.json                     # strict layout version only
 │       ├── adrs/                            # decisions for this feature
 │       │   ├── README.md
 │       │   └── NNN-evaluation-lifecycle.md
@@ -197,27 +201,25 @@ packages/
 The three `package.json` files are the load-bearing boundaries. In this
 example:
 
-- `evaluations-contract` has only runtime-portable dependencies;
-- `evaluations-server` depends on `evaluations-contract`, server-safe
+- `evaluation-contract` has only runtime-portable dependencies;
+- `evaluation-server` depends on `evaluation-contract`, server-safe
   infrastructure and frameworks such as Eventing;
-- `evaluations-web` depends on `evaluations-contract`, the browser API client,
+- `evaluation-web` depends on `evaluation-contract`, the browser API client,
   React and Chakra; and
-- neither the contract nor web package depends on `evaluations-server`.
+- neither the contract nor web package depends on `evaluation-server`.
 
-The `registration` files do not register themselves globally as an import side
-effect. They export explicit installation functions. The app API composition
-root may install `internalApi` and `publicApi`; the worker composition root may
-install `worker`. A process therefore loads only the evaluation capabilities
-it actually runs.
+Package imports do not register routes, pipelines, consumers, or timers. The
+API and worker composition roots construct the concrete service once and mount
+only the API or worker adapters that process needs.
 
 The internal and public API adapters both call the same evaluation service.
 The tRPC fragment supplies the internal application interface and the public
 adapter implements the separately versioned OpenAPI contract. Neither owns a
-second copy of evaluation behaviour. Likewise, the Eventing directory owns
-evaluation pipelines and handlers, while `@langwatch/eventing` remains only
-the reusable framework.
+second copy of evaluation behaviour. An Eventing adapter uses the same service
+and portable events while `@langwatch/eventing` remains only the reusable
+framework.
 
-ADRs and feature specs live at the `evaluations` ownership root because they
+ADRs and feature specs live at the `evaluation` ownership root because they
 may describe behaviour spanning contract, server and web packages. Unit and
 type-boundary tests live with the physical package they exercise.
 
@@ -225,7 +227,7 @@ type-boundary tests live with the physical package they exercise.
 
 The contract package owns the feature's portable vocabulary: identifiers,
 domain values, input and output DTOs, validation schemas, domain errors, event
-definitions and structural service capabilities. Zod schemas are the source of
+definitions and abstract service capabilities. Zod schemas are the source of
 truth where a value crosses a process, persistence or trust boundary;
 TypeScript types are inferred from those schemas. Contract packages compile
 and emit declarations independently so internal RPC validation, public OpenAPI
@@ -234,12 +236,13 @@ safe to load in a browser and does not depend on React, Prisma, Node-only
 infrastructure, API router implementations or the feature's server and web
 packages.
 
-Zod 3 is the contract authoring library, not an API-framework coupling.
-Contracts import it from `zod`, never the separate `zod/v4` compatibility
-entry point. Hono adapters consume those schemas through Standard Schema and
-the root `hono-openapi` API. Feature packages do not import
-`hono-openapi/zod` or `@hono/zod-validator`. OpenAPI is a compiled view of the
-same Zod 3 contract schemas used by RPC and service validation, as decided in
+Zod 4 is the contract authoring library, not an API-framework coupling.
+Contracts import it from `zod`; governed packages do not import `zod/v3` or
+introduce a cross-major compatibility bridge. Hono adapters consume those
+schemas through Standard Schema and the root `hono-openapi` API. Feature
+packages do not import `hono-openapi/zod` or `@hono/zod-validator`. OpenAPI is a
+compiled view of the same Zod 4 contract schemas used by RPC and service
+validation, as decided in
 [ADR-103](./103-standard-schema-api-boundary.md).
 
 The server package implements the contract. It owns services, repository
@@ -252,9 +255,9 @@ API transport.
 Service implementations are classes. A service exposes a static `create`
 method; it is not wrapped by a standalone `createXService` function. Service
 behaviour stays on the class rather than in neighbouring factory or helper
-functions. The contract may describe the service structurally so consumers can
-inject a fake without importing its implementation. Server code uses explicit
-control flow instead of nested ternaries and conditional object spreads.
+functions. The contract exports the abstract service class so consumers can inject a fake
+without importing its implementation. Server code uses explicit control flow
+instead of nested ternaries and conditional object spreads.
 
 A singular service lookup either returns the requested contract value or
 throws a concrete domain error containing useful identifiers. It does not
@@ -281,20 +284,22 @@ served by the app, never a raw environment-variable relay.
 
 When one feature needs another feature's capability, its server package
 depends on the owning feature's contract package and accepts that service
-interface as a dependency. An application composition root imports both
-server packages and connects their concrete instances.
+capability as a dependency. An application composition root imports both
+server packages, constructs one canonical instance of each service for the
+process, and connects them. Hono and tRPC read that graph from their request
+context; they do not construct it per request.
 
 ```text
-@langwatch/evaluations-server
+@langwatch/evaluation-server
           │
           │ depends on interface and values
           ▼
-@langwatch/agents-contract
+@langwatch/agent-contract
 
 app or worker composition root
           │ creates and connects concrete implementations
-          ├── @langwatch/evaluations-server
-          └── @langwatch/agents-server
+          ├── @langwatch/evaluation-server
+          └── @langwatch/agent-server
 ```
 
 A feature never imports another feature's server package, repository,
@@ -345,8 +350,10 @@ own the static catalogue of available installers. Application composition roots
 remain the only place where the selected catalogue is constructed and connected
 to core extension points.
 
-The exact grouping of enterprise features can evolve independently; enterprise
-status does not weaken the browser/server, contract or repository boundaries.
+Enterprise grouping does not weaken singular product ownership or the
+browser/server, contract, and repository boundaries. The Enterprise catalogue
+contains only the independently owned features listed by ADR-112; core `ops`
+and `saas` are not Enterprise features.
 
 ADR-111 adds the deliberate aggregate root around those features. The portable
 `@langwatch/enterprise` package owns catalogue vocabulary; separate
@@ -362,7 +369,7 @@ decision.
 ### Tooling enforces the shape
 
 Repository checks will derive the allowed dependency graph from package role
-and feature name. At minimum they reject:
+and the authoritative feature catalogue. At minimum they reject:
 
 - `contract` importing `server`, `web`, React, Prisma or Node-only runtime code;
 - `web` importing any `server` package or generated Prisma code;
@@ -375,7 +382,8 @@ and feature name. At minimum they reject:
   ternaries and conditional object spreads; and
 - a feature ownership root without an indexed boundary ADR and linked Gherkin
   spec covering public surfaces, dependencies, persistence, runtime,
-  environment, errors and contract validation.
+  environment, errors and contract validation; and
+- an unregistered, duplicate, plural-alias, or wrong-owner product subject.
 
 Oxlint handles source and import rules in the ordinary fast lint path. The
 workspace checker handles manifests, cycles, emitted declarations and the

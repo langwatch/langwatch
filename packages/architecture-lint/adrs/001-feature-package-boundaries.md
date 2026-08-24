@@ -11,6 +11,7 @@
 [ADR-101: feature package surfaces](../../../dev/docs/adr/101-feature-package-surfaces.md),
 [ADR-102: runtime composition roots](../../../dev/docs/adr/102-runtime-composition-roots.md),
 [ADR-111: physical application workspaces](../../../dev/docs/adr/111-physical-application-workspaces.md),
+[ADR-112: singular feature ownership](../../../dev/docs/adr/112-singular-feature-ownership.md),
 and [ADR-003: unified Oxc toolchain](./003-unified-oxc-toolchain.md).
 
 ## Context
@@ -79,14 +80,20 @@ Missing optional roles are valid. Unexpected directories containing a
 `package.json`, duplicate package names and a feature directory containing its
 own package manifest are errors.
 
-A broad bounded context may declare a sorted `subjects` array in its
-`feature.json`. Contract and server production filenames must correspond to one
-of those subjects after architectural suffixes such as `.service`, `.port`,
-`.adapter`, `.repository`, `.projection`, `.commands`, `.queries`, and
-`.events` are removed. Adding a subject is an architectural expansion: the
-feature ADR and behavioural spec must explain the ownership decision in the
-same change. This keeps a coherent product boundary possible without allowing
-its broad name to become a catch-all.
+`packages/features/catalogue.json` is the authoritative ownership map for core
+and Enterprise features. It registers each singular feature identifier, exact
+root, classification and sorted product subjects. `feature.json` selects only
+the strict layout version. Contract and server production filenames must
+correspond to a subject owned by their registered feature after architectural
+suffixes such as `.service`, `.port`, `.adapter`, `.repository`,
+`.projection`, `.commands`, `.queries`, and `.events` are removed.
+
+Every subject has exactly one owner. A local manifest edit cannot acquire an
+adjacent subject, and a package cannot export a service, repository, store,
+adapter or schema named for another feature's subject. Adding a feature or
+subject is an architectural expansion: the catalogue, feature ADR and
+behavioural spec change together. This preserves coherent subordinate concepts
+without allowing a broad feature name to become a catch-all.
 
 ADR-111 adds four non-feature enterprise packages at fixed paths beneath one
 legal ownership root:
@@ -279,6 +286,8 @@ for the checks an AST lint plugin cannot perform.
 ## Consequences
 
 - New feature packages cannot silently regain monolith dependencies.
+- Feature roots and package names use their singular catalogue identifier.
+- Product subjects cannot be duplicated or claimed through a local manifest.
 - “Contract only” cross-feature collaboration is mechanically checked.
 - Export maps become deliberate API design rather than packaging decoration.
 - Prisma leaks fail both at source and public declaration boundaries.

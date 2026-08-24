@@ -5,6 +5,7 @@
 **Behavioural contract:** [Enterprise package catalogue](../specs/enterprise-catalogue.feature)
 
 **Related:** [ADR-111: physical application workspaces](../../../dev/docs/adr/111-physical-application-workspaces.md)
+and [ADR-112: singular feature ownership](../../../dev/docs/adr/112-singular-feature-ownership.md)
 
 ## Context
 
@@ -14,7 +15,10 @@ feature ownership, and runtime composition in one physical source tree.
 ## Decision
 
 `packages/enterprise` is the governing legal root and `@langwatch/enterprise`
-is a portable catalogue of explicitly named Enterprise feature contracts.
+is a portable catalogue of explicitly named Enterprise feature contracts. The
+catalogue contains only `audit-log`, `billing`, `governance`, `licensing`,
+`managed-provider`, `scim`, `sso`, and `webhook`; core `ops` and `saas` are not
+Enterprise features.
 
 ## Public surfaces and transports
 
