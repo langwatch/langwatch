@@ -174,11 +174,39 @@ export class PrismaIdentityProjectionRepository
    *
    * The INCUMBENT keeps the subject and the newcomer is skipped, rather than
    * either row being rewritten — a fold for one user must not reach across
-   * and demote another user's projection, and the losing fact is not lost
-   * either way: it stays in the log, and its user simply cannot pass the
-   * backfill's parity proof, so they stay HELD with a report. That is the
-   * system's own way of saying "this user is not right yet", and it is a far
-   * better outcome than a projection that stops folding for everybody.
+   * and demote another user's projection. The losing FACT is never lost: it
+   * stays in the log, and a replay onto a database where the subject is free
+   * projects it.
+   *
+   * What happens to the losing USER depends on where they are, and only one
+   * of the two cases is contained:
+   *
+   *   still being backfilled (no record, or `migrated`) — contained. The
+   *     next pass re-reads their legacy rows, `prove` diffs them against the
+   *     projection, the missing identifier shows up as a parity diff and the
+   *     user is HELD with a report. That is the system saying "not right
+   *     yet", and it is a far better outcome than a projection that stops
+   *     folding for everybody.
+   *
+   *   already `finalized` — NOT contained. `finalized` is terminal, so the
+   *     runner short-circuits on it (`isTerminalTenantStatus`) and no later
+   *     pass ever revisits them. A latched user linking a new enterprise
+   *     account whose subject collides therefore ends up with the identifier
+   *     permanently absent from the projection, the cursor committed, and
+   *     nothing scheduled that would notice. Their `Account` bridge row is
+   *     still written — `projectAccounts` reads the fold STATE, not the rows
+   *     this method wrote — so what actually covers them is the legacy
+   *     fallback ADR-116 exists to retire. This WARN is the only signal.
+   *
+   * (An unlatched user cannot reach here at all: their ceremonies state no
+   * facts, so nothing of theirs is ever folded.)
+   *
+   * Closing the second case properly means refusing the collision at COMMAND
+   * time rather than parking it at fold time — a subject lock mirroring
+   * `IdentifierReservation`'s address lock, so the attach is refused
+   * synchronously and the customer is told at link time. Tracked as
+   * follow-up; the unique index makes the collision unreachable from the
+   * data we have, which is why this is a net rather than a hole.
    *
    * Both identifier ids are named in the line, because the interesting fact
    * is the PAIR — one of them is a duplicate or a takeover, and neither id

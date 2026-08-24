@@ -81,6 +81,18 @@ Feature: Running system migrations across organizations
     Then no further pass starts
     And the shutdown does not wait out the interval
 
+  # `lease.acquire` fails safe to false on contention AND on any Redis error,
+  # and a tenant that cannot be claimed does no work — so a pass shut out of
+  # the whole fleet reports exactly what a converged one reports. Reading that
+  # as convergence would stop this process for its whole lifetime, and if the
+  # pod actually holding the claims is then evicted, nothing drives the rest.
+  @unit
+  Scenario: A pass shut out by another process is not convergence
+    Given every organization claimed by another process
+    When the pass advances nothing
+    Then the run continues rather than stopping
+    But an installation with no organizations at all is converged
+
   @unit
   Scenario: A loop that never converges stops at its cap and says so
     Given passes that report progress every time
@@ -347,6 +359,24 @@ Feature: Running system migrations across organizations
     Given "org_acme" is migrated
     When an operator rolls it back
     Then "org_acme" answers from its legacy path again
+
+  # The pin is the ONLY runtime lever an automatically enrolled migration has -
+  # there is no enrollment to withdraw - so it has to be placeable whatever
+  # state the organization is in, including states that never touched the
+  # ledger. What varies is whether the migration's rollback EFFECT runs.
+  @unit
+  Scenario: An operator stops a rollout for an organization that keeps erroring
+    Given "org_acme" parks on every pass
+    When an operator rolls it back
+    Then the pin is recorded and later passes leave it alone
+    And no rollback effect runs, because it never cut over
+
+  @unit
+  Scenario: An operator holds an organization out of a rollout before it is reached
+    Given the migration has never processed "org_acme"
+    When an operator rolls it back
+    Then the pin is recorded and no pass ever processes it
+    And no rollback effect runs, because it never cut over
 
   @unit
   Scenario: Rolling back a cutover takes effect without a deploy, even with the queue stopped

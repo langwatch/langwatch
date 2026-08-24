@@ -1,7 +1,6 @@
 import {
   emptyIdentityHeads,
   type IdentifierFact,
-  type IdentifierProvider,
   type IdentityFact,
   type IdentityFactInput,
   type IdentityHeads,
@@ -65,17 +64,17 @@ export class InMemoryHeads implements IdentityHeadsRepository {
   async findIdentifierIdForAccount({
     userId,
     accountId,
-    provider,
+    providerId,
   }: {
     userId: string;
     accountId: string;
-    provider: IdentifierProvider;
+    providerId: string;
   }): Promise<string | null> {
     const heads = Object.values(this.heads.get(userId)?.identifiers ?? {});
     const byAccount = heads.find((head) => head.accountId === accountId);
     if (byAccount) return byAccount.identifierId;
     const byProvider = heads.filter(
-      (head) => head.provider === provider && head.detachedAtMs === null,
+      (head) => head.providerId === providerId && head.detachedAtMs === null,
     );
     return byProvider.length === 1 ? (byProvider[0]?.identifierId ?? null) : null;
   }

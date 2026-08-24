@@ -165,21 +165,6 @@ const SEAT_LIMIT_LABELS: Record<string, string> = {
 };
 
 /**
- * The migration runner's per-tenant statuses as a sentence reads them.
- *
- * Authored rather than derived: `meta.status` is a machine sub-classifier, and
- * this registry's rule for those is to branch on the value and return copy,
- * never to render the value. Reshaping `rolled_back` into prose with string
- * surgery also only works by accident — `String.prototype.replace` with a
- * string pattern converts the FIRST match, so the first status with two
- * underscores would reach a customer half-converted.
- */
-const MIGRATION_STATUS_LABELS: Record<string, string> = {
-  parked: "parked for retry",
-  rolled_back: "already rolled back",
-};
-
-/**
  * Registered migration names, in the operator's words rather than the
  * column's. Stable identifiers (renaming one orphans its state rows), so
  * keying copy on them is safe; an unmapped name falls back to the generic
@@ -1184,11 +1169,6 @@ const presentations = {
     describe: () =>
       "It arrives in a later release and will run automatically then — nothing to do until that release.",
   },
-  migration_state_not_found: {
-    title: "No migration state for that organization",
-    describe: () =>
-      "Check the organization id — only organizations a migration has already processed have state to act on.",
-  },
   migration_rollback_blocked_by_dependent: {
     title: "Another migration still stands on this one",
     describe: (error) => {
@@ -1205,15 +1185,6 @@ const presentations = {
     title: "This organization has not been cut over",
     describe: () =>
       "It is still waiting to cut over, so there is nothing to roll back. It stays on the legacy path until the cutover runs.",
-  },
-  migration_rollback_requires_migrated_or_finalized: {
-    title: "Only a migrated or finalized organization can be rolled back",
-    describe: (error) => {
-      const state = label(MIGRATION_STATUS_LABELS, str(error, "status", ""));
-      return state
-        ? `This organization is ${state}, so it is already on — or on its way back to — the legacy path.`
-        : "This organization has not reached the ledger, so it is already on the legacy path.";
-    },
   },
   duplicate_invite: {
     title: "They already have an invite",

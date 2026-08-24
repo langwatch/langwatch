@@ -446,10 +446,26 @@ invariant is pinned by a test asserting that no two configured providers
 collapse onto the same provider id.
 
 The fold stays total if the constraint is ever violated anyway: the incumbent
-keeps the subject, the newcomer is parked with a WARN naming both identifier
-ids and both users, and the parked user simply cannot pass the backfill's
-parity proof — so they stay HELD with a report, which is the system's own way
-of saying "not right yet", rather than the projection stopping for everybody.
+keeps the subject and the newcomer is parked with a WARN naming both
+identifier ids and both users, rather than the projection stopping for
+everybody. What that costs the losing user depends on where they are, and
+only one case is contained. A user still being backfilled is revisited every
+pass, the missing identifier shows up as a parity diff, and they stay HELD
+with a report — the system saying "not right yet". A user who has already
+`finalized` is NOT revisited: `finalized` is terminal and the runner
+short-circuits on it, so a latched user linking a new enterprise account whose
+subject collides ends up with that identifier permanently absent from the
+projection and nothing scheduled that would notice. Their `Account` bridge row
+is still written, so what covers them is the legacy fallback this ADR exists
+to retire, and the WARN is the only signal. (An unlatched user cannot reach
+this at all — their ceremonies state no facts.)
+
+Closing that second case means refusing the collision at COMMAND time instead
+of parking it at fold time: a subject lock mirroring `IdentifierReservation`'s
+address lock, so the attach is refused synchronously and the customer is told
+at link time. Follow-up rather than a blocker, because the unique index makes
+the collision unreachable from the data we have — the park is a net, not a
+hole.
 
 ### 7. Upgrade discipline — the honest cost
 

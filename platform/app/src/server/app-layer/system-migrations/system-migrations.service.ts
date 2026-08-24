@@ -10,30 +10,23 @@ import {
   MigrationEnrollmentOrganizationNotFoundError,
   MigrationNotAvailableOnInstallationError,
   MigrationPassAlreadyRunningError,
-  MigrationRollbackRequiresMigratedOrFinalizedError,
   MigrationRunRequiresEnrollmentError,
-  MigrationStateNotFoundError,
   MigrationUnknownError,
 } from "./errors";
 
 /**
- * The statuses a tenant may be rolled back from. The same pair as
- * `ON_ENGINE_STATUSES` in ../authz/engine-gate.ts, but the premise
- * is weaker than "already on the ledger": what `migrated` MEANS is each
- * migration's own business (the cutover parks tenants in `migrated` while
- * they merely WAIT on prerequisites or a cohort, and those never touched
- * the ledger at all). The status check here is therefore only the generic
- * floor - per-migration preconditions live in `rollbackGuards`, which is
- * where "this migrated tenant has nothing to roll back" and "another
- * migration still depends on this one" are refused. `parked` never did any
- * work worth undoing, and `rolled_back` is accepted only as a RETRY of a
- * standing pin.
+ * The statuses whose rollback has an EFFECT to run, as opposed to a pin to
+ * place. A tenant that reached `migrated` or `finalized` may be live on the
+ * ledger (engine-gate.ts), so undoing it is real work; `rolled_back` is the
+ * retry of exactly that. A `parked` tenant, or one with no record at all,
+ * never got there - there is nothing to undo, only a pass to stop - so the
+ * pin is placed and no effect fires. Which is not the same as being
+ * ineligible: every tenant is pinnable, because stopping the pass is the
+ * point.
  */
-const ROLLBACK_ELIGIBLE_STATUSES: readonly TenantMigrationStatus[] = [
+const ROLLBACK_EFFECT_STATUSES: readonly TenantMigrationStatus[] = [
   "migrated",
   "finalized",
-  // Not a rollback but a RETRY of one: the pin already stands and only the
-  // effect re-fires. See `rollBack`.
   "rolled_back",
 ];
 
@@ -303,7 +296,10 @@ export class SystemMigrationsService {
         string,
         (args: {
           tenantId: string;
-          record: TenantMigrationRecord;
+          /** Null when nothing has run for this tenant yet - the operator is
+           *  pinning it OUT of a rollout ahead of the pass, and a guard that
+           *  needs a record has to say so itself rather than assume one. */
+          record: TenantMigrationRecord | null;
         }) => Promise<void>
       >;
     },
@@ -741,6 +737,58 @@ export class SystemMigrationsService {
   }
 
   /**
+   * The `rolled_back` pin, written unless a retry already carries it.
+   *
+   * A retry writes no second pin and mints no second decision moment: it
+   * exists to finish the one already recorded. A standing pin with NO stamp
+   * (it predates the stamp, or its report write was lost) does get this
+   * moment persisted onto it - otherwise every retry mints a fresh
+   * `decidedAt`, and an effect's decidedAt-keyed dedupe treats each retry as
+   * a new decision instead of finishing the recorded one.
+   */
+  private async writePin({
+    pin,
+    record,
+    isRetry,
+    priorReport,
+    actorUserId,
+  }: {
+    pin: TenantMigrationRecord;
+    record: TenantMigrationRecord | null;
+    isRetry: boolean;
+    priorReport: Record<string, unknown>;
+    actorUserId: string;
+  }): Promise<void> {
+    if (isRetry) {
+      if (rollbackDecidedAt(priorReport) === null) {
+        await this.deps.state.upsertRecord(pin);
+      }
+      logger.warn(
+        {
+          migrationName: pin.migrationName,
+          tenantId: pin.tenantId,
+          actorUserId,
+        },
+        "operator retried the rollback of an already pinned tenant",
+      );
+      return;
+    }
+    await this.deps.state.upsertRecord(pin);
+    logger.warn(
+      {
+        migrationName: pin.migrationName,
+        tenantId: pin.tenantId,
+        actorUserId,
+        // Null when nothing had run for this organization yet: the operator is
+        // holding it OUT of a rollout rather than pulling it back from one,
+        // and the trail must not read as the latter.
+        priorStatus: record?.status ?? null,
+      },
+      "operator pinned a tenant onto its legacy path; later passes leave it alone",
+    );
+  }
+
+  /**
    * Refuses an enrollment action on a migration that admits every
    * organization anyway. Withdrawal asks this too: pausing a rollout is what
    * an operator withdraws FOR, and a migration outside enrollment's reach
@@ -777,31 +825,44 @@ export class SystemMigrationsService {
   }
 
   /**
-   * The operator's rollback: pin a migrated or finalized organization back
-   * onto its legacy path (specs/migration/system-migrations-runner.feature, "An
-   * operator rolls a finalized organization back to its legacy path", "An
-   * operator rolls a migrated organization back to its legacy path"), then
-   * apply whatever that migration's rollback has to DO.
+   * The operator's rollback: pin ANY organization onto its legacy path and
+   * keep every later pass off it
+   * (specs/migration/system-migrations-runner.feature, the rollback
+   * scenarios), then apply whatever that migration's rollback has to DO.
    *
-   * Three statuses are accepted, and the third is the whole point:
+   * The pin is the lever, and it is the ONLY runtime lever: a migration that
+   * enrols automatically has no enrollment to withdraw, so this is how an
+   * operator takes one organization out of a rollout without a deploy. It
+   * therefore accepts every status, and no record at all:
    *
    *   `migrated`     held on the ledger with parity still disagreeing —
-   *   `finalized`    parity clean. Both are already live on ledger writes
-   *                  (engine-gate.ts), so both are the operator's to
-   *                  pull back. The pin is written FIRST — the stored
-   *                  `rolled_back` status is what stops the next pass
-   *                  re-finalizing the tenant, so it must land even if the
-   *                  effect cannot — and the effect runs after it.
+   *   `finalized`    parity clean. Both may be live on ledger writes
+   *                  (engine-gate.ts), so both are the operator's to pull
+   *                  back, effect and all.
    *   `rolled_back`  a RETRY of a rollback whose effect did not fully apply.
    *                  The pin already stands and is left exactly as it is
    *                  (including who decided and when); only the effect
    *                  re-fires. Without this an effect that threw halfway
    *                  stranded the organization: the status said rolled back,
    *                  the fleet still served it from the engine, and every
-   *                  retry bounced off the eligibility refusal.
+   *                  retry bounced off an eligibility refusal.
+   *   `parked`       erroring every pass. This is the case a status gate got
+   *                  WRONG: an organization whose migration throws — its
+   *                  ledger unreachable, its data plane down — is precisely
+   *                  the one an operator needs to stop, and the convergence
+   *                  loop now re-drives it up to `MAX_PASSES` times per boot
+   *                  until they can.
+   *   no record      never attempted, or not reached yet. Pinning ahead of
+   *                  the pass is how an organization is held out of a
+   *                  rollout that would otherwise reach it automatically.
    *
-   * Every other status either never reached the ledger or is the runner's to
-   * move, and is refused.
+   * The pin is written FIRST in every case — the stored `rolled_back` status
+   * is what stops the next pass, so it must land even if an effect cannot —
+   * and the effect runs after it, for the statuses that could have reached
+   * the ledger (`ROLLBACK_EFFECT_STATUSES`). A `parked` organization and one
+   * with no record get the pin alone: there is no cutover to undo, and an
+   * effect written for a tenant that cut over has no defined meaning against
+   * one that never did.
    *
    * Because a retry re-runs the effect, effects must be idempotent. They are
    * handed `decidedAt` — the pin's own timestamp, unchanged across retries —
@@ -825,22 +886,17 @@ export class SystemMigrationsService {
     tenantId: string;
     actorUserId: string;
   }): Promise<void> {
+    this.requireRegisteredMigration(migrationName);
     const record = await this.deps.state.findRecord({
       migrationName,
       tenantId,
     });
-    if (!record) throw new MigrationStateNotFoundError();
-    if (!ROLLBACK_ELIGIBLE_STATUSES.includes(record.status)) {
-      throw new MigrationRollbackRequiresMigratedOrFinalizedError({
-        status: record.status,
-      });
-    }
     // The migration's own preconditions, before anything is written: a
     // refusal here leaves no pin behind, so the tenant's state is exactly
     // what it was when the operator asked.
     await this.deps.rollbackGuards?.[migrationName]?.({ tenantId, record });
     const priorReport =
-      record.report != null && typeof record.report === "object"
+      record?.report != null && typeof record.report === "object"
         ? (record.report as Record<string, unknown>)
         : {};
     // A fresh decision for an organization still on the ledger, the recorded
@@ -849,10 +905,19 @@ export class SystemMigrationsService {
     // has since been cut over again, and rolling it back now is a NEW
     // decision that must not reuse the old moment (and so must not dedupe
     // against the old event).
+    const isRetry = record?.status === "rolled_back";
     const decidedAt =
-      (record.status === "rolled_back"
-        ? rollbackDecidedAt(priorReport)
-        : null) ?? new Date().toISOString();
+      (isRetry ? rollbackDecidedAt(priorReport) : null) ??
+      new Date().toISOString();
+    const pin = {
+      migrationName,
+      tenantId,
+      status: "rolled_back" as const,
+      report: {
+        ...priorReport,
+        rolledBack: { by: actorUserId, at: decidedAt },
+      },
+    };
 
     // The pin FIRST, its effects after — deliberately in that order. The
     // stored `rolled_back` status is what stops the next pass re-finalizing
@@ -861,42 +926,14 @@ export class SystemMigrationsService {
     // operator, who sees a rollback that was recorded but not fully applied
     // and can retry it; the reverse order could leave a tenant the runner
     // re-finalizes minutes later.
-    if (record.status !== "rolled_back") {
-      await this.deps.state.upsertRecord({
-        ...record,
-        status: "rolled_back",
-        report: {
-          ...priorReport,
-          rolledBack: { by: actorUserId, at: decidedAt },
-        },
-      });
-      logger.warn(
-        { migrationName, tenantId, actorUserId, priorStatus: record.status },
-        "operator rolled a migrated or finalized tenant back to its legacy path",
-      );
-    } else {
-      // No second pin, and no second decision moment: this call exists to
-      // finish the one already recorded. A standing pin with no stamp (the
-      // pin predates the stamp, or its report write was lost) gets THIS
-      // moment persisted onto it - otherwise every retry mints a fresh
-      // decidedAt, and the effect's decidedAt-keyed dedupe treats each retry
-      // as a new decision instead of finishing the recorded one.
-      if (rollbackDecidedAt(priorReport) === null) {
-        await this.deps.state.upsertRecord({
-          ...record,
-          status: "rolled_back",
-          report: {
-            ...priorReport,
-            rolledBack: { by: actorUserId, at: decidedAt },
-          },
-        });
-      }
-      logger.warn(
-        { migrationName, tenantId, actorUserId, decidedAt },
-        "operator retried the rollback of an already pinned tenant",
-      );
-    }
+    await this.writePin({ pin, record, isRetry, priorReport, actorUserId });
 
+    // Only for a status that could have reached the ledger. A `parked`
+    // organization and one with no record never cut over, so there is
+    // nothing for an effect to undo and no defined meaning for running one.
+    if (record === null || !ROLLBACK_EFFECT_STATUSES.includes(record.status)) {
+      return;
+    }
     await this.deps.rollbackEffects?.[migrationName]?.({
       tenantId,
       actorUserId,

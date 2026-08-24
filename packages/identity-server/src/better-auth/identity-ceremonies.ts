@@ -213,7 +213,9 @@ export class IdentityCeremonies implements IdentityAccountCeremonies {
     const identifierId = await this.heads.findIdentifierIdForAccount({
       userId,
       accountId: id,
-      provider: identifierProviderFor(providerId),
+      // better-auth's own id, verbatim: the fallback inside must not match
+      // across two enterprise IdPs that fold to one vocabulary.
+      providerId,
     });
     if (identifierId === null) {
       // Nothing in the projection mirrors this row (adopted before the

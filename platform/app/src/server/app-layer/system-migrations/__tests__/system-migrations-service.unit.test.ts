@@ -7,9 +7,7 @@ import {
   MigrationEnrollmentCloudOnlyError,
   MigrationEnrollmentOrganizationNotFoundError,
   MigrationPassAlreadyRunningError,
-  MigrationRollbackRequiresMigratedOrFinalizedError,
   MigrationRunRequiresEnrollmentError,
-  MigrationStateNotFoundError,
   MigrationUnknownError,
 } from "../errors";
 import {
@@ -123,7 +121,10 @@ function serviceWith({
   >;
   rollbackGuards?: Record<
     string,
-    (args: { tenantId: string; record: TenantMigrationRecord }) => Promise<void>
+    (args: {
+      tenantId: string;
+      record: TenantMigrationRecord | null;
+    }) => Promise<void>
   >;
   isSaaS?: boolean;
   enrollments?: ReturnType<typeof enrollmentStoreStub>;
@@ -436,46 +437,69 @@ describe("SystemMigrationsService.rollBack", () => {
   });
 
   describe("given an organization the migration never processed", () => {
-    it("refuses with migration_state_not_found and writes nothing", async () => {
+    /** @scenario "An operator holds an organization out of a rollout before it is reached" */
+    it("pins it anyway, so a pass that would reach it automatically never does", async () => {
       const { service, upserts } = serviceWith({ record: null });
-      await expect(
-        service.rollBack({
-          migrationName: MIGRATION,
-          tenantId: TENANT,
-          actorUserId: "user_alex",
-        }),
-      ).rejects.toThrow(MigrationStateNotFoundError);
-      expect(upserts).toHaveLength(0);
+
+      await service.rollBack({
+        migrationName: MIGRATION,
+        tenantId: TENANT,
+        actorUserId: "user_alex",
+      });
+
+      // The pin is the only runtime lever left for an automatically enrolled
+      // migration, so it has to be placeable before the pass arrives.
+      expect(upserts).toHaveLength(1);
+      expect(upserts[0]).toMatchObject({
+        migrationName: MIGRATION,
+        tenantId: TENANT,
+        status: "rolled_back",
+      });
+    });
+
+    /** @scenario "An operator holds an organization out of a rollout before it is reached" */
+    it("runs no rollback effect, because nothing ever cut over", async () => {
+      const effect = vi.fn().mockResolvedValue(undefined);
+      const { service } = serviceWith({
+        record: null,
+        rollbackEffects: { [MIGRATION]: effect },
+      });
+
+      await service.rollBack({
+        migrationName: MIGRATION,
+        tenantId: TENANT,
+        actorUserId: "user_alex",
+      });
+
+      expect(effect).not.toHaveBeenCalled();
     });
   });
 
-  describe("given an organization that is parked rather than migrated or finalized", () => {
-    it("refuses with migration_rollback_requires_migrated_or_finalized, naming the actual status", async () => {
+  describe("given an organization parked on every pass", () => {
+    /** @scenario "An operator stops a rollout for an organization that keeps erroring" */
+    it("pins it, so the convergence loop stops re-driving it", async () => {
+      const effect = vi.fn().mockResolvedValue(undefined);
       const { service, upserts } = serviceWith({
         record: {
           migrationName: MIGRATION,
           tenantId: TENANT,
           status: "parked",
-          report: null,
+          report: { kind: "error", message: "ledger unreachable" },
         },
+        rollbackEffects: { [MIGRATION]: effect },
       });
-      const attempt = service.rollBack({
+
+      await service.rollBack({
         migrationName: MIGRATION,
         tenantId: TENANT,
         actorUserId: "user_alex",
       });
-      await expect(attempt).rejects.toThrow(
-        MigrationRollbackRequiresMigratedOrFinalizedError,
-      );
-      await attempt.catch(
-        (error: MigrationRollbackRequiresMigratedOrFinalizedError) => {
-          expect(error.code).toBe(
-            "migration_rollback_requires_migrated_or_finalized",
-          );
-          expect(error.meta).toMatchObject({ status: "parked" });
-        },
-      );
-      expect(upserts).toHaveLength(0);
+
+      expect(upserts).toHaveLength(1);
+      expect(upserts[0]).toMatchObject({ status: "rolled_back" });
+      // The park never reached the ledger, so there is nothing to undo and an
+      // effect written for a cutover has no meaning here.
+      expect(effect).not.toHaveBeenCalled();
     });
   });
 });

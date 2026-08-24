@@ -135,6 +135,70 @@ describe("startSystemMigrations", () => {
     });
   });
 
+  describe("given every organization claimed by another process", () => {
+    describe("when a pass advances nothing", () => {
+      /** @scenario "A pass shut out by another process is not convergence" */
+      it("keeps going rather than reading its own shut-out as convergence", async () => {
+        // What `lease.acquire` returning false looks like in a summary - and
+        // it returns false on a Redis error too, not only on real contention.
+        const shutOut: MigrationPassSummary = {
+          ...summaryOf({ advanced: 0 }),
+          tenantsSeen: 12,
+          claimed: 12,
+        };
+        stubs.runPass
+          .mockResolvedValueOnce(shutOut)
+          .mockResolvedValueOnce(shutOut)
+          .mockResolvedValue(summaryOf({ advanced: 0 }));
+
+        const { stop } = startSystemMigrations();
+        await drive({ cycles: 8 });
+        await stop();
+
+        // Three: it did not stop on either shut-out pass, and stopped on the
+        // one that actually got to look at the fleet.
+        expect(stubs.runPass).toHaveBeenCalledTimes(3);
+      });
+
+      /** @scenario "A pass shut out by another process is not convergence" */
+      it("stops when only some tenants were claimed, which is an ordinary pass", async () => {
+        stubs.runPass.mockResolvedValue({
+          ...summaryOf({ advanced: 0 }),
+          tenantsSeen: 12,
+          claimed: 11,
+        });
+
+        const { stop } = startSystemMigrations();
+        await drive({ cycles: 8 });
+        await stop();
+
+        expect(stubs.runPass).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe("given an installation with no tenants in the cohort", () => {
+    describe("when a pass sees nothing at all", () => {
+      /** @scenario "A pass shut out by another process is not convergence" */
+      it("reads an empty fleet as converged rather than looping to the cap", async () => {
+        // `claimed === tenantsSeen` holds vacuously at zero, so an empty
+        // installation would loop to MAX_PASSES on every boot without this.
+        stubs.runPass.mockResolvedValue({
+          ...summaryOf({ advanced: 0 }),
+          tenantsSeen: 0,
+          claimed: 0,
+        });
+
+        const { stop } = startSystemMigrations();
+        await drive({ cycles: 8 });
+        await stop();
+
+        expect(stubs.runPass).toHaveBeenCalledTimes(1);
+        expect(stubs.errors).toEqual([]);
+      });
+    });
+  });
+
   describe("given a pass that keeps reporting progress", () => {
     describe("when the loop reaches its maximum passes", () => {
       /** @scenario "A loop that never converges stops at its cap and says so" */

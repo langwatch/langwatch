@@ -160,14 +160,19 @@ describe("PrismaIdentityHeadsRepository", () => {
         id: `${namespace}-linked`,
         userId: USER,
         accountId: `${namespace}-acc`,
+        providerId: "google",
       });
-      await identifierRow({ id: `${namespace}-same-provider`, userId: USER });
+      await identifierRow({
+        id: `${namespace}-same-provider`,
+        userId: USER,
+        providerId: "google",
+      });
 
       expect(
         await repository.findIdentifierIdForAccount({
           userId: USER,
           accountId: `${namespace}-acc`,
-          provider: "google",
+          providerId: "google",
         }),
       ).toBe(`${namespace}-linked`);
     });
@@ -177,12 +182,13 @@ describe("PrismaIdentityHeadsRepository", () => {
         id: `${namespace}-only`,
         userId: USER,
         provider: "github",
+        providerId: "github",
       });
       expect(
         await repository.findIdentifierIdForAccount({
           userId: USER,
           accountId: `${namespace}-unlinked`,
-          provider: "github",
+          providerId: "github",
         }),
       ).toBe(`${namespace}-only`);
 
@@ -190,14 +196,48 @@ describe("PrismaIdentityHeadsRepository", () => {
         id: `${namespace}-second`,
         userId: USER,
         provider: "github",
+        providerId: "github",
       });
       expect(
         await repository.findIdentifierIdForAccount({
           userId: USER,
           accountId: `${namespace}-unlinked`,
-          provider: "github",
+          providerId: "github",
         }),
       ).toBeNull();
+    });
+
+    /**
+     * The fallback keyed on the FOLDED vocabulary until now, and auth0 and
+     * okta both fold to `oidc`. A user whose Okta identifier is missing while
+     * its `Account` row survives - which the collision park can produce -
+     * unlinking Okta matched their one live `oidc` identifier, the AUTH0 one,
+     * and detached a sign-in they still use.
+     */
+    it("never detaches another enterprise IdP's identifier that folds to the same vocabulary", async () => {
+      await identifierRow({
+        id: `${namespace}-auth0`,
+        userId: USER,
+        provider: "oidc",
+        providerId: "auth0",
+        providerAccountId: "auth0|abc",
+      });
+
+      expect(
+        await repository.findIdentifierIdForAccount({
+          userId: USER,
+          accountId: `${namespace}-okta-acc`,
+          providerId: "okta",
+        }),
+      ).toBeNull();
+      // And the fallback still answers for the provider it really is.
+      expect(
+        await repository.findIdentifierIdForAccount({
+          userId: USER,
+          accountId: `${namespace}-unlinked`,
+          providerId: "auth0",
+        }),
+      ).toBe(`${namespace}-auth0`);
     });
 
     it("never resolves to a detached identifier", async () => {
@@ -205,6 +245,7 @@ describe("PrismaIdentityHeadsRepository", () => {
         id: `${namespace}-gone`,
         userId: USER,
         provider: "gitlab",
+        providerId: "gitlab",
         state: "DETACHED",
         detachedAt: new Date(),
       });
@@ -212,7 +253,7 @@ describe("PrismaIdentityHeadsRepository", () => {
         await repository.findIdentifierIdForAccount({
           userId: USER,
           accountId: `${namespace}-unlinked`,
-          provider: "gitlab",
+          providerId: "gitlab",
         }),
       ).toBeNull();
     });
