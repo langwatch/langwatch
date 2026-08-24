@@ -1,121 +1,100 @@
-import { createLogger } from "@langwatch/observability";
-import type { IngestionSource, PrismaClient } from "~/generated/prisma/client";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 import {
-  ensureHiddenGovernanceProject,
-  PROJECT_KIND,
-} from "../governanceProject.service";
+  GovernanceDiagnosticsPort,
+  IngestionPullLifecycleCommandPort,
+  IngestionPullTenantPort,
+  PostgresIngestionPullLifecycleAdapter,
+  type IngestionPullLifecycleService,
+  type IngestionPullLifecycleSource,
+} from "@langwatch/enterprise-governance-server";
+import { createLogger } from "@langwatch/observability";
+import type { PrismaClient } from "~/generated/prisma/client";
+import { ensureHiddenGovernanceProject } from "../governanceProject.service";
 
 const logger = createLogger("langwatch:governance:ingestion-pull-lifecycle");
 
-export interface IngestionPullLifecycleCommands {
-  configure(args: {
-    tenantId: string;
-    occurredAt: number;
-    sourceId: string;
-    cron: string;
-    configVersion: string;
-    cursor: string | null;
-  }): Promise<void>;
-  disable(args: {
-    tenantId: string;
-    occurredAt: number;
-    sourceId: string;
-    configVersion: string;
-  }): Promise<void>;
-}
+export type AppIngestionPullLifecycleCommands = {
+  configure(
+    input: Parameters<IngestionPullLifecycleCommandPort["configure"]>[0],
+  ): Promise<unknown>;
+  disable(
+    input: Parameters<IngestionPullLifecycleCommandPort["disable"]>[0],
+  ): Promise<unknown>;
+};
 
-function cursorOf(
-  source: Pick<IngestionSource, "pollerCursor">,
-): string | null {
-  if (typeof source.pollerCursor === "string") return source.pollerCursor;
-  return source.pollerCursor == null
-    ? null
-    : JSON.stringify(source.pollerCursor);
-}
+class AppIngestionPullTenantPort extends IngestionPullTenantPort {
+  private constructor(private readonly prisma: PrismaClient) {
+    super();
+  }
 
-export async function syncIngestionPullSource(params: {
-  prisma: PrismaClient;
-  commands: IngestionPullLifecycleCommands;
-  source: IngestionSource;
-}): Promise<void> {
-  const { source } = params;
-  const project = await ensureHiddenGovernanceProject(
-    params.prisma,
-    source.organizationId,
-  );
-  const occurredAt = Date.now();
-  const configVersion = `${source.updatedAt.getTime()}:${source.status}:${source.pullSchedule}:${source.archivedAt?.getTime() ?? "live"}`;
-  const enabled =
-    source.pullSchedule !== null &&
-    source.archivedAt === null &&
-    (source.status === "active" || source.status === "awaiting_first_event");
-  if (enabled && source.pullSchedule) {
-    await params.commands.configure({
-      tenantId: project.id,
-      occurredAt,
-      sourceId: source.id,
-      cron: source.pullSchedule,
-      configVersion,
-      cursor: cursorOf(source),
-    });
-  } else {
-    await params.commands.disable({
-      tenantId: project.id,
-      occurredAt,
-      sourceId: source.id,
-      configVersion,
-    });
+  static create(prisma: PrismaClient): AppIngestionPullTenantPort {
+    return new AppIngestionPullTenantPort(prisma);
+  }
+
+  async resolveTenantId(organizationId: string): Promise<string> {
+    const project = await ensureHiddenGovernanceProject(
+      this.prisma,
+      organizationId,
+    );
+    return project.id;
   }
 }
 
-export async function reconcileIngestionPullProcesses(params: {
-  prisma: PrismaClient;
-  commands: IngestionPullLifecycleCommands;
-}): Promise<{ reconciled: number; failed: number }> {
-  const governanceProjects = await params.prisma.project.findMany({
-    where: {
-      kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
-      archivedAt: null,
-    },
-    select: { id: true },
-  });
-  const governanceProjectIds = governanceProjects.map(({ id }) => id);
-  const existingProcesses =
-    governanceProjectIds.length === 0
-      ? []
-      : await params.prisma.processManagerInstance.findMany({
-          where: {
-            processName: "ingestionPull",
-            projectId: { in: governanceProjectIds },
-          },
-          select: { processKey: true },
-        });
-  const sources = await params.prisma.ingestionSource.findMany({
-    where: {
-      OR: [
-        { pullSchedule: { not: null } },
-        { id: { in: existingProcesses.map((row) => row.processKey) } },
-      ],
-    },
-  });
-  let reconciled = 0;
-  let failed = 0;
-  for (const source of sources) {
-    try {
-      await syncIngestionPullSource({ ...params, source });
-      reconciled += 1;
-    } catch (error) {
-      failed += 1;
-      // The aggregate count alone strands an operator: name the source and
-      // the reason so a nonzero `failed` is actionable.
-      logger.warn(
-        {
-          sourceId: source.id,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "Reconciling this ingestion source's pull process failed; the next boot retries it",
-      );
-    }
+class AppIngestionPullCommandPort extends IngestionPullLifecycleCommandPort {
+  private constructor(
+    private readonly commands: AppIngestionPullLifecycleCommands,
+  ) {
+    super();
   }
-  return { reconciled, failed };
+
+  static create(
+    commands: AppIngestionPullLifecycleCommands,
+  ): AppIngestionPullCommandPort {
+    return new AppIngestionPullCommandPort(commands);
+  }
+
+  async configure(
+    input: Parameters<IngestionPullLifecycleCommandPort["configure"]>[0],
+  ): Promise<void> {
+    await this.commands.configure(input);
+  }
+
+  async disable(
+    input: Parameters<IngestionPullLifecycleCommandPort["disable"]>[0],
+  ): Promise<void> {
+    await this.commands.disable(input);
+  }
+}
+
+class AppIngestionPullDiagnosticsPort extends GovernanceDiagnosticsPort {
+  warn(message: string, context: Record<string, unknown>): void {
+    logger.warn(context, message);
+  }
+}
+
+export class AppIngestionPullLifecycleService {
+  private constructor(private readonly service: IngestionPullLifecycleService) {}
+
+  static create(options: {
+    prisma: PrismaClient;
+    commands: AppIngestionPullLifecycleCommands;
+  }): AppIngestionPullLifecycleService {
+    return new AppIngestionPullLifecycleService(
+      PostgresIngestionPullLifecycleAdapter.create({
+        database: options.prisma,
+        tenant: AppIngestionPullTenantPort.create(options.prisma),
+        commands: AppIngestionPullCommandPort.create(options.commands),
+        diagnostics: new AppIngestionPullDiagnosticsPort(),
+      }).build(),
+    );
+  }
+
+  sync(source: IngestionPullLifecycleSource): Promise<void> {
+    return this.service.sync(source);
+  }
+
+  reconcile(): Promise<{ reconciled: number; failed: number }> {
+    return this.service.reconcile();
+  }
 }

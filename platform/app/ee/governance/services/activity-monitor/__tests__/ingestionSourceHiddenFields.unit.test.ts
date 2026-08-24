@@ -19,7 +19,9 @@ vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({ commands: { ingestionPull: {} } }),
 }));
 vi.mock("@ee/governance/services/pullers/ingestionPullLifecycle", () => ({
-  syncIngestionPullSource: vi.fn(),
+  AppIngestionPullLifecycleService: {
+    create: () => ({ sync: vi.fn() }),
+  },
 }));
 vi.mock("@ee/governance/services/governanceProject.service", () => ({
   ensureHiddenGovernanceProject: vi.fn(),

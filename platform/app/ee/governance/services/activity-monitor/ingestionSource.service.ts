@@ -23,7 +23,7 @@
 
 import { pullScheduleSchema } from "@langwatch/enterprise-governance-contract";
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
-import { syncIngestionPullSource } from "@ee/governance/services/pullers/ingestionPullLifecycle";
+import { AppIngestionPullLifecycleService } from "@ee/governance/services/pullers/ingestionPullLifecycle";
 import {
   HandledError,
   NotFoundError,
@@ -191,11 +191,10 @@ async function syncPullProcessBestEffort({
   source: IngestionSource;
 }): Promise<void> {
   try {
-    await syncIngestionPullSource({
+    await AppIngestionPullLifecycleService.create({
       prisma,
       commands: getApp().commands.ingestionPull,
-      source,
-    });
+    }).sync(source);
   } catch (error) {
     logger.error(
       { sourceId: source.id, error },

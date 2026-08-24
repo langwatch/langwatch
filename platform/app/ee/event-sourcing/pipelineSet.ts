@@ -16,7 +16,7 @@ import {
   AppPulledUsageLedgerService,
   type AppPulledUsageLedgerConfig,
 } from "@ee/governance/process-manager/pulledUsageLedger.process";
-import { reconcileIngestionPullProcesses } from "@ee/governance/services/pullers/ingestionPullLifecycle";
+import { AppIngestionPullLifecycleService } from "@ee/governance/services/pullers/ingestionPullLifecycle";
 import {
   type PulledUsageDispatcher,
   runIngestionPull,
@@ -166,10 +166,11 @@ export class AppGovernancePipelineRuntime {
     commands: EnterprisePipelineCommands["ingestionPull"],
   ): void {
     if (!this.deps.runsWorkers) return;
-    void reconcileIngestionPullProcesses({
+    void AppIngestionPullLifecycleService.create({
       prisma: this.deps.prisma,
       commands,
     })
+      .reconcile()
       .then(({ reconciled, failed }) => {
         if (failed > 0) {
           logger.warn(
