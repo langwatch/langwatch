@@ -100,6 +100,7 @@ const registry = {
       "Read `meta.parameters` — it lists every parameter the SQL declares that the request left unset",
       "Send a value for each under `parameters`, keyed by the name inside the braces: `{since:DateTime}` reads `parameters.since`",
       "`period_start` and `period_end` are the exception — send them as `timeWindow: { start, end }`, never under `parameters`",
+      "`period_granularity_seconds` is also an exception — send it as the request's own `granularitySeconds` field, never under `parameters`",
     ],
   },
   lwql_reserved_parameter_supplied: {

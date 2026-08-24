@@ -1,6 +1,7 @@
 import { Button } from "@chakra-ui/react";
 import { Clock, Edit, Grid, MoreVertical, Trash2 } from "lucide-react";
 import { Menu } from "~/components/ui/menu";
+import { LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS } from "~/features/analytics-query/components/LangWatchQLDashboardWidget";
 import {
   describeLangWatchQLGranularityStep,
   LWQL_GRANULARITY_STEPS,
@@ -122,10 +123,11 @@ export function GraphCardMenu({
         {isWorkbenchChart && onGranularityChange && (
           <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
             <Menu.TriggerItem value="granularity">
-              <Clock /> Datapoints
-              {granularitySeconds === undefined
-                ? ""
-                : ` (${granularityLabel(granularitySeconds)})`}
+              <Clock /> Datapoints (
+              {granularityLabel(
+                granularitySeconds ?? LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS,
+              )}
+              )
             </Menu.TriggerItem>
             <Menu.Content>
               {LWQL_GRANULARITY_STEPS.map((step) => (
@@ -135,7 +137,9 @@ export function GraphCardMenu({
                   onClick={() => onGranularityChange(step)}
                 >
                   {granularityLabel(step)}
-                  {step === granularitySeconds && " ✓"}
+                  {step ===
+                    (granularitySeconds ??
+                      LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS) && " ✓"}
                 </Menu.Item>
               ))}
             </Menu.Content>

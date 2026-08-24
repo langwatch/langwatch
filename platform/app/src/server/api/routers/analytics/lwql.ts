@@ -27,8 +27,10 @@ import {
   MAX_LWQL_LENGTH,
 } from "~/server/analytics/lwql";
 import { lwqlEnabled } from "~/server/analytics/lwql/access";
-import { LWQL_GRANULARITY_STEPS } from "~/server/analytics/lwql/timeWindow";
-import { lwqlTimeWindowSchema } from "~/server/analytics/lwql/timeWindowSchema";
+import {
+  lwqlGranularityStepSchema,
+  lwqlTimeWindowSchema,
+} from "~/server/analytics/lwql/timeWindowSchema";
 
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 import { getUserProtectionsForProject } from "../../utils";
@@ -132,17 +134,11 @@ const query = protectedProcedure
       /**
        * The datapoint step for a statement that declares
        * `{period_granularity_seconds:UInt32}`, in seconds — restricted to the
-       * offered steps ({@link LWQL_GRANULARITY_STEPS}) so an off-list value is
-       * a schema rejection here rather than reaching the service's backstop.
+       * offered steps ({@link lwqlGranularityStepSchema}) so an off-list value
+       * is a schema rejection here rather than reaching the service's backstop.
        * The bucket-budget arithmetic and its refusal are still the service's.
        */
-      granularitySeconds: z
-        .union([
-          z.literal(LWQL_GRANULARITY_STEPS[0]),
-          z.literal(LWQL_GRANULARITY_STEPS[1]),
-          z.literal(LWQL_GRANULARITY_STEPS[2]),
-        ])
-        .optional(),
+      granularitySeconds: lwqlGranularityStepSchema.optional(),
     }),
   )
   .permission("analytics:view")

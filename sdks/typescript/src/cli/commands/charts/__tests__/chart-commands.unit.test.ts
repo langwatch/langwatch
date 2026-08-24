@@ -378,6 +378,8 @@ describe("the chart family while the workbench switch is off", () => {
       mocks.runQuery.mockRejectedValue(flagOff);
 
       const attempts: [string, () => Promise<unknown>][] = [
+        ["list", () => listChartsCommand()],
+        ["get", () => getChartCommand("chart-1")],
         ["create", () => createChartCommand({ name: "x", sql: "SELECT 1" })],
         ["update", () => updateChartCommand("chart-1", { name: "y" })],
         ["delete", () => deleteChartCommand("chart-1")],
@@ -394,6 +396,11 @@ describe("the chart family while the workbench switch is off", () => {
       }
       // The refusal came from the platform's switch, before any row was
       // written — nothing here retried or fell back to another write path.
+      expect(mocks.list).toHaveBeenCalledTimes(1);
+      // 2, not 1: the "run" attempt below reads the chart via the same
+      // `service.get` before it can execute it, so this method sees one call
+      // from the "get" attempt and one from "run"'s internal read.
+      expect(mocks.get).toHaveBeenCalledTimes(2);
       expect(mocks.create).toHaveBeenCalledTimes(1);
       expect(mocks.update).toHaveBeenCalledTimes(1);
       expect(mocks.delete).toHaveBeenCalledTimes(1);

@@ -277,10 +277,10 @@ function build(
   executor: LangWatchQLExecutor | null = null,
   overrides: {
     /** Every dashboard belongs, by default: most suites are not testing tenancy. */
-    dashboardBelongsToProject?: (
-      dashboardId: string,
-      projectId: string,
-    ) => Promise<boolean>;
+    dashboardBelongsToProject?: (input: {
+      dashboardId: string;
+      projectId: string;
+    }) => Promise<boolean>;
     /**
      * Row 0, by default: most suites place a single chart and never look at
      * the row it landed on.
@@ -708,9 +708,14 @@ describe("placing a saved workbench chart on a dashboard", () => {
           projectId: PROJECT_ID,
           input: {
             dashboardId: "dashboard-1",
+            // gridColumn 1 + colSpan 1 is the widest column placement the
+            // 2-column grid still accepts at gridColumn 1 (see placementSchema's
+            // cross-field refine) — chosen so gridColumn, gridRow and rowSpan
+            // each start away from their post-unplace default and the
+            // assertions below actually prove they were cleared.
             gridColumn: 1,
             gridRow: 3,
-            colSpan: 2,
+            colSpan: 1,
             rowSpan: 2,
           },
         });

@@ -128,7 +128,7 @@ describe("saved workbench charts (integration)", () => {
         executor: null,
         database: "analytics",
       }),
-      dashboardBelongsToProject: (dashboardId, projectId) =>
+      dashboardBelongsToProject: ({ dashboardId, projectId }) =>
         dashboardBelongsToProject(prisma, dashboardId, projectId),
       allocateNextGridRow: (input) => allocateNextGridRow(prisma, input),
     });

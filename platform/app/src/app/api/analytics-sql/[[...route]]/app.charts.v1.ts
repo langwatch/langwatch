@@ -156,10 +156,10 @@ const chartSchema = z.object({
   platformUrl: z.string(),
   /** `null` when the chart has never been placed, or has been unplaced. */
   dashboardId: z.string().nullable(),
-  gridColumn: z.number(),
-  gridRow: z.number(),
-  colSpan: z.number(),
-  rowSpan: z.number(),
+  gridColumn: z.number().int(),
+  gridRow: z.number().int(),
+  colSpan: z.number().int(),
+  rowSpan: z.number().int(),
 });
 
 const chartListSchema = z.object({ data: z.array(chartSchema) });

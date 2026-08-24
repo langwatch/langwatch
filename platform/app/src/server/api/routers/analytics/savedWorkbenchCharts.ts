@@ -25,8 +25,10 @@
 
 import { z } from "zod";
 
-import { LWQL_GRANULARITY_STEPS } from "~/server/analytics/lwql/timeWindow";
-import { lwqlTimeWindowSchema } from "~/server/analytics/lwql/timeWindowSchema";
+import {
+  lwqlGranularityStepSchema,
+  lwqlTimeWindowSchema,
+} from "~/server/analytics/lwql/timeWindowSchema";
 import { SavedWorkbenchChartService } from "~/server/analytics/saved-workbench-charts/savedWorkbenchChart.service";
 
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
@@ -160,16 +162,10 @@ const run = protectedProcedure
       timeWindow: lwqlTimeWindowSchema.optional(),
       /**
        * The datapoint step, in seconds — restricted to the offered steps
-       * ({@link LWQL_GRANULARITY_STEPS}) so an off-list value is a schema
+       * ({@link lwqlGranularityStepSchema}) so an off-list value is a schema
        * rejection here rather than reaching the service's backstop.
        */
-      granularitySeconds: z
-        .union([
-          z.literal(LWQL_GRANULARITY_STEPS[0]),
-          z.literal(LWQL_GRANULARITY_STEPS[1]),
-          z.literal(LWQL_GRANULARITY_STEPS[2]),
-        ])
-        .optional(),
+      granularitySeconds: lwqlGranularityStepSchema.optional(),
       onBudgetOverflow: z.enum(["refuse", "coarsen"]).optional(),
     }),
   )

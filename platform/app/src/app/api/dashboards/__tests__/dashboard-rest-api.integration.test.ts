@@ -446,6 +446,8 @@ describe("Feature: Dashboard REST API", () => {
       await createWorkbenchChart(dashboard.id);
 
       const res = await helpers.api.get(`/api/dashboards/${dashboard.id}`);
+      expect(res.status).toBe(200);
+
       const raw = await res.text();
 
       // Asserted over the whole body rather than over `graphs`: the claim is

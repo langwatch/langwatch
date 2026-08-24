@@ -122,10 +122,10 @@ export interface SavedWorkbenchChartServiceDependencies {
    * @default the real {@link dashboardBelongsToProject}, bound to a Prisma
    *   client by {@link SavedWorkbenchChartService.create}.
    */
-  readonly dashboardBelongsToProject: (
-    dashboardId: string,
-    projectId: string,
-  ) => Promise<boolean>;
+  readonly dashboardBelongsToProject: (input: {
+    dashboardId: string;
+    projectId: string;
+  }) => Promise<boolean>;
   /**
    * The next free grid row on a dashboard, counting every chart on it
    * regardless of kind. Shared with `graphs.create` via
@@ -149,13 +149,22 @@ export interface SavedWorkbenchChartServiceDependencies {
 const MAX_GRID_COORDINATE = 2_000_000_000;
 
 /** Grid bounds a chart may be placed with — the same 2-column grid the chart builder places onto. */
-const placementSchema = z.object({
-  dashboardId: z.string().min(1),
-  gridColumn: z.number().int().min(0).max(1).optional(),
-  gridRow: z.number().int().min(0).max(MAX_GRID_COORDINATE).optional(),
-  colSpan: z.number().int().min(1).max(2).optional(),
-  rowSpan: z.number().int().min(1).max(2).optional(),
-});
+const placementSchema = z
+  .object({
+    dashboardId: z.string().min(1),
+    gridColumn: z.number().int().min(0).max(1).optional(),
+    gridRow: z.number().int().min(0).max(MAX_GRID_COORDINATE).optional(),
+    colSpan: z.number().int().min(1).max(2).optional(),
+    rowSpan: z.number().int().min(1).max(2).optional(),
+  })
+  // Each field's own bounds pass a column/span pair that still overflows the
+  // grid — {gridColumn: 1, colSpan: 2} occupies columns 1 and 2, and column 2
+  // does not exist. Checked together so that combination is refused here
+  // rather than silently clipped or accepted by the placement it feeds.
+  .refine(({ gridColumn = 0, colSpan = 1 }) => gridColumn + colSpan <= 2, {
+    message: "gridColumn + colSpan must not exceed the 2-column grid",
+    path: ["colSpan"],
+  });
 
 export class SavedWorkbenchChartService {
   constructor(private readonly deps: SavedWorkbenchChartServiceDependencies) {}
@@ -165,7 +174,7 @@ export class SavedWorkbenchChartService {
     return new SavedWorkbenchChartService({
       repository: new SavedWorkbenchChartRepository(prisma),
       lwql: getLangWatchQLService(),
-      dashboardBelongsToProject: (dashboardId, projectId) =>
+      dashboardBelongsToProject: ({ dashboardId, projectId }) =>
         dashboardBelongsToProject(prisma, dashboardId, projectId),
       allocateNextGridRow: (input) => allocateNextGridRow(prisma, input),
     });
@@ -438,10 +447,10 @@ export class SavedWorkbenchChartService {
     // Refused before anything else is resolved, so a member placing onto
     // another project's dashboard learns only that it is not here — the same
     // shape of refusal `getById` already gives for a foreign chart id.
-    const belongs = await this.deps.dashboardBelongsToProject(
-      parsed.data.dashboardId,
+    const belongs = await this.deps.dashboardBelongsToProject({
+      dashboardId: parsed.data.dashboardId,
       projectId,
-    );
+    });
     if (!belongs) throw new SavedWorkbenchChartDashboardNotFoundError();
 
     const gridRow =

@@ -62,7 +62,7 @@ export function useLangWatchQLWidgetRun({
   const issuedRequests = useRef(0);
   const [settled, setSettled] = useState<Settled | null>(null);
 
-  const requestKey = `${chartId}:${start}:${end}:${granularitySeconds}`;
+  const requestKey = `${chartId}:${projectId}:${start}:${end}:${granularitySeconds}`;
 
   useEffect(() => {
     if (!chartLoaded) return;

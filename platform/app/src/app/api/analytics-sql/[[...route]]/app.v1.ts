@@ -36,8 +36,10 @@ import {
   LWQL_DIAGNOSTIC_CODES,
   MAX_LWQL_LENGTH,
 } from "~/server/analytics/lwql";
-import { LWQL_GRANULARITY_STEPS } from "~/server/analytics/lwql/timeWindow";
-import { lwqlTimeWindowSchema } from "~/server/analytics/lwql/timeWindowSchema";
+import {
+  lwqlGranularityStepSchema,
+  lwqlTimeWindowSchema,
+} from "~/server/analytics/lwql/timeWindowSchema";
 import { type createProjectApp, requires } from "~/server/api/security";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { validator as zValidator } from "~/server/api/validation";
@@ -84,17 +86,11 @@ const lwqlQuerySchema = z.object({
    * `{period_granularity_seconds:UInt32}`, in seconds — the REST twin of the
    * workbench's step control, so a statement's bucketing means the same thing
    * at both doors. Restricted to the steps the surface actually offers
-   * ({@link LWQL_GRANULARITY_STEPS}) rather than any positive integer, so an
-   * off-list value is a clean schema rejection instead of reaching the
+   * ({@link lwqlGranularityStepSchema}) rather than any positive integer, so
+   * an off-list value is a clean schema rejection instead of reaching the
    * service's backstop. The bucket-budget refusal is still the service's.
    */
-  granularitySeconds: z
-    .union([
-      z.literal(LWQL_GRANULARITY_STEPS[0]),
-      z.literal(LWQL_GRANULARITY_STEPS[1]),
-      z.literal(LWQL_GRANULARITY_STEPS[2]),
-    ])
-    .optional(),
+  granularitySeconds: lwqlGranularityStepSchema.optional(),
 });
 
 // Response schemas exist for the published OpenAPI document. The service owns
