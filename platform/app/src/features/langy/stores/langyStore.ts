@@ -356,7 +356,26 @@ interface LangyState extends TurnPhaseState {
   setDraft: (draft: string) => void;
   /** Per-session model override for the next send. "" = use the project default. */
   modelOverride: string;
+  /**
+   * Seeding: the panel writing the resolved default, or an allowlist snap.
+   * Either way the model is not the user's choice, so this clears the pick
+   * flag. An allowlist snap in particular OVERRULES a pick, and a pick the
+   * panel has taken away must not go on holding the pill off the default.
+   */
   setModelOverride: (model: string) => void;
+  /** The user choosing a model in the picker. Their pick, not a seed. */
+  pickModel: (model: string) => void;
+  /**
+   * Whether the model in the picker is the user's own choice rather than a
+   * seeded value. Session-only, never persisted, and cleared with the
+   * conversation it was made in.
+   *
+   * The flag exists because the two are otherwise indistinguishable at the
+   * one moment it matters: accept "make it the default" and the pick BECOMES
+   * the default, so every "is this still the default?" test reads an explicit
+   * choice as untouched and the follow rules below overwrite it.
+   */
+  isModelPickedByUser: boolean;
   /**
    * Which conversation the picker was last seeded for from the durable
    * record — so a poll of the same history does not re-apply a model the
@@ -365,27 +384,21 @@ interface LangyState extends TurnPhaseState {
   modelSeededForConversationId: string | null;
   /**
    * A conversation remembers the model its last turn ran on; opening it
-   * brings that model back to the picker. Applies once per selection, only
-   * while the pick is still the seeded default (an explicit pick since the
-   * conversation was opened is never replaced).
+   * brings that model back to the picker. Applies once per selection, and
+   * never over the user's own pick.
    */
   followConversationModel: (args: {
     conversationId: string;
     model: string;
-    resolvedDefault: string | null;
   }) => void;
   /**
    * The project's coding default changed server-side (a codex connect flow
    * wrote the LANGY role default). Follow it with the composer's pill ONLY
-   * when the pill is still on the default it replaced: an empty override, or
-   * one equal to the outgoing default (the panel seeds the override from the
-   * resolved default on open), both mean the user never explicitly diverged.
-   * A model the user picked on purpose is never hijacked.
+   * while the pill still holds a seeded value: the user's own pick is never
+   * hijacked, including when they picked the model that just became the
+   * default.
    */
-  followCodingDefaultChange: (change: {
-    previousDefault: string | null;
-    nextDefault: string;
-  }) => void;
+  followCodingDefaultChange: (change: { nextDefault: string }) => void;
 
   /**
    * Page-context chips the user has CHOSEN, by id.
@@ -729,6 +742,12 @@ export const useLangyStore = create<LangyState>()(
           activeConversationId: null,
           historyLoadConversationId: null,
           draft: "",
+          // The model pick belongs to the conversation being left behind, the
+          // same as a new chat. Kept, it would steer a conversation the user
+          // never picked it for, and hold the pill off the default for good.
+          modelOverride: "",
+          isModelPickedByUser: false,
+          modelSeededForConversationId: null,
           ...emptyConversationState(),
           // AFTER the spread: emptyConversationState() nulls `pendingPrompt`, so
           // the queued question is written last or it would be wiped out.
@@ -792,6 +811,7 @@ export const useLangyStore = create<LangyState>()(
           // being opened seeds its own from the durable record (or the
           // default) once its history lands.
           modelOverride: "",
+          isModelPickedByUser: false,
           modelSeededForConversationId: null,
           ...emptyConversationState(),
         }),
@@ -812,6 +832,7 @@ export const useLangyStore = create<LangyState>()(
           // conversation" is the dialog's promise) — a new chat starts on
           // the resolved default again.
           modelOverride: "",
+          isModelPickedByUser: false,
           modelSeededForConversationId: null,
           chosenChipIds: new Set<string>(),
           // The targets the user pointed at were gathered for the conversation
@@ -828,31 +849,27 @@ export const useLangyStore = create<LangyState>()(
       draft: "",
       setDraft: (draft) => set({ draft }),
       modelOverride: "",
-      setModelOverride: (modelOverride) => set({ modelOverride }),
+      setModelOverride: (modelOverride) =>
+        set({ modelOverride, isModelPickedByUser: false }),
+      pickModel: (modelOverride) =>
+        set({ modelOverride, isModelPickedByUser: true }),
+      isModelPickedByUser: false,
       modelSeededForConversationId: null,
-      followConversationModel: ({ conversationId, model, resolvedDefault }) =>
+      followConversationModel: ({ conversationId, model }) =>
         set((state) => {
           if (state.activeConversationId !== conversationId) return state;
           if (state.modelSeededForConversationId === conversationId)
             return state;
-          // An empty override, or one equal to the resolved default the panel
-          // seeds on open, both mean the user never picked since opening this
-          // conversation — only then may the record's model take the pill.
-          const isUntouched =
-            state.modelOverride === "" ||
-            state.modelOverride === resolvedDefault;
-          return isUntouched
-            ? {
+          return state.isModelPickedByUser
+            ? { modelSeededForConversationId: conversationId }
+            : {
                 modelOverride: model,
                 modelSeededForConversationId: conversationId,
-              }
-            : { modelSeededForConversationId: conversationId };
+              };
         }),
-      followCodingDefaultChange: ({ previousDefault, nextDefault }) =>
+      followCodingDefaultChange: ({ nextDefault }) =>
         set((state) =>
-          state.modelOverride === "" || state.modelOverride === previousDefault
-            ? { modelOverride: nextDefault }
-            : state,
+          state.isModelPickedByUser ? state : { modelOverride: nextDefault },
         ),
 
       chosenChipIds: new Set<string>(),

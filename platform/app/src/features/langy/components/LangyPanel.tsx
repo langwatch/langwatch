@@ -544,6 +544,7 @@ function LangyPanel({
   const setDraft = useLangyStore((s) => s.setDraft);
   const modelOverride = useLangyStore((s) => s.modelOverride);
   const setModelOverride = useLangyStore((s) => s.setModelOverride);
+  const pickModel = useLangyStore((s) => s.pickModel);
   const activeConversationId = useLangyStore((s) => s.activeConversationId);
   const interruptedConversationId = useLangyStore(
     (s) => s.interruptedConversationId,
@@ -1167,14 +1168,8 @@ function LangyPanel({
     useLangyStore.getState().followConversationModel({
       conversationId: activeConversationId,
       model: conversationLastModel,
-      resolvedDefault: resolvedDefaultQuery.data?.model ?? null,
     });
-  }, [
-    activeConversationId,
-    conversationLastModel,
-    langyModelsAllowed,
-    resolvedDefaultQuery.data?.model,
-  ]);
+  }, [activeConversationId, conversationLastModel, langyModelsAllowed]);
 
   /**
    * The conversation's own history failed to load.
@@ -3241,7 +3236,7 @@ function LangyPanel({
                       // codex session; leaving the reconnect screen up would trap
                       // the panel on the sign-in it no longer needs.
                       setReconnectCodex(false);
-                      setModelOverride(model);
+                      pickModel(model);
                       // The pick is done; this only ASKS whether it should also
                       // become the default, when the picker can grant that.
                       offerMakeDefault(model);

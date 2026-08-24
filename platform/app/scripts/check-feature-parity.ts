@@ -524,7 +524,6 @@ const LEGACY_INERT: string[] = [
   "specs/ops/clickhouse-backup-metrics.feature",
   "specs/ops/dashboard-latency.feature",
   "specs/ops/dejaview-impersonation-access.feature",
-  "specs/ops/internal-feature-flags.feature",
   "specs/ops/local-observability-stack.feature",
   "specs/ops/production-bundle-integrity.feature",
   "specs/otlp/canonical-log-ingestion.feature",

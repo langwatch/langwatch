@@ -1,8 +1,10 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -128,23 +130,37 @@ func logRequestError(logger *zap.Logger, ctx context.Context, failure requestErr
 }
 
 // upstreamReasonLimit caps the reason field: long enough for any provider's
-// rejection sentence, short enough that a body in a shape we do not know
-// cannot put a request payload on the line.
+// rejection sentence, short enough that a provider answering at length cannot
+// take the log line over.
 const upstreamReasonLimit = 256
 
 // upstreamReason reads the provider's own explanation out of a forwarded error
 // body. Providers state it in different places: OpenAI and Anthropic use
 // error.message, the codex backend answers "detail", several others use a bare
-// message or a plain error string. A body in none of those shapes (an HTML
-// edge page, a text response) is reported by its first line, so the operator
-// still learns who answered and roughly what they said.
+// message or a plain error string. Each of those is a field the provider wrote
+// to explain itself, which is what the operator needs.
+//
+// A body in none of those shapes is described, never quoted. An HTML edge page
+// or a plain-text rejection can reflect the request that caused it, so quoting
+// it would put a prompt, a key or personal data on a log line. The status, the
+// code and the size still say who answered and that we could not read it.
 func upstreamReason(body []byte) string {
 	for _, path := range []string{"error.message", "detail", "message", "error"} {
 		if value := gjson.GetBytes(body, path); value.Type == gjson.String && value.Str != "" {
 			return cappedReason(value.Str)
 		}
 	}
-	return cappedReason(firstLine(body))
+	return unreadableReason(body)
+}
+
+// unreadableReason states that a body carried no reason we can read, and how
+// big it was, with nothing of the body itself.
+func unreadableReason(body []byte) string {
+	size := len(bytes.TrimSpace(body))
+	if size == 0 {
+		return ""
+	}
+	return fmt.Sprintf("unrecognized upstream body, %d bytes", size)
 }
 
 // unstatedReason is upstreamReason minus what the message already says, so a
@@ -164,14 +180,6 @@ func cappedReason(text string) string {
 	}
 	const ellipsis = "..."
 	return strings.ToValidUTF8(text[:upstreamReasonLimit-len(ellipsis)], "") + ellipsis
-}
-
-func firstLine(body []byte) string {
-	text := strings.TrimSpace(string(body))
-	if end := strings.IndexByte(text, '\n'); end >= 0 {
-		text = text[:end]
-	}
-	return text
 }
 
 // recordClientReject counts a rejection the GATEWAY issued against the caller.

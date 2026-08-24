@@ -3246,6 +3246,15 @@ model IngestionSource {
   /// 'awaiting_first_event' (created but never received).
   status String @default("awaiting_first_event")
 
+  /// ADR-088 v7: optional trace DESTINATION for conversation-bearing pulls
+  /// (Databricks Genie). Null = don't route. Same shape as
+  /// VirtualKey.traceProjectId: a destination is NOT a scope row and grants
+  /// no access to the source; it only decides where routed conversation
+  /// traces land. Must be a project of this org (validated at write time).
+  /// Freely editable; already-routed history stays where it landed.
+  /// NOT the deferred cost-attribution projectId (ADR-088 Decision 4).
+  traceProjectId String?
+
   /// Last event timestamp observed (any direction). Surfaces in the
   /// admin UI as "last event 2 minutes ago".
   lastEventAt DateTime?

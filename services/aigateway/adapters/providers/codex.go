@@ -247,16 +247,81 @@ func codexSessionExpiredError(ctx context.Context) error {
 	})
 }
 
+// codexAllowedFields is what the ChatGPT codex backend accepts on a Responses
+// body. Everything else comes back 400 "Unsupported parameter: <name>" before
+// a single token is generated, so the gateway keeps the caller's body to this
+// set instead of removing offenders one at a time.
+//
+// It is an allowlist because the backend keeps one of its own. A strip list
+// costs a production outage per field, and it took two of them to learn that:
+// pi sends prompt_cache_retention AND max_output_tokens, so stripping the
+// first only uncovered the second. Verified against the live backend, which
+// refuses at least max_output_tokens, max_tool_calls, prompt_cache_options,
+// prompt_cache_retention, temperature, top_p, top_logprobs, truncation,
+// metadata, service_tier, background, user, safety_identifier and
+// previous_response_id, and accepts every field below.
+//
+// A field OpenAI adds later is dropped until it is listed here, and that is
+// the safe direction: the same field on an unlisted body would have failed
+// the whole request anyway.
+var codexAllowedFields = map[string]bool{
+	"model":               true,
+	"input":               true,
+	"instructions":        true,
+	"stream":              true,
+	"stream_options":      true,
+	"store":               true,
+	"include":             true,
+	"tools":               true,
+	"tool_choice":         true,
+	"parallel_tool_calls": true,
+	"reasoning":           true,
+	"text":                true,
+	"prompt_cache_key":    true,
+}
+
 // codexRequestBody pins the backend's invariants onto the caller's raw body:
 // the bare model name (the gateway stays in control of what lands upstream),
-// stream on, store off, and no sampling params the backend refuses.
+// stream on, store off, and nothing the backend does not accept.
 func codexRequestBody(raw []byte, model string) ([]byte, error) {
 	body := raw
 	if len(bytes.TrimSpace(body)) == 0 {
 		body = []byte("{}")
 	}
-	bare := strings.TrimPrefix(model, codexModelPrefix)
+	// A Responses call is a JSON object, and only an object has fields to
+	// filter. Without this, anything else read as no fields at all and was
+	// rebuilt into the pins alone: a truncated body, an array, or plain text
+	// went upstream as a well-formed request with no turn in it, and the
+	// caller paid a provider round trip to be told what we could see here.
+	if !gjson.ValidBytes(body) {
+		return nil, errors.New("codex body is not valid JSON")
+	}
+	if !gjson.ParseBytes(body).IsObject() {
+		return nil, errors.New("codex body must be a JSON object")
+	}
+	// The outgoing body is BUILT from the accepted names, rather than the
+	// caller's body having the refused ones deleted out of it. A field name is
+	// data, and turning data into an sjson path is what let a name break the
+	// very call this filtering exists to save: ".", "*", "?" and ":" select
+	// something else, so ":input" deleted "input"; "|", "#" and "@" make the
+	// path complex, which DeleteBytes refuses; and an empty name has no path
+	// at all. Copying under our own fixed names cannot address anything but
+	// the field we mean, whatever the caller called theirs.
+	out := []byte("{}")
 	var err error
+	gjson.ParseBytes(body).ForEach(func(key, value gjson.Result) bool {
+		name := key.String()
+		if !codexAllowedFields[name] {
+			return true
+		}
+		out, err = sjson.SetRawBytes(out, name, []byte(value.Raw))
+		return err == nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("build codex body: %w", err)
+	}
+	body = out
+	bare := strings.TrimPrefix(model, codexModelPrefix)
 	for _, set := range []struct {
 		path  string
 		value any
@@ -268,21 +333,6 @@ func codexRequestBody(raw []byte, model string) ([]byte, error) {
 		body, err = sjson.SetBytes(body, set.path, set.value)
 		if err != nil {
 			return nil, fmt.Errorf("rewrite %s on codex body: %w", set.path, err)
-		}
-	}
-	// The codex backend refuses params the wider Responses API accepts: a body
-	// carrying temperature, top_p, or prompt_cache_retention comes back
-	// 400 Bad Request ("Unsupported parameter", verified against the live
-	// backend; prompt_cache_key passes). Clients that set them for other
-	// providers would break every codex call — the title generator and the
-	// tiny assists send temperature, and pi's long-cache-retention mode sends
-	// prompt_cache_retention — so strip them here where the gateway already
-	// owns the backend's invariants. DeleteBytes is a no-op when the key is
-	// absent, so this is safe for the opencode turns that never set them.
-	for _, path := range []string{"temperature", "top_p", "prompt_cache_retention"} {
-		body, err = sjson.DeleteBytes(body, path)
-		if err != nil {
-			return nil, fmt.Errorf("strip %s from codex body: %w", path, err)
 		}
 	}
 	return body, nil
