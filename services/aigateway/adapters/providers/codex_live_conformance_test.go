@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"slices"
+	"sort"
 	"testing"
 	"time"
 
@@ -169,8 +171,11 @@ func TestCodexLiveConformance(t *testing.T) {
 		if err != nil {
 			t.Fatalf("codexRequestBody: %v", err)
 		}
-		if len(dropped) != 3 {
-			t.Errorf("expected max_output_tokens, prompt_cache_retention and temperature dropped, got %v", dropped)
+		got := append([]string(nil), dropped...)
+		sort.Strings(got)
+		want := []string{"max_output_tokens", "prompt_cache_retention", "temperature"}
+		if !slices.Equal(got, want) {
+			t.Errorf("dropped %v, want %v", got, want)
 		}
 		status, detail := probe(t, body)
 		if status != http.StatusOK {

@@ -300,10 +300,13 @@ func TestLLMProxy_PiHarnessReadsAnthropicStreamUsage(t *testing.T) {
 // input_tokens_details.cached_tokens.
 // @scenario "An option the gateway dropped from a model call is visible on the turn's telemetry"
 func TestLLMProxy_PiHarnessRecordsGatewayDroppedParams(t *testing.T) {
+	// A, B, A: the first set must stay deduped after a different set arrives
+	// in between, so a turn that alternates bodies does not log A twice.
+	sets := []string{"max_output_tokens,temperature", "top_p", "max_output_tokens,temperature"}
 	var calls atomic.Int32
 	gateway := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		calls.Add(1)
-		w.Header().Set("X-LangWatch-Params-Dropped", "max_output_tokens,temperature")
+		n := calls.Add(1)
+		w.Header().Set("X-LangWatch-Params-Dropped", sets[(int(n)-1)%len(sets)])
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"id":"cmpl_1","usage":{"prompt_tokens":1,"completion_tokens":1}}`))
 	}))
@@ -322,7 +325,7 @@ func TestLLMProxy_PiHarnessRecordsGatewayDroppedParams(t *testing.T) {
 	ingest := startSignallingIngest(t)
 	token := registerPiWorker(t, relay, gateway.URL, ingest.srv.URL)
 
-	for range 2 {
+	for range len(sets) {
 		resp, err := http.Post(relay.LLMBaseURLFor(token)+"/chat/completions", "application/json", strings.NewReader(`{}`))
 		if err != nil {
 			t.Fatalf("proxied LLM call: %v", err)
@@ -335,13 +338,13 @@ func TestLLMProxy_PiHarnessRecordsGatewayDroppedParams(t *testing.T) {
 	if v, ok := span.Attributes().Get("langwatch.langy.params_dropped"); !ok || v.Str() != "max_output_tokens,temperature" {
 		t.Errorf("the retold span must record what the gateway dropped, got %v", v.Str())
 	}
-	if calls.Load() != 2 {
-		t.Fatalf("expected both calls to reach the gateway, got %d", calls.Load())
+	if int(calls.Load()) != len(sets) {
+		t.Fatalf("expected every call to reach the gateway, got %d", calls.Load())
 	}
-	// A busy turn makes many LLM calls; the same drop set is logged once.
+	// A busy turn makes many LLM calls; each distinct drop set is logged once.
 	logged := logs.FilterMessage("gateway dropped params from a langy model call")
-	if logged.Len() != 1 {
-		t.Errorf("the drop set must be logged once per worker, got %d lines", logged.Len())
+	if logged.Len() != 2 {
+		t.Errorf("the two distinct drop sets must be logged once each, got %d lines", logged.Len())
 	}
 }
 

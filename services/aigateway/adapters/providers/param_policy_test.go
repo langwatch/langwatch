@@ -341,9 +341,7 @@ func TestParamPolicy_DropTuningParamsDefaultTrue(t *testing.T) {
 	}
 }
 
-// classifyRequestBuildError: policy refusals carry unsupported_parameter,
-// everything else stays bad_request.
-func TestClassifyChatBuildError(t *testing.T) {
+func TestClassifyRequestBuildError(t *testing.T) {
 	refusal := classifyRequestBuildError(context.Background(), &paramRefusalError{msg: "refusing to drop 'x'"})
 	if !strings.Contains(refusal.Error(), "unsupported_parameter") {
 		t.Fatalf("refusal classified as %v, want unsupported_parameter", refusal)
