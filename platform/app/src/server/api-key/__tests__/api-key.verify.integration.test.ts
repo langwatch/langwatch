@@ -6,11 +6,11 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { getApp } from "~/server/app-layer/app";
 
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { ApiKeyService } from "../api-key.service";
 
 /**
  * Authentication-time rejection of keys that should no longer work.
@@ -23,7 +23,7 @@ import { ApiKeyService } from "../api-key.service";
  */
 describe("Feature: API key verification", () => {
   const ns = `apikey-verify-${nanoid(8)}`;
-  const service = ApiKeyService.create(prisma);
+  const service = getApp().apiKeys;
 
   let organizationId: string;
   let userId: string;

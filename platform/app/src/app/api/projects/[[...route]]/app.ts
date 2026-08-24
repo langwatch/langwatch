@@ -1,5 +1,5 @@
 import { describeRoute } from "hono-openapi";
-import { z } from "zod";
+import { z } from "zod/v4";
 import type { Organization } from "~/generated/prisma/client";
 import {
   anyAuthenticated,
@@ -8,9 +8,8 @@ import {
   requiresOnProject,
 } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import type { ApiKeyService } from "~/server/api-key/api-key.service";
-import { resolveVisibleProjects } from "~/server/api-key/project-visibility";
-import type { OrgResolvedToken } from "~/server/api-key/token-resolver";
+import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ResolvedOrganizationApiKeyToken as OrgResolvedToken } from "@langwatch/api-key-contract";
 import {
   DestinationTeamNotFoundError,
   PersonalProjectProtectedError,
@@ -19,9 +18,7 @@ import {
   type ProjectService,
   ProjectSlugConflictError,
   TeamNotInOrganizationError,
-} from "~/server/app-layer/projects/project.service";
-import { prisma } from "~/server/db";
-import { generateApiKey } from "~/server/utils/apiKeyGenerator";
+} from "@langwatch/project-contract";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import type { ApiKeyServiceMiddlewareVariables } from "../../middleware/api-key-service";
 import { apiKeyServiceMiddleware } from "../../middleware/api-key-service";
@@ -149,10 +146,8 @@ secured
       // credential class.
       const resolved = c.get("orgResolvedToken") as OrgResolvedToken;
 
-      const visible = await resolveVisibleProjects({
-        prisma,
+      const visible = await c.app.apiKeys.resolveVisibleProjects({
         apiKeyId: resolved.apiKeyId,
-        userId: resolved.userId,
         organizationId: organization.id,
       });
 
@@ -246,7 +241,7 @@ secured
       const organization = c.get("organization") as Organization;
       const service = c.get("projectService") as ProjectService;
 
-      const project = await service.getWithTeam(id);
+      const project = await service.tryGetWithTeam(id);
       if (!project || project.team.organizationId !== organization.id) {
         throw new NotFoundError("Project not found");
       }
@@ -356,7 +351,7 @@ secured
       const organization = c.get("organization") as Organization;
       const service = c.get("projectService") as ProjectService;
 
-      const project = await service.getWithTeam(id);
+      const project = await service.tryGetWithTeam(id);
       if (!project || project.team.organizationId !== organization.id) {
         throw new NotFoundError("Project not found");
       }
@@ -376,16 +371,12 @@ secured
       const organization = c.get("organization") as Organization;
       const service = c.get("projectService") as ProjectService;
 
-      const project = await service.getWithTeam(id);
+      const project = await service.tryGetWithTeam(id);
       if (!project || project.team.organizationId !== organization.id) {
         throw new NotFoundError("Project not found");
       }
 
-      const newApiKey = generateApiKey();
-      await prisma.project.update({
-        where: { id },
-        data: { apiKey: newApiKey },
-      });
+      const newApiKey = await service.regenerateApiKey(id);
 
       return c.json({ apiKey: newApiKey });
     },

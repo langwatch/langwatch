@@ -39,3 +39,77 @@ export function getTokenType(token: string): ApiKeyTokenType {
     ? "apiKey"
     : "legacyProjectKey";
 }
+
+export const apiKeyTokenResolutionInputSchema = z
+  .object({
+    token: z.string().min(1),
+    projectId: z.string().min(1).nullable().optional(),
+  })
+  .strict();
+export type ApiKeyTokenResolutionInput = z.infer<
+  typeof apiKeyTokenResolutionInputSchema
+>;
+
+const resolvedApiKeyProjectShape = {
+  project: projectWithTeamSchema,
+};
+
+export const resolvedApiKeyTokenSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("legacyProjectKey"),
+      ...resolvedApiKeyProjectShape,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("apiKey"),
+      apiKeyId: z.string().min(1),
+      userId: z.string().min(1).nullable(),
+      organizationId: z.string().min(1),
+      ingestSourceType: z.string().nullable(),
+      ingestionTemplateId: z.string().nullable(),
+      isLangySessionKey: z.boolean().optional(),
+      ...resolvedApiKeyProjectShape,
+    })
+    .strict(),
+]);
+export type ResolvedApiKeyToken = z.infer<typeof resolvedApiKeyTokenSchema>;
+
+export const organizationApiKeyResolutionInputSchema = z
+  .object({ token: z.string().min(1) })
+  .strict();
+export type OrganizationApiKeyResolutionInput = z.infer<
+  typeof organizationApiKeyResolutionInputSchema
+>;
+
+export const organizationApiKeyResolutionSchema = z.discriminatedUnion("ok", [
+  z
+    .object({
+      ok: z.literal(true),
+      resolved: z
+        .object({
+          type: z.literal("apiKey-org"),
+          apiKeyId: z.string().min(1),
+          userId: z.string().min(1).nullable(),
+          organizationId: z.string().min(1),
+        })
+        .strict(),
+    })
+    .strict(),
+  z
+    .object({
+      ok: z.literal(false),
+      reason: z.enum(["wrong_credential_class", "unusable_credential"]),
+    })
+    .strict(),
+]);
+export type OrganizationApiKeyResolution = z.infer<
+  typeof organizationApiKeyResolutionSchema
+>;
+export type ResolvedOrganizationApiKeyToken = Extract<
+  OrganizationApiKeyResolution,
+  { ok: true }
+>["resolved"];
+import { projectWithTeamSchema } from "@langwatch/project-contract";
+import { z } from "zod/v4";

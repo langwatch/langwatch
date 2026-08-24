@@ -4,6 +4,8 @@ import {
   API_KEY_PREFIX,
   INGEST_KEY_PREFIX,
   LEGACY_PAT_PREFIX,
+  apiKeyVisibleProjectsInputSchema,
+  apiKeyVisibleProjectsSchema,
   getTokenType,
   splitApiKeyToken,
 } from "@langwatch/api-key-contract";
@@ -26,5 +28,20 @@ describe("API-key contract", () => {
 
   it("defines the supported permission modes", () => {
     expect(API_KEY_PERMISSION_MODES).toEqual(["all", "readonly", "restricted"]);
+  });
+
+  it("validates bounded project-visibility inputs and results", () => {
+    expect(
+      apiKeyVisibleProjectsInputSchema.parse({
+        apiKeyId: "key-1",
+        organizationId: "org-1",
+      }),
+    ).toEqual({ apiKeyId: "key-1", organizationId: "org-1" });
+    expect(
+      apiKeyVisibleProjectsSchema.parse({
+        kind: "some",
+        ids: ["project-1"],
+      }),
+    ).toEqual({ kind: "some", ids: ["project-1"] });
   });
 });

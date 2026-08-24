@@ -20,17 +20,21 @@ import { type App, getApp } from "~/server/app-layer/app";
 // A pure rule with a type-only dependency of its own, so reading it here adds
 // no module cycle back into the Langy feature.
 import { classifyForLangy } from "~/server/app-layer/langy/langyPermissionPolicy";
-import { getTokenType } from "./api-key-token.utils";
 import {
   ApiKeyPermissionDeniedError,
   ApiKeyPermissionNotDelegableError,
-} from "./errors";
-import {
-  type OrgResolution,
-  type OrgResolvedToken,
-  type ResolvedToken,
-  TokenResolver,
-} from "./token-resolver";
+  getTokenType,
+  type ApiKeyService,
+  type OrganizationApiKeyResolution,
+  type ResolvedApiKeyToken,
+} from "@langwatch/api-key-contract";
+
+export type ResolvedToken = ResolvedApiKeyToken;
+export type OrgResolution = OrganizationApiKeyResolution;
+export type OrgResolvedToken = Extract<
+  OrganizationApiKeyResolution,
+  { ok: true }
+>["resolved"];
 
 const logger = createLogger("langwatch:api:unified-auth");
 const permissionLogger = createLogger("langwatch:api:api-key-ceiling");
@@ -114,10 +118,8 @@ function extractCredentials(
  * markUsed is late — called only after `next()` returns a 2xx response.
  */
 export function createUnifiedAuthMiddleware({
-  prisma,
   errorEnvelope = "legacy",
 }: {
-  prisma: PrismaClient;
   /**
    * The shape refusals answer with. Authentication runs beneath the family's
    * own error handler, so a family publishing the canonical envelope must not
@@ -125,12 +127,12 @@ export function createUnifiedAuthMiddleware({
    */
   errorEnvelope?: ApiErrorEnvelope;
 }): MiddlewareHandler {
-  const resolver = TokenResolver.create(prisma);
   const refusal = authRefusalBody(errorEnvelope);
 
   return async (c, next) => {
+    const { apiKeys } = c.var.langwatchApp;
     const outcome = await resolveProjectPrincipal({
-      resolver,
+      apiKeys,
       // Diagnostic context for auth failures — lets on-call attribute a 401 to
       // a specific customer/SDK without needing the customer to reproduce with
       // debug logs. Read once and reused across every failure path so values
@@ -164,7 +166,7 @@ export function createUnifiedAuthMiddleware({
       c.res.status >= 200 &&
       c.res.status < 300
     ) {
-      resolver.markUsed({ apiKeyId: resolved.apiKeyId });
+      apiKeys.markUsed({ id: resolved.apiKeyId });
     }
   };
 }
@@ -180,11 +182,11 @@ export function createUnifiedAuthMiddleware({
  * `error.code` must not have to learn which one answered.
  */
 async function resolveProjectPrincipal({
-  resolver,
+  apiKeys,
   credentials,
   diag,
 }: {
-  resolver: TokenResolver;
+  apiKeys: ApiKeyService;
   credentials: { token: string; projectId: string | null } | null;
   diag: AuthDiagnostics;
 }): Promise<
@@ -211,7 +213,7 @@ async function resolveProjectPrincipal({
 
   let resolved: ResolvedToken | null;
   try {
-    resolved = await resolver.resolve({
+    resolved = await apiKeys.tryResolveToken({
       token: credentials.token,
       projectId: credentials.projectId,
     });
@@ -327,14 +329,14 @@ export function createOrgAuthMiddleware({
   errorEnvelope?: ApiErrorEnvelope;
   refusals?: "respond" | "throw";
 }): MiddlewareHandler {
-  const resolver = TokenResolver.create(prisma);
   const orgLogger = createLogger("langwatch:api:org-auth");
   const refusal = authRefusalBody(errorEnvelope);
 
   return async (c, next) => {
+    const { apiKeys } = c.var.langwatchApp;
     const outcome = await resolveOrgPrincipal({
       prisma,
-      resolver,
+      apiKeys,
       orgLogger,
       credentials: extractCredentials((name) => c.req.header(name)),
       diag: collectAuthDiagnostics(c),
@@ -358,7 +360,7 @@ export function createOrgAuthMiddleware({
     await next();
 
     if (c.res.status >= 200 && c.res.status < 300) {
-      resolver.markUsed({ apiKeyId: resolved.apiKeyId });
+      apiKeys.markUsed({ id: resolved.apiKeyId });
     }
   };
 }
@@ -449,13 +451,13 @@ function refusalForUnresolvedOrg(
  */
 async function resolveOrgPrincipal({
   prisma,
-  resolver,
+  apiKeys,
   orgLogger,
   credentials,
   diag,
 }: {
   prisma: PrismaClient;
-  resolver: TokenResolver;
+  apiKeys: ApiKeyService;
   orgLogger: ReturnType<typeof createLogger>;
   credentials: { token: string; projectId: string | null } | null;
   diag: AuthDiagnostics;
@@ -479,7 +481,9 @@ async function resolveOrgPrincipal({
 
   let resolution: OrgResolution;
   try {
-    resolution = await resolver.resolveOrgOnly({ token: credentials.token });
+    resolution = await apiKeys.resolveOrganizationToken({
+      token: credentials.token,
+    });
   } catch (error) {
     orgLogger.error({ ...diag, error }, "Database error during org auth");
     return {

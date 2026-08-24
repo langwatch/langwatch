@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import { createHash } from "node:crypto";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import {
+  projectWithTeamSchema,
+  type ProjectService,
+} from "@langwatch/project-contract";
 import { ApiKeyService, type ApiKeyDependencies } from "../src/services/api-key.service";
 import { ApiKeyRepository, type ApiKeyCreateRecord, type ApiKeyUpdateRecord, type StoredApiKey } from "../src/repositories/api-key.repository";
 import { ApiKeyTokenAdapter } from "../src/adapters/api-key-token.api-key-token.adapter";
@@ -25,6 +28,49 @@ class MemoryApiKeys extends ApiKeyRepository {
   findIngestKeysForProject(): Promise<StoredApiKey[]> { return Promise.resolve([]); }
   tryFindPersonalWorkspaceOwner(): Promise<{ ownerUserId: string | null } | null> { return Promise.resolve(null); }
 }
+
+const resolvedProject = projectWithTeamSchema.parse({
+  id: "project-1",
+  name: "Project",
+  slug: "project",
+  apiKey: "sk-lw-legacy",
+  lwqlKey: "lwql",
+  teamId: "team-1",
+  language: "typescript",
+  framework: "langchain",
+  kind: "application",
+  firstMessage: false,
+  integrated: true,
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+  userLinkTemplate: null,
+  traceSharingEnabled: false,
+  presenceEnabled: false,
+  s3Endpoint: null,
+  s3AccessKeyId: null,
+  s3SecretAccessKey: null,
+  s3Bucket: null,
+  archivedAt: null,
+  isPersonal: false,
+  ownerUserId: null,
+  personalFeatures: {},
+  departmentId: null,
+  langyEgressAllowlist: null,
+  lastCodingAgentSessionAt: null,
+  lastCodingAgentPullRequestAt: null,
+  team: {
+    id: "team-1",
+    name: "Team",
+    slug: "team",
+    organizationId: "org-1",
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    archivedAt: null,
+    isPersonal: false,
+    ownerUserId: null,
+    departmentId: null,
+  },
+});
 
 function dependencies(
   overrides: Partial<ApiKeyDependencies> = {},
@@ -50,15 +96,19 @@ function dependencies(
       getBillingProfile: vi.fn().mockResolvedValue({ name: "Organization" }),
     } as unknown as OrganizationService,
     projects: {
-      getWithTeam: vi.fn().mockResolvedValue({
-        archivedAt: null,
-        team: { id: "team-1", organizationId: "org-1" },
-      }),
+      getWithTeam: vi.fn().mockResolvedValue(resolvedProject),
+      tryGetWithTeam: vi.fn().mockResolvedValue(resolvedProject),
+      tryGetWithTeamByLegacyApiKey: vi.fn().mockResolvedValue(null),
       getById: vi.fn().mockResolvedValue(null),
       listByOrganization: vi.fn().mockResolvedValue({ data: [] }),
+      listActiveByScopes: vi
+        .fn()
+        .mockResolvedValue({ data: [], hasMore: false }),
     } as unknown as ProjectService,
     newBindingId: () => "binding-id",
-    mintLegacyGrant: vi.fn(),
+    legacyGrants: {
+      mint: vi.fn(),
+    } as unknown as ApiKeyDependencies["legacyGrants"],
     tokens: ApiKeyTokenAdapter.create("test-pepper"),
     ...overrides,
   };
@@ -79,6 +129,44 @@ describe("API-key service", () => {
     const created = await service.create({ name: "test", organizationId: "org-1", permissionMode: "default", bindings: [{ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: "org-1" }] });
     await service.revoke({ id: created.apiKey.id, organizationId: "org-1", callerUserId: null, callerIsAdmin: true });
     expect(await service.tryVerify({ token: created.token })).toBeNull();
+  });
+
+  it("resolves a current key through its single project binding", async () => {
+    const service = new ApiKeyService(new MemoryApiKeys(), dependencies());
+    const created = await service.create({
+      name: "project key",
+      organizationId: "org-1",
+      permissionMode: "all",
+      bindings: [
+        { scopeType: "PROJECT", scopeId: "project-1", role: "VIEWER" },
+      ],
+    });
+
+    await expect(
+      service.tryResolveToken({ token: created.token }),
+    ).resolves.toMatchObject({
+      type: "apiKey",
+      apiKeyId: created.apiKey.id,
+      organizationId: "org-1",
+      project: { id: "project-1" },
+    });
+  });
+
+  it("falls back to the deprecated project credential after a current-shape miss", async () => {
+    const projects = {
+      tryGetWithTeamByLegacyApiKey: vi.fn().mockResolvedValue(resolvedProject),
+    } as unknown as ProjectService;
+    const service = new ApiKeyService(
+      new MemoryApiKeys(),
+      dependencies({ projects }),
+    );
+    const token = `sk-lw-${"a".repeat(16)}_${"b".repeat(48)}`;
+
+    await expect(service.tryResolveToken({ token })).resolves.toMatchObject({
+      type: "legacyProjectKey",
+      project: { id: "project-1" },
+    });
+    expect(projects.tryGetWithTeamByLegacyApiKey).toHaveBeenCalledWith(token);
   });
 
   it("upgrades a legacy SHA-256 hash after successful verification", async () => {
@@ -131,5 +219,117 @@ describe("API-key service", () => {
     (repository as unknown as { tryFindPersonalWorkspaceOwner: ReturnType<typeof vi.fn> }).tryFindPersonalWorkspaceOwner = vi.fn().mockResolvedValue({ ownerUserId: "owner-1" });
     const service = new ApiKeyService(repository, dependencies());
     await expect(service.create({ name: "service", organizationId: "org-1", permissionMode: "all", bindings: [{ scopeType: "TEAM", scopeId: "personal-team", role: "VIEWER" }] })).rejects.toMatchObject({ code: "api_key_scope_violation" });
+  });
+
+  it("resolves visible projects through Project candidates and one AuthZ batch", async () => {
+    const repository = new MemoryApiKeys();
+    const canBatchByIds = vi.fn().mockResolvedValue({
+      teams: new Map(),
+      projects: new Map([
+        ["project-1", true],
+        ["project-2", false],
+      ]),
+      organizationRole: null,
+    });
+    const authz = {
+      can: vi.fn().mockResolvedValue(false),
+      canBatchByIds,
+      hasPermission: vi.fn().mockResolvedValue(true),
+      listUserCreatedRoles: vi.fn().mockResolvedValue([]),
+    } as unknown as AuthzService;
+    const listActiveByScopes = vi.fn().mockResolvedValue({
+      data: [
+        resolvedProject,
+        { ...resolvedProject, id: "project-2" },
+      ],
+      hasMore: false,
+    });
+    const projects = {
+      getWithTeam: vi.fn().mockResolvedValue(resolvedProject),
+      listActiveByScopes,
+    } as unknown as ProjectService;
+    const service = new ApiKeyService(
+      repository,
+      dependencies({ authz, projects }),
+    );
+    const created = await service.create({
+      name: "scoped",
+      organizationId: "org-1",
+      permissionMode: "all",
+      bindings: [
+        { scopeType: "TEAM", scopeId: "team-1", role: "VIEWER" },
+      ],
+    });
+
+    await expect(
+      service.resolveVisibleProjects({
+        apiKeyId: created.apiKey.id,
+        organizationId: "org-1",
+      }),
+    ).resolves.toEqual({ kind: "some", ids: ["project-1"] });
+    expect(listActiveByScopes).toHaveBeenCalledWith({
+      organizationId: "org-1",
+      organizationWide: false,
+      teamIds: ["team-1"],
+      projectIds: [],
+      limit: 5_000,
+    });
+    expect(canBatchByIds).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns all projects when the key and owner ceiling allow organization view", async () => {
+    const repository = new MemoryApiKeys();
+    const projects = {
+      listActiveByScopes: vi.fn(),
+    } as unknown as ProjectService;
+    const service = new ApiKeyService(repository, dependencies({ projects }));
+    const created = await service.create({
+      name: "organization",
+      organizationId: "org-1",
+      permissionMode: "all",
+      bindings: [],
+    });
+
+    await expect(
+      service.resolveVisibleProjects({
+        apiKeyId: created.apiKey.id,
+        organizationId: "org-1",
+      }),
+    ).resolves.toEqual({ kind: "all" });
+    expect(projects.listActiveByScopes).not.toHaveBeenCalled();
+  });
+
+  it("refuses to silently truncate a visibility decision", async () => {
+    const repository = new MemoryApiKeys();
+    const authz = {
+      can: vi.fn().mockResolvedValue(false),
+      hasPermission: vi.fn().mockResolvedValue(true),
+      listUserCreatedRoles: vi.fn().mockResolvedValue([]),
+    } as unknown as AuthzService;
+    const projects = {
+      getWithTeam: vi.fn().mockResolvedValue(resolvedProject),
+      listActiveByScopes: vi
+        .fn()
+        .mockResolvedValue({ data: [], hasMore: true }),
+    } as unknown as ProjectService;
+    const service = new ApiKeyService(
+      repository,
+      dependencies({ authz, projects }),
+    );
+    const created = await service.create({
+      name: "too-wide",
+      organizationId: "org-1",
+      permissionMode: "all",
+      bindings: [
+        { scopeType: "TEAM", scopeId: "team-1", role: "VIEWER" },
+      ],
+    });
+
+    await expect(
+      service.resolveVisibleProjects({
+        apiKeyId: created.apiKey.id,
+        organizationId: "org-1",
+      }),
+    ).rejects.toMatchObject({ code: "project_visibility_too_wide" });
   });
 });

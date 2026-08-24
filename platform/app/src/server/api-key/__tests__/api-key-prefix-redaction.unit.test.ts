@@ -3,10 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   API_KEY_PREFIX,
-  generateApiKeyToken,
   INGEST_KEY_PREFIX,
   LEGACY_PAT_PREFIX,
-} from "../api-key-token.utils";
+} from "@langwatch/api-key-contract";
 
 /**
  * The redaction package lists our own key prefixes as known vendor prefixes, and
@@ -28,7 +27,7 @@ describe("the redaction rules, given the API key prefixes the app mints", () => 
   describe("given a token minted by the real generator", () => {
     /** @scenario "A key minted by LangWatch is redacted on its prefix" */
     it.each(prefixes)("redacts a %s", (_label, prefix) => {
-      const { token } = generateApiKeyToken({ prefix });
+      const token = `${prefix}${"a".repeat(16)}_${"b".repeat(48)}`;
       const { text, redactedCount } = redactSecretsInText({
         text: `the key is ${token} and the model is gpt-5-mini`,
       });

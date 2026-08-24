@@ -5,15 +5,18 @@ import {
   ApiKeyReservedNameError,
   ApiKeyScopeViolationError,
   CliKeySelectionInvalidError,
+  ProjectVisibilityTooWideError,
 } from "@langwatch/api-key-contract";
 import { ALL_PERMISSIONS, isRegistryPermission, type AuthzGrantsService, type AuthzPermission, type AuthzService } from "@langwatch/authz-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
-import { ApiKeyService as ApiKeyCapability, apiKeyPermissionSchema, cliKeySelectionSchema, createApiKeyInputSchema, type ApiKey, type ApiKeyBinding, type ApiKeyBindingNames, type ApiKeyDetail, type ApiKeyListEnrichment, type ApiKeyName, type ApiKeyProject, type ApiKeyRoleSummary, type ApiKeyScope, type ApiKeyTeam, type ApiKeyUser, type CliKeyScopeSummary, type CliKeySelection, type CreateApiKeyInput, type RevokeApiKeyInput, type UpdateApiKeyInput, API_KEY_PREFIX, INGEST_KEY_PREFIX, HIDDEN_SYSTEM_KEY_NAMES } from "@langwatch/api-key-contract";
+import { ApiKeyService as ApiKeyCapability, apiKeyPermissionSchema, apiKeyTokenResolutionInputSchema, apiKeyVisibleProjectsInputSchema, cliKeySelectionSchema, createApiKeyInputSchema, getTokenType, organizationApiKeyResolutionInputSchema, organizationApiKeyResolutionSchema, resolvedApiKeyTokenSchema, type ApiKey, type ApiKeyBinding, type ApiKeyBindingNames, type ApiKeyDetail, type ApiKeyListEnrichment, type ApiKeyName, type ApiKeyProject, type ApiKeyRoleSummary, type ApiKeyScope, type ApiKeyTeam, type ApiKeyUser, type ApiKeyVisibleProjects, type CliKeyScopeSummary, type CliKeySelection, type CreateApiKeyInput, type OrganizationApiKeyResolution, type ResolvedApiKeyToken, type RevokeApiKeyInput, type UpdateApiKeyInput, API_KEY_PREFIX, INGEST_KEY_PREFIX, HIDDEN_SYSTEM_KEY_NAMES, LANGY_SESSION_API_KEY_NAME } from "@langwatch/api-key-contract";
 import type { ApiKeyTokenPort } from "../ports/api-key-token.port";
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository";
+import type { LegacyApiKeyGrantService } from "./legacy-api-key-grant.service";
 
 const SYSTEM_NAMES = new Set(HIDDEN_SYSTEM_KEY_NAMES);
+const MAX_VISIBLE_PROJECT_CANDIDATES = 5_000;
 
 export type ApiKeyDependencies = {
   authz: AuthzService;
@@ -21,7 +24,7 @@ export type ApiKeyDependencies = {
   organizations: OrganizationService;
   projects: ProjectService;
   newBindingId: () => string;
-  mintLegacyGrant: (input: { apiKey: ApiKey }) => void;
+  legacyGrants: LegacyApiKeyGrantService;
   tokens: ApiKeyTokenPort;
 };
 
@@ -93,8 +96,134 @@ export class ApiKeyService extends ApiKeyCapability {
     const verification = this.options.tokens.verify(split.secret, row.hashedSecret);
     if (verification === "no_match") return null;
     if (verification === "match_legacy") void this.repository.upgradeHash({ id: row.id, hashedSecret: this.options.tokens.hash(split.secret) }).catch(() => undefined);
-    this.options.mintLegacyGrant({ apiKey: publicKey(row) });
+    this.options.legacyGrants.mint(publicKey(row));
     return { ...publicKey(row), tokenType: "apiKey" };
+  }
+
+  async tryResolveToken(input: {
+    token: string;
+    projectId?: string | null;
+  }): Promise<ResolvedApiKeyToken | null> {
+    const parsed = apiKeyTokenResolutionInputSchema.parse(input);
+    const tokenType = getTokenType(parsed.token);
+
+    if (tokenType === "legacyProjectKey") {
+      return this.tryResolveLegacyProjectKey(parsed.token);
+    }
+
+    if (tokenType === "apiKey") {
+      const resolved = await this.tryResolveCurrentApiKey(
+        parsed.token,
+        parsed.projectId ?? null,
+      );
+      if (resolved) return resolved;
+      if (parsed.token.startsWith(API_KEY_PREFIX)) {
+        return this.tryResolveLegacyProjectKey(parsed.token);
+      }
+      return null;
+    }
+
+    return this.tryResolveLegacyProjectKey(parsed.token);
+  }
+
+  async resolveOrganizationToken(input: {
+    token: string;
+  }): Promise<OrganizationApiKeyResolution> {
+    const parsed = organizationApiKeyResolutionInputSchema.parse(input);
+    if (getTokenType(parsed.token) === "apiKey") {
+      const apiKey = await this.tryVerify({ token: parsed.token });
+      if (apiKey) {
+        return organizationApiKeyResolutionSchema.parse({
+          ok: true,
+          resolved: {
+            type: "apiKey-org",
+            apiKeyId: apiKey.id,
+            userId: apiKey.userId,
+            organizationId: apiKey.organizationId,
+          },
+        });
+      }
+    }
+
+    const legacy = await this.tryResolveLegacyProjectKey(parsed.token);
+    return organizationApiKeyResolutionSchema.parse(
+      legacy
+        ? { ok: false, reason: "wrong_credential_class" }
+        : { ok: false, reason: "unusable_credential" },
+    );
+  }
+
+  async resolveVisibleProjects(input: {
+    apiKeyId: string;
+    organizationId: string;
+  }): Promise<ApiKeyVisibleProjects> {
+    const parsed = apiKeyVisibleProjectsInputSchema.parse(input);
+    const key = await this.repository.tryFindByIdInOrganization({
+      id: parsed.apiKeyId,
+      organizationId: parsed.organizationId,
+    });
+    if (!key) return { kind: "some", ids: [] };
+
+    const principal = { type: "apiKey" as const, id: key.id };
+    const organizationWide = await this.options.authz.can({
+      principal,
+      permission: "project:view",
+      scope: { type: "organization", id: parsed.organizationId },
+    });
+    if (organizationWide) return { kind: "all" };
+
+    const teamIds = [
+      ...new Set(
+        key.roleBindings.flatMap((binding) =>
+          binding.scopeType === "TEAM" ? [binding.scopeId] : [],
+        ),
+      ),
+    ];
+    const projectIds = [
+      ...new Set(
+        key.roleBindings.flatMap((binding) =>
+          binding.scopeType === "PROJECT" ? [binding.scopeId] : [],
+        ),
+      ),
+    ];
+    const candidates = await this.options.projects.listActiveByScopes({
+      organizationId: parsed.organizationId,
+      organizationWide: key.roleBindings.some(
+        (binding) => binding.scopeType === "ORGANIZATION",
+      ),
+      teamIds,
+      projectIds,
+      limit: MAX_VISIBLE_PROJECT_CANDIDATES,
+    });
+    if (candidates.hasMore) {
+      throw new ProjectVisibilityTooWideError(
+        `Resolving this credential's project visibility would scan more than ${MAX_VISIBLE_PROJECT_CANDIDATES} projects`,
+        {
+          meta: {
+            organizationId: parsed.organizationId,
+            limit: MAX_VISIBLE_PROJECT_CANDIDATES,
+          },
+        },
+      );
+    }
+    if (candidates.data.length === 0) return { kind: "some", ids: [] };
+
+    const decision = await this.options.authz.canBatchByIds({
+      principal,
+      permission: "project:view",
+      organizationId: parsed.organizationId,
+      teams: [],
+      projects: candidates.data.map((project) => ({
+        projectId: project.id,
+        teamId: project.teamId,
+      })),
+    });
+    return {
+      kind: "some",
+      ids: candidates.data
+        .filter((project) => decision.projects.get(project.id) === true)
+        .map((project) => project.id),
+    };
   }
 
   markUsed({ id }: { id: string }): void { void this.repository.updateLastUsedAt({ id }).catch(() => undefined); }
@@ -339,6 +468,57 @@ export class ApiKeyService extends ApiKeyCapability {
   }
 
   private trySplitToken(token: string): { lookupId: string; secret: string } | null { return this.options.tokens.trySplit(token); }
+  private async tryResolveLegacyProjectKey(
+    token: string,
+  ): Promise<ResolvedApiKeyToken | null> {
+    const project = await this.options.projects.tryGetWithTeamByLegacyApiKey(
+      token,
+    );
+    return project
+      ? resolvedApiKeyTokenSchema.parse({ type: "legacyProjectKey", project })
+      : null;
+  }
+
+  private async tryResolveCurrentApiKey(
+    token: string,
+    projectId: string | null,
+  ): Promise<ResolvedApiKeyToken | null> {
+    const apiKey = await this.tryVerify({ token });
+    if (!apiKey) return null;
+
+    let effectiveProjectId = projectId;
+    if (!effectiveProjectId) {
+      const projectIds = [
+        ...new Set(
+          apiKey.roleBindings.flatMap((binding) =>
+            binding.scopeType === "PROJECT" && binding.scopeId
+              ? [binding.scopeId]
+              : [],
+          ),
+        ),
+      ];
+      if (projectIds.length === 1) effectiveProjectId = projectIds[0] ?? null;
+    }
+    if (!effectiveProjectId) return null;
+
+    const project = await this.options.projects.tryGetWithTeam(
+      effectiveProjectId,
+    );
+    if (!project || project.team.organizationId !== apiKey.organizationId) {
+      return null;
+    }
+
+    return resolvedApiKeyTokenSchema.parse({
+      type: "apiKey",
+      apiKeyId: apiKey.id,
+      userId: apiKey.userId,
+      organizationId: apiKey.organizationId,
+      ingestSourceType: apiKey.ingestSourceType,
+      ingestionTemplateId: apiKey.ingestionTemplateId,
+      isLangySessionKey: apiKey.name === LANGY_SESSION_API_KEY_NAME,
+      project,
+    });
+  }
   private async getInOrganization(id: string, organizationId: string): Promise<StoredApiKey> { const row = await this.repository.tryFindByIdInOrganization({ id, organizationId }); if (!row) throw new ApiKeyNotFoundError(id); return row; }
   private async assertPersonalScopesOwnedBy(input: { scopes: ApiKeyScope[]; organizationId: string; ownerUserId: string | null }): Promise<void> {
     for (const scope of input.scopes) {

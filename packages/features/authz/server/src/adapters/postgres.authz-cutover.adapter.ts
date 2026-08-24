@@ -17,8 +17,8 @@ export type AuthzCutoverDatabase = {
           tenantId: string;
         };
       };
-      select: { status: true };
-    }): Promise<{ status: string } | null>;
+      select: { status: true; occurredAt?: true };
+    }): Promise<{ status: string; occurredAt?: Date } | null>;
   };
 };
 
@@ -107,6 +107,36 @@ export class PostgresAuthzCutoverAdapter {
       organizationId,
       read: () => this.query({ organizationId }),
     });
+  }
+
+  async tryGetFinalizedAt({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<Date | null> {
+    try {
+      const record =
+        await this.options.database.systemMigrationTenantState.findUnique({
+          where: {
+            migrationName_tenantId: {
+              migrationName: AUTHZ_ENGINE_MIGRATION_NAME,
+              tenantId: organizationId,
+            },
+          },
+          select: { status: true, occurredAt: true },
+        });
+      return record &&
+        (ON_ENGINE_STATUSES as readonly string[]).includes(record.status)
+        ? (record.occurredAt ?? null)
+        : null;
+    } catch (error) {
+      this.options.reporter.report({
+        organizationId,
+        error,
+        ttlMs: ENGINE_GATE_CACHE_TTL_MS,
+      });
+      return null;
+    }
   }
 
   invalidate({ organizationId }: { organizationId: string }): void {

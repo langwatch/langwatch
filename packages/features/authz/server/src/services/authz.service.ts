@@ -106,6 +106,8 @@ export type AuthzServiceOptions = {
   cacheMaxAgeMs?: number;
   /** Rollout head used only by legacy app fallbacks during migration. */
   isOnEngine?: (organizationId: string) => Promise<boolean>;
+  /** Finalized cutover time used by compatibility fact minting. */
+  tryGetEngineCutoverAt?: (organizationId: string) => Promise<Date | null>;
 };
 
 export class AuthzService extends AuthzServiceContract {
@@ -144,15 +146,15 @@ export class AuthzService extends AuthzServiceContract {
     const organizationId = scopeOrganizationId(scope);
     const [grants, resourceGrants, ownerGrants] = await Promise.all([
       this.collectCached({ principal, organizationId }),
-      this.resourceGrantsFor(scope),
-      this.ownerGrantsFor({ principal, organizationId }),
+      this.tryResourceGrantsFor(scope),
+      this.tryOwnerGrantsFor({ principal, organizationId }),
     ]);
     const decision = this.engine.decideWithCeiling({
       keyGrants: grants,
       ownerGrants,
       permission,
       scope,
-      demoProjectId: this.demoProjectId(),
+      demoProjectId: this.tryDemoProjectId(),
       resourceGrants,
     });
     this.recordDenial(decision);
@@ -170,6 +172,14 @@ export class AuthzService extends AuthzServiceContract {
     organizationId: string;
   }): Promise<boolean> {
     return this.options.isOnEngine?.(organizationId) ?? true;
+  }
+
+  async tryGetEngineCutoverAt({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<Date | null> {
+    return this.options.tryGetEngineCutoverAt?.(organizationId) ?? null;
   }
 
   async authorize<
@@ -217,10 +227,10 @@ export class AuthzService extends AuthzServiceContract {
     const organizationId = scopeOrganizationId(scope);
     const [grants, resourceGrants, ownerGrants] = await Promise.all([
       this.collectCached({ principal, organizationId }),
-      this.resourceGrantsFor(scope),
-      this.ownerGrantsFor({ principal, organizationId }),
+      this.tryResourceGrantsFor(scope),
+      this.tryOwnerGrantsFor({ principal, organizationId }),
     ]);
-    const demo = this.demoProjectId();
+    const demo = this.tryDemoProjectId();
     return ALL_PERMISSIONS.filter(
       (permission) =>
         this.engine.decideWithCeiling({
@@ -257,7 +267,7 @@ export class AuthzService extends AuthzServiceContract {
     permission: AuthzPermission;
     ceiling?: boolean;
   }): Promise<{ allowed: boolean; organizationRole: OrganizationRoleOrNull }> {
-    const scope = await this.resolveScope({
+    const scope = await this.tryResolveScope({
       projectId,
       teamId,
       organizationId,
@@ -273,7 +283,7 @@ export class AuthzService extends AuthzServiceContract {
         reader: pass,
       }),
       ceiling
-        ? this.ownerGrantsFor({
+        ? this.tryOwnerGrantsFor({
             principal,
             organizationId: scopeOrg,
             reader: pass,
@@ -285,7 +295,7 @@ export class AuthzService extends AuthzServiceContract {
       ownerGrants,
       permission,
       scope,
-      demoProjectId: this.demoProjectId(),
+      demoProjectId: this.tryDemoProjectId(),
     });
     this.recordDenial(decision);
     return {
@@ -312,7 +322,7 @@ export class AuthzService extends AuthzServiceContract {
     matchedPermission?: AuthzPermission;
     organizationRole: OrganizationRoleOrNull;
   }> {
-    const scope = await this.collector.resolveScopeRef({ projectId });
+    const scope = await this.collector.tryResolveScopeRef({ projectId });
     if (!scope) return { allowed: false, organizationRole: null };
 
     // Same api-key owner ceiling every other decision path applies: an
@@ -329,13 +339,13 @@ export class AuthzService extends AuthzServiceContract {
         organizationId: scopeOrg,
         reader: pass,
       }),
-      this.ownerGrantsFor({
+      this.tryOwnerGrantsFor({
         principal,
         organizationId: scopeOrg,
         reader: pass,
       }),
     ]);
-    const demoProjectId = this.demoProjectId();
+    const demoProjectId = this.tryDemoProjectId();
     const matched = permissions.find(
       (permission) =>
         this.engine.decideWithCeiling({
@@ -392,9 +402,9 @@ export class AuthzService extends AuthzServiceContract {
         organizationId,
         reader: pass,
       }),
-      this.ownerGrantsFor({ principal, organizationId, reader: pass }),
+      this.tryOwnerGrantsFor({ principal, organizationId, reader: pass }),
     ]);
-    const demoProjectId = this.demoProjectId();
+    const demoProjectId = this.tryDemoProjectId();
     const allowedAt = (scope: AuthzScopeRef | null): boolean =>
       scope
         ? this.engine.decideWithCeiling({
@@ -413,7 +423,7 @@ export class AuthzService extends AuthzServiceContract {
           allowedAt(
             teamId
               ? { type: "project", id: projectId, teamId, organizationId }
-              : await this.collector.resolveScopeRef({ projectId }),
+              : await this.collector.tryResolveScopeRef({ projectId }),
           ),
         ],
       ),
@@ -433,15 +443,15 @@ export class AuthzService extends AuthzServiceContract {
 
   /** Most-specific-first, the order every seam resolves in: an explicit
    *  project or team wins over the organization it sits in. */
-  async resolveScope({
+  async tryResolveScope({
     projectId,
     teamId,
     organizationId,
   }: ScopeIds): Promise<AuthzScopeRef | null> {
-    if (projectId) return this.collector.resolveScopeRef({ projectId });
-    if (teamId) return this.collector.resolveScopeRef({ teamId });
+    if (projectId) return this.collector.tryResolveScopeRef({ projectId });
+    if (teamId) return this.collector.tryResolveScopeRef({ teamId });
     if (organizationId) {
-      return this.collector.resolveScopeRef({ organizationId });
+      return this.collector.tryResolveScopeRef({ organizationId });
     }
     return null;
   }
@@ -488,7 +498,7 @@ export class AuthzService extends AuthzServiceContract {
       permission: Permission;
     } & PermissionScopeArg<Permission>,
   ): Promise<boolean> {
-    const scope = this.scopeOf(check);
+    const scope = this.tryScopeOf(check);
     if (!scope) return false;
     return (
       await this.getDecision({
@@ -499,20 +509,20 @@ export class AuthzService extends AuthzServiceContract {
     ).permitted;
   }
 
-  async requirePermission<
+  async authorizePermission<
     Permission extends AuthzPermission,
     ScopeArg extends PermissionScopeArg<Permission>,
   >(
     check: { userId: string; permission: Permission } & ScopeArg,
   ): Promise<Authorized<TierOfScopeArg<ScopeArg>, Permission>> {
-    const declaredScope = this.scopeOf(check);
+    const declaredScope = this.tryScopeOf(check);
     let scope: AuthzScopeRef | null = null;
     if (declaredScope?.tier === "project") {
-      scope = await this.resolveScope({ projectId: declaredScope.id });
+      scope = await this.tryResolveScope({ projectId: declaredScope.id });
     } else if (declaredScope?.tier === "team") {
-      scope = await this.resolveScope({ teamId: declaredScope.id });
+      scope = await this.tryResolveScope({ teamId: declaredScope.id });
     } else if (declaredScope?.tier === "organization") {
-      scope = await this.resolveScope({ organizationId: declaredScope.id });
+      scope = await this.tryResolveScope({ organizationId: declaredScope.id });
     }
     if (!scope || scope.type === "resource") {
       throw new PermissionDeniedError({
@@ -532,7 +542,7 @@ export class AuthzService extends AuthzServiceContract {
     return witness as Authorized<TierOfScopeArg<ScopeArg>, Permission>;
   }
 
-  async requireProjectPermission({
+  async authorizeProjectPermission({
     userId,
     projectId,
     permission,
@@ -583,7 +593,7 @@ export class AuthzService extends AuthzServiceContract {
     projectId,
     permission,
   }: AuthzGetApiKeyProjectDecisionInput): Promise<ApiKeyProjectDecision> {
-    const scope = await this.resolveScope({ projectId });
+    const scope = await this.tryResolveScope({ projectId });
     if (scope?.type !== "project" || scope.organizationId !== organizationId) {
       return { outcome: "project_not_found" };
     }
@@ -675,7 +685,7 @@ export class AuthzService extends AuthzServiceContract {
    * for every other principal AND for a service key (one with no owner) -
    * both of which the engine reads as "no ceiling".
    */
-  private async ownerGrantsFor({
+  private async tryOwnerGrantsFor({
     principal,
     organizationId,
     reader,
@@ -689,7 +699,7 @@ export class AuthzService extends AuthzServiceContract {
     reader?: AuthzReadRepository;
   }): Promise<CollectedGrants | null> {
     if (principal.type !== "apiKey") return null;
-    const owner = await this.collector.findApiKeyOwner({
+    const owner = await this.collector.tryFindApiKeyOwner({
       apiKeyId: principal.id,
     });
     if (!owner?.userId) return null;
@@ -706,14 +716,14 @@ export class AuthzService extends AuthzServiceContract {
       : this.collectCached({ principal: ownerPrincipal, organizationId });
   }
 
-  private async resourceGrantsFor(
+  private async tryResourceGrantsFor(
     scope: AuthzScopeRef,
   ): Promise<readonly ResourceGrant[] | undefined> {
     if (scope.type !== "resource") return undefined;
     return this.collector.collectResourceGrants({ scope });
   }
 
-  private demoProjectId(): string | undefined {
+  private tryDemoProjectId(): string | undefined {
     return this.options.demoProjectId?.();
   }
 
@@ -738,7 +748,7 @@ export class AuthzService extends AuthzServiceContract {
       return this.collector.collectGrants({ principal, organizationId });
     }
 
-    const currentEpoch = await epoch.read({ organizationId });
+    const currentEpoch = await epoch.tryRead({ organizationId });
     if (currentEpoch === null) {
       return this.collector.collectGrants({ principal, organizationId });
     }
@@ -800,7 +810,7 @@ export class AuthzService extends AuthzServiceContract {
   }
 
   /** Fail closed if an untyped caller bypasses the exclusive scope argument. */
-  private scopeOf(
+  private tryScopeOf(
     scope: Partial<Record<"projectId" | "teamId" | "organizationId", string>>,
   ): AuthzDeclaredScopeId | null {
     if (scope.projectId) return { tier: "project", id: scope.projectId };

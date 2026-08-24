@@ -14,6 +14,8 @@ import { HandledError } from "@langwatch/handled-error";
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
+import type { App } from "~/server/app-layer/app";
 
 // auth-middleware → api/rbac → ~/server/auth → ~/server/better-auth → redis +
 // db. Mock both so no real connection keeps the worker alive (established
@@ -22,12 +24,6 @@ vi.mock("~/server/db", () => ({ prisma: {} }));
 
 const resolveOrgOnly = vi.fn();
 const markUsed = vi.fn();
-
-vi.mock("../token-resolver", () => ({
-  TokenResolver: {
-    create: () => ({ resolveOrgOnly, markUsed }),
-  },
-}));
 
 import { createOrgAuthMiddleware } from "../auth-middleware";
 
@@ -67,6 +63,15 @@ function buildApp(options: {
     caught.push(error);
     return c.json({ caught: true }, 500);
   });
+  app.use(
+    appContextMiddlewareFor({
+      apiKeys: {
+        resolveOrganizationToken: resolveOrgOnly,
+        markUsed,
+      },
+      projects: {},
+    } as App),
+  );
   app.use(
     createOrgAuthMiddleware({
       prisma: options.prisma,

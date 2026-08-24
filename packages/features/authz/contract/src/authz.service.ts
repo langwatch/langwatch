@@ -101,7 +101,7 @@ export abstract class AuthzService {
     args: AuthzCanBatchByIdsInput,
   ): Promise<AuthzCanBatchByIdsOutput>;
 
-  abstract resolveScope(
+  abstract tryResolveScope(
     args: AuthzResolveScopeInput,
   ): Promise<AuthzScopeRef | null>;
 
@@ -125,14 +125,14 @@ export abstract class AuthzService {
     } & PermissionScopeArg<Permission>,
   ): Promise<boolean>;
 
-  abstract requirePermission<
+  abstract authorizePermission<
     Permission extends AuthzPermission,
     ScopeArg extends PermissionScopeArg<Permission>,
   >(
     check: { userId: string; permission: Permission } & ScopeArg,
   ): Promise<Authorized<TierOfScopeArg<ScopeArg>, Permission>>;
 
-  abstract requireProjectPermission(
+  abstract authorizeProjectPermission(
     args: AuthzRequireProjectPermissionInput,
   ): Promise<void>;
 
@@ -180,6 +180,11 @@ export abstract class AuthzService {
   abstract isOnEngine(
     args: AuthzListOrganizationBindingsInput,
   ): Promise<boolean>;
+
+  /** Finalized migration time for compatibility facts, or null before cutover. */
+  abstract tryGetEngineCutoverAt(
+    args: AuthzListOrganizationBindingsInput,
+  ): Promise<Date | null>;
 }
 
 /** Useful structural union for adapters that accept either typed path form. */

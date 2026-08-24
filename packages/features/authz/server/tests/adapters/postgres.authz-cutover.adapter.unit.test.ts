@@ -82,6 +82,25 @@ describe("PostgresAuthzCutoverAdapter", () => {
     ]);
   });
 
+  it("returns only the finalized cutover business time", async () => {
+    const occurredAt = new Date("2026-08-18T09:00:00.000Z");
+    const findUnique = vi
+      .fn()
+      .mockResolvedValueOnce({ status: "finalized", occurredAt })
+      .mockResolvedValueOnce({ status: "migrated", occurredAt });
+    const adapter = PostgresAuthzCutoverAdapter.create({
+      database: { systemMigrationTenantState: { findUnique } },
+      reporter: new RecordingReporter(),
+    });
+
+    await expect(
+      adapter.tryGetFinalizedAt({ organizationId: ORG_ID }),
+    ).resolves.toEqual(occurredAt);
+    await expect(
+      adapter.tryGetFinalizedAt({ organizationId: ORG_ID }),
+    ).resolves.toBeNull();
+  });
+
   it("raises through the uncached read used by revocation routing", async () => {
     const adapter = PostgresAuthzCutoverAdapter.create({
       database: {

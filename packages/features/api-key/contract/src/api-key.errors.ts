@@ -77,6 +77,10 @@ export class ApiKeyPermissionDeniedError extends HandledError {
       meta: { permission, ...options.meta },
       httpStatus: 403,
       fault: "customer",
+      tips: [
+        "Re-create the API key with the required scope, or ask an admin to raise your role",
+      ],
+      docsUrl: "https://docs.langwatch.ai/api-reference/api-keys/create-api-key",
     });
     this.name = "ApiKeyPermissionDeniedError";
   }
@@ -90,6 +94,10 @@ export class ApiKeyPermissionNotDelegableError extends HandledError {
       meta: { permission, ...options.meta },
       httpStatus: 403,
       fault: "customer",
+      tips: [
+        "A wider key or a higher role does not change this — make the change in LangWatch instead",
+      ],
+      docsUrl: "https://docs.langwatch.ai/api-reference/api-keys/create-api-key",
     });
     this.name = "ApiKeyPermissionNotDelegableError";
   }

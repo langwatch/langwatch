@@ -1,4 +1,14 @@
 import type { ApiKey, ApiKeyBinding, ApiKeyBindingNames, ApiKeyDetail, ApiKeyListEnrichment, ApiKeyName, ApiKeyProject, ApiKeyScope, ApiKeyTeam, ApiKeyUser, ApiKeyVerification, CliKeyScopeSummary, CliKeySelection, CreateApiKeyInput, RevokeApiKeyInput, UpdateApiKeyInput } from "./api-key";
+import type {
+  ApiKeyTokenResolutionInput,
+  OrganizationApiKeyResolution,
+  OrganizationApiKeyResolutionInput,
+  ResolvedApiKeyToken,
+} from "./api-key.tokens";
+import type {
+  ApiKeyVisibleProjects,
+  ApiKeyVisibleProjectsInput,
+} from "./api-key.visibility";
 export type ApiKeySelectionInput = { userId: string; organizationId: string; bindings: Array<ApiKeyScope & { role: "CUSTOM" }>; permissions: string[] };
 export type ApiKeyListInput = { userId: string; organizationId: string };
 export type ApiKeyListAllInput = { organizationId: string };
@@ -16,6 +26,17 @@ export abstract class ApiKeyService {
   abstract update(input: UpdateApiKeyInput): Promise<ApiKey>;
   /** Authentication is an attempted lookup: invalid credentials return null. */
   abstract tryVerify(input: ApiKeyVerifyInput): Promise<ApiKeyVerification | null>;
+  /** Resolves either a current API key or the deprecated project credential. */
+  abstract tryResolveToken(
+    input: ApiKeyTokenResolutionInput,
+  ): Promise<ResolvedApiKeyToken | null>;
+  /** Resolves organization-only credentials while keeping refusal classes apart. */
+  abstract resolveOrganizationToken(
+    input: OrganizationApiKeyResolutionInput,
+  ): Promise<OrganizationApiKeyResolution>;
+  abstract resolveVisibleProjects(
+    input: ApiKeyVisibleProjectsInput,
+  ): Promise<ApiKeyVisibleProjects>;
   abstract markUsed(input: ApiKeyIdInput): void;
   abstract list(input: ApiKeyListInput): Promise<ApiKey[]>;
   abstract listAll(input: ApiKeyListAllInput): Promise<ApiKey[]>;

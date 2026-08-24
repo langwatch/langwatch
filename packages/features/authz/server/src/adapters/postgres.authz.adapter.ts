@@ -212,6 +212,8 @@ export class PostgresAuthzAdapter {
       }),
       epoch,
       isOnEngine: selectHead,
+      tryGetEngineCutoverAt: (organizationId) =>
+        cutover.tryGetFinalizedAt({ organizationId }),
     };
     if (this.options.cacheEnabled) {
       authzOptions.cacheEnabled = this.options.cacheEnabled;

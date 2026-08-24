@@ -1,18 +1,19 @@
 import { ALL_PERMISSIONS } from "@langwatch/authz-contract";
-import { describe, expect, it } from "vitest";
-import { hasPermissionWithHierarchy } from "../../api/rbac";
-import { CustomRolePermissionsSchema } from "../../rbac/custom-role-permissions";
 import {
   CLI_KEY_DEFAULT_EXCLUDED_PERMISSIONS,
-  defaultCliKeyPermissions,
-} from "../cli-key-defaults";
-import {
   categorizablePermissions,
   categoryPermissions,
   computePermissionsFromSelections,
+  defaultCliKeyPermissions,
   PERMISSION_CATEGORIES,
   selectionsFromPermissions,
-} from "../permission-categories";
+  apiKeyPermissionFormatSchema,
+} from "@langwatch/api-key-contract";
+import { describe, expect, it } from "vitest";
+import { hasPermissionWithHierarchy } from "../../api/rbac";
+import { z } from "zod/v4";
+
+const CustomRolePermissionsSchema = z.array(apiKeyPermissionFormatSchema);
 
 describe("PERMISSION_CATEGORIES", () => {
   /** @scenario Every registry permission belongs to a category */

@@ -1,5 +1,8 @@
 import { Hono } from "hono";
+import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
+import { getApp } from "~/server/app-layer/app";
 
 import type { Permission } from "~/server/api/rbac";
 import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
@@ -8,8 +11,7 @@ import {
   enforceApiKeyCeiling,
   requireApiKeyPermission,
 } from "../auth-middleware";
-import { ApiKeyPermissionDeniedError } from "../errors";
-import type { ResolvedToken } from "../token-resolver";
+import type { ResolvedApiKeyToken as ResolvedToken } from "@langwatch/api-key-contract";
 
 /**
  * Enforcement side of the API-key ceiling — the middleware and the guard it
@@ -77,6 +79,7 @@ function appWith(
     c.text("reached"),
   );
   const app = new Hono();
+  app.use("*", appContextMiddlewareFor(getApp()));
   app.use("*", async (c, next) => {
     if (resolved) c.set("resolvedToken" as never, resolved as never);
     await next();
