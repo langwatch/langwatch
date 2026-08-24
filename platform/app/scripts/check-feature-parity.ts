@@ -457,11 +457,6 @@ const LEGACY_INERT: string[] = [
   // ADR ships ahead of the identity storage adapter, and the adapter PR binds
   // these as it lands. Remove this entry with the first binding.
   "specs/identity/identity-storage-adapter.feature",
-  // Wave 2 design contracts (ADR-117), every scenario @unimplemented on
-  // purpose: the specs ship ahead of the Wave 2 PRs (delivery plan, Wave 2
-  // PR breakdown), and each PR binds its file as it lands. Remove each
-  // entry with its first binding.
-  "specs/identity/sso-connection-lifecycle.feature",
   "specs/langy/langy-agent-service-conventions.feature",
   "specs/langy/langy-baseline.feature",
   "specs/langy/langy-card-taxonomy.feature",
