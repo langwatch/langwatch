@@ -100,6 +100,22 @@ enrolled, or the migration is on for everyone. No sampling, no cohorts, no
 pacing ladder. Self-hosted runs it for every organization automatically, as it
 already did.
 
+**And on cloud the switch is now thrown: this migration is enrolled
+automatically.** The migration declares `enrolledAutomatically`, and the
+cohort admits every cloud organization with no enrollment row and no operator
+action. Enrollment paced the rollout while it was happening; the rollout is
+finished, and what enrollment would still decide is only whether an
+organization created SINCE ever migrates — which must not depend on an
+operator remembering it. An organization created today is created against the
+legacy authorization path exactly as before, writes its founder's legacy rows
+imperatively, and the next pass adopts them. Creation never touches the
+ledger, so nothing here re-introduces the born-on-engine coupling that made
+signup wait on the queue. The one class the automatic cohort leaves out is an
+organization running a private data plane; an operator naming one
+deliberately still enrolls it. The declaration is per migration, so a
+migration still mid-rollout — the identity ones — keeps its enrollment pacing
+untouched.
+
 **Aggregate ids must be STABLE ACROSS RETRIES, which is not determinism.** The
 event log dedupes on `(TenantId, AggregateType, AggregateId, IdempotencyKey)`,
 so `AggregateId` is part of the dedup key and an idempotency key only dedupes

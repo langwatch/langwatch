@@ -5,6 +5,7 @@ import type {
   TenantMigrationStatus,
 } from "@langwatch/system-migrations";
 import {
+  MigrationEnrolledAutomaticallyError,
   MigrationEnrollmentCloudOnlyError,
   MigrationEnrollmentOrganizationNotFoundError,
   MigrationNotAvailableOnInstallationError,
@@ -43,8 +44,8 @@ const logger = createLogger("langwatch:ops:system-migrations");
  * runner's own port: the runner reads and writes one tenant at a time; the
  * dashboard reads across them, and its writes are the operator's levers -
  * the rollback (migrated or finalized → rolled_back, the state machine's
- * only human-driven edge) and, on cloud, the enrollment rows that pace who
- * migrates at all.
+ * only human-driven edge) and, on cloud, the enrollment rows that pace the
+ * migrations still asking to be paced.
  */
 /** One enrollment row as the ops page lists it. */
 export type MigrationEnrollmentRecord = {
@@ -150,12 +151,20 @@ export type MigrationOverview = {
    * registered migration, so this is always true there.
    */
   availableOnThisInstallation: boolean;
+  /**
+   * Whether every organization is in this migration's cohort with no
+   * operator action. The page says so instead of offering enrollment it
+   * would be lying about.
+   */
+  enrolledAutomatically: boolean;
   counts: Record<TenantMigrationStatus, number>;
   /**
-   * The rollout gauge, cloud only (null off cloud, where enrollment does
-   * not exist): how many organizations are enrolled for this migration, and
-   * how many are not. Enrollment only - an organization counts as not
-   * enrolled whether or not its prerequisites have finalized, because
+   * The rollout gauge: how many organizations are enrolled for this
+   * migration, and how many are not. Null when there is nothing to enroll -
+   * off cloud, where enrollment does not exist, and for a migration that
+   * admits every organization automatically, where the count would describe
+   * rows that decide nothing. Enrollment only - an organization counts as
+   * not enrolled whether or not its prerequisites have finalized, because
    * enrolling early is legitimate (the migration waits), so this must never
    * be read as "ready to run".
    */
@@ -194,6 +203,12 @@ export class SystemMigrationsService {
         description: string;
         requiresOperatorConfirmation: boolean;
         runsAutomaticallyOnSelfHosted: boolean;
+        /**
+         * Whether cloud puts every organization in this migration's cohort
+         * with no enrollment row. The enrollment actions refuse for such a
+         * migration rather than writing rows nothing reads.
+         */
+        enrolledAutomatically: boolean;
         /**
          * Which axis the runner drives this migration over. Organization
          * migrations form the ordered per-organization pipeline; a user
@@ -330,16 +345,18 @@ export class SystemMigrationsService {
           requiresOperatorConfirmation: migration.requiresOperatorConfirmation,
           availableOnThisInstallation:
             isSaaS || migration.runsAutomaticallyOnSelfHosted,
+          enrolledAutomatically: migration.enrolledAutomatically,
           counts,
-          enrollment: enrolledByMigration
-            ? {
-                enrolledCount,
-                notEnrolledCount: Math.max(
-                  0,
-                  totalOrganizations - enrolledCount,
-                ),
-              }
-            : null,
+          enrollment:
+            enrolledByMigration && !migration.enrolledAutomatically
+              ? {
+                  enrolledCount,
+                  notEnrolledCount: Math.max(
+                    0,
+                    totalOrganizations - enrolledCount,
+                  ),
+                }
+              : null,
           attention,
         };
       }),
@@ -386,9 +403,11 @@ export class SystemMigrationsService {
    * (specs/migration/system-migrations-runner.feature, the enrollment scenarios).
    * Takes effect on the next pass - the runner reads enrollment fresh each
    * time - and refuses rather than lies: off cloud (where a row would change
-   * nothing, see MigrationEnrollmentCloudOnlyError), for a migration nothing
-   * registered answers to, for an organization that does not exist, and for
-   * one already enrolled (the store's unique key raises that refusal).
+   * nothing, see MigrationEnrollmentCloudOnlyError), for a migration that
+   * admits every organization already (`enrolledAutomatically`), for a
+   * migration nothing registered answers to, for an organization that does
+   * not exist, and for one already enrolled (the store's unique key raises
+   * that refusal).
    */
   async enroll({
     organizationId,
@@ -401,6 +420,7 @@ export class SystemMigrationsService {
   }): Promise<void> {
     if (!this.deps.isSaaS()) throw new MigrationEnrollmentCloudOnlyError();
     this.requireRegisteredMigration(migrationName);
+    this.requireEnrollmentDecidesSomething(migrationName);
     const organization = await this.deps.enrollments.findOrganizationById({
       organizationId,
     });
@@ -468,6 +488,7 @@ export class SystemMigrationsService {
   }> {
     if (!this.deps.isSaaS()) throw new MigrationEnrollmentCloudOnlyError();
     this.requireRegisteredMigration(migrationName);
+    this.requireEnrollmentDecidesSomething(migrationName);
     // The steps run as an ordered pipeline per organization, so a later
     // step's pool is the step before it: an organization enrolled for a
     // step whose predecessor nothing will ever run would sit pending
@@ -550,7 +571,9 @@ export class SystemMigrationsService {
    * Withdraw an enrollment: the row is deleted, and the next pass simply no
    * longer processes the organization for that migration. State already
    * recorded stays exactly as it is - withdrawal pauses the rollout, it does
-   * not roll anything back (that is the operator rollback's job).
+   * not roll anything back (that is the operator rollback's job). Refused
+   * for a migration that admits every organization anyway, where deleting a
+   * row would pause nothing.
    */
   async withdraw({
     organizationId,
@@ -562,6 +585,7 @@ export class SystemMigrationsService {
     actorUserId: string;
   }): Promise<void> {
     if (!this.deps.isSaaS()) throw new MigrationEnrollmentCloudOnlyError();
+    this.requireEnrollmentDecidesSomething(migrationName);
     await this.deps.enrollments.delete({ organizationId, migrationName });
     logger.info(
       { organizationId, migrationName, actorUserId },
@@ -580,11 +604,12 @@ export class SystemMigrationsService {
    * (specs/migration/system-migrations-runner.feature, "An operator runs one
    * migration for one organization now"). Awaited rather than
    * fire-and-forget - the operator asked about one organization and wants
-   * its outcome. Enrollment stays the pacing source of truth on cloud: an
-   * unenrolled organization is refused, never quietly migrated. The
-   * organization's own claim still applies, so a run while another pass is
-   * working that organization is refused with a retry-shaped error instead
-   * of double-driving it.
+   * its outcome. The cohort stays the source of truth on cloud: an
+   * organization outside it is refused, never quietly migrated - though for
+   * a migration that admits everyone the run only brings this organization's
+   * turn forward. The organization's own claim still applies, so a run while
+   * another pass is working that organization is refused with a retry-shaped
+   * error instead of double-driving it.
    */
   async runForOrganization({
     organizationId,
@@ -636,7 +661,10 @@ export class SystemMigrationsService {
     organizationId,
     migrationName,
   }: {
-    migration: { runsAutomaticallyOnSelfHosted: boolean };
+    migration: {
+      runsAutomaticallyOnSelfHosted: boolean;
+      enrolledAutomatically: boolean;
+    };
     organizationId: string;
     migrationName: string;
   }): Promise<void> {
@@ -650,6 +678,9 @@ export class SystemMigrationsService {
       throw new MigrationEnrollmentOrganizationNotFoundError();
     }
     if (!this.deps.isSaaS()) return;
+    // Nothing to be outside of: the migration admits every organization, so
+    // a targeted run only brings this one's turn forward.
+    if (migration.enrolledAutomatically) return;
     const enrolled = await this.deps.enrollments.isEnrolled({
       organizationId,
       migrationName,
@@ -707,6 +738,26 @@ export class SystemMigrationsService {
       .find((candidate) => candidate.name === migrationName);
     if (!migration) throw new MigrationUnknownError();
     return migration;
+  }
+
+  /**
+   * Refuses an enrollment action on a migration that admits every
+   * organization anyway. Withdrawal asks this too: pausing a rollout is what
+   * an operator withdraws FOR, and a migration outside enrollment's reach
+   * cannot be paused that way - the per-organization rollback is the lever
+   * that still works on it.
+   *
+   * An unregistered name passes here and is refused by
+   * `requireRegisteredMigration` where the caller checks it, so this guard
+   * never turns "unknown migration" into the wrong refusal.
+   */
+  private requireEnrollmentDecidesSomething(migrationName: string): void {
+    const migration = this.deps
+      .migrations()
+      .find((candidate) => candidate.name === migrationName);
+    if (migration?.enrolledAutomatically) {
+      throw new MigrationEnrolledAutomaticallyError({ migrationName });
+    }
   }
 
   /**

@@ -25,12 +25,13 @@ const DEFAULT_TENANT_CONCURRENCY = 25;
 /**
  * Which (tenant, migration) pairs a pass may touch. The app composes this:
  * self-hosted installations answer true for every tenant (migration just
- * happens, in the background, no configuration), cloud answers from the
- * per-migration enrollments operators have written, read fresh each pass.
- * A pair outside the cohort is skipped without even a state record - "not
- * started" and "not enrolled yet" are the same pending state, which is what
- * lets the rollout widen later, and what lets each migration pace
- * independently of the others.
+ * happens, in the background, no configuration); cloud answers from the
+ * migration's own `enrolledAutomatically` declaration, and for a migration
+ * that has not made it, from the per-migration enrollments operators have
+ * written, read fresh each pass. A pair outside the cohort is skipped
+ * without even a state record - "not started" and "not in the cohort yet"
+ * are the same pending state, which is what lets a rollout widen later, and
+ * what lets each migration pace independently of the others.
  */
 export type MigrationCohort = (args: {
   tenantId: string;

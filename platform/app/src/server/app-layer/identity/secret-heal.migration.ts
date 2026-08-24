@@ -43,6 +43,9 @@ export class IdentitySecretHealMigration implements SystemMigration {
   // Follows the backfill it repairs after: nothing to heal on an
   // installation where no user has latched.
   readonly runsAutomaticallyOnSelfHosted = false;
+  // Paced with the backfill it repairs after, for the same reason: a user
+  // outside the backfill's cohort has nothing to heal.
+  readonly enrolledAutomatically = false;
 
   constructor(
     private readonly secrets: Pick<IdentitySecretCarryService, "carryForUser">,

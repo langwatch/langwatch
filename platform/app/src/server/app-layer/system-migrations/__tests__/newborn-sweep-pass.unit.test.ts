@@ -65,6 +65,7 @@ vi.mock("../../identity/runtime", () => ({
     description: "backfill",
     requiresOperatorConfirmation: false,
     runsAutomaticallyOnSelfHosted: false,
+    enrolledAutomatically: false,
     migrateTenant: vi.fn(),
   }),
   identitySecretHealMigration: () => ({
@@ -73,6 +74,7 @@ vi.mock("../../identity/runtime", () => ({
     description: "heal",
     requiresOperatorConfirmation: false,
     runsAutomaticallyOnSelfHosted: false,
+    enrolledAutomatically: false,
     migrateTenant: vi.fn(),
   }),
   identityNewbornReconciliation: () => ({ runPass: stubs.runPass }),

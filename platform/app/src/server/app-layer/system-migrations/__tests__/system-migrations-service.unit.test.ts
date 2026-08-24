@@ -23,11 +23,13 @@ const TENANT = "org_acme";
 function migrationOf({
   name,
   runsAutomaticallyOnSelfHosted = true,
+  enrolledAutomatically = false,
   requiresOperatorConfirmation = false,
   tenant,
 }: {
   name: string;
   runsAutomaticallyOnSelfHosted?: boolean;
+  enrolledAutomatically?: boolean;
   requiresOperatorConfirmation?: boolean;
   tenant?: "organization" | "user";
 }) {
@@ -37,6 +39,7 @@ function migrationOf({
     description: name,
     requiresOperatorConfirmation,
     runsAutomaticallyOnSelfHosted,
+    enrolledAutomatically,
     ...(tenant ? { tenant } : {}),
   };
 }
@@ -712,6 +715,7 @@ describe("SystemMigrationsService enrollment", () => {
             description: "What the first step does.",
             requiresOperatorConfirmation: false,
             runsAutomaticallyOnSelfHosted: true,
+            enrolledAutomatically: false,
           },
           {
             name: "second",
@@ -719,6 +723,7 @@ describe("SystemMigrationsService enrollment", () => {
             description: "What the second step does.",
             requiresOperatorConfirmation: false,
             runsAutomaticallyOnSelfHosted: true,
+            enrolledAutomatically: false,
           },
         ],
       });
@@ -1042,6 +1047,116 @@ describe("SystemMigrationsService.runForOrganization", () => {
         code: "migration_not_available_on_installation",
       });
       expect(runTargetedPass).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("SystemMigrationsService and a migration enrolled automatically", () => {
+  const AUTOMATIC = "authz-engine";
+  const automaticMigration = migrationOf({
+    name: AUTOMATIC,
+    enrolledAutomatically: true,
+  });
+
+  describe("given the ops page reads the overview", () => {
+    /** @scenario "The migrations page is told there is nothing to enroll" */
+    it("says the migration is automatic and reports no enrollment gauge", async () => {
+      const { service } = serviceWith({
+        record: null,
+        migrations: [automaticMigration],
+      });
+
+      const overview = await service.getOverview();
+
+      expect(overview[0]?.enrolledAutomatically).toBe(true);
+      // A gauge here would count rows that decide nothing, and "Not enrolled
+      // 4,231" would read as a rollout that had barely started.
+      expect(overview[0]?.enrollment).toBeNull();
+    });
+  });
+
+  describe("when an operator enrolls one organization for it", () => {
+    /** @scenario "Enrolling an organization for an automatically enrolled migration is refused" */
+    it("refuses and writes no row", async () => {
+      const { service, enrollments } = serviceWith({
+        record: null,
+        migrations: [automaticMigration],
+      });
+
+      await expect(
+        service.enroll({
+          organizationId: TENANT,
+          migrationName: AUTOMATIC,
+          actorUserId: "user_ops",
+        }),
+      ).rejects.toMatchObject({ code: "migration_enrolled_automatically" });
+      expect(enrollments.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when an operator enrolls a cohort for it", () => {
+    /** @scenario "Enrolling an organization for an automatically enrolled migration is refused" */
+    it("refuses before drawing a sample", async () => {
+      const { service, enrollments } = serviceWith({
+        record: null,
+        migrations: [automaticMigration],
+      });
+
+      await expect(
+        service.enrollCohort({
+          migrationName: AUTOMATIC,
+          sampleSize: 5,
+          actorUserId: "user_ops",
+        }),
+      ).rejects.toMatchObject({ code: "migration_enrolled_automatically" });
+      expect(
+        enrollments.findCohortEligibleOrganizations,
+      ).not.toHaveBeenCalled();
+      expect(enrollments.createMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when an operator withdraws an organization from it", () => {
+    /** @scenario "Withdrawing from an automatically enrolled migration is refused" */
+    it("refuses rather than deleting a row that pauses nothing", async () => {
+      const { service, enrollments } = serviceWith({
+        record: null,
+        migrations: [automaticMigration],
+      });
+
+      await expect(
+        service.withdraw({
+          organizationId: TENANT,
+          migrationName: AUTOMATIC,
+          actorUserId: "user_ops",
+        }),
+      ).rejects.toMatchObject({ code: "migration_enrolled_automatically" });
+      expect(enrollments.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when an operator runs it for one organization nothing enrolled", () => {
+    /** @scenario "A targeted run needs no enrollment for an automatically enrolled migration" */
+    it("runs it without consulting enrollment at all", async () => {
+      const enrollments = enrollmentStoreStub();
+      enrollments.isEnrolled.mockResolvedValue(false);
+      const { service, runTargetedPass } = serviceWith({
+        record: null,
+        enrollments,
+        migrations: [automaticMigration],
+      });
+
+      await service.runForOrganization({
+        organizationId: TENANT,
+        migrationName: AUTOMATIC,
+        actorUserId: "user_ops",
+      });
+
+      expect(runTargetedPass).toHaveBeenCalledWith({
+        organizationId: TENANT,
+        migrationName: AUTOMATIC,
+      });
+      expect(enrollments.isEnrolled).not.toHaveBeenCalled();
     });
   });
 });

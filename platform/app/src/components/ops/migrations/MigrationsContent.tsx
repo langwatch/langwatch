@@ -302,7 +302,7 @@ function MigrationSection({
         <Spacer />
         {canManage && migration.availableOnThisInstallation && (
           <HStack>
-            {isSaaS && (
+            {isSaaS && !migration.enrolledAutomatically && (
               <>
                 <EnrollAction
                   migrationName={migration.name}
@@ -341,7 +341,14 @@ function MigrationSection({
         </Text>
       ) : (
         <Stack gap={4}>
-          {isSaaS && (
+          {isSaaS && migration.enrolledAutomatically && (
+            <Text fontSize="sm" color="fg.muted">
+              Every organization runs this step, including any created from now
+              on, so there is nothing to enroll. To take one organization back
+              off it, roll that organization back.
+            </Text>
+          )}
+          {isSaaS && !migration.enrolledAutomatically && (
             <EnrollmentTable enrollments={enrollments} canManage={canManage} />
           )}
           {migration.attention.length === 0 ? (

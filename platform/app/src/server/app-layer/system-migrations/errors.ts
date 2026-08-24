@@ -135,6 +135,27 @@ export class MigrationEnrollmentNotFoundError extends HandledError {
   }
 }
 
+/**
+ * An enrollment action refused because the migration admits every
+ * organization already (`enrolledAutomatically`). The row would decide
+ * nothing, and accepting it would tell the operator they had paced something
+ * they had not - so the action refuses rather than writing inert
+ * bookkeeping.
+ */
+export class MigrationEnrolledAutomaticallyError extends HandledError {
+  declare readonly code: "migration_enrolled_automatically";
+
+  constructor({ migrationName }: { migrationName: string }) {
+    super(
+      "migration_enrolled_automatically",
+      "This migration already runs for every organization, so there is nothing to enroll",
+      // meta.migrationName lets the presentation name the migration.
+      { httpStatus: 409, fault: "customer", meta: { migrationName } },
+    );
+    this.name = "MigrationEnrolledAutomaticallyError";
+  }
+}
+
 /** A migration name nothing registered answers to. */
 export class MigrationUnknownError extends HandledError {
   declare readonly code: "migration_unknown";

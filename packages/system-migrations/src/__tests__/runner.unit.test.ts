@@ -110,6 +110,7 @@ function migrationOf(
     description: name,
     requiresOperatorConfirmation: false,
     runsAutomaticallyOnSelfHosted: true,
+    enrolledAutomatically: false,
     migrateTenant,
   };
 }

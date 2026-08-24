@@ -1,4 +1,4 @@
-# The generic system-migrations runner: enrollment, cohorts, passes, claims,
+# The generic system-migrations runner: cohorts, enrollment, passes, claims,
 # rollback and the operator surfaces. What any one migration does when it runs
 # lives in that migration's own spec — for the authz migration,
 # specs/migration/authz-grants-rollout.feature.
@@ -6,9 +6,11 @@
 @migration @runner
 Feature: Running system migrations across organizations
   As a LangWatch operator
-  I want migrations to run organization by organization, paced by enrollment,
-  claimed by one process at a time and reversible without a deploy
-  So that a platform-wide change lands gradually and any organization can be
+  I want migrations to run organization by organization, paced while a rollout
+  is happening and automatic once it is finished, claimed by one process at a
+  time and reversible without a deploy
+  So that a platform-wide change lands gradually, reaches every organization
+  in the end including the ones created since, and any organization can be
   taken back off it the moment something looks wrong
 
   Background:
@@ -48,7 +50,75 @@ Feature: Running system migrations across organizations
     When a later pass runs
     Then it is skipped
 
+  # ═══ Automatic enrollment ═════════════════════════════════════════════
+  # Enrollment paces a rollout while it is happening. A finished rollout has
+  # the opposite problem: every organization created since must migrate too,
+  # and nothing should depend on an operator remembering to enroll it. A
+  # migration says which of the two it is, once, in its own declaration — so
+  # a migration mid-rollout and a migration that has finished one can coexist
+  # on the same installation.
+
+  @unit
+  Scenario: A migration can declare that every organization is in its cohort
+    Given a cloud installation
+    And a migration declared enrolled automatically
+    When a pass computes its cohort
+    Then an organization nobody enrolled is in it
+
+  @unit
+  Scenario: An organization nobody enrolled migrates for an automatically enrolled migration
+    Given a cloud installation
+    And a migration declared enrolled automatically
+    And an organization created after the rollout finished
+    When a pass runs
+    Then that organization is migrated
+
+  # The one class no cohort draw has ever included. Their events belong on
+  # their own instance, and a declaration is not the place to change that.
+  @unit
+  Scenario: An automatic cohort leaves out a private-dataplane organization
+    Given a migration declared enrolled automatically
+    And an organization with a dedicated data plane exists
+    When a pass runs
+    Then that organization is left alone with no state recorded
+
+  @unit
+  Scenario: An operator can still enroll a private-dataplane organization by name
+    Given a migration declared enrolled automatically
+    And an operator has enrolled an organization with a dedicated data plane
+    When a pass runs
+    Then that organization is migrated
+
+  @unit
+  Scenario: Enrolling an organization for an automatically enrolled migration is refused
+    Given a migration declared enrolled automatically
+    When an operator enrols an organization for it
+    Then the action is refused
+    And no enrollment row is written
+
+  @unit
+  Scenario: Withdrawing from an automatically enrolled migration is refused
+    Given a migration declared enrolled automatically
+    When an operator withdraws an organization from it
+    Then the action is refused
+    And nothing is paused
+
+  @unit
+  Scenario: A targeted run needs no enrollment for an automatically enrolled migration
+    Given a migration declared enrolled automatically
+    And an organization no enrollment row names
+    When an operator targets it
+    Then the migration runs for that organization
+
+  @unit
+  Scenario: The migrations page is told there is nothing to enroll
+    Given a migration declared enrolled automatically
+    When the migrations page reads that migration
+    Then it is told every organization runs it
+    And it is offered no enrollment count
+
   # ═══ Enrollment ═══════════════════════════════════════════════════════
+  # What paces a migration that has not declared itself automatic.
 
   @unit
   Scenario: Enrollment alone decides which organizations migrate
@@ -171,8 +241,9 @@ Feature: Running system migrations across organizations
     Then a typed confirmation is required first
 
   # ═══ Self-hosted installations ════════════════════════════════════════
-  # Cloud paces by enrollment; self-hosted paces by the migration declaring
-  # itself released for self-hosting.
+  # Cloud decides WHO by the migration's cohort; self-hosted decides WHETHER
+  # by the migration declaring itself released for self-hosting. Two axes,
+  # two declarations, and self-hosted never reads the cohort one.
 
   @unit
   Scenario: Enrollment does not apply to self-hosted installations
@@ -210,7 +281,7 @@ Feature: Running system migrations across organizations
     Given a cloud installation
     And a migration not declared released for self-hosting
     When a pass runs
-    Then enrolled organizations are still processed
+    Then the organizations in its cohort are still processed
 
   @unit
   Scenario: Self-hosted installations run the preparation work but not the cutover yet

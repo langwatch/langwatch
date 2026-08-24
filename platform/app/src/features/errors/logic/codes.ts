@@ -198,6 +198,7 @@ export const APP_ERROR_CODES = [
   "member_not_found",
   "member_seat_limit_reached",
   "membership_disabled",
+  "migration_enrolled_automatically",
   "migration_enrollment_already_exists",
   "migration_enrollment_cloud_only",
   "migration_enrollment_not_found",
