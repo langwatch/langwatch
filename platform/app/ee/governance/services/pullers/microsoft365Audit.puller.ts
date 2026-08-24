@@ -136,6 +136,80 @@ function isAlreadyEnabled(error: unknown): boolean {
   );
 }
 
+/** Longest `error.code` still plausibly a code rather than a diagnostic dump. */
+const MAX_ERROR_CODE_CHARS = 40;
+
+/**
+ * The Management Activity API's own `AFnnnnn` code for a failed call.
+ *
+ * Every setup mistake this API can report arrives as the same 400 with the
+ * same status text, and `HttpResponseError` deliberately keeps the body out
+ * of `message` because an upstream service is free to echo whatever it was
+ * sent — so without this, "HTTP 400 Bad Request" is the entire diagnosis for
+ * unified audit logging being switched off, a tenant id that does not exist,
+ * and a content type the tenant has not licensed alike.
+ *
+ * The `AF` scan runs FIRST, ahead of the documented `error.code` field,
+ * because that field is not reliably a code. Observed live against a tenant
+ * with no Microsoft 365 estate, `error.code` held a 200-character diagnostic
+ * string — `StartSubscription [CorrId=…][TenantId=…,ApplicationId=…][AppId`
+ * — truncated mid-token with the remainder spilled into `message`. Taking it
+ * at its word puts that whole blob in the log field meant for a code.
+ */
+export function managementApiErrorCode(error: unknown): string | undefined {
+  if (!(error instanceof HttpResponseError)) return undefined;
+
+  const documented = /\bAF\d{5}\b/.exec(error.bodyText)?.[0];
+  if (documented !== undefined) return documented;
+
+  try {
+    const parsed: unknown = JSON.parse(error.bodyText);
+    const code = (parsed as { error?: { code?: unknown } })?.error?.code;
+    if (
+      typeof code === "string" &&
+      code !== "" &&
+      code.length <= MAX_ERROR_CODE_CHARS
+    ) {
+      return code;
+    }
+  } catch {
+    // Not JSON, or not the documented shape. Nothing to report.
+  }
+  return undefined;
+}
+
+/** Cap on the upstream explanation kept for the log. Enough for one sentence. */
+const MAX_ERROR_DETAIL_CHARS = 200;
+
+/**
+ * The first line of the API's own explanation, bounded.
+ *
+ * The `AF` code is the actionable signal when there is one, but this API does
+ * not always send one: a tenant with no Microsoft 365 estate answers with a
+ * bare .NET exception whose only useful content is the sentence "Tenant
+ * {guid} does not exist." — no code anywhere in the body. Without this, that
+ * case logs as a 400 with no code and no explanation, which is the same shape
+ * as every other failure here.
+ *
+ * Bounded and first-line-only on purpose: the body continues into a server
+ * stack trace, and this field is a pointer to the cause, not a transcript.
+ */
+export function managementApiErrorDetail(error: unknown): string | undefined {
+  if (!(error instanceof HttpResponseError)) return undefined;
+  let text = error.bodyText;
+  try {
+    const parsed: unknown = JSON.parse(text);
+    const message = (parsed as { error?: { message?: unknown } })?.error
+      ?.message;
+    if (typeof message === "string" && message !== "") text = message;
+  } catch {
+    // Not JSON. Fall back to the raw body, still bounded below.
+  }
+  const firstLine = text.split(/[\r\n]/)[0]?.trim();
+  if (firstLine === undefined || firstLine === "") return undefined;
+  return firstLine.slice(0, MAX_ERROR_DETAIL_CHARS);
+}
+
 /**
  * How far back a first-ever run reaches. The API does not backfill beyond
  * its own retention, and a subscription only publishes content from the
@@ -393,6 +467,13 @@ export class Microsoft365AuditPuller
         {
           ingestionSourceId: options.context?.ingestionSourceId,
           emitted: events.length,
+          // The window this run actually asked for. `emitted: 0` on its own
+          // cannot say whether the feed was quiet or the window was wrong,
+          // and the second is the likelier mistake on a source that does not
+          // backfill: a window that predates the subscription can only ever
+          // return nothing, however healthy everything else looks.
+          windowStart: cursor.windowStart,
+          windowEnd: cursor.windowEnd,
           ...stats,
         },
         "microsoft_365_audit: run complete",
@@ -544,6 +625,18 @@ export class Microsoft365AuditPuller
         signal: options.signal,
         deadlineAtMs: options.deadlineMs,
       });
+      // Only a first-ever start reaches here; every later run is AF20024
+      // below. Worth saying out loud, because the feed does not backfill:
+      // this line is the moment from which content exists at all, and any
+      // Copilot activity before it is gone.
+      logger.info(
+        {
+          ingestionSourceId: options.context?.ingestionSourceId,
+          tenantId: config.tenantId,
+          contentType: config.contentType,
+        },
+        "microsoft_365_audit: subscription started — content is published from now on, earlier activity is not recoverable",
+      );
     } catch (error) {
       // AF20024 ("subscription is already enabled") is the expected answer on
       // every run after the first, and it arrives as a 400. It is the only
@@ -564,6 +657,22 @@ export class Microsoft365AuditPuller
         );
         return;
       }
+      // About to rethrow, and the code that says which mistake this is lives
+      // only in `bodyText`, which HttpResponseError keeps out of `message`.
+      // Log it here or lose it: the caller sees "HTTP 400 Bad Request" and
+      // audit-logging-off, wrong-tenant and unlicensed-content-type are then
+      // the same error.
+      logger.error(
+        {
+          ingestionSourceId: options.context?.ingestionSourceId,
+          tenantId: config.tenantId,
+          contentType: config.contentType,
+          status: error instanceof HttpResponseError ? error.status : undefined,
+          managementApiCode: managementApiErrorCode(error),
+          managementApiDetail: managementApiErrorDetail(error),
+        },
+        "microsoft_365_audit: could not start the subscription",
+      );
       throw error;
     }
   }

@@ -258,6 +258,65 @@ describe("given the token endpoint refuses the credentials", () => {
       expect((failure as Error).message).not.toContain(SECRET);
       expect((failure as Error).message).not.toContain("AADSTS7000215");
     });
+
+    it("carries the numeric AADSTS codes, which name the mistake the status cannot", async () => {
+      // Four different setup mistakes all answer 400 here — wrong secret,
+      // wrong app id, wrong tenant, and a scope whose resource principal was
+      // never provisioned in the tenant. Only these numbers tell them apart,
+      // and unlike `error_description` they are not free text the service
+      // composed out of what it was sent.
+      responseQueue = [
+        {
+          status: 400,
+          body: {
+            error: "unauthorized_client",
+            error_description: `AADSTS700016: app not found ${SECRET}`,
+            error_codes: [700016],
+          },
+        },
+      ];
+
+      const { createTokenProvider, TokenAcquisitionError } =
+        await loadProvider();
+      const provider = createTokenProvider({
+        credentials: CREDENTIALS,
+        scope: SCOPE,
+        deadlineAtMs: Date.now() + 10_000,
+        tokenEndpoint,
+      });
+
+      const failure = await provider
+        .getToken()
+        .catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(TokenAcquisitionError);
+      expect((failure as { errorCodes: number[] }).errorCodes).toEqual([
+        700016,
+      ]);
+      expect((failure as Error).message).toContain("700016");
+      // The codes travel; the text that quotes our request back at us does not.
+      expect((failure as Error).message).not.toContain(SECRET);
+      expect((failure as Error).message).not.toContain("app not found");
+    });
+
+    it("reports no codes rather than guessing when the body carries none", async () => {
+      responseQueue = [{ status: 400, body: { error: "invalid_request" } }];
+
+      const { createTokenProvider } = await loadProvider();
+      const provider = createTokenProvider({
+        credentials: CREDENTIALS,
+        scope: SCOPE,
+        deadlineAtMs: Date.now() + 10_000,
+        tokenEndpoint,
+      });
+
+      const failure = await provider
+        .getToken()
+        .catch((error: unknown) => error);
+
+      expect((failure as { errorCodes: number[] }).errorCodes).toEqual([]);
+      expect((failure as Error).message).not.toContain("AADSTS");
+    });
   });
 
   describe("when the failure is not the endpoint refusing us", () => {

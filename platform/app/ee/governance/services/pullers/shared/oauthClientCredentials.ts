@@ -67,14 +67,54 @@ interface TokenResponse {
 
 /**
  * Thrown when the token endpoint refuses or answers with something
- * unusable. Deliberately carries no response body: the request that produced
- * it had the client secret in its form body, and an error that quotes the
- * exchange is the most likely way a secret reaches a log.
+ * unusable. Carries the status and, when the endpoint supplied them, the
+ * numeric AADSTS codes — never the response text and never the request body:
+ * the request that produced it had the client secret in its form body, and an
+ * error that quotes the exchange is the most likely way a secret reaches a log.
+ *
+ * The codes matter because the status alone cannot say which of the four
+ * setup mistakes happened, and all four answer 400:
+ *
+ *   7000215  wrong client secret
+ *   700016   the app id is not in this tenant
+ *   90002    the tenant id does not exist
+ *   500011   the scope's resource principal is not in this tenant — for
+ *            `https://manage.office.com/.default` that means the Office 365
+ *            Management APIs service principal was never provisioned
+ *
+ * Without them, "the token endpoint answered 400" is where the investigation
+ * both starts and stops.
  */
 export class TokenAcquisitionError extends Error {
-  constructor(reason: string) {
-    super(`OAuth client-credentials token request failed: ${reason}`);
+  readonly errorCodes: number[];
+
+  constructor(reason: string, errorCodes: number[] = []) {
+    super(
+      `OAuth client-credentials token request failed: ${reason}` +
+        (errorCodes.length > 0 ? ` (AADSTS ${errorCodes.join(", ")})` : ""),
+    );
     this.name = "TokenAcquisitionError";
+    this.errorCodes = errorCodes;
+  }
+}
+
+/**
+ * The `error_codes` array from an Azure AD token-endpoint failure.
+ *
+ * Numbers only, by construction: `error_description` is free text the service
+ * composes, and this module's rule is that nothing from that exchange is
+ * quoted. An unparseable or differently-shaped body yields an empty list
+ * rather than throwing — a failure to explain a failure must not replace it.
+ */
+function aadErrorCodesFrom(bodyText: string): number[] {
+  try {
+    const parsed: unknown = JSON.parse(bodyText);
+    if (typeof parsed !== "object" || parsed === null) return [];
+    const codes = (parsed as { error_codes?: unknown }).error_codes;
+    if (!Array.isArray(codes)) return [];
+    return codes.filter((code): code is number => typeof code === "number");
+  } catch {
+    return [];
   }
 }
 
@@ -114,10 +154,10 @@ export function createTokenProvider({
       deadlineAtMs,
     }).catch((error: unknown) => {
       // A client status is the endpoint refusing us — a wrong secret, a wrong
-      // tenant, a scope we were not granted. Carry the status only: the
-      // request that produced this had the client secret in its form body,
-      // and HttpResponseError keeps the response body, which is exactly what
-      // TokenAcquisitionError is documented never to carry.
+      // tenant, a scope we were not granted. Carry the status and the numeric
+      // AADSTS codes, nothing else: the request that produced this had the
+      // client secret in its form body, and HttpResponseError keeps the
+      // response body, which is what TokenAcquisitionError must not carry.
       //
       // Everything else stays as it is: deadline, abort, transport failure
       // and exhausted 5xx retries are not the endpoint refusing us, and
@@ -126,6 +166,7 @@ export function createTokenProvider({
       if (error instanceof HttpResponseError && error.status < 500) {
         throw new TokenAcquisitionError(
           `the token endpoint answered ${error.status}`,
+          aadErrorCodesFrom(error.bodyText),
         );
       }
       throw error;
