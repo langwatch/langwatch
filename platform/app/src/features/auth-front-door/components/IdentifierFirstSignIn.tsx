@@ -207,6 +207,7 @@ export function IdentifierFirstSignIn() {
               methodSet={instanceMethods}
               lastUsedMethodId={lastUsedMethodId}
               onFederatedMethodChosen={dialFederated}
+              callbackUrl={callbackUrl}
             />
           ) : null
         }

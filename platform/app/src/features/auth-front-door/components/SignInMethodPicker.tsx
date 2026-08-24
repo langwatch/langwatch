@@ -13,6 +13,7 @@ import { signInMethodActionLabel } from "../logic/methodLabels";
 import { signInRoutingReasonCopy } from "../logic/routingReasonCopy";
 import "../authFrontDoor.css";
 import { BRAND, MONO_FONT, SHAPE } from "../logic/brand";
+import { PasskeySignInButton } from "./PasskeySignInButton";
 import { SignInMethodIcon } from "./SignInMethodIcon";
 
 /**
@@ -110,7 +111,9 @@ export function hasAlternativeMethods(
 ): boolean {
   return (
     DEV_SHOWS_ALL_SOCIAL ||
-    methodSet.some((method) => method.kind === "federated")
+    methodSet.some(
+      (method) => method.kind === "federated" || method.kind === "passkey",
+    )
   );
 }
 
@@ -125,10 +128,12 @@ export function AlternativeMethods({
   methodSet,
   lastUsedMethodId,
   onFederatedMethodChosen,
+  callbackUrl,
 }: {
   methodSet: readonly SignInMethod[];
   lastUsedMethodId?: string | null;
   onFederatedMethodChosen: (method: SignInMethod) => void;
+  callbackUrl?: string;
 }) {
   const offered = methodSet.filter((method) => method.kind === "federated");
   const offeredIds = new Set(offered.map((method) => method.id));
@@ -154,6 +159,13 @@ export function AlternativeMethods({
           onChosen={onFederatedMethodChosen}
         />
       ))}
+      {/* A passkey belongs on THIS step, beside the providers, rather than
+          behind the address one: it names the account by itself, so asking
+          for an address first would be asking for something the ceremony
+          does not need and cannot use. */}
+      {methodSet.some((method) => method.kind === "passkey") ? (
+        <PasskeySignInButton callbackUrl={callbackUrl} />
+      ) : null}
     </VStack>
   );
 }

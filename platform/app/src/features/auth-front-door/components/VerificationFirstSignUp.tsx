@@ -197,6 +197,7 @@ export function VerificationFirstSignUp() {
               methodSet={instanceMethods}
               lastUsedMethodId={lastUsedMethodId}
               onFederatedMethodChosen={dialFederated}
+              callbackUrl={callbackUrl}
             />
           ) : null
         }
