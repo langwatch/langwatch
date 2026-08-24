@@ -68,6 +68,10 @@ export function VerificationFirstSignUp() {
     readonly SignInMethod[]
   >([]);
   const [lastUsedMethodId] = useState(() => readLastUsedMethodId());
+  // Every failure this card can have shows in one place, at the top. A
+  // passkey is refused from a button part-way down the rail of methods, and
+  // an alert opening there pushes the rest of the rail down the page.
+  const [passkeyError, setPasskeyError] = useState<unknown>(null);
   const spent = useRef(false);
   const askedOnMount = useRef(false);
 
@@ -188,7 +192,8 @@ export function VerificationFirstSignUp() {
     return (
       <CheckYourEmail
         email={sentTo}
-        what="Open it to confirm the address and carry on."
+        what="Open it to confirm the address, then choose a password."
+        onUseDifferentEmail={() => setSentTo(null)}
       />
     );
   }
@@ -203,8 +208,14 @@ export function VerificationFirstSignUp() {
         <HandledErrorAlert
           error={requestVerification.error}
           fallbackTitle="Couldn't start your sign-up"
+          className="lw-front-door-alert"
         />
       ) : null}
+      <HandledErrorAlert
+        error={passkeyError}
+        fallbackTitle="Could not use a passkey"
+        className="lw-front-door-alert"
+      />
       <IdentifierStepForm
         submitLabel="Continue"
         isSubmitting={requestVerification.isPending}
@@ -223,6 +234,7 @@ export function VerificationFirstSignUp() {
               lastUsedMethodId={lastUsedMethodId}
               onFederatedMethodChosen={dialFederated}
               callbackUrl={callbackUrl}
+              onPasskeyError={setPasskeyError}
             />
           ) : null
         }
@@ -251,12 +263,19 @@ function WelcomeBack({
   onFederatedMethodChosen: (method: SignInMethod) => void;
   onUseDifferentEmail: () => void;
 }) {
+  const [passkeyError, setPasskeyError] = useState<unknown>(null);
+
   return (
     // No notice, no callout, nothing that reads as a refusal: somebody who
     // clicked the wrong page gets the right page, and the only thing that
     // changes is the words on it.
     <AuthCard title="Welcome back">
       <div data-testid="welcome-back" hidden />
+      <HandledErrorAlert
+        error={passkeyError}
+        fallbackTitle="Could not use a passkey"
+        className="lw-front-door-alert"
+      />
       {decision ? (
         <SignInMethodPicker
           methodSet={decision.methodSet}
@@ -264,6 +283,7 @@ function WelcomeBack({
           lastUsedMethodId={lastUsedMethodId}
           onFederatedMethodChosen={onFederatedMethodChosen}
           callbackUrl={callbackUrl}
+          onPasskeyError={setPasskeyError}
           renderLocalMethod={(method) =>
             method.kind === "password" ? (
               <CredentialSignInForm
@@ -361,6 +381,10 @@ function signUpDepth({
   return "entry";
 }
 
+/** Nothing can refuse a passkey on a step that offers none. Named rather than
+ *  written inline so the reason travels with it. */
+const noPasskeyOnThisStep = () => undefined;
+
 /**
  * The address is confirmed, so the question is which sign-in method to hold.
  * The picker is the log-in screen's, unchanged: one component, so the two
@@ -400,6 +424,9 @@ function MethodChoice({
           lastUsedMethodId={lastUsedMethodId}
           onFederatedMethodChosen={onFederatedMethodChosen}
           callbackUrl={callbackUrl}
+          // Nothing can arrive: the set above has had every passkey taken out
+          // of it, so there is no seat here to refuse one.
+          onPasskeyError={noPasskeyOnThisStep}
           renderLocalMethod={(method) =>
             method.kind === "password" ? (
               <SignUpCredentialForm

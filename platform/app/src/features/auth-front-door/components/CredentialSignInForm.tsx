@@ -55,9 +55,11 @@ export function CredentialSignInForm({
   callbackUrl?: string;
   onUseDifferentEmail: () => void;
   /**
-   * Told when the address turned out to have no account and the password
-   * became a sign-up instead. Absent where an account is already known to
-   * exist, in which case a refusal is only ever a wrong password.
+   * Told when the address turned out to have no account, so a confirmation
+   * link went out instead. The password typed here is NOT kept — it is chosen
+   * once, after the address is confirmed, on the screen built to ask for it.
+   * Absent where an account is already known to exist, in which case a refusal
+   * is only ever a wrong password.
    */
   onSignUpStarted?: (email: string) => void;
 }) {
@@ -89,7 +91,11 @@ export function CredentialSignInForm({
       if (parsed.success) form.clearErrors("password");
     },
   });
-  const startPasswordSignUp = api.frontDoor.startPasswordSignUp.useMutation();
+  // The same request the sign-up door makes, because from here on it IS the
+  // sign-up door: no password travels with it, and the one that was typed
+  // above is not kept.
+  const requestSignUpVerification =
+    api.frontDoor.requestSignUpVerification.useMutation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRevealed, setIsRevealed] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -107,7 +113,7 @@ export function CredentialSignInForm({
       password: values.password,
       callbackUrl,
       convertToSignUp: onSignUpStarted
-        ? startPasswordSignUp.mutateAsync
+        ? requestSignUpVerification.mutateAsync
         : undefined,
     });
     setIsSubmitting(false);

@@ -46,7 +46,6 @@ function makeService({ registered = false }: { registered?: boolean } = {}) {
         addressIsTaken = true;
       },
     },
-    hashPassword: async () => FAKE_PASSWORD_HASH,
     buildVerificationUrl: ({ token }) =>
       `https://app.test/auth/signup?verify=${token}`,
     now: () => NOW,
@@ -137,42 +136,20 @@ describe("given a sign-up address to confirm", () => {
     });
   });
 
-  describe("when a password is typed for an address nobody holds", () => {
-    it("holds the credential as a hash and sends a confirmation link", async () => {
-      await expect(
-        harness.service.startPasswordSignUp({
-          email: "sam@acme.com",
-          password: "correct horse",
-        }),
-      ).resolves.toEqual({ outcome: "verification_sent" });
+  describe("when a link is asked for", () => {
+    it("carries the address alone, with no credential on it", async () => {
+      await harness.service.requestVerification({ email: "sam@acme.com" });
 
       expect(harness.sent).toHaveLength(1);
       expect(harness.created).toHaveLength(0);
-      // The password itself is nowhere: only its hash was written down.
-      expect(harness.issued[0]?.identifier).not.toContain("correct horse");
-      expect(harness.issued[0]?.identifier).toContain(FAKE_PASSWORD_HASH);
+      // Nothing that could become a password travels on the link. Both doors
+      // send this one, and the password is chosen once, on the screen the
+      // link lands on, where it is typed twice and held to a length.
+      expect(harness.issued[0]?.identifier).toContain('"passwordHash":null');
     });
 
-    it("creates the account when the link comes back", async () => {
-      await harness.service.startPasswordSignUp({
-        email: "sam@acme.com",
-        password: "correct horse",
-      });
-
-      await expect(
-        harness.service.completeVerification({ token: "token-1" }),
-      ).resolves.toEqual({ email: "sam@acme.com", accountCreated: true });
-      expect(harness.created).toEqual([
-        { email: "sam@acme.com", passwordHash: FAKE_PASSWORD_HASH },
-      ]);
-    });
-
-    it("creates nothing when the address gained an account meanwhile", async () => {
-      await harness.service.startPasswordSignUp({
-        email: "sam@acme.com",
-        password: "correct horse",
-      });
-      harness.takeAddress();
+    it("leaves the account to be finished, never creating one itself", async () => {
+      await harness.service.requestVerification({ email: "sam@acme.com" });
 
       await expect(
         harness.service.completeVerification({ token: "token-1" }),
@@ -181,18 +158,43 @@ describe("given a sign-up address to confirm", () => {
     });
   });
 
-  describe("when a password is typed for an address that does have an account", () => {
-    it("says so and sends nothing, so a wrong password stays a wrong password", async () => {
-      const registered = makeService({ registered: true });
+  describe("when a link minted before the doors converged comes back", () => {
+    /**
+     * Nothing writes a credential onto a link any more, but links that were
+     * issued with one are still in inboxes with an hour to live, and each was
+     * promised an account. Seeded directly, because the method that used to
+     * write them is gone.
+     */
+    function seedLinkCarryingCredential(harnessed: typeof harness) {
+      harnessed.issued.push({
+        identifier: `identity-signup-verification:${JSON.stringify({
+          email: "sam@acme.com",
+          passwordHash: FAKE_PASSWORD_HASH,
+        })}`,
+        token: "link-in-flight",
+        expires: new Date(NOW.getTime() + SIGN_UP_VERIFICATION_TTL_MS),
+      });
+    }
+
+    it("still creates the account it promised", async () => {
+      seedLinkCarryingCredential(harness);
 
       await expect(
-        registered.service.startPasswordSignUp({
-          email: "sam@acme.com",
-          password: "not the password",
-        }),
-      ).resolves.toEqual({ outcome: "account_exists" });
-      expect(registered.sent).toHaveLength(0);
-      expect(registered.created).toHaveLength(0);
+        harness.service.completeVerification({ token: "link-in-flight" }),
+      ).resolves.toEqual({ email: "sam@acme.com", accountCreated: true });
+      expect(harness.created).toEqual([
+        { email: "sam@acme.com", passwordHash: FAKE_PASSWORD_HASH },
+      ]);
+    });
+
+    it("creates nothing when the address gained an account meanwhile", async () => {
+      seedLinkCarryingCredential(harness);
+      harness.takeAddress();
+
+      await expect(
+        harness.service.completeVerification({ token: "link-in-flight" }),
+      ).resolves.toEqual({ email: "sam@acme.com", accountCreated: false });
+      expect(harness.created).toHaveLength(0);
     });
   });
 });

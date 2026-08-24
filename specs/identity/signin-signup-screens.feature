@@ -109,6 +109,28 @@ Feature: The first-party sign-in and sign-up screens - the front door is ours
     Then I am told a link is on its way to finish setting up my account
     And a wrong password for an address that does have one still says so
 
+  # The password is chosen ONCE, on the screen the confirmed link lands on,
+  # where it is typed twice and held to a length. The log-in form's password
+  # field is spelled `current-password` and asked for once; banking whatever
+  # was typed into it meant the same account could be created two ways, and
+  # the log-in way took a single character and never asked twice.
+  @integration
+  Scenario: A password typed at the log-in door never becomes an account's password
+    Given I enter an address nobody holds an account for
+    When I submit a password on the log-in screen
+    Then only my address is sent to start the sign-up
+    And I choose my password after the address is confirmed, like every sign-up
+
+  # The commonest reason to be staring at "check your email" is that the
+  # address on it is wrong. The step lives in memory rather than in the URL,
+  # so the browser's own back button is not a way out of it.
+  @integration
+  Scenario: Going back from a sent link returns to the address step
+    Given a confirmation link has been sent to the address I typed
+    When I say the address was wrong
+    Then I am returned to the address step, not to the password step
+    And the link that went out simply expires unopened
+
   # ── The screens are one surface ────────────────────────────────────────
 
   @integration

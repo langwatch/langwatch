@@ -49,6 +49,7 @@ export function SignInMethodPicker({
   onFederatedMethodChosen,
   renderLocalMethod,
   callbackUrl,
+  onPasskeyError,
 }: {
   methodSet: readonly SignInMethod[];
   reasonCode: string;
@@ -58,6 +59,8 @@ export function SignInMethodPicker({
   renderLocalMethod?: (method: SignInMethod) => ReactNode;
   /** Where a completed ceremony lands. The passkey seat dials for itself. */
   callbackUrl?: string;
+  /** A refused ceremony, sent to the card's one alert at the top. */
+  onPasskeyError: (error: unknown) => void;
 }) {
   const guidance = signInRoutingReasonCopy(reasonCode);
 
@@ -91,6 +94,7 @@ export function SignInMethodPicker({
           onFederatedMethodChosen={onFederatedMethodChosen}
           renderLocalMethod={renderLocalMethod}
           callbackUrl={callbackUrl}
+          onPasskeyError={onPasskeyError}
         />
       ))}
     </VStack>
@@ -126,11 +130,14 @@ export function AlternativeMethods({
   lastUsedMethodId,
   onFederatedMethodChosen,
   callbackUrl,
+  onPasskeyError,
 }: {
   methodSet: readonly SignInMethod[];
   lastUsedMethodId?: string | null;
   onFederatedMethodChosen: (method: SignInMethod) => void;
   callbackUrl?: string;
+  /** A refused ceremony, sent to the card's one alert at the top. */
+  onPasskeyError: (error: unknown) => void;
 }) {
   const offered = methodSet.filter((method) => method.kind === "federated");
   const offeredIds = new Set(offered.map((method) => method.id));
@@ -159,6 +166,7 @@ export function AlternativeMethods({
         <PasskeySignInButton
           callbackUrl={callbackUrl}
           badge={lastUsedMethodId === "passkey" ? <LastUsedBadge /> : null}
+          onError={onPasskeyError}
         />
       ) : null}
       {methods.map((method) => (
@@ -242,12 +250,14 @@ function MethodEntry({
   onFederatedMethodChosen,
   renderLocalMethod,
   callbackUrl,
+  onPasskeyError,
 }: {
   method: SignInMethod;
   isLastUsed: boolean;
   onFederatedMethodChosen: (method: SignInMethod) => void;
   renderLocalMethod?: (method: SignInMethod) => ReactNode;
   callbackUrl?: string;
+  onPasskeyError: (error: unknown) => void;
 }) {
   if (method.kind === "federated") {
     return (
@@ -268,6 +278,7 @@ function MethodEntry({
       <PasskeySignInButton
         callbackUrl={callbackUrl}
         badge={isLastUsed ? <LastUsedBadge /> : null}
+        onError={onPasskeyError}
       />
     );
   }

@@ -115,50 +115,6 @@ export const frontDoorRouter = createTRPCRouter({
     }),
 
   /**
-   * A password typed into the log-in form for an address nobody holds.
-   *
-   * That is not a failed log-in, it is a sign-up that came in the other door,
-   * and answering it as a refusal is the dead end this front door exists to
-   * remove. So it is answered the way sign-up is: the credential is held as a
-   * hash, a confirmation link goes out, and the account exists once the link
-   * comes back.
-   *
-   * An address that DOES have an account is answered `account_exists`, and the
-   * screen says the address and password do not match — the honest failure,
-   * with no more detail than a wrong password has ever had.
-   */
-  startPasswordSignUp: publicProcedure
-    .input(
-      z.object({
-        email: z.string().email(),
-        password: z.string().min(1),
-      }),
-    )
-    .noPermission({
-      reason:
-        "starts a signed-out visitor's own sign-up from the log-in form; no tenant scope exists before an account does",
-    })
-    .mutation(async ({ ctx, input }) => {
-      const ip = getClientIp(ctx.req) ?? "unknown";
-      const limit = await rateLimit({
-        key: `frontDoor.startPasswordSignUp:${ip}`,
-        windowSeconds: 60 * 60,
-        max: 20,
-      });
-      if (!limit.allowed) {
-        throw new TRPCError({
-          code: "TOO_MANY_REQUESTS",
-          message: "Too many signup attempts. Please try again later.",
-        });
-      }
-
-      return signUpVerification().startPasswordSignUp({
-        email: input.email,
-        password: input.password,
-      });
-    }),
-
-  /**
    * Spends a confirmation link and answers the address it confirmed, so the
    * screen can carry on to the method choice. A link that carried a pending
    * credential also creates the account. Expired, already spent and never

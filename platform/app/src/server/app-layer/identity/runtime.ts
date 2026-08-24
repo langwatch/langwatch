@@ -28,7 +28,6 @@ import {
   VerificationCeremonyService,
 } from "@langwatch/identity-server";
 import { IdentityCeremonies } from "@langwatch/identity-server/better-auth";
-import { hash } from "bcrypt";
 import { env } from "~/env.mjs";
 import { prisma } from "../../db";
 import { featureFlagService } from "../../featureFlag";
@@ -339,9 +338,6 @@ export function signUpVerification(): SignUpVerificationService {
         });
       },
     },
-    // The same cost factor every other credential in the platform is hashed
-    // at, in the one place this path hashes anything.
-    hashPassword: (password) => hash(password, 10),
     buildVerificationUrl: ({ token }) => buildSignUpVerificationUrl(token),
   });
 }

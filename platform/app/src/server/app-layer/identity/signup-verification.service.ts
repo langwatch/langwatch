@@ -69,8 +69,6 @@ export interface SignUpVerificationDeps {
   mailer: SignUpVerificationMailer;
   directory: SignUpAccountDirectory;
   accounts: SignUpAccountFactory;
-  /** Hashes a password the way every other credential here is hashed. */
-  hashPassword(password: string): Promise<string>;
   /** Builds the link the email carries, from a minted token. */
   buildVerificationUrl(input: { token: string }): string;
   now?: () => Date;
@@ -87,17 +85,23 @@ const SIGN_UP_TOKEN_NAMESPACE = "identity-signup-verification:";
 /** One hour, matching the reset link's lifetime and the email's promise. */
 export const SIGN_UP_VERIFICATION_TTL_MS = 60 * 60 * 1000;
 
-/** What a sign-up token stands for: an address, and sometimes a credential. */
+/**
+ * What a sign-up token stands for: an address, and — only on links minted
+ * before both doors converged — a credential.
+ *
+ * Nothing writes a hash any more. A password is chosen ONCE, on the screen the
+ * confirmed link lands on, where it is typed twice and held to a length. The
+ * log-in door used to hash whatever was typed into its password field and bake
+ * that in, which meant the same account could be created two ways, one of them
+ * accepting a single character and never asking twice.
+ *
+ * The READ stays, because links issued before that change are still in
+ * people's inboxes and still have an hour to live. It can go once none can.
+ */
 interface PendingSignUp {
   email: string;
   passwordHash: string | null;
 }
-
-export type PasswordSignUpOutcome =
-  /** The address has an account: this was a wrong password, not a sign-up. */
-  | { outcome: "account_exists" }
-  /** Nobody holds the address: a confirmation link is on its way. */
-  | { outcome: "verification_sent" };
 
 export class SignUpVerificationService {
   private readonly deps: SignUpVerificationDeps;
@@ -127,33 +131,13 @@ export class SignUpVerificationService {
   }
 
   /**
-   * A password typed into the log-in form for an address that turns out to
-   * have no account. It is a sign-up that came in the other door, so it is
-   * answered like one: the credential is held as a hash, a confirmation link
-   * goes out, and the account exists once the link comes back.
-   */
-  async startPasswordSignUp({
-    email,
-    password,
-  }: {
-    email: string;
-    password: string;
-  }): Promise<PasswordSignUpOutcome> {
-    if (await this.addressIsRegistered({ email })) {
-      return { outcome: "account_exists" };
-    }
-
-    await this.issueLink({
-      email,
-      passwordHash: await this.deps.hashPassword(password),
-    });
-    return { outcome: "verification_sent" };
-  }
-
-  /**
-   * Spends a link, and answers the address it confirmed. A link that carried a
-   * pending credential also creates the account, which is the whole of what
-   * "the link finishes setting it up" means.
+   * Spends a link, and answers the address it confirmed. Both doors answer
+   * `accountCreated: false` and send the person to the one screen that chooses
+   * a password.
+   *
+   * A link minted before the doors converged carries a credential, and that
+   * one still creates the account on the way through — it was promised an
+   * account and has an hour to be opened. Nothing mints those any more.
    *
    * A token that expired, one that was already spent and one that never
    * existed all raise the same refusal. They are the same thing to the person

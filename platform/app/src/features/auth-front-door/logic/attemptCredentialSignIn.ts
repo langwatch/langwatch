@@ -14,6 +14,13 @@ import { credentialSignInFailure } from "./credentialSignIn";
  * up at the log-in form, so the attempt carries on as a sign-up rather than
  * becoming a refusal they have to act on.
  *
+ * What it does NOT do is keep the password. It asks for the same confirmation
+ * link the sign-up door asks for, and the password is chosen once, afterwards,
+ * on the one screen built to ask for it — typed twice and held to a length.
+ * Banking whatever was typed into a field labelled `current-password` meant an
+ * account could be created two ways, and the log-in way took a single
+ * character and never asked twice.
+ *
  * Kept out of the component because it is the one piece of this screen that is
  * a decision rather than a rendering, and because it is the piece a test wants
  * to drive without a form around it.
@@ -38,13 +45,15 @@ export async function attemptCredentialSignIn({
   password: string;
   callbackUrl?: string;
   /**
-   * How an address with no account becomes a sign-up. Absent where an account
-   * is already known to exist, in which case a refusal is only ever a wrong
-   * password.
+   * How an address with no account becomes a sign-up: it asks for the same
+   * confirmation link the sign-up door asks for, and takes no password. It
+   * REFUSES for an address that does have an account, which is what tells the
+   * two situations apart — so a wrong password stays a wrong password.
+   *
+   * Absent where an account is already known to exist, in which case a refusal
+   * is only ever a wrong password.
    */
-  convertToSignUp?: (input: { email: string; password: string }) => Promise<{
-    outcome: "account_exists" | "verification_sent";
-  }>;
+  convertToSignUp?: (input: { email: string }) => Promise<unknown>;
 }): Promise<CredentialAttempt> {
   let response: Awaited<ReturnType<typeof signIn>>;
   try {
@@ -75,12 +84,13 @@ export async function attemptCredentialSignIn({
   if (!looksLikeWrongCredentials || !convertToSignUp) return refused;
 
   try {
-    const answer = await convertToSignUp({ email, password });
-    return answer.outcome === "verification_sent"
-      ? { outcome: "signing_up" }
-      : refused;
+    await convertToSignUp({ email });
+    return { outcome: "signing_up" };
   } catch {
-    // Rate-limited or unreachable: the honest refusal still stands.
+    // The address already has an account (so this really was a wrong
+    // password), or the request was rate-limited or could not be made. All
+    // three leave the honest refusal standing, which is the safe way to be
+    // wrong: it never claims a link is coming when none is.
     return refused;
   }
 }

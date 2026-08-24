@@ -19,7 +19,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const {
   publicEnvRef,
   routeMock,
-  startPasswordSignUpMock,
   requestVerificationMock,
   completeVerificationMock,
   registerMock,
@@ -35,7 +34,6 @@ const {
     } as Record<string, unknown>,
   },
   routeMock: vi.fn(),
-  startPasswordSignUpMock: vi.fn(),
   requestVerificationMock: vi.fn(),
   completeVerificationMock: vi.fn(),
   registerMock: vi.fn(),
@@ -54,13 +52,6 @@ vi.mock("~/utils/api", () => ({
       route: {
         useMutation: () => ({
           mutateAsync: routeMock,
-          isPending: false,
-          error: null,
-        }),
-      },
-      startPasswordSignUp: {
-        useMutation: () => ({
-          mutateAsync: startPasswordSignUpMock,
           isPending: false,
           error: null,
         }),

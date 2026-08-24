@@ -17,7 +17,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const {
   requestVerificationMock,
   completeVerificationMock,
-  startPasswordSignUpMock,
   routeMock,
   registerMock,
   signInMock,
@@ -25,7 +24,6 @@ const {
 } = vi.hoisted(() => ({
   requestVerificationMock: vi.fn(),
   completeVerificationMock: vi.fn(),
-  startPasswordSignUpMock: vi.fn(),
   routeMock: vi.fn(),
   registerMock: vi.fn(),
   signInMock: vi.fn(),
@@ -67,9 +65,6 @@ vi.mock("~/utils/api", async () => {
         },
         completeSignUpVerification: {
           useMutation: useFakeMutation(completeVerificationMock),
-        },
-        startPasswordSignUp: {
-          useMutation: useFakeMutation(startPasswordSignUpMock),
         },
       },
       user: { register: { useMutation: useFakeMutation(registerMock) } },

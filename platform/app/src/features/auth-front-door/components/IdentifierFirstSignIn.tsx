@@ -68,6 +68,10 @@ export function IdentifierFirstSignIn() {
   >([]);
   const [lastUsedMethodId] = useState(() => readLastUsedMethodId());
   const [signingUp, setSigningUp] = useState<string | null>(null);
+  // Every failure this card can have shows in one place, at the top. A
+  // passkey is refused from a button part-way down the rail of methods, and
+  // an alert opening there pushes the rest of the rail down the page.
+  const [passkeyError, setPasskeyError] = useState<unknown>(null);
 
   useEffect(() => {
     if (!session) return;
@@ -122,7 +126,14 @@ export function IdentifierFirstSignIn() {
     return (
       <CheckYourEmail
         email={signingUp}
-        what="Open it to finish setting up your account."
+        what="Open it to confirm the address, then choose a password."
+        onUseDifferentEmail={() => {
+          // Both, and in this order: the address step reads the router's
+          // identifier, so clearing only the sent-to state would land back on
+          // the password step for the address they came here to change.
+          setSigningUp(null);
+          routing.clear();
+        }}
       />
     );
   }
@@ -147,12 +158,18 @@ export function IdentifierFirstSignIn() {
   if (showPicker) {
     return (
       <AuthCard title="Log in to LangWatch">
+        <HandledErrorAlert
+          error={passkeyError}
+          fallbackTitle="Could not use a passkey"
+          className="lw-front-door-alert"
+        />
         <SignInMethodPicker
           methodSet={decision.methodSet}
           reasonCode={decision.reasonCode}
           lastUsedMethodId={lastUsedMethodId}
           onFederatedMethodChosen={dialFederated}
           callbackUrl={callbackUrl}
+          onPasskeyError={setPasskeyError}
           renderLocalMethod={(method) => {
             if (method.kind !== "password") return null;
             return (
@@ -191,6 +208,11 @@ export function IdentifierFirstSignIn() {
         fallbackTitle="Could not start log-in"
         className="lw-front-door-alert"
       />
+      <HandledErrorAlert
+        error={passkeyError}
+        fallbackTitle="Could not use a passkey"
+        className="lw-front-door-alert"
+      />
       <IdentifierStepForm
         submitLabel="Continue"
         isSubmitting={routing.isDeciding}
@@ -208,6 +230,7 @@ export function IdentifierFirstSignIn() {
               lastUsedMethodId={lastUsedMethodId}
               onFederatedMethodChosen={dialFederated}
               callbackUrl={callbackUrl}
+              onPasskeyError={setPasskeyError}
             />
           ) : null
         }

@@ -35,7 +35,6 @@ const PUBLIC_PROCEDURE_ALLOWLIST: string[] = [
   "frontDoor.requestFreshInvite",
   "frontDoor.requestSignUpVerification",
   "frontDoor.route",
-  "frontDoor.startPasswordSignUp",
   // Client bootstrap: exposes only the PUBLIC_* env whitelist, no tenant data.
   "publicEnv",
   // The one anonymous trace read. Token-gated by ShareService.resolveForViewer;

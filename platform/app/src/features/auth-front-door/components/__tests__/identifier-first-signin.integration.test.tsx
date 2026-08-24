@@ -17,7 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const {
   routeMock,
   routeErrorRef,
-  startPasswordSignUpMock,
+  requestSignUpVerificationMock,
   signInMock,
   replaceMock,
   sessionRef,
@@ -25,7 +25,7 @@ const {
 } = vi.hoisted(() => ({
   routeMock: vi.fn(),
   routeErrorRef: { current: null as unknown },
-  startPasswordSignUpMock: vi.fn(),
+  requestSignUpVerificationMock: vi.fn(),
   signInMock: vi.fn(),
   replaceMock: vi.fn(),
   sessionRef: { current: { data: null as unknown } },
@@ -42,9 +42,9 @@ vi.mock("~/utils/api", () => ({
           error: routeErrorRef.current,
         }),
       },
-      startPasswordSignUp: {
+      requestSignUpVerification: {
         useMutation: () => ({
-          mutateAsync: startPasswordSignUpMock,
+          mutateAsync: requestSignUpVerificationMock,
           isPending: false,
           error: null,
         }),
@@ -141,6 +141,13 @@ const enterEmail = async (email: string) => {
 describe("given the identifier-first sign-in screen", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // The address has an account unless a test says otherwise, which is what
+    // makes a rejected password a WRONG password by default. Set explicitly,
+    // because an unset mock resolves — and a resolved sign-up request means
+    // "no account here, a link is on its way", which is the opposite.
+    requestSignUpVerificationMock.mockRejectedValue(
+      new Error("email_already_registered"),
+    );
     routeErrorRef.current = null;
     sessionRef.current = { data: null };
     searchParamsRef.current = new URLSearchParams("");
@@ -329,17 +336,15 @@ describe("given the identifier-first sign-in screen", () => {
   });
 
   describe("when the address typed in has no account at all", () => {
-    /** @scenario Signing in without an account creates it through verification */
-    it("carries the password into a sign-up and says a link is on its way", async () => {
+    /** @scenario A password typed at the log-in door never becomes an account's password */
+    it("asks for a link and never banks the password that was typed", async () => {
       routeMock.mockResolvedValue(localPicker);
       signInMock.mockResolvedValue({
         error: "INVALID_EMAIL_OR_PASSWORD",
         code: "INVALID_EMAIL_OR_PASSWORD",
         status: 401,
       });
-      startPasswordSignUpMock.mockResolvedValue({
-        outcome: "verification_sent",
-      });
+      requestSignUpVerificationMock.mockResolvedValue({ sent: true });
 
       const { container } = renderScreen();
       await enterEmail("nobody@example.com");
@@ -354,12 +359,43 @@ describe("given the identifier-first sign-in screen", () => {
       expect(await screen.findByTestId("verification-sent")).toHaveTextContent(
         /nobody@example\.com/,
       );
-      expect(startPasswordSignUpMock).toHaveBeenCalledWith({
+      // The address, and ONLY the address. A password typed into a field
+      // spelled `current-password` must never become an account's password:
+      // it was never confirmed and never held to a length.
+      expect(requestSignUpVerificationMock).toHaveBeenCalledWith({
         email: "nobody@example.com",
-        password: "a-new-password",
       });
       // No refusal is shown on the way: nothing dead-ends here.
       expect(container.textContent).not.toMatch(/invalid email or password/i);
+    });
+
+    /** @scenario Going back from a sent link returns to the address step */
+    it("goes back to the address step when the address was wrong", async () => {
+      routeMock.mockResolvedValue(localPicker);
+      signInMock.mockResolvedValue({
+        error: "INVALID_EMAIL_OR_PASSWORD",
+        code: "INVALID_EMAIL_OR_PASSWORD",
+        status: 401,
+      });
+      requestSignUpVerificationMock.mockResolvedValue({ sent: true });
+
+      const { container } = renderScreen();
+      await enterEmail("typo@example.com");
+      await screen.findByTestId("method-picker");
+      await userEvent.type(
+        container.querySelector('input[type="password"]')!,
+        "a-new-password",
+      );
+      await userEvent.click(screen.getByRole("button", { name: /^log in$/i }));
+      await screen.findByTestId("verification-sent");
+
+      await userEvent.click(screen.getByTestId("check-email-back"));
+
+      // All the way back to the address, not back to the password step for
+      // the address they came here to change.
+      expect(await screen.findByLabelText(/email/i)).toBeTruthy();
+      expect(screen.queryByTestId("verification-sent")).toBeNull();
+      expect(screen.queryByTestId("method-picker")).toBeNull();
     });
 
     /** @scenario Signing in without an account creates it through verification */
@@ -370,7 +406,9 @@ describe("given the identifier-first sign-in screen", () => {
         code: "INVALID_EMAIL_OR_PASSWORD",
         status: 401,
       });
-      startPasswordSignUpMock.mockResolvedValue({ outcome: "account_exists" });
+      requestSignUpVerificationMock.mockRejectedValue(
+        new Error("email_already_registered"),
+      );
 
       const { container } = renderScreen();
       await enterEmail("sam@example.com");
