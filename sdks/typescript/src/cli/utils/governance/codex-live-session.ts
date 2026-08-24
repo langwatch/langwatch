@@ -50,7 +50,7 @@ export const LIVE_ROLLOUT_WINDOW_MS = 15 * 60_000;
 export const HOT_ROLLOUT_WINDOW_MS = 60_000;
 
 /** `rollout-<timestamp>-<uuid>.jsonl`, the uuid being the session id. */
-const ROLLOUT_SESSION_ID =
+export const ROLLOUT_SESSION_ID =
   /-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i;
 
 /** A candidate key that is a session id rather than a path standing in for one. */
@@ -150,7 +150,10 @@ export async function resolveLiveCodexSession({
     ROLLOUT_SESSION_ID.exec(basename(chosen.path))?.[1] ??
     meta?.sessionId ??
     null;
-  if (!sessionId) return { kind: "none" };
+  // The filename branch already yields a session id in codex's own shape. The
+  // transcript branch is a fallback for a name codex changes the shape of, so
+  // it is held to the same shape rather than trusted to carry anything.
+  if (!sessionId || !UUID.test(sessionId)) return { kind: "none" };
 
   return {
     kind: "session",

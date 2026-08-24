@@ -12,6 +12,8 @@ import * as path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import type { AncestorProbe } from "@/cli/utils/governance/codex-ancestor-session";
+
 import { contextCommand } from "../context";
 import { hookCommand } from "../hook";
 import {
@@ -87,6 +89,29 @@ function writeRollout({
   fs.utimesSync(file, mtime, mtime);
 }
 
+/** A process tree where nothing holds a rollout open: the fallback path. */
+const NO_ANCESTOR: AncestorProbe = {
+  parentPidOf: async () => null,
+  openFilesOf: async () => [],
+};
+
+/** A process tree whose ancestor 90 holds this session's rollout open. */
+const ancestorHolding = (sessionId: string): AncestorProbe => ({
+  parentPidOf: async (pid) => (pid === 100 ? 90 : null),
+  openFilesOf: async (pid) =>
+    pid === 90
+      ? [
+          path.join(
+            sessionsRoot,
+            "2026",
+            "08",
+            "22",
+            `rollout-2026-08-22T10-00-00-${sessionId}.jsonl`,
+          ),
+        ]
+      : [],
+});
+
 const runContext = (
   options: Partial<Parameters<typeof contextCommand>[0]> = {},
 ) =>
@@ -99,6 +124,8 @@ const runContext = (
     stateDir,
     claudeRegistryDir: path.join(stateDir, "claude-sessions"),
     codexSessionsRoot: sessionsRoot,
+    ancestorStartPid: 100,
+    ancestorProbe: NO_ANCESTOR,
     readCliConfig: () => ({}),
     writeLine: (line) => lines.push(line),
     ...options,
@@ -157,6 +184,59 @@ describe("the declare command's session resolution", () => {
     expect(posted).toHaveLength(0);
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain("--agent");
+  });
+
+  /** @scenario "The invoking codex session is resolved from the ancestor process that holds the rollout open" */
+  it("declares for the session whose process this runs under", async () => {
+    writeRollout({ sessionId: CODEX_SESSION, agoMs: 5 * 60_000 });
+    writeRollout({ sessionId: OTHER_CODEX_SESSION, agoMs: 1_000 });
+
+    await runContext({
+      env: { OTEL_EXPORTER_OTLP_ENDPOINT: ENDPOINT },
+      ancestorProbe: ancestorHolding(CODEX_SESSION),
+    });
+
+    expect(posted).toHaveLength(1);
+    expect(attributesOf(posted[0]!)).toMatchObject({
+      "coding_agent.name": "codex",
+      "session.id": CODEX_SESSION,
+      "langwatch.session.title": "review the auth PR",
+    });
+  });
+
+  /** @scenario "The invoking codex session is resolved from the ancestor process that holds the rollout open" */
+  it("declares for the ancestor session while a second session is mid-turn", async () => {
+    writeRollout({ sessionId: CODEX_SESSION, agoMs: 5_000 });
+    writeRollout({ sessionId: OTHER_CODEX_SESSION, agoMs: 2_000 });
+
+    await runContext({
+      env: { OTEL_EXPORTER_OTLP_ENDPOINT: ENDPOINT },
+      ancestorProbe: ancestorHolding(OTHER_CODEX_SESSION),
+    });
+
+    expect(posted).toHaveLength(1);
+    expect(attributesOf(posted[0]!)["session.id"]).toBe(OTHER_CODEX_SESSION);
+  });
+
+  it("prefers the claude environment over the ancestor codex session", async () => {
+    writeRollout({ sessionId: CODEX_SESSION });
+
+    await runContext({ ancestorProbe: ancestorHolding(CODEX_SESSION) });
+
+    expect(attributesOf(posted[0]!)["coding_agent.name"]).toBe("claude_code");
+  });
+
+  it("prefers explicit flags over the ancestor codex session", async () => {
+    writeRollout({ sessionId: CODEX_SESSION });
+
+    await runContext({
+      env: { OTEL_EXPORTER_OTLP_ENDPOINT: ENDPOINT },
+      ancestorProbe: ancestorHolding(CODEX_SESSION),
+      agent: "codex",
+      sessionId: "explicit-thread",
+    });
+
+    expect(attributesOf(posted[0]!)["session.id"]).toBe("explicit-thread");
   });
 
   /** @scenario "Two simultaneously active codex sessions declare nothing" */

@@ -20,10 +20,16 @@
  *      `CLAUDECODE` and `CLAUDE_CODE_SESSION_ID` into every shell it spawns.
  *      Checked first so a codex started inside a claude session declares for
  *      the claude session actually doing the work.
- *   3. The codex session active on this machine, from the rollout transcripts
- *      (codex exports nothing about itself). With two codex sessions active
- *      at once nothing on disk says which one asked, so the command declares
- *      nothing and asks for the flags rather than name the wrong session.
+ *   3. The codex session this process runs UNDER: codex holds its rollout
+ *      transcript open for the whole session and spawns the shell that runs
+ *      this, so the first ancestor process holding a rollout open is the
+ *      session asking. Deterministic, and unbothered by other sessions.
+ *   4. Failing that, the codex session active on this machine, inferred from
+ *      the rollout transcripts. This is what answers when the process tree
+ *      cannot be read, under a restrictive sandbox above all. Inference
+ *      cannot tell two simultaneously active sessions apart, so there it
+ *      declares nothing and asks for the flags rather than name the wrong
+ *      session.
  *
  * Unlike the hooks this command talks to whoever ran it: its stdout is the
  * agent's tool result, so it says in one line what it declared or why it
@@ -84,6 +90,10 @@ import {
   findRolloutForThread,
 } from "@/cli/utils/governance/codex-rollout-otlp";
 import { resolveLiveCodexSession } from "@/cli/utils/governance/codex-live-session";
+import {
+  type AncestorProbe,
+  resolveCodexSessionFromAncestors,
+} from "@/cli/utils/governance/codex-ancestor-session";
 import { readFile } from "node:fs/promises";
 
 /** The agents a declaration can name, keyed by their normalized spelling. */
@@ -103,6 +113,10 @@ export interface ContextCommandOptions {
   stateDir?: string;
   claudeRegistryDir?: string;
   codexSessionsRoot?: string;
+  /** The process the ancestor walk starts from. Defaults to the parent. */
+  ancestorStartPid?: number;
+  /** The process-tree readings. Defaults to the real `ps` and `lsof`. */
+  ancestorProbe?: AncestorProbe;
   readCliConfig?: () => CliTelemetryConfig;
   /** One line to whoever ran the command. Defaults to stdout. */
   writeLine?: (line: string) => void;
@@ -131,6 +145,8 @@ export async function contextCommand({
   stateDir = defaultStateDir(),
   claudeRegistryDir,
   codexSessionsRoot = defaultCodexSessionsRoot(),
+  ancestorStartPid = process.ppid,
+  ancestorProbe,
   readCliConfig = loadConfig,
   writeLine = (line) => process.stdout.write(`${line}\n`),
 }: ContextCommandOptions = {}): Promise<void> {
@@ -146,6 +162,8 @@ export async function contextCommand({
       stateDir,
       claudeRegistryDir,
       codexSessionsRoot,
+      ancestorStartPid,
+      ancestorProbe,
       readCliConfig,
       writeLine,
     });
@@ -165,14 +183,19 @@ async function declare({
   stateDir,
   claudeRegistryDir,
   codexSessionsRoot,
+  ancestorStartPid,
+  ancestorProbe,
   readCliConfig,
   writeLine,
 }: Required<
-  Omit<ContextCommandOptions, "sessionId" | "agent" | "claudeRegistryDir">
+  Omit<
+    ContextCommandOptions,
+    "sessionId" | "agent" | "claudeRegistryDir" | "ancestorProbe"
+  >
 > &
   Pick<
     ContextCommandOptions,
-    "sessionId" | "agent" | "claudeRegistryDir"
+    "sessionId" | "agent" | "claudeRegistryDir" | "ancestorProbe"
   >): Promise<void> {
   const session = await resolveSession({
     sessionId,
@@ -180,6 +203,8 @@ async function declare({
     env,
     now,
     codexSessionsRoot,
+    ancestorStartPid,
+    ancestorProbe,
     writeLine,
   });
   if (!session) return;
@@ -280,6 +305,8 @@ async function resolveSession({
   env,
   now,
   codexSessionsRoot,
+  ancestorStartPid,
+  ancestorProbe,
   writeLine,
 }: {
   sessionId?: string;
@@ -287,6 +314,8 @@ async function resolveSession({
   env: NodeJS.ProcessEnv;
   now: () => number;
   codexSessionsRoot: string;
+  ancestorStartPid: number;
+  ancestorProbe?: AncestorProbe;
   writeLine: (line: string) => void;
 }): Promise<ResolvedSession | null> {
   if (sessionId || agent) {
@@ -320,6 +349,22 @@ async function resolveSession({
     return { agent: "claude_code", sessionId: claudeSessionId, codexMeta: null };
   }
 
+  // The process tree answers exactly when it can, so it is asked before the
+  // machine-wide inference below.
+  const ancestor = await resolveCodexSessionFromAncestors({
+    startPid: ancestorStartPid,
+    ...(ancestorProbe ? { probe: ancestorProbe } : {}),
+  });
+  if (ancestor) {
+    return {
+      agent: "codex",
+      sessionId: ancestor.sessionId,
+      // The same rollout the session is writing, read for the same title the
+      // turn harvest sends, so the two seams' fingerprints agree.
+      codexMeta: await readRolloutMeta(ancestor.rolloutPath),
+    };
+  }
+
   const live = await resolveLiveCodexSession({
     sessionsRoot: codexSessionsRoot,
     nowMs: now(),
@@ -342,6 +387,17 @@ async function resolveSession({
     "Could not find a live coding-agent session on this machine. Pass --agent and --session-id to name one.",
   );
   return null;
+}
+
+/** The rollout identity at a known transcript path, best-effort. */
+async function readRolloutMeta(
+  rolloutPath: string,
+): Promise<CodexRolloutMeta | null> {
+  try {
+    return parseCodexRollout(await readFile(rolloutPath, "utf8")).meta;
+  } catch {
+    return null;
+  }
 }
 
 /** The rollout identity for an explicitly named codex session, best-effort. */

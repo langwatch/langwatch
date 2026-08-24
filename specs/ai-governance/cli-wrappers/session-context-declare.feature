@@ -73,6 +73,25 @@ Rule: The agent can declare its working context itself
     When the declare command runs with an explicit agent and session id
     Then the record declares exactly that agent and session id
 
+  # Codex holds its rollout transcript open for the whole session and spawns
+  # the shell that runs the command, so the session asking is identifiable by
+  # construction. The first ancestor process holding a rollout open is it.
+  # The identifying property is the open rollout, not the process name.
+  @unit
+  Scenario: The invoking codex session is resolved from the ancestor process that holds the rollout open
+    Given the command runs under a codex process that holds its rollout open
+    And another codex session wrote its rollout more recently
+    When the declare command runs with no flags
+    Then the record declares codex with the session id of the ancestor's rollout
+
+  # The process tree cannot always be read: a restrictive sandbox, a platform
+  # without the tools, or a command run outside any codex process at all.
+  @unit
+  Scenario: Ancestor resolution unavailable falls back to recent-rollout inference
+    Given no ancestor process holds a codex rollout open
+    When the declare command runs with no flags
+    Then the session is inferred from the recently written rollouts instead
+
   # Nothing on disk says which of two simultaneously active sessions spawned
   # the process running the command, so it names neither. A session mid-turn
   # wrote its rollout seconds ago, which is what tells a second running
