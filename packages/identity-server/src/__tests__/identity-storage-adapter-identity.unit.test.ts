@@ -34,6 +34,10 @@ type Stack = IdentityStack;
 
 const userIdOf = (stack: Stack): string => stack.db.user?.[0]?.id as string;
 
+/** One user's id when a suite holds more than one of them. */
+const idOfUser = (stack: Stack, email: string): string =>
+  stack.db.user?.find((row) => row.email === email)?.id as string;
+
 const statedIdentifiers = (stack: Stack) =>
   [...stack.heads.heads.values()].flatMap((heads) =>
     Object.values(heads.identifiers),
@@ -784,6 +788,150 @@ describe("better-auth over the identity storage adapter", () => {
         statedIdentifiers(stack).map((identifier) => identifier.value),
       ).toEqual(["sam@acme.com"]);
       expect(stack.db.account).toHaveLength(1);
+    });
+  });
+
+  /**
+   * Enterprise SSO, which is the population D02 moves across and the one
+   * shape the end-to-end suites never drove: a latched user whose sign-in
+   * method arrived from a generic-OAuth / OIDC provider, signing in through
+   * the IdP callback with no legacy `Account` row behind them.
+   *
+   * The vocabulary is the hazard. `Identifier.provider` folds every
+   * enterprise IdP into `oidc` (`identifierProviderFor`), while
+   * `Identifier.providerId` keeps better-auth's own id verbatim. What comes
+   * back out has to be the verbatim one, or no configured provider would
+   * match the row again.
+   */
+  describe("given a latched user who signs in through an enterprise IdP", () => {
+    let stack: Stack;
+
+    beforeEach(() => {
+      stack = identityStack();
+      stack.gate.open = () => true;
+    });
+
+    describe("when the IdP callback names the provider subject", () => {
+      /** @scenario "An enterprise SSO sign-in is served from the identity tables" */
+      it("resolves the user from the identity tables and answers with the verbatim provider id", async () => {
+        await signUp(stack.auth, EMAIL);
+        const userId = userIdOf(stack);
+        const context = await stack.auth.$context;
+        await context.internalAdapter.linkAccount({
+          userId,
+          providerId: "auth0",
+          accountId: "auth0|abc123",
+        });
+        // Every legacy row gone: whatever answers below came out of
+        // `Identifier` joined to its credential, and nothing else.
+        stack.db.account = [];
+
+        const found = await context.internalAdapter.findAccountByProviderId(
+          "auth0|abc123",
+          "auth0",
+        );
+
+        expect(found?.userId).toBe(userId);
+        // The folded vocabulary must never leak back: `oidc` here would mean
+        // no configured provider matches this account again.
+        expect(found?.providerId).toBe("auth0");
+        expect(found?.accountId).toBe("auth0|abc123");
+
+        // The same lookup through the callback's own entry point, which is
+        // what better-auth actually calls when the IdP returns.
+        const resolved = await context.internalAdapter.findOAuthUser(
+          EMAIL,
+          "auth0|abc123",
+          "auth0",
+        );
+        expect(resolved?.user.id).toBe(userId);
+        expect(resolved?.linkedAccount?.providerId).toBe("auth0");
+        // The fact carries the folded vocabulary, so the verbatim id in the
+        // answer above came from the row, not from the query echoing back.
+        expect(
+          statedIdentifiers(stack)
+            .filter(
+              (identifier) => identifier.providerAccountId === "auth0|abc123",
+            )
+            .map((identifier) => identifier.provider),
+        ).toEqual(["oidc"]);
+      });
+
+      /** @scenario "An enterprise SSO sign-in is served from the identity tables" */
+      it("tells two enterprise IdPs apart when both fold to the same vocabulary", async () => {
+        await signUp(stack.auth, EMAIL);
+        const userId = userIdOf(stack);
+        const context = await stack.auth.$context;
+        await context.internalAdapter.linkAccount({
+          userId,
+          providerId: "okta",
+          accountId: "00u1a2b3c4",
+        });
+        stack.db.account = [];
+
+        const found = await context.internalAdapter.findAccountByProviderId(
+          "00u1a2b3c4",
+          "okta",
+        );
+
+        expect(found?.userId).toBe(userId);
+        expect(found?.providerId).toBe("okta");
+      });
+
+      /**
+       * SKIPPED BECAUSE IT FAILS: the reproduction for a defect this branch
+       * found and did not fix, kept executable for whoever does.
+       *
+       * The lookup folds `auth0` and `okta` to `oidc` and matches on THAT
+       * (`identity-storage-adapter.ts` `byProviderSubject`, and the
+       * `provider` predicates in `identity-resolution.prisma.repository.ts`
+       * and `identity-accounts.prisma.repository.ts`). `Identifier.providerId`
+       * holds the verbatim id and no query reads it, so two IdPs minting the
+       * same subject collapse onto one identifier - and production resolves
+       * with `ORDER BY attachedAt ASC LIMIT 1`, so the OLDER user wins and
+       * the other is signed in as them. Nothing prevents the collision
+       * either: `Identifier` has an index but no unique constraint on
+       * `(provider, providerAccountId)`, and the attach guard locks the
+       * address, not the subject. The legacy branch does not have this -
+       * `Account` is unique on the VERBATIM provider.
+       *
+       * Un-skip when the queries key on `providerId`. The spec scenario is
+       * tagged @unimplemented to declare the same gap.
+       */
+      it.skip("resolves each IdP's subject to its own user when the subject strings collide", async () => {
+        // One subject string, two different enterprise IdPs, two different
+        // customers. `sub` is only unique WITHIN an issuer, and plenty of
+        // OIDC deployments mint small integers, sequential ids or the user's
+        // own address - so two tenants sharing one is not exotic.
+        await signUp(stack.auth, "sam@acme.com");
+        const samId = idOfUser(stack, "sam@acme.com");
+        await signUp(stack.auth, "olga@globex.com");
+        const olgaId = idOfUser(stack, "olga@globex.com");
+        const context = await stack.auth.$context;
+        await context.internalAdapter.linkAccount({
+          userId: samId,
+          providerId: "auth0",
+          accountId: "user-1",
+        });
+        await context.internalAdapter.linkAccount({
+          userId: olgaId,
+          providerId: "okta",
+          accountId: "user-1",
+        });
+        stack.db.account = [];
+
+        const fromAuth0 = await context.internalAdapter.findAccountByProviderId(
+          "user-1",
+          "auth0",
+        );
+        const fromOkta = await context.internalAdapter.findAccountByProviderId(
+          "user-1",
+          "okta",
+        );
+
+        expect(fromAuth0?.userId).toBe(samId);
+        expect(fromOkta?.userId).toBe(olgaId);
+      });
     });
   });
 });

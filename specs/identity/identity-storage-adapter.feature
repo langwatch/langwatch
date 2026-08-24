@@ -413,3 +413,30 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     When a user signs up, signs in with the account join, lists accounts, changes password, links a provider and deletes the account
     Then every operation succeeds on the identity branch
     And the suite fails if a better-auth upgrade introduces a query shape the branch does not serve
+
+  # ═══ Enterprise SSO ═══════════════════════════════════════════════════
+  # The population D02 moves across. `Identifier.provider` folds every
+  # enterprise IdP into `oidc`, while `Identifier.providerId` keeps
+  # better-auth's own id verbatim — and the verbatim one is what has to come
+  # back out, since `oidc` matches no configured provider.
+
+  @unit
+  Scenario: An enterprise SSO sign-in is served from the identity tables
+    Given a latched user holding an identifier that arrived from an enterprise IdP
+    And no legacy Account row for that user
+    When the IdP callback looks the account up by its provider and subject
+    Then the identity tables resolve the user
+    And the answer carries the provider id the IdP is configured under, not the folded vocabulary
+
+  # DECLARED GAP, not a passing test. The lookup matches on the FOLDED
+  # vocabulary and ignores `Identifier.providerId`, so two enterprise IdPs
+  # that mint the same subject string resolve to whichever user attached
+  # first. The covering test is written and skipped; see the report on the
+  # branch that added it.
+  @unit @unimplemented
+  Scenario: Two enterprise IdPs sharing a subject resolve to different users
+    Given two latched users at different customers
+    And each holds an identifier from a different enterprise IdP carrying the same subject string
+    When each IdP's callback looks its own account up
+    Then each resolves to its own user
+    And neither is served the other's account
