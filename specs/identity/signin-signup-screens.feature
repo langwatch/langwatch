@@ -130,6 +130,35 @@ Feature: The first-party sign-in and sign-up screens - the front door is ours
     Then the complaint appears next to the field that caused it
     And it says what to change rather than that something went wrong
 
+  @integration
+  Scenario: A rate-limited log-in says how long, and stops asking
+    Given the installation has stopped accepting attempts for now
+    When my sign-in is refused for it
+    Then the screen says how long is actually left, from the answer it got
+    And the submit stands down until the wait is over
+
+  # The surrounding panel is the hosted product's case, and it is composed
+  # AROUND the card rather than into it: the component that authenticates a
+  # person is the same one on every installation, and an installation with
+  # nothing to sell renders none of it. Below the split it collapses to the
+  # headline, because a tagline and a logo row above a log-in form on a phone
+  # are two screens of scrolling in front of the thing the person came to do.
+  @integration
+  Scenario: The hosted front door makes its case beside the card, never inside it
+    Given a hosted deployment
+    When the front door renders
+    Then the headline and its tagline stand in their own panel beside the card
+    And a company's own installation shows the card with nothing beside it
+
+  # The card is live from the first frame; the entrance only decides what is
+  # painted while the first keystroke is being typed, and when focus is taken.
+  @integration
+  Scenario: The entrance plays once, and never in front of a keystroke
+    When the front door paints for the first time after the loading screen
+    Then the mark it was showing arrives in the card and the rows rise behind it
+    And it plays once for the page, not once per screen
+    And nothing moves at all when less motion has been asked for
+
   # ── Password reset and verification states ─────────────────────────────
   # The reset flow's no-oracle response and revoke-all-sessions guarantees
   # stay owned by specs/auth/password-reset.feature; the half-created-account

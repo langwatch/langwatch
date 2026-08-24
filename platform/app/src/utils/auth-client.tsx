@@ -189,7 +189,19 @@ export const signIn = async (
     redirect?: boolean;
   },
 ): Promise<
-  { error?: string; code?: string; status?: number; ok?: boolean } | undefined
+  | {
+      error?: string;
+      code?: string;
+      status?: number;
+      ok?: boolean;
+      /**
+       * Seconds to wait, when the refusal was a rate limit that said so. The
+       * header carries the real remaining window, and a screen that has it can
+       * say how long instead of guessing "a minute".
+       */
+      retryAfterSeconds?: number;
+    }
+  | undefined
 > => {
   // Same-origin guard on the post-login redirect target.
   const callbackURL = options?.callbackUrl
@@ -198,10 +210,24 @@ export const signIn = async (
   const shouldRedirect = options?.redirect !== false;
 
   if (provider === "credentials" || provider === "email") {
+    // The rate limiter's remaining window rides a response header, which the
+    // result object does not carry. Read on the way past rather than inferred
+    // from the status, so a screen either knows the real wait or knows it does
+    // not know.
+    let retryAfterSeconds: number | undefined;
     const result = await client.signIn.email({
       email: options?.email ?? "",
       password: options?.password ?? "",
       callbackURL,
+      fetchOptions: {
+        onError: (context: { response?: { headers?: Headers } }) => {
+          const header = context.response?.headers?.get("X-Retry-After");
+          const seconds = header === null ? Number.NaN : Number(header);
+          if (Number.isFinite(seconds) && seconds > 0) {
+            retryAfterSeconds = seconds;
+          }
+        },
+      },
     });
     if (result.error) {
       // `code` is what the screens map to wording; `error` stays the message
@@ -210,6 +236,7 @@ export const signIn = async (
         error: result.error.message ?? "CredentialsSignin",
         code: result.error.code,
         status: result.error.status,
+        retryAfterSeconds,
         ok: false,
       };
     }

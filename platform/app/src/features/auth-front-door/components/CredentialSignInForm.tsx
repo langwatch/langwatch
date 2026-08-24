@@ -15,16 +15,14 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { HorizontalFormControl } from "~/components/HorizontalFormControl";
-import {
-  authFailureMessage,
-  isCredentialRejection,
-} from "~/pages/auth/authFailureMessage";
 import { api } from "~/utils/api";
-import { signIn } from "~/utils/auth-client";
 import Link from "~/utils/compat/next-link";
 import "../authFrontDoor.css";
+import { useFocusWhenSettled } from "../hooks/useFocusWhenSettled";
+import { useRetryCountdown } from "../hooks/useRetryCountdown";
+import { attemptCredentialSignIn } from "../logic/attemptCredentialSignIn";
 import { BRAND, SHAPE } from "../logic/brand";
-import { credentialSignInFailure } from "../logic/credentialSignIn";
+import { describeRemainingWait } from "../logic/credentialSignIn";
 import { rememberLastUsedMethod } from "../logic/lastUsedMethod";
 
 const credentialSchema = z.object({
@@ -72,61 +70,36 @@ export function CredentialSignInForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRevealed, setIsRevealed] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const passwordField = useFocusWhenSettled();
+  // The rate limiter's window, counted down where the person can see it. The
+  // submit stays down until it runs out, so the one thing that cannot help is
+  // also the one thing they cannot do.
+  const { secondsToWait, startWait } = useRetryCountdown();
 
   const onSubmit = async (values: CredentialValues) => {
     setSubmitError(null);
     setIsSubmitting(true);
+    const attempt = await attemptCredentialSignIn({
+      email,
+      password: values.password,
+      callbackUrl,
+      convertToSignUp: onSignUpStarted
+        ? startPasswordSignUp.mutateAsync
+        : undefined,
+    });
+    setIsSubmitting(false);
 
-    let message: string | null = null;
-    let rejected = false;
-    try {
-      const response = await signIn("credentials", {
-        email,
-        password: values.password,
-        callbackUrl,
-      });
-      message = credentialSignInFailure({ response });
-      rejected = isCredentialRejection({
-        code: response?.code,
-        message: response?.error,
-      });
-    } catch (error) {
-      message = authFailureMessage({
-        message: error instanceof Error ? error.message : void 0,
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-
-    if (!message) {
+    if (attempt.outcome === "signed_in") {
       rememberLastUsedMethod({ id: "password" });
       return;
     }
-
-    // A refused credential is one of two situations, and only the server can
-    // tell them apart: a password that is wrong for an account that exists, or
-    // an address nobody has an account for at all. The second is somebody
-    // signing up at the log-in form, so it carries on as a sign-up rather than
-    // becoming a refusal they have to act on.
-    if (rejected && onSignUpStarted) {
-      setIsSubmitting(true);
-      try {
-        const answer = await startPasswordSignUp.mutateAsync({
-          email,
-          password: values.password,
-        });
-        if (answer.outcome === "verification_sent") {
-          onSignUpStarted(email);
-          return;
-        }
-      } catch {
-        // Rate-limited or unreachable: the honest failure below still stands.
-      } finally {
-        setIsSubmitting(false);
-      }
+    if (attempt.outcome === "signing_up") {
+      onSignUpStarted?.(email);
+      return;
     }
 
-    setSubmitError(message);
+    if (attempt.retryAfterSeconds) startWait(attempt.retryAfterSeconds);
+    setSubmitError(attempt.message);
   };
 
   return (
@@ -177,9 +150,15 @@ export function CredentialSignInForm({
               minHeight="44px"
               borderRadius={SHAPE.field}
               autoComplete="current-password"
-              // eslint-disable-next-line jsx-a11y/no-autofocus
-              autoFocus
+              _focusVisible={{
+                borderColor: BRAND.detail,
+                boxShadow: `0 0 0 1px ${BRAND.detail}`,
+              }}
               {...form.register("password")}
+              ref={(node) => {
+                form.register("password").ref(node);
+                passwordField.current = node;
+              }}
             />
             <IconButton
               variant="ghost"
@@ -195,11 +174,21 @@ export function CredentialSignInForm({
           <Alert.Root
             status="error"
             borderStartWidth="4px"
-            borderStartColor="colorPalette.solid"
-            colorPalette="red"
+            borderStartColor={BRAND.danger}
+            color={BRAND.danger}
           >
             <Alert.Content>
-              <Alert.Description>{submitError}</Alert.Description>
+              <Alert.Description data-testid="signin-failure">
+                {submitError}
+                {secondsToWait !== null ? (
+                  <>
+                    {" "}
+                    <span data-testid="retry-countdown">
+                      {describeRemainingWait(secondsToWait)}
+                    </span>
+                  </>
+                ) : null}
+              </Alert.Description>
             </Alert.Content>
           </Alert.Root>
         ) : null}
@@ -213,6 +202,7 @@ export function CredentialSignInForm({
           color={BRAND.onAction}
           _hover={{ backgroundColor: BRAND.actionHover }}
           loading={isSubmitting}
+          disabled={secondsToWait !== null}
         >
           Log in
         </Button>

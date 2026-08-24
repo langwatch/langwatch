@@ -352,6 +352,65 @@ describe("given the identifier-first sign-in screen", () => {
     });
   });
 
+  describe("when the installation has stopped accepting attempts", () => {
+    /** @scenario A rate-limited log-in says how long, and stops asking */
+    it("says how long is actually left and disables the submit", async () => {
+      routeMock.mockResolvedValue(localPicker);
+      signInMock.mockResolvedValue({
+        error: "Too many requests",
+        status: 429,
+        retryAfterSeconds: 120,
+      });
+
+      const { container } = renderScreen();
+      await enterEmail("sam@example.com");
+      await screen.findByTestId("method-picker");
+
+      await userEvent.type(
+        container.querySelector('input[type="password"]')!,
+        "a-password",
+      );
+      await userEvent.click(screen.getByRole("button", { name: /^log in$/i }));
+
+      // The anchor's wording stands, and the real remaining window is added to
+      // it rather than replacing it with a guess.
+      expect(await screen.findByTestId("signin-failure")).toHaveTextContent(
+        /too many attempts/i,
+      );
+      expect(screen.getByTestId("retry-countdown")).toHaveTextContent(
+        "Try again in 2 minutes.",
+      );
+      expect(screen.getByRole("button", { name: /^log in$/i })).toBeDisabled();
+    });
+
+    /** @scenario A rate-limited log-in says how long, and stops asking */
+    it("keeps the submit alive when the wait is not known", async () => {
+      routeMock.mockResolvedValue(localPicker);
+      signInMock.mockResolvedValue({
+        error: "Too many requests",
+        status: 429,
+      });
+
+      const { container } = renderScreen();
+      await enterEmail("sam@example.com");
+      await screen.findByTestId("method-picker");
+
+      await userEvent.type(
+        container.querySelector('input[type="password"]')!,
+        "a-password",
+      );
+      await userEvent.click(screen.getByRole("button", { name: /^log in$/i }));
+
+      expect(await screen.findByTestId("signin-failure")).toHaveTextContent(
+        /too many attempts/i,
+      );
+      expect(screen.queryByTestId("retry-countdown")).toBeNull();
+      expect(
+        screen.getByRole("button", { name: /^log in$/i }),
+      ).not.toBeDisabled();
+    });
+  });
+
   describe("when this browser has signed in before", () => {
     /** @scenario The method last used on this device is badged, never reordered */
     it("badges the method it remembers, in the order the decision named", async () => {

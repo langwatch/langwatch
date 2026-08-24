@@ -73,6 +73,7 @@ describe("given the front door in either colour mode", () => {
         "components/SignUpCredentialForm.tsx",
         "components/SignInMethodPicker.tsx",
         "components/FrontDoorShell.tsx",
+        "components/FrontDoorValuePanel.tsx",
       ]) {
         // A hex literal in a component is a value that cannot follow the mode
         // toggle. The brand values live in `logic/brand.ts` as custom
@@ -85,6 +86,42 @@ describe("given the front door in either colour mode", () => {
       const styles = sourceOf("authFrontDoor.css");
       expect(styles).toContain("--lw-front-door-action:");
       expect(styles).toMatch(/\.dark\s*\{/);
+    });
+
+    it("gives the refusal red and the accent details a dark step of their own", () => {
+      const styles = sourceOf("authFrontDoor.css");
+      const [light = "", dark = ""] = styles.split(/\.dark\s*\{/);
+
+      for (const property of [
+        "--lw-front-door-danger:",
+        "--lw-front-door-detail:",
+      ]) {
+        expect(light).toContain(property);
+        expect(dark).toContain(property);
+        // The two modes must not agree: a red that reads on white is the red
+        // that fails on a dark ground, which is the whole reason for the pair.
+        const lightValue = light.split(property)[1]?.split(";")[0]?.trim();
+        const darkValue = dark.split(property)[1]?.split(";")[0]?.trim();
+        expect(lightValue).toBeTruthy();
+        expect(darkValue).not.toBe(lightValue);
+      }
+    });
+  });
+});
+
+describe("given the hosted panel on a narrow viewport", () => {
+  describe("when the split has nowhere to go", () => {
+    it("keeps the headline and stands the rest down", () => {
+      const panel = sourceOf("components/FrontDoorValuePanel.tsx");
+
+      // Both the tagline and the trusted-by row are desktop-only: stacked
+      // above a log-in form on a phone they are two screens of scrolling in
+      // front of the thing the person came to do.
+      expect([
+        ...panel.matchAll(/display=\{\{ base: "none", md: "block" \}\}/g),
+      ]).toHaveLength(2);
+      expect(panel).toContain('width={{ base: "full", md: "50%" }}');
+      expect(panel).toContain('borderInlineEndWidth={{ base: 0, md: "1px" }}');
     });
   });
 });

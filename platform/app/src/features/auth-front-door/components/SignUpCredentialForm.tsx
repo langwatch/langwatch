@@ -4,7 +4,6 @@ import {
   HStack,
   IconButton,
   Input,
-  Spacer,
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -114,10 +113,11 @@ export function SignUpCredentialForm({
         password: values.password,
         callbackUrl,
       });
-      message = credentialSignInFailure({
-        response,
-        fallback: ACCOUNT_CREATED_FALLBACK,
-      });
+      message =
+        credentialSignInFailure({
+          response,
+          fallback: ACCOUNT_CREATED_FALLBACK,
+        })?.message ?? null;
     } catch {
       message = authFailureMessage({ fallback: ACCOUNT_CREATED_FALLBACK });
     } finally {
@@ -207,8 +207,8 @@ export function SignUpCredentialForm({
           <Alert.Root
             status="error"
             borderStartWidth="4px"
-            borderStartColor="colorPalette.solid"
-            colorPalette="red"
+            borderStartColor={BRAND.danger}
+            color={BRAND.danger}
           >
             <Alert.Content>
               <Alert.Description>{submitError}</Alert.Description>
