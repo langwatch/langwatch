@@ -36,7 +36,7 @@ Feature: Microsoft Copilot Studio reference puller (built on HttpPollingPullerAd
   Scenario: Microsoft 401 surfaces as actionable
     Given Microsoft returns 401 (credentials expired)
     Then the puller fails with `errorCount = 1` + cursor unchanged
-    And the IngestionSource UI shows "Microsoft authentication failed. Re-authorize at /governance/ingestion-sources/<id>"
+    And the IngestionSource UI shows "Microsoft authentication failed. Re-authorize at /governance/inventory/<id>"
     And the next pull won't fire until the admin re-authenticates (back-off + alert; not infinite retry)
 
   Scenario: Future pullers follow the same pattern
