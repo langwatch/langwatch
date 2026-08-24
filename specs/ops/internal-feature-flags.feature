@@ -24,6 +24,22 @@ Feature: Internal feature flag system for system-level kill switches
   #   - PRODUCT scope: keeps PostHog (A/B testing, user targeting) with
   #     env override on top and a DB fallback so self-hosted installs
   #     without PostHog can still toggle product features.
+  #
+  # ===========================================================================
+  # 2026-08 amendment — PostHog left the resolver entirely
+  # ===========================================================================
+  # PR #7194 deleted the PostHog service and its branch of the resolver, so
+  # the split above no longer describes two paths. BOTH scopes now resolve
+  #   env override -> force-enable list -> postgres store -> registry default
+  # and no flag of either scope consults PostHog. The PRODUCT scenarios below
+  # that name PostHog are kept as the record of the 2026-05 design; the
+  # scenarios under "Every registered flag resolves from our own store" are
+  # the current contract.
+  #
+  # What scope still means: it is the classification the Ops UI groups and
+  # badges by, and it records who owns the lever — SYSTEM meaning the internal
+  # flag store is the only administration point. It decides nothing about how
+  # a value is fetched, and it does not decide whether targeting applies.
 
   Background:
     Given the application registers every flag in a single in-code registry
@@ -32,6 +48,8 @@ Feature: Internal feature flag system for system-level kill switches
         pipeline toggles
     And product-scoped flags are reserved for UI features and A/B tests
     And the registry default for a flag is used when no override is found
+    And both scopes resolve through the same order, so scope changes who
+        administers a flag and never how its value is found
 
   Rule: SYSTEM flags never reach PostHog
 
@@ -77,7 +95,9 @@ Feature: Internal feature flag system for system-level kill switches
       When code checks the new registry key
       Then the flag resolves enabled from the legacy env override
 
-  Rule: PRODUCT flags keep PostHog with a postgres fallback
+  # Superseded by the 2026-08 amendment: PostHog is no longer consulted
+  # for any flag. Retained as the record of the 2026-05 design.
+  Rule: PRODUCT flags kept PostHog with a postgres fallback (until 2026-08)
 
     Scenario: PRODUCT flag with PostHog reachable consults PostHog for user targeting
       Given the registry has a PRODUCT-scoped UI flag
@@ -101,7 +121,7 @@ Feature: Internal feature flag system for system-level kill switches
       When the flag is checked
       Then the flag resolves enabled
 
-  Rule: Postgres targeting rules win over PostHog
+  Rule: Postgres targeting rules decide the value
 
     Scenario: org-scoped postgres rule enables a PRODUCT flag without touching PostHog
       Given the postgres flag store has a row for the PRODUCT flag with
@@ -133,6 +153,34 @@ Feature: Internal feature flag system for system-level kill switches
       When the flag is checked
       Then the flag resolves disabled from the row-level enabled value
       And PostHog is not consulted because the postgres row was present
+
+  Rule: Every registered flag resolves from our own store, whatever its scope
+
+    Scenario: a SYSTEM flag takes per-organization targeting like any other
+      Given the registry has a SYSTEM-scoped flag
+      And the postgres flag store has a row for it whose targeting rule
+          matches the calling organization with enabled true
+      And the row-level enabled value is false
+      When the flag is checked with that organization in context
+      Then the flag resolves enabled from the targeting rule
+      And the result is reached the same way it would be for a PRODUCT flag
+
+    @unit
+    Scenario: a flag the web UI can read is registered, so operators keep the lever
+      Given a flag key is exposed to the frontend
+      Then it resolves to a registry entry, whether SYSTEM or PRODUCT scoped, so
+           /ops/feature-flags can list it and target it per organization
+      And an unregistered key is reported instead, because it would resolve from
+          the legacy in-memory path where the operator store cannot see it
+      And the one historical exception is named explicitly rather than counted
+
+    @unit
+    Scenario: a frontend flag classified SYSTEM is declared, not discovered
+      Given the flags exposed to the frontend that resolve to a SYSTEM-scoped definition
+      Then they match the declared register of such flags exactly
+      And a new SYSTEM classification therefore arrives as a visible edit for
+          review, because scope decides how /ops/feature-flags groups, badges
+          and warns on the flag even though it no longer decides resolution
 
   Rule: Operators manage flags from the Ops Feature Flags page
 
@@ -166,17 +214,20 @@ Feature: Internal feature flag system for system-level kill switches
       And the flag resolves to its registry default again
       And the page row shows source "registry default" and last edit "never"
 
-    Scenario: Ops page warns when a PRODUCT flag is being managed on a SaaS install
-      Given the installation is running in SaaS mode with PostHog enabled
+    @integration
+    Scenario: Ops page warns about the blast radius of a PRODUCT flag on a shared install
+      Given the installation is running in SaaS mode
       And the operator focuses a PRODUCT-scoped flag row
-      Then the page surfaces a note that PRODUCT flags should normally be
-          managed in PostHog so user targeting and A/B test rules apply
-      And the operator can still set a postgres override for emergency use
+      Then the page surfaces a note that the row-level value reaches every
+          organization no targeting rule matches, which on a shared install is
+          the whole fleet
+      And the note points the operator at a per-organization or per-project rule
+          for a rollout
 
   Rule: Self-hosted parity
 
-    Scenario: Self-hosted install with no PostHog can still flip kill switches
-      Given the installation is self-hosted with no PostHog configured
+    Scenario: Self-hosted install with no third-party flag service can still flip kill switches
+      Given the installation is self-hosted with no external flag service configured
       When an operator toggles a SYSTEM kill switch from the Ops UI
       Then the change persists in postgres
       And every pod observes the new value
