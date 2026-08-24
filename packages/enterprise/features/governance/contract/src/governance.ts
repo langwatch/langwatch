@@ -36,3 +36,16 @@ export const governanceEventEnvelopeSchema = z
     idempotencyKey: z.string().min(1).optional(),
   })
   .strict();
+
+export const governanceSetupStateSchema = z
+  .object({
+    hasPersonalVKs: z.boolean(),
+    hasRoutingPolicies: z.boolean(),
+    hasIngestionSources: z.boolean(),
+    hasAnomalyRules: z.boolean(),
+    hasRecentActivity: z.boolean(),
+    hasApplicationTraces: z.boolean(),
+    governanceActive: z.boolean(),
+  })
+  .strict();
+export type GovernanceSetupState = z.infer<typeof governanceSetupStateSchema>;

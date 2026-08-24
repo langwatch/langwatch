@@ -28,7 +28,7 @@ import {
 import {
   AppQuarantineFillEvaluatorService,
 } from "@ee/governance/services/quarantineFillEvaluator.service";
-import { GovernanceSetupStateService } from "@ee/governance/services/setupState.service";
+import { AppGovernanceSetupStateService } from "@ee/governance/services/setupState.service";
 import { z } from "zod";
 import {
   ENTERPRISE_FEATURE_ERRORS,
@@ -57,7 +57,7 @@ export const governanceRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("governance:view")
     .query(async ({ ctx, input }) => {
-      const service = GovernanceSetupStateService.create({
+      const service = AppGovernanceSetupStateService.create({
         prisma: ctx.prisma,
         traceActivity: getApp().governance.traceActivity,
       });
@@ -85,7 +85,7 @@ export const governanceRouter = createTRPCRouter({
     .permission("organization:view")
     .query(async ({ ctx, input }): Promise<PersonaResolution> => {
       const userId = ctx.session.user.id;
-      const setupService = GovernanceSetupStateService.create({
+      const setupService = AppGovernanceSetupStateService.create({
         prisma: ctx.prisma,
         traceActivity: getApp().governance.traceActivity,
       });
