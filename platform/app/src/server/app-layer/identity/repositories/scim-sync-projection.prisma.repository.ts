@@ -1,5 +1,4 @@
 import type {
-  ScimApplyOp,
   ScimRevokeCause,
   ScimSyncFailure,
   ScimSyncLifecycleState,
@@ -146,37 +145,10 @@ export function rowToScimSync(row: ScimSyncRow): ScimSyncState {
 }
 
 /**
- * The failure surface's shape: the connection, the operation and a reason
- * code, and nothing else. It is derived here rather than read off the row by
- * a caller so that adding a column to the projection cannot accidentally
- * publish it — the fields a customer may read are the ones listed here.
+ * There is no view-model helper here on purpose. The projection already
+ * carries only what a failure surface may publish — the connection, the
+ * operation, a reason code, a count and the person it was about — so a
+ * reader shapes what it needs from `lastFailure` and `deadLetters` directly.
+ * A helper with no consumer would be a surface claiming to exist; the ops
+ * page that reads these is not part of D08.
  */
-export type ScimSyncFailureView = {
-  connectionId: string;
-  op: ScimApplyOp;
-  errorCode: string;
-  attempts: number;
-  retired: boolean;
-  userId: string | null;
-  occurredAtMs: number;
-};
-
-export function failureViewsOf(state: ScimSyncState): ScimSyncFailureView[] {
-  const failures = state.lastFailure
-    ? [
-        ...state.deadLetters.filter(
-          (dead) => dead.occurredAtMs !== state.lastFailure?.occurredAtMs,
-        ),
-        state.lastFailure,
-      ]
-    : state.deadLetters;
-  return failures.map((failure) => ({
-    connectionId: state.connectionId,
-    op: failure.op,
-    errorCode: failure.errorCode,
-    attempts: failure.attempts,
-    retired: failure.retiredAtMs !== null,
-    userId: failure.userId,
-    occurredAtMs: failure.occurredAtMs,
-  }));
-}
