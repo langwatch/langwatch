@@ -14,8 +14,10 @@ import type { SectionNavItemData } from "./sectionNavItems";
  * that appears in a nav list is resolved here by name. Today that is one:
  * the billed-cost placeholders. Adding a second flag to a nav list means
  * touching three places here, and they fail differently. Miss its
- * `useFeatureFlag` call or its `case` in the lookup and the exhaustive
- * `default: false` below hides the item — the safe failure. Miss its
+ * `useFeatureFlag` call or its `case` in the lookup and the catch-all
+ * `default: false` below hides the item — the safe failure, and the
+ * reason the switch keeps a default rather than checking exhaustively.
+ * Miss its
  * `enabled` gate and nothing hides: the query simply runs on lists that
  * never read it, costing a round-trip nobody sees.
  */

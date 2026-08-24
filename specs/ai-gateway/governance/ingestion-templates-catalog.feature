@@ -133,9 +133,13 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
   #      Whether read-only template viewing SHOULD need a manage grant is
   #      a product decision, not a spec typo; left for the owner.
   #   2. The footer string below does not exist anywhere in the codebase.
-  #   3. "NO Edit button" holds only for platform rows; org-authored rows
-  #      render an 'Edit OTTL' control and a clone action
-  #      (IngestionTemplatesEditor.tsx:28-30,68).
+  #   3. The button set is the mirror of what is claimed. Platform rows —
+  #      the ones this scenario is about — carry 'View' and 'Clone to
+  #      customise' (IngestionTemplatesEditor.tsx:202,218), so "NO Fork
+  #      button" is contradicted outright and the read affordance is
+  #      labelled 'View', not 'View OTTL'. The 'Edit OTTL' and archive
+  #      controls sit on the org-authored branch (:235,237), which this
+  #      scenario does not describe.
   # The first two Then clauses are also vacuous as written — both expect
   # an empty set and would pass against an unbuilt feature.
   @bdd @ingestion-templates @admin-readonly
