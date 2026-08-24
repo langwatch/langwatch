@@ -11,6 +11,7 @@
  */
 import {
   IdentityBackfillService,
+  IdentityEmailService,
   IdentityGuards,
   IdentityService,
   newIdentityCommandId,
@@ -32,10 +33,23 @@ const identityHeads = new PrismaIdentityHeadsRepository(prisma);
 const identityUsers = new PrismaIdentityUsersRepository(prisma);
 const migrationState = new PrismaSystemMigrationStateRepository(prisma);
 
-/** The per-user write gate as the services take it: one closure, one
- *  state repository, composed here rather than defaulted inside a service. */
+/** The per-user fork as the services take it: one closure, one state
+ *  repository, composed here rather than defaulted inside a service. The
+ *  SAME predicate forks the ceremonies' writes and the email read — ADR-110's
+ *  one switch, re-tenanted to users. */
 export function isLatched({ userId }: { userId: string }): Promise<boolean> {
   return isUserOnIdentityWrites({ userId, state: migrationState });
+}
+
+/**
+ * The read fork for `User.email`. A module-level singleton rather than a
+ * per-call composition: it holds no request state, and the session boundary
+ * resolves it on every authenticated request.
+ */
+const identityEmailService = new IdentityEmailService(identityHeads, isLatched);
+
+export function identityEmail(): IdentityEmailService {
+  return identityEmailService;
 }
 
 /**

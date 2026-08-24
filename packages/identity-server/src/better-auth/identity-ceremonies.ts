@@ -4,11 +4,9 @@ import { nanoid } from "nanoid";
 import { mintUserHashKey } from "../crypto/user-hash-key";
 import type { IdentityHeadsRepository } from "../identity-heads.repository";
 import type { IdentityUsersRepository } from "../identity-users.repository";
+import type { IdentityUserGate } from "../identity-user-gate";
 import type { IdentityCeremonyWrites } from "../identity-writes";
-import type {
-  IdentityCeremonyClock,
-  IdentityWriteGate,
-} from "./ceremony-types";
+import type { IdentityCeremonyClock } from "./ceremony-types";
 
 const logger = createLogger("langwatch:better-auth:identity-ceremonies");
 
@@ -68,7 +66,7 @@ export class IdentityCeremonies {
     private readonly heads: IdentityHeadsRepository,
     private readonly users: IdentityUsersRepository,
     private readonly identity: IdentityCeremonyWrites,
-    private readonly isLatched: IdentityWriteGate,
+    private readonly isLatched: IdentityUserGate,
     private readonly clock: IdentityCeremonyClock,
   ) {}
 

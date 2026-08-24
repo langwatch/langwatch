@@ -14,6 +14,8 @@
  *                                detach orphans, prove
  *   crypto                       deriveIdentifierId, computeIdentifierHash,
  *                                mintUserHashKey, the PKCE helpers
+ *   IdentityEmailService         the READ fork: User.email answered from the
+ *                                identifiers for a finalized user
  *   identity-command-id          every form a command id takes, in one place
  *   identity-backfill-plan       what the legacy rows imply, as a pure plan
  *   ./better-auth                the routing facade over the stock adapter:
@@ -53,6 +55,7 @@ export {
   IdentityBackfillService,
   type IdentityBackfillServiceDeps,
 } from "./identity-backfill.service";
+export { IdentityEmailService } from "./identity-email.service";
 export {
   adoptAccountCommandId,
   adoptUserEmailCommandId,
@@ -62,6 +65,7 @@ export {
 } from "./identity-command-id";
 export type { IdentityHeadsRepository } from "./identity-heads.repository";
 export type { IdentityLedger } from "./identity-ledger";
+export type { IdentityUserGate } from "./identity-user-gate";
 export type { IdentityUsersRepository } from "./identity-users.repository";
 export type {
   IdentityVerificationRecord,

@@ -69,6 +69,7 @@ export {
   verifyIdentifierCommandDataSchema,
 } from "./facts";
 export { identifierDomain, normalizeIdentifierValue } from "./identifier";
+export { primaryEmailOf } from "./primary-email";
 export { reduceIdentity } from "./reduce";
 export {
   arrivalStateForProvider,

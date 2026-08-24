@@ -218,6 +218,41 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And the email identifier, which has no account row, is left alone
     And a further pass detaches nothing
 
+  # The READ fork (ADR-101 §5). `User.email` is a legacy column answering a
+  # question identity now owns, so a finalized user's email comes from their
+  # identifiers and the column is a stale copy. One switch forks both
+  # directions: the user whose ceremonies emit events is exactly the user
+  # whose identifiers were proven against their legacy rows.
+
+  @unit
+  Scenario: The legacy email field answers from the identifiers
+    Given "sam"'s identifier backfill has finalized
+    And "sam" holds a PRIMARY identifier and a more recently VERIFIED one
+    When anything reads "sam"'s user email
+    Then the PRIMARY identifier's value answers
+    And with no PRIMARY, the most recently VERIFIED one answers instead
+
+  @unit
+  Scenario: An unproven address never answers the legacy email field
+    Given "sam" holds only ATTACHED, DETACHED or DEAD_END identifiers
+    When anything reads "sam"'s user email
+    Then no identifier answers, so the legacy column stands
+    And attaching an address can therefore never redirect "sam"'s mail
+
+  @unit
+  Scenario: An unmigrated user keeps the legacy email column
+    Given "sam"'s identifier backfill has not finalized
+    When anything reads "sam"'s user email
+    Then the projection is not consulted at all
+    And the legacy column answers, exactly as it does today
+
+  @unit
+  Scenario: An unreadable projection never fails a request
+    Given the Identifier projection cannot be read
+    When anything reads "sam"'s user email
+    Then the legacy column answers and the request proceeds
+    And the fallback is logged, because it is otherwise silent
+
   @unit
   Scenario: Finalizing a user's backfill opens their write gate
     Given "sam"'s backfill pass concludes with matching rows

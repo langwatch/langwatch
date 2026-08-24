@@ -4,8 +4,5 @@
  * app binds `IdentityCeremonies` to four of better-auth's own
  * `databaseHooks` in one place, its identity runtime.
  */
-export type {
-  IdentityCeremonyClock,
-  IdentityWriteGate,
-} from "./better-auth/ceremony-types";
+export type { IdentityCeremonyClock } from "./better-auth/ceremony-types";
 export { IdentityCeremonies } from "./better-auth/identity-ceremonies";
