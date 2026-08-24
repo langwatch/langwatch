@@ -241,7 +241,17 @@ export type EndpointVariables = {
 /** The Hono context a service handler receives, with typed variables. */
 export type ServiceContext<
   TVariables extends Record<string, unknown> = EndpointVariables,
-> = Context<{ Variables: TVariables }>;
+  TApp = unknown,
+> = Context<{ Variables: TVariables }> & {
+  readonly app: TApp;
+  actor(): RequestActor;
+  authorize(permission: AuthzPermission): Promise<void>;
+};
+
+/** Authenticated principal exposed directly to service handlers. */
+export interface RequestActor {
+  readonly id: string;
+}
 
 // ---------------------------------------------------------------------------
 // Route-mounting report
@@ -298,7 +308,7 @@ export interface MountedRoute {
 /**
  * Top-level configuration for `createService()`.
  */
-export interface ServiceConfig {
+export interface ServiceConfig<TApp = unknown> {
   /** Service name, used in the default base path (`/api/${name}`). */
   name: string;
   /** Override the default base path. */
@@ -313,6 +323,29 @@ export interface ServiceConfig {
   logger?: false;
   /** Additional global middleware applied to every request. */
   middleware?: MiddlewareHandler[];
+  /**
+   * Resolves the process-composed application for a request. The framework
+   * exposes it directly as `context.app`; feature handlers never resolve or
+   * construct services per request.
+   */
+  app?: (context: Context) => TApp;
+  /** Resolves the authenticated actor when a handler calls `context.actor()`. */
+  actor?: (context: Context) => RequestActor;
+  /**
+   * Authorizes an input-dependent permission when a handler calls
+   * `context.authorize(permission)`. Static endpoint permissions still belong
+   * on `.withPermission(...)`; this seam is for a permission selected from
+   * validated request data.
+   */
+  authorize?: (
+    context: Context,
+    permission: AuthzPermission,
+  ) => Promise<void>;
+  /**
+   * Require a validated body `projectId` to equal the project selected and
+   * authorized by project authentication.
+   */
+  projectIdInput?: true;
   /**
    * Rate limiter port backing `.withRateLimit()`. Declaring the capability
    * without the port fails the build. See `ports.ts`.

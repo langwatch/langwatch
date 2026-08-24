@@ -14,7 +14,12 @@ export {
   type DiscoveredOperation,
   type ServiceCatalogue,
 } from "./discover.js";
-export { createErrorHandler, formatError } from "./errors.js";
+export {
+  AuthenticatedActorRequiredError,
+  createErrorHandler,
+  formatError,
+  ProjectInputMismatchError,
+} from "./errors.js";
 export { loggerMiddleware, tracerMiddleware } from "./middleware.js";
 // Spec generation must come from the same hono-openapi package instance that
 // attached the route metadata. Re-export it so hosts cannot accidentally use
@@ -47,6 +52,7 @@ export {
   type HttpMethod,
   isDateVersion,
   type MountedRoute,
+  type RequestActor,
   type ServiceConfig,
   type ServiceContext,
   VERSION_LATEST,

@@ -25,7 +25,7 @@ import {
 
 type ProviderMap<TProject> = Record<
   string,
-  (base: BaseApp<TProject>) => unknown
+  (base: BaseApp<TProject>, context: Context) => unknown
 >;
 type ErrorHandler = NonNullable<ServiceConfig["onError"]>;
 

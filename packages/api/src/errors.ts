@@ -29,6 +29,28 @@ class SchemaFailure extends HandledError {
   }
 }
 
+export class ProjectInputMismatchError extends HandledError {
+  constructor() {
+    super(
+      "project_input_mismatch",
+      "The requested project is not the project authorized for this request",
+      { httpStatus: 403 },
+    );
+    this.name = "ProjectInputMismatchError";
+  }
+}
+
+export class AuthenticatedActorRequiredError extends HandledError {
+  constructor() {
+    super(
+      "authenticated_actor_required",
+      "This operation requires a credential bound to a user",
+      { httpStatus: 403 },
+    );
+    this.name = "AuthenticatedActorRequiredError";
+  }
+}
+
 /**
  * Converts a `ZodError` into a `ValidationError` — a real `HandledError`, so
  * it carries `httpStatus: 422` and `fault: "customer"`.

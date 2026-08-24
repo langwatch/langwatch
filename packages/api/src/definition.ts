@@ -11,6 +11,14 @@ import type {
 } from "./types.js";
 import { VERSION_LATEST, VERSION_PREVIEW } from "./types.js";
 
+declare const inputDeclared: unique symbol;
+declare const outputDeclared: unique symbol;
+
+/** @internal Type-state marker produced only by `.withInput(...)`. */
+export type InputDeclared = { readonly [inputDeclared]: true };
+/** @internal Type-state marker produced only by `.withOutput(...)`. */
+export type OutputDeclared = { readonly [outputDeclared]: true };
+
 // ---------------------------------------------------------------------------
 // The definition chain (ADR 001 §3)
 //
@@ -53,9 +61,9 @@ export interface DefaultsChain {
 /** The definition chain of an RPC endpoint: every argument travels in the body. */
 export interface RpcChain extends DefaultsChain {
   /** JSON body schema — every argument of the RPC. */
-  withInput(schema: ApiSchema): this;
+  withInput(schema: ApiSchema): this & InputDeclared;
   /** Response body schema — validated before serialization. */
-  withOutput(schema: ApiSchema): this;
+  withOutput(schema: ApiSchema): this & OutputDeclared;
   /** HTTP status code for successful responses (default: 200, or 204 with no body). */
   withStatus(status: ContentfulStatusCode): this;
 }
@@ -63,9 +71,9 @@ export interface RpcChain extends DefaultsChain {
 /** The definition chain of a REST route registered with `registerRoute`. */
 export interface RouteChain extends DefaultsChain {
   /** JSON body schema. */
-  withInput(schema: ApiSchema): this;
+  withInput(schema: ApiSchema): this & InputDeclared;
   /** Response body schema — validated before serialization. */
-  withOutput(schema: ApiSchema): this;
+  withOutput(schema: ApiSchema): this & OutputDeclared;
   /** HTTP status code for successful responses (default: 200, or 204 with no body). */
   withStatus(status: ContentfulStatusCode): this;
   /** Path parameter schema; validated values are read via `c.get("params")`. */
@@ -159,14 +167,14 @@ export class ChainBuilder {
     return this;
   }
 
-  withInput(schema: ApiSchema): this {
+  withInput(schema: ApiSchema): this & InputDeclared {
     this._def.input = schema;
-    return this;
+    return this as this & InputDeclared;
   }
 
-  withOutput(schema: ApiSchema): this {
+  withOutput(schema: ApiSchema): this & OutputDeclared {
     this._def.output = schema;
-    return this;
+    return this as this & OutputDeclared;
   }
 
   withStatus(status: ContentfulStatusCode): this {

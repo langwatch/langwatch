@@ -13,6 +13,7 @@ import {
   rateLimitMiddleware,
   writeCachedResponse,
 } from "./capabilities.js";
+import { ProjectInputMismatchError } from "./errors.js";
 import {
   createApiSchemaError,
   parseApiSchemaSync,
@@ -33,7 +34,7 @@ import type { ResolvedEndpoint } from "./versioning.js";
 
 type ProviderMap<TProject> = Record<
   string,
-  (base: BaseApp<TProject>) => unknown
+  (base: BaseApp<TProject>, context: Context) => unknown
 >;
 type ErrorHandler = NonNullable<ServiceConfig["onError"]>;
 
@@ -71,11 +72,20 @@ export function buildEndpointMiddlewareStack<TProject>(
   const { ep, serviceConfig, status, version } = options;
   const { config } = ep;
   const stack = [versionContextMiddleware(options)];
+  if (serviceConfig.app) {
+    stack.push(directAppMiddleware(serviceConfig.app));
+  }
   const documented =
     options.suppressDocs !== true && isDocumentedMount({ config, status });
 
   appendAuthMiddleware({ stack, config, serviceConfig });
   appendPermissionMiddleware({ stack, config, serviceConfig });
+  stack.push(
+    requestCapabilitiesMiddleware({
+      actor: serviceConfig.actor,
+      authorize: serviceConfig.authorize,
+    }),
+  );
 
   if (config.rateLimit) {
     stack.push(
@@ -133,6 +143,53 @@ export function buildEndpointMiddlewareStack<TProject>(
   stack.push(handlerMiddleware(options));
 
   return stack;
+}
+
+function directAppMiddleware(
+  resolve: NonNullable<ServiceConfig["app"]>,
+): MiddlewareHandler {
+  return async (context, next) => {
+    Object.defineProperty(context, "app", {
+      configurable: true,
+      enumerable: false,
+      value: resolve(context),
+    });
+    await next();
+  };
+}
+
+function requestCapabilitiesMiddleware(
+  options: Pick<ServiceConfig, "actor" | "authorize">,
+): MiddlewareHandler {
+  return async (context, next) => {
+    Object.defineProperty(context, "actor", {
+      configurable: true,
+      enumerable: false,
+      value: () => {
+        if (!options.actor) {
+          throw new Error(
+            "This API service has no authenticated actor resolver",
+          );
+        }
+        return options.actor(context);
+      },
+    });
+    Object.defineProperty(context, "authorize", {
+      configurable: true,
+      enumerable: false,
+      value: (permission: Parameters<
+        NonNullable<ServiceConfig["authorize"]>
+      >[1]) => {
+        if (!options.authorize) {
+          throw new Error(
+            "This API service has no dynamic permission authorizer",
+          );
+        }
+        return options.authorize(context, permission);
+      },
+    });
+    await next();
+  };
 }
 
 /**
@@ -438,7 +495,7 @@ function providerMiddleware<TProject>(
     const resolved = Object.entries(providers);
     await Promise.all(
       resolved.map(async ([key, factory]) => {
-        c.set(key, await factory(base));
+        c.set(key, await factory(base, c));
       }),
     );
     await next();
@@ -471,6 +528,11 @@ function handlerMiddleware<TProject>({
 
   return async (c: Context) => {
     const input = config.input ? c.req.valid("json" as never) : undefined;
+    assertAuthorizedProjectInput({
+      context: c,
+      input,
+      required: serviceConfig.projectIdInput === true,
+    });
     const result = await ep.handler(c, input);
     const response = serializeEndpointResult({ c, config, result });
     if (config.cache && config.output && !(result instanceof Response)) {
@@ -483,4 +545,34 @@ function handlerMiddleware<TProject>({
     }
     return response;
   };
+}
+
+function assertAuthorizedProjectInput({
+  context,
+  input,
+  required,
+}: {
+  context: Context;
+  input: unknown;
+  required: boolean;
+}): void {
+  if (!required) return;
+  const inputProjectId =
+    typeof input === "object" && input !== null && "projectId" in input
+      ? input.projectId
+      : undefined;
+  const authorizedProject: unknown = context.get("project");
+  const authorizedProjectId =
+    typeof authorizedProject === "object" &&
+    authorizedProject !== null &&
+    "id" in authorizedProject
+      ? authorizedProject.id
+      : undefined;
+  if (
+    typeof inputProjectId !== "string" ||
+    typeof authorizedProjectId !== "string" ||
+    inputProjectId !== authorizedProjectId
+  ) {
+    throw new ProjectInputMismatchError();
+  }
 }

@@ -28,6 +28,14 @@ Feature: API framework boundary and package authoring
     Then each family builds its own app from its own file
     And the framework never enumerates the families
 
+  @architecture @unit
+  Scenario: Handlers use the process-composed application
+    Given the host has composed one application instance
+    When a feature endpoint handles a request
+    Then the instance is available as context.app
+    And the authenticated principal is available as context.actor()
+    And the feature does not construct or resolve a service per request
+
   @security @unit
   Scenario: Every mounted endpoint has one explicit access policy
     Given REST, URL-addressed RPC and SSE endpoints built with the framework

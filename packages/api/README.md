@@ -12,30 +12,31 @@ A service is one file exporting a built Hono app. An endpoint is one `register` 
 
 ```ts
 // src/app/api/things/[[...route]]/app.ts
-import { z } from "zod";
-import { createService } from "@langwatch/api";
-import { authMiddleware } from "../../middleware/auth";
-import { organizationMiddleware } from "../../middleware/organization";
-import { ThingService } from "~/server/things/thing.service";
-import { prisma } from "~/server/db";
+import { z } from "zod/v4";
+import { createProjectApiService } from "~/server/api/project-service";
 
 const thingSchema = z.object({ id: z.string(), name: z.string() });
 
-export const app = createService({
+export const app = createProjectApiService({
   name: "things",
-  auth: authMiddleware,
-  _legacy: { organizationMiddleware },
+  basePath: "/api/things",
 })
-  .provide({
-    things: () => ThingService.create(prisma),
-  })
   .register(
     "things.create",
     "2026-08-07",
-    async (c, input: { name: string }) => c.get("things").create(c, input),
+    async (context, input: { projectId: string; name: string }) =>
+      context.app.things.create({
+        ...input,
+        actorId: context.actor().id,
+      }),
     (b) =>
       b
-        .withInput(z.object({ name: z.string().min(1) }))
+        .withInput(
+          z.object({
+            projectId: z.string().min(1),
+            name: z.string().min(1),
+          }),
+        )
         .withOutput(thingSchema)
         .withStatus(201)
         .withDocs({ operationId: "createThing", tags: ["Things"] }),
@@ -43,9 +44,11 @@ export const app = createService({
   .register(
     "things.list",
     "2026-08-07",
-    async (c) => c.get("things").getAll(),
+    async (context, input: { projectId: string }) =>
+      context.app.things.list(input),
     (b) =>
       b
+        .withInput(z.object({ projectId: z.string().min(1) }))
         .withOutput(z.array(thingSchema))
         .withDocs({ operationId: "listThings", tags: ["Things"] }),
   )
@@ -76,18 +79,39 @@ api.route("/", thingsApp);
 
 ## The handler contract
 
-Handlers are positional: `(c, input)` — the Hono context and the validated input. There is no destructured bag. Everything else arrives as typed context variables:
+Handlers are positional: `(context, input)` — the Hono context and the
+validated input. There is no destructured bag. The process-composed application
+and authenticated principal are direct context capabilities:
 
 ```ts
-.registerRoute("patch", "/:id", "2026-08-07", async (c, input: UpdateThing) => {
-  const things = c.get("things");          // typed from .provide()
-  const params = c.get("params") as { id: string };  // validated by withParams
-  const query = c.get("query");            // validated by withQuery
+.registerRoute("patch", "/:id", "2026-08-07", async (context, input: UpdateThing) => {
+  const things = context.app.things;       // one process-composed service
+  const actorId = context.actor().id;      // authenticated request principal
+  await context.authorize("traces:view"); // when validated input selects a permission
+  const params = context.get("params") as { id: string }; // withParams
+  const query = context.get("query");      // withQuery
   // ...
 }, (b) => b.withParams(idParams).withInput(updateThingSchema).withOutput(thingSchema));
 ```
 
-One honesty note on types: `input` is declared on the definition chain, which is the argument _after_ the handler — TypeScript checks arguments in order, so the chain cannot flow back into the handler's parameter type. Annotate `input` (or delegate to a typed domain function) as above; the declared schema is always the runtime guarantee. `params` and `query` are typed loosely for the same reason. An endpoint registered without a chain gets `input: undefined` — that one is enforced by an overload.
+A feature handler never creates a repository, constructs a service or awaits a
+service resolver. Project-scoped RPCs include `projectId` in their validated
+input. The application authentication middleware must authorize that exact
+project before the handler runs, which lets multi-project credentials choose a
+target without trusting an arbitrary tenant id.
+
+Static permissions stay on `.withPermission(...)`. Use
+`context.authorize(permission)` only when validated input selects an additional
+permission, such as a stored object's delivery audience.
+
+One honesty note on types: `input` is declared on the definition chain, which
+is the argument _after_ the handler — TypeScript checks arguments in order, so
+the chain cannot flow back into the handler's parameter type. Annotate `input`
+(or delegate to a typed domain function) as above; the declared schema is
+always the runtime guarantee. The registration type still requires
+`withInput` whenever the handler declares the input parameter, and requires
+`withOutput` whenever it returns data. An endpoint registered without a chain
+gets `input: undefined`.
 
 When `withOutput` is declared, return raw data: the framework validates and serializes (a handler response that violates its own output contract is a 500 — our bug, not the caller's). Without it, return a Hono `Response` directly and own the status outright. An endpoint answers ONE success status: `withStatus(201)` or 200 by default, 204 for a `z.void()` / `z.undefined()` output. An output schema that accepts both `undefined` and a value is refused at registration, because that is what used to let the status move per request.
 
@@ -290,7 +314,7 @@ When creating a new API service using this framework:
 3. Use `createService({ name })` with the service name matching the URL path segment
 4. Pass auth and organization middleware through `createService({ auth, _legacy: { organizationMiddleware } })`; pass capability ports through `createService({ rateLimiter, cache })` when any endpoint declares them — declaring without the port fails the build
 5. Default to `register(name, version, handler, define?)` with a dotted lower-camelCase name; `registerRoute` is for the existing REST management families, `registerSse` for streams. Every registration names its version explicitly
-6. Use `.provide()` for service-layer dependencies and read them as typed context variables (`c.get("things")`); read validated `params`/`query` via `c.get(...)`. Handler signature is `(c, input)` — annotate `input` with the schema's inferred type
+6. Compose one application instance at process boot and expose it as `context.app`; expose the authenticated request principal as `context.actor()`. Feature handlers must not construct or resolve services per request. Read validated `params`/`query` via `context.get(...)`. Handler signature is `(context, input)` — annotate `input` with the schema's inferred type
 7. Declare capabilities on the definition chain: `withInput`/`withOutput`/`withParams`/`withQuery`, `withStatus(201)` on creation endpoints, `withDocs({ operationId, tags })` on every documented endpoint, `withMeta({ policy })` when the host keeps a route policy registry
 8. Handlers return raw data when `withOutput` is declared; the framework validates and serializes
 9. Throw `NotFoundError` / `HandledError` for error responses, never a manual `c.json({ error }, 404)`

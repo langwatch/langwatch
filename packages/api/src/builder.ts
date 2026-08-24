@@ -1,9 +1,11 @@
-import { Hono, type MiddlewareHandler } from "hono";
+import { Hono, type Context, type MiddlewareHandler } from "hono";
 import type { ApiSchema } from "./schema.js";
 
 import {
   ChainBuilder,
   type DefaultsChain,
+  type InputDeclared,
+  type OutputDeclared,
   type RouteChain,
   type RpcChain,
   type SseChain,
@@ -50,32 +52,54 @@ import { type RegistrationEvent, resolveVersions } from "./versioning.js";
 // the no-chain overloads below.
 // ---------------------------------------------------------------------------
 
-/** RPC handler: `(c, input)`; returns data when `withOutput` is declared, else a Response. */
-// biome-ignore lint/suspicious/noExplicitAny: see the note above — the chain cannot flow back into the handler's parameters.
-type RpcHandler<TVariables extends Record<string, unknown>> = (
-  c: ServiceContext<TVariables>,
-  // biome-ignore lint/suspicious/noExplicitAny: see the note above.
+/**
+ * Contextual handler shape. The inferred `THandler` retains whether the author
+ * actually declared the second parameter and what the handler returns; the
+ * broad constraint exists only to type the inline callback parameters.
+ */
+type RpcHandler<
+  TVariables extends Record<string, unknown>,
+  TApp,
+> = (
+  c: ServiceContext<TVariables, TApp>,
+  // oxlint-disable-next-line typescript/no-explicit-any -- the annotated handler parameter is the domain type; this constraint only supplies contextual typing.
   input: any,
-  // biome-ignore lint/suspicious/noExplicitAny: see the note above.
+  // oxlint-disable-next-line typescript/no-explicit-any -- inferred from each concrete handler.
 ) => any;
 
-/** REST route handler: same shape as an RPC handler. */
-type RouteHandler<TVariables extends Record<string, unknown>> = (
-  c: ServiceContext<TVariables>,
-  // biome-ignore lint/suspicious/noExplicitAny: same as RpcHandler.
-  input: any,
-  // biome-ignore lint/suspicious/noExplicitAny: same as RpcHandler.
-) => any;
+type RouteHandler<
+  TVariables extends Record<string, unknown>,
+  TApp,
+> = RpcHandler<TVariables, TApp>;
+
+type NeedsOutput<TResult> = [Awaited<TResult>] extends [Response | void]
+  ? false
+  : true;
+type HasInput<THandler extends (...args: never[]) => unknown> =
+  "1" extends keyof Parameters<THandler> ? true : false;
+type RequiredDefinition<
+  TChain,
+  TNeedsInput extends boolean,
+  TResult,
+> = TChain &
+  (TNeedsInput extends true ? InputDeclared : unknown) &
+  (NeedsOutput<TResult> extends true ? OutputDeclared : unknown);
 
 /** SSE handler: `(c, stream)` — a stream has no body. */
-type SseHandler<TVariables extends Record<string, unknown>> = (
-  c: ServiceContext<TVariables>,
+type SseHandler<
+  TVariables extends Record<string, unknown>,
+  TApp,
+> = (
+  c: ServiceContext<TVariables, TApp>,
   stream: TypedSSEStream<Record<string, ApiSchema>>,
 ) => void | Promise<void>;
 
 /** Handler of an endpoint registered with no definition chain at all. */
-type BareHandler<TVariables extends Record<string, unknown>> = (
-  c: ServiceContext<TVariables>,
+type BareHandler<
+  TVariables extends Record<string, unknown>,
+  TApp,
+> = (
+  c: ServiceContext<TVariables, TApp>,
   input: undefined,
 ) => Response | Promise<Response>;
 
@@ -86,18 +110,25 @@ type BareHandler<TVariables extends Record<string, unknown>> = (
  * @typeParam TVariables - The context variable map: `EndpointVariables` widened
  *   by each `.provide()` call, so `c.get("things")` is typed in every handler.
  */
-class ServiceBuilder<TProject, TVariables extends Record<string, unknown>> {
-  private readonly _config: ServiceConfig;
+class ServiceBuilder<
+  TProject,
+  TVariables extends Record<string, unknown>,
+  TApp = unknown,
+> {
+  private readonly _config: ServiceConfig<TApp>;
   private readonly _providers: Record<
     string,
-    (base: BaseApp<TProject>) => unknown
+    (base: BaseApp<TProject>, context: Context) => unknown
   >;
   private readonly _events: RegistrationEvent[];
   private readonly _defaults: ChainBuilder;
 
   constructor(
-    config: ServiceConfig,
-    providers: Record<string, (base: BaseApp<TProject>) => unknown> = {},
+    config: ServiceConfig<TApp>,
+    providers: Record<
+      string,
+      (base: BaseApp<TProject>, context: Context) => unknown
+    > = {},
     events: RegistrationEvent[] = [],
     defaults: ChainBuilder = new ChainBuilder(),
   ) {
@@ -115,11 +146,17 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>> {
    * Factories receive the base app context and cannot depend on one another.
    * Provided services reach handlers as typed context variables.
    */
-  provide<P extends Record<string, (base: BaseApp<TProject>) => unknown>>(
+  provide<
+    P extends Record<
+      string,
+      (base: BaseApp<TProject>, context: Context) => unknown
+    >,
+  >(
     providers: P,
   ): ServiceBuilder<
     TProject,
-    TVariables & { [K in keyof P]: Awaited<ReturnType<P[K]>> }
+    TVariables & { [K in keyof P]: Awaited<ReturnType<P[K]>> },
+    TApp
   > {
     for (const key of Object.keys(providers)) {
       if (key === "project" || key === "_legacy") {
@@ -134,7 +171,8 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>> {
 
     return new ServiceBuilder<
       TProject,
-      TVariables & { [K in keyof P]: Awaited<ReturnType<P[K]>> }
+      TVariables & { [K in keyof P]: Awaited<ReturnType<P[K]>> },
+      TApp
     >(
       this._config,
       { ...this._providers, ...providers },
@@ -211,13 +249,22 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>> {
   register<TName extends string>(
     name: TName & RpcName<TName>,
     version: VersionLabel,
-    handler: BareHandler<TVariables>,
+    handler: BareHandler<TVariables, TApp>,
   ): this;
-  register<TName extends string>(
+  register<
+    TName extends string,
+    THandler extends RpcHandler<TVariables, TApp>,
+  >(
     name: TName & RpcName<TName>,
     version: VersionLabel,
-    handler: RpcHandler<TVariables>,
-    define: (b: RpcChain) => RpcChain,
+    handler: THandler,
+    define: (
+      b: RpcChain,
+    ) => RequiredDefinition<
+      RpcChain,
+      HasInput<THandler>,
+      ReturnType<THandler>
+    >,
   ): this;
   register(
     name: string,
@@ -236,7 +283,7 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>> {
   registerSse<TName extends string>(
     name: TName & RpcName<TName>,
     version: VersionLabel,
-    handler: SseHandler<TVariables>,
+    handler: SseHandler<TVariables, TApp>,
     define?: (b: SseChain) => SseChain,
   ): this {
     this._registerSse(name, version, undefined, handler, define);
@@ -251,14 +298,20 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>> {
     method: HttpMethod,
     path: string,
     version: VersionLabel,
-    handler: BareHandler<TVariables>,
+    handler: BareHandler<TVariables, TApp>,
   ): this;
-  registerRoute(
+  registerRoute<THandler extends RouteHandler<TVariables, TApp>>(
     method: HttpMethod,
     path: string,
     version: VersionLabel,
-    handler: RouteHandler<TVariables>,
-    define: (b: RouteChain) => RouteChain,
+    handler: THandler,
+    define: (
+      b: RouteChain,
+    ) => RequiredDefinition<
+      RouteChain,
+      HasInput<THandler>,
+      ReturnType<THandler>
+    >,
   ): this;
   registerRoute(
     method: HttpMethod,
@@ -280,8 +333,8 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>> {
   group(
     name: string,
     define?: (b: DefaultsChain) => DefaultsChain,
-  ): GroupRegistrar<TVariables> {
-    return new GroupRegistrar<TVariables>(this, name, collectDef(define));
+  ): GroupRegistrar<TVariables, TApp> {
+    return new GroupRegistrar<TVariables, TApp>(this, name, collectDef(define));
   }
 
   /**
@@ -483,10 +536,13 @@ class ServiceBuilder<TProject, TVariables extends Record<string, unknown>> {
  * registration methods as the service, with the group's chain applied as
  * defaults between the service defaults and the endpoint's own declaration.
  */
-class GroupRegistrar<TVariables extends Record<string, unknown>> {
+class GroupRegistrar<
+  TVariables extends Record<string, unknown>,
+  TApp = unknown,
+> {
   constructor(
     // biome-ignore lint/suspicious/noExplicitAny: the registrar never touches provider factories, so the project type is irrelevant here and `unknown` would be invariant.
-    private readonly _service: ServiceBuilder<any, TVariables>,
+    private readonly _service: ServiceBuilder<any, TVariables, TApp>,
     private readonly _name: string,
     private readonly _defaults: RawEndpointDef,
   ) {}
@@ -494,13 +550,19 @@ class GroupRegistrar<TVariables extends Record<string, unknown>> {
   register(
     name: string,
     version: VersionLabel,
-    handler: BareHandler<TVariables>,
+    handler: BareHandler<TVariables, TApp>,
   ): void;
-  register(
+  register<THandler extends RpcHandler<TVariables, TApp>>(
     name: string,
     version: VersionLabel,
-    handler: RpcHandler<TVariables>,
-    define: (b: RpcChain) => RpcChain,
+    handler: THandler,
+    define: (
+      b: RpcChain,
+    ) => RequiredDefinition<
+      RpcChain,
+      HasInput<THandler>,
+      ReturnType<THandler>
+    >,
   ): void;
   register(
     name: string,
@@ -520,7 +582,7 @@ class GroupRegistrar<TVariables extends Record<string, unknown>> {
   registerSse(
     name: string,
     version: VersionLabel,
-    handler: SseHandler<TVariables>,
+    handler: SseHandler<TVariables, TApp>,
     define?: (b: SseChain) => SseChain,
   ): void {
     this._service._registerSse(
@@ -536,14 +598,20 @@ class GroupRegistrar<TVariables extends Record<string, unknown>> {
     method: HttpMethod,
     path: string,
     version: VersionLabel,
-    handler: BareHandler<TVariables>,
+    handler: BareHandler<TVariables, TApp>,
   ): void;
-  registerRoute(
+  registerRoute<THandler extends RouteHandler<TVariables, TApp>>(
     method: HttpMethod,
     path: string,
     version: VersionLabel,
-    handler: RouteHandler<TVariables>,
-    define: (b: RouteChain) => RouteChain,
+    handler: THandler,
+    define: (
+      b: RouteChain,
+    ) => RequiredDefinition<
+      RouteChain,
+      HasInput<THandler>,
+      ReturnType<THandler>
+    >,
   ): void;
   registerRoute(
     method: HttpMethod,
@@ -572,9 +640,9 @@ class GroupRegistrar<TVariables extends Record<string, unknown>> {
 }
 
 /** Creates a new typed service builder. */
-export function createService<TProject = unknown>(
-  config: ServiceConfig,
-): ServiceBuilder<TProject, EndpointVariables> {
+export function createService<TProject = unknown, TApp = unknown>(
+  config: ServiceConfig<TApp>,
+): ServiceBuilder<TProject, EndpointVariables, TApp> {
   return new ServiceBuilder(config);
 }
 

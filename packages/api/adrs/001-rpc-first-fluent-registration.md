@@ -66,7 +66,8 @@ API-key-only management surface.
 service.register(
   "things.create",
   "2026-08-07",
-  async (c, input) => c.get("things").create(c, input),
+  async (context, input) =>
+    context.app.things.create({ ...input, actorId: context.actor().id }),
   (b) =>
     b
       .withInput(z.object({ name: z.string() }))
@@ -76,15 +77,27 @@ service.register(
 );
 ```
 
-The handler signature is `(c, input)` — the Hono context and the validated
-input, positionally. There is no destructured bag. Everything else a handler
-needs arrives through the context, which is where Hono already puts request
-state: `.provide()` services and `registerRoute`'s validated params and query
-are typed context variables (`c.get("things")`, `c.get("params")`,
-`c.get("query")`). An endpoint without `withInput` receives `input` as
-`undefined`. `registerSse` handlers take `(c, stream)`, a stream having no
-body. Domain services stay plain functions of `(c, input)`, testable without
-the framework's bag type.
+The handler signature is `(context, input)` — the Hono context and the
+validated input, positionally. There is no destructured bag. The process owns
+one composed application instance and the host exposes it as `context.app`;
+feature handlers do not resolve or construct services per request. The host
+also exposes the authenticated principal as `context.actor()` and an
+input-dependent permission check as `context.authorize(permission)`. Static
+permissions still belong on `withPermission`; `authorize` is only for a second
+permission selected from already-validated input. Validated route
+params and query remain context variables. An endpoint without `withInput`
+receives `input` as `undefined`. `registerSse` handlers take `(context, stream)`,
+a stream having no body.
+
+Project-scoped RPCs carry `projectId` in their input so credentials that can
+reach more than one project can choose a target. The host must compare that
+value with the project selected and authorized by authentication before the
+handler runs. A caller cannot gain tenancy by choosing an arbitrary body value.
+
+The registration types require `withInput` when the handler declares an input
+parameter and require `withOutput` when the handler returns data. This is an
+editor guarantee; runtime validation then enforces each schema that was
+declared.
 
 ### 3. The definition chain is the only extension point
 

@@ -151,6 +151,51 @@ export function rpcRegistrationsTheCompilerJudges(): void {
     const _never: string = input;
     return new Response("pong");
   });
+
+  service.register(
+    "things.missingInputSchema",
+    "2026-08-07",
+    async (_c, input: { id: string }) => new Response(input.id),
+    // @ts-expect-error a declared handler input requires withInput
+    (b) => b.withDocs({ summary: "missing input schema" }),
+  );
+
+  service.register(
+    "things.missingOptionalInputSchema",
+    "2026-08-07",
+    async (_c, input?: { id: string }) => new Response(input?.id),
+    // @ts-expect-error an optional declared handler input still requires withInput
+    (b) => b.withDocs({ summary: "missing optional input schema" }),
+  );
+
+  service.register(
+    "things.missingOutputSchema",
+    "2026-08-07",
+    async () => ({ id: "1" }),
+    // @ts-expect-error a data-returning handler requires withOutput
+    (b) => b.withDocs({ summary: "missing output schema" }),
+  );
+}
+
+export function applicationContextTheCompilerJudges(): void {
+  createService<unknown, { things: { list(): Promise<unknown[]> } }>({
+    name: "things",
+    // @ts-expect-error the resolver must return the application handlers receive
+    app: () => ({ wrong: true }),
+  });
+
+  createService<unknown, { things: { list(): Promise<unknown[]> } }>({
+    name: "things",
+    app: () => ({ things: { list: async () => [] } }),
+  });
+}
+
+export function requestCapabilitiesTheCompilerJudges(
+  context: import("../types.js").ServiceContext,
+): void {
+  void context.authorize("traces:view");
+  // @ts-expect-error dynamic authorization accepts only registry permissions
+  void context.authorize("anything:anywhere");
 }
 
 /**

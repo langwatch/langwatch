@@ -17,7 +17,23 @@ Feature: Fluent endpoint registration
       handler and a chain declaring input and output
     Then the endpoint serves POST /api/things/2026-08-07/things.create
     And the handler is called with the Hono context and the validated input
-    And provided services are reached as typed context variables
+    And the process application is reached as context.app
+    And the authenticated principal is reached as context.actor()
+    And a validated input-dependent permission can be checked with context.authorize()
+
+  @typecheck
+  Scenario: Handler data contracts cannot be omitted
+    Given an endpoint handler that declares an input parameter
+    Then omitting withInput is a TypeScript error
+    Given an endpoint handler that returns response data
+    Then omitting withOutput is a TypeScript error
+
+  @security @unit
+  Scenario: A project-scoped RPC chooses an authorized target
+    Given a credential that may access more than one project
+    When its request input names a projectId
+    Then the handler receives that validated projectId
+    And the host rejects the request unless authentication authorized the same project
 
   @unit
   Scenario: A bare endpoint declares no chain

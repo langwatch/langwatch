@@ -275,6 +275,170 @@ describe("provide", () => {
     expect(await jsonBody(res)).toEqual({ loaded: true });
   });
 
+  it("lets providers resolve the process app installed on Hono context", async () => {
+    const runtimeApp = { marker: "one-process-app" };
+    const middleware: MiddlewareHandler = async (c, next) => {
+      c.set("langwatchApp", runtimeApp);
+      await next();
+    };
+    const app = createService({
+      name: "test",
+      basePath: "/api/test",
+      middleware: [middleware],
+    })
+      .provide({
+        runtimeApp: (_base, context) => context.get("langwatchApp"),
+      })
+      .register(
+        "things.app",
+        "2025-03-15",
+        async (c) => c.get("runtimeApp"),
+        (b) => b.withOutput(z.object({ marker: z.string() })),
+      )
+      .build();
+
+    const response = await app.request("/api/test/2025-03-15/things.app", {
+      method: "POST",
+    });
+    expect(await jsonBody(response)).toEqual(runtimeApp);
+  });
+
+  it("exposes the process app directly on the handler context", async () => {
+    const runtimeApp = { things: { marker: "one-process-app" } };
+    const app = createService<unknown, typeof runtimeApp>({
+      name: "test",
+      basePath: "/api/test",
+      app: () => runtimeApp,
+    })
+      .withoutPermission("framework test endpoint")
+      .register(
+        "things.app",
+        "2025-03-15",
+        async (context) => context.app.things,
+        (builder) =>
+          builder.withOutput(z.object({ marker: z.string() })),
+      )
+      .build();
+
+    const response = await app.request("/api/test/2025-03-15/things.app", {
+      method: "POST",
+    });
+    expect(await jsonBody(response)).toEqual(runtimeApp.things);
+  });
+
+  it("exposes the resolved actor as a context function", async () => {
+    const app = createService({
+      name: "test",
+      basePath: "/api/test",
+      actor: () => ({ id: "user-1" }),
+    })
+      .withoutPermission("framework test endpoint")
+      .register(
+        "things.actor",
+        "2025-03-15",
+        async (context) => context.actor(),
+        (builder) => builder.withOutput(z.object({ id: z.string() })),
+      )
+      .build();
+
+    const response = await app.request("/api/test/latest/things.actor", {
+      method: "POST",
+    });
+    expect(await jsonBody(response)).toEqual({ id: "user-1" });
+  });
+
+  it("does not resolve an actor until a handler asks for it", async () => {
+    const resolveActor = vi.fn(() => ({ id: "user-1" }));
+    const app = createService({
+      name: "test",
+      basePath: "/api/test",
+      actor: resolveActor,
+    })
+      .withoutPermission("framework test endpoint")
+      .register(
+        "things.list",
+        "2025-03-15",
+        async () => [],
+        (builder) => builder.withOutput(z.array(z.string())),
+      )
+      .build();
+
+    const response = await app.request("/api/test/latest/things.list", {
+      method: "POST",
+    });
+    expect(response.status).toBe(200);
+    expect(resolveActor).not.toHaveBeenCalled();
+  });
+
+  it("authorizes a permission selected from validated request data", async () => {
+    const authorize = vi.fn(async () => undefined);
+    const app = createService({
+      name: "test",
+      basePath: "/api/test",
+      authorize,
+    })
+      .withoutPermission("framework test endpoint")
+      .register(
+        "things.read",
+        "2025-03-15",
+        async (context, input: { permission: "traces:view" }) => {
+          await context.authorize(input.permission);
+          return { authorized: true };
+        },
+        (builder) =>
+          builder
+            .withInput(z.object({ permission: z.literal("traces:view") }))
+            .withOutput(z.object({ authorized: z.boolean() })),
+      )
+      .build();
+
+    const response = await app.request("/api/test/latest/things.read", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ permission: "traces:view" }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(authorize).toHaveBeenCalledOnce();
+    expect(authorize).toHaveBeenCalledWith(
+      expect.anything(),
+      "traces:view",
+    );
+  });
+
+  it("rejects a body projectId different from the authenticated project", async () => {
+    const app = createService({
+      name: "test",
+      basePath: "/api/test",
+      projectIdInput: true,
+      middleware: [async (context, next) => {
+        context.set("project" as never, { id: "project-1" });
+        await next();
+      }],
+    })
+      .withoutPermission("framework test endpoint")
+      .register(
+        "things.get",
+        "2025-03-15",
+        async (_context, input: { projectId: string }) => input,
+        (builder) =>
+          builder
+            .withInput(z.object({ projectId: z.string() }))
+            .withOutput(z.object({ projectId: z.string() })),
+      )
+      .build();
+
+    const response = await app.request("/api/test/latest/things.get", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ projectId: "project-2" }),
+    });
+    expect(response.status).toBe(403);
+    await expect(jsonBody(response)).resolves.toMatchObject({
+      code: "project_input_mismatch",
+    });
+  });
+
   it("preserves endpoints registered before the provide call", async () => {
     const app = buildTestService()
       .register(
@@ -865,7 +1029,7 @@ describe("group", () => {
 describe("error handling", () => {
   it("formats an unhandled throw as an unknown 500", async () => {
     const app = buildTestService()
-      .register("things.fail", "2025-03-15", async (c) => {
+      .register("things.fail", "2025-03-15", async (_c) => {
         throw new Error("something broke");
       })
       .build();
