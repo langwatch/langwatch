@@ -1,11 +1,23 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { dedupeNewestReleaseSection, newestReleaseCommitShas } from "./dedupe-release-notes.ts";
+import {
+  dedupeNewestReleaseSection,
+  newestReleaseCommitShas,
+  subjectPullRequestsFor,
+} from "./dedupe-release-notes.ts";
 
 const sha = (value: string): string => value.repeat(40 / value.length);
 
-const entry = (title: string, commit: string, pullRequest?: number): string => {
+const entry = ({
+  title,
+  commit,
+  pullRequest,
+}: {
+  title: string;
+  commit: string;
+  pullRequest?: number;
+}): string => {
   const pullRequestLink = pullRequest
     ? ` ([#${pullRequest}](https://github.com/langwatch/langwatch/issues/${pullRequest}))`
     : "";
@@ -13,6 +25,7 @@ const entry = (title: string, commit: string, pullRequest?: number): string => {
 };
 
 describe("dedupeNewestReleaseSection", () => {
+  /** @scenario "Duplicate commit entries leave one generated release note" */
   it("keeps the entry linked to the canonical squash subject PR", () => {
     const duplicate = sha("a");
     const content = [
@@ -21,15 +34,18 @@ describe("dedupeNewestReleaseSection", () => {
       "## [3.16.0] (2026-08-21)",
       "",
       "### Features",
-      entry("body conventional commit", duplicate, 7346),
-      entry("squash subject", duplicate, 7347),
+      entry({ title: "body conventional commit", commit: duplicate, pullRequest: 7346 }),
+      entry({ title: "squash subject", commit: duplicate, pullRequest: 7347 }),
       "",
       "## [3.15.0] (2026-08-01)",
-      entry("historical entry", duplicate, 7000),
+      entry({ title: "historical entry", commit: duplicate, pullRequest: 7000 }),
       "",
     ].join("\n");
 
-    const result = dedupeNewestReleaseSection(content, { [duplicate]: 7347 });
+    const result = dedupeNewestReleaseSection({
+      content,
+      subjectPullRequests: { [duplicate]: 7347 },
+    });
 
     assert.match(result.content, /squash subject/);
     assert.doesNotMatch(result.content, /body conventional commit/);
@@ -41,33 +57,114 @@ describe("dedupeNewestReleaseSection", () => {
     const duplicate = sha("b");
     const content = [
       "## [1.0.0] (2026-08-21)",
-      entry("unlinked body", duplicate),
-      entry("linked subject", duplicate, 42),
+      entry({ title: "unlinked body", commit: duplicate }),
+      entry({ title: "linked subject", commit: duplicate, pullRequest: 42 }),
     ].join("\n");
 
-    const result = dedupeNewestReleaseSection(content, {});
+    const result = dedupeNewestReleaseSection({ content, subjectPullRequests: {} });
 
     assert.match(result.content, /linked subject/);
     assert.doesNotMatch(result.content, /unlinked body/);
   });
 
-  it("is a no-op for unique entries and for a second run", () => {
+  it("leaves unique entries unchanged", () => {
     const one = sha("c");
     const two = sha("d");
     const content = [
       "# Changelog",
       "",
       "## [1.0.0] (2026-08-21)",
-      entry("one", one, 1),
-      entry("two", two, 2),
+      entry({ title: "one", commit: one, pullRequest: 1 }),
+      entry({ title: "two", commit: two, pullRequest: 2 }),
       "",
     ].join("\n");
 
-    const first = dedupeNewestReleaseSection(content, {});
-    const second = dedupeNewestReleaseSection(first.content, {});
+    const result = dedupeNewestReleaseSection({ content, subjectPullRequests: {} });
 
-    assert.equal(first.content, content);
-    assert.equal(second.content, content);
+    assert.equal(result.content, content);
+    assert.deepEqual(result.removedCommitShas, []);
     assert.deepEqual(newestReleaseCommitShas(content), [one, two]);
+  });
+
+  it("is idempotent after removing duplicate entries", () => {
+    const duplicate = sha("e");
+    const content = [
+      "## [1.0.0] (2026-08-21)",
+      entry({ title: "first generated entry", commit: duplicate }),
+      entry({ title: "duplicate generated entry", commit: duplicate }),
+    ].join("\n");
+
+    const first = dedupeNewestReleaseSection({ content, subjectPullRequests: {} });
+    const second = dedupeNewestReleaseSection({
+      content: first.content,
+      subjectPullRequests: {},
+    });
+
+    assert.doesNotMatch(first.content, /duplicate generated entry/);
+    assert.deepEqual(first.removedCommitShas, [duplicate]);
+    assert.equal(second.content, first.content);
+    assert.deepEqual(second.removedCommitShas, []);
+  });
+
+  /** @scenario "Duplicate removal preserves following changelog sections" */
+  it("preserves subsection headings after a removed entry", () => {
+    const duplicate = sha("f");
+    const other = sha("1");
+    const content = [
+      "## [1.0.0] (2026-08-21)",
+      "### Features",
+      entry({ title: "first generated entry", commit: duplicate }),
+      entry({ title: "duplicate generated entry", commit: duplicate }),
+      "### Fixes",
+      entry({ title: "unrelated fix", commit: other }),
+    ].join("\n");
+
+    const result = dedupeNewestReleaseSection({ content, subjectPullRequests: {} });
+
+    assert.match(result.content, /^### Fixes$/m);
+    assert.match(result.content, /unrelated fix/);
+    assert.doesNotMatch(result.content, /duplicate generated entry/);
+  });
+
+  /** @scenario "Incomplete changelogs remain unchanged" */
+  it("keeps changelogs without a generated release section unchanged", () => {
+    const content = "# Changelog\n\nNo releases have been generated yet.\n";
+
+    const result = dedupeNewestReleaseSection({ content, subjectPullRequests: {} });
+
+    assert.deepEqual(result, { content, removedCommitShas: [] });
+  });
+
+  /** @scenario "Incomplete changelogs remain unchanged" */
+  it("skips entries without a commit SHA", () => {
+    const commit = sha("2");
+    const content = [
+      "## [1.0.0] (2026-08-21)",
+      "* Entry with a missing commit link",
+      entry({ title: "valid entry", commit }),
+    ].join("\n");
+
+    const result = dedupeNewestReleaseSection({ content, subjectPullRequests: {} });
+
+    assert.equal(result.content, content);
+    assert.deepEqual(result.removedCommitShas, []);
+    assert.deepEqual(newestReleaseCommitShas(content), [commit]);
+  });
+});
+
+describe("subjectPullRequestsFor", () => {
+  /** @scenario "An unavailable commit subject does not stop generated release notes" */
+  it("skips an unavailable commit subject", () => {
+    const missingCommit = sha("0");
+    const warnings: string[] = [];
+
+    const result = subjectPullRequestsFor({
+      commitShas: [missingCommit],
+      cwd: process.cwd(),
+      warn: (message) => warnings.push(message),
+    });
+
+    assert.deepEqual(result, { [missingCommit]: undefined });
+    assert.match(warnings[0]!, new RegExp(missingCommit));
   });
 });
