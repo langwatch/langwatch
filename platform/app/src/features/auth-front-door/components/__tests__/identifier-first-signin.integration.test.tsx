@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   routeMock,
+  routeErrorRef,
   startPasswordSignUpMock,
   signInMock,
   replaceMock,
@@ -23,6 +24,7 @@ const {
   searchParamsRef,
 } = vi.hoisted(() => ({
   routeMock: vi.fn(),
+  routeErrorRef: { current: null as unknown },
   startPasswordSignUpMock: vi.fn(),
   signInMock: vi.fn(),
   replaceMock: vi.fn(),
@@ -37,7 +39,7 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({
           mutateAsync: routeMock,
           isPending: false,
-          error: null,
+          error: routeErrorRef.current,
         }),
       },
       startPasswordSignUp: {
@@ -139,6 +141,7 @@ const enterEmail = async (email: string) => {
 describe("given the identifier-first sign-in screen", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    routeErrorRef.current = null;
     sessionRef.current = { data: null };
     searchParamsRef.current = new URLSearchParams("");
     window.localStorage.clear();
@@ -203,6 +206,40 @@ describe("given the identifier-first sign-in screen", () => {
         ).not.toBeNull();
       });
       expect(signInMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the router itself cannot be reached", () => {
+    it("says so and leaves the address field there to try again", async () => {
+      routeMock.mockRejectedValue(new Error("router unreachable"));
+      routeErrorRef.current = new Error("router unreachable");
+
+      renderScreen();
+      await enterEmail("sam@example.com");
+
+      expect(
+        await screen.findByText(/could not start log-in/i),
+      ).toBeTruthy();
+      // The retry IS the field. An alert that replaces it leaves somebody
+      // holding an apology with nothing to act on.
+      expect(await screen.findByLabelText(/email/i)).toBeTruthy();
+      expect(
+        screen.getByRole("button", { name: /^continue$/i }),
+      ).toBeTruthy();
+    });
+
+    it("offers the address form rather than a picker built from a failed decision", async () => {
+      // The hook keeps the last decision on purpose, so a screen that only
+      // checked for one would answer a failed attempt with the methods from
+      // the attempt before it.
+      routeMock.mockResolvedValue(localPicker);
+      routeErrorRef.current = new Error("router unreachable");
+
+      renderScreen();
+      await enterEmail("sam@example.com");
+
+      expect(screen.queryByTestId("method-picker")).toBeNull();
+      expect(await screen.findByLabelText(/email/i)).toBeTruthy();
     });
   });
 

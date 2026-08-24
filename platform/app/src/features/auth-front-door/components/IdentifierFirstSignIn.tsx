@@ -108,18 +108,6 @@ export function IdentifierFirstSignIn() {
   const decision = routing.decision;
   const submittedIdentifier = routing.identifier;
 
-  if (routing.error) {
-    return (
-      <AuthCard title="Log in to LangWatch">
-        <HandledErrorAlert
-          error={routing.error}
-          fallbackTitle="Could not start log-in"
-        />
-        <SignUpLink callbackUrl={callbackUrl} label="Create your account" />
-      </AuthCard>
-    );
-  }
-
   if (decision?.outcome === "redirect_to_connection") {
     return (
       <RoutedToConnection
@@ -130,7 +118,11 @@ export function IdentifierFirstSignIn() {
     );
   }
 
-  const showPicker = decision && (breakGlass || submittedIdentifier !== null);
+  // A failed decision falls back to the address form rather than showing a
+  // picker built from the decision before it: the methods on offer are the
+  // answer to a question that just failed to be answered.
+  const showPicker =
+    !routing.error && decision && (breakGlass || submittedIdentifier !== null);
 
   if (showPicker) {
     return (
@@ -167,6 +159,16 @@ export function IdentifierFirstSignIn() {
 
   return (
     <AuthCard title="Log in to LangWatch" finePrint={<FrontDoorFinePrint />}>
+      {/* The alert explains the form; it does not replace it. A failure to
+          reach the router is nearly always worth retrying, and the retry is
+          typing the address again — so taking the field away leaves somebody
+          holding an apology and no way to act on it. It sits above the form,
+          and the form stays live underneath. */}
+      <HandledErrorAlert
+        error={routing.error}
+        fallbackTitle="Could not start log-in"
+        className="lw-front-door-alert"
+      />
       <IdentifierStepForm
         submitLabel="Continue"
         isSubmitting={routing.isDeciding}

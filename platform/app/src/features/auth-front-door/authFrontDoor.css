@@ -293,6 +293,31 @@
 		background-color 200ms ease;
 }
 
+/* The alert is glass too, for the same reason the pill is: it sits ON the
+   card, and an opaque panel in the middle of a translucent one reads as a
+   patch rather than part of the surface. It keeps its red hairline and its
+   red mark — the warning must not soften — and only the pane behind the
+   words becomes glass, tinted just enough to carry the alarm. The blur is
+   smaller than the card's: it is a nearer layer, and the ground should move
+   through it less. */
+.lw-front-door-alert {
+	/* A literal red rather than a mix of the theme's: every other colour in
+	   this file is a literal too, because these screens must not depend on
+	   another stylesheet's tokens having loaded. The `!important` is what
+	   takes the pane back from the component's own opaque background — the
+	   only thing being overridden. */
+	background-color: rgba(220, 62, 62, 0.1) !important;
+	background-image: linear-gradient(
+		180deg,
+		rgba(255, 255, 255, 0.14),
+		rgba(255, 255, 255, 0.03) 60%,
+		rgba(255, 255, 255, 0) 100%
+	);
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+	-webkit-backdrop-filter: blur(10px) saturate(1.25);
+	backdrop-filter: blur(10px) saturate(1.25);
+}
+
 .lw-front-door-primary:hover {
 	box-shadow:
 		inset 0 1px 0 rgba(255, 255, 255, 0.28),
