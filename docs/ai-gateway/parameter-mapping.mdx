@@ -81,6 +81,45 @@ When a parameter is dropped, the drop is visible in three places:
 
 {/* param-table:end */}
 
+## The codex lane
+
+Codex models (your own ChatGPT subscription, model prefix `openai_codex/`) speak the Responses API, and the codex backend accepts a fixed set of fields: anything outside it fails the whole request upstream with `400 Unsupported parameter`. The gateway builds the outgoing body itself, so every field follows the same policy as above. The gateway also pins three invariants the backend requires: the bare model name, `stream` on, and `store` off. Dropped fields are signaled on the `X-LangWatch-Params-Dropped` header and the gateway span; the response body is the backend's own SSE stream, so `extra_fields.params_dropped` is not injected into it. `drop_tuning_params` works on this lane too.
+
+{/* codex-param-table:begin generated from codexParamPolicyTable, kept in sync by TestParamPolicyDocsInSync */}
+
+| Parameter | codex | Notes |
+|---|---|---|
+| `background` | refused | the background response id the caller expects to poll would be silently absent |
+| `include` | mapped |  |
+| `input` | mapped |  |
+| `instructions` | mapped |  |
+| `max_output_tokens` | dropped | the codex backend refuses an output cap |
+| `max_tool_calls` | refused | the tool-call cap would be silently unenforced |
+| `metadata` | dropped | the codex backend refuses request metadata |
+| `model` | mapped | pinned to the bare model name |
+| `parallel_tool_calls` | mapped |  |
+| `previous_response_id` | refused | the codex lane pins store: false, so the response chain the caller asked to continue would silently not continue |
+| `prompt_cache_key` | mapped |  |
+| `prompt_cache_options` | dropped | the codex backend manages its own prompt cache |
+| `prompt_cache_retention` | dropped | the codex backend manages its own prompt cache |
+| `reasoning` | mapped |  |
+| `safety_identifier` | dropped | the codex backend refuses caller identifiers |
+| `service_tier` | dropped | the codex backend has no service tiers |
+| `store` | mapped | pinned off (the backend is stateless) |
+| `stream` | mapped | pinned on (the backend is SSE-only) |
+| `stream_options` | mapped |  |
+| `temperature` | dropped | the codex backend refuses sampling options |
+| `text` | mapped |  |
+| `tool_choice` | mapped |  |
+| `tools` | mapped |  |
+| `top_logprobs` | refused | the requested log probabilities would be silently absent from the response |
+| `top_p` | dropped | the codex backend refuses sampling options |
+| `truncation` | dropped | the codex backend manages its own context truncation |
+| `user` | dropped | the codex backend refuses caller identifiers |
+| any other key | dropped | the codex backend accepts a fixed set of fields |
+
+{/* codex-param-table:end */}
+
 ## reasoning_effort budgets
 
 On lanes that map `reasoning_effort` to a thinking budget (Anthropic models without adaptive thinking, on both the anthropic and bedrock lanes), the budget is derived from your output cap: `budget = 1024 + ratio x (max_tokens - 1024)` with ratios `minimal 0.025`, `low 0.15`, `medium 0.425`, `high 0.80`, `xhigh 0.92`, `max 1.0`. Claude Opus and Sonnet 4.6+ use the provider's adaptive thinking with your effort passed through (`minimal` maps to `low`). Gemini thinking models receive the effort natively. Thinking tokens count inside `usage.completion_tokens`.

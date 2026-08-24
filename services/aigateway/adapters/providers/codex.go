@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -155,10 +156,11 @@ func (r *BifrostRouter) dispatchCodexStream(
 		})
 	}
 
-	body, err := codexRequestBody(req.Body, model)
+	body, droppedParams, err := codexRequestBody(req.Body, model)
 	if err != nil {
-		return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{"reason": err.Error()})
+		return nil, classifyRequestBuildError(ctx, err)
 	}
+	recordParamsDropped(ctx, droppedParams)
 
 	accessToken := cred.APIKey
 	accountID := cred.Extra["account_id"]
@@ -247,43 +249,14 @@ func codexSessionExpiredError(ctx context.Context) error {
 	})
 }
 
-// codexAllowedFields is what the ChatGPT codex backend accepts on a Responses
-// body. Everything else comes back 400 "Unsupported parameter: <name>" before
-// a single token is generated, so the gateway keeps the caller's body to this
-// set instead of removing offenders one at a time.
-//
-// It is an allowlist because the backend keeps one of its own. A strip list
-// costs a production outage per field, and it took two of them to learn that:
-// pi sends prompt_cache_retention AND max_output_tokens, so stripping the
-// first only uncovered the second. Verified against the live backend, which
-// refuses at least max_output_tokens, max_tool_calls, prompt_cache_options,
-// prompt_cache_retention, temperature, top_p, top_logprobs, truncation,
-// metadata, service_tier, background, user, safety_identifier and
-// previous_response_id, and accepts every field below.
-//
-// A field OpenAI adds later is dropped until it is listed here, and that is
-// the safe direction: the same field on an unlisted body would have failed
-// the whole request anyway.
-var codexAllowedFields = map[string]bool{
-	"model":               true,
-	"input":               true,
-	"instructions":        true,
-	"stream":              true,
-	"stream_options":      true,
-	"store":               true,
-	"include":             true,
-	"tools":               true,
-	"tool_choice":         true,
-	"parallel_tool_calls": true,
-	"reasoning":           true,
-	"text":                true,
-	"prompt_cache_key":    true,
-}
-
-// codexRequestBody pins the backend's invariants onto the caller's raw body:
+// codexRequestBody builds the outgoing body under the codex parameter
+// policy (codexParamPolicyTable) and pins the backend's invariants onto it:
 // the bare model name (the gateway stays in control of what lands upstream),
-// stream on, store off, and nothing the backend does not accept.
-func codexRequestBody(raw []byte, model string) ([]byte, error) {
+// stream on, store off. Mapped fields are copied, droppable fields are
+// removed and reported back for the response-side drop signals, and a
+// functional field the backend refuses fails the request here as a
+// paramRefusalError, before a provider round trip is paid.
+func codexRequestBody(raw []byte, model string) ([]byte, []string, error) {
 	body := raw
 	if len(bytes.TrimSpace(body)) == 0 {
 		body = []byte("{}")
@@ -294,12 +267,12 @@ func codexRequestBody(raw []byte, model string) ([]byte, error) {
 	// went upstream as a well-formed request with no turn in it, and the
 	// caller paid a provider round trip to be told what we could see here.
 	if !gjson.ValidBytes(body) {
-		return nil, errors.New("codex body is not valid JSON")
+		return nil, nil, errors.New("codex body is not valid JSON")
 	}
 	if !gjson.ParseBytes(body).IsObject() {
-		return nil, errors.New("codex body must be a JSON object")
+		return nil, nil, errors.New("codex body must be a JSON object")
 	}
-	// The outgoing body is BUILT from the accepted names, rather than the
+	// The outgoing body is BUILT from the mapped names, rather than the
 	// caller's body having the refused ones deleted out of it. A field name is
 	// data, and turning data into an sjson path is what let a name break the
 	// very call this filtering exists to save: ".", "*", "?" and ":" select
@@ -307,21 +280,60 @@ func codexRequestBody(raw []byte, model string) ([]byte, error) {
 	// path complex, which DeleteBytes refuses; and an empty name has no path
 	// at all. Copying under our own fixed names cannot address anything but
 	// the field we mean, whatever the caller called theirs.
+	bare := strings.TrimPrefix(model, codexModelPrefix)
+	out, dropped, err := codexPolicyPass(body, bare)
+	if err != nil {
+		return nil, nil, err
+	}
+	out, err = pinCodexInvariants(out, bare)
+	if err != nil {
+		return nil, nil, err
+	}
+	return out, dropped, nil
+}
+
+// codexPolicyPass walks the caller's top-level keys through the codex
+// disposition table: mapped fields are copied into a fresh object, droppable
+// fields are collected for the response-side signals, a refused field fails
+// the pass.
+func codexPolicyPass(body []byte, bare string) ([]byte, []string, error) {
+	strict := !dropTuningParamsEnabled(body)
 	out := []byte("{}")
+	var dropped []string
+	var refusal *paramRefusalError
 	var err error
 	gjson.ParseBytes(body).ForEach(func(key, value gjson.Result) bool {
 		name := key.String()
-		if !codexAllowedFields[name] {
+		if name == "drop_tuning_params" {
+			// The gateway's own directive, consumed by strict above.
+			return true
+		}
+		verdict := classifyCodexParam(name, bare, strict)
+		if verdict.refusal != nil {
+			refusal = verdict.refusal
+			return false
+		}
+		if verdict.drop {
+			dropped = append(dropped, name)
 			return true
 		}
 		out, err = sjson.SetRawBytes(out, name, []byte(value.Raw))
 		return err == nil
 	})
-	if err != nil {
-		return nil, fmt.Errorf("build codex body: %w", err)
+	if refusal != nil {
+		return nil, nil, refusal
 	}
-	body = out
-	bare := strings.TrimPrefix(model, codexModelPrefix)
+	if err != nil {
+		return nil, nil, fmt.Errorf("build codex body: %w", err)
+	}
+	sort.Strings(dropped)
+	return out, dropped, nil
+}
+
+// pinCodexInvariants forces what the backend requires of every call: the
+// bare model name, stream on, store off.
+func pinCodexInvariants(body []byte, bare string) ([]byte, error) {
+	var err error
 	for _, set := range []struct {
 		path  string
 		value any
