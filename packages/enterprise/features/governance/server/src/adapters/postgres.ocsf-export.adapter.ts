@@ -1,6 +1,6 @@
 import type { GovernanceOcsfEventsReaderPort } from "../ports/ocsf-export.port";
 import { PrismaGovernanceOcsfExportRepository } from "../repositories/prisma/prisma.ocsf-export.repository";
-import { GovernanceOcsfExportService } from "../services/ocsf-export.service";
+import { DefaultGovernanceOcsfExportService } from "../services/ocsf-export.service";
 
 export class PostgresGovernanceOcsfExportAdapter {
   private constructor(
@@ -18,8 +18,8 @@ export class PostgresGovernanceOcsfExportAdapter {
     );
   }
 
-  build(): GovernanceOcsfExportService {
-    return GovernanceOcsfExportService.create({
+  build(): DefaultGovernanceOcsfExportService {
+    return DefaultGovernanceOcsfExportService.create({
       repository: PrismaGovernanceOcsfExportRepository.create(this.database),
       events: this.events,
     });

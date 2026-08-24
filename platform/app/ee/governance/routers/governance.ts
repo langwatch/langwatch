@@ -17,7 +17,6 @@
  */
 
 import { AdminWorkspaceViewAuditService } from "@ee/governance/services/adminWorkspaceViewAudit.service";
-import { PostgresGovernanceOcsfExportAdapter } from "@langwatch/enterprise-governance-server";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import {
   QUARANTINE_DEFAULT_THRESHOLD,
@@ -214,11 +213,7 @@ export const governanceRouter = createTRPCRouter({
     .permission("complianceExport:view")
     .use(requireEnterprisePlan(ENTERPRISE_FEATURE_ERRORS.OCSF_EXPORT))
     .query(async ({ ctx, input }) => {
-      const service = PostgresGovernanceOcsfExportAdapter.create({
-        database: ctx.prisma,
-        events: getApp().governance.ocsfEvents,
-      }).build();
-      return await service.list({
+      return await ctx.app.governance.ocsfExport.list({
         organizationId: input.organizationId,
         sinceMs: input.sinceMs ?? 0,
         sinceEventId: input.sinceEventId,

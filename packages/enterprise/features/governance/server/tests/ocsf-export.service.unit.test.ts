@@ -4,7 +4,7 @@ import {
   GovernanceOcsfEventsReaderPort,
   GovernanceOcsfExportRepository,
 } from "../src/ports/ocsf-export.port";
-import { GovernanceOcsfExportService } from "../src/services/ocsf-export.service";
+import { DefaultGovernanceOcsfExportService } from "../src/services/ocsf-export.service";
 
 class FixedTenantRepository extends GovernanceOcsfExportRepository {
   constructor(private readonly tenantId: string | null) {
@@ -43,10 +43,10 @@ function event(eventId: string, eventTimeMs: number): GovernanceOcsfExportRow {
   };
 }
 
-describe("GovernanceOcsfExportService", () => {
+describe("DefaultGovernanceOcsfExportService", () => {
   it("returns an empty page without reading events when no tenant exists", async () => {
     const events = new FixedEventReader();
-    const page = await GovernanceOcsfExportService.create({
+    const page = await DefaultGovernanceOcsfExportService.create({
       repository: new FixedTenantRepository(null),
       events,
     }).list({ organizationId: "organization", sinceMs: 0, limit: 500 });
@@ -62,7 +62,7 @@ describe("GovernanceOcsfExportService", () => {
   it("returns the final event as the compound cursor", async () => {
     const events = new FixedEventReader();
     events.findAll.mockResolvedValue([event("event-1", 100), event("event-2", 100)]);
-    const page = await GovernanceOcsfExportService.create({
+    const page = await DefaultGovernanceOcsfExportService.create({
       repository: new FixedTenantRepository("tenant"),
       events,
     }).list({
@@ -86,7 +86,7 @@ describe("GovernanceOcsfExportService", () => {
 
   it("fails clearly when a tenant exists without event storage", async () => {
     await expect(
-      GovernanceOcsfExportService.create({
+      DefaultGovernanceOcsfExportService.create({
         repository: new FixedTenantRepository("tenant"),
       }).list({ organizationId: "organization", sinceMs: 0, limit: 1 }),
     ).rejects.toThrow("OCSF event storage is not configured");

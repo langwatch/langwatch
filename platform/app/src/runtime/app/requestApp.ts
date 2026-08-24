@@ -4,6 +4,7 @@ import type {
   AuthzService,
 } from "@langwatch/authz-contract";
 import type {
+  GovernanceOcsfExportService,
   GovernanceSetupStateService,
   IngestionTemplatesService,
 } from "@langwatch/enterprise-governance-contract";
@@ -16,6 +17,7 @@ export type RequestAppServices = {
   governance: {
     ingestionTemplates: IngestionTemplatesService;
     setupState: GovernanceSetupStateService;
+    ocsfExport: GovernanceOcsfExportService;
   };
 };
 
@@ -34,6 +36,7 @@ export class RequestApp implements RequestAppServices {
       governance: {
         ingestionTemplates: IngestionTemplatesService;
         setupState: GovernanceSetupStateService;
+        ocsfExport: GovernanceOcsfExportService;
       };
     },
   ): RequestApp {
@@ -52,6 +55,7 @@ export class RequestApp implements RequestAppServices {
     readonly governance: {
       ingestionTemplates: IngestionTemplatesService;
       setupState: GovernanceSetupStateService;
+      ocsfExport: GovernanceOcsfExportService;
     },
   ) {}
 }

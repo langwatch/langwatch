@@ -1,33 +1,36 @@
-import type { GovernanceOcsfExportPage } from "@langwatch/enterprise-governance-contract";
+import {
+  GovernanceOcsfExportService as GovernanceOcsfExportServiceContract,
+  governanceOcsfExportInputSchema,
+  type GovernanceOcsfExportInput,
+  type GovernanceOcsfExportPage,
+} from "@langwatch/enterprise-governance-contract";
 import type {
   GovernanceOcsfEventsReaderPort,
   GovernanceOcsfExportRepository,
 } from "../ports/ocsf-export.port";
 
-export class GovernanceOcsfExportService {
+export class DefaultGovernanceOcsfExportService extends GovernanceOcsfExportServiceContract {
   private constructor(
     private readonly repository: GovernanceOcsfExportRepository,
     private readonly events: GovernanceOcsfEventsReaderPort | undefined,
-  ) {}
+  ) {
+    super();
+  }
 
   static create(options: {
     repository: GovernanceOcsfExportRepository;
     events?: GovernanceOcsfEventsReaderPort;
-  }): GovernanceOcsfExportService {
-    return new GovernanceOcsfExportService(
+  }): DefaultGovernanceOcsfExportService {
+    return new DefaultGovernanceOcsfExportService(
       options.repository,
       options.events,
     );
   }
 
-  async list(input: {
-    organizationId: string;
-    sinceMs: number;
-    sinceEventId?: string;
-    limit: number;
-  }): Promise<GovernanceOcsfExportPage> {
+  async list(input: GovernanceOcsfExportInput): Promise<GovernanceOcsfExportPage> {
+    const parsed = governanceOcsfExportInputSchema.parse(input);
     const tenantId = await this.repository.resolveGovernanceTenantId(
-      input.organizationId,
+      parsed.organizationId,
     );
     if (!tenantId) {
       return { events: [], nextCursor: null, nextCursorCompound: null };
@@ -36,9 +39,9 @@ export class GovernanceOcsfExportService {
 
     const events = await this.events.findAll({
       tenantId,
-      sinceMs: input.sinceMs,
-      sinceEventId: input.sinceEventId ?? "",
-      limit: input.limit,
+      sinceMs: parsed.sinceMs,
+      sinceEventId: parsed.sinceEventId ?? "",
+      limit: parsed.limit,
     });
     const lastEvent = events.at(-1);
     return {

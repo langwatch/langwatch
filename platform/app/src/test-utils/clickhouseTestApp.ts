@@ -86,8 +86,11 @@ export function installClickHouseTestApp({
 
   const governanceTraceActivity =
     new GovernanceTraceActivityClickHouseRepository(required);
+  const governanceOcsfEvents =
+    new GovernanceOcsfEventsClickHouseRepository(required);
   const governanceRuntime = AppGovernanceRuntime.create(prisma, {
     setupActivity: governanceTraceActivity,
+    ocsfEvents: governanceOcsfEvents,
   });
 
   globalForApp.__langwatch_app = createTestApp({
@@ -107,7 +110,8 @@ export function installClickHouseTestApp({
     governance: {
       ingestionTemplates: governanceRuntime.ingestionTemplates,
       setupState: governanceRuntime.setupState,
-      ocsfEvents: new GovernanceOcsfEventsClickHouseRepository(required),
+      ocsfExport: governanceRuntime.ocsfExport,
+      ocsfEvents: governanceOcsfEvents,
       traceActivity: governanceTraceActivity,
       kpis: new GovernanceKpisClickHouseRepository(required),
       personalUsage: new PersonalUsageClickHouseRepository(required),

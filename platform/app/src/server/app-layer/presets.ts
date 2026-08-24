@@ -1671,6 +1671,7 @@ export function initializeDefaultApp(options?: {
 
   const governanceRuntime = AppGovernanceRuntime.create(prisma, {
     setupActivity: governanceTraceActivityRepository,
+    ocsfEvents: governanceOcsfEventsRepository,
   });
   const pullRequestUsage = new PullRequestUsageService({
     pullRequests: githubPullRequestsRepository,
@@ -1934,6 +1935,7 @@ export function initializeDefaultApp(options?: {
     governance: {
       ingestionTemplates: governanceRuntime.ingestionTemplates,
       setupState: governanceRuntime.setupState,
+      ocsfExport: governanceRuntime.ocsfExport,
       ocsfEvents: governanceOcsfEventsRepository,
       traceActivity: governanceTraceActivityRepository,
       kpis: governanceKpisRepository,
@@ -2297,6 +2299,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     governance: {
       ingestionTemplates: testGovernanceRuntime.ingestionTemplates,
       setupState: testGovernanceRuntime.setupState,
+      ocsfExport: testGovernanceRuntime.ocsfExport,
       ocsfEvents: undefined,
       traceActivity: undefined,
       kpis: undefined,

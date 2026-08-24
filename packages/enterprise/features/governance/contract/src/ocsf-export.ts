@@ -34,3 +34,21 @@ export const governanceOcsfExportPageSchema = z.object({
 export type GovernanceOcsfExportPage = z.infer<
   typeof governanceOcsfExportPageSchema
 >;
+
+export const governanceOcsfExportInputSchema = z
+  .object({
+    organizationId: z.string().min(1),
+    sinceMs: z.number().int().nonnegative(),
+    sinceEventId: z.string().optional(),
+    limit: z.number().int().min(1).max(1_000),
+  })
+  .strict();
+export type GovernanceOcsfExportInput = z.infer<
+  typeof governanceOcsfExportInputSchema
+>;
+
+export abstract class GovernanceOcsfExportService {
+  abstract list(
+    input: GovernanceOcsfExportInput,
+  ): Promise<GovernanceOcsfExportPage>;
+}

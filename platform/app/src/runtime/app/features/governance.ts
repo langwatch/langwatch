@@ -2,13 +2,16 @@ import {
   CanonicalCostExtractorService,
   GovernanceSetupActivityPort,
   PostgresGovernanceAdapter,
+  PostgresGovernanceOcsfExportAdapter,
   PostgresGovernanceSetupStateAdapter,
   PostgresIngestionTemplateAdapter,
   type CanonicalCostEvent,
   type GovernanceDatabase,
+  type GovernanceOcsfEventsReaderPort,
   type OtlpLogsRequest,
 } from "@langwatch/enterprise-governance-server";
 import type {
+  GovernanceOcsfExportService,
   GovernancePolicyService,
   GovernanceSetupStateService,
   IngestionTemplatesService,
@@ -47,11 +50,15 @@ export class AppGovernanceRuntime {
     private readonly policy: GovernancePolicyService,
     readonly ingestionTemplates: IngestionTemplatesService,
     readonly setupState: GovernanceSetupStateService,
+    readonly ocsfExport: GovernanceOcsfExportService,
   ) {}
 
   static create(
     database: GovernanceDatabase,
-    options?: { setupActivity?: GovernanceSetupActivity },
+    options?: {
+      setupActivity?: GovernanceSetupActivity;
+      ocsfEvents?: GovernanceOcsfEventsReaderPort;
+    },
   ): AppGovernanceRuntime {
     return new AppGovernanceRuntime(
       CanonicalCostExtractorService.create(),
@@ -62,6 +69,10 @@ export class AppGovernanceRuntime {
         activity: options?.setupActivity
           ? AppGovernanceSetupActivityPort.create(options.setupActivity)
           : undefined,
+      }).build(),
+      PostgresGovernanceOcsfExportAdapter.create({
+        database,
+        events: options?.ocsfEvents,
       }).build(),
     );
   }
