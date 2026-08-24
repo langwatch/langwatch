@@ -40,7 +40,7 @@ describe("buildAnthropicAdminPullConfig on the edit path", () => {
   it("given a blank secret, omits the credentials key entirely so the stored one is kept", () => {
     const config = buildAnthropicAdminPullConfig(
       composer({ credentialsToken: "", report: "usage", bucketWidth: "1h" }),
-      { requireCredentials: false },
+      { shouldRequireCredentials: false },
     );
 
     expect(config).not.toBeNull();
@@ -59,7 +59,7 @@ describe("buildAnthropicAdminPullConfig on the edit path", () => {
         bucketWidth: "1h",
         startingAt: "2026-08-01",
       }),
-      { requireCredentials: false },
+      { shouldRequireCredentials: false },
     );
 
     const parsed = anthropicAdminPullConfigSchema.parse(config);
@@ -71,7 +71,7 @@ describe("buildAnthropicAdminPullConfig on the edit path", () => {
   it("given a freshly typed secret, carries it so the stored one is replaced", () => {
     const config = buildAnthropicAdminPullConfig(
       composer({ credentialsToken: "sk-ant-admin-new", report: "usage" }),
-      { requireCredentials: false },
+      { shouldRequireCredentials: false },
     );
 
     expect((config as Record<string, unknown>).credentials).toEqual({
@@ -89,7 +89,7 @@ describe("buildAnthropicAdminPullConfig on the edit path", () => {
         report: "usage",
         bucketWidth: "5m",
       }),
-      { requireCredentials: false },
+      { shouldRequireCredentials: false },
     );
 
     expect(config).toBeNull();
@@ -122,7 +122,7 @@ describe("buildEditedParserConfig", () => {
     // clearing a bucket width saved successfully and changed nothing.
     const rebuilt = buildAnthropicAdminPullConfig(
       composer({ credentialsToken: "", report: "usage", bucketWidth: "" }),
-      { requireCredentials: false },
+      { shouldRequireCredentials: false },
     );
 
     const next = buildEditedParserConfig({
@@ -139,7 +139,7 @@ describe("buildEditedParserConfig", () => {
   it("keeps adapter bookkeeping the form does not own", () => {
     const rebuilt = buildAnthropicAdminPullConfig(
       composer({ credentialsToken: "", report: "usage" }),
-      { requireCredentials: false },
+      { shouldRequireCredentials: false },
     );
 
     const next = buildEditedParserConfig({
@@ -155,7 +155,7 @@ describe("buildEditedParserConfig", () => {
   it("carries no credentials key when the secret was left blank", () => {
     const rebuilt = buildAnthropicAdminPullConfig(
       composer({ credentialsToken: "", report: "usage" }),
-      { requireCredentials: false },
+      { shouldRequireCredentials: false },
     );
 
     const next = buildEditedParserConfig({

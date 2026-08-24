@@ -262,7 +262,7 @@ describe("seedComposerParserConfig", () => {
 
     const config = buildAnthropicAdminPullConfig(
       composer(values, "0 * * * *"),
-      { requireCredentials: false },
+      { shouldRequireCredentials: false },
     );
 
     expect(config).not.toHaveProperty("credentials");

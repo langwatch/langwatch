@@ -156,7 +156,9 @@ function fmtRelative(date: Date | string | null): string {
  */
 function resolvePullConfig(
   composer: ComposerState,
-  { requireCredentials = true }: { requireCredentials?: boolean } = {},
+  {
+    shouldRequireCredentials = true,
+  }: { shouldRequireCredentials?: boolean } = {},
 ): { pullConfig: Record<string, unknown> | null } | null {
   const pullAdapter = PULL_ADAPTER_FOR_SOURCE[composer.sourceType];
   // For BYO `http_custom` we send the FULL HttpPollingConfig shape so the
@@ -177,9 +179,10 @@ function resolvePullConfig(
       "Workspace URL is required, plus a way to sign in: either a workspace token, or a service principal's client ID and secret together.",
     ],
     anthropic_admin: [
-      () => buildAnthropicAdminPullConfig(composer, { requireCredentials }),
+      () =>
+        buildAnthropicAdminPullConfig(composer, { shouldRequireCredentials }),
       "Missing or invalid Anthropic fields",
-      requireCredentials
+      shouldRequireCredentials
         ? "Admin API key is required, report must be `usage` or `cost`, bucket width is usage-only and must be 1m/1h/1d, and the backfill start must be a calendar date (2026-08-01) or an instant carrying a timezone (2026-08-01T00:00:00Z)."
         : "Report must be `usage` or `cost`, bucket width is usage-only and must be 1m/1h/1d, and the backfill start must be a calendar date (2026-08-01) or an instant carrying a timezone (2026-08-01T00:00:00Z). Leave the admin API key blank to keep the current one.",
     ],
@@ -1814,7 +1817,7 @@ function buildHttpCustomPullConfig(
  * here would sit in the row looking fine and fail on every pull — so the
  * builder is the last checkpoint before the database.
  *
- * `requireCredentials` is the one thing that differs between creating a source
+ * `shouldRequireCredentials` is the one thing that differs between creating a source
  * and editing one, and it defaults to the stricter case. On create there is no
  * stored secret to fall back on, so a blank token is a broken source. On edit
  * the secret is never shown — `toDto` strips it — so a blank token means
@@ -1829,12 +1832,14 @@ function buildHttpCustomPullConfig(
  */
 export function buildAnthropicAdminPullConfig(
   c: ComposerState,
-  { requireCredentials = true }: { requireCredentials?: boolean } = {},
+  {
+    shouldRequireCredentials = true,
+  }: { shouldRequireCredentials?: boolean } = {},
 ): Record<string, unknown> | null {
   const p = c.parserConfig;
   const token = trimmedField(p, "credentialsToken");
   const report = trimmedField(p, "report").toLowerCase();
-  if (!token && requireCredentials) return null;
+  if (!token && shouldRequireCredentials) return null;
   if (report !== "usage" && report !== "cost") return null;
 
   const bucketWidth = validBucketWidth(trimmedField(p, "bucketWidth"), report);
@@ -2434,7 +2439,7 @@ export function buildEditSubmission({
         ottlStatements,
         pullSchedule,
       },
-      { requireCredentials: false },
+      { shouldRequireCredentials: false },
     );
     // Refusing here is the whole point of the builder: nothing validates this
     // server-side, so a bad value saved now surfaces as a failing pull an hour
