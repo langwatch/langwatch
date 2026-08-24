@@ -32,93 +32,110 @@
 	font-display: swap;
 }
 
-:root {
-	/* The ground the whole viewport stands on: the site's paper. */
-	--lw-front-door-ground: #ffffff;
-	/* The primary action is the brand orange on both grounds. It used to be an
-	   ink pill here and orange only on dark, on the reasoning that orange was
-	   the accent and never the button — but the two themes then disagreed
-	   about what the most important thing on the screen looks like, and the
-	   door is the one place every customer sees before they see anything else.
+/*
+ * COLOUR LIVES IN THE THEME, NOT HERE.
+ *
+ * The sixteen `--lw-front-door-*` properties that used to be declared twice in
+ * this file (once for paper, once for ink) are semantic tokens now, in
+ * `frontDoorTheme.ts`. Chakra emits them as `--chakra-colors-front-door-*` and
+ * resolves the ground the same way it does for every other surface in the app,
+ * so a component writes `bg="frontDoor.action"` instead of importing a `var()`
+ * string, and there is one vocabulary rather than two.
+ *
+ * What is left in this file is what a token cannot hold: gradients, the
+ * wide-gamut upgrade, keyframes, and the glass effects that need real CSS.
+ */
 
-	   Deepened from the dark theme's #f56b1a: white on the vivid orange is
-	   about 2.9:1, which fails on a white ground at this text size. This cut
-	   clears 4.5:1 and still reads as the same orange. */
-	--lw-front-door-action: #c2510a;
-	--lw-front-door-action-hover: #a83e05;
-	--lw-front-door-on-action: #ffffff;
-	/* Text on a tinted surface, and the tint itself: the brand's own cuts. */
-	--lw-front-door-ink: #a83e05;
-	--lw-front-door-tint: #fdece0;
-	--lw-front-door-hairline: rgba(20, 20, 23, 0.12);
-	/* Refusals. The accent is not allowed to say "wrong", so this is the only
-	   other colour these screens carry. */
-	--lw-front-door-danger: #c53030;
-	/* Focus rings, badges, hairline accents: everything that is the brand
-	   without being the button. */
-	--lw-front-door-detail: #f56b1a;
-	--lw-front-door-focus-ring: rgba(245, 107, 26, 0.22);
-	/* The one gradient word: blue into warm orange, the site's `.text-gradient`. */
+:root {
+	/* The one gradient word: blue into warm orange, the site's
+	   `.text-gradient`. Not a colour token - Chakra's `colors` namespace holds
+	   colours, and this is a paint. */
 	--lw-front-door-accent-gradient: linear-gradient(
 		100deg,
 		#2563eb 0%,
 		#d9531e 100%
 	);
-	/* The glass the card is made of: the site's light glass — a thin milky
-	   surface with a bright hairline and an inner highlight, the ground
-	   showing through it. Thin enough that the mesh's colour actually moves
-	   inside the card; the fields below are what carry the type. */
-	--lw-front-door-card-bg: rgba(255, 255, 255, 0.4);
-	--lw-front-door-card-border: rgba(255, 255, 255, 0.85);
+	/* The card's shadow: three stacked layers, which `shadows` could hold but
+	   only by splitting one effect across two token systems. It stays here,
+	   beside the glass it belongs to. */
 	--lw-front-door-card-shadow:
 		inset 0 1px 1px rgba(255, 255, 255, 0.9),
 		inset 0 0 0 0.5px rgba(255, 255, 255, 0.5),
 		0 24px 48px -20px rgba(20, 20, 23, 0.28);
-	/* Fields sit a step more solid than the card, so type stays crisp. */
-	--lw-front-door-field-bg: rgba(255, 255, 255, 0.62);
-	--lw-front-door-field-border: rgba(20, 20, 23, 0.14);
-	/* The warmth an activation gives off: the brand, as light rather than
-	   as a surface. */
-	--lw-front-door-glow: rgba(245, 107, 26, 0.28);
 }
 
 .dark {
-	/* The site's dark band: ink-950, not the app panel grey. */
-	--lw-front-door-ground: #0a0a0c;
-	/* On ink, the action is the brand itself: the orange that is LangWatch,
-	   which reads as a light source here the way it never could on paper. */
-	--lw-front-door-action: rgba(245, 107, 26, 0.92);
-	--lw-front-door-action-hover: #ff8a3d;
-	--lw-front-door-on-action: #ffffff;
-	--lw-front-door-ink: #ff8a3d;
-	--lw-front-door-tint: rgba(245, 107, 26, 0.18);
-	--lw-front-door-hairline: rgba(239, 238, 233, 0.14);
-	/* The light red is unreadable on a dark ground: it fails contrast against
-	   the panel and reads as brown. This is the same red, lifted. */
-	--lw-front-door-danger: #e08573;
-	/* Details step up a stop, so a focus ring is visible on a dark field
-	   without lighting up like a solid button — and the border itself eases
-	   off, because a solid orange rectangle on ink reads as an alarm. */
-	--lw-front-door-detail: rgba(255, 138, 61, 0.75);
-	--lw-front-door-focus-ring: rgba(255, 138, 61, 0.22);
 	/* The site's `.text-gradient-dark`: the same pair, lifted to read on ink. */
 	--lw-front-door-accent-gradient: linear-gradient(
 		100deg,
 		#5fa3ff 0%,
 		#ffa24d 100%
 	);
-	/* Dark glass is smoked, not clear: an ink-tinted pane with the site's
-	   white/10 hairline. The glow still moves through the blur, but the type
-	   always has a dark floor under it — a clear film over a bright warp left
-	   the words fighting the light behind them. */
-	--lw-front-door-card-bg: rgba(10, 10, 12, 0.55);
-	--lw-front-door-card-border: rgba(255, 255, 255, 0.1);
+	/* Dark glass is smoked, not clear, so the type always has a dark floor
+	   under it - a clear film over a bright warp left the words fighting the
+	   light behind them. */
 	--lw-front-door-card-shadow:
 		inset 0 1px 0 rgba(255, 255, 255, 0.06),
 		0 24px 60px -24px rgba(0, 0, 0, 0.65);
-	--lw-front-door-field-bg: rgba(255, 255, 255, 0.06);
-	--lw-front-door-field-border: rgba(255, 255, 255, 0.14);
-	--lw-front-door-glow: rgba(255, 138, 61, 0.22);
+}
+
+/*
+ * WIDE GAMUT.
+ *
+ * sRGB cannot show the brand orange. #f56b1a is already at the edge of the
+ * space and the deepened #c2510a is a compromise made twice over - once for
+ * contrast, once for the gamut - so on a display that can do better, it
+ * should.
+ *
+ * These re-declare the THEME's own emitted variables rather than introducing a
+ * second set, which is what keeps one source of truth: the token holds the
+ * sRGB value every display can render, and this block upgrades it in place
+ * where `color(display-p3 ...)` is available. A browser without `color-gamut`
+ * support, or a display without the gamut, never enters the block and never
+ * sees a colour it would have to clip.
+ *
+ * Only the ORANGES are lifted. White, ink and the neutral alphas are identical
+ * in both spaces, so restating them would be noise; the red is left alone
+ * because a refusal gains nothing from being more saturated.
+ */
+@media (color-gamut: p3) {
+	:root {
+		--chakra-colors-front-door-action: color(display-p3 0.706 0.325 0.055);
+		--chakra-colors-front-door-action-hover: color(display-p3 0.62 0.247 0.02);
+		--chakra-colors-front-door-ink: color(display-p3 0.62 0.247 0.02);
+		--chakra-colors-front-door-detail: color(display-p3 0.91 0.427 0.114);
+		--chakra-colors-front-door-tint: color(display-p3 0.98 0.925 0.882);
+		--chakra-colors-front-door-focus-ring: color(
+			display-p3 0.91 0.427 0.114 / 0.22
+		);
+		--chakra-colors-front-door-glow: color(display-p3 0.91 0.427 0.114 / 0.28);
+		--lw-front-door-accent-gradient: linear-gradient(
+			100deg,
+			color(display-p3 0.161 0.373 0.898) 0%,
+			color(display-p3 0.831 0.337 0.133) 100%
+		);
+	}
+
+	.dark {
+		--chakra-colors-front-door-action: color(
+			display-p3 0.91 0.427 0.114 / 0.92
+		);
+		--chakra-colors-front-door-action-hover: color(display-p3 0.98 0.549 0.259);
+		--chakra-colors-front-door-ink: color(display-p3 0.98 0.549 0.259);
+		--chakra-colors-front-door-detail: color(
+			display-p3 0.98 0.549 0.259 / 0.75
+		);
+		--chakra-colors-front-door-tint: color(display-p3 0.91 0.427 0.114 / 0.18);
+		--chakra-colors-front-door-focus-ring: color(
+			display-p3 0.98 0.549 0.259 / 0.22
+		);
+		--chakra-colors-front-door-glow: color(display-p3 0.98 0.549 0.259 / 0.22);
+		--lw-front-door-accent-gradient: linear-gradient(
+			100deg,
+			color(display-p3 0.408 0.639 1) 0%,
+			color(display-p3 1 0.639 0.318) 100%
+		);
+	}
 }
 
 /*
@@ -165,8 +182,16 @@
    palette is always painted underneath, and the shader fades in over it once
    its first frame exists. What a visitor sees is colour that sharpens, not a
    blank page that suddenly acquires a background. */
-.lw-front-door-shader-arrive {
-	animation: lw-front-door-arrive 700ms ease 120ms both;
+/* Declared INSIDE a no-preference query rather than switched off by a reduce
+   one, which is the rule this file states at the top and this animation was
+   the one exception to. The difference is not cosmetic: opting out means a
+   visitor who asked for less motion loads a page that starts animating and
+   then stops, and the pattern also silently fails wherever the override loses
+   a specificity fight. Opting IN means the animation never exists for them. */
+@media (prefers-reduced-motion: no-preference) {
+	.lw-front-door-shader-arrive {
+		animation: lw-front-door-arrive 700ms ease 120ms both;
+	}
 }
 
 /* Only a `from`: each layer fades up to its own resting opacity — the warp
@@ -177,57 +202,80 @@
 	}
 }
 
-@media (prefers-reduced-motion: reduce) {
-	.lw-front-door-shader-arrive {
-		animation: none;
-	}
-}
-
 /* The live dark shader sits in the site's own frame: anchored to the card's
    side, full height, bled past every edge so no seam of bare ground shows,
    dissolving toward the reading side. */
+/*
+ * The dissolve is the STAGE's, not this rule's. `--lw-ground-hold` is where
+ * the colour is still solid and `--lw-ground-reach` is how much of the page it
+ * crosses; `FrontDoorGround` writes both from the tweened stage, so the field
+ * opens out or draws back as somebody moves through a door, and the two doors
+ * do not get the same amount of the page.
+ *
+ * The fade also runs much further than it used to. It held solid to 30% and
+ * was gone by 84%, which is a band of about half the width — short enough to
+ * read as the edge of a shape. Now it holds to whatever the stage says (35%
+ * at the tightest, 5% at the loosest) and does not reach nothing until 100%,
+ * so what is left is light falling off rather than a cloud with a border.
+ *
+ * The fallbacks are the resting values, for the frame before React has set
+ * anything and for a machine that never runs the component at all.
+ */
 .lw-front-door-warp {
 	position: absolute;
 	top: -12%;
 	right: -12%;
-	width: 84%;
+	width: calc(84% * var(--lw-ground-reach, 1));
 	height: 124%;
 	opacity: 0.55;
 	-webkit-mask-image: linear-gradient(
 		to left,
 		black 0%,
-		black 30%,
-		rgba(0, 0, 0, 0.5) 56%,
-		transparent 84%
+		black var(--lw-ground-hold, 30%),
+		rgba(0, 0, 0, 0.45) 62%,
+		rgba(0, 0, 0, 0.12) 86%,
+		transparent 100%
 	);
 	mask-image: linear-gradient(
 		to left,
 		black 0%,
-		black 30%,
-		rgba(0, 0, 0, 0.5) 56%,
-		transparent 84%
+		black var(--lw-ground-hold, 30%),
+		rgba(0, 0, 0, 0.45) 62%,
+		rgba(0, 0, 0, 0.12) 86%,
+		transparent 100%
 	);
+	transition:
+		width 900ms ease,
+		mask-image 900ms ease;
 }
 
 /* Where the card stands alone, the glow stands behind it instead of off to
    one side: same shader, held in a centred pool. */
+/* The centred pool takes the same two knobs: `reach` widens the ellipse and
+   `hold` is how much of it stays solid before the fall-off starts. It runs to
+   nothing at 100% for the same reason the side one does — an edge at 85% is
+   an edge. */
 .lw-front-door-warp--center {
 	top: -12%;
 	right: auto;
 	left: 50%;
 	transform: translateX(-50%);
-	width: 130%;
+	width: calc(130% * var(--lw-ground-reach, 1));
 	-webkit-mask-image: radial-gradient(
 		ellipse 62% 70% at 50% 42%,
 		black 0%,
-		rgba(0, 0, 0, 0.7) 55%,
-		transparent 85%
+		black var(--lw-ground-hold, 30%),
+		rgba(0, 0, 0, 0.55) 62%,
+		rgba(0, 0, 0, 0.16) 84%,
+		transparent 100%
 	);
 	mask-image: radial-gradient(
 		ellipse 62% 70% at 50% 42%,
 		black 0%,
-		rgba(0, 0, 0, 0.7) 55%,
-		transparent 85%
+		black var(--lw-ground-hold, 30%),
+		rgba(0, 0, 0, 0.55) 62%,
+		rgba(0, 0, 0, 0.16) 84%,
+		transparent 100%
 	);
 }
 
@@ -342,14 +390,14 @@
 .lw-front-door-primary:hover {
 	box-shadow:
 		inset 0 1px 0 rgba(255, 255, 255, 0.28),
-		0 2px 18px -4px var(--lw-front-door-glow);
+		0 2px 18px -4px var(--chakra-colors-front-door-glow);
 }
 
 .lw-front-door-primary:active {
 	transform: translateY(1px);
 	box-shadow:
 		inset 0 1px 0 rgba(255, 255, 255, 0.28),
-		0 4px 26px -6px var(--lw-front-door-glow);
+		0 4px 26px -6px var(--chakra-colors-front-door-glow);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -367,8 +415,8 @@
    a slow breath of the brand's light, so clicking into a field feels like
    the surface noticed. */
 .lw-front-door-card {
-	background: var(--lw-front-door-card-bg) !important;
-	border-color: var(--lw-front-door-card-border) !important;
+	background: var(--chakra-colors-front-door-card-bg) !important;
+	border-color: var(--chakra-colors-front-door-card-border) !important;
 	box-shadow: var(--lw-front-door-card-shadow);
 	-webkit-backdrop-filter: blur(26px) saturate(1.5);
 	backdrop-filter: blur(26px) saturate(1.5);
@@ -380,7 +428,7 @@
 .lw-front-door-card:focus-within {
 	box-shadow:
 		var(--lw-front-door-card-shadow),
-		0 0 56px -14px var(--lw-front-door-glow);
+		0 0 56px -14px var(--chakra-colors-front-door-glow);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -415,7 +463,7 @@
 .lw-front-door-hairline {
 	flex: 1;
 	height: 1px;
-	background: var(--lw-front-door-hairline);
+	background: var(--chakra-colors-front-door-hairline);
 }
 
 /* "Last used" floats on the shoulder of the method it belongs to. */
@@ -433,7 +481,7 @@
 	width: 8px;
 	height: 8px;
 	border-radius: 9999px;
-	background: var(--lw-front-door-detail);
+	background: var(--chakra-colors-front-door-detail);
 }
 
 @media (prefers-reduced-motion: no-preference) {

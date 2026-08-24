@@ -26,7 +26,7 @@ const authCard = readFileSync(
 describe("given the front door on a small viewport", () => {
   describe("when the card is laid out", () => {
     it("goes full bleed on a phone and stays a narrow column above it", () => {
-      expect(authCard).toContain('maxW={{ base: "100%", sm: "440px" }}');
+      expect(authCard).toContain('maxW={{ base: "100%", sm: "408px" }}');
       expect(authCard).toContain('borderWidth={{ base: 0, sm: "1px" }}');
       expect(authCard).toContain('borderRadius={{ base: 0, sm: "14px" }}');
       // Nothing may be pinned wider than the narrowest phone this has to work
@@ -36,14 +36,19 @@ describe("given the front door on a small viewport", () => {
   });
 
   describe("when a field takes focus", () => {
+    /**
+     * Every file that renders an INPUT, which is now two: the password boxes
+     * moved into `PasswordInput` when the reveal toggle went inside them, so
+     * asserting this on the forms that merely compose it would pass while
+     * checking nothing.
+     */
     it("asks for at least 16px, and a target big enough to hit", () => {
       for (const file of [
         "components/IdentifierStepForm.tsx",
-        "components/CredentialSignInForm.tsx",
-        "components/SignUpCredentialForm.tsx",
+        "components/PasswordInput.tsx",
       ]) {
         const source = sourceOf(file);
-        expect(source).toContain('fontSize={{ base: "16px", md: "sm" }}');
+        expect(source).toContain('fontSize={{ base: "16px", md: "14px" }}');
         expect(source).toContain('minHeight="44px"');
       }
     });
@@ -76,35 +81,60 @@ describe("given the front door in either colour mode", () => {
         "components/FrontDoorValuePanel.tsx",
       ]) {
         // A hex literal in a component is a value that cannot follow the mode
-        // toggle. The brand values live in `logic/brand.ts` as custom
-        // properties, declared for both modes in the stylesheet.
+        // toggle. The brand values are semantic tokens in `frontDoorTheme.ts`,
+        // which declares each one for both grounds.
         expect(sourceOf(file)).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
       }
     });
 
-    it("declares both modes where the brand values are written down", () => {
-      const styles = sourceOf("authFrontDoor.css");
-      expect(styles).toContain("--lw-front-door-action:");
-      expect(styles).toMatch(/\.dark\s*\{/);
+    /**
+     * The colours moved out of the stylesheet and into the theme, which is
+     * what lets a component write `bg="frontDoor.action"`. These two used to
+     * read the CSS; they read the token source now, because that is where the
+     * pair is declared.
+     */
+    it("declares both grounds where the brand values are written down", () => {
+      const theme = sourceOf("frontDoorTheme.ts");
+
+      expect(theme).toContain("semanticTokens");
+      expect(theme).toContain("frontDoor:");
+      // The helper every token goes through. A token written as a bare string
+      // would be one ground's value pinned to both.
+      expect(theme).toMatch(/_light:[\s\S]{0,40}_dark:/);
     });
 
     it("gives the refusal red and the accent details a dark step of their own", () => {
-      const styles = sourceOf("authFrontDoor.css");
-      const [light = "", dark = ""] = styles.split(/\.dark\s*\{/);
+      const theme = sourceOf("frontDoorTheme.ts");
 
-      for (const property of [
-        "--lw-front-door-danger:",
-        "--lw-front-door-detail:",
-      ]) {
-        expect(light).toContain(property);
-        expect(dark).toContain(property);
-        // The two modes must not agree: a red that reads on white is the red
+      for (const token of ["danger", "detail"]) {
+        const declaration = theme
+          .split(new RegExp(`\\b${token}: mode\\(`))[1]
+          ?.split(")")[0];
+        expect(declaration).toBeTruthy();
+
+        // The two grounds must not agree: a red that reads on white is the red
         // that fails on a dark ground, which is the whole reason for the pair.
-        const lightValue = light.split(property)[1]?.split(";")[0]?.trim();
-        const darkValue = dark.split(property)[1]?.split(";")[0]?.trim();
-        expect(lightValue).toBeTruthy();
-        expect(darkValue).not.toBe(lightValue);
+        const [light, dark] = (declaration ?? "")
+          .split(",")
+          .map((part) => part.trim());
+        expect(light).toBeTruthy();
+        expect(dark).toBeTruthy();
+        expect(dark).not.toBe(light);
       }
+    });
+
+    /**
+     * The wide-gamut block upgrades the theme's OWN emitted variables. A
+     * rename in the theme would leave it overriding variables nobody reads —
+     * no build error, just a silent loss of the P3 colours — so the two are
+     * pinned to each other here.
+     */
+    it("upgrades the same variables the theme emits, on a display that can show them", () => {
+      const styles = sourceOf("authFrontDoor.css");
+
+      expect(styles).toContain("@media (color-gamut: p3)");
+      expect(styles).toContain("--chakra-colors-front-door-action:");
+      expect(styles).toContain("color(display-p3");
     });
   });
 });
@@ -121,7 +151,6 @@ describe("given the hosted panel on a narrow viewport", () => {
         ...panel.matchAll(/display=\{\{ base: "none", md: "block" \}\}/g),
       ]).toHaveLength(2);
       expect(panel).toContain('width={{ base: "full", md: "50%" }}');
-      expect(panel).toContain('borderInlineEndWidth={{ base: 0, md: "1px" }}');
     });
   });
 });

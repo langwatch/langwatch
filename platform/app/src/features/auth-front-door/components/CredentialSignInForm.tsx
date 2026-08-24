@@ -6,10 +6,10 @@ import { z } from "zod";
 import { api } from "~/utils/api";
 import Link from "~/utils/compat/next-link";
 import "../authFrontDoor.css";
+import { SHAPE } from "../frontDoorTheme";
 import { useFocusWhenSettled } from "../hooks/useFocusWhenSettled";
 import { useRetryCountdown } from "../hooks/useRetryCountdown";
 import { attemptCredentialSignIn } from "../logic/attemptCredentialSignIn";
-import { BRAND, SHAPE } from "../logic/brand";
 import { describeRemainingWait } from "../logic/credentialSignIn";
 import { rememberLastUsedMethod } from "../logic/lastUsedMethod";
 import { EmailPill } from "./EmailPill";
@@ -182,8 +182,8 @@ export function CredentialSignInForm({
           <Alert.Root
             status="error"
             borderStartWidth="4px"
-            borderStartColor={BRAND.danger}
-            color={BRAND.danger}
+            borderStartColor={"frontDoor.danger"}
+            color={"frontDoor.danger"}
           >
             <Alert.Content>
               <Alert.Description data-testid="signin-failure">
@@ -207,9 +207,9 @@ export function CredentialSignInForm({
           minHeight="44px"
           fontWeight={600}
           borderRadius={SHAPE.action}
-          backgroundColor={BRAND.action}
-          color={BRAND.onAction}
-          _hover={{ backgroundColor: BRAND.actionHover }}
+          backgroundColor={"frontDoor.action"}
+          color={"frontDoor.onAction"}
+          _hover={{ backgroundColor: "frontDoor.actionHover" }}
           loading={isSubmitting}
           disabled={secondsToWait !== null}
         >

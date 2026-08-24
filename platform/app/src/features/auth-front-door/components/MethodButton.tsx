@@ -1,7 +1,7 @@
 import { Box, Button, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import "../authFrontDoor.css";
-import { SHAPE } from "../logic/brand";
+import { SHAPE } from "../frontDoorTheme";
 
 /**
  * One seat in the rail of ways in.
@@ -47,9 +47,9 @@ export function MethodButton({
       borderRadius={SHAPE.action}
       justifyContent="center"
       overflow="visible"
-      borderColor="var(--lw-front-door-field-border)"
+      borderColor="frontDoor.fieldBorder"
       _hover={{
-        backgroundColor: "var(--lw-front-door-field-bg)",
+        backgroundColor: "frontDoor.fieldBg",
         borderColor: "fg.subtle",
       }}
       loading={isBusy}

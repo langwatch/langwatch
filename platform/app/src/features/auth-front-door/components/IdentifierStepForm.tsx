@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import "../authFrontDoor.css";
+import { SHAPE } from "../frontDoorTheme";
 import { useFocusWhenSettled } from "../hooks/useFocusWhenSettled";
-import { BRAND, SHAPE } from "../logic/brand";
 import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "./FrontDoorField";
 import { MethodDivider } from "./SignInMethodPicker";
 
@@ -136,9 +136,9 @@ export function IdentifierStepForm({
               fontSize="14px"
               fontWeight={600}
               borderRadius={SHAPE.action}
-              backgroundColor={BRAND.action}
-              color={BRAND.onAction}
-              _hover={{ backgroundColor: BRAND.actionHover }}
+              backgroundColor={"frontDoor.action"}
+              color={"frontDoor.onAction"}
+              _hover={{ backgroundColor: "frontDoor.actionHover" }}
               loading={isSubmitting}
             >
               {submitLabel}

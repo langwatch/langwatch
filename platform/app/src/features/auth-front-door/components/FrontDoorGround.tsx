@@ -1,5 +1,5 @@
 import { MeshGradient, Warp } from "@paper-design/shaders-react";
-import { useMemo, useState } from "react";
+import { type CSSProperties, useMemo, useState } from "react";
 import { useColorMode } from "~/components/ui/color-mode";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import "../authFrontDoor.css";
@@ -84,6 +84,20 @@ export function FrontDoorGround({
       }
       data-testid="front-door-ambient"
       aria-hidden="true"
+      // The dissolve and the width are the stage's, published as custom
+      // properties so the masks in the stylesheet read them. They cannot be
+      // Chakra tokens: they change per step and are tweened per frame, which
+      // is a value in motion rather than a value in the design system.
+      //
+      // `--lw-ground-hold` is where the colour is still solid; the mask runs
+      // from there to nothing at the far edge, so a bigger `fade` is a longer
+      // dissolve rather than a smaller cloud.
+      style={
+        {
+          "--lw-ground-hold": `${Math.round((1 - shift.fade) * 100)}%`,
+          "--lw-ground-reach": shift.reach.toFixed(3),
+        } as CSSProperties
+      }
     >
       {/* The floor: always there, so the shader has something to arrive over. */}
       <div className="lw-front-door-ambient-static" />

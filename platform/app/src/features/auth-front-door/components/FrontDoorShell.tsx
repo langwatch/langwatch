@@ -57,7 +57,7 @@ export function FrontDoorShell({
           : "lw-front-door"
       }
       position="relative"
-      backgroundColor="var(--lw-front-door-ground)"
+      backgroundColor="frontDoor.ground"
       minHeight="100vh"
       width="full"
       overflowX="hidden"

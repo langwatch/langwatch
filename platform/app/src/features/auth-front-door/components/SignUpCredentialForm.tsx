@@ -20,7 +20,7 @@ import { signIn } from "~/utils/auth-client";
 import { credentialSignInFailure } from "../logic/credentialSignIn";
 import { rememberLastUsedMethod } from "../logic/lastUsedMethod";
 import "../authFrontDoor.css";
-import { BRAND, SHAPE } from "../logic/brand";
+import { SHAPE } from "../frontDoorTheme";
 import { EmailPill } from "./EmailPill";
 import { FrontDoorField } from "./FrontDoorField";
 import { PasskeySignUpButton } from "./PasskeySignUpButton";
@@ -293,8 +293,8 @@ export function SignUpCredentialForm({
           <Alert.Root
             status="error"
             borderStartWidth="4px"
-            borderStartColor={BRAND.danger}
-            color={BRAND.danger}
+            borderStartColor={"frontDoor.danger"}
+            color={"frontDoor.danger"}
           >
             <Alert.Content>
               <Alert.Description>{submitError}</Alert.Description>
@@ -318,9 +318,9 @@ export function SignUpCredentialForm({
             marginTop={2}
             fontWeight={600}
             borderRadius={SHAPE.action}
-            backgroundColor={BRAND.action}
-            color={BRAND.onAction}
-            _hover={{ backgroundColor: BRAND.actionHover }}
+            backgroundColor={"frontDoor.action"}
+            color={"frontDoor.onAction"}
+            _hover={{ backgroundColor: "frontDoor.actionHover" }}
             loading={register.isPending || isSigningIn}
           >
             Create account

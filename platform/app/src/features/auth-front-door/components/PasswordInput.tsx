@@ -4,7 +4,7 @@ import type { Ref } from "react";
 import { useState } from "react";
 import type { UseFormRegisterReturn } from "react-hook-form";
 import "../authFrontDoor.css";
-import { SHAPE } from "../logic/brand";
+import { SHAPE } from "../frontDoorTheme";
 import { FIELD_FOCUS, FIELD_SURFACE } from "./FrontDoorField";
 
 /**

@@ -2,7 +2,7 @@ import { Box, HStack, Text } from "@chakra-ui/react";
 import { type ReactNode, useId } from "react";
 import type { FieldError } from "react-hook-form";
 import "../authFrontDoor.css";
-import { BRAND, MONO_FONT } from "../logic/brand";
+import { MONO_FONT } from "../frontDoorTheme";
 
 /**
  * One labelled row of the front door's forms: a small quiet label, the input,
@@ -56,7 +56,7 @@ export function FrontDoorField({
           fontSize="12.5px"
           lineHeight="1.5"
           marginTop="6px"
-          color={BRAND.danger}
+          color={"frontDoor.danger"}
         >
           {error.message}
         </Text>
@@ -67,8 +67,8 @@ export function FrontDoorField({
 
 /** The focus treatment every front-door input shares: the brand's ring. */
 export const FIELD_FOCUS = {
-  borderColor: BRAND.detail,
-  boxShadow: "0 0 0 3px var(--lw-front-door-focus-ring)",
+  borderColor: "frontDoor.detail",
+  boxShadow: "0 0 0 3px {colors.frontDoor.focusRing}",
   outline: "none",
 } as const;
 
@@ -78,6 +78,6 @@ export const FIELD_FOCUS = {
  * stay crisp with the ground moving underneath.
  */
 export const FIELD_SURFACE = {
-  backgroundColor: "var(--lw-front-door-field-bg)",
-  borderColor: "var(--lw-front-door-field-border)",
+  backgroundColor: "frontDoor.fieldBg",
+  borderColor: "frontDoor.fieldBorder",
 } as const;

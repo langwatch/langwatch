@@ -2,7 +2,7 @@ import { Box, Heading, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { FullLogo } from "~/components/icons/FullLogo";
 import "../authFrontDoor.css";
-import { HEADING_FONT } from "../logic/brand";
+import { FRONT_DOOR_GRADIENT, HEADING_FONT } from "../frontDoorTheme";
 
 /**
  * The case the hosted product makes, next to the door rather than inside it.
@@ -151,7 +151,7 @@ function AccentedHeadline({ text, accent }: { text: string; accent?: string }) {
       {text.slice(0, at)}
       <Box
         as="span"
-        backgroundImage="var(--lw-front-door-accent-gradient)"
+        backgroundImage={FRONT_DOOR_GRADIENT.accent}
         backgroundClip="text"
         color="transparent"
         paddingRight="0.04em"

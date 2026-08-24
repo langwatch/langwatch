@@ -5,7 +5,7 @@ import { LangChainParrot } from "~/components/icons/LangChainParrot";
 import { OpenAI } from "~/components/icons/OpenAI";
 import { OpenTelemetry } from "~/components/icons/OpenTelemetry";
 import { Vercel } from "~/components/icons/Vercel";
-import { MONO_FONT } from "../logic/brand";
+import { MONO_FONT } from "../frontDoorTheme";
 
 /**
  * What sits under the pitch: the stack somebody's agent is already built on.

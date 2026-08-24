@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { signInMethodActionLabel } from "../logic/methodLabels";
 import { signInRoutingReasonCopy } from "../logic/routingReasonCopy";
 import "../authFrontDoor.css";
-import { BRAND, MONO_FONT } from "../logic/brand";
+import { MONO_FONT } from "../frontDoorTheme";
 import { MethodButton } from "./MethodButton";
 import { PasskeySignInButton } from "./PasskeySignInButton";
 import { SignInMethodIcon } from "./SignInMethodIcon";
@@ -211,8 +211,8 @@ export function LastUsedBadge() {
       paddingX="9px"
       fontSize="10px"
       fontWeight={500}
-      backgroundColor={BRAND.tint}
-      color={BRAND.ink}
+      backgroundColor={"frontDoor.tint"}
+      color={"frontDoor.ink"}
       data-testid="last-used-method"
     >
       Last used
