@@ -123,6 +123,21 @@ Feature: AI Gateway Governance — Ingestion Templates Catalog (personal-workspa
   # Admin catalog surface — READ-ONLY v1
   # ---------------------------------------------------------------------------
 
+  # UNVERIFIED — this scenario does not describe the product as built, and
+  # nothing measures it (no BOUND_TAG among its tags). Three gaps, all
+  # predating the rename above:
+  #   1. `ingestionTemplate:view` is not a permission that exists. The
+  #      Catalog pane gates on `aiTools:manage` (ToolCatalogPanel.tsx:96),
+  #      returning a PermissionRequiredNotice at :108 for anyone without
+  #      it — so this persona never reaches the Ingestion Templates tab.
+  #      Whether read-only template viewing SHOULD need a manage grant is
+  #      a product decision, not a spec typo; left for the owner.
+  #   2. The footer string below does not exist anywhere in the codebase.
+  #   3. "NO Edit button" holds only for platform rows; org-authored rows
+  #      render an 'Edit OTTL' control and a clone action
+  #      (IngestionTemplatesEditor.tsx:28-30,68).
+  # The first two Then clauses are also vacuous as written — both expect
+  # an empty set and would pass against an unbuilt feature.
   @bdd @ingestion-templates @admin-readonly
   Scenario: Admin sees only non-coding-assistant templates as READ-ONLY in the Inventory Catalog
     Given admin "carol@acme.com" has the `ingestionTemplate:view` permission
