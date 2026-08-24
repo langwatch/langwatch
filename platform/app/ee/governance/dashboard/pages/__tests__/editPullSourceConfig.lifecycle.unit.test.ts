@@ -166,6 +166,9 @@ describe("an unrelated edit on a row whose two schedules disagree", () => {
       },
       ottlStatements: [],
       pullSchedule: seededCadence,
+      // A pull source never offers the destination picker, so an edit of one
+      // leaves the field untouched.
+      destination: undefined,
     });
     const commands = { configure: vi.fn(), disable: vi.fn() };
 
@@ -251,6 +254,7 @@ describe("renaming a source an admin has deliberately disabled", () => {
         pullSchedule: "0 */6 * * *",
         storedParserConfig: STORED,
       }),
+      destination: undefined,
     });
 
     // The submission carries a perfectly good cron. The status is what stops
