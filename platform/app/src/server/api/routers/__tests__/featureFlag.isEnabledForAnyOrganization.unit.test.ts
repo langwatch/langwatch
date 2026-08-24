@@ -4,16 +4,21 @@
  * Unit tests for the featureFlag.isEnabledForAnyOrganization tRPC procedure.
  *
  * The procedure receives a list of organization ids from the client. It MUST
- * intersect that list with the caller's actual `OrganizationUser` memberships
- * before evaluating the flag — otherwise an authenticated user could probe
- * the flag state of arbitrary organizations they don't belong to, which leaks
- * business information (e.g. which organizations use governance).
+ * intersect that list with the caller's actual current memberships before
+ * evaluating the flag — otherwise an authenticated user could probe the flag
+ * state of arbitrary organizations they don't belong to, which leaks business
+ * information (e.g. which organizations use governance).
  *
  * Failure mode under test (pre-fix regression): the resolver fanned out
  * `featureFlagService.isEnabled` over every input id without a membership
  * check, so an attacker who knew (or guessed) another org's id could read
  * its flag state. The fix silently drops non-member ids and returns
  * `{ enabled: false }` when the filtered set is empty.
+ *
+ * Second failure mode, narrower and later: the intersection asked only whether
+ * an `OrganizationUser` row existed. Disabling a seat does not delete that row,
+ * so a member an admin had locked out kept reading flag state until the
+ * intersection moved to `isCurrentOrganizationMember`.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -57,15 +62,27 @@ const OWN_ORG_B = "org_own_b";
 const FOREIGN_ORG = "org_foreign";
 const FLAG = "release_ui_ai_governance_enabled" as const;
 
-function buildMockPrisma(memberOf: Set<string>) {
+/**
+ * `memberOf` is every organization with an `OrganizationUser` row for the
+ * user; `disabledIn` is the subset whose seat an admin has turned off. The row
+ * survives that, which is the whole point of the distinction: a membership
+ * check that only asks whether the row exists still says yes.
+ */
+function buildMockPrisma(
+  memberOf: Set<string>,
+  disabledIn = new Set<string>(),
+) {
   return {
     organizationUser: {
-      findUnique: vi.fn(({ where }: any) => {
-        const { userId, organizationId } = where.userId_organizationId;
-        if (userId !== USER_ID) return Promise.resolve(null);
-        return Promise.resolve(
-          memberOf.has(organizationId) ? { organizationId } : null,
-        );
+      findFirst: vi.fn(({ where }: any) => {
+        const { userId, organizationId } = where;
+        if (userId !== USER_ID || !memberOf.has(organizationId)) {
+          return Promise.resolve(null);
+        }
+        return Promise.resolve({
+          role: "MEMBER",
+          disabledAt: disabledIn.has(organizationId) ? new Date(0) : null,
+        });
       }),
     },
   } as unknown as PrismaClient;
@@ -112,6 +129,7 @@ describe("featureFlag.isEnabledForAnyOrganization", () => {
   });
 
   describe("when the input mixes member and non-member organizations", () => {
+    /** @scenario The cross-org flag check rejects arbitrary organization ids */
     it("silently filters non-member ids before evaluating the flag", async () => {
       const caller = buildCaller(buildMockPrisma(new Set([OWN_ORG_A])));
       mockIsEnabled.mockImplementation(
@@ -166,6 +184,26 @@ describe("featureFlag.isEnabledForAnyOrganization", () => {
     });
   });
 
+  describe("when the user's seat in the organization has been disabled", () => {
+    it("does not evaluate the flag there, though the membership row still exists", async () => {
+      const caller = buildCaller(
+        buildMockPrisma(new Set([OWN_ORG_A, OWN_ORG_B]), new Set([OWN_ORG_B])),
+      );
+      mockIsEnabled.mockResolvedValue(true);
+
+      const result = await caller.isEnabledForAnyOrganization({
+        flag: FLAG,
+        organizationIds: [OWN_ORG_A, OWN_ORG_B],
+      });
+
+      expect(result).toEqual({ enabled: true });
+      const evaluatedOrgIds = mockIsEnabled.mock.calls.map(
+        ([, opts]: any) => opts.organizationId,
+      );
+      expect(evaluatedOrgIds).toEqual([OWN_ORG_A]);
+    });
+  });
+
   describe("when the input list is empty", () => {
     it("returns enabled:false without touching prisma or featureFlagService", async () => {
       const prisma = buildMockPrisma(new Set([OWN_ORG_A]));
@@ -177,7 +215,7 @@ describe("featureFlag.isEnabledForAnyOrganization", () => {
       });
 
       expect(result).toEqual({ enabled: false });
-      expect(prisma.organizationUser.findUnique).not.toHaveBeenCalled();
+      expect(prisma.organizationUser.findFirst).not.toHaveBeenCalled();
       expect(mockIsEnabled).not.toHaveBeenCalled();
     });
   });

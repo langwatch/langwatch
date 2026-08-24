@@ -1092,6 +1092,30 @@ async function getCurrentOrganizationRole(args: {
   return currentRoleOf(await getCurrentMembership(args));
 }
 
+/**
+ * Whether the user is a CURRENT member of the organization, with no regard
+ * for what the membership lets them do.
+ *
+ * Exported for the other kind of caller: a procedure that takes an
+ * organization id as *targeting input* rather than as a resource to read.
+ * It has no permission to test — there is nothing of the organization's in
+ * the response — but it still must not evaluate against an id the caller
+ * has no business naming, or the answer itself becomes the leak.
+ *
+ * Routed through the same row and the same disabled-seat policy as every
+ * scoped permission path so a tenancy fix keeps landing in one place. A
+ * caller who checks `OrganizationUser` directly gets a subtly different
+ * answer: the row survives an admin disabling the seat, and a raw existence
+ * check reads that as membership.
+ */
+export async function isCurrentOrganizationMember(args: {
+  prisma: PrismaClient;
+  userId: string;
+  organizationId: string;
+}): Promise<boolean> {
+  return (await getCurrentOrganizationRole(args)) !== null;
+}
+
 /** A denial reached before any binding was read. */
 function refused(denialReason?: AuthzDenialReason): PermissionResult {
   return {

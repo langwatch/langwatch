@@ -283,7 +283,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/governance/cli-tool-mode-policy.feature",
   "specs/ai-gateway/governance/compliance-baseline.feature",
   "specs/ai-gateway/governance/event-log-durability.feature",
-  "specs/ai-gateway/governance/feature-flag-gating.feature",
   "specs/ai-gateway/governance/folds.feature",
   "specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature",
   "specs/ai-gateway/governance/guardrails-project-scope.feature",
