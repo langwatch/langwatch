@@ -1,7 +1,7 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { defaultSettingsMiddleware, wrapLanguageModel } from "ai";
 import { env } from "../../env.mjs";
-import { ensureGatewayV1BaseUrl } from "../app-layer/langy/LangyCredentialService";
+import { ensureGatewayV1BaseUrl } from "@langwatch/langy-contract";
 import { provisionLangyVirtualKey } from "../app-layer/langy/langyVirtualKey";
 import { prisma } from "../db";
 import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "./codexRefusalMessage";

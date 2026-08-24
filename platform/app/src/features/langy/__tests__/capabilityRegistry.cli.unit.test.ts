@@ -1,4 +1,4 @@
-import { CLI_SUBRESOURCE_VERBS } from "@langwatch/langy";
+import { CLI_SUBRESOURCE_VERBS } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 import { FEATURES } from "~/shared/langy/featureMap";
 import { extractPlatformUrl } from "~/utils/platformHref";

@@ -44,7 +44,7 @@ import {
   cardKindFor,
   cliVerbTone,
   type MeasuredCardKind,
-} from "@langwatch/langy";
+} from "@langwatch/langy-contract";
 import {
   type CliCommand,
   featureForCliCommand,

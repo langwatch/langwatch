@@ -14,7 +14,7 @@
 import { Button, Text, VStack } from "@chakra-ui/react";
 // `asJsonDocument` is the shared CLI contract's, not the panel's — the CLI and the
 // panel agree on what a result document IS in exactly one place.
-import { asJsonDocument } from "@langwatch/langy";
+import { asJsonDocument } from "@langwatch/langy-contract";
 import { Search } from "lucide-react";
 import { useRouter } from "~/utils/compat/next-router";
 import {

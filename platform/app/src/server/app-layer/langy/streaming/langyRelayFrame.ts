@@ -15,7 +15,7 @@ import {
   type HerrEnvelope,
   handledErrorFromHerr,
 } from "@langwatch/handled-error";
-import { cliToolResultSchema } from "@langwatch/langy";
+import { cliToolResultSchema } from "@langwatch/langy-contract";
 import * as z from "zod";
 
 /**

@@ -25,11 +25,13 @@
  * costing reads immediately.
  */
 
-import type { LangyEventCursor } from "@langwatch/langy";
-import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy";
+import {
+  LANGY_CONVERSATION_EVENT_TYPES,
+  LangyConversationNotFoundError,
+  extractLangyTextFromParts,
+  type LangyEventCursor,
+} from "@langwatch/langy-contract";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
-import { LangyConversationNotFoundError } from "~/server/app-layer/langy/errors";
-import { extractTextFromParts } from "~/server/app-layer/langy/langy-message.service";
 import { createLangyTokenBuffer } from "./langyTokenBuffer";
 
 /**
@@ -78,7 +80,7 @@ export function abortableDelay(
 
 type ConversationTurnEvents = Awaited<
   ReturnType<
-    ReturnType<typeof getApp>["langy"]["conversations"]["getEventsAfter"]
+    ReturnType<typeof getApp>["langy"]["getEventsAfter"]
   >
 >;
 
@@ -107,7 +109,7 @@ function settlementFromEvent(
     return {
       succeeded: true,
       outcome: event.data.outcome,
-      text: extractTextFromParts(event.data.parts),
+      text: extractLangyTextFromParts(event.data.parts),
       error: null,
     };
   }
@@ -159,7 +161,7 @@ async function readSettlementFromFold({
   let cursor: LangyEventCursor = { acceptedAt: 0, eventId: "" };
   while (!signal.aborted) {
     const events = await getApp()
-      .langy.conversations.getEventsAfter({
+      .langy.getEventsAfter({
         projectId,
         conversationId,
         userId,

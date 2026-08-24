@@ -24,7 +24,7 @@
  * them as questions so the lock state derives correctly, and
  * `LangyToolActivity` excludes the tool part from the activity spine.
  */
-import { type LangyCardPart, parseLangyCardPart } from "@langwatch/langy";
+import { type LangyCardPart, parseLangyCardPart } from "@langwatch/langy-contract";
 
 interface QuestionToolPartLike {
   type?: string;

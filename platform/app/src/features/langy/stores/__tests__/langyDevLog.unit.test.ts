@@ -1,4 +1,4 @@
-import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy";
+import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {

@@ -18,7 +18,7 @@
  * the panel, the composer, the store, the fold — is real.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy";
+import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

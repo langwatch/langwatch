@@ -7,7 +7,7 @@ import {
 import {
   compareLangyEventCursors,
   cursorHasReachedEvent,
-} from "@langwatch/langy";
+} from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 
 /**

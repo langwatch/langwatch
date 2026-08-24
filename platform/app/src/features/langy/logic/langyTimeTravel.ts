@@ -30,7 +30,7 @@
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   type LangyEventCursor,
-} from "@langwatch/langy";
+} from "@langwatch/langy-contract";
 
 import type { LangyMessageDto } from "../data/langy.dtos";
 import {

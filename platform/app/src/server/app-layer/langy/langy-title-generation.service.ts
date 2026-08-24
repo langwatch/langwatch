@@ -14,12 +14,17 @@
  * @see specs/langy/langy-conversation-title.feature
  */
 
-import { LANGY_TITLE_GENERATION } from "@langwatch/langy";
+import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { generateText } from "ai";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
-import type { LangyTrustedMessageReader } from "./langy-message.service";
+type LangyTrustedMessageReader = {
+  getRecordsByConversation(input: {
+    conversationId: string;
+    projectId: string;
+  }): Promise<Array<{ role: string; content: string }>>;
+};
 
 const logger = createLogger("langwatch:langy:title-generator");
 

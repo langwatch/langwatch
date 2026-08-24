@@ -22,7 +22,7 @@ import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
   type LangyEventCursor,
-} from "@langwatch/langy";
+} from "@langwatch/langy-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -54,11 +54,11 @@ vi.mock("../../rbac", async (importOriginal) => {
 });
 
 import { BroadcastService } from "~/server/app-layer/broadcast/broadcast.service";
-import { LangyConversationService } from "~/server/app-layer/langy/langy-conversation.service";
-import { PrismaLangyConversationRepository } from "~/server/app-layer/langy/repositories/langy-conversation.prisma.repository";
-import { createLangyConversationUpdateBroadcastSubscriber } from "~/server/app-layer/langy/subscribers/langy-conversation-update-broadcast.subscriber";
+import { LangyConversationService } from "@langwatch/langy-server/testing";
+import { PrismaLangyConversationRepository } from "@langwatch/langy-server/repositories/prisma/prisma.langy-conversation.repository";
+import { createLangyConversationUpdateBroadcastSubscriber } from "@langwatch/langy-server";
 import { prisma } from "~/server/db";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import type { LangyConversationProcessingEvent } from "@langwatch/langy-server/event-sourcing/langy.events";
 import { appPermissionsService } from "~/test-utils/appPermissionsMock";
 import { createInnerTRPCContext } from "../../trpc";
 import { langyRouter } from "../langy";

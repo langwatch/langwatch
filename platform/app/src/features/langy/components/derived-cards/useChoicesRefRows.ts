@@ -15,7 +15,7 @@
  *   - `pending`  the fetch is still in flight.
  */
 
-import type { LangyDerivedChoicesCard } from "@langwatch/langy";
+import type { LangyDerivedChoicesCard } from "@langwatch/langy-contract";
 import { useEffect, useMemo, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   LangyCliEnvelopeService,
   type LangyToolFrame,
-} from "../langy-cli-envelope.service";
+} from "@langwatch/langy-server/services/langy-cli-envelope.service";
 
 const bashFrame = (overrides: Partial<LangyToolFrame>): LangyToolFrame => ({
   id: "call_1",

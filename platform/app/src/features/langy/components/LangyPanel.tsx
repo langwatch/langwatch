@@ -13,7 +13,7 @@ import {
   type LangyDerivedCard,
   type LangyDerivedChoicesCard,
   renderLangyChoiceSelectionText,
-} from "@langwatch/langy";
+} from "@langwatch/langy-contract";
 import type { UIMessage } from "ai";
 import {
   AppWindow,

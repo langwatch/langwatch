@@ -17,7 +17,7 @@
  * TTL, not the event log (ADR-044 part 2).
  */
 
-import type { CliResultDigest, CliToolResult } from "@langwatch/langy";
+import type { CliResultDigest, CliToolResult } from "@langwatch/langy-contract";
 import {
   LANGY_LIVENESS,
   LANGY_STREAM,

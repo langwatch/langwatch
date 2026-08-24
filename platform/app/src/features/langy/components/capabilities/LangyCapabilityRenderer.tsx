@@ -28,7 +28,7 @@ import {
   namesCreatedResource,
   parseCliToolResult,
   toCliToolResult,
-} from "@langwatch/langy";
+} from "@langwatch/langy-contract";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { digestOfToolCall } from "../../logic/langyCapabilityDigest";
 import { LangyCardBoundary } from "../LangyCardBoundary";

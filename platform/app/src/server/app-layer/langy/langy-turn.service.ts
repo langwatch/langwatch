@@ -21,15 +21,29 @@
  */
 
 import { createHash } from "node:crypto";
-import type { LangyMessagePart } from "@langwatch/langy";
-import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
+import {
+  LANGY_CONVERSATION_STATUS,
+  LangyAgentUnavailableError,
+  LangyConversationNotOwnedError,
+  LangyEmptyMessageError,
+  LangyIdempotencyMismatchError,
+  LangyInsufficientScopeError,
+  LangyModelNotAllowedError,
+  LangyModelNotConfiguredError,
+  LangyTurnInProgressError,
+  LangyTurnNotStoppableError,
+  extractLangyTextFromParts,
+  type LangyMessagePart,
+  type LangyCredentials,
+  type LangyCredentialSession,
+  stripGithubCredentials,
+  type LangyConversationTurnCapability,
+  type LangyCredentialTurnCapability,
+  type LangyMessageTurnCapability,
+  type LangyTurnAdmissionCapability,
+} from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { trace } from "@opentelemetry/api";
-import type {
-  LangyCredentialService,
-  LangyCredentials,
-} from "~/server/app-layer/langy/LangyCredentialService";
-import { stripGithubCredentials } from "~/server/app-layer/langy/LangyCredentialService";
 import { LangySessionKeyScopeError } from "~/server/app-layer/langy/langyApiKey";
 import {
   extractLangyConversationMemory,
@@ -46,34 +60,20 @@ import {
 import type { LangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
 import { renderLangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
 import type { LangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
-import type {
-  LangyMessageRepository,
-  LangyMessageRow,
-} from "~/server/app-layer/langy/repositories/langy-message.repository";
-import { mintRunToken } from "~/server/app-layer/langy/streaming/langyFrameAuth";
+import type { LangyMessageRow } from "@langwatch/langy-contract";
+import { LangyFinalPartsService, mintRunToken } from "@langwatch/langy-server";
 import type { LangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import type { LangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
 import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
 import type { Session } from "~/server/auth";
 import { getLangyTurnsCounter } from "~/server/metrics";
-import type { PromptService } from "~/server/prompt-config/prompt.service";
-import {
-  LangyAgentUnavailableError,
-  LangyConversationNotOwnedError,
-  LangyEmptyMessageError,
-  LangyIdempotencyMismatchError,
-  LangyInsufficientScopeError,
-  LangyModelNotAllowedError,
-  LangyModelNotConfiguredError,
-  LangyTurnInProgressError,
-  LangyTurnNotStoppableError,
-} from "./errors";
-import type { LangyConversationService } from "./langy-conversation.service";
-import { buildFinalAssistantParts } from "./langy-final-parts";
-import { extractTextFromParts } from "./langy-message.service";
+import type { PromptService } from "@langwatch/prompt-contract";
 import { LangyTurnAttempt } from "./langy-turn-attempt";
 import { resolveLangyTurnBaseDependencies } from "./langy-turn-base-dependencies";
-import type { LangyTurnAdmissionRepository } from "./repositories/langy-turn-admission.repository";
+
+type LangyConversationCapability = LangyConversationTurnCapability;
+type LangyCredentialCapability = LangyCredentialTurnCapability;
+type LangyMessageRepository = LangyMessageTurnCapability;
 
 const logger = createLogger("langwatch:langy:turn-service");
 
@@ -140,7 +140,7 @@ let lastRegistryOverrideText: string | null = null;
  * Unconfigured is the default and costs nothing: no prompt service call, no
  * database round trip on the turn path.
  *
- * When configured it DOES cost round trips (`getPromptByIdOrHandle` resolves
+ * When configured it DOES cost round trips (`tryGetPromptByIdOrHandle` resolves
  * the org before reading the config), which is why the caller starts this
  * alongside the other conversation-scoped reads instead of awaiting it on its
  * own — see the overlapped batch in `startConversationTurn`.
@@ -298,14 +298,15 @@ export interface StartConversationTurnInput {
 }
 
 export interface LangyTurnServiceDeps {
-  conversations: LangyConversationService;
-  credentials: LangyCredentialService;
+  finalParts?: LangyFinalPartsService;
+  conversations: LangyConversationCapability;
+  credentials: LangyCredentialCapability;
   /**
    * Reads Langy's versioned prompts (ADR-050). Optional: absent (tests, and any
    * composition that has not wired it) means the in-repo fallback text, which
    * is also what a configured-but-empty registry yields.
    */
-  prompts?: Pick<PromptService, "getPromptByIdOrHandle">;
+  prompts?: Pick<PromptService, "tryGetPromptByIdOrHandle">;
   /**
    * Resolve the project's configured Langy model; rejects when none is
    * configured. The returned `modelId` is the full provider-prefixed id and
@@ -363,7 +364,7 @@ export interface LangyTurnServiceDeps {
     apiKeyId: string;
     projectId: string;
   }) => Promise<void>;
-  admission: LangyTurnAdmissionRepository;
+  admission: LangyTurnAdmissionCapability;
   accessStore: LangyTurnAccessStore | null;
   handoffStore: LangyTurnHandoffStore | null;
   /**
@@ -437,10 +438,17 @@ async function reconstructPartialAnswer(
 }
 
 export class LangyTurnService {
-  private constructor(private readonly deps: LangyTurnServiceDeps) {}
+  private constructor(
+    private readonly deps: LangyTurnServiceDeps & {
+      finalParts: LangyFinalPartsService;
+    },
+  ) {}
 
   static create(deps: LangyTurnServiceDeps): LangyTurnService {
-    return new LangyTurnService(deps);
+    return new LangyTurnService({
+      ...deps,
+      finalParts: deps.finalParts ?? LangyFinalPartsService.create(),
+    });
   }
 
   /**
@@ -494,7 +502,7 @@ export class LangyTurnService {
         })
       : false;
     if (!isActor) {
-      const conv = await conversations.findByIdVisible({
+      const conv = await conversations.tryFindByIdVisible({
         id: conversationId,
         projectId,
         userId,
@@ -525,7 +533,7 @@ export class LangyTurnService {
       projectId,
       conversationId,
       turnId,
-      parts: buildFinalAssistantParts({ text: partialText }),
+      parts: this.deps.finalParts.build({ text: partialText }),
       outcome: "stopped",
     });
 
@@ -644,7 +652,7 @@ export class LangyTurnService {
 
     // Allowlist parity with the turn: warming on a model the turn would
     // reject boots a worker the turn can never reuse.
-    const modelsAllowed = await this.deps.credentials.getModelsAllowed({
+    const modelsAllowed = await this.deps.credentials.tryGetModelsAllowed({
       projectId,
       organizationId: credentials.organizationId,
     });
@@ -754,7 +762,9 @@ export class LangyTurnService {
     // empty turn is one the agent can only 422, and a permanently rejected
     // dispatch used to poison the process outbox with endless retries.
     const lastUserMessage = messages[messages.length - 1];
-    const userText = extractTextFromParts(lastUserMessage?.parts);
+    const userText = extractLangyTextFromParts(
+      lastUserMessage?.parts,
+    );
     if (!userText.trim()) {
       // Self-report like every other rejection branch — without this the
       // empty-send path is invisible in the turn-outcome metric.
@@ -863,7 +873,7 @@ export class LangyTurnService {
       // started while the previous reply streamed), and those must not become
       // the title.
       const title =
-        extractTextFromParts(
+        extractLangyTextFromParts(
           messages.find((message) => message.role === "user")?.parts,
         ).slice(0, 80) || null;
 
@@ -902,24 +912,24 @@ export class LangyTurnService {
         // message. isNew already answers the question the read would.
         conversation.isNew
           ? Promise.resolve(null)
-          : conversationService.findByIdVisible({
+          : conversationService.tryFindByIdVisible({
               id: conversation.id,
               projectId,
               userId,
             }),
         conversation.isNew
           ? Promise.resolve(null)
-          : conversationService.getPendingHandoff({
+          : conversationService.tryGetPendingHandoff({
               projectId,
               conversationId: conversation.id,
             }),
         mintedRunToken
           ? Promise.resolve(mintedRunToken)
-          : conversationService.getRunToken({
+          : conversationService.tryGetRunToken({
               projectId,
               conversationId: conversation.id,
             }),
-        credentialService.getModelsAllowed({
+        credentialService.tryGetModelsAllowed({
           projectId,
           organizationId: credentials.organizationId,
         }),
@@ -937,7 +947,7 @@ export class LangyTurnService {
         // The system-block override (ADR-050). It depends on nothing computed
         // after `resolveLangyTurnBaseDependencies`, so it belongs in this
         // batch: awaiting it on its own at the composition site put two serial
-        // Prisma round trips (`getPromptByIdOrHandle` resolves the org, then
+        // Prisma round trips (`tryGetPromptByIdOrHandle` resolves the org, then
         // reads the config) in front of time-to-first-token on EVERY turn, for
         // a value that is the same for every tenant. Unconfigured (the default)
         // resolves synchronously and costs nothing here either.

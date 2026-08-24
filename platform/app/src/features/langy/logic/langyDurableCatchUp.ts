@@ -2,7 +2,7 @@ import {
   compareLangyEventCursors,
   isLangyTurnProjectionTerminal,
   type LangyEventCursor,
-} from "@langwatch/langy";
+} from "@langwatch/langy-contract";
 
 import type { api } from "~/utils/api";
 import { useLangyDevLog } from "../stores/langyDevLog";

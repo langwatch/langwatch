@@ -21,7 +21,7 @@
  *
  * @see specs/langy/langy-capability-cards.feature
  */
-import type { DigestStrategy } from "@langwatch/langy";
+import type { DigestStrategy } from "@langwatch/langy-contract";
 
 /**
  * Every platform surface a card can point at. The label, path, icon and

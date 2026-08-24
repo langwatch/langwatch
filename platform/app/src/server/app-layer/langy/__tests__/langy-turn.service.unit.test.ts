@@ -1,4 +1,4 @@
-import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
+import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   LangyAgentUnavailableError,
@@ -7,7 +7,7 @@ import {
   LangyModelNotConfiguredError,
   LangyTurnInProgressError,
   LangyTurnNotStoppableError,
-} from "../errors";
+} from "@langwatch/langy-contract";
 import {
   __resetLangyTurnOverrideCacheForTests,
   LangyTurnService,
@@ -17,8 +17,8 @@ import {
 } from "../langy-turn.service";
 import { LANGY_REFERENT_POLICY } from "../langyConversationMemory";
 import { LANGY_TURN_OVERRIDE_FALLBACK } from "../langyPromptRegistry";
-import type { LangyMessageRow } from "../repositories/langy-message.repository";
-import type { LangyTurnAdmissionClaim } from "../repositories/langy-turn-admission.repository";
+import type { LangyMessageRow } from "@langwatch/langy-server/repositories/langy-message.repository";
+import type { LangyTurnAdmissionClaim } from "@langwatch/langy-server/repositories/langy-turn-admission.repository";
 
 const REQUEST_ID = "00000000-0000-4000-8000-000000000001";
 const SESSION = {
@@ -1080,16 +1080,16 @@ describe("when the project holding Langy's versioned prompts is configured", () 
   /** @scenario "A production-tagged registry version is used when present" */
   it("sends the promoted registry text as the system override", async () => {
     process.env[PROJECT_ENV] = "project-system";
-    const getPromptByIdOrHandle = vi.fn(async () => ({
+    const tryGetPromptByIdOrHandle = vi.fn(async () => ({
       prompt: "REGISTRY OVERRIDE TEXT",
     }));
     const { deps, mocks } = makeDeps({
-      prompts: { getPromptByIdOrHandle },
+      prompts: { tryGetPromptByIdOrHandle },
     } as unknown as Partial<LangyTurnServiceDeps>);
 
     await LangyTurnService.create(deps).startConversationTurn(input());
 
-    expect(getPromptByIdOrHandle).toHaveBeenCalledWith(
+    expect(tryGetPromptByIdOrHandle).toHaveBeenCalledWith(
       expect.objectContaining({
         projectId: "project-system",
         tag: "production",
@@ -1103,7 +1103,7 @@ describe("when the project holding Langy's versioned prompts is configured", () 
     process.env[PROJECT_ENV] = "project-system";
     const { deps, mocks } = makeDeps({
       prompts: {
-        getPromptByIdOrHandle: vi.fn(async () => {
+        tryGetPromptByIdOrHandle: vi.fn(async () => {
           throw new Error("registry down");
         }),
       },
@@ -1122,20 +1122,20 @@ describe("when the project holding Langy's versioned prompts is configured", () 
   it("reuses the last text it read when a later read fails, not the constant", async () => {
     process.env[PROJECT_ENV] = "project-system";
     let readCount = 0;
-    const getPromptByIdOrHandle = vi.fn(async () => {
+    const tryGetPromptByIdOrHandle = vi.fn(async () => {
       readCount += 1;
       if (readCount === 1) return { prompt: "REGISTRY OVERRIDE TEXT" };
       throw new Error("registry down");
     });
 
     const first = makeDeps({
-      prompts: { getPromptByIdOrHandle },
+      prompts: { tryGetPromptByIdOrHandle },
     } as unknown as Partial<LangyTurnServiceDeps>);
     await LangyTurnService.create(first.deps).startConversationTurn(input());
     expect(systemOf(first.mocks.dispatch)).toContain("REGISTRY OVERRIDE TEXT");
 
     const second = makeDeps({
-      prompts: { getPromptByIdOrHandle },
+      prompts: { tryGetPromptByIdOrHandle },
     } as unknown as Partial<LangyTurnServiceDeps>);
     await LangyTurnService.create(second.deps).startConversationTurn(input());
 
@@ -1157,7 +1157,7 @@ describe("when the project holding Langy's versioned prompts is configured", () 
     // fall back to the in-repo constant — the text from read 1 is gone on
     // purpose, and a cache that outlives the miss would serve it back on every
     // failure for the rest of the process's life.
-    const getPromptByIdOrHandle = vi.fn(async () => {
+    const tryGetPromptByIdOrHandle = vi.fn(async () => {
       readCount += 1;
       if (readCount === 1) return { prompt: "REGISTRY OVERRIDE TEXT" };
       if (readCount === 2) return null;
@@ -1165,7 +1165,7 @@ describe("when the project holding Langy's versioned prompts is configured", () 
     });
     const startTurn = async () => {
       const { deps, mocks } = makeDeps({
-        prompts: { getPromptByIdOrHandle },
+        prompts: { tryGetPromptByIdOrHandle },
       } as unknown as Partial<LangyTurnServiceDeps>);
       await LangyTurnService.create(deps).startConversationTurn(input());
       return systemOf(mocks.dispatch);
@@ -1187,14 +1187,14 @@ describe("when no prompt project is configured", () => {
   /** @scenario "A turn runs from the in-repo copy when no registry row exists" */
   it("never consults the registry", async () => {
     delete process.env.LANGY_PROMPT_PROJECT_ID;
-    const getPromptByIdOrHandle = vi.fn();
+    const tryGetPromptByIdOrHandle = vi.fn();
     const { deps } = makeDeps({
-      prompts: { getPromptByIdOrHandle },
+      prompts: { tryGetPromptByIdOrHandle },
     } as unknown as Partial<LangyTurnServiceDeps>);
 
     await LangyTurnService.create(deps).startConversationTurn(input());
 
-    expect(getPromptByIdOrHandle).not.toHaveBeenCalled();
+    expect(tryGetPromptByIdOrHandle).not.toHaveBeenCalled();
   });
 });
 

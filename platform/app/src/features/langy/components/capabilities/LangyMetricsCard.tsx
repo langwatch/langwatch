@@ -7,7 +7,7 @@
  */
 
 import { Text, VStack } from "@chakra-ui/react";
-import { asJsonDocument } from "@langwatch/langy";
+import { asJsonDocument } from "@langwatch/langy-contract";
 import type { LangyTurnMetric } from "../../hooks/useLangyTurnSignals";
 import { formatMoneyShort } from "../Money";
 import { StreamingStatCard } from "../StreamingStatCard";

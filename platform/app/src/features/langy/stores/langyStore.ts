@@ -13,7 +13,7 @@ import {
   settleTurn as reduceSettleTurn,
   seedLangyTurnProjection,
   type TurnPhaseState,
-} from "@langwatch/langy";
+} from "@langwatch/langy-contract";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { LangyResourceKind } from "~/shared/langy/langyResourceKinds";

@@ -20,7 +20,7 @@ import {
   renderLangyConversationMemory,
   renderLangyConversationTranscript,
 } from "../langyConversationMemory";
-import type { LangyMessageRow } from "../repositories/langy-message.repository";
+import type { LangyMessageRow } from "@langwatch/langy-server/repositories/langy-message.repository";
 
 /** An assistant message carrying one settled CLI tool part. */
 function agentTurn(

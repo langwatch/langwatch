@@ -40,18 +40,13 @@
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LangyIdentityDenialReason } from "~/server/app-layer/langy/langyApiKeyIdentity";
+import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
+import { getApp } from "~/server/app-layer/app";
 
 // ─── Auth mocks ───────────────────────────────────────────────────────────────
-// The route builds a module-scope `tokenResolver = TokenResolver.create(prisma)`,
-// so TokenResolver must be mocked before the route module is imported.
+// The route resolves credentials through the process App service.
 const mockResolve = vi.fn();
 const mockMarkUsed = vi.fn();
-
-vi.mock("~/server/api-key/token-resolver", () => ({
-  TokenResolver: {
-    create: vi.fn(() => ({ resolve: mockResolve, markUsed: mockMarkUsed })),
-  },
-}));
 
 const mockExtractCredentials = vi.fn();
 const mockEnforceApiKeyCeiling = vi.fn();
@@ -98,16 +93,20 @@ const mockStartConversationTurn = vi.fn();
 vi.mock("~/server/app-layer/app", () => ({
   tryGetApp: () => null,
   getApp: vi.fn(() => ({
-    langy: { turns: { startConversationTurn: mockStartConversationTurn } },
+    apiKeys: {
+      tryResolveToken: mockResolve,
+      markUsed: mockMarkUsed,
+    },
+    langy: { startConversationTurn: mockStartConversationTurn },
   })),
 }));
 
 // ─── App under test ───────────────────────────────────────────────────────────
-// Imported AFTER every mock so the module-scope TokenResolver.create(prisma)
-// picks up the mock rather than the real client.
+// Imported after the process App and transport dependencies are mocked.
 const { app: langyApp } = await import("../langy-api");
 
 const testApp = new Hono();
+testApp.use("*", appContextMiddlewareFor(getApp()));
 testApp.route("/", langyApp);
 
 const TURN_URL = "http://localhost/api/langy/conversations";
@@ -239,7 +238,7 @@ describe("/api/langy refusal chain", () => {
   describe("open surface (flag on)", () => {
     it("lets the ceiling denial through untranslated", async () => {
       const { ApiKeyPermissionDeniedError } = await import(
-        "~/server/api-key/errors"
+        "@langwatch/api-key-contract"
       );
       mockEnforceApiKeyCeiling.mockRejectedValue(
         new ApiKeyPermissionDeniedError("langy:create"),
@@ -325,7 +324,7 @@ describe("/api/langy refusal chain", () => {
       // 202, not 200: the turn is dispatched and the answer does not exist yet.
       expect(res.status).toBe(202);
       expect(await res.json()).toEqual({ conversationId: "conv-1" });
-      expect(mockMarkUsed).toHaveBeenCalledWith({ apiKeyId: "key-1" });
+      expect(mockMarkUsed).toHaveBeenCalledWith({ id: "key-1" });
     });
 
     // The tenancy argument. A 202 alone would still pass if the route handed

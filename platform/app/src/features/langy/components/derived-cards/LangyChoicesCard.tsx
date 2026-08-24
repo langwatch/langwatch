@@ -21,7 +21,7 @@ import type {
   LangyChoiceSelection,
   LangyChoicesLockState,
   LangyDerivedChoicesCard,
-} from "@langwatch/langy";
+} from "@langwatch/langy-contract";
 import { Check, CircleSlash } from "lucide-react";
 import { useState } from "react";
 

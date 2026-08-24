@@ -54,7 +54,7 @@ import {
   LangyCredentialService,
   resolveWorkerCallbackUrl,
   resolveWorkerGatewayBaseUrl,
-} from "../LangyCredentialService";
+} from "../langy-credential.test-adapter";
 
 // Every getOrProvision call now takes the requesting user's session (the mint
 // needs it to compute the held-permission subset). Fixed to user "u1" so the

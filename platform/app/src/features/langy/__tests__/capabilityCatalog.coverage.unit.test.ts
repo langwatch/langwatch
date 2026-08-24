@@ -8,7 +8,7 @@
  *
  * @see specs/langy/langy-capability-cards.feature
  */
-import { DIGEST_STRATEGIES } from "@langwatch/langy";
+import { DIGEST_STRATEGIES } from "@langwatch/langy-contract";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { describe, expect, it } from "vitest";

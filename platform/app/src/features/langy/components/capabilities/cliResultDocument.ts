@@ -23,7 +23,7 @@ import {
   asJsonDocument,
   paginationSchema,
   textValueSchema,
-} from "@langwatch/langy";
+} from "@langwatch/langy-contract";
 
 /** Keys whose array value is the result list in a LangWatch JSON document. */
 const COLLECTION_KEYS = ["traces", "items", "records", "results", "data"];

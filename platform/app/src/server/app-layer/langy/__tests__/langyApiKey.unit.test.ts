@@ -24,10 +24,8 @@ vi.mock("~/server/api/rbac", () => ({
 }));
 
 const apiKeyCreate = vi.fn();
-vi.mock("~/server/api-key/api-key.service", () => ({
-  ApiKeyService: {
-    create: vi.fn(() => ({ create: apiKeyCreate })),
-  },
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({ apiKeys: { create: apiKeyCreate } }),
 }));
 
 import {

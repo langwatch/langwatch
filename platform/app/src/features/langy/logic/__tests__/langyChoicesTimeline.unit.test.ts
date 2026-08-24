@@ -1,4 +1,4 @@
-import { deriveLangyChoicesLockState } from "@langwatch/langy";
+import { deriveLangyChoicesLockState } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 
 import { langyChoicesTimeline } from "../langyChoicesTimeline";

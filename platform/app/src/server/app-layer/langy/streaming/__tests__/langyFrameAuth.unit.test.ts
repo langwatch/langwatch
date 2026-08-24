@@ -17,7 +17,7 @@ import {
   newFrameNonce,
   signFrame,
   verifyFrame,
-} from "../langyFrameAuth";
+} from "@langwatch/langy-server/streaming/langy-frame-auth";
 
 interface Vectors {
   vectors: Array<

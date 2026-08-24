@@ -1,22 +1,22 @@
 import {
-  AppGovernancePipelineRuntime,
-  type EnterprisePipelineSetConfig,
-} from "@ee/event-sourcing/pipelineSet";
-import type { GatewayDebitsProcessDeps } from "@ee/governance/process-manager/gatewayDebits.process";
+  AppGovernanceEventingAdapter,
+  type AppGovernanceEventingAdapterOptions,
+} from "~/runtime/app/features/governance/governance-eventing.adapter";
 import {
-  createGovernanceKpisSyncHandler,
+  AppGatewayDebitAdapter,
+  type AppGatewayDebitAdapterDependencies,
+} from "~/runtime/app/features/governance/gateway-debit.adapter";
+import {
   GOVERNANCE_KPIS_SYNC_WINDOW_MS,
-  type GovernanceKpisSyncSubscriberDeps,
-  isGovernanceKpiTrace,
-} from "@ee/governance/subscribers/governanceKpisSync.subscriber";
-import {
-  createGovernanceOcsfEventsSyncHandler,
   GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS,
-  type GovernanceOcsfEventsSyncSubscriberDeps,
-  isGovernanceOcsfTrace,
-} from "@ee/governance/subscribers/governanceOcsfEventsSync.subscriber";
-import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
+} from "@langwatch/enterprise-governance-server";
+import {
+  AppGovernanceSubscriberAdapter,
+  type AppGovernanceKpisSubscriberDependencies,
+  type AppGovernanceOcsfSubscriberDependencies,
+} from "~/runtime/app/features/governance/governance-subscriber.adapter";
 import type { WebhookDeliveryProcessDeps } from "~/runtime/app/features/webhooks";
+import { AppGovernanceWebhookAdapter } from "~/runtime/app/features/governance/governance-webhook.adapter";
 import type {
   AppendStore,
   EventSourcing,
@@ -24,6 +24,7 @@ import type {
   ProcessStore,
   StateProjectionStore,
   StaticPipelineDefinition,
+  TriggerContext,
 } from "@langwatch/eventing";
 import {
   type CommandDispatcher,
@@ -39,25 +40,20 @@ import type {
   LangyConversationStateData,
   LangyConversationTurnData,
   LangyMessageProjectionRecord,
-} from "@langwatch/langy";
+} from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import type { Cluster, Redis } from "ioredis";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { recordTrackedEventSpan } from "~/server/app-layer/events/track-event.service";
 import { reapExpiredLangySessionApiKeys } from "~/server/app-layer/langy/langyApiKey";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
-import { DatasetRepository } from "~/server/datasets/dataset.repository";
-import {
-  createDatasetNormalizeHandler,
-  type DatasetNormalizePayload,
-} from "~/server/datasets/dataset-normalize.job";
-import { registerDatasetNormalizeEnqueue } from "~/server/datasets/dataset-normalize.queue";
-import { getDatasetStorage } from "~/server/datasets/dataset-storage";
+import type { DatasetNormalizePayload } from "@langwatch/dataset-server";
 import { featureFlagService } from "~/server/featureFlag";
 import type { GatewaySpendEventsRepository } from "~/server/gateway/spendEvents.clickhouse.repository";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import type { UsageReportingService } from "~/runtime/app/features/billing";
-import type { TriggerService } from "../../app-layer/automations/trigger.service";
+import type { AutomationService } from "@langwatch/automation-contract";
+import type { EvaluationService } from "@langwatch/evaluation-contract";
 import type { BillingCheckpointService } from "../../app-layer/billing/billingCheckpoint.service";
 import type { BroadcastService } from "../../app-layer/broadcast/broadcast.service";
 import type { CodingAgentSessionRepository } from "../../app-layer/coding-agent/repositories/coding-agent-session.repository";
@@ -77,19 +73,19 @@ import {
   revokeLangySessionApiKey,
 } from "../../app-layer/langy/langyApiKey";
 import type { LangyWorkerPort } from "../../app-layer/langy/langyWorker";
-import type { LangyTurnAdmissionRepository } from "../../app-layer/langy/repositories/langy-turn-admission.repository";
+import type { LangyTurnAdmissionCapability } from "@langwatch/langy-contract";
 import type { LangyTokenBuffer } from "../../app-layer/langy/streaming/langyTokenBuffer";
 import type { LangyTurnHandoffStore } from "../../app-layer/langy/streaming/langyTurnHandoff";
 import {
   createAgentTurnLivenessSubscriber,
   createLangyConversationUpdateBroadcastSubscriber,
   createLangyTurnAdmissionLifecycleSubscriber,
-} from "../../app-layer/langy/subscribers";
+} from "@langwatch/langy-server";
 import type { CanonicalLogRecordRepository } from "../../app-layer/logs/repositories/canonical-log-record.repository";
 import type { MetricDataPointRepository } from "../../app-layer/metrics/repositories/metric-data-point.repository";
-import type { MonitorService } from "../../app-layer/monitors/monitor.service";
+import type { MonitorService } from "@langwatch/monitor-contract";
 import type { OrganizationService } from "../../app-layer/organizations/organization.service";
-import type { ProjectService } from "../../app-layer/projects/project.service";
+import type { ProjectService } from "@langwatch/project-contract";
 import { createRateLimitedBootstrap } from "../../app-layer/topic-clustering/topicClusteringBootstrapGate";
 import type { TraceAnalyticsRepository } from "../../app-layer/traces/repositories/trace-analytics.repository";
 import type { TraceAnalyticsRollupRepository } from "../../app-layer/traces/repositories/trace-analytics-rollup.repository";
@@ -152,9 +148,9 @@ import { getOpenAdmissionFindersByInstance } from "../pipelines/gateway-spend-pr
 import { GATEWAY_SPEND_PIPELINE_NAME } from "../pipelines/gateway-spend-processing/schemas/constants";
 import { createGithubMaintenancePipeline } from "../pipelines/github-maintenance/pipeline";
 import { createGovernanceEventsPipeline } from "../pipelines/governance-events/pipeline";
-import { createLangyConversationProcessingPipeline } from "../pipelines/langy-conversation-processing/pipeline";
+import { createLangyConversationProcessingPipeline } from "@langwatch/langy-server";
 import { createLangyEffectPorts } from "../pipelines/langy-conversation-processing/process-manager/langyEffectPorts";
-import type { LangyAnalyticsEventProjectionRecord } from "../pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
+import type { LangyAnalyticsEventProjectionRecord } from "@langwatch/langy-server";
 import { createLangyMaintenancePipeline } from "../pipelines/langy-maintenance/pipeline";
 import { resolveLogCommandShardCount as resolveCanonicalLogCommandShardCount } from "../pipelines/log-processing/canonicalLog";
 import { createLogProcessingPipeline } from "../pipelines/log-processing/pipeline";
@@ -344,7 +340,7 @@ export interface PipelineRepositories {
   /** Write-through topic model store (the Topic table + cursor row). */
   topicModel: StateProjectionStore<TopicModelData>;
   /** Postgres-authoritative logical-send receipts and active-turn claims. */
-  langyTurnAdmission: LangyTurnAdmissionRepository;
+  langyTurnAdmission: LangyTurnAdmissionCapability;
 }
 
 export interface PipelineRegistryDeps {
@@ -367,17 +363,25 @@ export interface PipelineRegistryDeps {
     /** Runs one clustering page (the ADR-051 effect's domain function). */
     runPort: TopicClusteringRunPort;
   };
-  enterprisePipelines: EnterprisePipelineSetConfig;
+  enterprisePipelines: Omit<
+    AppGovernanceEventingAdapterOptions,
+    "eventSourcing"
+  >;
   projects: ProjectService;
   monitors: MonitorService;
-  triggers: TriggerService;
+  automation: AutomationService;
   automations: { ports: AutomationDispatchPorts };
   prisma: PrismaClient;
+  datasetNormalization: {
+    process(payload: DatasetNormalizePayload): Promise<void>;
+    connect(sender: (payload: DatasetNormalizePayload) => Promise<void>): void;
+  };
   traces: {
     summary: TraceSummaryService;
     spans: SpanStorageService;
   };
   evaluations: {
+    service: EvaluationService;
     runs: EvaluationRunService;
     execution: EvaluationExecutionService;
   };
@@ -387,7 +391,7 @@ export interface PipelineRegistryDeps {
   usageReportingService?: UsageReportingService;
   gatewaySpend?: { repository: GatewaySpendEventsRepository };
   webhookDelivery?: WebhookDeliveryProcessDeps;
-  gatewayDebits?: GatewayDebitsProcessDeps;
+  gatewayDebits?: AppGatewayDebitAdapterDependencies;
   /**
    * ADR-022: BlobStore for RecordSpanCommand spool reconstitution.
    * When provided, the trace-processing pipeline wires it into RecordSpanCommand
@@ -395,8 +399,8 @@ export interface PipelineRegistryDeps {
    * best-effort DELETEd after event_log INSERT succeeds.
    */
   blobStore?: BlobStore;
-  governanceKpisSync?: GovernanceKpisSyncSubscriberDeps;
-  governanceOcsfEventsSync?: GovernanceOcsfEventsSyncSubscriberDeps;
+  governanceKpisSync?: AppGovernanceKpisSubscriberDependencies;
+  governanceOcsfEventsSync?: AppGovernanceOcsfSubscriberDependencies;
   retentionPolicyResolver?: RetentionPolicyResolver;
   codingAgent?: {
     /**
@@ -430,6 +434,9 @@ export interface PipelineRegistryDeps {
  * store interfaces and pre-built artifacts — never raw deps like prisma or ClickHouse clients.
  */
 export class PipelineRegistry {
+  private governanceLifecycle:
+    | ReturnType<AppGovernanceEventingAdapter["register"]>["lifecycle"]
+    | undefined;
   constructor(private readonly deps: PipelineRegistryDeps) {}
 
   /**
@@ -459,7 +466,7 @@ export class PipelineRegistry {
 
     const automationPorts = this.deps.automations.ports;
     const graphActivityHandler = createGraphTriggerActivityHandler({
-      triggers: this.deps.triggers,
+      automation: this.deps.automation,
       evaluateGraphTrigger: automationPorts.evaluateGraphTrigger,
     });
     const automationPipeline = this.deps.eventSourcing.register(
@@ -550,7 +557,7 @@ export class PipelineRegistry {
     const evalPipeline = this.registerEvaluationPipeline({
       automations: {
         triggerMatchHandler: createEvaluationAlertTriggerMatchHandler({
-          triggers: this.deps.triggers,
+          automation: this.deps.automation,
           traceSummaryStore,
           recordTriggerMatch: {
             send: automationCommands.recordTriggerMatch,
@@ -590,12 +597,13 @@ export class PipelineRegistry {
       evalPipeline,
       traceSummaryStore,
       automations: {
-        triggerMatchHandler: createTraceAlertTriggerMatchHandler({
-          triggers: this.deps.triggers,
-          recordTriggerMatch: {
-            send: automationCommands.recordTriggerMatch,
-          },
-        }),
+          triggerMatchHandler: AppGovernanceSubscriberAdapter.create()
+          .traceAlerts({
+            triggers: this.deps.automation,
+            matches: {
+              send: automationCommands.recordTriggerMatch,
+            },
+          }),
         graphActivityHandler,
       },
       codingAgentSubscribers: [
@@ -621,10 +629,11 @@ export class PipelineRegistry {
       this.registerLangyConversationPipeline();
     const { pipeline: topicClusteringPipeline } =
       this.registerTopicClusteringPipeline();
-    const enterprisePipelines = AppGovernancePipelineRuntime.create({
+    const enterprisePipelines = AppGovernanceEventingAdapter.create({
       ...this.deps.enterprisePipelines,
       eventSourcing: this.deps.eventSourcing,
     }).register();
+    this.governanceLifecycle = enterprisePipelines.lifecycle;
     const billingPipeline = this.registerBillingReportingPipeline();
     // The grants ledger (ADR-092 §13). The write paths emit through the
     // app-layer ledger module, gated PER ORGANIZATION (decision 4): only an
@@ -657,6 +666,15 @@ export class PipelineRegistry {
       /** Late-bind the execution pool for the simulationRunExecution process manager. */
       scenarioExecutionPool,
     };
+  }
+
+  getGovernanceLifecycle(): NonNullable<
+    PipelineRegistry["governanceLifecycle"]
+  > {
+    if (!this.governanceLifecycle) {
+      throw new Error("Governance pipelines have not been registered");
+    }
+    return this.governanceLifecycle;
   }
 
   /**
@@ -769,7 +787,7 @@ export class PipelineRegistry {
         projectId: string;
         conversationId: string;
       }) => {
-        const projection = await conversationStore.load(conversationId, {
+        const projection = await conversationStore.tryLoad(conversationId, {
           tenantId: createTenantId(projectId),
           aggregateId: conversationId,
         });
@@ -886,7 +904,11 @@ export class PipelineRegistry {
   private registerGovernanceEventsPipeline() {
     return this.deps.eventSourcing.register(
       createGovernanceEventsPipeline({
-        webhookDelivery: this.deps.webhookDelivery,
+        webhookDelivery: this.deps.webhookDelivery
+          ? AppGovernanceWebhookAdapter.create(
+              this.deps.webhookDelivery,
+            ).build()
+          : undefined,
       }),
     );
   }
@@ -903,7 +925,9 @@ export class PipelineRegistry {
         // The ADR-073 delivery process manager consumes this pipeline's
         // committed events through its transactional inbox.
         webhookDelivery: this.deps.webhookDelivery,
-        gatewayDebits: this.deps.gatewayDebits,
+        gatewayDebits: this.deps.gatewayDebits
+          ? AppGatewayDebitAdapter.create(this.deps.gatewayDebits).build()
+          : undefined,
         settlement: {
           // Lazy: the pipeline is being built by this very call, so the
           // sweeper resolves the command sender at execution time.
@@ -1102,7 +1126,7 @@ export class PipelineRegistry {
     return this.deps.eventSourcing.register(
       createEvaluationProcessingPipeline({
         evalRunStore: new EvaluationRunStore(
-          this.deps.evaluations.runs.repository,
+          this.deps.evaluations.service,
         ),
         // Redis cache is the eval slim fold's warm read path; a miss now falls
         // through to the store's own ClickHouse read-back (ADR-066, migration
@@ -1222,31 +1246,50 @@ export class PipelineRegistry {
 
     // EE governance rollups, composed here as full subscriber specs so the
     // OSS pipeline definition stays free of `@ee` imports.
-    const governanceKpisSync = this.deps.governanceKpisSync
+    const governanceSubscribers = AppGovernanceSubscriberAdapter.create();
+    const governanceKpis = this.deps.governanceKpisSync
+      ? governanceSubscribers.kpis(
+          this.deps.governanceKpisSync.governanceKpisRepository,
+        )
+      : undefined;
+    const governanceKpisSync = governanceKpis
       ? {
           fold: "traceSummary" as const,
-          when: isGovernanceKpiTrace,
+          when: (
+            event: TraceProcessingEvent,
+            context: TriggerContext<TraceSummaryData>,
+          ) => governanceKpis.when(event, context),
           ...throttledWindow<TraceProcessingEvent>({
             makeId: (event) => `${event.tenantId}:${event.aggregateId}`,
             windowMs: GOVERNANCE_KPIS_SYNC_WINDOW_MS,
           }),
-          handler: createGovernanceKpisSyncHandler(
-            this.deps.governanceKpisSync,
-          ),
+          handler: (
+            event: TraceProcessingEvent,
+            context: TriggerContext<TraceSummaryData>,
+          ) => governanceKpis.handle(event, context),
         }
       : undefined;
 
-    const governanceOcsfEventsSync = this.deps.governanceOcsfEventsSync
+    const governanceOcsf = this.deps.governanceOcsfEventsSync
+      ? governanceSubscribers.ocsf(
+          this.deps.governanceOcsfEventsSync.governanceOcsfEventsRepository,
+        )
+      : undefined;
+    const governanceOcsfEventsSync = governanceOcsf
       ? {
           fold: "traceSummary" as const,
-          when: isGovernanceOcsfTrace,
+          when: (
+            event: TraceProcessingEvent,
+            context: TriggerContext<TraceSummaryData>,
+          ) => governanceOcsf.when(event, context),
           ...throttledWindow<TraceProcessingEvent>({
             makeId: (event) => `${event.tenantId}:${event.aggregateId}`,
             windowMs: GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS,
           }),
-          handler: createGovernanceOcsfEventsSyncHandler(
-            this.deps.governanceOcsfEventsSync,
-          ),
+          handler: (
+            event: TraceProcessingEvent,
+            context: TriggerContext<TraceSummaryData>,
+          ) => governanceOcsf.handle(event, context),
         }
       : undefined;
 
@@ -1331,20 +1374,13 @@ export class PipelineRegistry {
       );
     }
 
-    // ADR-032 D5: register the standalone `datasetNormalize` GroupQueue job
-    // (pure Postgres + S3, no fold/subscriber). Per-group concurrency is inherent
-    // and the group key is the datasetId (framework prepends tenantId=projectId)
-    // → exactly one normalize in flight per dataset. The enqueue side is wired
-    // into the dataset domain via `registerDatasetNormalizeEnqueue`; when the
-    // global queue is unavailable the dataset module inline-runs the handler.
-    const datasetNormalizeHandler = createDatasetNormalizeHandler({
-      repository: new DatasetRepository(this.deps.prisma),
-      getStorage: getDatasetStorage,
-    });
+    // ADR-032 D5: the Dataset package owns normalization and its persistence;
+    // this process root only mounts the durable queue and hands the sender back
+    // to that process-owned capability.
     const datasetNormalizeQueue =
       tracePipeline.service.registerJob<DatasetNormalizePayload>({
         name: "datasetNormalize",
-        process: datasetNormalizeHandler,
+        process: (payload) => this.deps.datasetNormalization.process(payload),
         // The per-dataset group key already serializes to concurrency-1, so no
         // deduplication block is needed; the 200ms debounce default is
         // surprising and could swallow a fast retry (m1).
@@ -1352,12 +1388,11 @@ export class PipelineRegistry {
       });
 
     if (datasetNormalizeQueue) {
-      registerDatasetNormalizeEnqueue((payload) =>
+      this.deps.datasetNormalization.connect((payload) =>
         datasetNormalizeQueue.send(payload),
       );
     }
-    // No else: when the global queue is absent the dataset module falls back to
-    // running the handler inline at enqueue time (dev/test without a worker).
+    // With no queue, the same capability runs its serialized inline fallback.
 
     return {
       pipeline: tracePipeline,

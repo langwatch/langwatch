@@ -4,8 +4,8 @@ import type {
   LangyChoicesTimelineEntry,
   LangyDerivedCard,
   LangyDerivedChoicesCard,
-} from "@langwatch/langy";
-import { deriveLangyChoicesLockState } from "@langwatch/langy";
+} from "@langwatch/langy-contract";
+import { deriveLangyChoicesLockState } from "@langwatch/langy-contract";
 import type { UIMessage } from "ai";
 import { ArrowRight, Check, Sparkles } from "lucide-react";
 import type React from "react";

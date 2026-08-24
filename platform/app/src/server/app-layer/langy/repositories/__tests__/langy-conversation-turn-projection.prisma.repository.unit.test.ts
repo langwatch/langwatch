@@ -1,12 +1,12 @@
 import type { ProjectionStoreContext } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
-import { LANGY_CONVERSATION_TURN_STATUS } from "@langwatch/langy";
+import { LANGY_CONVERSATION_TURN_STATUS } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
 import {
   type LangyConversationTurnProjection,
   Prisma,
 } from "~/generated/prisma/client";
-import { PrismaLangyConversationTurnProjectionRepository } from "../langy-conversation-turn-projection.prisma.repository";
+import { PrismaLangyConversationTurnProjectionRepository } from "@langwatch/langy-server/repositories/prisma/prisma.langy-conversation-turn-projection.repository";
 
 type Row = LangyConversationTurnProjection;
 type Client = ConstructorParameters<

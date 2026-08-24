@@ -15,7 +15,7 @@ vi.mock("~/env.mjs", () => ({
   env: { BASE_HOST: "https://app.langwatch.ai" },
 }));
 
-import { mintRunToken, signFrame } from "../langyFrameAuth";
+import { mintRunToken, signFrame } from "@langwatch/langy-server/streaming/langy-frame-auth";
 import {
   type LangyRelayBuffer,
   type LangyRelayConversations,

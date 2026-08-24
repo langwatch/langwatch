@@ -31,7 +31,7 @@ import {
   isTerminalFailure,
   parseCliJson,
   readCliErrorDocument,
-} from "@langwatch/langy";
+} from "@langwatch/langy-contract";
 import { LIMIT_TYPE_LABELS } from "~/server/license-enforcement/constants";
 
 /** The plan allowance a failure ran into, in the customer's own words. */

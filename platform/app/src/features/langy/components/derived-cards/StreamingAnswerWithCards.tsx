@@ -25,7 +25,7 @@ import {
   feedLangyDerivedCardPreview,
   type LangyDerivedCardPreview,
   splitLangyCardFences,
-} from "@langwatch/langy";
+} from "@langwatch/langy-contract";
 import { useMemo, useRef } from "react";
 
 import { LangyCardBoundary } from "../LangyCardBoundary";

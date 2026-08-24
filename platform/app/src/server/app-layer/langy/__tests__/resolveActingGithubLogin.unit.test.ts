@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { Session } from "~/server/auth";
-import { resolveActingGithubLogin } from "../LangyCredentialService";
+import { resolveActingGithubLogin } from "../langy-credential.test-adapter";
 
 function session(user: Record<string, unknown>): Session {
   return { user: { id: "u1", ...user }, expires: "1" } as unknown as Session;

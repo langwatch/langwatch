@@ -2,7 +2,7 @@ import { nanoid } from "nanoid";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
-import { PrismaLangyTurnAdmissionRepository } from "../langy-turn-admission.prisma.repository";
+import { PrismaLangyTurnAdmissionRepository } from "@langwatch/langy-server/repositories/prisma/prisma.langy-turn-admission.repository";
 
 const namespace = `langy-admission-${nanoid(10)}`;
 const projectId = `${namespace}-project`;

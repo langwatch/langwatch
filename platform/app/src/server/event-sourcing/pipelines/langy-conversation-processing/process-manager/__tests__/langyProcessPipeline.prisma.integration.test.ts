@@ -11,18 +11,16 @@ import { nanoid } from "nanoid";
 import { afterEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { PrismaProcessStore } from "~/server/event-sourcing/adapters/postgres/prismaProcessStore";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import type { LangyConversationProcessingEvent } from "@langwatch/langy-server/event-sourcing/langy.events";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
-import { langyConversationProcess } from "../langyConversationProcess";
 import {
   LANGY_CONVERSATION_PROCESS_NAME,
+  langyConversationProcess,
   type LangyConversationProcessState,
-} from "../langyConversationProcess.types";
-import {
-  createStubLangyEffectPorts,
   type LangyEffectPorts,
-} from "../langyEffectPorts";
+} from "@langwatch/langy-server/eventing/langy-conversation-processing/process-manager";
+import { createStubLangyEffectPorts } from "@langwatch/langy-server/testing";
 import {
   agentRespondedEvent,
   agentTurnAcceptedEvent,

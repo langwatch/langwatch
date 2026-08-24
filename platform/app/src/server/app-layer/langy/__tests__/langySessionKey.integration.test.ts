@@ -19,8 +19,8 @@ import {
 } from "~/generated/prisma/client";
 import type { Permission } from "~/server/api/rbac";
 import { enforceApiKeyCeiling } from "~/server/api-key/auth-middleware";
-import { LANGY_SESSION_API_KEY_NAME } from "~/server/api-key/reserved-names";
-import { TokenResolver } from "~/server/api-key/token-resolver";
+import { LANGY_SESSION_API_KEY_NAME } from "@langwatch/api-key-contract";
+import { getApp } from "~/server/app-layer/app";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
@@ -276,7 +276,8 @@ describe("Langy session key (caller-scoped)", () => {
           organizationId,
         });
 
-        const resolved = await TokenResolver.create(prisma).resolve({
+        const app = getApp();
+        const resolved = await app.apiKeys.tryResolveToken({
           token,
           projectId,
         });
@@ -307,7 +308,8 @@ describe("Langy session key (caller-scoped)", () => {
           organizationId,
         });
 
-        const resolved = await TokenResolver.create(prisma).resolve({
+        const app = getApp();
+        const resolved = await app.apiKeys.tryResolveToken({
           token,
           projectId,
         });

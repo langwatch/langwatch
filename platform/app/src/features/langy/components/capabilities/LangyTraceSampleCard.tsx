@@ -32,7 +32,7 @@
  */
 
 import { Button, Text } from "@chakra-ui/react";
-import { asJsonDocument, type CliResultDigest } from "@langwatch/langy";
+import { asJsonDocument, type CliResultDigest } from "@langwatch/langy-contract";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 import {

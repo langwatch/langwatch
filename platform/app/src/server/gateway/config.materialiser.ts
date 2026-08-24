@@ -18,9 +18,9 @@ import type {
 
 import { readCustomKeys } from "~/server/modelProviders/customKeys";
 import {
-  type LangyMirrorTier,
   resolveLangyMirrorTier,
-} from "../app-layer/langy/LangyCredentialService";
+  type LangyMirrorTier,
+} from "@langwatch/langy-contract";
 import { modelProviders } from "../modelProviders/registry";
 import type { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
 import { budgetPeriodFloorMs, effectiveBudgetPeriod } from "./budgetPeriod";
@@ -380,7 +380,7 @@ export class GatewayConfigMaterialiser {
       // duplicated into LangWatch's mirror project.
       langy_mirror_tier:
         vk.purpose === "LANGY" && traceProject?.id
-          ? resolveLangyMirrorTier({ projectId: traceProject.id })
+          ? resolveLangyMirrorTier({ projectId: traceProject.id }, process.env)
           : "skip",
       providers: providers.map((mp, index) => buildProviderSlot(mp, index)),
       fallback: {

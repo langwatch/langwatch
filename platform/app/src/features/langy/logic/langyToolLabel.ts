@@ -1,5 +1,5 @@
 import { githubStepOf } from "~/server/app-layer/langy/execution/githubCommand";
-import { parseLangwatchCommand } from "~/server/app-layer/langy/execution/langwatchCommand";
+import { parseLangwatchCommand } from "@langwatch/langy-contract";
 import { findSkill } from "~/shared/langy/langySkills";
 import { resolveCapabilityProgress } from "../components/capabilities/capabilityRegistry";
 

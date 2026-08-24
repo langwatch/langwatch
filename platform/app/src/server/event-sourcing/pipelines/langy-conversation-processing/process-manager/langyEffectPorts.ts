@@ -1,22 +1,24 @@
 import { createLogger } from "@langwatch/observability";
-import { LangyDispatchRejectedError } from "~/server/app-layer/langy/errors";
-import { serializeLangyTurnError } from "~/server/app-layer/langy/execution/langy-turn-errors";
+import { LangyDispatchRejectedError } from "@langwatch/langy-contract";
+import { serializeLangyTurnError } from "@langwatch/langy-server";
+import type {
+  LangyEffectPorts,
+} from "@langwatch/langy-server";
 import type { LangyTitleGenerator } from "~/server/app-layer/langy/langy-title-generation.service";
 import { LangyTurnDispatchRetry } from "~/server/app-layer/langy/langy-turn-retry.error";
 import {
-  AGENT_DISPATCH_TIMEOUT_MS,
   type LangyWorkerPort,
 } from "~/server/app-layer/langy/langyWorker";
 import type {
   LangyTurnHandoff,
   LangyTurnHandoffStore,
 } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
-import type { LangyFailTurnCommandPort } from "~/server/app-layer/langy/subscribers/agent-turn-liveness.subscriber";
+import type { LangyFailTurnCommandPort } from "@langwatch/langy-server";
 
 import type {
   LangyGenerateTitleIntent,
   LangyWorkerDispatchIntent,
-} from "./langyConversationProcess.types";
+} from "@langwatch/langy-server";
 
 const logger = createLogger("langwatch:langy:process-effects");
 
@@ -31,44 +33,6 @@ const logger = createLogger("langwatch:langy:process-effects");
  * and never be retired. Keep this comfortably above the network jitter around
  * a commit.
  */
-export const LANGY_OUTBOX_LEASE_MARGIN_MS = 30_000;
-
-/**
- * Exclusive-lease window for the Langy process outbox. Derived from the
- * worker-dispatch budget so the relationship can never silently drift: the
- * lease always outlasts the slowest accepted dispatch. The generic 30s default
- * is unsafe here because a single dispatch may legitimately run up to
- * {@link AGENT_DISPATCH_TIMEOUT_MS}.
- */
-export const LANGY_OUTBOX_LEASE_DURATION_MS =
-  AGENT_DISPATCH_TIMEOUT_MS + LANGY_OUTBOX_LEASE_MARGIN_MS;
-
-/**
- * Typed effect ports the Langy process outbox dispatches into. There is
- * deliberately NO fail-turn port: the heartbeat-aware liveness subscriber
- * owns observed worker health and terminal recovery.
- *
- * Handlers must stay idempotent on the intent identity — outbox delivery is
- * at-least-once.
- */
-export interface LangyWorkerDispatchPort {
-  /** Idempotent per turnId — mirrors Go ClaimTurn semantics. */
-  dispatchTurn(
-    params: LangyWorkerDispatchIntent & { projectId: string },
-  ): Promise<void>;
-}
-
-export interface LangyTitleGenerationPort {
-  /** Requests the one-shot auto-title generation for a finalized turn. */
-  generateTitle(
-    params: LangyGenerateTitleIntent & { projectId: string },
-  ): Promise<void>;
-}
-
-export interface LangyEffectPorts {
-  workerDispatch: LangyWorkerDispatchPort;
-  titleGeneration: LangyTitleGenerationPort;
-}
 
 export interface CreateLangyEffectPortsOptions {
   handoffStore: Pick<LangyTurnHandoffStore, "read" | "stash">;

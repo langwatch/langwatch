@@ -12,7 +12,7 @@ vi.mock("~/server/organizations/resolveOrganizationId", () => ({
   resolveOrganizationId,
 }));
 
-import { LangyNotEnabledError } from "~/server/app-layer/langy/errors";
+import { LangyNotEnabledError } from "@langwatch/langy-contract";
 import { enforceLangyAccess } from "../langyAccessMiddleware";
 
 const user = { id: "user-1", email: "user@example.com", emailVerified: true };

@@ -2,21 +2,22 @@
 
 import { on } from "node:events";
 import { ValidationError } from "@langwatch/handled-error";
-import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
+import {
+  LANGY_CONVERSATION_STATUS,
+  LangyConversationNotFoundError,
+  LangyRateLimitedError,
+  type LangyConversationDetail as ConversationDetail,
+  type LangyConversationListItem as ConversationListItem,
+} from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp, tryGetApp } from "~/server/app-layer/app";
+import type { App } from "~/server/app-layer/app";
 import {
-  LangyConversationNotFoundError,
-  LangyRateLimitedError,
-} from "~/server/app-layer/langy/errors";
-import { AGENT_CHAT_TIMEOUT_MS } from "~/server/app-layer/langy/execution/langy-turn-errors";
-import type {
-  ConversationDetail,
-  ConversationListItem,
-} from "~/server/app-layer/langy/langy-conversation.service";
-import { ADOPTABLE_CONVERSATION_ID } from "~/server/app-layer/langy/langy-conversation.service";
+  AGENT_CHAT_TIMEOUT_MS,
+  ADOPTABLE_CONVERSATION_ID,
+} from "@langwatch/langy-server";
 import type { LangyChatMessageInput } from "~/server/app-layer/langy/langy-turn.service";
 import { isLangyConversationUpdateVisibleToUser } from "~/server/app-layer/langy/langyConversationUpdateVisibility";
 import {
@@ -218,11 +219,13 @@ function toDetailDto(detail: ConversationDetail): LangyConversationDetailDto {
  * visibility rule (owner or shared). It never widens access.
  */
 async function canWatchTurn({
+  langy,
   projectId,
   conversationId,
   turnId,
   userId,
 }: {
+  langy: App["langy"];
   projectId: string;
   conversationId: string;
   turnId: string;
@@ -237,7 +240,7 @@ async function canWatchTurn({
       return true;
     }
   }
-  const conv = await getApp().langy.conversations.findByIdVisible({
+  const conv = await langy.tryFindByIdVisible({
     id: conversationId,
     projectId,
     userId,
@@ -287,7 +290,7 @@ async function watchForMissedTerminal({
     if (!(await abortableDelay(SETTLEMENT_POLL_MS, signal))) return null;
     const [conversation, liveness] = await Promise.all([
       getApp()
-        .langy.conversations.getById({ id: conversationId, projectId, userId })
+    .langy.getById({ id: conversationId, projectId, userId })
         .catch(() => null),
       buffer.liveness({ conversationId, turnId }).catch(() => null),
     ]);
@@ -318,10 +321,12 @@ async function watchForMissedTerminal({
  * `data.error` (read by the client's `readLangyTrpcError`).
  */
 async function acceptTurn({
+  langy,
   input,
   adoptConversationId,
   session,
 }: {
+  langy: App["langy"];
   input: {
     projectId: string;
     idempotencyKey?: string | undefined;
@@ -355,7 +360,7 @@ async function acceptTurn({
     // HandledError's own `message` is not put on the wire.
     throw new ValidationError(message, { meta: { message } });
   }
-  return getApp().langy.turns.startConversationTurn({
+  return langy.startConversationTurn({
     projectId: input.projectId,
     idempotencyKey,
     session,
@@ -391,7 +396,7 @@ export const langyRouter = createTRPCRouter({
         items: LangyConversationListItemDto[];
         nextCursor: LangyConversationListCursorDto | null;
       }> => {
-        const page = await getApp().langy.conversations.getPage({
+        const page = await ctx.app.langy.getPage({
           projectId: input.projectId,
           userId: ctx.session.user.id,
           limit: input.limit,
@@ -429,7 +434,7 @@ export const langyRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input, ctx }) => {
-      return await getApp().langy.conversations.getEventsAfter({
+      return await ctx.app.langy.getEventsAfter({
         projectId: input.projectId,
         conversationId: input.conversationId,
         userId: ctx.session.user.id,
@@ -446,7 +451,7 @@ export const langyRouter = createTRPCRouter({
         // caller for which absence is a real answer: `findByIdVisible`, not
         // `getById`. Using the throwing form here would 500 the poll on every
         // first turn.
-        const detail = await getApp().langy.conversations.findByIdVisible({
+        const detail = await ctx.app.langy.tryFindByIdVisible({
           id: input.conversationId,
           projectId: input.projectId,
           userId: ctx.session.user.id,
@@ -540,12 +545,12 @@ export const langyRouter = createTRPCRouter({
         // Both reads go through user-scoped application services. The message
         // service performs its own visibility check; this detail read is also
         // needed for the durable turn status returned alongside the transcript.
-        const conversation = await getApp().langy.conversations.getById({
+        const conversation = await ctx.app.langy.getById({
           id: input.conversationId,
           projectId: input.projectId,
           userId: ctx.session.user.id,
         });
-        const rows = await getApp().langy.messages.getAllByConversation({
+        const rows = await ctx.app.langy.getAllByConversation({
           conversationId: input.conversationId,
           projectId: input.projectId,
           userId: ctx.session.user.id,
@@ -563,7 +568,7 @@ export const langyRouter = createTRPCRouter({
           conversation.status === LANGY_CONVERSATION_STATUS.RUNNING;
         const shouldAskFeedback = isTurnInFlight
           ? false
-          : await getApp().langy.feedbackPrompt.shouldAsk({
+          : await ctx.app.langy.shouldAskFeedback({
               userId: ctx.session.user.id,
               conversationId: input.conversationId,
               assistantAnswerCount: messages.filter(
@@ -602,7 +607,7 @@ export const langyRouter = createTRPCRouter({
   deleteConversation: langyDeleteProcedure
     .input(z.object({ conversationId: z.string() }))
     .mutation(async ({ input, ctx }): Promise<{ success: boolean }> => {
-      const success = await getApp().langy.conversations.deleteById({
+      const success = await ctx.app.langy.deleteById({
         id: input.conversationId,
         projectId: input.projectId,
         userId: ctx.session.user.id,
@@ -619,7 +624,7 @@ export const langyRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }): Promise<LangyConversationDetailDto> => {
-      const detail = await getApp().langy.conversations.updateById({
+      const detail = await ctx.app.langy.updateById({
         id: input.conversationId,
         projectId: input.projectId,
         userId: ctx.session.user.id,
@@ -640,7 +645,7 @@ export const langyRouter = createTRPCRouter({
   forkConversation: langyCreateProcedure
     .input(z.object({ conversationId: z.string().min(1) }))
     .mutation(async ({ input, ctx }): Promise<LangyConversationDetailDto> => {
-      const { conversation } = await getApp().langy.conversations.forkById({
+      const { conversation } = await ctx.app.langy.forkById({
         id: input.conversationId,
         projectId: input.projectId,
         userId: ctx.session.user.id,
@@ -679,6 +684,7 @@ export const langyRouter = createTRPCRouter({
         ctx,
       }): Promise<{ conversationId: string; turnId: string }> => {
         return acceptTurn({
+          langy: ctx.app.langy,
           input: {
             ...input,
             messages: input.messages as LangyChatMessageInput[],
@@ -708,6 +714,7 @@ export const langyRouter = createTRPCRouter({
         ctx,
       }): Promise<{ conversationId: string; turnId: string }> => {
         return acceptTurn({
+          langy: ctx.app.langy,
           input: {
             ...input,
             messages: input.messages as LangyChatMessageInput[],
@@ -737,7 +744,7 @@ export const langyRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }): Promise<{ stopped: boolean }> => {
-      await getApp().langy.turns.stopTurn({
+      await ctx.app.langy.stopTurn({
         projectId: input.projectId,
         conversationId: input.conversationId,
         turnId: input.turnId,
@@ -795,7 +802,7 @@ export const langyRouter = createTRPCRouter({
               warmed: false,
             };
           }
-          return await getApp().langy.turns.warmConversationWorker({
+          return await ctx.app.langy.warmConversationWorker({
             projectId: input.projectId,
             session: ctx.session,
             requestedConversationId: input.conversationId ?? null,
@@ -828,9 +835,9 @@ export const langyRouter = createTRPCRouter({
    * all.
    */
   modelsAllowed: langyReadProcedure.query(
-    async ({ input }): Promise<{ modelsAllowed: string[] | null }> => {
+    async ({ input, ctx }): Promise<{ modelsAllowed: string[] | null }> => {
       const modelsAllowed =
-        await getApp().langy.credentials.getModelsAllowedForProject(
+        await ctx.app.langy.tryGetModelsAllowedForProject(
           input.projectId,
         );
       return { modelsAllowed };
@@ -881,7 +888,7 @@ export const langyRouter = createTRPCRouter({
       // just carries no cross-user attribution.
       let conversationId = input.conversationId;
       if (conversationId) {
-        const conv = await getApp().langy.conversations.findByIdVisible({
+        const conv = await ctx.app.langy.tryFindByIdVisible({
           id: conversationId,
           projectId: input.projectId,
           userId: ctx.session.user.id,
@@ -935,7 +942,7 @@ export const langyRouter = createTRPCRouter({
       // project + ownership/shared rules, so a forged or foreign id is a
       // silent no-op instead of stamping the caller's cadence record with
       // attribution they don't own.
-      const conversation = await getApp().langy.conversations.findByIdVisible({
+      const conversation = await ctx.app.langy.tryFindByIdVisible({
         id: input.conversationId,
         projectId: input.projectId,
         userId: ctx.session.user.id,
@@ -951,7 +958,7 @@ export const langyRouter = createTRPCRouter({
         );
         return;
       }
-      await getApp().langy.feedbackPrompt.markShown({
+      await ctx.app.langy.markFeedbackShown({
         userId: ctx.session.user.id,
         conversationId: input.conversationId,
       });
@@ -1021,7 +1028,13 @@ export const langyRouter = createTRPCRouter({
       // because subscriptions are span- and log-silenced (SILENCED_LOG_TYPES),
       // so without this line a denied attach leaves no operator trace at all.
       if (
-        !(await canWatchTurn({ projectId, conversationId, turnId, userId }))
+        !(await canWatchTurn({
+          langy: opts.ctx.app.langy,
+          projectId,
+          conversationId,
+          turnId,
+          userId,
+        }))
       ) {
         logger.warn(
           { projectId, conversationId, turnId, userId },

@@ -8,6 +8,7 @@
  * agent-authored.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { AgentService } from "@langwatch/agent-contract";
 
 vi.mock("~/env.mjs", () => ({
   env: { BASE_HOST: "https://app.langwatch.ai" },
@@ -17,22 +18,22 @@ const {
   getScenarioRunData,
   getProjectById,
   findExperimentById,
-  getPromptByIdOrHandle,
+  tryGetPromptByIdOrHandle,
   getDatasetBySlugOrId,
   getEvaluatorById,
   getAgentByIdOrThrow,
   workflowFindFirst,
-  getMonitorById,
+  tryGetMonitorById,
 } = vi.hoisted(() => ({
   getScenarioRunData: vi.fn(),
   getProjectById: vi.fn(),
   findExperimentById: vi.fn(),
-  getPromptByIdOrHandle: vi.fn(),
+  tryGetPromptByIdOrHandle: vi.fn(),
   getDatasetBySlugOrId: vi.fn(),
   getEvaluatorById: vi.fn(),
   getAgentByIdOrThrow: vi.fn(),
   workflowFindFirst: vi.fn(),
-  getMonitorById: vi.fn(),
+  tryGetMonitorById: vi.fn(),
 }));
 
 vi.mock("~/server/app-layer/app", () => ({
@@ -40,8 +41,12 @@ vi.mock("~/server/app-layer/app", () => ({
   tryGetApp: () => null,
   getApp: () => ({
     simulations: { runs: { getScenarioRunData } },
-    projects: { getById: getProjectById },
+    projects: { tryGetById: getProjectById },
     experiments: { findById: findExperimentById },
+    prompts: { tryGetPromptByIdOrHandle },
+    dataset: { getBySlugOrId: getDatasetBySlugOrId },
+    evaluators: { tryGetById: getEvaluatorById },
+    monitors: { tryGetMonitorById },
   }),
 }));
 
@@ -49,28 +54,6 @@ vi.mock("~/server/db", () => ({
   prisma: {
     workflow: { findFirst: workflowFindFirst },
   },
-}));
-
-vi.mock("~/server/prompt-config/prompt.service", () => ({
-  PromptService: class {
-    getPromptByIdOrHandle = getPromptByIdOrHandle;
-  },
-}));
-
-vi.mock("~/server/datasets/dataset.service", () => ({
-  DatasetService: { create: () => ({ getBySlugOrId: getDatasetBySlugOrId }) },
-}));
-
-vi.mock("~/server/app-layer/monitors/monitor.service", () => ({
-  MonitorService: { create: () => ({ getMonitorById }) },
-}));
-
-vi.mock("~/server/evaluators/evaluator.service", () => ({
-  EvaluatorService: { create: () => ({ getById: getEvaluatorById }) },
-}));
-
-vi.mock("~/server/agents/agent.service", () => ({
-  AgentService: { create: () => ({ getByIdOrThrow: getAgentByIdOrThrow }) },
 }));
 
 import { resolveNavigateFallbackUrl } from "../langyNavigateFallback";
@@ -81,7 +64,11 @@ const DRAWER_URL =
   `&drawer.scenarioRunId=${RUN_ID}`;
 
 const resolve = (resourceId: string) =>
-  resolveNavigateFallbackUrl({ projectId: "proj_1", resourceId });
+  resolveNavigateFallbackUrl({
+    projectId: "proj_1",
+    resourceId,
+    agents: { getById: getAgentByIdOrThrow } as unknown as AgentService,
+  });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -96,7 +83,7 @@ describe("resolveNavigateFallbackUrl", () => {
       // before any tenancy-scoped lookup runs.
       expect(await resolve("session_0002Gu9QAAAABBBB")).toBeNull();
       expect(getScenarioRunData).not.toHaveBeenCalled();
-      expect(getPromptByIdOrHandle).not.toHaveBeenCalled();
+      expect(tryGetPromptByIdOrHandle).not.toHaveBeenCalled();
       expect(getProjectById).not.toHaveBeenCalled();
     });
   });
@@ -118,19 +105,19 @@ describe("resolveNavigateFallbackUrl", () => {
   describe("given a prompt id the project can see", () => {
     /** @scenario "The platform fallback resolves every resource surface Langy opens" */
     it("resolves the prompts page with that prompt's editor drawer open: the reported chained-navigate case", async () => {
-      getPromptByIdOrHandle.mockResolvedValue({ id: "prompt_abc" });
+      tryGetPromptByIdOrHandle.mockResolvedValue({ id: "prompt_abc" });
 
       expect(await resolve("prompt_abc")).toBe(
         "https://app.langwatch.ai/acme/prompts?drawer.open=promptEditor&drawer.promptId=prompt_abc",
       );
-      expect(getPromptByIdOrHandle).toHaveBeenCalledWith({
+      expect(tryGetPromptByIdOrHandle).toHaveBeenCalledWith({
         idOrHandle: "prompt_abc",
         projectId: "proj_1",
       });
     });
 
     it("returns null for a prompt the project cannot resolve", async () => {
-      getPromptByIdOrHandle.mockResolvedValue(null);
+      tryGetPromptByIdOrHandle.mockResolvedValue(null);
 
       expect(await resolve("prompt_gone")).toBeNull();
       expect(getProjectById).not.toHaveBeenCalled();
@@ -202,19 +189,19 @@ describe("resolveNavigateFallbackUrl", () => {
 
   describe("given a monitor id the project can see", () => {
     it("resolves the online-evaluations page with that monitor's drawer open", async () => {
-      getMonitorById.mockResolvedValue({ id: "monitor_1" });
+      tryGetMonitorById.mockResolvedValue({ id: "monitor_1" });
 
       expect(await resolve("monitor_1")).toBe(
         "https://app.langwatch.ai/acme/online-evaluations?drawer.open=onlineEvaluation&drawer.monitorId=monitor_1",
       );
-      expect(getMonitorById).toHaveBeenCalledWith({
+      expect(tryGetMonitorById).toHaveBeenCalledWith({
         projectId: "proj_1",
-        monitorId: "monitor_1",
+        id: "monitor_1",
       });
     });
 
     it("returns null when the monitor does not resolve in this project", async () => {
-      getMonitorById.mockResolvedValue(null);
+      tryGetMonitorById.mockResolvedValue(null);
 
       expect(await resolve("monitor_gone")).toBeNull();
     });

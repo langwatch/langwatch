@@ -22,8 +22,8 @@ import {
   type CliResultDigest,
   cliResultDigestSchema,
   extractDigest,
-} from "@langwatch/langy";
-import { parseLangwatchCommand } from "~/server/app-layer/langy/execution/langwatchCommand";
+  parseLangwatchCommand,
+} from "@langwatch/langy-contract";
 
 /** The typed tool name the CLI envelope records calls under. */
 const CLI_TOOL_NAME = /^langwatch\.([a-z][a-z0-9-]*)\.([a-z][a-z0-9-]*)$/;

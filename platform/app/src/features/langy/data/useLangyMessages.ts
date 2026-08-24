@@ -1,4 +1,4 @@
-import type { LangyEventCursor } from "@langwatch/langy";
+import type { LangyEventCursor } from "@langwatch/langy-contract";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect } from "react";
 

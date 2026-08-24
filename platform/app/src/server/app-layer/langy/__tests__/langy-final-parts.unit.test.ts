@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildFinalAssistantParts } from "../langy-final-parts";
+import { LangyFinalPartsService } from "@langwatch/langy-server/services/langy-final-parts.service";
+
+const buildFinalAssistantParts = (
+  input: Parameters<LangyFinalPartsService["build"]>[0],
+) => LangyFinalPartsService.create().build(input);
 
 /** A well-formed stats block, fenced the way the model emits it. */
 const statsFence = [

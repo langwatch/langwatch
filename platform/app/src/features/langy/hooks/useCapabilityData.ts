@@ -24,7 +24,7 @@
  * to `idle`, and the card falls back to its stored-output path.
  */
 
-import { CLI_SUBRESOURCE_VERBS, type CliResultDigest } from "@langwatch/langy";
+import { CLI_SUBRESOURCE_VERBS, type CliResultDigest } from "@langwatch/langy-contract";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";

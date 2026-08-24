@@ -8,11 +8,11 @@ import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
   makeConversationTurnKey,
-} from "@langwatch/langy";
+} from "@langwatch/langy-contract";
 import { nanoid } from "nanoid";
 import { afterEach, describe, expect, it } from "vitest";
-import { LangyConversationNotFoundError } from "~/server/app-layer/langy/errors";
-import { LangyMessageService } from "~/server/app-layer/langy/langy-message.service";
+import { LangyConversationNotFoundError } from "@langwatch/langy-contract";
+import { LangyMessageService } from "@langwatch/langy-server/testing";
 import { prisma } from "~/server/db";
 import {
   LangyAgentRespondedEventSchema,
@@ -25,13 +25,13 @@ import {
   LangyPlanUpdatedEventSchema,
   LangyToolCallInitiatedEventSchema,
   LangyToolCallSucceededEventSchema,
-} from "~/server/event-sourcing/pipelines/langy-conversation-processing";
+} from "@langwatch/langy-server/eventing/langy-conversation-processing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-import { PrismaLangyConversationRepository } from "../langy-conversation.prisma.repository";
-import { PrismaLangyConversationProjectionRepository } from "../langy-conversation-projection.prisma.repository";
-import { PrismaLangyConversationTurnProjectionRepository } from "../langy-conversation-turn-projection.prisma.repository";
-import { PrismaLangyMessageRepository } from "../langy-message.prisma.repository";
-import { PrismaLangyMessageProjectionRepository } from "../langy-message-projection.prisma.repository";
+import { PrismaLangyConversationRepository } from "@langwatch/langy-server/repositories/prisma/prisma.langy-conversation.repository";
+import { PrismaLangyConversationProjectionRepository } from "@langwatch/langy-server/repositories/prisma/prisma.langy-conversation-projection.repository";
+import { PrismaLangyConversationTurnProjectionRepository } from "@langwatch/langy-server/repositories/prisma/prisma.langy-conversation-turn-projection.repository";
+import { PrismaLangyMessageRepository } from "@langwatch/langy-server/repositories/prisma/prisma.langy-message.repository";
+import { PrismaLangyMessageProjectionRepository } from "@langwatch/langy-server/repositories/prisma/prisma.langy-message-projection.repository";
 
 const namespace = `langy-operational-${nanoid(10)}`;
 const projectIds = [`${namespace}-project-a`, `${namespace}-project-b`];

@@ -65,7 +65,7 @@ vi.mock("../../rbac", async (importOriginal) => {
   };
 });
 
-import { LangyRateLimitedError } from "~/server/app-layer/langy/errors";
+import { LangyRateLimitedError } from "@langwatch/langy-contract";
 import { createInnerTRPCContext, errorFormatter } from "../../trpc";
 import { langyRouter } from "../langy";
 

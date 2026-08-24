@@ -116,7 +116,7 @@ export interface LangyDomainError
 export const KNOWN_LANGY_ERROR_KINDS = [
   "langy_conversation_not_found",
   "langy_conversation_not_owned",
-  // Turn-execution failures (see server/app-layer/langy/execution/langy-turn-errors.ts).
+  // Turn-execution failures (see the Langy server turn-error contract).
   "langy_agent_unavailable",
   "langy_agent_at_capacity",
   "langy_agent_session_lost",
@@ -135,7 +135,7 @@ export const KNOWN_LANGY_ERROR_KINDS = [
   // covered by the app installation — a grant-access step, not a fault.
   "langy_github_repo_not_accessible",
   // Turn-START rejections from the control plane (app-layer LangyTurnService,
-  // see server/app-layer/langy/errors.ts). These reach the browser as coded
+  // see the Langy contract errors). These reach the browser as coded
   // TRPCErrors from the create/continue mutations — NOT from the worker's turn
   // classifier — so they need their own copy rather than the generic default.
   "langy_model_not_configured",

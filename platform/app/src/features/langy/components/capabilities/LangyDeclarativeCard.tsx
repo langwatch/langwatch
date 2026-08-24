@@ -17,7 +17,7 @@
  * a real answer and says so in real words.
  */
 import { Box, Grid, Text, VStack } from "@chakra-ui/react";
-import { type CliResultDigest, parseCardResult } from "@langwatch/langy";
+import { type CliResultDigest, parseCardResult } from "@langwatch/langy-contract";
 import { extractPlatformUrl } from "~/utils/platformHref";
 import {
   type CapabilityData,

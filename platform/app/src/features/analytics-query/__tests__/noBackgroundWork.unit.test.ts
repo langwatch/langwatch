@@ -90,7 +90,7 @@ const FORBIDDEN: readonly {
     because: "the workbench exposes no agent surface",
   },
   {
-    token: "@langwatch/langy",
+    token: "@langwatch/langy-contract",
     because: "the workbench exposes no agent surface",
   },
 ];

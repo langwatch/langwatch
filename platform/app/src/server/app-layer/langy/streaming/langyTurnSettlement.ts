@@ -1,4 +1,4 @@
-import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
+import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy-contract";
 import type { LangyStreamEntry } from "./langyTokenBuffer";
 
 /**

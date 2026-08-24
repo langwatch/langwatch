@@ -26,7 +26,7 @@ import {
   type LangyChoicesLockState,
   type LangyDerivedCard,
   type LangyDerivedChoicesCard,
-} from "@langwatch/langy";
+} from "@langwatch/langy-contract";
 import { Pause, Play, RotateCcw, StepForward } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 

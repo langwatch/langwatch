@@ -3,11 +3,11 @@ import { createTenantId } from "@langwatch/eventing";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
-} from "@langwatch/langy";
+} from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import type { LangyConversationProcessingEvent } from "@langwatch/langy-server/event-sourcing/langy.events";
 
-import { createLangyConversationUpdateBroadcastSubscriber } from "../langy-conversation-update-broadcast.subscriber";
+import { createLangyConversationUpdateBroadcastSubscriber } from "@langwatch/langy-server";
 
 const ACCEPTED_AT = 1_752_600_000_000;
 const context: EventSubscriberContext = {

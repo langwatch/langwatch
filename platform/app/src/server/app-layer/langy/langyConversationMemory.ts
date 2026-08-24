@@ -67,13 +67,15 @@
  *    that authenticates, which is the same boundary every other read crosses.
  */
 
-import { cliResultDigestSchema } from "@langwatch/langy";
-import { extractTextFromParts } from "./langy-message.service";
+import {
+  cliResultDigestSchema,
+  extractLangyTextFromParts,
+} from "@langwatch/langy-contract";
 import {
   MAX_LABEL_LENGTH,
   sanitizeLangyPromptValue,
 } from "./langyTurnContext.schema";
-import type { LangyMessageRow } from "./repositories/langy-message.repository";
+import type { LangyMessageRow } from "@langwatch/langy-contract";
 
 /** More entries than a follow-up could plausibly mean, and a bounded prompt. */
 export const MAX_MEMORY_ENTRIES = 10;
@@ -325,7 +327,9 @@ export function renderLangyConversationTranscript({
   const spoken: { role: "user" | "assistant"; text: string }[] = [];
   for (const message of messages) {
     if (message.role !== "user" && message.role !== "assistant") continue;
-    const text = sanitizeTranscriptText(extractTextFromParts(message.parts));
+    const text = sanitizeTranscriptText(
+      extractLangyTextFromParts(message.parts),
+    );
     if (!text) continue;
     spoken.push({ role: message.role, text });
   }

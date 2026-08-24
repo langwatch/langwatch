@@ -21,19 +21,15 @@
  *   - Projection lag (`LangyConversationNotFoundError` from the fold read)
  *     means "keep waiting", not "gone".
  */
-import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy";
+import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
+import { getApp } from "~/server/app-layer/app";
 
 // ─── Auth mocks (same seam as langy-api-refusal-chain.unit.test.ts) ───────────
 const mockResolve = vi.fn();
 const mockMarkUsed = vi.fn();
-
-vi.mock("~/server/api-key/token-resolver", () => ({
-  TokenResolver: {
-    create: vi.fn(() => ({ resolve: mockResolve, markUsed: mockMarkUsed })),
-  },
-}));
 
 const mockExtractCredentials = vi.fn();
 const mockEnforceApiKeyCeiling = vi.fn();
@@ -78,9 +74,13 @@ const mockGetEventsAfter = vi.fn();
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: vi.fn(() => ({
+    apiKeys: {
+      tryResolveToken: mockResolve,
+      markUsed: mockMarkUsed,
+    },
     langy: {
-      turns: { startConversationTurn: mockStartConversationTurn },
-      conversations: { getEventsAfter: mockGetEventsAfter },
+      startConversationTurn: mockStartConversationTurn,
+      getEventsAfter: mockGetEventsAfter,
     },
   })),
   // No Redis in this suite: awaitTurnSettlement exercises its fold-poll
@@ -92,6 +92,7 @@ vi.mock("~/server/app-layer/app", () => ({
 const { app: langyApp } = await import("../langy-api");
 
 const testApp = new Hono();
+testApp.use("*", appContextMiddlewareFor(getApp()));
 testApp.route("/", langyApp);
 
 const TURN_URL = "http://localhost/api/langy/conversations";
@@ -286,7 +287,7 @@ describe("/api/langy wait mode (Prefer: wait)", () => {
 
   it("treats projection lag as keep-waiting, not gone", async () => {
     const { LangyConversationNotFoundError } = await import(
-      "~/server/app-layer/langy/errors"
+      "@langwatch/langy-contract"
     );
     mockGetEventsAfter
       .mockRejectedValueOnce(new LangyConversationNotFoundError("conv-1"))

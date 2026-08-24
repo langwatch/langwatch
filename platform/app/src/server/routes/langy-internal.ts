@@ -17,13 +17,13 @@
  */
 
 import { ValidationError } from "@langwatch/handled-error";
-import { type CliToolResult, cliToolResultSchema } from "@langwatch/langy";
+import { type CliToolResult, cliToolResultSchema } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { timingSafeEqual } from "crypto";
 import type { Context, Next } from "hono";
 import { z } from "zod";
 import { createServiceApp, internalSecret } from "~/server/api/security";
-import { getApp } from "~/server/app-layer/app";
+import { appFromContext } from "~/app/api/middleware/app-context";
 import { revokeLangySessionApiKey } from "~/server/app-layer/langy/langyApiKey";
 import { prisma } from "~/server/db";
 import {
@@ -143,7 +143,7 @@ secured
     // this rejects a forged triple and a benign cross-tenant mix-up alike.
     // 404 (not 4xx-with-detail) so a probe never confirms a cross-tenant id;
     // the manager treats 4xx as terminal, so it will not retry-loop.
-    const turnExists = await getApp().langy.conversations.turnExists({
+    const turnExists = await appFromContext(c).langy.turnExists({
       projectId: body.projectId,
       conversationId: body.conversationId,
       turnId,
@@ -160,7 +160,7 @@ secured
       return c.json({ error: "turn not found" }, 404);
     }
 
-    await getApp().langy.conversations.ingestAgentTurnResult({
+    await appFromContext(c).langy.ingestAgentTurnResult({
       projectId: body.projectId,
       conversationId: body.conversationId,
       turnId,

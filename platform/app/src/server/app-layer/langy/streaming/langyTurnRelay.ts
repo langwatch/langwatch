@@ -22,7 +22,11 @@ import {
   type CliResultDigest,
   type CliToolResult,
   cliToolResultPayload,
-} from "@langwatch/langy";
+  isSoleLangwatchInvocation,
+  type LangwatchCommand,
+  parseAllLangwatchCommands,
+  parseLangwatchCommand,
+} from "@langwatch/langy-contract";
 import { env } from "~/env.mjs";
 import { resolveCapabilityProgress } from "~/features/langy/components/capabilities/capabilityRegistry";
 import {
@@ -31,20 +35,14 @@ import {
   toRelativeSameOriginHref,
 } from "~/utils/platformHref";
 import {
-  isSoleLangwatchInvocation,
-  type LangwatchCommand,
-  parseAllLangwatchCommands,
-  parseLangwatchCommand,
-} from "../execution/langwatchCommand";
-import {
   LangyCliEnvelopeService,
   type LangyToolFrame,
-} from "../execution/langy-cli-envelope.service";
+} from "@langwatch/langy-server";
 import {
   langyAgentErrorFromErrorFrame,
   serializeLangyTurnError,
-} from "../execution/langy-turn-errors";
-import { verifyFrame } from "./langyFrameAuth";
+} from "@langwatch/langy-server";
+import { verifyFrame } from "@langwatch/langy-server";
 import {
   type LangyFrameEnvelope,
   type LangyRelayFrame,
@@ -206,7 +204,7 @@ export interface LangyRelayBuffer {
 
 /** The slice of the conversation service the relay dispatches durable events through. */
 export interface LangyRelayConversations {
-  getRunToken(a: {
+  tryGetRunToken(a: {
     projectId: string;
     conversationId: string;
   }): Promise<string | null>;
@@ -467,7 +465,7 @@ export class LangyTurnRelay {
     // Fallback: the durable RunToken projection. Covers a handoff that aged out
     // past its TTL on a very long turn, and keeps working when no handoff dep is
     // wired (unit tests).
-    const fromProjection = await this.deps.conversations.getRunToken({
+    const fromProjection = await this.deps.conversations.tryGetRunToken({
       projectId,
       conversationId,
     });
@@ -694,7 +692,7 @@ export class LangyTurnRelay {
     // bare index (a scenario run whose set could not be resolved, say) — an
     // index must never be cached as if it were the resource's own address.
     if (frame.phase === "end" && !call.isError) {
-      const command = this.cliEnvelope.shellCommandOf({
+      const command = this.cliEnvelope.tryShellCommandOf({
         id: frame.id,
         name: frame.name,
         phase: frame.phase,
@@ -810,7 +808,7 @@ export class LangyTurnRelay {
   private shellCommandOfFrame(
     frame: Extract<LangyRelayFrame, { type: "tool" }>,
   ): string | null {
-    return this.cliEnvelope.shellCommandOf({
+    return this.cliEnvelope.tryShellCommandOf({
       id: frame.id,
       name: frame.name,
       phase: frame.phase,

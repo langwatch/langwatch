@@ -8,7 +8,7 @@
  *         policy, not per-user state.
  *
  * The enforcement path is the credentials envelope + the agent's egress
- * adapter (see LangyCredentialService.getEgressAllowlist and
+ * adapter (see LangyCredentialService.tryGetEgressAllowlist and
  * app-layer/langyagent/adapters/egress/adapter.go). This router is only how a
  * customer reads and sets the value; a change takes effect on the
  * conversation's next turn (the worker recycles when its egress signature
@@ -27,11 +27,8 @@
  */
 
 import { auditLog } from "~/runtime/app/features/audit-log";
+import { langyEgressAllowlistSchema } from "@langwatch/langy-contract";
 import { z } from "zod";
-import {
-  LangyCredentialService,
-  langyEgressAllowlistSchema,
-} from "~/server/app-layer/langy/LangyCredentialService";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { enforceLangyAccess, refuseDemoProject } from "./langyAccessMiddleware";
 
@@ -42,8 +39,7 @@ export const langyEgressRouter = createTRPCRouter({
     .use(refuseDemoProject)
     .use(enforceLangyAccess)
     .query(async ({ ctx, input }) => {
-      const service = LangyCredentialService.create(ctx.prisma);
-      const allowlist = await service.getEgressAllowlist({
+      const allowlist = await ctx.app.langy.tryGetEgressAllowlist({
         projectId: input.projectId,
       });
       // `null` ⇒ monitor-only. The editor renders an empty list + the
@@ -62,8 +58,7 @@ export const langyEgressRouter = createTRPCRouter({
     .use(refuseDemoProject)
     .use(enforceLangyAccess)
     .mutation(async ({ ctx, input }) => {
-      const service = LangyCredentialService.create(ctx.prisma);
-      const saved = await service.setEgressAllowlist({
+      const saved = await ctx.app.langy.trySetEgressAllowlist({
         projectId: input.projectId,
         allowlist: input.allowlist,
       });

@@ -14,6 +14,7 @@
 import { createLogger } from "@langwatch/observability";
 import { context, propagation, trace } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+import { LANGY_AGENT_DISPATCH_TIMEOUT_MS } from "@langwatch/langy-server";
 import { getLangyDispatchCounter } from "~/server/metrics";
 
 const logger = createLogger("langwatch:langy:worker");
@@ -29,7 +30,7 @@ const AGENT_WARM_TIMEOUT_MS = 3_000;
  * must cover a cold start with margin. Not a per-token deadline — it closes the
  * moment the status lands.
  */
-export const AGENT_DISPATCH_TIMEOUT_MS = 60_000;
+export const AGENT_DISPATCH_TIMEOUT_MS = LANGY_AGENT_DISPATCH_TIMEOUT_MS;
 
 /**
  * The pre-stream outcome of a turn dispatch. `accepted` (202) means the worker is

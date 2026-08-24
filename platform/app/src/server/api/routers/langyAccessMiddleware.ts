@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 
 import { isDemoProjectId, type PermissionMiddleware } from "~/server/api/rbac";
-import { LangyNotEnabledError } from "~/server/app-layer/langy/errors";
+import { LangyNotEnabledError } from "@langwatch/langy-contract";
 import { hasLangyAccess } from "~/server/app-layer/langy/langyAccessGate";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 

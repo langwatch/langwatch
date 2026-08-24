@@ -10,7 +10,7 @@ import {
 
 /**
  * The kind list is the contract between the worker's turn classifier
- * (`server/app-layer/langy/execution/langy-turn-errors.ts`) and the copy the
+ * (the Langy server turn-error contract) and the copy the
  * browser renders. Pinning it here means adding a backend kind without copy —
  * or renaming one — fails loudly instead of silently landing in the generic
  * default.

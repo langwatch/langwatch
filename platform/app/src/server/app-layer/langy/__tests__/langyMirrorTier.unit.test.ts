@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { resolveLangyMirrorTier } from "../LangyCredentialService";
+import { resolveLangyMirrorTier } from "../langy-credential.test-adapter";
 
 describe("resolveLangyMirrorTier", () => {
   describe("when no mirror project id is configured", () => {

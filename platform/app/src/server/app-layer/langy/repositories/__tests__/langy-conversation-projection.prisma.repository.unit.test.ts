@@ -4,13 +4,13 @@ import type {
   StateProjectionDefinition,
 } from "@langwatch/eventing";
 import { createTenantId, StateProjectionExecutor } from "@langwatch/eventing";
-import type { LangyConversationStateData } from "@langwatch/langy";
+import type { LangyConversationStateData } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
 import {
   type LangyConversationProjection,
   LangyProjectionTitleSource,
 } from "~/generated/prisma/client";
-import { PrismaLangyConversationProjectionRepository } from "../langy-conversation-projection.prisma.repository";
+import { PrismaLangyConversationProjectionRepository } from "@langwatch/langy-server/repositories/prisma/prisma.langy-conversation-projection.repository";
 
 type Row = LangyConversationProjection;
 type Client = ConstructorParameters<

@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   LangyConversationIdUnadoptableError,
   LangyModelNotConfiguredError,
-} from "../errors";
+} from "@langwatch/langy-contract";
 import {
   LangyTurnService,
   type LangyTurnServiceDeps,

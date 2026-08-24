@@ -1,13 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  createLangyTrustedMessageReader,
-  type LangyMessageRepository,
   LangyMessageService,
-} from "../langy-message.service";
+  type LangyMessageRepository,
+} from "@langwatch/langy-server/testing";
 import type {
   LangyConversationRepository,
   LangyConversationRow,
-} from "../repositories/langy-conversation.repository";
+} from "@langwatch/langy-server/repositories/langy-conversation-projection.repository";
 
 function makeMessageRepo(overrides?: Partial<LangyMessageRepository>) {
   return {
@@ -146,7 +145,7 @@ describe("createLangyTrustedMessageReader", () => {
         },
       ]),
     });
-    const trustedReader = createLangyTrustedMessageReader(repo);
+    const trustedReader = LangyMessageService.createTrustedMessageReader(repo);
 
     await expect(
       trustedReader.getRecordsByConversation({
@@ -172,7 +171,7 @@ describe("createLangyTrustedMessageReader", () => {
     });
 
     await expect(
-      createLangyTrustedMessageReader(repo).getRecordsByConversation({
+      LangyMessageService.createTrustedMessageReader(repo).getRecordsByConversation({
         conversationId: "c1",
         projectId: "p1",
       }),

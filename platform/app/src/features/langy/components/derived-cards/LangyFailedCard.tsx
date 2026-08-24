@@ -6,7 +6,7 @@
  * is the reader's evidence of what the model actually wrote.
  */
 import { Box, chakra, HStack, Text } from "@chakra-ui/react";
-import type { LangyCardFailedPart } from "@langwatch/langy";
+import type { LangyCardFailedPart } from "@langwatch/langy-contract";
 import { ChevronDown, ChevronRight, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 

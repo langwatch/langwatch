@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { PrismaLangyConversationRepository } from "../langy-conversation.prisma.repository";
+import { PrismaLangyConversationRepository } from "@langwatch/langy-server/repositories/prisma/prisma.langy-conversation.repository";
 
 function makeRepository() {
   const findMany = vi.fn().mockResolvedValue([]);

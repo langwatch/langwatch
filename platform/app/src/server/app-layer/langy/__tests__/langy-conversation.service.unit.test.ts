@@ -4,12 +4,12 @@ import {
   LangyConversationIdUnadoptableError,
   LangyConversationNotFoundError,
   LangyConversationNotOwnedError,
-} from "../errors";
+} from "@langwatch/langy-contract";
 import {
   type LangyConversationCommands,
   type LangyConversationReadRepository,
   LangyConversationService,
-} from "../langy-conversation.service";
+} from "@langwatch/langy-server/testing";
 
 /** Latest-version fold row the read repository returns. */
 type Row = {

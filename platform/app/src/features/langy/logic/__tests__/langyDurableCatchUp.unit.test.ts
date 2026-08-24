@@ -8,7 +8,7 @@
  * @see specs/langy/langy-frontend-realtime.feature
  *      "A tab whose live stream dropped still converges on the turn"
  */
-import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy";
+import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useLangyStore } from "../../stores/langyStore";
 import { catchUpConversationFold } from "../langyDurableCatchUp";

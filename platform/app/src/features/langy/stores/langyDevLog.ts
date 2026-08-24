@@ -5,7 +5,7 @@ import {
   type LangyEventCursor,
   type LangyTurnProjectionState,
   seedLangyTurnProjection,
-} from "@langwatch/langy";
+} from "@langwatch/langy-contract";
 import { create } from "zustand";
 import type { LangyStreamEntry } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { useLangyStore } from "./langyStore";

@@ -7,7 +7,7 @@
  * renders through the resource-result card / staged proposal instead.)
  */
 import { Text, VStack } from "@chakra-ui/react";
-import { asJsonDocument } from "@langwatch/langy";
+import { asJsonDocument } from "@langwatch/langy-contract";
 import { useCapabilityData } from "../../hooks/useCapabilityData";
 import {
   type CapabilityCardInput,

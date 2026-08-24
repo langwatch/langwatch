@@ -12,12 +12,9 @@ import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
-import { ProjectService } from "~/server/app-layer/projects/project.service";
-import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
 import { prisma } from "~/server/db";
-import { PromptService } from "~/server/prompt-config/prompt.service";
 import { resolveNavigateFallbackUrl } from "../langyNavigateFallback";
 
 describe("Feature: the navigate fallback resolves a prompt with the project's own access", () => {
@@ -54,9 +51,7 @@ describe("Feature: the navigate fallback resolves a prompt with the project's ow
       },
     });
 
-    globalForApp.__langwatch_app = createTestApp({
-      projects: new ProjectService(new PrismaProjectRepository(prisma)),
-    });
+    globalForApp.__langwatch_app = createTestApp();
   });
 
   afterEach(async () => {
@@ -83,7 +78,7 @@ describe("Feature: the navigate fallback resolves a prompt with the project's ow
 
   describe("when the agent asks to open a prompt the project can see", () => {
     it("resolves the prompts-page drawer address for that prompt", async () => {
-      const prompt = await new PromptService(prisma).createPrompt({
+      const prompt = await getApp().prompts.createPrompt({
         projectId: project.id,
         organizationId: organization.id,
         handle: `navfix-prompt-${nanoid().toLowerCase()}`,
@@ -107,7 +102,7 @@ describe("Feature: the navigate fallback resolves a prompt with the project's ow
 
   describe("when the id does not resolve in the asking project", () => {
     it("returns null for another project's prompt id", async () => {
-      const prompt = await new PromptService(prisma).createPrompt({
+      const prompt = await getApp().prompts.createPrompt({
         projectId: project.id,
         organizationId: organization.id,
         handle: `navfix-prompt-${nanoid().toLowerCase()}`,

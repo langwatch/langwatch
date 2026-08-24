@@ -5,7 +5,7 @@ import type { Session } from "~/server/auth";
 import {
   LangyEgressMisconfiguredError,
   LangyModelNotConfiguredError,
-} from "./errors";
+} from "@langwatch/langy-contract";
 import type { LangyTurnServiceDeps } from "./langy-turn.service";
 
 const logger = createLogger("langwatch:langy:turn-dependencies");
@@ -71,7 +71,7 @@ export async function resolveLangyTurnBaseDependencies(args: {
           session,
           mintSessionKey: false,
         }),
-        deps.credentials.getEgressAllowlist({ projectId }),
+        deps.credentials.tryGetEgressAllowlist({ projectId }),
         // ADR-061 mirror tier — resolved in the same window as the egress list.
         deps.credentials.resolveMirrorTier({ projectId }),
       ]),

@@ -88,14 +88,13 @@ import {
   enforceApiKeyCeiling,
   extractCredentials,
 } from "~/server/api-key/auth-middleware";
-import { TokenResolver } from "~/server/api-key/token-resolver";
-import { getApp } from "~/server/app-layer/app";
+import { appFromContext } from "~/app/api/middleware/app-context";
 import {
   LangyApiCredentialInvalidError,
   LangyApiCredentialMissingError,
   LangyApiIdentityDeniedError,
   LangyApiRequestInvalidError,
-} from "~/server/app-layer/langy/errors";
+} from "@langwatch/langy-contract";
 import type { LangyChatMessageInput } from "~/server/app-layer/langy/langy-turn.service";
 import { resolveLangyActorSession } from "~/server/app-layer/langy/langyApiKeyActorSession";
 import { resolveLangyKeyIdentity } from "~/server/app-layer/langy/langyApiKeyIdentity";
@@ -104,10 +103,8 @@ import { prisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
 import { bodyLimit } from "./_lib/body-limit";
 
-const tokenResolver = TokenResolver.create(prisma);
-
 const AUTH_REASON =
-  "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling, then bridged to an owning user by resolveLangyKeyIdentity";
+  "project API key resolved by context.app.apiKeys and checked with enforceApiKeyCeiling, then bridged to an owning user by resolveLangyKeyIdentity";
 
 /**
  * A turn is text plus small structured parts, never an upload. The cap is well
@@ -184,7 +181,8 @@ async function authorizeTurn(c: Context) {
   const credentials = extractCredentials((name) => c.req.header(name));
   if (!credentials) throw new LangyApiCredentialMissingError();
 
-  const resolved = await tokenResolver.resolve({
+  const apiKeys = appFromContext(c).apiKeys;
+  const resolved = await apiKeys.tryResolveToken({
     token: credentials.token,
     projectId: credentials.projectId,
   });
@@ -246,7 +244,7 @@ async function authorizeTurn(c: Context) {
     projectId: resolved.project.id,
     markUsed: () => {
       if (resolved.type === "apiKey") {
-        tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
+        apiKeys.markUsed({ id: resolved.apiKeyId });
       }
     },
   };
@@ -315,7 +313,7 @@ async function startTurn({
 
   const body = await parseTurnBody(c, conversationId);
 
-  const result = await getApp().langy.turns.startConversationTurn({
+  const result = await appFromContext(c).langy.startConversationTurn({
     projectId: auth.projectId,
     idempotencyKey: body.idempotencyKey,
     session: auth.session,

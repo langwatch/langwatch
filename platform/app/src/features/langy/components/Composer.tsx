@@ -1,5 +1,5 @@
 import { Box, chakra, HStack, Spinner, Text, Textarea } from "@chakra-ui/react";
-import type { LangyTurnPhase } from "@langwatch/langy";
+import type { LangyTurnPhase } from "@langwatch/langy-contract";
 import {
   Bot,
   Check,

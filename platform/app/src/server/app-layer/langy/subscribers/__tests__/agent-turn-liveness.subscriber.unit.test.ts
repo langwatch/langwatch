@@ -4,20 +4,19 @@ import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
   LANGY_CONVERSATION_STATUS,
-} from "@langwatch/langy";
+} from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
-import { LangyTurnDispatchRetry } from "~/server/app-layer/langy/langy-turn-retry.error";
-import { LANGY_LIVENESS } from "~/server/app-layer/langy/streaming/langy.streaming.constants";
 import type { LangyTurnHandoff } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
+import type { LangyConversationProcessingEvent } from "@langwatch/langy-server/event-sourcing/langy.events";
 
 import {
   createAgentTurnLivenessSubscriber,
+  LANGY_HEARTBEAT_GRACE_MS,
   type LangyConversationLivenessRecord,
-} from "../agent-turn-liveness.subscriber";
+} from "@langwatch/langy-server";
 
 const NOW = 1_752_600_100_000;
-const ACCEPTED_AT = NOW - LANGY_LIVENESS.HEARTBEAT_GRACE_MS;
+const ACCEPTED_AT = NOW - LANGY_HEARTBEAT_GRACE_MS;
 const context: EventSubscriberContext = {
   tenantId: "ignored_context_project",
   aggregateId: "ignored_context_conversation",
@@ -111,14 +110,14 @@ describe("agent turn liveness subscriber", () => {
       aggregateId: "conv_2",
     });
 
-    expect(subscriber.options?.delay).toBe(LANGY_LIVENESS.HEARTBEAT_GRACE_MS);
+    expect(subscriber.options?.delay).toBe(LANGY_HEARTBEAT_GRACE_MS);
     const deduplication = subscriber.options?.deduplication;
     expect(typeof deduplication).toBe("object");
     if (typeof deduplication === "object") {
       expect(deduplication.makeId(event)).toBe(
         "langy-liveness:project_2:conv_2:turn_1",
       );
-      expect(deduplication.ttlMs).toBe(LANGY_LIVENESS.HEARTBEAT_GRACE_MS * 2);
+      expect(deduplication.ttlMs).toBe(LANGY_HEARTBEAT_GRACE_MS * 2);
     }
   });
 
@@ -144,7 +143,7 @@ describe("agent turn liveness subscriber", () => {
       conversationId: "conv_2",
       turnId: "turn_1",
       now: NOW,
-      graceMs: LANGY_LIVENESS.HEARTBEAT_GRACE_MS,
+      graceMs: LANGY_HEARTBEAT_GRACE_MS,
     });
   });
 
@@ -176,7 +175,7 @@ describe("agent turn liveness subscriber", () => {
     expect(error).toBeInstanceOf(DispatchError);
     expect((error as DispatchError).retryable).toBe(true);
     expect((error as DispatchError).retryAfterMs).toBe(
-      LANGY_LIVENESS.HEARTBEAT_GRACE_MS,
+      LANGY_HEARTBEAT_GRACE_MS,
     );
     expect(deps.handoffStore.read).not.toHaveBeenCalled();
     expect(deps.worker.dispatch).not.toHaveBeenCalled();
@@ -203,7 +202,7 @@ describe("agent turn liveness subscriber", () => {
 
     await expect(
       subscriber.handle(makeEvent(), context),
-    ).rejects.toBeInstanceOf(LangyTurnDispatchRetry);
+    ).rejects.toBeInstanceOf(DispatchError);
     expect(deps.worker.dispatch).toHaveBeenCalledWith(
       expect.objectContaining({
         projectId: "project_1",
@@ -219,7 +218,7 @@ describe("agent turn liveness subscriber", () => {
   it("fails a turn that stayed stale past the retry window", async () => {
     const deps = makeDeps({
       conversation: makeRecord({
-        lastActivityAtMs: NOW - LANGY_LIVENESS.HEARTBEAT_GRACE_MS * 3 - 1,
+        lastActivityAtMs: NOW - LANGY_HEARTBEAT_GRACE_MS * 3 - 1,
       }),
       handoff: makeHandoff(),
     });

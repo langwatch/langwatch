@@ -2,10 +2,10 @@ import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { batchProjectPermissions, type Permission } from "~/server/api/rbac";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
-import { LANGY_SESSION_API_KEY_NAME } from "~/server/api-key/reserved-names";
+import { LANGY_SESSION_API_KEY_NAME } from "@langwatch/api-key-contract";
 import type { Session } from "~/server/auth";
 import { getLangySessionKeysCounter } from "~/server/metrics";
+import { getApp } from "~/server/app-layer/app";
 
 const logger = createLogger("langwatch:langy:api-key");
 const tracer = getLangWatchTracer("langwatch.langy.api-key");
@@ -417,7 +417,7 @@ export async function mintLangySessionApiKey({
     );
   }
 
-  const service = ApiKeyService.create(prisma);
+  const service = getApp().apiKeys;
   // Its own span: this is the INSERT (plus the ceiling check). Separating it from
   // the probes above is the point — a fat `mint` span tells you nothing, but
   // "probes 40ms / insert 8ms" tells you exactly which half to attack. It also

@@ -11,7 +11,7 @@
  *     Redis connection.
  *   - An aborted follow() is never mistaken for a settlement signal.
  */
-import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy";
+import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGetEventsAfter = vi.fn();

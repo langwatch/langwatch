@@ -32,10 +32,12 @@ import {
   expect,
   it,
 } from "vitest";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-import { langyConversationProcess } from "../langyConversationProcess";
-import { LANGY_CONVERSATION_PROCESS_NAME } from "../langyConversationProcess.types";
-import { createStubLangyEffectPorts } from "../langyEffectPorts";
+import type { LangyConversationProcessingEvent } from "@langwatch/langy-server/event-sourcing/langy.events";
+import {
+  LANGY_CONVERSATION_PROCESS_NAME,
+  langyConversationProcess,
+} from "@langwatch/langy-server/eventing/langy-conversation-processing/process-manager";
+import { createStubLangyEffectPorts } from "@langwatch/langy-server/testing";
 import {
   agentTurnAcceptedEvent,
   CONVERSATION_ID,

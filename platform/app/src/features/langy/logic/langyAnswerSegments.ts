@@ -22,7 +22,7 @@ import {
   type LangyCardPart,
   parseLangyCardFailedPart,
   parseLangyCardPart,
-} from "@langwatch/langy";
+} from "@langwatch/langy-contract";
 
 export type LangyAnswerSegment =
   | { type: "text"; text: string }

@@ -22,7 +22,8 @@
 
 import { createLogger } from "@langwatch/observability";
 import { createServiceApp, internalSecret } from "~/server/api/security";
-import { getApp, tryGetApp } from "~/server/app-layer/app";
+import { tryGetApp } from "~/server/app-layer/app";
+import { appFromContext } from "~/app/api/middleware/app-context";
 import { createLangyFrameDedup } from "~/server/app-layer/langy/streaming/langyFrameDedup";
 import { resolveNavigateFallbackUrl } from "~/server/app-layer/langy/streaming/langyNavigateFallback";
 import { createLangyResourceLinkStore } from "~/server/app-layer/langy/streaming/langyResourceLinks";
@@ -70,7 +71,7 @@ secured.access(relayPolicy()).post("/relay/frames", async (c) => {
 
   const handoffStore = createLangyTurnHandoffStore({ redis: connection });
   const relay = new LangyTurnRelay({
-    conversations: getApp().langy.conversations,
+    conversations: appFromContext(c).langy,
     buffer: createLangyTokenBuffer({ redis: connection }),
     reserveFrameNonce: createLangyFrameDedup({ redis: connection })
       .reserveFrameNonce,
@@ -88,7 +89,11 @@ secured.access(relayPolicy()).post("/relay/frames", async (c) => {
       return handoff.runToken || null;
     },
     resourceLinks: createLangyResourceLinkStore({ redis: connection }),
-    resolveResourceUrl: resolveNavigateFallbackUrl,
+    resolveResourceUrl: (input) =>
+      resolveNavigateFallbackUrl({
+        ...input,
+        agents: appFromContext(c).agents,
+      }),
     logger,
   });
 

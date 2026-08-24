@@ -1,9 +1,9 @@
 import type { ProjectionStoreContext } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
-import type { LangyMessageProjectionRecord } from "@langwatch/langy";
+import type { LangyMessageProjectionRecord } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
 import type { LangyMessageProjection } from "~/generated/prisma/client";
-import { PrismaLangyMessageProjectionRepository } from "../langy-message-projection.prisma.repository";
+import { PrismaLangyMessageProjectionRepository } from "@langwatch/langy-server/repositories/prisma/prisma.langy-message-projection.repository";
 
 type Row = LangyMessageProjection;
 type Client = ConstructorParameters<

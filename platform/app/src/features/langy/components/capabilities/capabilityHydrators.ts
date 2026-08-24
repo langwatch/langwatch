@@ -223,7 +223,7 @@ async function datasetByIds({
       matchesId(candidate, id, ["id", "slug"]),
     );
     if (!dataset) continue;
-    const records = dataset._count.datasetRecords;
+    const records = dataset.recordCount;
     rows.push({
       id: dataset.id,
       primary: dataset.name,

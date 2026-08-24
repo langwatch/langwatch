@@ -39,7 +39,7 @@ import {
   cliToolResultSchema,
   parseCliJson,
   readCliErrorDocument,
-} from "@langwatch/langy";
+} from "@langwatch/langy-contract";
 import type { UIMessage } from "ai";
 import { Braces, Check, ChevronRight, Layers3 } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";

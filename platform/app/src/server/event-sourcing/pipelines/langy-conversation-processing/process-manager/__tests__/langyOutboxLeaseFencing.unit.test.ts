@@ -9,17 +9,15 @@ import {
 } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AGENT_DISPATCH_TIMEOUT_MS } from "~/server/app-layer/langy/langyWorker";
-import type { LangyConversationProcessingEvent } from "~/server/event-sourcing/pipelines/langy-conversation-processing/schemas/events";
-import { langyConversationProcess } from "../langyConversationProcess";
-import type { LangyConversationProcessState } from "../langyConversationProcess.types";
+import type { LangyConversationProcessingEvent } from "@langwatch/langy-server/event-sourcing/langy.events";
 import {
   LANGY_CONVERSATION_PROCESS_NAME,
-  LANGY_PROCESS_INTENT_TYPES,
-} from "../langyConversationProcess.types";
-import {
-  createStubLangyEffectPorts,
   LANGY_OUTBOX_LEASE_DURATION_MS,
-} from "../langyEffectPorts";
+  LANGY_PROCESS_INTENT_TYPES,
+  langyConversationProcess,
+  type LangyConversationProcessState,
+} from "@langwatch/langy-server/eventing/langy-conversation-processing/process-manager";
+import { createStubLangyEffectPorts } from "@langwatch/langy-server/testing";
 import {
   agentTurnAcceptedEvent,
   CONVERSATION_ID,

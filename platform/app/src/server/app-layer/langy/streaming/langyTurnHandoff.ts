@@ -15,7 +15,7 @@
  * turn.
  */
 
-import type { LangyCredentials } from "../LangyCredentialService";
+import type { LangyCredentials } from "@langwatch/langy-contract";
 
 /** The non-durable inputs the spawn function needs, out of band from the event. */
 export interface LangyTurnHandoff {

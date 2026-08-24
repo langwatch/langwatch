@@ -17,7 +17,7 @@ import {
   LANGY_CONVERSATION_EVENT_TYPES,
   type LangyConversationTurnWireEvent,
   type LangyEventCursor,
-} from "@langwatch/langy";
+} from "@langwatch/langy-contract";
 import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

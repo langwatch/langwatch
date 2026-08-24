@@ -28,7 +28,7 @@ import type {
   LangyDerivedChoicesCard,
   LangyDerivedStatsCard,
   LangyDerivedTableCard,
-} from "@langwatch/langy";
+} from "@langwatch/langy-contract";
 import { ArrowUpRight, BadgeCheck } from "lucide-react";
 import type { ReactNode } from "react";
 import {

@@ -17,7 +17,7 @@ import {
   type LangyChoicesTimelineEntry,
   parseLangyCardPart,
   parseLangyChoiceSelectionPart,
-} from "@langwatch/langy";
+} from "@langwatch/langy-contract";
 
 import { isQuestionToolPart, questionToolCardParts } from "./langyQuestionTool";
 
