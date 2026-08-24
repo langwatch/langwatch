@@ -104,6 +104,22 @@ export {
   type SignInCallbackLinkingDeps,
 } from "./signin-callback-linking.service";
 export {
+  JoinRequestGuards,
+  type JoinRequestGuardsDeps,
+} from "./join-request-guards";
+export {
+  approveJoinCommandId,
+  expireJoinCommandId,
+  newJoinRequestCommandId,
+  newJoinRequestId,
+} from "./join-request-id";
+export type { JoinRequestLedger } from "./join-request-ledger";
+export type {
+  JoinCandidateRepository,
+  JoinRequestReadRepository,
+} from "./join-request.repository";
+export { JoinRequestService } from "./join-request.service";
+export {
   type LegacySsoOrganizationRepository,
   type SsoConnectionGrandfatherDeps,
   type SsoConnectionGrandfatherOutcome,

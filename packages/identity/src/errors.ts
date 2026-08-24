@@ -171,3 +171,140 @@ export class SsoConnectionStringEditRetiredError extends SsoConnectionCommandRef
     this.name = "SsoConnectionStringEditRetiredError";
   }
 }
+
+/**
+ * A join-request refusal (D12).
+ *
+ * One of these is deliberately INDISTINGUISHABLE across several causes, and
+ * that is the security property rather than an accident: `join_not_available`
+ * answers an organization that does not exist, one that turned joining off,
+ * one whose identity provider already admits people, and an address nobody
+ * has verified — with the same code, the same status and the same words. A
+ * refusal that said which would be an oracle for which organizations exist
+ * and who works at them, which is the one thing this deliverable must not
+ * build.
+ */
+export abstract class JoinRequestRefusedError extends HandledError {}
+
+/**
+ * Nothing here is open to you — and we will not say which of the several
+ * possible reasons applies. Also the answer to naming an organization
+ * directly that was never offered.
+ */
+export class JoinNotAvailableError extends JoinRequestRefusedError {
+  constructor(detail: string) {
+    super("join_not_available", "join_not_available", {
+      httpStatus: 404,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "JoinNotAvailableError";
+  }
+}
+
+/** The request is not this organization's to answer. Same shape as "there is
+ *  no such request", because saying otherwise reveals another organization. */
+export class JoinRequestNotFoundError extends JoinRequestRefusedError {
+  constructor(detail: string) {
+    super("join_request_not_found", "join_request_not_found", {
+      httpStatus: 404,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "JoinRequestNotFoundError";
+  }
+}
+
+/** Every ending is terminal: approve, reject, withdraw and expire all act on
+ *  PENDING and nothing else. */
+export class JoinRequestNotPendingError extends JoinRequestRefusedError {
+  constructor(detail: string) {
+    super("join_request_not_pending", "join_request_not_pending", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "JoinRequestNotPendingError";
+  }
+}
+
+/** One open request per person per organization. A request costs an admin
+ *  attention, so the cheapest attack on them is volume. */
+export class JoinRequestAlreadyPendingError extends JoinRequestRefusedError {
+  constructor(detail: string) {
+    super("join_request_already_pending", "join_request_already_pending", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "JoinRequestAlreadyPendingError";
+  }
+}
+
+/**
+ * Asking, or looking organizations up, faster than the installation allows —
+ * and the cool-down after a rejection, which is the same refusal on purpose:
+ * a rejected person who could tell "you were rejected" from "you are going
+ * too fast" has been told the rejection the silent-ish ending exists to keep
+ * quiet.
+ *
+ * `retryAfterSeconds` comes off the limiter's own answer, so the screen says
+ * how long is left rather than guessing.
+ */
+export class JoinRequestThrottledError extends JoinRequestRefusedError {
+  constructor(retryAfterSeconds: number) {
+    super("join_request_throttled", "join_request_throttled", {
+      httpStatus: 429,
+      fault: "customer",
+      meta: { retryAfterSeconds },
+    });
+    this.name = "JoinRequestThrottledError";
+  }
+}
+
+/**
+ * Automatic joining was turned on for a domain nobody has proved: a consumer
+ * mail provider, or a company domain only one member holds a verified address
+ * on. The copy says company domains only and does not list the deny-list —
+ * publishing it turns the refusal into a way to enumerate it.
+ */
+export class JoinAutoDomainUnprovenError extends JoinRequestRefusedError {
+  constructor(detail: string) {
+    super("join_auto_domain_unproven", "join_auto_domain_unproven", {
+      httpStatus: 422,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "JoinAutoDomainUnprovenError";
+  }
+}
+
+/** An organization whose identity provider already admits people cannot also
+ *  admit them by domain: the connection's own provisioning is the way in. */
+export class JoinAutoConnectionAdmitsError extends JoinRequestRefusedError {
+  constructor(detail: string) {
+    super("join_auto_connection_admits", "join_auto_connection_admits", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "JoinAutoConnectionAdmitsError";
+  }
+}
+
+/**
+ * The licence asymmetry, refused. Automatic joining is federation — the
+ * deployment decides who counts as a colleague and admits them with nobody in
+ * the loop — so the gate that has always held single sign-on holds this too.
+ * Asking to join is NOT gated and never reaches here.
+ */
+export class JoinAutoNotLicensedError extends JoinRequestRefusedError {
+  constructor(detail: string) {
+    super("join_auto_not_licensed", "join_auto_not_licensed", {
+      httpStatus: 403,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "JoinAutoNotLicensedError";
+  }
+}
