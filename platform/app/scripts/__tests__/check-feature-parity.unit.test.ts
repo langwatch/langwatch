@@ -300,6 +300,40 @@ describe("findScenarioAnnotations", () => {
   const titles = (src: string): string[] =>
     findScenarioAnnotations(src).map((a) => a.title);
 
+  describe("given the annotation opens no comment of its own", () => {
+    // The prefix accepts zero markers so the Python SDK's docstring form keeps
+    // binding. Zero markers also matches a bare source line, and only reading
+    // the file in order can tell the two apart: the deciding context is on an
+    // earlier line.
+    it("binds from inside a python docstring, which is how the SDK writes it", () => {
+      expect(
+        titles('def test_it():\n    """\n    @scenario Docstring form\n    """\n'),
+      ).toEqual(["Docstring form"]);
+    });
+
+    it("binds from inside a block comment that opened on an earlier line", () => {
+      expect(titles("/*\n@scenario Marker-less block form\n*/")).toEqual([
+        "Marker-less block form",
+      ]);
+    });
+
+    it("does not bind from a bare source line, which opens nothing", () => {
+      expect(titles('@scenario "Bare line"')).toEqual([]);
+    });
+
+    it("does not bind from test data, where an annotation is a string not a binding", () => {
+      expect(titles('const fixture = `\n@scenario "Quoted in a fixture"\n`;')).toEqual(
+        [],
+      );
+    });
+
+    it("does not bind after the block comment it was inside has closed", () => {
+      expect(titles('/* opened and closed */\n@scenario "After the comment"')).toEqual(
+        [],
+      );
+    });
+  });
+
   describe("given the annotation opens its comment", () => {
     it("reads a quoted title from a jsdoc block", () => {
       expect(titles('/** @scenario "Quoted title" */')).toEqual([

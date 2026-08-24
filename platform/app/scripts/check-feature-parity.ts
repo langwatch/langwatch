@@ -838,9 +838,10 @@ export function discoverFeatureFiles(
 // to an `it(` / `test(` call with a linear forward scan (see
 // `isFollowedByTestCall`). Doing it all in the regex invites ReDoS.
 //
-// The token has to open its comment. The unquoted alternative below accepts a
-// bare title, so without the anchor any sentence containing the word binds to
-// whatever follows it: a comment reading "carries no @scenario annotation:
+// The token has to open its comment, or, when it opens no comment of its own,
+// be inside one already: `markerlessBindingSpans` below decides that case. The
+// unquoted alternative here accepts a bare title, so without the anchor any
+// sentence containing the word binds to whatever follows it: a comment reading "carries no @scenario annotation:
 // this guards a temporary exclusion" bound a scenario named "annotation: this
 // guards a temporary", and the failure then named a scenario nobody wrote at a
 // line whose comment says the opposite. The prefix allows the comment markers
@@ -858,6 +859,65 @@ const ANNOTATION_RE =
   /^[ \t]*(?:(?:\/\/|\/\*|\*|#)[ \t]*)*@scenario[ \t]+(?:"([^"\n]+)"|'([^'\n]+)'|([^\n*]+?))[ \t]*(?:\*\/|$)/gm;
 
 /**
+ * The spans of `src` that a MARKER-LESS annotation is allowed to live in: block
+ * comments, and the triple-quoted strings Python writes its docstrings as.
+ *
+ * WHY THIS EXISTS. The annotation prefix above accepts zero comment markers,
+ * because the marker-less form is real: five live bindings in the Python SDK
+ * sit on their own line inside a `"""` docstring, and requiring a marker would
+ * un-bind all five without a word, which is the vacuous green this gate exists
+ * to remove. But zero markers also matches a bare source line, and a line regex
+ * cannot tell an unmarked line inside a block comment from one outside it: the
+ * deciding context is on an earlier line. Only reading the file in order
+ * answers that.
+ *
+ * WHY IT IS NOT CONSULTED FOR A MARKED ANNOTATION. It was, in the first
+ * version, and it dropped 9 live bindings out of 7133. A template literal on an
+ * earlier line desynchronised the string tracking, and the phantom string then
+ * swallowed the `/**` of a real annotation six lines later. Marked annotations
+ * are 7128 of the 7133; putting a hand-written scanner in front of all of them
+ * risks far more than it can win. So a marker is still proof on its own, and
+ * this only decides the marker-less case, where the worst a mistake can do is
+ * accept one annotation the old code accepted too.
+ *
+ * That is also why strings are not tracked here. A stray `/*` inside a string
+ * can open a span that is not really a comment, and the cost of that is bounded
+ * by the paragraph above.
+ */
+function markerlessBindingSpans(src: string): { start: number; end: number }[] {
+  const spans: { start: number; end: number }[] = [];
+  const len = src.length;
+  let i = 0;
+
+  while (i < len) {
+    if (src[i] === "/" && src[i + 1] === "*") {
+      const close = src.indexOf("*/", i + 2);
+      const end = close === -1 ? len : close + 2;
+      spans.push({ start: i, end });
+      i = end;
+      continue;
+    }
+
+    const ch = src[i];
+    if ((ch === '"' || ch === "'") && src.startsWith(ch.repeat(3), i)) {
+      const quote = ch.repeat(3);
+      const close = src.indexOf(quote, i + 3);
+      const end = close === -1 ? len : close + 3;
+      spans.push({ start: i, end });
+      i = end;
+      continue;
+    }
+
+    i++;
+  }
+
+  return spans;
+}
+
+/** Whether the annotation opened its own comment, which needs no further proof. */
+const MARKED_ANNOTATION = /^[ \t]*(?:\/\/|\/\*|\*|#)/;
+
+/**
  * Every `@scenario` annotation in `src`, with the offset just past each match so
  * callers can run their own proximity check.
  *
@@ -871,11 +931,24 @@ export function findScenarioAnnotations(
   src: string,
 ): { title: string; index: number; end: number }[] {
   const found: { title: string; index: number; end: number }[] = [];
+  let spans: { start: number; end: number }[] | null = null;
+
   let m: RegExpExecArray | null;
   ANNOTATION_RE.lastIndex = 0;
   while ((m = ANNOTATION_RE.exec(src)) !== null) {
     const title = (m[1] ?? m[2] ?? m[3] ?? "").trim();
     if (!title) continue;
+
+    if (!MARKED_ANNOTATION.test(m[0])) {
+      // Computed on first need: most files have no marker-less annotation at
+      // all, and this walks the whole source.
+      spans ??= markerlessBindingSpans(src);
+      // The match starts at the line's indentation, so the token's own offset
+      // is what has to be inside the span.
+      const at = m.index + m[0].indexOf("@scenario");
+      if (!spans.some((span) => at >= span.start && at < span.end)) continue;
+    }
+
     found.push({ title, index: m.index, end: m.index + m[0].length });
   }
   return found;
