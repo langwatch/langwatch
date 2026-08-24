@@ -83,7 +83,7 @@ import { createLogger } from "@langwatch/observability";
 import type { Hono } from "hono";
 import { register } from "prom-client";
 import { createMcpHandler } from "./mcp/handler";
-import { createApp, createRequestAppServices } from "./runtime/app";
+import { createApp } from "./runtime/app";
 import type { AppRuntime } from "./runtime/app";
 import { createApiRouter } from "./server/api-router";
 import {
@@ -247,8 +247,7 @@ export const startApp = async (options: StartAppOptions) => {
       : basePort);
 
   const mcpHandler = createMcpHandler();
-  const requestApp = createRequestAppServices(appRuntime.legacy);
-  const honoApp = createApiRouter(requestApp, appRuntime.legacy);
+  const honoApp = createApiRouter(appRuntime.legacy);
   // The Node→Hono bridge. `getRequestListener` streams request bodies through
   // (no buffering — the Langy ndjson relay depends on this) and streams the
   // response back. `overrideGlobalObjects: false`: never patch the process's
@@ -407,6 +406,7 @@ export const startApp = async (options: StartAppOptions) => {
   // browser's 6-connection HTTP cap by riding a single long-lived socket.
   const wsHandle = setupTRPCWebSocket(
     server as ReturnType<typeof createServer>,
+    appRuntime.legacy,
   );
 
   server.once("error", (err) => {

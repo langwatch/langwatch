@@ -34,6 +34,7 @@ import type {
 interface CreateNextContextOptions {
   req: any;
   res: any;
+  app: RequestAppServices;
 }
 
 import { auditLog } from "~/runtime/app/features/audit-log";
@@ -56,7 +57,7 @@ import { createLogger } from "@langwatch/observability";
 import { getLogLevelFromStatusCode } from "@langwatch/observability/request";
 import superjson from "superjson";
 import type { OrganizationUserRole } from "~/generated/prisma/client";
-import { RequestApp, type RequestAppServices } from "~/runtime/app/requestApp";
+import type { RequestAppServices } from "~/runtime/app/requestApp";
 import { getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
 import { getServerAuthSession } from "~/server/auth";
@@ -120,20 +121,14 @@ interface CreateContextOptions {
  * @see https://create.t3.gg/en/usage/trpc#-serverapitrpcts
  */
 export const createInnerTRPCContext = (opts: CreateContextOptions) => {
+  const requestApp = opts.app ?? createLegacyRequestApp();
+
   return {
     session: opts.session,
     req: opts.req,
     res: opts.res,
     prisma,
-    app:
-      opts.app ??
-      RequestApp.create({
-        prisma,
-        session: opts.session,
-        permissions: getApp().permissions,
-        authzGrants: getApp().authzGrants,
-        governance: getApp().governance,
-      }),
+    app: requestApp,
     permissionChecked: opts.permissionChecked ?? false,
     publiclyShared: opts.publiclyShared ?? false,
     organizationRole: opts.organizationRole ?? undefined,
@@ -143,13 +138,22 @@ export const createInnerTRPCContext = (opts: CreateContextOptions) => {
 };
 
 /**
+ * Compatibility-only context for Next handlers and tests that have not yet
+ * crossed the explicit transport boundary. The executable Hono/tRPC path
+ * always supplies `opts.app`, so it never resolves the process App here.
+ */
+function createLegacyRequestApp(): RequestAppServices {
+  return getApp();
+}
+
+/**
  * This is the actual context you will use in your router. It will be used to process every request
  * that goes through your tRPC endpoint.
  *
  * @see https://trpc.io/docs/context
  */
 export const createTRPCContext = async (opts: CreateNextContextOptions) => {
-  const { req, res } = opts;
+  const { req, res, app } = opts;
 
   // Get the session via the BetterAuth-backed compat helper.
   const session = await getServerAuthSession({ req, res });
@@ -158,6 +162,7 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
     req,
     res,
     session,
+    app,
     permissionChecked: false,
     publiclyShared: false,
   });

@@ -20,7 +20,8 @@ describe("given the real composed API router", () => {
   describe("when a single request is dispatched to it", () => {
     it("logs that request exactly once", async () => {
       const { createApiRouter } = await import("~/server/api-router");
-      const api = createApiRouter();
+      const { createTestApp } = await import("~/server/app-layer/presets");
+      const api = createApiRouter(createTestApp());
       logHttpRequest.mockClear();
 
       await api.request("http://localhost/api/health");

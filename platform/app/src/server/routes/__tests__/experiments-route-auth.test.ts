@@ -55,7 +55,8 @@ let router: Hono;
 
 beforeAll(async () => {
   const { createApiRouter } = await import("~/server/api-router");
-  router = createApiRouter();
+  const { createTestApp } = await import("~/server/app-layer/presets");
+  router = createApiRouter(createTestApp());
 }, 120_000);
 
 describe("POST /api/experiments/execute auth", () => {

@@ -50,7 +50,8 @@ const isUnenumerableMount = (method: string, path: string): boolean =>
 
 const liveEndpoints = async (): Promise<Set<string>> => {
   const { createApiRouter } = await import("~/server/api-router");
-  const router = createApiRouter();
+  const { createTestApp } = await import("~/server/app-layer/presets");
+  const router = createApiRouter(createTestApp());
   const set = new Set<string>();
   for (const r of (
     router as unknown as { routes: { method: string; path: string }[] }

@@ -20,7 +20,7 @@ import {
 } from "~/generated/prisma/client";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { createApiRouter } from "~/server/api-router";
-import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { getApp, globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
@@ -112,7 +112,7 @@ describe("Feature: Groups REST API through the composed router", () => {
     describe("when the composed router is asked for the groups collection", () => {
       /** @scenario The groups API is reachable through the composed router */
       it("resolves GET /api/groups instead of 404ing", async () => {
-        const api = createApiRouter();
+        const api = createApiRouter(getApp());
         const res = await api.request("/api/groups", {
           headers: { Authorization: `Bearer ${patToken}` },
         });

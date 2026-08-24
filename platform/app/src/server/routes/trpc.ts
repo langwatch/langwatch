@@ -14,6 +14,7 @@ import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import type { Context } from "hono";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { createInnerTRPCContext } from "~/server/api/trpc";
+import type { App } from "~/server/app-layer/app";
 import { getServerAuthSession } from "~/server/auth";
 
 /**
@@ -72,8 +73,6 @@ async function getAppRouter() {
   return _appRouter;
 }
 
-const secured = createServiceApp({ basePath: "/api" });
-
 /**
  * Build a minimal NextApiRequest-shaped shim from a web Request.
  *
@@ -115,62 +114,71 @@ function buildReqShim(req: Request): any {
  * Batched requests use comma-separated names (e.g. "foo,bar") which the
  * tRPC client sends as a single path segment, so the same pattern works.
  */
-const handler = async (c: Context) => {
-  // tRPC's fetch adapter serializes procedure-level errors into a JSON error
-  // body itself. But an exception that escapes the adapter entirely — a throw
-  // in `createContext`, or a synchronous throw like the ClickHouse "client not
-  // available" guard — bypasses that serialization. If it propagated, the
-  // route would emit a 0-byte body (see `routeThroughHono` in src/start.ts),
-  // and the client's `response.json()` would throw `Unexpected end of JSON
-  // input`. Catch it here and return a well-formed tRPC error envelope so the
-  // route NEVER yields an empty body. @see langwatch#5219
-  try {
-    return await fetchRequestHandler({
-      endpoint: "/api/trpc",
-      req: c.req.raw,
-      router: await getAppRouter(),
-      createContext: async ({ req }: FetchCreateContextFnOptions) => {
-        const reqShim = buildReqShim(req);
+function createHandler(app: App) {
+  return async (c: Context) => {
+    // tRPC's fetch adapter serializes procedure-level errors into a JSON error
+    // body itself. But an exception that escapes the adapter entirely — a throw
+    // in `createContext`, or a synchronous throw like the ClickHouse "client not
+    // available" guard — bypasses that serialization. If it propagated, the
+    // route would emit a 0-byte body (see `routeThroughHono` in src/start.ts),
+    // and the client's `response.json()` would throw `Unexpected end of JSON
+    // input`. Catch it here and return a well-formed tRPC error envelope so the
+    // route NEVER yields an empty body. @see langwatch#5219
+    try {
+      return await fetchRequestHandler({
+        endpoint: "/api/trpc",
+        req: c.req.raw,
+        router: await getAppRouter(),
+        createContext: async ({ req }: FetchCreateContextFnOptions) => {
+          const reqShim = buildReqShim(req);
 
-        const session = await getServerAuthSession({
-          req: req as unknown as Parameters<
-            typeof getServerAuthSession
-          >[0]["req"],
-        });
+          const session = await getServerAuthSession({
+            req: req as unknown as Parameters<
+              typeof getServerAuthSession
+            >[0]["req"],
+          });
 
-        return createInnerTRPCContext({
-          req: reqShim,
-          res: undefined,
-          session,
-          permissionChecked: false,
-          publiclyShared: false,
-        });
-      },
-    });
-  } catch (error) {
-    return c.json(trpcErrorEnvelope(error), 500);
-  }
-};
+          return createInnerTRPCContext({
+            req: reqShim,
+            res: undefined,
+            session,
+            app,
+            permissionChecked: false,
+            publiclyShared: false,
+          });
+        },
+      });
+    } catch (error) {
+      return c.json(trpcErrorEnvelope(error), 500);
+    }
+  };
+}
 
-secured
-  .access(
-    handlerManagedAuth({
-      reason: "tRPC enforces per-procedure RBAC internally",
-      // Per-procedure, via checkProjectPermission — not visible at route level.
-      permissions: [],
-      credential: "both",
-    }),
-  )
-  .get("/trpc/*", handler);
-secured
-  .access(
-    handlerManagedAuth({
-      reason: "tRPC enforces per-procedure RBAC internally",
-      // Per-procedure, via checkProjectPermission — not visible at route level.
-      permissions: [],
-      credential: "both",
-    }),
-  )
-  .post("/trpc/*", handler);
+/** Creates a tRPC transport bound to the process-owned request services. */
+export function createTRPCApp(app: App) {
+  const secured = createServiceApp({ basePath: "/api" });
+  const handler = createHandler(app);
 
-export const app = secured.hono;
+  secured
+    .access(
+      handlerManagedAuth({
+        reason: "tRPC enforces per-procedure RBAC internally",
+        // Per-procedure, via checkProjectPermission — not visible at route level.
+        permissions: [],
+        credential: "both",
+      }),
+    )
+    .get("/trpc/*", handler);
+  secured
+    .access(
+      handlerManagedAuth({
+        reason: "tRPC enforces per-procedure RBAC internally",
+        // Per-procedure, via checkProjectPermission — not visible at route level.
+        permissions: [],
+        credential: "both",
+      }),
+    )
+    .post("/trpc/*", handler);
+
+  return secured.hono;
+}

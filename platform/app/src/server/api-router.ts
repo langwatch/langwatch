@@ -83,12 +83,17 @@ import { app as rumApp } from "./routes/rum";
 import { app as scenarioGenerateApp } from "./routes/scenario-generate";
 import { app as sseApp } from "./routes/sse";
 import { app as tracesLegacyApp } from "./routes/traces-legacy";
-import { app as trpcApp } from "./routes/trpc";
+import { createTRPCApp } from "./routes/trpc";
+import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
+import type { App } from "~/server/app-layer/app";
 import { app as unsubscribeApp } from "./routes/unsubscribe";
 import { app as workflowsApp } from "./routes/workflows";
 
-export function createApiRouter() {
+export function createApiRouter(app: App) {
   const api = new Hono();
+  const processTrpcApp = createTRPCApp(app);
+
+  api.use("*", appContextMiddlewareFor(app));
 
   // Legacy OAuth callback rewrites — customer IdPs registered with old URLs.
   // These only rewrite the path and re-dispatch to /api/auth/oauth2/callback/*
@@ -226,7 +231,7 @@ export function createApiRouter() {
   api.route("/", opsApp);
   api.route("/", sseApp);
   api.route("/", tracesLegacyApp);
-  api.route("/", trpcApp);
+  api.route("/", processTrpcApp);
   api.route("/", unsubscribeApp); // /api/unsubscribe — RFC 8058 one-click POST
 
   return api;

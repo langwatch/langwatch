@@ -45,6 +45,7 @@ vi.mock("~/server/app-layer/app", () => ({
 }));
 
 import { createApiRouter } from "~/server/api-router";
+import { getApp } from "~/server/app-layer/app";
 
 const API_KEY = "integration-test-key";
 /** This suite's database, resolved in beforeAll and templated into every query. */
@@ -93,7 +94,7 @@ describe("POST /api/ops/clickhouse/explain (HTTP integration)", () => {
 
     // Built AFTER env is set so the route module reads the right values
     // on first init.
-    router = createApiRouter();
+    router = createApiRouter(getApp());
   }, 300_000);
 
   afterAll(() => {

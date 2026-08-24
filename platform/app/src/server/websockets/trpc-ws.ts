@@ -21,6 +21,7 @@ import { WebSocketServer } from "ws";
 import { env } from "~/env.mjs";
 import { appRouter } from "../api/root";
 import { createTRPCContext } from "../api/trpc";
+import type { App } from "../app-layer/app";
 
 const PATH = "/api/trpc-ws";
 const logger = createLogger("langwatch:server:websockets:trpc-ws");
@@ -46,7 +47,10 @@ function buildOriginAllowlist(): Set<string> | null {
   }
 }
 
-export function setupTRPCWebSocket(server: HttpServer): TRPCWebSocketHandle {
+export function setupTRPCWebSocket(
+  server: HttpServer,
+  app: App,
+): TRPCWebSocketHandle {
   // `noServer: true` — we route by URL pathname so other future WS endpoints
   // can share the same HTTP server without their upgrades fighting.
   const wss = new WebSocketServer({ noServer: true });
@@ -101,6 +105,7 @@ export function setupTRPCWebSocket(server: HttpServer): TRPCWebSocketHandle {
           typeof createTRPCContext
         >[0]["req"],
         res: opts.res as Parameters<typeof createTRPCContext>[0]["res"],
+        app,
       }),
   });
 

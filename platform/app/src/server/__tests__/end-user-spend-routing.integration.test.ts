@@ -167,7 +167,8 @@ describe("end-user spend on the composed router", () => {
     orgKeyToken = created.token;
 
     const { createApiRouter } = await import("~/server/api-router");
-    const built = createApiRouter();
+    const { getApp } = await import("~/server/app-layer/app");
+    const built = createApiRouter(getApp());
     router = built as unknown as typeof router;
     routes = (
       built as unknown as { routes: Array<{ method: string; path: string }> }
