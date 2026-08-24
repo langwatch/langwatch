@@ -19,7 +19,7 @@ the chart next.
 Two things collide when a caller controls both the window and the granularity of
 the same query. First, bucket count is the actual cost driver of a chart query,
 independent of the window's span: `INTERVAL 1 SECOND` over a seven-day range is
-10,080 buckets from a completely ordinary pairing, already past a workable
+604,800 buckets from a completely ordinary pairing, already past a workable
 ceiling. Second, ClickHouse compiles the unit half of an `INTERVAL` expression
 to a function name — `INTERVAL 1 HOUR` becomes `toIntervalHour(1)` — so the unit
 cannot itself be a bound value; only the multiplier can. A caller who could set
