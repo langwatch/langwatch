@@ -74,106 +74,17 @@ export function InvitesTable({
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {invites.map((invite) => {
-                const displayStatus = invite.displayStatus;
-                const badge =
-                  STATUS_BADGES[displayStatus] ?? STATUS_BADGES.PENDING!;
-                const roleLabel =
-                  orgRoleOptions.find((o) => o.value === invite.role)?.label ??
-                  invite.role;
-                const canResend =
-                  isAdmin &&
-                  (displayStatus === "PENDING" || displayStatus === "EXPIRED");
-                const canRevoke = canResend;
-                const canViewLink = displayStatus === "PENDING";
-
-                return (
-                  <Table.Row key={invite.id}>
-                    <Table.Cell>
-                      <RandomColorAvatar size="2xs" name={invite.email} />
-                    </Table.Cell>
-                    <Table.Cell>{invite.email}</Table.Cell>
-                    <Table.Cell>
-                      <Badge
-                        size="sm"
-                        variant="surface"
-                        colorPalette={badge.colorPalette}
-                      >
-                        {badge.label}
-                      </Badge>
-                    </Table.Cell>
-                    <Table.Cell>
-                      {displayStatus === "PENDING" ||
-                      displayStatus === "EXPIRED"
-                        ? (invite.expiration
-                            ? new Date(invite.expiration).toLocaleDateString()
-                            : "—")
-                        : "—"}
-                    </Table.Cell>
-                    <Table.Cell>{roleLabel}</Table.Cell>
-                    <Table.Cell>
-                      <TeamIdsDisplay teamIds={invite.teamIds} teams={teams} />
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Box
-                        width="full"
-                        height="full"
-                        display="flex"
-                        justifyContent="end"
-                      >
-                        {(canViewLink || canResend || canRevoke) && (
-                          <Menu.Root>
-                            <Menu.Trigger asChild>
-                              <IconButton
-                                aria-label="Invite actions"
-                                variant="ghost"
-                                size="sm"
-                              >
-                                <MoreVertical size={16} />
-                              </IconButton>
-                            </Menu.Trigger>
-                            <Menu.Content>
-                              {canViewLink && (
-                                <Menu.Item
-                                  value="view-link"
-                                  onClick={() =>
-                                    onViewInviteLink(
-                                      invite.inviteCode,
-                                      invite.email,
-                                    )
-                                  }
-                                >
-                                  <Mail size={16} />
-                                  View invite link
-                                </Menu.Item>
-                              )}
-                              {canResend && (
-                                <Menu.Item
-                                  value="resend"
-                                  onClick={() => onResendInvite(invite.id)}
-                                >
-                                  <RefreshCw size={16} />
-                                  Resend invitation
-                                </Menu.Item>
-                              )}
-                              {canRevoke && (
-                                <Menu.Item
-                                  value="revoke"
-                                  color="red.500"
-                                  onClick={() => onRevokeInvite(invite.id)}
-                                >
-                                  <Trash2 size={16} />
-                                  Revoke
-                                </Menu.Item>
-                              )}
-                            </Menu.Content>
-                          </Menu.Root>
-                        )}
-                      </Box>
-                    </Table.Cell>
-                  </Table.Row>
-                );
-              })}
+              {invites.map((invite) => (
+                <InviteRow
+                  key={invite.id}
+                  invite={invite}
+                  isAdmin={isAdmin}
+                  teams={teams}
+                  onViewInviteLink={onViewInviteLink}
+                  onResendInvite={onResendInvite}
+                  onRevokeInvite={onRevokeInvite}
+                />
+              ))}
             </Table.Body>
           </Table.Root>
         </Card.Body>
@@ -181,6 +92,116 @@ export function InvitesTable({
     </VStack>
   );
 }
+
+interface InviteRowProps extends Omit<InvitesTableProps, "invites"> {
+  invite: OrganizationInvite;
+}
+
+const InviteRow = ({
+  invite,
+  isAdmin,
+  teams,
+  onViewInviteLink,
+  onResendInvite,
+  onRevokeInvite,
+}: InviteRowProps) => {
+  const displayStatus = invite.displayStatus;
+  const badge = STATUS_BADGES[displayStatus] ?? STATUS_BADGES.PENDING!;
+  const roleLabel =
+    orgRoleOptions.find((o) => o.value === invite.role)?.label ?? invite.role;
+  const isOpen = displayStatus === "PENDING" || displayStatus === "EXPIRED";
+  const canResend = isAdmin && isOpen;
+  const canViewLink = displayStatus === "PENDING";
+
+  return (
+    <Table.Row>
+      <Table.Cell>
+        <RandomColorAvatar size="2xs" name={invite.email} />
+      </Table.Cell>
+      <Table.Cell>{invite.email}</Table.Cell>
+      <Table.Cell>
+        <Badge size="sm" variant="surface" colorPalette={badge.colorPalette}>
+          {badge.label}
+        </Badge>
+      </Table.Cell>
+      <Table.Cell>
+        {isOpen && invite.expiration
+          ? new Date(invite.expiration).toLocaleDateString()
+          : "\u2014"}
+      </Table.Cell>
+      <Table.Cell>{roleLabel}</Table.Cell>
+      <Table.Cell>
+        <TeamIdsDisplay teamIds={invite.teamIds} teams={teams} />
+      </Table.Cell>
+      <Table.Cell>
+        <Box width="full" height="full" display="flex" justifyContent="end">
+          <InviteRowActions
+            invite={invite}
+            canViewLink={canViewLink}
+            canResend={canResend}
+            onViewInviteLink={onViewInviteLink}
+            onResendInvite={onResendInvite}
+            onRevokeInvite={onRevokeInvite}
+          />
+        </Box>
+      </Table.Cell>
+    </Table.Row>
+  );
+};
+
+const InviteRowActions = ({
+  invite,
+  canViewLink,
+  canResend,
+  onViewInviteLink,
+  onResendInvite,
+  onRevokeInvite,
+}: Pick<
+  InvitesTableProps,
+  "onViewInviteLink" | "onResendInvite" | "onRevokeInvite"
+> & {
+  invite: OrganizationInvite;
+  canViewLink: boolean;
+  canResend: boolean;
+}) => {
+  if (!canViewLink && !canResend) return null;
+  return (
+    <Menu.Root>
+      <Menu.Trigger asChild>
+        <IconButton aria-label="Invite actions" variant="ghost" size="sm">
+          <MoreVertical size={16} />
+        </IconButton>
+      </Menu.Trigger>
+      <Menu.Content>
+        {canViewLink && (
+          <Menu.Item
+            value="view-link"
+            onClick={() => onViewInviteLink(invite.inviteCode, invite.email)}
+          >
+            <Mail size={16} />
+            View invite link
+          </Menu.Item>
+        )}
+        {canResend && (
+          <Menu.Item value="resend" onClick={() => onResendInvite(invite.id)}>
+            <RefreshCw size={16} />
+            Resend invitation
+          </Menu.Item>
+        )}
+        {canResend && (
+          <Menu.Item
+            value="revoke"
+            color="red.500"
+            onClick={() => onRevokeInvite(invite.id)}
+          >
+            <Trash2 size={16} />
+            Revoke
+          </Menu.Item>
+        )}
+      </Menu.Content>
+    </Menu.Root>
+  );
+};
 
 interface TeamIdsDisplayProps {
   teamIds: string;

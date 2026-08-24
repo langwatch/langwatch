@@ -170,6 +170,8 @@ Proposed 2026-08-24 (spike, with [ADR-117](../adr/117-identifier-first-front-doo
 
 Spec amendments ride the PR that makes them true (the amendment table below): PR 4 amends `update-pending-invitation.feature` (WAITING_APPROVAL retires) and `enforcement-members.feature`; PR 6 retires the `NEXTAUTH_PROVIDER` matrix scenarios and ports the sign-in flow specs; PR 7 ports `sso-wrong-provider-recovery.feature` to connections.
 
+> **D11 landed 2026-08-24** on the Wave 2 branch, riding the same PR as the docs (Alex's one-PR-per-wave call from Wave 1): 14-day expiry, conditional acceptance/resend claims, soft REVOKED, derived EXPIRED, identifier-aware acceptance, one-click resend, the WAITING_APPROVAL retirement (rows migrated to REVOKED, enum value deprecated in place), and both support-pain replay tests green against Postgres — `resilient-invitations.feature` 11/11 bound (the guided-signup scenario waits for D13's screens). Two notes against the gate as written: the identifier-aware match is **inert until users finalize** (the read fork answers null pre-latch, so deploy changes no acceptance behavior on its own), and rollback for the acceptance-match change is revert-level rather than a bake flag — the mechanical state changes (expiry, claims, revocation) are additive exactly as specified. `enforcement-members.feature`'s expired-invite counting scenarios were already state-model-agnostic and stand unamended; `update-pending-invitation.feature` slimmed to invitation creation.
+
 # ADRs to write (before or with the gated deliverable)
 
 Plain design docs, written before the code they cover:

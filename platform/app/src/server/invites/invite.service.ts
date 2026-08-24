@@ -1,4 +1,5 @@
 import { ledgerActorFor } from "@langwatch/actor";
+import { normalizeIdentifierValue } from "@langwatch/identity";
 import { generate } from "@langwatch/ksuid";
 import type { JsonArray } from "@prisma/client/runtime/client";
 import { nanoid } from "nanoid";
@@ -111,6 +112,41 @@ export function resolveInviteDisplayStatus(
     return "EXPIRED";
   }
   return invite.status;
+}
+
+/**
+ * Whether the signed-in person may accept an invitation targeting
+ * `inviteEmail`, and through which identifier (D11).
+ *
+ * `matchable` is the user's proven addresses from the identity read fork —
+ * `null` for a user not yet on identifiers, who keeps the legacy
+ * case-insensitive session-email comparison byte-for-byte. For a user on
+ * identifiers the proven set is the authority: a session email nothing
+ * verified does not accept.
+ */
+export function matchInviteToAcceptor({
+  inviteEmail,
+  sessionEmail,
+  matchable,
+}: {
+  inviteEmail: string;
+  sessionEmail: string;
+  matchable: Array<{ identifierId: string; value: string }> | null;
+}): { matches: boolean; viaIdentifierId: string | null } {
+  if (matchable === null) {
+    return {
+      matches: sessionEmail.toLowerCase() === inviteEmail.trim().toLowerCase(),
+      viaIdentifierId: null,
+    };
+  }
+  const normalizedInviteEmail = normalizeIdentifierValue(inviteEmail);
+  const hit = matchable.find(
+    (candidate) => candidate.value === normalizedInviteEmail,
+  );
+  return {
+    matches: hit !== undefined,
+    viaIdentifierId: hit?.identifierId ?? null,
+  };
 }
 
 /**
@@ -1090,7 +1126,7 @@ export class InviteService {
       where: { id: inviteId, organizationId },
       include: { organization: true },
     });
-    if (!existing || existing.status !== "PENDING") {
+    if (existing?.status !== "PENDING") {
       throw new InviteNotFoundError("Invitation not found");
     }
     if (!existing.organization) {

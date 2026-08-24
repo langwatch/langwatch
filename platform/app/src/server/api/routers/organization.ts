@@ -1,6 +1,5 @@
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { declareAuthzMiddleware } from "@langwatch/authz";
-import { normalizeIdentifierValue } from "@langwatch/identity";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { fireTeamMemberInvitedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
@@ -42,6 +41,7 @@ import {
 import { buildInviteAcceptUrl } from "../../invites/invite-link";
 import {
   InviteService,
+  matchInviteToAcceptor,
   resolveInviteDisplayStatus,
 } from "../../invites/invite.service";
 import { LimitExceededError } from "../../license-enforcement/errors";
@@ -774,30 +774,16 @@ export const organizationRouter = createTRPCRouter({
       // and ANY of the signed-in user's VERIFIED identifiers holding that
       // address vouches for them — password, Google, or the org's SSO. The
       // person invited by email who signed in with their Google account is
-      // no longer a support ticket.
-      //
-      // A user not yet on identifiers answers `null` and keeps the legacy
-      // comparison byte-for-byte: BetterAuth lowercases emails during
-      // signup/signin so `session.user.email` is always lowercase, while
-      // `invite.email` preserves the admin's original casing — hence the
-      // case-insensitive compare.
-      const matchable = await identityEmail().verifiedEmailsOf({
-        userId: session.user.id,
-      });
-      let viaIdentifierId: string | null = null;
-      let inviteEmailMatches: boolean;
-      if (matchable === null) {
-        inviteEmailMatches =
-          session.user.email.toLowerCase() ===
-          invite.email.trim().toLowerCase();
-      } else {
-        const normalizedInviteEmail = normalizeIdentifierValue(invite.email);
-        const hit = matchable.find(
-          (candidate) => candidate.value === normalizedInviteEmail,
-        );
-        inviteEmailMatches = hit !== undefined;
-        viaIdentifierId = hit?.identifierId ?? null;
-      }
+      // no longer a support ticket. A user not yet on identifiers answers
+      // `null` and keeps the legacy session-email comparison byte-for-byte.
+      const { matches: inviteEmailMatches, viaIdentifierId } =
+        matchInviteToAcceptor({
+          inviteEmail: invite.email,
+          sessionEmail: session.user.email,
+          matchable: await identityEmail().verifiedEmailsOf({
+            userId: session.user.id,
+          }),
+        });
       if (!inviteEmailMatches) {
         throw new TRPCError({
           code: "FORBIDDEN",

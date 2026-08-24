@@ -461,7 +461,6 @@ const LEGACY_INERT: string[] = [
   // purpose: the specs ship ahead of the Wave 2 PRs (delivery plan, Wave 2
   // PR breakdown), and each PR binds its file as it lands. Remove each
   // entry with its first binding.
-  "specs/identity/resilient-invitations.feature",
   "specs/identity/signin-router.feature",
   "specs/identity/signin-signup-screens.feature",
   "specs/identity/sso-connection-lifecycle.feature",
