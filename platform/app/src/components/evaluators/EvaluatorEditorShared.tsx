@@ -57,7 +57,7 @@ import {
 import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
 import { api } from "~/utils/api";
 
-import type { EvaluatorCategoryId } from "./EvaluatorCategorySelectorDrawer";
+import type { EvaluatorCategoryId } from "@langwatch/evaluator-web";
 import { EvaluatorMappingsSection } from "./EvaluatorMappingsSection";
 
 // Stable reference for the "no comparison config yet" default (new comparison

@@ -1,36 +1,13 @@
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
-import { z } from "zod";
-import { Prisma, type PrismaClient } from "~/generated/prisma/client";
+import { z } from "zod/v4";
+import {
+  codeEvaluatorConfigSchema,
+  evaluatorTypeSchema,
+} from "@langwatch/evaluator-contract";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
-import type { Workflow } from "../../../optimization_studio/types/dsl";
-import { getWorkflowEntryOutputs } from "../../../optimization_studio/utils/workflowFields";
-import { codeEvaluatorConfigSchema } from "../../evaluators/codeEvaluator";
-import { EvaluatorService } from "../../evaluators/evaluator.service";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { copyEvaluatorToProject } from "./copyEvaluatorToProject";
-
-/**
- * Evaluator type enum for validation
- */
-const evaluatorTypeSchema = z.enum(["evaluator", "code", "workflow"]);
-
-const assertWorkflowInProject = async (
-  prisma: PrismaClient,
-  projectId: string,
-  workflowId: string,
-) => {
-  const workflow = await prisma.workflow.findFirst({
-    where: { id: workflowId, projectId, archivedAt: null },
-    select: { id: true },
-  });
-  if (!workflow) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "Workflow is not available in this project",
-    });
-  }
-};
 
 /**
  * Evaluator Router - Manages evaluator CRUD operations
@@ -48,8 +25,7 @@ export const evaluatorsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("evaluations:view")
     .query(async ({ ctx, input }) => {
-      const evaluatorService = EvaluatorService.create(ctx.prisma);
-      return await evaluatorService.getAllWithFields({
+      return await ctx.app.evaluators.getAllWithFields({
         projectId: input.projectId,
       });
     }),
@@ -62,8 +38,7 @@ export const evaluatorsRouter = createTRPCRouter({
     .input(z.object({ id: z.string(), projectId: z.string() }))
     .permission("evaluations:view")
     .query(async ({ ctx, input }) => {
-      const evaluatorService = EvaluatorService.create(ctx.prisma);
-      return await evaluatorService.getByIdWithFields({
+      return await ctx.app.evaluators.tryGetByIdWithFields({
         id: input.id,
         projectId: input.projectId,
       });
@@ -76,8 +51,7 @@ export const evaluatorsRouter = createTRPCRouter({
     .input(z.object({ slug: z.string(), projectId: z.string() }))
     .permission("evaluations:view")
     .query(async ({ ctx, input }) => {
-      const evaluatorService = EvaluatorService.create(ctx.prisma);
-      return await evaluatorService.getBySlug({
+      return await ctx.app.evaluators.tryGetBySlug({
         slug: input.slug,
         projectId: input.projectId,
       });
@@ -112,17 +86,9 @@ export const evaluatorsRouter = createTRPCRouter({
 
       // If workflowId is provided, check if an evaluator already exists for this workflow
       if (input.workflowId) {
-        await assertWorkflowInProject(
-          ctx.prisma,
-          input.projectId,
-          input.workflowId,
-        );
-        const existingEvaluator = await ctx.prisma.evaluator.findFirst({
-          where: {
-            workflowId: input.workflowId,
-            projectId: input.projectId,
-            archivedAt: null,
-          },
+        const existingEvaluator = await ctx.app.evaluators.tryGetByWorkflow({
+          workflowId: input.workflowId,
+          projectId: input.projectId,
         });
 
         if (existingEvaluator) {
@@ -133,13 +99,12 @@ export const evaluatorsRouter = createTRPCRouter({
         }
       }
 
-      const evaluatorService = EvaluatorService.create(ctx.prisma);
-      return await evaluatorService.create({
+      return await ctx.app.evaluators.create({
         id: input.id,
         projectId: input.projectId,
         name: input.name,
         type: input.type,
-        config: input.config as Prisma.InputJsonValue,
+        config: input.config,
         workflowId: input.workflowId,
       });
     }),
@@ -170,21 +135,15 @@ export const evaluatorsRouter = createTRPCRouter({
         }
       }
       if (input.workflowId) {
-        await assertWorkflowInProject(
-          ctx.prisma,
-          input.projectId,
-          input.workflowId,
-        );
       }
-      const evaluatorService = EvaluatorService.create(ctx.prisma);
-      return await evaluatorService.update({
+      return await ctx.app.evaluators.update({
         id: input.id,
         projectId: input.projectId,
         data: {
           ...(input.name !== undefined && { name: input.name }),
           ...(input.type !== undefined && { type: input.type }),
           ...(input.config !== undefined && {
-            config: input.config as Prisma.InputJsonValue,
+            config: input.config,
           }),
           ...(input.workflowId !== undefined && {
             workflowId: input.workflowId,
@@ -201,13 +160,9 @@ export const evaluatorsRouter = createTRPCRouter({
     .input(z.object({ id: z.string(), projectId: z.string() }))
     .permission("evaluations:view")
     .query(async ({ ctx, input }) => {
-      const evaluator = await ctx.prisma.evaluator.findFirst({
-        where: {
-          id: input.id,
-          projectId: input.projectId,
-          archivedAt: null,
-        },
-        select: { id: true, workflowId: true },
+      const evaluator = await ctx.app.evaluators.tryGetById({
+        id: input.id,
+        projectId: input.projectId,
       });
 
       // Find the linked workflow (if any)
@@ -243,53 +198,33 @@ export const evaluatorsRouter = createTRPCRouter({
     .input(z.object({ id: z.string(), projectId: z.string() }))
     .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
-      return ctx.prisma.$transaction(async (tx) => {
-        // 1. Get the evaluator to find linked workflow
-        const evaluator = await tx.evaluator.findFirst({
-          where: {
-            id: input.id,
-            projectId: input.projectId,
-            archivedAt: null,
-          },
-          select: { id: true, workflowId: true },
-        });
+      const evaluator = await ctx.app.evaluators.getById({
+        id: input.id,
+        projectId: input.projectId,
+      });
+      const deletedMonitors = await ctx.prisma.monitor.deleteMany({
+        where: {
+          evaluatorId: input.id,
+          projectId: input.projectId,
+        },
+      });
+      const archivedEvaluator = await ctx.app.evaluators.archive({
+        id: input.id,
+        projectId: input.projectId,
+      });
 
-        if (!evaluator) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Evaluator not found",
-          });
-        }
-
-        // 2. Delete monitors using this evaluator (hard delete)
-        const deletedMonitors = await tx.monitor.deleteMany({
-          where: {
-            evaluatorId: input.id,
-            projectId: input.projectId,
-          },
-        });
-
-        // 3. Archive the evaluator
-        const archivedEvaluator = await tx.evaluator.update({
-          where: { id: input.id, projectId: input.projectId },
+      let archivedWorkflow = null;
+      if (evaluator.workflowId) {
+        archivedWorkflow = await ctx.prisma.workflow.update({
+          where: { id: evaluator.workflowId, projectId: input.projectId },
           data: { archivedAt: new Date() },
         });
-
-        // 4. Archive the linked workflow (if any)
-        let archivedWorkflow = null;
-        if (evaluator.workflowId) {
-          archivedWorkflow = await tx.workflow.update({
-            where: { id: evaluator.workflowId, projectId: input.projectId },
-            data: { archivedAt: new Date() },
-          });
-        }
-
-        return {
-          evaluator: archivedEvaluator,
-          archivedWorkflow,
-          deletedMonitorsCount: deletedMonitors.count,
-        };
-      });
+      }
+      return {
+        evaluator: archivedEvaluator,
+        archivedWorkflow,
+        deletedMonitorsCount: deletedMonitors.count,
+      };
     }),
 
   /**
@@ -299,8 +234,7 @@ export const evaluatorsRouter = createTRPCRouter({
     .input(z.object({ id: z.string(), projectId: z.string() }))
     .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
-      const evaluatorService = EvaluatorService.create(ctx.prisma);
-      return await evaluatorService.softDelete({
+      return await ctx.app.evaluators.archive({
         id: input.id,
         projectId: input.projectId,
       });
@@ -316,58 +250,7 @@ export const evaluatorsRouter = createTRPCRouter({
     .permission("evaluations:view")
     .query(async ({ ctx, input }) => {
       // Fetch the evaluator first, then scope its workflow to the same project.
-      const evaluator = await ctx.prisma.evaluator.findFirst({
-        where: {
-          id: input.id,
-          projectId: input.projectId,
-          archivedAt: null,
-        },
-      });
-
-      if (!evaluator) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Evaluator not found",
-        });
-      }
-
-      const workflow = evaluator.workflowId
-        ? await ctx.prisma.workflow.findFirst({
-            where: {
-              id: evaluator.workflowId,
-              projectId: input.projectId,
-              archivedAt: null,
-            },
-            include: { currentVersion: true },
-          })
-        : null;
-
-      // If not a workflow evaluator, return empty fields
-      if (evaluator.type !== "workflow" || !workflow) {
-        return {
-          evaluatorId: evaluator.id,
-          evaluatorType: evaluator.type,
-          fields: [],
-        };
-      }
-
-      // Get the workflow DSL from the current version
-      const dsl = workflow.currentVersion?.dsl as unknown as
-        | Workflow
-        | undefined;
-
-      // Extract entry node outputs
-      const fields = getWorkflowEntryOutputs(dsl);
-
-      return {
-        evaluatorId: evaluator.id,
-        evaluatorType: evaluator.type,
-        workflowId: evaluator.workflowId,
-        workflowName: workflow.name,
-        workflowIcon: (workflow.currentVersion?.dsl as { icon?: string } | null)
-          ?.icon,
-        fields,
-      };
+      return ctx.app.evaluators.getWorkflowFields(input);
     }),
 
   /**
@@ -382,41 +265,7 @@ export const evaluatorsRouter = createTRPCRouter({
     )
     .permission("evaluations:view")
     .query(async ({ ctx, input }) => {
-      const source = await ctx.prisma.evaluator.findFirst({
-        where: {
-          id: input.evaluatorId,
-          projectId: input.projectId,
-          archivedAt: null,
-        },
-      });
-      if (!source) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Evaluator not found",
-        });
-      }
-      const copies = await ctx.prisma.evaluator.findMany({
-        where: {
-          copiedFromEvaluatorId: input.evaluatorId,
-          archivedAt: null,
-        },
-        select: {
-          id: true,
-          name: true,
-          projectId: true,
-          project: {
-            select: {
-              name: true,
-              team: {
-                select: {
-                  name: true,
-                  organization: { select: { name: true } },
-                },
-              },
-            },
-          },
-        },
-      });
+      const copies = await ctx.app.evaluators.getCopies(input);
 
       const authorizedCopies = await Promise.all(
         copies.map(async (c) => ({
@@ -431,12 +280,7 @@ export const evaluatorsRouter = createTRPCRouter({
         results.filter((r) => r.hasPermission).map((r) => r.copy),
       );
 
-      return authorizedCopies.map((c) => ({
-        id: c.id,
-        name: c.name,
-        projectId: c.projectId,
-        fullPath: `${c.project.team.organization.name} / ${c.project.team.name} / ${c.project.name}`,
-      }));
+      return authorizedCopies;
     }),
 
   /**
@@ -489,68 +333,20 @@ export const evaluatorsRouter = createTRPCRouter({
     )
     .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
-      const source = await ctx.prisma.evaluator.findFirst({
-        where: {
-          id: input.evaluatorId,
-          projectId: input.projectId,
-          archivedAt: null,
-        },
-        include: {
-          _count: { select: { copiedEvaluators: true } },
-          copiedEvaluators: {
-            where: { archivedAt: null },
-            select: { id: true, projectId: true },
-          },
-        },
-      });
-
-      if (!source) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Evaluator not found",
-        });
-      }
-      if (source.copiedEvaluators.length === 0) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "This evaluator has no copies to push to",
-        });
-      }
-
+      const copies = await ctx.app.evaluators.getCopies(input);
       const copiesToPush = input.copyIds
-        ? source.copiedEvaluators.filter((c) => input.copyIds!.includes(c.id))
-        : source.copiedEvaluators;
-
-      if (copiesToPush.length === 0) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "No valid copies selected to push to",
-        });
-      }
-
-      let pushedTo = 0;
+        ? copies.filter((copy) => input.copyIds!.includes(copy.id))
+        : copies;
+      const allowedProjectIds: string[] = [];
       for (const copy of copiesToPush) {
         const hasPermission = await probeProjectPermission(
           ctx,
           copy.projectId,
           "evaluations:manage",
         );
-        if (!hasPermission) continue;
-
-        await ctx.prisma.evaluator.update({
-          where: { id: copy.id },
-          data: {
-            name: source.name,
-            config:
-              source.config === null
-                ? Prisma.JsonNull
-                : (source.config as Prisma.InputJsonValue),
-          },
-        });
-        pushedTo++;
+        if (hasPermission) allowedProjectIds.push(copy.projectId);
       }
-
-      return { pushedTo, selectedCopies: copiesToPush.length };
+      return ctx.app.evaluators.pushToCopies({ ...input, allowedProjectIds });
     }),
 
   /**
@@ -565,33 +361,7 @@ export const evaluatorsRouter = createTRPCRouter({
     )
     .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
-      const copy = await ctx.prisma.evaluator.findFirst({
-        where: {
-          id: input.evaluatorId,
-          projectId: input.projectId,
-          archivedAt: null,
-        },
-        select: { id: true, name: true, copiedFromEvaluatorId: true },
-      });
-
-      if (!copy?.copiedFromEvaluatorId) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message:
-            "This evaluator is not a copy and has no source to sync from",
-        });
-      }
-
-      const source = await ctx.prisma.evaluator.findFirst({
-        where: { id: copy.copiedFromEvaluatorId, archivedAt: null },
-      });
-
-      if (!source) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Source evaluator has been deleted",
-        });
-      }
+      const { source } = await ctx.app.evaluators.getCopySource(input);
 
       const hasSourcePermission = await probeProjectPermission(
         ctx,
@@ -606,18 +376,7 @@ export const evaluatorsRouter = createTRPCRouter({
         });
       }
 
-      await ctx.prisma.evaluator.update({
-        where: { id: copy.id },
-        data: {
-          name: source.name,
-          config:
-            source.config === null
-              ? Prisma.JsonNull
-              : (source.config as Prisma.InputJsonValue),
-        },
-      });
-
-      return { ok: true };
+      return ctx.app.evaluators.syncFromSource(input);
     }),
 
   /**
@@ -628,7 +387,9 @@ export const evaluatorsRouter = createTRPCRouter({
     .input(z.object({ evaluatorId: z.string(), projectId: z.string() }))
     .permission("evaluations:view")
     .query(async ({ ctx, input }) => {
-      const service = EvaluatorService.create(ctx.prisma);
-      return service.getHistory(input.evaluatorId, input.projectId);
+      return ctx.app.evaluators.getHistory({
+        evaluatorId: input.evaluatorId,
+        projectId: input.projectId,
+      });
     }),
 });

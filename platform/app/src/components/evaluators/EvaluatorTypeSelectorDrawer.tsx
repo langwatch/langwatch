@@ -3,7 +3,7 @@ import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import { getComplexProps, useDrawer, useDrawerParams } from "~/hooks/useDrawer";
-import type { EvaluatorCategoryId } from "./EvaluatorCategorySelectorDrawer";
+import type { EvaluatorCategoryId } from "@langwatch/evaluator-web";
 import {
   categoryNames,
   EvaluatorTypeSelectorContent,

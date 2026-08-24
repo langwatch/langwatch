@@ -1,14 +1,15 @@
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
-import { Prisma, type PrismaClient } from "~/generated/prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import type { Session } from "~/server/auth";
-import { EvaluatorService } from "../../evaluators/evaluator.service";
+import type { RequestAppServices } from "~/runtime/app/requestApp";
+import { evaluatorTypeSchema } from "@langwatch/evaluator-contract";
 import {
   copyWorkflowWithDatasets,
   saveOrCommitWorkflowVersion,
 } from "./workflows";
 
-type CopyEvaluatorCtx = { prisma: PrismaClient; session: Session };
+type CopyEvaluatorCtx = { prisma: PrismaClient; session: Session; app: RequestAppServices };
 
 type SourceEvaluator = NonNullable<
   Awaited<ReturnType<typeof loadSourceEvaluator>>
@@ -20,14 +21,20 @@ async function loadSourceEvaluator(
   evaluatorId: string,
   sourceProjectId: string,
 ) {
-  const source = await ctx.prisma.evaluator.findFirst({
-    where: { id: evaluatorId, projectId: sourceProjectId, archivedAt: null },
-    include: { workflow: { include: { latestVersion: true } } },
+  const source = await ctx.app.evaluators.tryGetById({
+    id: evaluatorId,
+    projectId: sourceProjectId,
   });
   if (!source) {
     throw new TRPCError({ code: "NOT_FOUND", message: "Evaluator not found" });
   }
-  return source;
+  const workflow = source.workflowId
+    ? await ctx.prisma.workflow.findFirst({
+        where: { id: source.workflowId, projectId: sourceProjectId, archivedAt: null },
+        include: { latestVersion: true },
+      })
+    : null;
+  return { ...source, workflow };
 }
 
 /**
@@ -117,16 +124,13 @@ export async function copyEvaluatorToProject({
     sourceProjectId,
   );
 
-  const evaluatorService = EvaluatorService.create(ctx.prisma);
   try {
-    return await evaluatorService.create({
+    return await ctx.app.evaluators.create({
       id: newEvaluatorId,
       projectId: targetProjectId,
       name: source.name,
-      type: source.type,
-      config: (source.config === null
-        ? Prisma.JsonNull
-        : source.config) as Prisma.InputJsonValue,
+      type: evaluatorTypeSchema.parse(source.type),
+      config: source.config === null ? {} : source.config as Record<string, unknown>,
       workflowId: newWorkflowId ?? undefined,
       copiedFromEvaluatorId: source.id,
     });

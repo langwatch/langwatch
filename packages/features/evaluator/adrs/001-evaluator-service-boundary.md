@@ -18,10 +18,12 @@ depend on Prisma-shaped records.
 
 ## Decision
 
-The Evaluator ownership root provides a portable contract and one process-owned
-server implementation. The contract owns Zod 4 schemas, definitions, domain
-errors and the abstract service capability. The server owns the service,
-private repository and the Postgres adapter. The application composes one
+The Evaluator ownership root provides a portable contract, one process-owned
+server implementation, and browser-safe reusable UI. The contract owns Zod 4
+schemas, definitions, domain errors and the abstract service capability. The
+server owns the service, private repository and the Postgres adapter. The web
+package owns evaluator category/type pickers, evaluator-card presentation, and
+pure authoring guidance. The application composes one
 `PostgresEvaluatorAdapter` instance and supplies its contract through App;
 request handlers delegate to that instance.
 
@@ -60,6 +62,13 @@ Existing REST and tRPC routes remain compatibility adapters over the contract
 service. Their URLs and authorization semantics are unchanged by this
 extraction.
 
+`@langwatch/evaluator-web` has one root export. It accepts callback and
+availability ports from its host and uses `@langwatch/evaluator-contract` as
+its sole domain vocabulary. It never imports app aliases, tRPC, router state,
+or the Evaluator server. App wrappers retain drawer-stack routing, availability
+queries, API-usage code snippets, Langy context, relative-time formatting, and
+copy/cascade composition.
+
 ## Environment and configuration
 
 Evaluator receives resolved model defaults from the composition root. It does
@@ -79,5 +88,5 @@ the extraction. Persistence and transport types cannot leak through the
 contract, and composition tests can replace persistence and canonical service
 dependencies.
 
-This decision does not move evaluator UI, workflow ownership, or unrelated
-optimization orchestration into the Evaluator package.
+This decision does not move pages, workflow ownership, availability transport,
+or unrelated optimization orchestration into the Evaluator package.

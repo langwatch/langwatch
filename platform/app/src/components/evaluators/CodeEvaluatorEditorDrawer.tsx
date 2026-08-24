@@ -37,7 +37,7 @@ import {
 } from "~/server/evaluators/codeEvaluator";
 import { api } from "~/utils/api";
 
-import { codeEvaluatorDisabledReason } from "./codeEvaluatorValidation";
+import { codeEvaluatorDisabledReason } from "@langwatch/evaluator-web";
 import type { EvaluatorMappingsConfig } from "./EvaluatorEditorShared";
 
 const FIELD_TYPES = ["str", "float", "bool", "list[str]", "dict"] as const;

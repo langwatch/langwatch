@@ -18,3 +18,9 @@ Feature: Evaluator service boundary
     When the repository maps the row
     Then the returned value conforms to the contract schema
     And no generated Prisma type crosses the package boundary
+
+  Scenario: Reusable evaluator UI remains browser-safe
+    Given a browser host supplies evaluator availability and navigation callbacks
+    When it renders an evaluator category, type picker, or card
+    Then the reusable UI uses only the evaluator contract for domain values
+    And router, tRPC, API-usage, copy, and cascade composition remain in the host

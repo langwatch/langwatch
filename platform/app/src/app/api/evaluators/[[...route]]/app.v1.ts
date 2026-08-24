@@ -2,14 +2,11 @@ import { createLogger } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute, resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
-import { z } from "zod";
+import { z } from "zod/v4";
 import { badRequestSchema } from "~/app/api/shared/schemas";
-import type { Prisma } from "~/generated/prisma/client";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import { prisma } from "~/server/db";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
-import { resolveModelForFeature } from "~/server/modelProviders/resolveModelForFeature";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import {
   type AuthMiddlewareVariables,
@@ -130,18 +127,21 @@ export function registerEvaluatorRoutes(
       logger.info({ projectId: project.id, idOrSlug }, "Getting evaluator");
 
       // Try by ID first, then by slug
-      let evaluator = await service.getByIdWithFields({
+      let evaluator = await service.tryGetByIdWithFields({
         id: idOrSlug,
         projectId: project.id,
       });
 
       if (!evaluator) {
-        const bySlug = await service.getBySlug({
+        const bySlug = await service.tryGetBySlug({
           slug: idOrSlug,
           projectId: project.id,
         });
         if (bySlug) {
-          evaluator = await service.enrichWithFields(bySlug);
+          evaluator = await service.getByIdWithFields({
+            id: bySlug.id,
+            projectId: project.id,
+          });
         }
       }
 
@@ -194,41 +194,42 @@ export function registerEvaluatorRoutes(
         "Creating evaluator",
       );
 
-      // Resolve the project's DEFAULT and EMBEDDINGS models via the
-      // cascade. ModelNotConfiguredError propagates so the global
-      // domain-error middleware can surface the typed missing-model
-      // response — the PR's "no global system fallback" contract bars
-      // falling back to a hardcoded OpenAI constant when nothing is
-      // configured. Only unrelated resolver-internal errors (DB, race)
-      // become null and let createWithDefaults render with placeholders.
-      const swallowNonMissingConfig = (err: unknown): null => {
-        if (err instanceof ModelNotConfiguredError) throw err;
-        return null;
-      };
       const [resolvedDefault, resolvedEmbedding] = await Promise.all([
-        resolveModelForFeature("evaluator.create_default", {
-          prisma,
+        c.app.modelProviders.tryGetResolvedDefault({
           projectId: project.id,
-        }).catch(swallowNonMissingConfig),
-        resolveModelForFeature("analytics.topic_clustering_embeddings", {
-          prisma,
+          featureKey: "evaluator.create_default",
+        }),
+        c.app.modelProviders.tryGetResolvedDefault({
           projectId: project.id,
-        }).catch(swallowNonMissingConfig),
+          featureKey: "analytics.topic_clustering_embeddings",
+        }),
       ]);
+
+      if (!resolvedDefault) {
+        throw new ModelNotConfiguredError(
+          "evaluator.create_default",
+          "DEFAULT",
+          "Evaluator",
+          project.id,
+        );
+      }
 
       const evaluator = await service.createWithDefaults({
         id: `evaluator_${nanoid()}`,
         projectId: project.id,
         name: data.name,
         type: "evaluator",
-        config: data.config as Prisma.InputJsonValue,
+        config: data.config,
         resolved: {
-          defaultModel: resolvedDefault?.model ?? null,
+          defaultModel: resolvedDefault.model,
           embeddingsModel: resolvedEmbedding?.model ?? null,
         },
       });
 
-      const enriched = await service.enrichWithFields(evaluator);
+      const enriched = await service.getByIdWithFields({
+        id: evaluator.id,
+        projectId: project.id,
+      });
 
       logger.info(
         { projectId: project.id, evaluatorId: enriched.id },
@@ -290,7 +291,7 @@ export function registerEvaluatorRoutes(
       );
 
       // Verify evaluator exists
-      const existing = await service.getById({
+      const existing = await service.tryGetById({
         id,
         projectId: project.id,
       });
@@ -329,7 +330,7 @@ export function registerEvaluatorRoutes(
         updateData.config = {
           ...existingConfig,
           ...data.config,
-        } as Prisma.InputJsonValue;
+        };
       }
 
       const updated = await service.update({
@@ -338,7 +339,10 @@ export function registerEvaluatorRoutes(
         data: updateData,
       });
 
-      const enriched = await service.enrichWithFields(updated);
+      const enriched = await service.getByIdWithFields({
+        id: updated.id,
+        projectId: project.id,
+      });
 
       logger.info(
         { projectId: project.id, evaluatorId: enriched.id },
@@ -393,7 +397,7 @@ export function registerEvaluatorRoutes(
       );
 
       // Verify evaluator exists
-      const existing = await service.getById({
+      const existing = await service.tryGetById({
         id,
         projectId: project.id,
       });
@@ -404,7 +408,7 @@ export function registerEvaluatorRoutes(
         });
       }
 
-      await service.softDelete({
+      await service.archive({
         id,
         projectId: project.id,
       });

@@ -1,7 +1,6 @@
 import type { MiddlewareHandler } from "hono";
-
-import { prisma } from "~/server/db";
-import { EvaluatorService } from "~/server/evaluators/evaluator.service";
+import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import { appFromContext } from "./app-context";
 
 export type EvaluatorServiceMiddlewareVariables = {
   evaluatorService: EvaluatorService;
@@ -11,6 +10,6 @@ export const evaluatorServiceMiddleware: MiddlewareHandler = async (
   c,
   next,
 ) => {
-  c.set("evaluatorService", EvaluatorService.create(prisma));
+  c.set("evaluatorService", appFromContext(c).evaluators);
   await next();
 };
