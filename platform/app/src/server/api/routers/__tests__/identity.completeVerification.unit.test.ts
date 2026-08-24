@@ -11,7 +11,9 @@
  */
 import { IdentityVerificationInvalidError } from "@langwatch/identity";
 import type { TRPCError } from "@trpc/server";
+import { memoryAdapter } from "better-auth/adapters/memory";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type * as IdentityRuntime from "~/server/app-layer/identity/runtime";
 import { createInnerTRPCContext } from "../../trpc";
 import { identityRouter } from "../identity";
 
@@ -19,19 +21,39 @@ const { mockComplete } = vi.hoisted(() => ({
   mockComplete: vi.fn<(...args: unknown[]) => Promise<void>>(),
 }));
 
-// The router reaches the runtime for the ceremony; the module graph behind
-// it (auth -> better-auth) reaches the same module for the hooks, so the
-// whole composition root is stubbed rather than a slice of it.
-vi.mock("~/server/app-layer/identity/runtime", () => ({
-  verificationCeremony: () => ({ completeEmailVerification: mockComplete }),
-  identityCeremonies: () => ({
-    beforeAccountCreate: async () => undefined,
-    beforeAccountDelete: async () => undefined,
-    beforeUserDelete: async () => undefined,
+/**
+ * The router reaches the runtime for the ceremony; the module graph behind
+ * it (auth -> better-auth) reaches the same module for the hooks and for
+ * better-auth's whole `database:` entry, so the composition root is stubbed
+ * WHOLE rather than a slice of it.
+ *
+ * The return type is what keeps it whole. A missing export is a module-load
+ * crash ("No X export is defined on the mock") that only shows up in the
+ * suite that happens to trip it; typed as the runtime's own key set, the
+ * same drift is a typecheck failure on this file instead. The VALUES stay
+ * deliberately partial — each stub answers only what this suite drives.
+ */
+vi.mock(
+  "~/server/app-layer/identity/runtime",
+  (): Record<keyof typeof IdentityRuntime, unknown> => ({
+    verificationCeremony: () => ({ completeEmailVerification: mockComplete }),
+    identityCeremonies: () => ({
+      beforeAccountCreate: async () => undefined,
+      beforeAccountDelete: async () => undefined,
+      beforeUserDelete: async () => undefined,
+    }),
+    identityEmail: () => ({ resolveEmail: async () => null }),
+    identityService: () => ({}),
+    identityBackfill: () => ({}),
+    identifierBackfillMigration: () => ({}),
+    isLatched: async () => false,
+    // `betterAuth()` builds its adapter EAGERLY at module load, so this one
+    // has to be real enough to initialise. better-auth's own memory engine
+    // over an empty store is exactly that, and it holds nothing this suite
+    // could accidentally assert against.
+    identityStorageAdapter: () => memoryAdapter({}),
   }),
-  identityEmail: () => ({ resolveEmail: async () => null }),
-  isLatched: async () => false,
-}));
+);
 
 /** A syntactically valid RFC 7636 verifier (43-128 unreserved characters). */
 const VERIFIER = "a".repeat(43);

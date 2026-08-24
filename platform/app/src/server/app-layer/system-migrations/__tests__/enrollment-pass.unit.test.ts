@@ -50,6 +50,21 @@ class InMemoryStateRepository implements SystemMigrationStateRepository {
     return true;
   }
 
+  /**
+   * The per-tenant gate's global short-circuit. Answered from the same rows
+   * the pass writes, so a suite about who gets processed never has to keep a
+   * second source of truth in agreement with the first.
+   */
+  async hasFinalizedTenant({
+    migrationName,
+  }: {
+    migrationName: string;
+  }): Promise<boolean> {
+    return [...this.rows.values()].some(
+      (row) => row.migrationName === migrationName && row.status === "finalized",
+    );
+  }
+
   tenantIdsWithRecords(): string[] {
     return [...new Set([...this.rows.values()].map((row) => row.tenantId))];
   }

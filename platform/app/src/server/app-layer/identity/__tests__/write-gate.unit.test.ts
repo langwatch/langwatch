@@ -129,6 +129,10 @@ describe("identifier write gate", () => {
         }),
         upsertRecord: vi.fn(async () => undefined),
         upsertRecordUnlessRolledBack: vi.fn(async () => true),
+        // Past the short-circuit on purpose: what this test proves is the
+        // per-user read failing safe, which it never reaches if the global
+        // question answers no first.
+        hasFinalizedTenant: vi.fn(async () => true),
       };
       await expect(
         isUserOnIdentityWrites({ userId: USER, state }),
