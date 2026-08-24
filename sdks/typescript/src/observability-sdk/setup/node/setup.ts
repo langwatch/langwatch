@@ -25,21 +25,53 @@ const createNoOpHandle = (logger: Logger): ObservabilityHandle => ({
 });
 
 /**
- * Renders a rejected value for the message below, without throwing.
+ * The three keys the options object is made of. A value carrying one of them is
+ * a request to configure the exporter whatever it was constructed from.
+ */
+const LANGWATCH_OPTION_KEYS = ["apiKey", "endpoint", "processorType"] as const;
+
+/**
+ * Whether `value` can be read as the options object.
  *
- * The message is the only thing standing between a misconfigured caller and
- * silence, so producing it must not fail. `JSON.stringify` raises a TypeError on
- * a BigInt, which would replace the diagnostic with an unrelated serialisation
- * error from the code meant to report the problem. It returns `undefined` rather
- * than a string for a symbol or a function, which would render as "undefined"
- * and name nothing. Both fall back to the type, which is what a caller needs to
- * see.
+ * A plain record is the ordinary case: an object literal, a JSON payload, a
+ * spread, `Object.create(null)`. Everything else has to earn it by carrying at
+ * least one option key, which keeps a configuration built by a class working
+ * while `new Date()`, `new Map()`, `new Set()`, a regular expression and a
+ * boxed string are turned away. None of those carries a key, so each one used
+ * to read as an empty configuration and export on the environment's API key,
+ * which is the same hole as the array by a different route.
+ *
+ * An empty `{}` stays valid: it is the documented way to say "configure me from
+ * the environment", so emptiness on its own cannot be the signal.
+ */
+const isLangWatchOptions = (value: object): boolean => {
+  const prototype = Object.getPrototypeOf(value) as unknown;
+  if (prototype === Object.prototype || prototype === null) return true;
+  return LANGWATCH_OPTION_KEYS.some((key) => key in value);
+};
+
+/**
+ * Names the KIND of a rejected value, never its contents.
+ *
+ * The contents cannot be logged. `langwatch: process.env.LANGWATCH_API_KEY` is
+ * an easy thing to write by mistake, and a report that echoed the value would
+ * put the API key in the application's logs, turning a misconfiguration into a
+ * credential leak. The kind is enough to act on, because the message names the
+ * one string the option accepts right beside it.
+ *
+ * Reading `constructor` can throw on a proxy, and this runs on the path that
+ * exists to explain a problem, so it must not become one.
  */
 const describeRejectedValue = (value: unknown): string => {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "an array";
+  if (typeof value !== "object") return `a ${typeof value}`;
+
   try {
-    return JSON.stringify(value) ?? typeof value;
+    const name = (value as { constructor?: { name?: string } }).constructor?.name;
+    return name && name !== "Object" ? `a ${name}` : "an object";
   } catch {
-    return typeof value;
+    return "an object";
   }
 };
 
@@ -56,9 +88,11 @@ const describeRejectedValue = (value: unknown): string => {
  *
  * `null` was the same shape of hole from the other side: `typeof null` is
  * `"object"`, so it reached the property reads below and threw a TypeError
- * naming neither the option nor the value. An array is the same hole again: it
- * is a non-null object, so it read as a configuration, every field came back
- * `undefined`, and the API key fell through to the environment.
+ * naming neither the option nor the value. Every other non-record object was
+ * the same hole again, by a longer route: an array, a `Date`, a `Map`, a
+ * regular expression and a boxed string all read as a configuration whose
+ * every field was `undefined`, so the API key fell through to the environment
+ * and the exporter came up. `isLangWatchOptions` is what turns those away.
  *
  * An unrecognised value is treated as disabled rather than guessed at. It is the
  * only safe reading: every value that lands here is a caller who did not
@@ -74,12 +108,17 @@ const resolveLangWatchOption = (
     return { disabled: langwatch === LANGWATCH_DISABLED, config: {} };
   }
 
-  if (typeof langwatch === "object" && langwatch !== null && !Array.isArray(langwatch)) {
+  if (
+    typeof langwatch === "object" &&
+    langwatch !== null &&
+    !Array.isArray(langwatch) &&
+    isLangWatchOptions(langwatch)
+  ) {
     return { disabled: false, config: langwatch };
   }
 
   logger.error(
-    `Invalid \`langwatch\` option: ${describeRejectedValue(langwatch)}.\n` +
+    `Invalid \`langwatch\` option: got ${describeRejectedValue(langwatch)}.\n` +
       `Expected an options object, or "${LANGWATCH_DISABLED}" to turn the integration off.\n` +
       `Treating it as "${LANGWATCH_DISABLED}", because a value that is neither cannot be read as a request to export.`,
   );

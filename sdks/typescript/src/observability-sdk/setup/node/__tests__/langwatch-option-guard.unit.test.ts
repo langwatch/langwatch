@@ -115,21 +115,27 @@ describe("given an options object", () => {
 });
 
 describe("given a value that is neither the sentinel nor an options object", () => {
-  // The third column is how the report must name the value. It is spelled out
-  // rather than derived, because deriving it with JSON.stringify would make the
-  // test throw on the very value the third case is about.
+  // The third column is the KIND the report must name. It is never the value
+  // itself: `langwatch: process.env.LANGWATCH_API_KEY` is an easy thing to
+  // write by mistake, and echoing the value would put the key in the logs.
   const nearMisses: [string, unknown, string][] = [
-    ["a typo of the sentinel", "disable", '"disable"'],
-    ["a different casing", "Disabled", '"Disabled"'],
-    ["the sentinel with whitespace", " disabled", '" disabled"'],
-    ["an unrelated string", "off", '"off"'],
-    ["the empty string", "", '""'],
+    ["a typo of the sentinel", "disable", "a string"],
+    ["a different casing", "Disabled", "a string"],
+    ["the sentinel with whitespace", " disabled", "a string"],
+    ["an unrelated string", "off", "a string"],
+    ["the empty string", "", "a string"],
     ["null", null, "null"],
-    ["a boolean", true, "true"],
-    ["a number", 0, "0"],
-    ["an array", [], "[]"],
-    ["a bigint", BigInt(1), "bigint"],
-    ["a symbol", Symbol("nope"), "symbol"],
+    ["a boolean", true, "a boolean"],
+    ["a number", 0, "a number"],
+    ["a bigint", BigInt(1), "a bigint"],
+    ["a symbol", Symbol("nope"), "a symbol"],
+    ["a function", () => undefined, "a function"],
+    ["an array", [], "an array"],
+    ["a Date", new Date(), "a Date"],
+    ["a Map", new Map(), "a Map"],
+    ["a Set", new Set(), "a Set"],
+    ["a regular expression", /nope/, "a RegExp"],
+    ["a boxed string", new String("disabled"), "a String"],
   ];
 
   describe.each(nearMisses)("when it is %s", (_label, value, rendered) => {
@@ -152,5 +158,36 @@ describe("given a value that is neither the sentinel nor an options object", () 
 
   it("does not throw on a value JSON cannot serialise, which the report itself used to hit", () => {
     expect(() => setup(BigInt(1))).not.toThrow();
+  });
+
+  it("never echoes the value, because an API key is an easy thing to pass here by mistake", () => {
+    setup(process.env.LANGWATCH_API_KEY);
+    const reported = logger.error.mock.calls.map(([message]) => String(message)).join("\n");
+    expect(reported).toContain("Invalid `langwatch` option");
+    expect(reported).not.toContain("sk-lw-from-the-environment");
+  });
+});
+
+describe("given an array carrying an option key", () => {
+  it("is still rejected, because an array is never a configuration record", () => {
+    setup(Object.assign([] as unknown[], { apiKey: "sk-lw-explicit" }));
+    expect(exporterWasConstructed()).toBe(false);
+  });
+});
+
+describe("given an object that is not a plain record but carries an option key", () => {
+  it("still configures the exporter, so a configuration built by a class is not broken", () => {
+    class Options {
+      apiKey = "sk-lw-explicit";
+    }
+    setup(new Options());
+    expect(exporterWasConstructed()).toBe(true);
+  });
+});
+
+describe("given a record with a null prototype", () => {
+  it("is read as options, because JSON and Object.create(null) both produce one", () => {
+    setup(Object.assign(Object.create(null) as object, { apiKey: "sk-lw-explicit" }));
+    expect(exporterWasConstructed()).toBe(true);
   });
 });
