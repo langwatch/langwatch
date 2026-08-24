@@ -290,12 +290,13 @@ func (a *App) driveTurn(ctx context.Context, req ChatRequest, worker Worker) {
 	defer func() { worker.ForwardTurnSpan(sc, start, time.Now(), failure) }()
 
 	// The per-turn relay push. Disabled (no runToken/endpoint/secret) ⇒ nil stream:
-	// the turn still runs + finalizes, it just has no live edge.
-	stream := a.openRelay(ctx, req)
-	if stream != nil {
-		defer func() { _ = stream.Close() }()
-	}
-	sink := newFrameSink(stream)
+	// the turn still runs + finalizes, it just has no live edge. The sink owns the
+	// stream from here (including any replacement it reopens after a push failure),
+	// so the deferred Close goes through it.
+	sink := newFrameSink(a.openRelay(ctx, req), func() FrameStream {
+		return a.openRelay(ctx, req)
+	})
+	defer sink.Close()
 	// A true status for the cold window: between the prompt POST and the first
 	// LLM request the worker prepares its tools (measured at 10s+ on a cold
 	// home) and produces NO frames — without a status the panel would sit on

@@ -10,10 +10,13 @@ import type { ExecutionScope } from "../types";
 
 describe("orchestrator", () => {
   // Helper to create test state (partial state with just what generateCells needs)
-  const createTestState = (
-    targetCount = 2,
-    evaluatorCount = 1,
-  ): Pick<
+  const createTestState = ({
+    targetCount,
+    evaluatorCount,
+  }: {
+    targetCount: number;
+    evaluatorCount: number;
+  }): Pick<
     EvaluationsV3State,
     "datasets" | "activeDatasetId" | "targets" | "evaluators"
   > => ({
@@ -99,7 +102,7 @@ describe("orchestrator", () => {
 
   describe("generateCells", () => {
     it("generates all cells for full execution scope", () => {
-      const state = createTestState(2, 1);
+      const state = createTestState({ targetCount: 2, evaluatorCount: 1 });
       const datasetRows = createTestDataset(3);
       const scope: ExecutionScope = { type: "full" };
 
@@ -119,7 +122,7 @@ describe("orchestrator", () => {
     });
 
     it("generates cells for rows scope (single row)", () => {
-      const state = createTestState(2, 1);
+      const state = createTestState({ targetCount: 2, evaluatorCount: 1 });
       const datasetRows = createTestDataset(3);
       const scope: ExecutionScope = { type: "rows", rowIndices: [1] };
 
@@ -130,7 +133,7 @@ describe("orchestrator", () => {
     });
 
     it("generates cells for rows scope (multiple rows)", () => {
-      const state = createTestState(2, 1);
+      const state = createTestState({ targetCount: 2, evaluatorCount: 1 });
       const datasetRows = createTestDataset(5);
       const scope: ExecutionScope = { type: "rows", rowIndices: [0, 2, 4] };
 
@@ -142,7 +145,7 @@ describe("orchestrator", () => {
     });
 
     it("generates cells for single target scope", () => {
-      const state = createTestState(2, 1);
+      const state = createTestState({ targetCount: 2, evaluatorCount: 1 });
       const datasetRows = createTestDataset(3);
       const scope: ExecutionScope = { type: "target", targetId: "target-1" };
 
@@ -152,8 +155,40 @@ describe("orchestrator", () => {
       expect(cells.every((c) => c.targetId === "target-1")).toBe(true);
     });
 
+    it("generates cells for target-rows scope crossing the two filters", () => {
+      const state = createTestState({ targetCount: 3, evaluatorCount: 1 });
+      const datasetRows = createTestDataset(5);
+      const scope: ExecutionScope = {
+        type: "target-rows",
+        targetIds: ["target-2"],
+        rowIndices: [0, 3],
+      };
+
+      const cells = generateCells(state, datasetRows, scope);
+
+      expect(cells).toHaveLength(2); // 2 rows × 1 target
+      expect(cells.every((c) => c.targetId === "target-2")).toBe(true);
+      expect(new Set(cells.map((c) => c.rowIndex))).toEqual(new Set([0, 3]));
+    });
+
+    it("covers every row for a target-rows scope without rowIndices", () => {
+      const state = createTestState({ targetCount: 3, evaluatorCount: 1 });
+      const datasetRows = createTestDataset(4);
+      const scope: ExecutionScope = {
+        type: "target-rows",
+        targetIds: ["target-1", "target-3"],
+      };
+
+      const cells = generateCells(state, datasetRows, scope);
+
+      expect(cells).toHaveLength(8); // 4 rows × 2 targets
+      expect(new Set(cells.map((c) => c.targetId))).toEqual(
+        new Set(["target-1", "target-3"]),
+      );
+    });
+
     it("generates single cell for cell scope", () => {
-      const state = createTestState(2, 1);
+      const state = createTestState({ targetCount: 2, evaluatorCount: 1 });
       const datasetRows = createTestDataset(3);
       const scope: ExecutionScope = {
         type: "cell",
@@ -169,7 +204,7 @@ describe("orchestrator", () => {
     });
 
     it("returns empty array for non-existent target", () => {
-      const state = createTestState(2, 1);
+      const state = createTestState({ targetCount: 2, evaluatorCount: 1 });
       const datasetRows = createTestDataset(3);
       const scope: ExecutionScope = {
         type: "target",
@@ -182,7 +217,7 @@ describe("orchestrator", () => {
     });
 
     it("filters out-of-bounds row indices", () => {
-      const state = createTestState(2, 1);
+      const state = createTestState({ targetCount: 2, evaluatorCount: 1 });
       const datasetRows = createTestDataset(3); // 0, 1, 2
       const scope: ExecutionScope = { type: "rows", rowIndices: [1, 10, 20] };
 
@@ -193,7 +228,7 @@ describe("orchestrator", () => {
     });
 
     it("attaches dataset entry with _datasetId", () => {
-      const state = createTestState(1, 0);
+      const state = createTestState({ targetCount: 1, evaluatorCount: 0 });
       const datasetRows = [{ question: "Hello", expected: "World" }];
       const scope: ExecutionScope = { type: "full" };
 
@@ -207,7 +242,7 @@ describe("orchestrator", () => {
     });
 
     it("attaches all evaluators to each cell", () => {
-      const state = createTestState(1, 3); // 1 target, 3 evaluators
+      const state = createTestState({ targetCount: 1, evaluatorCount: 3 });
       const datasetRows = [{ question: "Test", expected: "Test" }];
       const scope: ExecutionScope = { type: "full" };
 
@@ -217,7 +252,7 @@ describe("orchestrator", () => {
     });
 
     it("defers pairwise evaluators to phase 2 instead of attaching them to target cells", () => {
-      const state = createTestState(2, 1);
+      const state = createTestState({ targetCount: 2, evaluatorCount: 1 });
       state.evaluators.push({
         id: "pairwise-eval",
         evaluatorType: "langevals/pairwise_compare",
@@ -249,7 +284,7 @@ describe("orchestrator", () => {
     });
 
     it("skips column-style pairwise evaluator targets during phase 1", () => {
-      const state = createTestState(2, 0);
+      const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
       state.targets.push({
         id: "pairwise-target",
         type: "evaluator",
@@ -281,7 +316,7 @@ describe("orchestrator", () => {
     });
 
     it("skips column-style n-way evaluator targets during phase 1", () => {
-      const state = createTestState(2, 0);
+      const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
       state.targets.push({
         id: "select-best-target",
         type: "evaluator",
@@ -312,7 +347,7 @@ describe("orchestrator", () => {
     });
 
     it("does not rerun seeded comparison variants for a single comparison cell", () => {
-      const state = createTestState(2, 0);
+      const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
       state.targets.push({
         id: "comparison-target",
         type: "evaluator",
@@ -349,7 +384,7 @@ describe("orchestrator", () => {
     });
 
     it("reruns only missing comparison variants for a single comparison cell", () => {
-      const state = createTestState(2, 0);
+      const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
       state.targets.push({
         id: "comparison-target",
         type: "evaluator",
@@ -392,7 +427,7 @@ describe("orchestrator", () => {
       // produced an empty input object, and nlpgo rejected the request
       // with "evaluatorblock: Data required".
       it("does not attach it to per-target phase 1 cells", () => {
-        const state = createTestState(2, 0);
+        const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
         state.evaluators.push({
           id: "eval-select-best",
           evaluatorType: "langevals/select_best_compare",
@@ -443,6 +478,21 @@ describe("orchestrator", () => {
           rowCount: 3,
         }),
       ).toEqual([1]);
+    });
+
+    it("keeps a target-rows scope on its row subset, and spans without one", () => {
+      expect(
+        resolveScopedRowIndices({
+          scope: { type: "target-rows", targetIds: ["t1"], rowIndices: [0, 2] },
+          rowCount: 3,
+        }),
+      ).toEqual([0, 2]);
+      expect(
+        resolveScopedRowIndices({
+          scope: { type: "target-rows", targetIds: ["t1"] },
+          rowCount: 3,
+        }),
+      ).toEqual([0, 1, 2]);
     });
 
     // These two scopes re-run one evaluator over outputs that already exist.
@@ -501,7 +551,7 @@ describe("orchestrator", () => {
 
   describe("generateComparisonCells", () => {
     it("creates a column-target pairwise cell with both candidate outputs", () => {
-      const state = createTestState(2, 0);
+      const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
       state.targets.push({
         id: "pairwise-target",
         type: "evaluator",
@@ -572,7 +622,7 @@ describe("orchestrator", () => {
     // candidate_a_id") instead of re-running successfully.
     describe("given a column-target whose backing DB evaluator is still the legacy pairwise_compare judge", () => {
       const legacyPairwiseState = () => {
-        const state = createTestState(2, 0);
+        const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
         state.targets.push({
           id: "pairwise-target",
           type: "evaluator",
@@ -732,7 +782,7 @@ describe("orchestrator", () => {
     // every candidate must reach the judge, not just the first two.
     describe("given three or more variants", () => {
       it("includes every variant's output as a candidate", () => {
-        const state = createTestState(3, 0);
+        const state = createTestState({ targetCount: 3, evaluatorCount: 0 });
         state.targets.push({
           id: "comparison-target",
           type: "evaluator",
@@ -792,7 +842,7 @@ describe("orchestrator", () => {
       const structuredState = (
         variantOutputPaths?: Record<string, string[]>,
       ) => {
-        const state = createTestState(2, 0);
+        const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
         state.targets.push({
           id: "comparison-target",
           type: "evaluator",
@@ -901,7 +951,7 @@ describe("orchestrator", () => {
     // error the user never asked for.
     describe("given the run is scoped to a single row", () => {
       const twoRowComparisonState = () => {
-        const state = createTestState(2, 0);
+        const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
         state.targets.push({
           id: "comparison-target",
           type: "evaluator",
@@ -962,7 +1012,7 @@ describe("orchestrator", () => {
     // message must carry the disambiguated DISPLAY names.
     describe("given same-name variants are still waiting on their output", () => {
       it("names them with the disambiguated display names, not raw target ids", () => {
-        const state = createTestState(3, 0);
+        const state = createTestState({ targetCount: 3, evaluatorCount: 0 });
         // Turn the inline targets into saved prompts; targets 2 and 3 share the
         // "support-detailed" handle, exactly the reported duplicate-variant case.
         const handles = [
@@ -1023,7 +1073,7 @@ describe("orchestrator", () => {
     // re-deriving quality it has already been told.
     describe("given a variant column has its own evaluator scores", () => {
       const scoredState = () => {
-        const state = createTestState(2, 0);
+        const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
         state.targets.push({
           id: "comparison-target",
           type: "evaluator",
@@ -1205,7 +1255,7 @@ describe("orchestrator", () => {
     });
 
     it("uses the prompt handle as candidate id when loadedPrompts has it", () => {
-      const state = createTestState(2, 0);
+      const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
       // Mark the variants as prompt-typed so variantIdentifierFor can look
       // them up. The IDs in createTestState are "target-1" and "target-2".
       const variantA = state.targets[0]!;
@@ -1257,7 +1307,7 @@ describe("orchestrator", () => {
     // name two candidates at once, so the winner is unattributable. The
     // colliding entries must fall back to their unique target ids instead.
     it("falls back to target ids when two variants share the same prompt handle", () => {
-      const state = createTestState(2, 0);
+      const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
       const variantA = state.targets[0]!;
       const variantB = state.targets[1]!;
       // Both point at the SAME prompt → same handle.
@@ -1303,7 +1353,7 @@ describe("orchestrator", () => {
     });
 
     it("falls back to target id (not promptId) when handle is unavailable", () => {
-      const state = createTestState(2, 0);
+      const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
       // Prompt-typed variants with promptIds but NO entry in loadedPrompts —
       // simulates a deleted prompt or a worker that hasn't loaded the cache.
       const variantA = state.targets[0]!;
@@ -1345,7 +1395,7 @@ describe("orchestrator", () => {
     });
 
     it("does not create comparison cells until every variant has output", () => {
-      const state = createTestState(2, 0);
+      const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
       state.targets.push({
         id: "pairwise-target",
         type: "evaluator",
@@ -1384,7 +1434,7 @@ describe("orchestrator", () => {
     // The row is skipped with a distinct reason, not judged one candidate short.
     describe("when a picked output field no longer exists", () => {
       const stateWithPath = (path: string[]) => {
-        const state = createTestState(2, 0);
+        const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
         // Saved prompts, so the skip message can name the variant by its handle.
         state.targets = state.targets.map((t, i) => ({
           ...t,
@@ -1470,7 +1520,7 @@ describe("orchestrator", () => {
     // always skipped cell generation regardless of hasGoldenAnswer, so a
     // no-golden pairwise column never ran at all.
     it("creates a cell with an empty goldenField when hasGoldenAnswer is false", () => {
-      const state = createTestState(2, 0);
+      const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
       state.targets.push({
         id: "pairwise-target",
         type: "evaluator",
@@ -1511,7 +1561,7 @@ describe("orchestrator", () => {
     });
 
     it("still skips when hasGoldenAnswer is true and goldenField is empty", () => {
-      const state = createTestState(2, 0);
+      const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
       state.targets.push({
         id: "pairwise-target",
         type: "evaluator",
@@ -1549,7 +1599,7 @@ describe("orchestrator", () => {
     // with hasGoldenAnswer:true and no goldenField ran anyway, feeding the
     // judge an empty `golden` while its own settings claimed golden-aware.
     it("also skips a chip-style comparison when hasGoldenAnswer is true and goldenField is empty", () => {
-      const state = createTestState(2, 0);
+      const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
       state.evaluators.push({
         id: "eval-chip-comparison",
         evaluatorType: "langevals/select_best_compare",
@@ -1585,7 +1635,7 @@ describe("orchestrator", () => {
     // column-target synthetic's static value-mapping must agree, or the
     // judge gets a golden reference the runtime path deliberately omitted.
     it("omits golden from the synthetic mapping when hasGoldenAnswer is false, even with a stale goldenField", () => {
-      const state = createTestState(2, 0);
+      const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
       state.targets.push({
         id: "pairwise-target",
         type: "evaluator",
@@ -1627,7 +1677,7 @@ describe("orchestrator", () => {
   describe("generateCells with evaluator-all-rows scope", () => {
     /** @scenario "Running evaluator on all rows creates one execution per row with target output" */
     it("creates one cell per row that has a pre-computed target output", () => {
-      const state = createTestState(1, 2);
+      const state = createTestState({ targetCount: 1, evaluatorCount: 2 });
       const datasetRows = createTestDataset(4);
       const scope: ExecutionScope = {
         type: "evaluator-all-rows",
@@ -1654,7 +1704,7 @@ describe("orchestrator", () => {
 
     /** @scenario "Running evaluator on all rows creates one execution per row with target output" */
     it("skips target execution for each cell", () => {
-      const state = createTestState(1, 1);
+      const state = createTestState({ targetCount: 1, evaluatorCount: 1 });
       const datasetRows = createTestDataset(2);
       const scope: ExecutionScope = {
         type: "evaluator-all-rows",
@@ -1675,7 +1725,7 @@ describe("orchestrator", () => {
     });
 
     it("includes only the specified evaluator in each cell", () => {
-      const state = createTestState(1, 3);
+      const state = createTestState({ targetCount: 1, evaluatorCount: 3 });
       const datasetRows = createTestDataset(2);
       const scope: ExecutionScope = {
         type: "evaluator-all-rows",
@@ -1697,7 +1747,7 @@ describe("orchestrator", () => {
     });
 
     it("assigns precomputed target output to each cell", () => {
-      const state = createTestState(1, 1);
+      const state = createTestState({ targetCount: 1, evaluatorCount: 1 });
       const datasetRows = createTestDataset(3);
       const scope: ExecutionScope = {
         type: "evaluator-all-rows",
@@ -1722,7 +1772,7 @@ describe("orchestrator", () => {
     });
 
     it("returns empty array when evaluator is not found", () => {
-      const state = createTestState(1, 1);
+      const state = createTestState({ targetCount: 1, evaluatorCount: 1 });
       const datasetRows = createTestDataset(2);
       const scope: ExecutionScope = {
         type: "evaluator-all-rows",
@@ -1740,7 +1790,7 @@ describe("orchestrator", () => {
     });
 
     it("returns empty array when target is not found", () => {
-      const state = createTestState(1, 1);
+      const state = createTestState({ targetCount: 1, evaluatorCount: 1 });
       const datasetRows = createTestDataset(2);
       const scope: ExecutionScope = {
         type: "evaluator-all-rows",
@@ -1761,7 +1811,7 @@ describe("orchestrator", () => {
     // attaching it here would silently produce an empty input object (see the
     // matching Phase-1 skip a few tests up) rather than a real comparison run.
     it("skips a comparison evaluator instead of attaching it to a single-target cell", () => {
-      const state = createTestState(1, 0);
+      const state = createTestState({ targetCount: 1, evaluatorCount: 0 });
       state.evaluators.push({
         id: "cmp-eval",
         evaluatorType: "langevals/select_best_compare",
@@ -1799,7 +1849,7 @@ describe("orchestrator", () => {
     // Same reasoning as the evaluator-all-rows guard above — a comparison
     // evaluator can't run against one target's precomputed output.
     it("skips a comparison evaluator instead of attaching it to a single-target cell", () => {
-      const state = createTestState(1, 0);
+      const state = createTestState({ targetCount: 1, evaluatorCount: 0 });
       state.evaluators.push({
         id: "cmp-eval",
         evaluatorType: "langevals/select_best_compare",
@@ -1832,7 +1882,7 @@ describe("orchestrator", () => {
 
   describe("cell ordering", () => {
     it("orders cells by row first, then target", () => {
-      const state = createTestState(2, 0);
+      const state = createTestState({ targetCount: 2, evaluatorCount: 0 });
       const datasetRows = createTestDataset(2);
       const scope: ExecutionScope = { type: "full" };
 

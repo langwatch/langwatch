@@ -246,6 +246,12 @@ export const UNPUBLISHED = [
     why: "serves the document itself, for the same reason /api/gateway/v1/openapi.json above is absent: an operation inside the document describing where to fetch that same document is circular, and a reader holding it has already answered the question",
   },
 
+  {
+    match: "/api/langy/ui",
+    category: "internal",
+    why: "the live UI-action channel between a Langy worker and the user's open browser tab. It only answers mid-turn, for the conversation the caller's own session key was minted for, so no reader of the API reference can call it: outside a turn every request is refused, and the payload contract is the in-repo action manifest, not a stable public schema",
+  },
+
   // ── Gap: public, should be documented, not yet ─────────────────────────
   {
     match: "POST /api/langy/conversations",

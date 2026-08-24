@@ -296,6 +296,7 @@ func TestCodexRequestBody_PinsInvariantsAndStripsSampling(t *testing.T) {
 	// (the codex backend answers 400 on them), and leave the client's include
 	// and input untouched.
 	raw := []byte(`{"model":"openai_codex/gpt-5.6-terra","temperature":0.2,"top_p":0.9,` +
+		`"prompt_cache_retention":"24h","prompt_cache_key":"session-1",` +
 		`"input":[{"role":"user"}],"include":["reasoning.encrypted_content"]}`)
 	body, err := codexRequestBody(raw, "openai_codex/gpt-5.6-terra")
 	if err != nil {
@@ -315,6 +316,14 @@ func TestCodexRequestBody_PinsInvariantsAndStripsSampling(t *testing.T) {
 	}
 	if gjson.GetBytes(body, "top_p").Exists() {
 		t.Errorf("top_p must be stripped: %s", body)
+	}
+	if gjson.GetBytes(body, "prompt_cache_retention").Exists() {
+		t.Errorf("prompt_cache_retention must be stripped (codex 400s on it): %s", body)
+	}
+	// prompt_cache_key the backend accepts — it must survive so the session's
+	// cache routing keeps working.
+	if got := gjson.GetBytes(body, "prompt_cache_key").String(); got != "session-1" {
+		t.Errorf("prompt_cache_key must pass through, got %q in %s", got, body)
 	}
 	// The client's include (reasoning round-trip) and input pass through.
 	if got := gjson.GetBytes(body, "include.0").String(); got != "reasoning.encrypted_content" {

@@ -11,7 +11,6 @@ import {
   LangyConversationNotFoundError,
   LangyRateLimitedError,
 } from "~/server/app-layer/langy/errors";
-import { AGENT_CHAT_TIMEOUT_MS } from "~/server/app-layer/langy/execution/langy-turn-errors";
 import type {
   ConversationDetail,
   ConversationListItem,
@@ -23,13 +22,15 @@ import {
   type LangyTurnContext,
   langyTurnContextSchema,
 } from "~/server/app-layer/langy/langyTurnContext.schema";
-import { abortableDelay } from "~/server/app-layer/langy/streaming/awaitTurnSettlement";
-import {
-  createLangyTokenBuffer,
-  type LangyStreamEntry,
-} from "~/server/app-layer/langy/streaming/langyTokenBuffer";
+import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
+import type { TurnHealth } from "~/server/app-layer/langy/streaming/langyTurnSettlement";
 import { decideSyntheticTerminal } from "~/server/app-layer/langy/streaming/langyTurnSettlement";
+import { streamTurnEntries } from "~/server/app-layer/langy/streaming/langyTurnTail";
+import {
+  LangyUiActionService,
+  type UiActionRedis,
+} from "~/server/app-layer/langy/ui-actions/ui-action.service";
 import type { Session } from "~/server/auth";
 import {
   checkLangyMessageRateLimit,
@@ -245,69 +246,56 @@ async function canWatchTurn({
   return !!conv;
 }
 
-/** How often the settlement watcher consults the durable fold + heartbeat. */
-const SETTLEMENT_POLL_MS = 5_000;
-/**
- * Consecutive settled reads required before synthesizing a terminal, so a single
- * projection blip can never end a live stream.
- */
-const SETTLEMENT_CONFIRM_POLLS = 2;
+/** The claim/complete side of the UI-action channel, on the shared app deps. */
+function createUiActionService(): LangyUiActionService {
+  const redis = getApp().redis as unknown as UiActionRedis;
+  return new LangyUiActionService({
+    redis,
+    conversations: getApp().langy.conversations,
+    buffer: createLangyTokenBuffer({ redis: getApp().redis }),
+  });
+}
 
 /**
- * Poll a turn's durable fold + per-turn heartbeat while its live edge is being
- * tailed, and resolve to the terminal entry the buffer never received — or null
- * if the stream ended first (aborted) or the turn never settled.
- *
- * Split out of `onTurnStream` so the subscription body stays at the orchestration
- * level and this confirmation loop is independently testable. The safety gate
- * itself lives in {@link decideSyntheticTerminal}.
+ * Read the durable fold and the per-turn heartbeat once, or null when either
+ * read failed — which says nothing about the turn and must not count either way.
  */
-async function watchForMissedTerminal({
+async function readTurnHealth({
   projectId,
   conversationId,
   turnId,
   userId,
   buffer,
-  signal,
 }: {
   projectId: string;
   conversationId: string;
   turnId: string;
   userId: string;
-  buffer: {
-    liveness(a: {
-      conversationId: string;
-      turnId: string;
-    }): Promise<{ stale: boolean }>;
-  };
-  signal: AbortSignal;
-}): Promise<LangyStreamEntry | null> {
-  let settledStreak = 0;
-  while (!signal.aborted) {
-    if (!(await abortableDelay(SETTLEMENT_POLL_MS, signal))) return null;
-    const [conversation, liveness] = await Promise.all([
-      getApp()
-        .langy.conversations.getById({ id: conversationId, projectId, userId })
-        .catch(() => null),
-      buffer.liveness({ conversationId, turnId }).catch(() => null),
-    ]);
-    if (!conversation || !liveness) {
-      settledStreak = 0;
-      continue;
-    }
-    const decision = decideSyntheticTerminal({
+  buffer: LivenessSource;
+}): Promise<TurnHealth | null> {
+  const [conversation, liveness] = await Promise.all([
+    getApp()
+      .langy.conversations.getById({ id: conversationId, projectId, userId })
+      .catch(() => null),
+    buffer.liveness({ conversationId, turnId }).catch(() => null),
+  ]);
+  if (!conversation || !liveness) return null;
+  return {
+    isStale: liveness.stale,
+    terminal: decideSyntheticTerminal({
       status: conversation.status,
       lastError: conversation.lastError,
       heartbeatStale: liveness.stale,
-    });
-    if (!decision) {
-      settledStreak = 0;
-      continue;
-    }
-    settledStreak += 1;
-    if (settledStreak >= SETTLEMENT_CONFIRM_POLLS) return decision;
-  }
-  return null;
+    }),
+  };
+}
+
+/** The one thing this watcher needs of the token buffer. */
+interface LivenessSource {
+  liveness(a: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<{ stale: boolean }>;
 }
 
 /**
@@ -747,6 +735,71 @@ export const langyRouter = createTRPCRouter({
     }),
 
   /**
+   * The page asking to execute a dispatched UI action
+   * (specs/langy/langy-ui-actions.feature). First successful claim wins across
+   * every tab and every stream replay; everyone else gets `isClaimed: false` and
+   * drops. `langy:view` on purpose: executing happens under the human's own
+   * session on their own page, and the dispatch already enforced the action's
+   * real permission against the agent's session key. The pending record the
+   * dispatch pinned in Redis is what this claim is verified against, so a
+   * claim can never attach to another project's or another conversation's
+   * action. The turn is not asked for: the page and the dispatch read it from
+   * two places that settle at different times, and refusing on the difference
+   * pushed live work to the backend behind the user's back.
+   */
+  claimUiAction: langyReadProcedure
+    .input(
+      z.object({
+        conversationId: z.string(),
+        actionId: z.string(),
+      }),
+    )
+    .mutation(async ({ input, ctx }): Promise<{ isClaimed: boolean }> => {
+      const userId = ctx.session.user.id;
+      const conversation = await getApp().langy.conversations.findByIdVisible({
+        id: input.conversationId,
+        projectId: input.projectId,
+        userId,
+      });
+      if (!conversation) return { isClaimed: false };
+      return await createUiActionService().claim({
+        projectId: input.projectId,
+        userId,
+        conversationId: input.conversationId,
+        actionId: input.actionId,
+      });
+    }),
+
+  /**
+   * The page reporting a claimed action's outcome. Only the claiming user may
+   * complete; anything else is dropped as `isAccepted: false`. The dispatch has
+   * its own timeout, so a dropped completion cannot wedge the agent.
+   */
+  completeUiAction: langyReadProcedure
+    .input(
+      z.object({
+        conversationId: z.string(),
+        actionId: z.string(),
+        ok: z.boolean(),
+        result: z.unknown().optional(),
+        errorCode: z.string().max(200).optional(),
+      }),
+    )
+    .mutation(async ({ input, ctx }): Promise<{ isAccepted: boolean }> => {
+      return await createUiActionService().complete({
+        projectId: input.projectId,
+        userId: ctx.session.user.id,
+        conversationId: input.conversationId,
+        actionId: input.actionId,
+        completion: {
+          ok: input.ok,
+          ...(input.result !== undefined ? { result: input.result } : {}),
+          ...(input.errorCode ? { errorCode: input.errorCode } : {}),
+        },
+      });
+    }),
+
+  /**
    * Pre-boot the conversation's worker on panel open, before the first message
    * (specs/langy/langy-worker-prewarm.feature). Returns the conversation id
    * the first message should adopt (server-minted when none is given) and
@@ -1043,82 +1096,23 @@ export const langyRouter = createTRPCRouter({
         redis: connection,
         blockingRedis: blocking,
       });
-      // Tear down on client disconnect OR the hard per-turn deadline, whichever
-      // comes first — a wedged turn must not hold a blocking connection forever.
-      const signals: AbortSignal[] = [
-        AbortSignal.timeout(AGENT_CHAT_TIMEOUT_MS),
-      ];
-      if (opts.signal) signals.push(opts.signal);
-      const signal = AbortSignal.any(signals);
+      // Tear down when the client goes away. The tail carries no deadline of
+      // its own; `streamTurnEntries` says why.
+      const signal = opts.signal ?? new AbortController().signal;
 
-      try {
-        // Drain the buffered prefix, then tail the live edge from where it ended.
-        const { reads, lastId } = await buffer.readTail({
-          conversationId,
-          turnId,
-        });
-        let terminal = false;
-        for (const { entry } of reads) {
-          yield entry;
-          if (entry.type === "end" || entry.type === "error") terminal = true;
-        }
-        if (!terminal) {
-          // A refresh mid-turn can miss the worker's terminal frame (its relay
-          // connection dropped before it). follow() would then block until the
-          // hard per-turn deadline, leaving the UI on the startup status for minutes
-          // though the turn already finished. While we tail the live edge, watch
-          // the durable fold + per-turn heartbeat; if the turn has settled with
-          // no terminal in the buffer, synthesize one so the client resolves.
-          const settle = new AbortController();
-          const followSignal = AbortSignal.any([signal, settle.signal]);
-          let synthesized: LangyStreamEntry | null = null;
-
-          const watcher = watchForMissedTerminal({
-            projectId,
-            conversationId,
-            turnId,
-            userId,
-            buffer,
-            signal: followSignal,
-          })
-            .then((entry) => {
-              if (!entry) return;
-              synthesized = entry;
-              settle.abort(); // unblock the follow() below
-            })
-            // Attached HERE, not in the finally below: follow() can block for
-            // minutes, so a rejection would sit unhandled until then — and Node's
-            // default --unhandled-rejections=throw would take the process down
-            // first. A failed watcher just means no synthesized terminal.
-            .catch(() => undefined);
-
-          try {
-            for await (const { entry } of buffer.follow({
-              conversationId,
-              turnId,
-              fromId: lastId,
-              signal: followSignal,
-            })) {
-              yield entry;
-              if (entry.type === "end" || entry.type === "error") {
-                // A real terminal reached the buffer — never override it.
-                synthesized = null;
-                return;
-              }
-            }
-          } finally {
-            settle.abort();
-            await watcher; // already has its own .catch()
-          }
-
-          // follow() ended with no buffered terminal. If the watcher proved the
-          // turn settled, deliver the synthesized terminal so the UI resolves
-          // instead of hanging; the client reconciles the transcript via
-          // langy.messages.
-          if (synthesized) yield synthesized;
-        }
-      } finally {
-        blocking.disconnect();
-      }
+      yield* streamTurnEntries({
+        conversationId,
+        turnId,
+        buffer,
+        readHealth: () =>
+          readTurnHealth({ projectId, conversationId, turnId, userId, buffer }),
+        signal,
+        release: () => blocking.disconnect(),
+        onAbandoned: ({ stalePolls }) =>
+          logger.warn(
+            { projectId, conversationId, turnId, stalePolls },
+            "giving up a turn stream whose turn neither settled nor beat",
+          ),
+      });
     }),
 });

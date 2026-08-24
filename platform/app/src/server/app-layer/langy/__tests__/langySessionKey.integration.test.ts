@@ -58,10 +58,18 @@ const EXPECTED_HELD_SUBSET = [
 ];
 
 // A member who can work with experiments the ordinary way: the dedicated
-// experiments read every project role holds, plus management of the
-// evaluations family that actually executes a run.
+// experiments read every project role holds, the write grains the workbench
+// REST surface demands (create an experiment, save its setup), plus management
+// of the evaluations family that actually executes a run.
+//
+// This list has to keep up with the routes: the suite below checks the key
+// against every grain an /api/experiments route demands, so a route that asks
+// for a grain the caller does not hold fails here rather than reaching a user
+// as a 403.
 const EXPERIMENTER_ROLE_PERMISSIONS = [
   "experiments:view",
+  "experiments:create",
+  "experiments:update",
   "evaluations:manage",
 ];
 

@@ -192,3 +192,49 @@ export const LANGY_ADMIN_BOUNDARY_CRITERIA = [
   "If LangWatch itself does the thing the user actually wanted (for example: they asked to change a spend limit because they are worried about cost, and Langy can show them where the cost is going), Langy says so and offers it. If LangWatch does not, a plain decline with nothing attached is the correct and complete answer, and passes.",
   ...LANGY_CORE_RULE_CRITERIA,
 ];
+
+/**
+ * The baseline-untouched rule of the prompt optimization loop, exported by
+ * identity so a scenario can amend it. The hard fact (the baseline's
+ * localPromptConfig byte-identical before and after) is a Layer-2 REST
+ * assertion in the test; this criterion carries the conversational half.
+ */
+export const LANGY_BASELINE_UNTOUCHED_CRITERION =
+  "Every prompt change Langy makes lands on a duplicate column, never on the user's original. Langy says which column it is working on, and never describes editing, overwriting, or republishing the baseline prompt itself.";
+
+/**
+ * Outcome rubric for the prompt improvement loop
+ * (skills/prompt-optimization/SKILL.mdx). Threshold numbers quote the skill: a
+ * dataset over 100 rows gets one spend question before the first run, and the
+ * loop stops once it spends its 6 attempt budget. Several criteria are
+ * conditional and pass when their condition never arises in the run, stated
+ * inline so the judge never marks them inconclusive.
+ */
+export const LANGY_OPTIMIZE_LOOP_CRITERIA = [
+  "Langy reads the workbench state (or the experiment's current results) before making any edit. A run whose first mutation happens with no read behind it fails.",
+  LANGY_BASELINE_UNTOUCHED_CRITERION,
+  "Each prompt change comes with a one-sentence hypothesis naming a concrete failure pattern taken from row-level results Langy actually read. A rewrite justified only by generic prompt advice fails.",
+  "Runs are scoped before they are broad: a subset (the failing rows, or about 10 rows) runs before any full-dataset run. If the dataset is small enough that the skill's spend threshold never applies, a single full run passes this.",
+  "On a dataset over 100 rows, Langy states the row count and waits for the user's yes before the first run, asking once for the whole loop rather than per attempt. A run whose dataset never passes 100 rows satisfies this criterion; do not mark it inconclusive.",
+  "Langy narrates the loop: a short line before each run saying what changed and why, and a short line after saying what the numbers did. Silence across a whole run fails.",
+  "The conclusion carries numbers: the pass rate (or score) before and after, and what happened to cost. Improvement claims without numbers fail.",
+  "If the numbers end level or worse, Langy says so plainly instead of declaring a winner. A run that ends with a real improvement satisfies this criterion.",
+  "If three consecutive attempts fail to beat the best candidate, Langy stops and reports what it tried rather than continuing to churn. A run that improves before that point satisfies this criterion.",
+  "Langy runs at most 6 measured attempts. On the sixth it stops and reports the best result it found instead of starting a seventh. A run that stops earlier, on any other stop condition, satisfies this criterion; do not mark it inconclusive.",
+  ...LANGY_CORE_RULE_CRITERIA,
+];
+
+/**
+ * Rubric for the evaluator inference branches of the bootstrap flow. The
+ * mapping table mirrors the skill: labels get exact match, free text gets
+ * LLM answer match, contexts suggest faithfulness, a named quality dimension
+ * gets a judge naming it, and no golden answer at all gets the comparison
+ * judge. The evaluator that actually landed is a Layer-2 REST assertion;
+ * these grade the reasoning the user sees.
+ */
+export const LANGY_EVALUATOR_INFERENCE_CRITERIA = [
+  "Langy picks the evaluator from what the data shows and says why in a line: short label goldens get exact match, free-text goldens get LLM answer match, a contexts column brings up faithfulness, a named quality dimension gets a judge whose prompt names that dimension, and no golden answer at all gets a comparison between candidate columns.",
+  "The evaluator type slug Langy uses was read from the evaluator catalog in this conversation, never recalled from memory. Wiring an evaluator whose slug never appeared in a command result fails.",
+  "Before trusting a newly added evaluator, Langy checks it scores sensibly (a subset run, or reading a few scored rows) rather than optimizing against unverified scores. A conversation that ends before any run satisfies this criterion.",
+  ...LANGY_CORE_RULE_CRITERIA,
+];

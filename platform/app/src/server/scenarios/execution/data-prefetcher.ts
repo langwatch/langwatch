@@ -17,6 +17,7 @@ import { env } from "~/env.mjs";
 import { normalizeToSnakeCase } from "~/optimization_studio/components/properties/llm-configs/normalizeToSnakeCase";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
+import { ModelNotConfiguredError } from "../../modelProviders/modelNotConfiguredError";
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
 import { extractSuiteId } from "../../suites/suite-set-id";
 import { parseSuiteTargets } from "../../suites/types";
@@ -177,6 +178,7 @@ export type ModelParamsFailureReason =
   | "provider_not_found"
   | "provider_not_enabled"
   | "missing_params"
+  | "model_not_configured"
   | "preparation_error";
 
 /** Structured result from model params preparation */
@@ -533,7 +535,16 @@ export async function prefetchScenarioData({
       err instanceof Error
         ? err.message
         : "No default model configured for this project";
-    return { success: false, error: message };
+    // A project with no model set for scenarios is the customer's to fix and
+    // carries its own remediation message, so it is named rather than left
+    // reasonless — otherwise the caller cannot tell it from a fault of ours.
+    return {
+      success: false,
+      error: message,
+      ...(err instanceof ModelNotConfiguredError
+        ? { reason: "model_not_configured" as const }
+        : {}),
+    };
   }
 
   const [modelParamsResult, simulatorParamsResult, judgeParamsResult] =

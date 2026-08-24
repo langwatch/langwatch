@@ -13,7 +13,7 @@ import { CutoverAwareAuthzReadRepository } from "../authz-read.cutover.repositor
  */
 const spyRepository = (name: string): AuthzReadRepository =>
   ({
-    findOrganizationRole: vi.fn().mockResolvedValue(name),
+    findOrganizationMembership: vi.fn().mockResolvedValue(name),
     findUserBindings: vi.fn().mockResolvedValue([]),
     findGroupBindings: vi.fn().mockResolvedValue([]),
     findApiKeyBindings: vi.fn().mockResolvedValue([]),
@@ -167,7 +167,7 @@ describe("CutoverAwareAuthzReadRepository", () => {
       // both implementations run the same query against the same table, so
       // forking them would cost a gate read and change nothing.
       expect(
-        await repository.findOrganizationRole({
+        await repository.findOrganizationMembership({
           userId: "alice",
           organizationId: "org-1",
         }),
@@ -178,7 +178,7 @@ describe("CutoverAwareAuthzReadRepository", () => {
       await repository.findProjectLineage({ projectId: "proj-1" });
       await repository.findTeamOrganization({ teamId: "team-1" });
 
-      expect(grants.findOrganizationRole).not.toHaveBeenCalled();
+      expect(grants.findOrganizationMembership).not.toHaveBeenCalled();
       expect(grants.findApiKeyOwner).not.toHaveBeenCalled();
       expect(grants.findProjectLineage).not.toHaveBeenCalled();
       expect(grants.findTeamOrganization).not.toHaveBeenCalled();

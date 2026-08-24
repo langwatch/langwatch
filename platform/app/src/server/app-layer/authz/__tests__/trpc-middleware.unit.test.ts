@@ -30,6 +30,10 @@ vi.mock("~/server/api/rbac", () => ({
   resolveTeamPermission: (...args: unknown[]) => resolveTeamPermission(...args),
   hasOrganizationPermission: (...args: unknown[]) =>
     hasOrganizationPermission(...args),
+  // Only consulted on a refusal, to say WHY. Nothing in this suite is about a
+  // disabled seat, so it answers "nothing more useful to say" and the generic
+  // denial the assertions below expect is what comes out.
+  organizationDenialReason: async () => undefined,
   resolveProjectPermissionAny: (...args: unknown[]) =>
     resolveProjectPermissionAny(...args),
 }));

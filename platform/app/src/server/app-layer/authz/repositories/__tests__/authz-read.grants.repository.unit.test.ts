@@ -19,23 +19,44 @@ const member = () =>
   vi.fn().mockResolvedValue({ userId: "alice" }) as ReturnType<typeof vi.fn>;
 
 describe("GrantsAuthzReadRepository", () => {
-  describe("when findOrganizationRole reads the membership row", () => {
+  describe("when findOrganizationMembership reads the membership row", () => {
     it("reads the membership row, which the ledger never projected", async () => {
-      const findFirst = vi.fn().mockResolvedValue({ role: "ADMIN" });
+      const findFirst = vi
+        .fn()
+        .mockResolvedValue({ role: "ADMIN", disabledAt: null });
       const repository = new GrantsAuthzReadRepository(
         clientFor({ organizationUser: { findFirst } }),
       );
 
       expect(
-        await repository.findOrganizationRole({
+        await repository.findOrganizationMembership({
           userId: "alice",
           organizationId: "org-1",
         }),
-      ).toBe("ADMIN");
+      ).toEqual({ role: "ADMIN", disabled: false });
       expect(findFirst).toHaveBeenCalledWith({
         where: { userId: "alice", organizationId: "org-1" },
-        select: { role: true },
+        select: { role: true, disabledAt: true },
       });
+    });
+
+    it("reports a seat-disabled row as disabled, so the denial can name the seat", async () => {
+      const repository = new GrantsAuthzReadRepository(
+        clientFor({
+          organizationUser: {
+            findFirst: vi
+              .fn()
+              .mockResolvedValue({ role: "MEMBER", disabledAt: new Date() }),
+          },
+        }),
+      );
+
+      expect(
+        await repository.findOrganizationMembership({
+          userId: "alice",
+          organizationId: "org-1",
+        }),
+      ).toEqual({ role: "MEMBER", disabled: true });
     });
   });
 
@@ -340,7 +361,9 @@ describe("GrantsAuthzReadRepository", () => {
           userId: "alice",
           team: {
             organizationId: "org-1",
-            organization: { members: { some: { userId: "alice" } } },
+            organization: {
+              members: { some: { userId: "alice", disabledAt: null } },
+            },
           },
         },
         select: {

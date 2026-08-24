@@ -173,8 +173,11 @@ func TestProvision_ModelLanes(t *testing.T) {
 		if compatOf(model)["supportsStore"] != false {
 			t.Errorf("codex must pin supportsStore false, got %v", compatOf(model))
 		}
-		if compatOf(model)["supportsLongCacheRetention"] != true {
-			t.Errorf("codex lane must allow long cache retention, got %v", compatOf(model))
+		// The ChatGPT codex backend rejects prompt_cache_retention with 400
+		// "Unsupported parameter" — the flag that makes pi send it must stay
+		// off on this lane, or every codex turn dies on its first LLM call.
+		if _, present := compatOf(model)["supportsLongCacheRetention"]; present {
+			t.Errorf("codex lane must not ask for long cache retention, got %v", compatOf(model))
 		}
 		if model["id"] != "openai_codex/gpt-5-codex" {
 			t.Errorf("codex id must ride verbatim, got %v", model["id"])
@@ -411,5 +414,21 @@ func TestBuildWorkerEnv_UnmediatedFallback(t *testing.T) {
 	env = envMap(t, buildWorkerEnv(SpawnInput{Home: "/h", Creds: creds}))
 	if env["OPENAI_BASE_URL"] != "http://gateway.internal:5563" {
 		t.Errorf("unmediated anthropic base = %q, want the /v1 suffix stripped", env["OPENAI_BASE_URL"])
+	}
+}
+
+// The CLI's `ui call` names the conversation it drives with this variable; a
+// worker spawned without it could never reach the page channel.
+//
+// @scenario "The worker env carries the conversation id for the UI channel"
+func TestBuildWorkerEnv_CarriesConversationID(t *testing.T) {
+	env := envMap(t, buildWorkerEnv(SpawnInput{
+		Home:           "/h",
+		ConversationID: "conv-ui",
+		Creds:          testCreds(),
+	}))
+
+	if env["LANGY_CONVERSATION_ID"] != "conv-ui" {
+		t.Errorf("LANGY_CONVERSATION_ID = %q, want conv-ui", env["LANGY_CONVERSATION_ID"])
 	}
 }

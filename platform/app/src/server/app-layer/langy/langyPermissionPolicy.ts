@@ -129,9 +129,6 @@ const READ_ONLY_FAMILIES: Record<string, string> = {
   triggers:
     "a trigger is a standing instruction that keeps acting on its own schedule, " +
     "and outlives the session key that authored it",
-  experiments:
-    "the family's only write is `:manage`, which is the delete; RUNNING an " +
-    "experiment is gated by the evaluations family instead",
 };
 
 /** Splits `resource:action`, tolerating anything that is not in that shape. */

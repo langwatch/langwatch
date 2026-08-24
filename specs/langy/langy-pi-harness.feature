@@ -97,6 +97,18 @@ Feature: Langy can run a conversation on the pi harness
     Then it reads its own events, not the abandoned turn's
     And the abandoned turn's events are released instead of waiting forever
 
+  # The relay carries ephemeral frames the durable log can survive without, so
+  # a broken push must degrade the live view, never end the turn: ending it
+  # releases the worker mid tool call and the idle reaper kills it while an
+  # LLM call is still in flight.
+  @unit
+  Scenario: A broken relay push never fails the turn
+    Given the relay stream to the control plane breaks mid-turn
+    When the next frame push fails
+    Then the sink reopens the stream and retries the frame once
+    And repeated reopen failures drop frames under a cooldown instead of erroring
+    And the turn keeps running to its real terminal
+
   @unit
   Scenario: A command to a worker that stopped reading gives up instead of blocking
     Given a worker has stopped reading the commands the manager sends it
@@ -162,12 +174,16 @@ Feature: Langy can run a conversation on the pi harness
   # Provider prompt caching is what makes a long conversation affordable, and
   # the default cache tier expires faster than the pauses between a user's
   # messages. The worker asks for the long tier: anthropic's hour-long
-  # cache_control, the Responses lane's day-long retention.
+  # cache_control, the Responses lane's day-long retention. The codex lane is
+  # the exception: the ChatGPT backend rejects the retention parameter with a
+  # 400 (the API-key endpoint accepts it), and in production that 400 killed
+  # every codex turn on its first LLM call. So the codex lane never asks.
   @unit
   Scenario: The worker asks the provider for long cache retention
     Given a pi worker provisioned for an anthropic or openai model
     When its config and environment are assembled
     Then the model allows long cache retention and the environment selects it
+    But a codex model never asks for it, because its backend refuses the request
 
   @unit
   Scenario: A corrupt persisted session degrades to a fresh one instead of failing the spawn
