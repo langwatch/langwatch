@@ -34,11 +34,12 @@ This is parity with `make dev-full` from the dev tree, but for an end-user, **wi
 | ------------------------------ | ------------------------------------------- |
 | Monorepo root                  | `/`                                         |
 | Root pnpm workspace            | `/package.json`, `/pnpm-workspace.yaml`     |
-| `@langwatch/server` package    | `/packages/server/`                         |
-| CLI entry                      | `/packages/server/bin/langwatch-server.mjs` |
-| Predep installer               | `/packages/server/src/predeps/`             |
-| Service orchestration (julia)  | `/packages/server/src/services/`            |
-| Shared types/paths/env (smith) | `/packages/server/src/shared/`              |
+| `@langwatch/server` package    | `/apps/server/`                    |
+| CLI entry                      | `/apps/server/src/cli.ts`          |
+| Built CLI                      | `/apps/server/dist/cli.cjs`        |
+| Predep installer               | `/apps/server/src/predeps/`        |
+| Service orchestration (julia)  | `/apps/server/src/services/`       |
+| Shared types/paths/env (smith) | `/apps/server/src/shared/`         |
 | BDD specs                      | `/specs/npx-installer/`                     |
 | CI workflows                   | `/.github/workflows/npx-server-*.yml`       |
 
@@ -78,7 +79,7 @@ Windows: out of scope for v1. Tracked separately.
 
 ## 4. Local data layout (`~/.langwatch/`)
 
-Authoritative in code: `packages/server/src/shared/paths.ts`.
+Authoritative in code: `apps/server/src/shared/paths.ts`.
 
 ```
 ~/.langwatch/
@@ -115,7 +116,7 @@ Authoritative in code: `packages/server/src/shared/paths.ts`.
 
 ## 5. Port allocation
 
-The CLI picks a **port-base** (default `5560`). Authoritative in code: `packages/server/src/shared/ports.ts`.
+The CLI picks a **port-base** (default `5560`). Authoritative in code: `apps/server/src/shared/ports.ts`.
 
 Two **blocks** with a fixed +1000 offset, leaving room for future services without colliding with infra:
 
@@ -143,7 +144,7 @@ The resolved port-base is persisted to `install-manifest.json.lastPortBase`. `BA
 
 ## 6. Generated secrets and `.env` (`~/.langwatch/.env`)
 
-Authoritative in code: `packages/server/src/shared/env.ts` (function `buildEnv`). Generated on **first run**, persisted, never overwritten on subsequent runs unless explicitly forced.
+Authoritative in code: `apps/server/src/shared/env.ts` (function `buildEnv`). Generated on **first run**, persisted, never overwritten on subsequent runs unless explicitly forced.
 
 Mirrors the helm chart's `app/secrets.yaml` for the four secrets we have parity for, plus three additional secrets that are AI-Gateway-specific.
 
@@ -183,7 +184,7 @@ The CLI never writes user-provided provider keys to disk; they're injected into 
 
 ## 7. Service supervision
 
-Authoritative in code: `packages/server/src/shared/runtime-contract.ts` (`RuntimeApi` interface) and `packages/server/src/services/runtime.ts` (julia, implementation).
+Authoritative in code: `apps/server/src/shared/runtime-contract.ts` (`RuntimeApi` interface) and `apps/server/src/services/runtime.ts` (julia, implementation).
 
 The CLI flow (smith) is:
 
@@ -293,7 +294,7 @@ Auto-open browser on macOS (`open`) and Linux (`xdg-open`). Skip if `--no-open` 
 Triggers:
 - `workflow_dispatch` (manual)
 - `schedule: '0 4 * * *'` (nightly 04:00 UTC)
-- `push` paths: `package.json`, `pnpm-workspace.yaml`, `packages/server/**`, `langwatch_nlp/pyproject.toml`, `services/langevals/**/pyproject.toml`, `services/aigateway/**`, `platform/app/package.json`, `platform/app/scripts/**`
+- `push` paths: `package.json`, `pnpm-workspace.yaml`, `apps/server/**`, `langwatch_nlp/pyproject.toml`, `services/langevals/**/pyproject.toml`, `services/aigateway/**`, `platform/app/package.json`, `platform/app/scripts/**`
 
 Matrix:
 - `macos-latest` (arm64)
@@ -341,7 +342,7 @@ Version is read from `platform/app/package.json`. The `@langwatch/server` packag
 | ----------------------------------------------------- | --------------------------------------------------- |
 | `/pyproject.toml`                                     | uvx publish path replaced by npm                    |
 | `/build_hooks.py`                                     | hatchling build hook — gone                         |
-| `/bin/cli.py`, `/bin/__init__.py`                     | python CLI replaced by `packages/server/bin/...`    |
+| `/bin/cli.py`, `/bin/__init__.py`                     | python CLI replaced by `apps/server/src/cli.ts`     |
 | `/uv.lock`                                            | only uv root lock; per-service uv locks stay        |
 | `/.github/workflows/langwatch-server-publish.yml`     | replaced by `npx-server-publish.yml`                |
 | `Makefile` targets `python-build`, `python-install`, `start` | uv/pip flow gone; `start` redundant with new CLI |

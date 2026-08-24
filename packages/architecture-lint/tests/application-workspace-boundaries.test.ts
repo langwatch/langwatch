@@ -73,14 +73,12 @@ function application(
   write(`apps/${role}/src/index.ts`, options.source ?? "export {};");
 }
 
-const ENTERPRISE_COMPOSITION_NAMES: Record<
-  EnterpriseCompositionRole,
-  string
-> = {
-  api: "@langwatch/enterprise-api",
-  worker: "@langwatch/enterprise-worker",
-  web: "@langwatch/enterprise-web",
-};
+const ENTERPRISE_COMPOSITION_NAMES: Record<EnterpriseCompositionRole, string> =
+  {
+    api: "@langwatch/enterprise-api",
+    worker: "@langwatch/enterprise-worker",
+    web: "@langwatch/enterprise-web",
+  };
 
 function enterpriseComposition(
   role: EnterpriseCompositionRole,
@@ -153,6 +151,12 @@ describe("application workspace classification", () => {
     write("apps/shared/src/index.ts", "export {};");
 
     expect(policy("application-layout")).toHaveLength(2);
+  });
+
+  it("uses the repository application ADR instead of requiring duplicate local records", () => {
+    application("server");
+
+    expect(policy("architecture-record")).toEqual([]);
   });
 
   it("rejects manifest and relative source dependencies between apps", () => {

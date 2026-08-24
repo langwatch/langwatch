@@ -1,0 +1,67 @@
+{
+  "name": "@langwatch/server",
+  "version": "3.16.0",
+  "description": "Run LangWatch locally with one command — `npx @langwatch/server`. Complete LangWatch stack: observability, evaluations, AI gateway, agent simulations.",
+  "license": "Apache-2.0",
+  "homepage": "https://langwatch.ai",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/langwatch/langwatch.git"
+  },
+  "bugs": {
+    "url": "https://github.com/langwatch/langwatch/issues"
+  },
+  "keywords": [
+    "langwatch",
+    "llm",
+    "observability",
+    "evaluations",
+    "ai",
+    "tracing",
+    "playground",
+    "self-hosted"
+  ],
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=10"
+  },
+  "packageManager": "pnpm@10.24.0",
+  "type": "module",
+  "main": "dist/cli.cjs",
+  "exports": {
+    ".": "./dist/cli.cjs"
+  },
+  "bin": {
+    "langwatch-server": "dist/cli.cjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsx scripts/build.ts",
+    "dev": "tsx src/cli.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:invariants": "vitest run test/workspace-invariants.test.ts test/pack-npm-filters.test.ts"
+  },
+  "dependencies": {
+    "chalk": "^6.0.0",
+    "commander": "^15.0.0",
+    "concurrently": "^9.1.2",
+    "execa": "^9.6.0",
+    "listr2": "^9.0.4",
+    "ora": "^9.0.0",
+    "prompts": "^2.4.2",
+    "tar": "^7.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "@types/prompts": "^2.4.9",
+    "@types/tar": "^6.1.13",
+    "esbuild": "^0.28.1",
+    "tsx": "^4.21.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.0"
+  }
+}

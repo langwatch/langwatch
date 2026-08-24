@@ -11,6 +11,7 @@
 #
 # One install from the repo root now covers all of it.
 packages:
+  - "apps/*"
   - "platform/app"
   - "packages/*"
   - "packages/features/*/*"

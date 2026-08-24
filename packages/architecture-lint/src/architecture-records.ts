@@ -56,7 +56,12 @@ export function lintArchitectureRecords(
   packages: ClassifiedPackage[],
 ): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
-  const roots = new Set(packages.map(architectureRoot));
+  // Applications are composition and deployment roots documented by the
+  // repository-level application ADR/spec. Package-local records belong to
+  // reusable ownership boundaries, not each executable wrapper.
+  const roots = new Set(
+    packages.filter((pkg) => pkg.kind !== "application").map(architectureRoot),
+  );
 
   for (const root of roots) {
     const adrs = join(root, "adrs");

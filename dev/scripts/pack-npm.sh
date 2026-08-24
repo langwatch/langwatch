@@ -23,10 +23,10 @@
 # the whole artifact is staged under `app/`. That is also the layout the CLI
 # already expects: locatePackageSource() finds the app root by walking up for
 # `platform/app/package.json`, so nesting is transparent to it (see
-# packages/server/src/services/app-dir.ts).
+# apps/server/src/services/app-dir.ts).
 #
-# `files` in package.json stays the single source of truth for WHAT ships;
-# this script only decides WHERE it lands.
+# `apps/server/distribution-files.json` stays the single source of truth for
+# WHAT ships; this script only decides WHERE it lands.
 # ---------------------------------------------------------------------------
 
 set -euo pipefail
@@ -73,8 +73,8 @@ set -- ${PACK_ARGS[@]+"${PACK_ARGS[@]}"}
 
 # The CLI bundle is the package's entrypoint; packing without it produces a
 # tarball whose `bin` dangles and which fails at `npx` time, not at pack time.
-if [ "$CHECK_FILTERS_ONLY" -eq 0 ] && [ ! -f "packages/server/dist/cli.cjs" ]; then
-  echo "✗ packages/server/dist/cli.cjs missing — run 'pnpm build:cli' first" >&2
+if [ "$CHECK_FILTERS_ONLY" -eq 0 ] && [ ! -f "apps/server/dist/cli.cjs" ]; then
+  echo "✗ apps/server/dist/cli.cjs missing — run 'pnpm build:cli' first" >&2
   exit 1
 fi
 if [ ! -f "pnpm-lock.yaml" ]; then
@@ -263,13 +263,13 @@ anchored_patterns_for() {
   done
 }
 
-# Everything `files` lists, copied into app/ so the workspace root sits one
-# level below the package root.
+# Everything the server-owned distribution manifest lists, copied into app/ so
+# the workspace root sits one level below the package root.
 #
 # Trailing slashes are stripped before rsync sees the path: `rsync -a src/ dst/`
 # copies the CONTENTS of src, `rsync -a src dst/` copies src itself. The `files`
 # list writes directories both ways, and only the latter is wanted here — with
-# the slash left on, packages/server/dist/ lands as app/packages/server/cli.cjs.
+# the slash left on, apps/server/dist/ lands as app/apps/server/cli.cjs.
 #
 # A while-read loop rather than mapfile: mapfile is bash 4+, and macOS still
 # ships bash 3.2, so a local `pnpm pack:npm` would die on it.
@@ -280,7 +280,7 @@ while IFS= read -r entry; do
   FILES_ENTRIES+=("$entry")
   # npm skips a `files` entry that doesn't exist rather than failing, so this
   # matches it. Warn loudly though: a silently-skipped entry is how a stale
-  # list goes unnoticed (packages/server/templates/ sat here for a long time
+# list goes unnoticed (the old server launcher templates sat here for a long time
   # naming a directory that was never in the tree).
   if [ ! -e "$entry" ]; then
     echo "⚠ files entry does not exist, skipping: $entry" >&2
@@ -290,18 +290,18 @@ while IFS= read -r entry; do
   anchored_patterns_for "$entry"
   rsync -a ${anchored[@]+"${anchored[@]}"} "${EXCLUDES[@]}" \
     "$ROOT/$entry" "$APP/$(dirname "$entry")/"
-done < <(node -p "require('./package.json').files.join('\n')")
+done < <(node -p "require('./apps/server/distribution-files.json').join('\n')")
 
 # The workspace root's own manifest. pnpm resolves the lockfile's `.` importer
 # against it, so `--frozen-lockfile` fails without it.
 cp "$ROOT/package.json" "$APP/package.json"
 
-# The published manifest. Same package, but its entrypoint and file list
-# describe the staged layout rather than the repo's.
+# The published manifest is owned by apps/server. Its entrypoint and file list
+# are adjusted only for the staged layout.
 node -e '
   const fs = require("node:fs");
-  const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
-  pkg.bin = { "langwatch-server": "app/packages/server/dist/cli.cjs" };
+  const pkg = JSON.parse(fs.readFileSync("apps/server/package.json", "utf8"));
+  pkg.bin = { "langwatch-server": "app/apps/server/dist/cli.cjs" };
   pkg.files = ["app"];
   delete pkg.scripts;
   fs.writeFileSync(process.argv[1], JSON.stringify(pkg, null, 2) + "\n");

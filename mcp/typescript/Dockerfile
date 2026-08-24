@@ -28,7 +28,7 @@ COPY packages/automations/package.json ./packages/automations/
 COPY packages/observability/package.json ./packages/observability/
 COPY packages/react-rum/package.json ./packages/react-rum/
 COPY packages/langy/package.json ./packages/langy/
-COPY packages/server/package.json ./packages/server/
+COPY apps/server/package.json ./apps/server/
 COPY sdks/typescript/package.json ./sdks/typescript/
 COPY skills/package.json ./skills/
 COPY tests/agentic-e2e/package.json ./tests/agentic-e2e/

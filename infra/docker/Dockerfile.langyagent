@@ -133,7 +133,7 @@ COPY packages/react-rum/package.json ./packages/react-rum/
 COPY packages/redaction/package.json ./packages/redaction/
 COPY packages/ssrf/package.json ./packages/ssrf/
 COPY packages/handled-error/package.json ./packages/handled-error/
-COPY packages/server/package.json ./packages/server/
+COPY apps/server/package.json ./apps/server/
 COPY mcp/typescript/package.json ./mcp/typescript/
 COPY skills/package.json ./skills/
 COPY tests/agentic-e2e/package.json ./tests/agentic-e2e/

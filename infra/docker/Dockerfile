@@ -165,8 +165,8 @@ COPY --from=builder /app/sdks/typescript ./sdks/typescript
 # as an app dependency and forgetting to add a COPY line here leaves a
 # dangling symlink and a boot-time "Cannot find module" — which is exactly how
 # @langwatch/handled-error broke the workers entry point once already. Copying
-# the tree cannot be forgotten. It costs about 1.3MB (packages/server, the npx
-# CLI, is the only member the app does not import) against an image measured
+# the tree cannot be forgotten. It costs about 1.3MB; apps/server, the npx CLI,
+# is separate and is the only workspace application the app does not import
 # in hundreds.
 COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/services/langevals/ts-integration/evaluators.generated.ts ./services/langevals/ts-integration/evaluators.generated.ts

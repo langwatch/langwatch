@@ -4,8 +4,8 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = resolve(fileURLToPath(import.meta.url), "..");
-const rootPkg = JSON.parse(
-  readFileSync(resolve(__dirname, "../../../package.json"), "utf8")
+const serverPackage = JSON.parse(
+  readFileSync(resolve(__dirname, "../package.json"), "utf8"),
 );
 
 await build({
@@ -27,7 +27,7 @@ await build({
     ].join("\n"),
   },
   define: {
-    __LANGWATCH_VERSION__: JSON.stringify(rootPkg.version),
+    __LANGWATCH_VERSION__: JSON.stringify(serverPackage.version),
     "import.meta.url": "__cli_url",
   },
   minify: false,
@@ -36,4 +36,4 @@ await build({
   logLevel: "info",
 });
 
-console.log(`✓ built dist/cli.cjs (v${rootPkg.version})`);
+console.log(`✓ built dist/cli.cjs (v${serverPackage.version})`);

@@ -5,15 +5,15 @@ Feature: Docker dev environment worktree isolation and startup speed
 
   # The dev-environment scripts live in `dev/scripts/dev.sh` (bash) +
   # `dev/compose.dev.yml` and a TypeScript port allocator at
-  # `packages/server/src/shared/ports.ts`. Tests exist for the
-  # TypeScript pieces (`packages/server/test/ports.test.ts`,
+  # `apps/server/src/shared/ports.ts`. Tests exist for the
+  # TypeScript pieces (`apps/server/test/ports.test.ts`,
   # `env.test.ts`, `cli-doctor.test.ts`) and bash worktree helpers
   # (`dev/scripts/__tests__/worktree.unit.bats`,
   # `worktree.integration.bats`). The parity check's
-  # DEFAULT_TEST_ROOTS doesn't scan `packages/server/test/` or
+  # DEFAULT_TEST_ROOTS doesn't scan `apps/server/test/` or
   # `dev/scripts/__tests__/.bats` files, so JSDoc-bound scenarios there
   # would not be discovered. Leaving `@unimplemented` — extending
-  # DEFAULT_TEST_ROOTS to cover packages/server is the right
+  # DEFAULT_TEST_ROOTS to cover apps/server is the right
   # structural fix.
 
   Background:

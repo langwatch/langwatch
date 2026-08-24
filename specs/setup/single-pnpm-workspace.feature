@@ -9,7 +9,7 @@ Feature: One workspace for every JavaScript project in the repo
   physical application packages and amended npm staging workspace closure.
 
   # These scenarios describe how the repository installs, resolves and packages
-  # itself. The @unit ones bind to packages/server/test/workspace-invariants.test.ts
+  # itself. The @unit ones bind to apps/server/test/workspace-invariants.test.ts
   # (and, for the fresh-clone scenario, tools/thuishaven/app/deps_test.go),
   # which assert the shape directly against the repo — one lockfile, one
   # workspace definition, no member holding install rules pnpm would ignore,

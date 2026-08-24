@@ -35,7 +35,7 @@ on:
       - "package.json"
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
-      - "packages/server/**"
+      - "apps/server/**"
       - "services/langevals/pyproject.toml"
       - "services/langevals/uv.lock"
       - "services/aigateway/**"
@@ -57,6 +57,7 @@ on:
       # served a request, on a push this job did not watch.
       - "sdks/typescript/package.json"
       - "packages/*/package.json"
+      - "apps/*/package.json"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -168,11 +169,11 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build @langwatch/server CLI
-        run: pnpm --filter @langwatch/server-cli build
+        run: pnpm --filter @langwatch/server build
 
       # Runs here because this job's path filter is already the exact set of
       # files these assert about (the root manifest, the workspace definition,
-      # the lockfile, packages/server/**, the packing script) — and because
+      # the lockfile, apps/server/**, the packing script) — and because
       # nothing else in CI runs the CLI's tests at all, which would leave them
       # reading as coverage while never executing. Placed before the boot so a
       # workspace regression fails in seconds rather than 25 minutes.
@@ -181,7 +182,7 @@ jobs:
       # and surfacing those here would be a different change.
       - name: Check the workspace invariants (ADR-076)
         run: >
-          pnpm --filter @langwatch/server-cli run test:invariants
+          pnpm --filter @langwatch/server run test:invariants
 
       # Same prebuild as npx-server-publish.yml: every published artifact
       # ships platform/app/dist + mcp/typescript/dist (the publish sanity check
@@ -228,7 +229,7 @@ jobs:
           # services/langyworker ships ONE file, its manifest, because the
           # lockfile names it as a workspace member and an install whose
           # directory is absent fails much later, inside a migration
-          # (packages/server/test/workspace-invariants.test.ts, "ships a
+          # (apps/server/test/workspace-invariants.test.ts, "ships a
           # manifest for every workspace member"). The subtraction names that
           # exact path rather than the directory, so its TypeScript sources
           # still fail this guard if they ever start shipping.
@@ -415,7 +416,7 @@ jobs:
             echo "✗ no aigateway binary at $bin — predep install must have failed silently"
             exit 1
           fi
-          expected_version="$(node -p "require('$GITHUB_WORKSPACE/package.json').version")"
+          expected_version="$(node -p "require('$GITHUB_WORKSPACE/apps/server/package.json').version")"
           actual_version="$("$bin" --version 2>&1 | head -n1 | tr -d '\r')"
           echo "aigateway --version: $actual_version"
           echo "expected:            $expected_version"

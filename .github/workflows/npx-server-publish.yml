@@ -9,12 +9,12 @@
 #   exception to the `<component>@<version>` shape: Go requires a submodule's
 #   tag to be `<subdir>/vX.Y.Z`, so it tags as `sdks/go/v*`.
 # - `workflow_dispatch` from main for break-glass / first publish / beta
-#   bumps. The dispatched run reads the version from package.json — it does
+#   bumps. The dispatched run reads the version from apps/server/package.json — it does
 #   NOT require a release tag.
 #
-# Version lock: root package.json and platform/app/package.json must match.
-# Both are auto-bumped in lockstep by release-please-config.json (the `.`
-# package's extra-files list). The pre-publish step verifies it.
+# Version lock: apps/server/package.json and platform/app/package.json must match.
+# Both are auto-bumped in lockstep by release-please-config.json. The
+# pre-publish step verifies it.
 #
 # npm dist-tag is auto-derived from the package version:
 #   3.1.0          → @latest
@@ -74,15 +74,15 @@ jobs:
         id: versions
         run: |
           set -e
-          pkg_version="$(node -p "require('./package.json').version")"
+          pkg_version="$(node -p "require('./apps/server/package.json').version")"
           app_version="$(node -p "require('./platform/app/package.json').version")"
           tag="${GITHUB_REF_NAME:-}"
-          echo "package.json version:           $pkg_version"
+          echo "apps/server/package.json version: $pkg_version"
           echo "platform/app/package.json version: $app_version"
           echo "release tag (if any):           $tag"
 
           if [ "$pkg_version" != "$app_version" ]; then
-            echo "✗ version mismatch: root=$pkg_version langwatch=$app_version"
+            echo "✗ version mismatch: server=$pkg_version langwatch=$app_version"
             echo "  release-please should keep these in lockstep — check release-please-config.json"
             exit 1
           fi
@@ -170,7 +170,7 @@ jobs:
           fi
 
       - name: Build @langwatch/server CLI
-        run: pnpm --filter @langwatch/server-cli build
+        run: pnpm --filter @langwatch/server build
 
       # Pre-build the langwatch app (vite client + the dist/server bundles +
       # mcp-server) so the published tarball ships dist/ artifacts. Without
@@ -185,7 +185,7 @@ jobs:
       # node_modules/ never reaches the tarball (dev/scripts/pack-npm.sh excludes
       # it), so end users still run `pnpm install` once on first start, which
       # is what generates the platform-specific Prisma client via prisma's
-      # postinstall hook — see packages/server/src/services/node-deps.ts.
+      # postinstall hook — see apps/server/src/services/node-deps.ts.
       - name: Build langwatch app (vite + scenario + mcp + generated types)
         run: pnpm --filter "@langwatch/web..." run build
         env:
@@ -211,7 +211,7 @@ jobs:
           # staged one level down so the workspace root is NOT the package
           # root, which is the only way npm will carry pnpm-lock.yaml.
           required=(
-            "package/app/packages/server/dist/cli.cjs"
+            "package/app/apps/server/dist/cli.cjs"
             # The lockfile and workspace definition. npm deletes a lockfile at
             # the package ROOT unconditionally, so these two paths existing is
             # the whole reason for the staged layout — assert them, or a future
@@ -263,11 +263,9 @@ jobs:
           # are derived from a directory listing rather than named one by one,
           # so a new package on either side is covered by this gate the day
           # it appears, with nothing to remember to add here.
-          # packages/server is no longer skipped: since ADR-076 it is a member
-          # of the single workspace, so `--frozen-lockfile` on the end user's
-          # machine checks the lockfile against its manifest and fails without
-          # it. Every member's package.json must ship, this one included.
-          for pkgdir in packages/*/; do
+          # Every apps/* and packages/* workspace member is included. The
+          # frozen end-user install checks the lockfile against each manifest.
+          for pkgdir in apps/*/ packages/*/; do
             pkgdir="${pkgdir%/}"
             [ -f "$pkgdir/package.json" ] || continue
             required+=("package/app/$pkgdir/package.json")

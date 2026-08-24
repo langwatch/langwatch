@@ -3,7 +3,7 @@
 # sha256 sidecars) to s3://langwatch-embedded-binaries (served at
 # https://embeds.langwatch.ai).
 #
-# Versions live in packages/server/embeds.versions.json — bump there, run
+# Versions live in apps/server/embeds.versions.json — bump there, run
 # this workflow manually, predeps in the CLI auto-pick the new tarballs on
 # next user invocation.
 #
@@ -97,8 +97,8 @@ jobs:
             elif command -v brew >/dev/null 2>&1; then brew install jq
             fi
           )
-          POSTGRES_VERSION=$(jq -r '.postgres.version' packages/server/embeds.versions.json)
-          REDIS_VERSION=$(jq -r '.redis.version' packages/server/embeds.versions.json)
+          POSTGRES_VERSION=$(jq -r '.postgres.version' apps/server/embeds.versions.json)
+          REDIS_VERSION=$(jq -r '.redis.version' apps/server/embeds.versions.json)
           echo "postgres=$POSTGRES_VERSION" >> "$GITHUB_OUTPUT"
           echo "redis=$REDIS_VERSION" >> "$GITHUB_OUTPUT"
           echo "Pinned: postgres=$POSTGRES_VERSION redis=$REDIS_VERSION"

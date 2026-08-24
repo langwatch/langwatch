@@ -57,7 +57,7 @@ Feature: CI smoke + publish for `@langwatch/server`
       | trigger           | detail                                                                    |
       | workflow_dispatch | manual                                                                    |
       | schedule          | "0 4 * * *" (nightly, UTC)                                                |
-      | push paths        | package.json, pnpm-workspace.yaml, packages/server/**                     |
+      | push paths        | package.json, pnpm-workspace.yaml, apps/server/**                         |
       | push paths        | langwatch_nlp/pyproject.toml, services/langevals/**/pyproject.toml        |
       | push paths        | services/aigateway/**, platform/app/package.json, platform/app/scripts/** |
 
@@ -98,7 +98,7 @@ Feature: CI smoke + publish for `@langwatch/server`
     When the publish job builds the tarball
     Then the tarball contains:
       | path                                  |
-      | app/packages/server/dist/             |
+      | app/apps/server/dist/                 |
       | app/pnpm-workspace.yaml               |
       | app/pnpm-lock.yaml                    |
       | app/langwatch/dist/client/            |

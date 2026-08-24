@@ -26,7 +26,7 @@ export async function runMigrations(
   const langwatchDir = locateLangwatchDir();
   if (!langwatchDir) {
     throw new Error(
-      "could not locate langwatch app directory — expected next to packages/server (monorepo) or under @langwatch/server install root",
+      "could not locate langwatch app directory — expected next to apps/server (monorepo) or under @langwatch/server install root",
     );
   }
 
@@ -54,9 +54,24 @@ export async function runMigrations(
   // resolve to the same binary — the inner one finds it via PATH, which
   // the env block above already prepends with ctx.paths.bin.
   const pnpm = await resolvePnpm(ctx.paths);
-  await execAndPipe(bus, "migrate:prisma", pnpm.command, [...pnpm.args, "run", "prisma:migrate"], { cwd: langwatchDir, env });
-  await execAndPipe(bus, "migrate:clickhouse", pnpm.command, [...pnpm.args, "run", "clickhouse:migrate"], { cwd: langwatchDir, env });
+  await execAndPipe(
+    bus,
+    "migrate:prisma",
+    pnpm.command,
+    [...pnpm.args, "run", "prisma:migrate"],
+    { cwd: langwatchDir, env },
+  );
+  await execAndPipe(
+    bus,
+    "migrate:clickhouse",
+    pnpm.command,
+    [...pnpm.args, "run", "clickhouse:migrate"],
+    { cwd: langwatchDir, env },
+  );
 
-  bus.emit({ type: "healthy", service: "postgres", durationMs: Date.now() - start });
+  bus.emit({
+    type: "healthy",
+    service: "postgres",
+    durationMs: Date.now() - start,
+  });
 }
-
