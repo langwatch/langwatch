@@ -676,7 +676,7 @@
       "platform/app/ee/governance/services/governanceKpis.clickhouse.repository.ts": ["~/server/clickhouse/clickhouseClient"],
       "platform/app/ee/governance/services/governanceOcsfEvents.clickhouse.repository.ts": ["~/server/clickhouse/clickhouseClient"],
       "platform/app/ee/governance/services/governanceProject.service.ts": ["~/server/utils/apiKeyGenerator"],
-      "platform/app/ee/governance/services/governanceSignals.service.ts": ["~/server/app-layer/app","~/server/event-sourcing/pipelines/governance-events/schemas/commands","~/server/event-sourcing/pipelines/governance-events/schemas/constants","~/server/gateway/budget.clickhouse.repository","~/server/gateway/budgetPeriod"],
+      "platform/app/ee/governance/services/governanceSignals.service.ts": ["~/server/app-layer/app","~/server/event-sourcing/pipelines/governance-events/schemas/constants","~/server/gateway/budget.clickhouse.repository","~/server/gateway/budgetPeriod"],
       "platform/app/ee/governance/services/governanceTraceActivity.clickhouse.repository.ts": ["~/server/clickhouse/clickhouseClient"],
       "platform/app/ee/governance/services/ingestionKey.service.ts": ["~/server/api-key/api-key.repository","~/server/api-key/api-key.service"],
       "platform/app/ee/governance/services/personalUsage.clickhouse.repository.ts": ["~/server/analytics/clickhouse/clickhouse-analytics.service","~/server/clickhouse/clickhouseClient","~/server/gateway/spendEvents.clickhouse.repository","~/server/gateway/wireMoney"],

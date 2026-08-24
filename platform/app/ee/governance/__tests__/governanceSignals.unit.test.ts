@@ -21,7 +21,7 @@ vi.mock("~/server/app-layer/app", () => ({
 import { currentPeriodStart } from "~/server/gateway/budgetPeriod";
 import { anchoredPeriodStart } from "~/server/gateway/budgetWindow";
 
-import { detectBudgetCrossings } from "../services/governanceSignals.service";
+import { AppGovernanceSignalsService } from "../services/governanceSignals.service";
 
 function deps(spentByBudget: Record<string, string>, budgets: unknown[]) {
   return {
@@ -80,18 +80,17 @@ beforeEach(() => sendCrossing.mockClear());
 describe("budget crossing detection", () => {
   /** @scenario Crossing detection reads the boundary-aware figure */
   it("appends threshold at the warn line, breach at the limit, nothing below", async () => {
-    await detectBudgetCrossings(
+    await AppGovernanceSignalsService.create(
       deps({ b_low: "10.000000", b_warn: "85.000000", b_over: "120.000000" }, [
         budget("b_low"),
         budget("b_warn"),
         budget("b_over"),
       ]),
-      [
-        row("b_low", "vk_anchor:u1"),
-        row("b_warn", "vk_anchor:u2"),
-        row("b_over", "vk_anchor:u3"),
-      ],
-    );
+    ).detectBudgetCrossings([
+      row("b_low", "vk_anchor:u1"),
+      row("b_warn", "vk_anchor:u2"),
+      row("b_over", "vk_anchor:u3"),
+    ]);
     const kinds = sendCrossing.mock.calls.map(
       (c) => [c[0].budget_id, c[0].kind] as const,
     );
@@ -112,12 +111,11 @@ describe("budget crossing detection", () => {
     // start and the two are always distinguishable.
     const cycleAnchorAt = new Date("2026-06-17T09:00:00.000Z");
     const at = new Date();
-    await detectBudgetCrossings(
+    await AppGovernanceSignalsService.create(
       deps({ b_anchored: "120.000000" }, [
         budget("b_anchored", { cycleAnchorAt }),
       ]),
-      [row("b_anchored", "vk_anchor:u1")],
-    );
+    ).detectBudgetCrossings([row("b_anchored", "vk_anchor:u1")]);
 
     // Exactly one: a second dispatch for the same anchored period would be
     // the same customer told twice, and reading only calls[0] would miss it.
@@ -151,7 +149,9 @@ describe("budget crossing detection", () => {
       .fn()
       .mockRejectedValue(new Error("clickhouse down"));
     await expect(
-      detectBudgetCrossings(failing, [row("b_1", "vk_anchor:u1")]),
+      AppGovernanceSignalsService.create(failing).detectBudgetCrossings([
+        row("b_1", "vk_anchor:u1"),
+      ]),
     ).resolves.toBeUndefined();
     expect(sendCrossing).not.toHaveBeenCalled();
   });

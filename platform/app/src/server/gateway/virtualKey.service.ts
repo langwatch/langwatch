@@ -11,7 +11,7 @@
  * `scopeResolver.ts`); the service does not own a per-VK provider chain.
  */
 
-import { emitVkLifecycle } from "@ee/governance/services/governanceSignals.service";
+import { AppGovernanceSignalsService } from "@ee/governance/services/governanceSignals.service";
 import { TRPCError } from "@trpc/server";
 import { randomBytes } from "crypto";
 import { z } from "zod";
@@ -224,12 +224,16 @@ export type CreatedVirtualKey = {
  * - RBAC is enforced by tRPC / Hono layers before reaching the service.
  */
 export class VirtualKeyService {
+  private readonly governanceSignals: AppGovernanceSignalsService;
+
   constructor(
     private readonly prisma: PrismaClient,
     private readonly repository: VirtualKeyRepository,
     private readonly changeEvents: ChangeEventRepository,
     private readonly auditLog: GatewayAuditAdapter,
-  ) {}
+  ) {
+    this.governanceSignals = AppGovernanceSignalsService.create({ prisma });
+  }
 
   static create(prisma: PrismaClient): VirtualKeyService {
     return new VirtualKeyService(
@@ -385,7 +389,10 @@ export class VirtualKeyService {
         translateExternalIdConflict(error, "virtual_key", input.externalId),
       );
 
-    await emitVkLifecycle(this.prisma, { vk: created, action: "created" });
+    await this.governanceSignals.emitVirtualKeyLifecycle({
+      virtualKey: created,
+      action: "created",
+    });
     return { virtualKey: created, secret };
   }
 
@@ -611,7 +618,10 @@ export class VirtualKeyService {
       return vk;
     });
 
-    await emitVkLifecycle(this.prisma, { vk: rotated, action: "rotated" });
+    await this.governanceSignals.emitVirtualKeyLifecycle({
+      virtualKey: rotated,
+      action: "rotated",
+    });
     return { virtualKey: rotated, secret: newSecret };
   }
 
@@ -663,7 +673,10 @@ export class VirtualKeyService {
         return vk;
       })
       .then(async (vk) => {
-        await emitVkLifecycle(this.prisma, { vk, action: "revoked" });
+        await this.governanceSignals.emitVirtualKeyLifecycle({
+          virtualKey: vk,
+          action: "revoked",
+        });
         return vk;
       });
   }
@@ -725,8 +738,8 @@ export class VirtualKeyService {
         return vk;
       })
       .then(async (vk) => {
-        await emitVkLifecycle(this.prisma, {
-          vk,
+        await this.governanceSignals.emitVirtualKeyLifecycle({
+          virtualKey: vk,
           action: "disabled",
           reason: input.reason ?? null,
         });
@@ -784,7 +797,10 @@ export class VirtualKeyService {
         return vk;
       })
       .then(async (vk) => {
-        await emitVkLifecycle(this.prisma, { vk, action: "enabled" });
+        await this.governanceSignals.emitVirtualKeyLifecycle({
+          virtualKey: vk,
+          action: "enabled",
+        });
         return vk;
       });
   }

@@ -20,7 +20,7 @@ import {
   resolveApplicableBudgets,
 } from "~/server/gateway/budgetResolution.service";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
-import { detectBudgetCrossings } from "../services/governanceSignals.service";
+import { AppGovernanceSignalsService } from "../services/governanceSignals.service";
 
 const logger = createLogger("langwatch:governance:gateway-debits");
 
@@ -35,8 +35,11 @@ export interface GatewayDebitsProcessDeps {
 }
 
 class AppGatewayDebitPort extends GatewayDebitPort {
+  private readonly signals: AppGovernanceSignalsService;
+
   private constructor(private readonly deps: GatewayDebitsProcessDeps) {
     super();
+    this.signals = AppGovernanceSignalsService.create(deps);
   }
 
   static create(deps: GatewayDebitsProcessDeps): AppGatewayDebitPort {
@@ -76,7 +79,7 @@ class AppGatewayDebitPort extends GatewayDebitPort {
   }
 
   detectCrossings(rows: GatewayBudgetCrossingCandidate[]): Promise<void> {
-    return detectBudgetCrossings(this.deps, rows);
+    return this.signals.detectBudgetCrossings(rows);
   }
 
   shouldEmitBudgetUpdated(input: { projectId: string }): Promise<boolean> {

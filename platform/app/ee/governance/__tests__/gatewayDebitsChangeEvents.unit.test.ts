@@ -30,7 +30,11 @@ vi.mock(
 // Crossing detection is its own suite and its own best-effort seam; it has
 // no bearing on whether the invalidation is emitted.
 vi.mock("../services/governanceSignals.service", () => ({
-  detectBudgetCrossings: vi.fn().mockResolvedValue(undefined),
+  AppGovernanceSignalsService: {
+    create: () => ({
+      detectBudgetCrossings: vi.fn().mockResolvedValue(undefined),
+    }),
+  },
 }));
 
 function budget(onBreach: "BLOCK" | "WARN", id = `budget-${onBreach}`) {
