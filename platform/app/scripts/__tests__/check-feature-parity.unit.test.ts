@@ -307,7 +307,9 @@ describe("findScenarioAnnotations", () => {
     // earlier line.
     it("binds from inside a python docstring, which is how the SDK writes it", () => {
       expect(
-        titles('def test_it():\n    """\n    @scenario Docstring form\n    """\n'),
+        titles(
+          'def test_it():\n    """\n    @scenario Docstring form\n    """\n',
+        ),
       ).toEqual(["Docstring form"]);
     });
 
@@ -322,15 +324,15 @@ describe("findScenarioAnnotations", () => {
     });
 
     it("does not bind from test data, where an annotation is a string not a binding", () => {
-      expect(titles('const fixture = `\n@scenario "Quoted in a fixture"\n`;')).toEqual(
-        [],
-      );
+      expect(
+        titles('const fixture = `\n@scenario "Quoted in a fixture"\n`;'),
+      ).toEqual([]);
     });
 
     it("does not bind after the block comment it was inside has closed", () => {
-      expect(titles('/* opened and closed */\n@scenario "After the comment"')).toEqual(
-        [],
-      );
+      expect(
+        titles('/* opened and closed */\n@scenario "After the comment"'),
+      ).toEqual([]);
     });
   });
 
