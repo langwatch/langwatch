@@ -31,10 +31,6 @@
  *      OCSF read projection (SIEM export) on top of the unified store.
  */
 
-import {
-  type CanonicalCostEvent,
-  extractCanonicalCostEvents,
-} from "@ee/governance/services/activity-monitor/canonicalCostExtractor.service";
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { transformOttlPayload } from "@ee/governance/services/activity-monitor/ottlGatewayClient";
 import { ensureHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
@@ -52,6 +48,10 @@ import type {
 } from "@opentelemetry/otlp-transformer";
 import type { Context } from "hono";
 import type { IngestionSource } from "~/generated/prisma/client";
+import {
+  AppGovernanceRuntime,
+  type CanonicalCostEvent,
+} from "~/runtime/app/features/governance";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
@@ -221,6 +221,7 @@ function buildWebhookLogRequest(
 }
 
 const logger = createLogger("langwatch:ingest");
+const governanceRuntime = AppGovernanceRuntime.create();
 
 /**
  * Cost-event extraction via OTTL.
@@ -294,7 +295,7 @@ async function extractCostEventsForSource(input: {
         },
         "OTTL transform rejected statements at receive — falling back to un-mutated extraction",
       );
-      return extractCanonicalCostEvents(input.parsed);
+      return governanceRuntime.extractCanonicalCostEvents(input.parsed);
     }
     const mutatedBuffer = Buffer.from(result.payloadB64, "base64");
     const mutatedBytes = mutatedBuffer.buffer.slice(
@@ -311,15 +312,15 @@ async function extractCostEventsForSource(input: {
         { sourceId: input.source.id, err: reparsed.error },
         "OTTL transform returned unparseable payload — falling back to un-mutated extraction",
       );
-      return extractCanonicalCostEvents(input.parsed);
+      return governanceRuntime.extractCanonicalCostEvents(input.parsed);
     }
-    return extractCanonicalCostEvents(reparsed.request);
+    return governanceRuntime.extractCanonicalCostEvents(reparsed.request);
   } catch (transformErr) {
     logger.warn(
       { sourceId: input.source.id, err: String(transformErr) },
       "OTTL transform request failed — falling back to un-mutated extraction",
     );
-    return extractCanonicalCostEvents(input.parsed);
+    return governanceRuntime.extractCanonicalCostEvents(input.parsed);
   }
 }
 

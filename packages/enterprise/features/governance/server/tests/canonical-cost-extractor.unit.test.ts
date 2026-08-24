@@ -11,13 +11,18 @@
  * Spec: specs/ai-governance/ingestion-sources/claude-code-otlp.feature
  */
 
-import type {
-  IExportLogsServiceRequest,
-  IKeyValue,
-} from "@opentelemetry/otlp-transformer";
 import { describe, expect, it } from "vitest";
+import {
+  CanonicalCostExtractorService,
+  type OtlpFixed64,
+  type OtlpKeyValue,
+  type OtlpLogsRequest,
+} from "../src/services/canonical-cost-extractor.service";
 
-import { extractCanonicalCostEvents } from "../canonicalCostExtractor.service";
+const extractor = CanonicalCostExtractorService.create();
+
+type IKeyValue = OtlpKeyValue;
+type IExportLogsServiceRequest = OtlpLogsRequest;
 
 function strKv(key: string, value: string): IKeyValue {
   return { key, value: { stringValue: value } };
@@ -34,7 +39,7 @@ function dblKv(key: string, value: number): IKeyValue {
 function buildRequest(input: {
   resourceAttrs?: IKeyValue[];
   recordAttrs: IKeyValue[];
-  timeUnixNano?: string;
+  timeUnixNano?: OtlpFixed64;
 }): IExportLogsServiceRequest {
   return {
     resourceLogs: [
@@ -73,7 +78,7 @@ function buildRequest(input: {
 describe("extractCanonicalCostEvents", () => {
   describe("happy path — all canonical fields present on the record", () => {
     it("emits one event with every field populated", () => {
-      const events = extractCanonicalCostEvents(
+      const events = extractor.extract(
         buildRequest({
           recordAttrs: [
             dblKv("langwatch.cost.usd", 0.12545),
@@ -105,7 +110,7 @@ describe("extractCanonicalCostEvents", () => {
 
   describe("when resource attributes carry team.id_hint and the record carries the rest", () => {
     it("merges resource → record so the ledger row sees both", () => {
-      const events = extractCanonicalCostEvents(
+      const events = extractor.extract(
         buildRequest({
           resourceAttrs: [strKv("langwatch.team.id_hint", "platform")],
           recordAttrs: [
@@ -122,7 +127,7 @@ describe("extractCanonicalCostEvents", () => {
 
   describe("when record overrides resource for the same key", () => {
     it("prefers the record-level value (closer to the event)", () => {
-      const events = extractCanonicalCostEvents(
+      const events = extractor.extract(
         buildRequest({
           resourceAttrs: [
             strKv("langwatch.principal.email", "default@acme.test"),
@@ -140,7 +145,7 @@ describe("extractCanonicalCostEvents", () => {
 
   describe("when langwatch.cost.usd is missing", () => {
     it("drops the event — no idempotent ledger write possible without cost", () => {
-      const events = extractCanonicalCostEvents(
+      const events = extractor.extract(
         buildRequest({
           recordAttrs: [strKv("langwatch.request_id", "req_no_cost")],
         }),
@@ -151,7 +156,7 @@ describe("extractCanonicalCostEvents", () => {
 
   describe("when langwatch.request_id is missing", () => {
     it("drops the event — request_id is the idempotency key", () => {
-      const events = extractCanonicalCostEvents(
+      const events = extractor.extract(
         buildRequest({
           recordAttrs: [dblKv("langwatch.cost.usd", 0.01)],
         }),
@@ -162,7 +167,7 @@ describe("extractCanonicalCostEvents", () => {
 
   describe("when intValue arrives as a string (OTLP/HTTP JSON wire)", () => {
     it("coerces string ints to number fields", () => {
-      const events = extractCanonicalCostEvents(
+      const events = extractor.extract(
         buildRequest({
           recordAttrs: [
             dblKv("langwatch.cost.usd", 0.05),
@@ -177,9 +182,31 @@ describe("extractCanonicalCostEvents", () => {
     });
   });
 
+  describe("when timeUnixNano arrives as protobuf long bits", () => {
+    it("preserves the unsigned 64-bit timestamp", () => {
+      const nanos = 1_714_978_800_000_000_000n;
+      const events = extractor.extract(
+        buildRequest({
+          timeUnixNano: {
+            low: Number(nanos & 0xffff_ffffn),
+            high: Number(nanos >> 32n),
+          },
+          recordAttrs: [
+            dblKv("langwatch.cost.usd", 0.01),
+            strKv("langwatch.request_id", "req_long_bits"),
+          ],
+        }),
+      );
+
+      expect(events[0]?.occurredAt).toEqual(
+        new Date(Number(nanos / 1_000_000n)),
+      );
+    });
+  });
+
   describe("when langwatch.model is missing but cost + request_id present", () => {
     it("emits the event with model='unknown' (cost rolls up; admin can debug later)", () => {
-      const events = extractCanonicalCostEvents(
+      const events = extractor.extract(
         buildRequest({
           recordAttrs: [
             dblKv("langwatch.cost.usd", 0.03),
@@ -194,7 +221,7 @@ describe("extractCanonicalCostEvents", () => {
 
   describe("when token fields are missing", () => {
     it("defaults to zero rather than dropping the event", () => {
-      const events = extractCanonicalCostEvents(
+      const events = extractor.extract(
         buildRequest({
           recordAttrs: [
             dblKv("langwatch.cost.usd", 0.001),
@@ -260,7 +287,7 @@ describe("extractCanonicalCostEvents", () => {
           },
         ],
       } as unknown as IExportLogsServiceRequest;
-      const events = extractCanonicalCostEvents(req);
+      const events = extractor.extract(req);
       expect(events.map((e) => e.requestId)).toEqual(["req_a", "req_b"]);
     });
   });

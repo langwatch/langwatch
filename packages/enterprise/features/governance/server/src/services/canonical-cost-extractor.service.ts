@@ -1,13 +1,17 @@
 export type OtlpAnyValue = {
-  stringValue?: string;
-  intValue?: string | number;
-  doubleValue?: number;
-  boolValue?: boolean;
+  stringValue?: string | null;
+  intValue?: string | number | null;
+  doubleValue?: number | null;
+  boolValue?: boolean | null;
 };
 export type OtlpKeyValue = { key?: string; value?: OtlpAnyValue };
+export type OtlpFixed64 =
+  | string
+  | number
+  | { low: number; high: number };
 export type OtlpLogRecord = {
   attributes?: OtlpKeyValue[];
-  timeUnixNano?: string | number;
+  timeUnixNano?: OtlpFixed64;
 };
 export type OtlpLogsRequest = {
   resourceLogs?: Array<{
@@ -118,10 +122,17 @@ export class CanonicalCostExtractorService {
     return Number.isFinite(Number(value)) ? value.trim() : null;
   }
 
-  private date(value: string | number | undefined): Date {
+  private date(value: OtlpFixed64 | undefined): Date {
     if (value === undefined) return new Date();
-    const nanos =
-      typeof value === "string" ? BigInt(value) : BigInt(Math.floor(value));
+    let nanos: bigint;
+    if (typeof value === "string") {
+      nanos = BigInt(value);
+    } else if (typeof value === "number") {
+      nanos = BigInt(Math.floor(value));
+    } else {
+      nanos =
+        (BigInt(value.high >>> 0) << 32n) | BigInt(value.low >>> 0);
+    }
     return new Date(Number(nanos / 1_000_000n));
   }
 }
