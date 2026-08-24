@@ -15,6 +15,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
   FrontDoorShell,
+  FrontDoorTraceDemo,
   useIdentityFrontDoor,
   VerificationFirstSignUp,
 } from "~/features/auth-front-door";
@@ -66,6 +67,7 @@ export default function SignUp() {
         headline="See what your agents are actually doing."
         headlineAccent="actually"
         tagline="Traces, evaluations and monitoring for every run. Free to start, no credit card."
+        liveTrace={<FrontDoorTraceDemo />}
       >
         <VerificationFirstSignUp />
       </FrontDoorShell>

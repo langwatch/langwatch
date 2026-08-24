@@ -29,6 +29,7 @@ export function FrontDoorShell({
   headline,
   headlineAccent,
   tagline,
+  liveTrace,
   trustStrip,
   children,
 }: {
@@ -40,6 +41,7 @@ export function FrontDoorShell({
   tagline?: string;
   /** Shown under the panel on hosted desktops. Empty until there is something
    *  true to put in it: an invented customer logo is worse than a gap. */
+  liveTrace?: ReactNode;
   trustStrip?: ReactNode;
   children: ReactNode;
 }) {
@@ -79,6 +81,7 @@ export function FrontDoorShell({
             headline={headline}
             headlineAccent={headlineAccent}
             tagline={tagline}
+            liveTrace={liveTrace}
             trustStrip={trustStrip}
           />
           <Flex
