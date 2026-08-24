@@ -33,6 +33,16 @@ const { mockComplete } = vi.hoisted(() => ({
  * same drift is a typecheck failure on this file instead. The VALUES stay
  * deliberately partial — each stub answers only what this suite drives.
  */
+/**
+ * The tRPC mutation pipeline audits every mutation, and the audit writer
+ * reaches Prisma — which in a unit test is a connection refusal, not a
+ * behaviour. Stubbed the way every other audited router suite stubs it; the
+ * audit trail's own content is not this suite's claim.
+ */
+vi.mock("@ee/audit-log/auditLog", () => ({
+  auditLog: vi.fn(() => Promise.resolve()),
+}));
+
 vi.mock(
   "~/server/app-layer/identity/runtime",
   (): Record<keyof typeof IdentityRuntime, unknown> => ({
@@ -48,6 +58,8 @@ vi.mock(
     identifierBackfillMigration: () => ({}),
     identityBirth: () => ({}),
     identityNewbornReconciliation: () => ({}),
+    identitySecretCarry: () => ({}),
+    identitySecretHealMigration: () => ({}),
     isLatched: async () => false,
     // `betterAuth()` builds its adapter EAGERLY at module load, so this one
     // has to be real enough to initialise. better-auth's own memory engine
