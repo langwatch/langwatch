@@ -209,9 +209,7 @@ describe("given an object whose type name the caller controls", () => {
     // Not a plain object literal: that would be accepted as options and would
     // report nothing, so the assertion would pass without testing anything.
     class Tagged {
-      get [Symbol.toStringTag](): string {
-        return "sk-lw-from-the-environment";
-      }
+      readonly [Symbol.toStringTag] = "sk-lw-from-the-environment";
     }
     setup(new Tagged());
 
