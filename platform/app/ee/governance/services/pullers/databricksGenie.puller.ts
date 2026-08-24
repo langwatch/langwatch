@@ -124,7 +124,7 @@ const DATABRICKS_WORKSPACE_HOST_SUFFIXES = [
  * `workspaceUrl`, and the next scheduled run would decrypt a token they never
  * saw and post it to their host.
  *
- * Enforced on the write path (`assertPullDestinationAllowed`) rather than in
+ * Enforced on the write path (`PullDestinationService`) rather than in
  * the schema below, so the rejection reaches whoever is making the change —
  * and so the adapter can still be pointed at a local fixture by its tests.
  */

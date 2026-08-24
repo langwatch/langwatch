@@ -33,6 +33,7 @@ import {
   NON_ENTERPRISE_INGESTION_SOURCE_CAP,
   unsupportedValue,
 } from "@langwatch/enterprise-governance-contract";
+import { PullDestinationService } from "@langwatch/enterprise-governance-server";
 import { createLogger } from "@langwatch/observability";
 import { createHash, randomBytes } from "crypto";
 import { env } from "~/env.mjs";
@@ -47,7 +48,8 @@ import {
   encryptParserConfigCredentials,
   isEncryptedCredentials,
 } from "./ingestionCredentials";
-import { assertPullDestinationAllowed } from "./pullDestination";
+
+const pullDestination = PullDestinationService.create();
 
 export type SourceType =
   | "otel_generic"
@@ -366,7 +368,7 @@ export class IngestionSourceService {
       ...(input.pullConfig ?? {}),
       ...(input.parserConfig ?? {}),
     };
-    assertPullDestinationAllowed(requestedParserConfig);
+    pullDestination.assertAllowed(requestedParserConfig);
     const mergedParserConfig = encryptParserConfigCredentials(
       requestedParserConfig,
     )!;
@@ -430,7 +432,7 @@ export class IngestionSourceService {
           incoming[key] = stored[key];
         }
       }
-      assertPullDestinationAllowed(incoming);
+      pullDestination.assertAllowed(incoming);
       data.parserConfig = encryptParserConfigCredentials(
         incoming,
       ) as Prisma.InputJsonValue;

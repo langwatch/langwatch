@@ -19,9 +19,11 @@ export class PullDestinationService {
       typeof parserConfig.workspaceUrl !== "string" ||
       !this.isDatabricksWorkspaceOrigin(parserConfig.workspaceUrl)
     ) {
-      throw new Error(
-        "Workspace URL must be an https Databricks workspace address, ending in .azuredatabricks.net, .cloud.databricks.com or .gcp.databricks.com.",
-      );
+      const message =
+        "Workspace URL must be an https Databricks workspace address, ending in .azuredatabricks.net, .cloud.databricks.com or .gcp.databricks.com.";
+      throw new GovernanceValidationError(message, {
+        formErrors: [message],
+      });
     }
   }
 
@@ -33,3 +35,4 @@ export class PullDestinationService {
     );
   }
 }
+import { GovernanceValidationError } from "@langwatch/enterprise-governance-contract";

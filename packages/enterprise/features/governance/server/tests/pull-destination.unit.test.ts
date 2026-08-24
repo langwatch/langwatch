@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { DATABRICKS_GENIE_ADAPTER_ID } from "../../pullers/databricksGenie.puller";
-import { assertPullDestinationAllowed } from "../pullDestination";
+import { GovernanceValidationError } from "@langwatch/enterprise-governance-contract";
+import { PullDestinationService } from "../src/services/pull-destination.service";
+
+const pullDestination = PullDestinationService.create();
+const DATABRICKS_GENIE_ADAPTER_ID = "databricks_genie";
 
 const genie = (workspaceUrl: string) => ({
   adapter: DATABRICKS_GENIE_ADAPTER_ID,
@@ -15,7 +18,7 @@ describe("given a Genie config naming a real workspace", () => {
       "https://dbc-1234abcd-5e6f.cloud.databricks.com",
       "https://1234567890.7.gcp.databricks.com",
     ])("accepts %s", (url) => {
-      expect(() => assertPullDestinationAllowed(genie(url))).not.toThrow();
+      expect(() => pullDestination.assertAllowed(genie(url))).not.toThrow();
     });
   });
 });
@@ -25,8 +28,11 @@ describe("given a Genie config pointed somewhere the token must never go", () =>
     /** @scenario "The token may only be sent to a Databricks workspace" */
     it("refuses a host the attacker controls", () => {
       expect(() =>
-        assertPullDestinationAllowed(genie("https://attacker.example.com")),
+        pullDestination.assertAllowed(genie("https://attacker.example.com")),
       ).toThrow(/Databricks workspace address/);
+      expect(() =>
+        pullDestination.assertAllowed(genie("https://attacker.example.com")),
+      ).toThrow(GovernanceValidationError);
     });
 
     /**
@@ -40,7 +46,7 @@ describe("given a Genie config pointed somewhere the token must never go", () =>
     it("names every address that would have been accepted", () => {
       let message = "";
       try {
-        assertPullDestinationAllowed(genie("https://attacker.example.com"));
+        pullDestination.assertAllowed(genie("https://attacker.example.com"));
       } catch (error) {
         message = error instanceof Error ? error.message : String(error);
       }
@@ -51,7 +57,7 @@ describe("given a Genie config pointed somewhere the token must never go", () =>
 
     it("refuses a lookalike that merely contains the real domain", () => {
       expect(() =>
-        assertPullDestinationAllowed(
+        pullDestination.assertAllowed(
           genie("https://azuredatabricks.net.attacker.example.com"),
         ),
       ).toThrow(/Databricks workspace address/);
@@ -59,7 +65,7 @@ describe("given a Genie config pointed somewhere the token must never go", () =>
 
     it("refuses plain http, which would expose the token even to a real workspace", () => {
       expect(() =>
-        assertPullDestinationAllowed(
+        pullDestination.assertAllowed(
           genie("http://adb-1234567890123456.7.azuredatabricks.net"),
         ),
       ).toThrow(/Databricks workspace address/);
@@ -67,7 +73,7 @@ describe("given a Genie config pointed somewhere the token must never go", () =>
 
     it("refuses a URL smuggling credentials in its userinfo", () => {
       expect(() =>
-        assertPullDestinationAllowed(
+        pullDestination.assertAllowed(
           genie("https://user:pass@adb-1.7.azuredatabricks.net"),
         ),
       ).toThrow(/Databricks workspace address/);
@@ -75,7 +81,7 @@ describe("given a Genie config pointed somewhere the token must never go", () =>
 
     it("refuses a missing workspace URL rather than letting it through", () => {
       expect(() =>
-        assertPullDestinationAllowed({
+        pullDestination.assertAllowed({
           adapter: DATABRICKS_GENIE_ADAPTER_ID,
         }),
       ).toThrow(/Databricks workspace address/);
@@ -87,7 +93,7 @@ describe("given a config for an adapter with no fixed destination", () => {
   describe("when the destination is checked", () => {
     it("leaves it alone rather than inventing a rule for it", () => {
       expect(() =>
-        assertPullDestinationAllowed({
+        pullDestination.assertAllowed({
           adapter: "http_polling",
           url: "https://customers-own-audit-api.example.com/events",
         }),
@@ -96,9 +102,9 @@ describe("given a config for an adapter with no fixed destination", () => {
 
     it("ignores a config with no adapter at all", () => {
       expect(() =>
-        assertPullDestinationAllowed({ ottlStatements: [] }),
+        pullDestination.assertAllowed({ ottlStatements: [] }),
       ).not.toThrow();
-      expect(() => assertPullDestinationAllowed(null)).not.toThrow();
+      expect(() => pullDestination.assertAllowed(null)).not.toThrow();
     });
   });
 });
