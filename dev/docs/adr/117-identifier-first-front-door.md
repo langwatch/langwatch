@@ -239,6 +239,18 @@ The screen set and routes are D13's spec
   (wrong password, rate-limit wait, origin mismatch, honest unknown) binds
   to the new screens unchanged.
 
+### Revision (2026-08-24) — the screen-level no-oracle is retired
+
+D13's implementation converts both dead ends into the other journey, at the
+owner's direction: signing up with an address that already has an account
+quietly becomes logging in (no banner), and a password typed for an address
+nobody holds becomes a verification-first sign-up. Sign-up already
+acknowledged existence under Q12, so the sign-in-side contortion bought
+nothing an attacker could not get through the sign-up door. **What still
+holds:** the router's decision object stays existence-independent (§1, §2,
+bound by `signin-router.feature`), the picker renders identical methods for
+any address, and password reset keeps its uniform response.
+
 ### 7. One flag, shadow-first, and the cutover
 
 - **`IDENTITY_ROUTER_V2`** covers D03 + D13 together: the router is the

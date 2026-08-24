@@ -3,12 +3,12 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
   I want to reset my password from the sign-in screen when I forget it
   So that I can recover my account on my own, without contacting support
 
-  # Password reset only exists in on-prem credential mode
-  # (NEXTAUTH_PROVIDER="email"). In Auth0 / Google / SSO deployments the
-  # identity provider owns the credential, so the sign-in screen renders a
-  # provider redirect instead of the email/password form — and BetterAuth's
-  # /request-password-reset and /reset-password endpoints stay blocked by the
-  # cloud-mode gate. The flow reuses the same email infrastructure
+  # Password reset belongs to the account rather than to the deployment: it is
+  # offered wherever the installation holds passwords of its own, and refused
+  # where it holds none, because there the endpoints are not mounted and the
+  # identity provider owns the credential. Which of the two an installation is
+  # is the method-set policy's answer (ADR-117 §6), not the name of a provider
+  # in its environment. The flow reuses the same email infrastructure
   # (SendGrid or AWS SES via `sendEmail`) that powers invites and other
   # transactional mail. BetterAuth already mounts and rate-limits the reset
   # endpoints; this feature wires the previously-missing `sendResetPassword`
@@ -132,20 +132,41 @@ Feature: Forgot / reset password on credential (email-mode) sign-in
     Then I am told the link is invalid
     And I see a link to request a new reset
 
-  # --- Cloud / SSO mode guard (existing invariant) ---
+  # --- Who may reset: the identifier, not the deployment mode ---
+  #
+  # Amended at D13 (ADR-117 §6, epic Q9). Reset follows the IDENTIFIER: an
+  # installation that authenticates people itself keeps this door open however
+  # it federates, so somebody whose identity provider is the thing that is
+  # broken can still recover. The retired scenario is the one that read the
+  # deployment's provider name as the answer.
+  #
+  # What a deployment still decides is whether it holds any passwords at all.
+  # Where none exist there is nothing to reset, the endpoints are not mounted,
+  # and saying so beats promising an email nobody can send. That is the
+  # method-set policy speaking (ADR-027's semantics, kept), and it stops
+  # speaking when those installations hold password identifiers.
 
-  # Enforced by the existing BetterAuth `hooks.before` gate and the
-  # `emailAndPassword.enabled = NEXTAUTH_PROVIDER === "email"` flag: in
-  # cloud/SSO mode the reset endpoints throw EMAIL_PASSWORD_DISABLED. The
-  # `auth` instance binds NEXTAUTH_PROVIDER at module load, so exercising the
-  # non-email branch would need an env override the singleton can't take in a
-  # unit test (mirrors index.test.ts, which only asserts the live-env case).
-  # Covered end-to-end by the cloud deployment; left unbound here.
-  @regression @unimplemented
-  Scenario: Password reset is rejected in cloud/SSO mode
-    Given the tenant runs on NEXTAUTH_PROVIDER="auth0"
-    When a request hits /request-password-reset or /reset-password
-    Then BetterAuth rejects it with EMAIL_PASSWORD_DISABLED
+  @integration
+  Scenario: Password reset stays a credential-mode concept before the flip
+    Given the deployment signs in through an identity provider
+    And the identifier-first front door is not enforced
+    When I open the reset screen
+    Then I am told my password is managed by my identity provider
+
+  @integration
+  Scenario: Password reset follows the identifier once the front door is enforced
+    Given an installation that federates but holds passwords of its own
+    And the identifier-first front door is enforced
+    When I request a password reset
+    Then the reset is offered
+    And the answer is the same confirmation whether or not the address has an account
+
+  @integration
+  Scenario: Password reset is offered only where passwords can be reset
+    Given an installation that holds no passwords at all
+    When I open the reset screen
+    Then I am told my password is managed by my identity provider
+    And no reset is offered that could not be completed
 
   # --- Full end-to-end (manual dogfood) ---
 

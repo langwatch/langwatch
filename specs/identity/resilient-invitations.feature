@@ -43,7 +43,7 @@ Feature: Resilient invitations - any verified method gets you in, and expiry is 
     When "sam" signs in with what they have and opens the invite
     Then the acceptance succeeds without creating a second account
 
-  @integration @unimplemented
+  @integration
   Scenario: A visitor with no account is guided through sign-up first
     Given no account holds "sam@acme.com"
     When "sam" opens the invite signed out
