@@ -48,3 +48,23 @@ Feature: Dashboard REST API
   Scenario: Unauthenticated request
     When I call GET /api/dashboards without an API key
     Then I receive 401 Unauthorized
+
+  @integration
+  Rule: A dashboard's graph count names what the dashboard shows
+
+    The list reports one number per dashboard and the detail returns the
+    charts themselves. Both answer for the same set: the charts the
+    reports grid renders. A chart saved from another surface, which no
+    dashboard shows yet, is nobody's card.
+
+    @integration
+    Scenario: The graph count agrees with the charts inside the dashboard
+      Given the project has a dashboard with charts
+      When I call GET /api/dashboards and GET /api/dashboards/:id
+      Then each graph count matches how many charts the detail read returns
+
+    @integration
+    Scenario: A saved custom-query chart on a dashboard is not counted as a card
+      Given a project dashboard also holds a chart saved from the custom-query workbench
+      When I call GET /api/dashboards and GET /api/dashboards/:id
+      Then neither the graph count nor the charts list includes it

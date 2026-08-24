@@ -346,7 +346,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-governance/sessions/admin-max-ttl.feature",
   "specs/ai-governance/sessions/personal-sessions.feature",
   "specs/ai-governance/sessions/sessions-inventory.feature",
-  "specs/analytics/dashboard-rest-api.feature",
   "specs/analytics/posthog-cost-control.feature",
   "specs/audit-log/audit-log.feature",
   "specs/auth/auth-signin-flows.feature",
