@@ -23,6 +23,7 @@ const row = (overrides: Record<string, unknown> = {}) =>
     name: "Genie fleet",
     description: null,
     parserConfig: {},
+    pullSchedule: "0 */6 * * *",
     status: "active",
     traceProjectId: null,
     lastEventAt: null,
@@ -82,6 +83,59 @@ describe("given an ingestion source with a trace destination", () => {
       expect(dto.parserConfig).toEqual({
         workspaceUrl: "https://example.databricks.net",
       });
+    });
+  });
+});
+
+describe("given a pull source whose cadence lives in two places", () => {
+  describe("when the column and the parser config's copy disagree", () => {
+    it("sends the column, because that is what the scheduler reads", () => {
+      // Without this the edit form cannot see the column at all, and falls
+      // back to the adapter's copy inside parserConfig — a duplicate nothing
+      // keeps in sync, which the form would then write back over the live
+      // value.
+      const dto = toIngestionSourceDto({
+        row: row({
+          sourceType: "anthropic_admin",
+          pullSchedule: "0 */6 * * *",
+          parserConfig: { adapter: "anthropic_admin", schedule: "0 * * * *" },
+        }),
+        liveTraceProjectIds: new Set<string>(),
+      });
+
+      expect(dto.pullSchedule).toBe("0 */6 * * *");
+    });
+  });
+
+  describe("when the source does not pull at all", () => {
+    it("passes the null through, because null is what stops it running", () => {
+      const dto = toIngestionSourceDto({
+        row: row({ sourceType: "otel_generic", pullSchedule: null }),
+        liveTraceProjectIds: new Set<string>(),
+      });
+
+      expect(dto.pullSchedule).toBeNull();
+    });
+  });
+
+  describe("when the parser config also carries the sealed credential", () => {
+    it("still strips it, cadence or no cadence", () => {
+      const dto = toIngestionSourceDto({
+        row: row({
+          sourceType: "anthropic_admin",
+          parserConfig: {
+            adapter: "anthropic_admin",
+            schedule: "0 * * * *",
+            credentials: "enc:v1:deadbeef:cafe:0123",
+            _rotation: { priorHash: "abc" },
+          },
+        }),
+        liveTraceProjectIds: new Set<string>(),
+      });
+
+      expect(dto.parserConfig).not.toHaveProperty("credentials");
+      expect(dto.parserConfig).not.toHaveProperty("_rotation");
+      expect(JSON.stringify(dto)).not.toContain("enc:v1:");
     });
   });
 });

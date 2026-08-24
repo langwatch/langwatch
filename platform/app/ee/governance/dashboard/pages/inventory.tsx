@@ -1137,11 +1137,15 @@ function useSourceEditForm(source: Source | null) {
         storedParserConfig: parser,
       }),
     );
-    // The `pullSchedule` column is not on the DTO, but the adapter's own copy
-    // of it rides along inside parserConfig, written there by the composer on
-    // create. Seeding from it keeps the field showing the cadence that is
-    // actually running rather than an empty box that reads as "no schedule".
-    setPullSchedule(typeof parser.schedule === "string" ? parser.schedule : "");
+    // The column first, because it is the one the lifecycle runs on; the
+    // adapter's copy inside parserConfig is a duplicate nothing keeps in sync.
+    // See `seedPullSchedule`.
+    setPullSchedule(
+      seedPullSchedule({
+        pullSchedule: source.pullSchedule,
+        storedParserConfig: parser,
+      }),
+    );
   }, [source?.id]);
 
   return {
@@ -2682,6 +2686,37 @@ export function seedComposerParserConfig({
     values[field.key] = String(stored);
   }
   return values;
+}
+
+/**
+ * The cadence the edit form opens on: the `pullSchedule` column, which is what
+ * the lifecycle actually runs, falling back to the adapter's copy inside
+ * `parserConfig` only when the column has nothing to say.
+ *
+ * The two are duplicates that nothing keeps in sync. The composer writes both
+ * from one value on create, so they agree for a source that has only ever been
+ * touched through the UI — but `update` takes `pullSchedule` on its own, and
+ * seeds, migrations and direct writes bypass the parser copy entirely. Seeding
+ * from the parser copy therefore showed a cadence the source was not running
+ * on, and because the save path writes the field back to the column, opening
+ * such a row and saving any unrelated field overwrote the live schedule with
+ * the stale one.
+ *
+ * The fallback stays because the column is nullable and older rows may carry
+ * only the parser copy; a blank field reads as "no schedule set", which is a
+ * different claim from "we could not find it".
+ */
+export function seedPullSchedule({
+  pullSchedule,
+  storedParserConfig,
+}: {
+  pullSchedule: string | null;
+  storedParserConfig: Record<string, unknown>;
+}): string {
+  const fromColumn = (pullSchedule ?? "").trim();
+  if (fromColumn) return fromColumn;
+  const fromParser = storedParserConfig.schedule;
+  return typeof fromParser === "string" ? fromParser.trim() : "";
 }
 
 /**
