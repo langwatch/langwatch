@@ -7,6 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"go.uber.org/zap"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // The api lane runs the production bundle, so `up` has to guarantee the bundle
@@ -68,6 +72,45 @@ func TestEnsureAPIBundleFailsTheUpWhenTheBuildFails(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), apiBundleRelPath) {
 		t.Errorf("expected the error to name the missing bundle, got %q", err)
+	}
+}
+
+// A play sandbox supervises the same child plan as `up`, so it needs the same
+// guarantee. This pins the wiring: remove the call and the sandbox goes back to
+// serving nothing.
+func TestPreparePlaySandboxBuildsTheAPIBundle(t *testing.T) {
+	root := t.TempDir()
+	lwDir := filepath.Join(root, "platform", "app")
+	if err := os.MkdirAll(filepath.Join(root, "node_modules"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(lwDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// A lockfile older than the install stamp keeps ensureDeps a no-op, so the
+	// test exercises the prep sequence and not pnpm.
+	if err := os.WriteFile(filepath.Join(root, "pnpm-lock.yaml"), []byte("lockfileVersion: '9.0'\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "node_modules", ".modules.yaml"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	sup := &fakeSupervisor{}
+	o := &Orchestrator{sup: sup, log: zap.NewNop()}
+
+	if err := o.preparePlaySandbox(context.Background(), PlaySandbox{Checkout: root, LwDir: lwDir}, domain.Stack{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var built bool
+	for _, sh := range sup.shells {
+		if strings.Contains(sh, "run build") {
+			built = true
+		}
+	}
+	if !built {
+		t.Fatalf("expected the sandbox prep to build the api bundle, ran %v", sup.shells)
 	}
 }
 
