@@ -11,11 +11,12 @@ package.
  IdentityHeadsRepository (interface)          reads over the Identifier projection
                                               and User.userHashKey
  IdentityLedger (interface)                   commit(command, facts) — THE emission
-                                              seam; the app appends waited, folds
-                                              on the calling path, stages last
+                                              seam; the app appends waited, stages
+                                              onto the queue, and waits for the fold
  IdentityVerificationRepository (interface)   the PKCE record: replace / find / consume
  IdentityBackfillRepository (interface)       the legacy rows a pass adopts and proves
- IdentityUsersRepository (interface)          the guarded userHashKey write
+ IdentityUsersRepository (interface)          the guarded userHashKey write and the
+                                              user's email a ceremony records
 
  IdentityGuards                veto-before-write; shared by the calling path and
                                the queue's staged re-run
@@ -23,11 +24,17 @@ package.
  VerificationCeremonyService   magic link + PKCE, id-pinned, single-use
  IdentityBackfillService       one user's pass: adopt → establish → detach → prove
 
+ IdentityCeremonyWrites        the write surface sliced by ROLE, so a collaborator
+ IdentityVerificationWrites    takes a named contract rather than a Pick<> of the
+ IdentityAdoptionWrites        service class (IdentityService implements all three)
+
  crypto/                       deriveIdentifierId · computeIdentifierHash ·
                                mintUserHashKey · s256Challenge
- ./better-auth                 createIdentityDatabase — the routing facade over
-                               the stock prismaAdapter, the routing table, the
-                               account/user ceremonies, the transaction guard
+ identity-command-id           every form a command id takes, in one place
+ identity-backfill-plan        what the legacy rows imply, as a pure plan
+ ./better-auth                 IdentityCeremonies — the four methods the app binds
+                               to better-auth's own databaseHooks (attach, detach,
+                               hash-key mint, erase)
 ```
 
 Nothing here reads the environment or a database. The write gate, the
@@ -43,5 +50,9 @@ Server-only by construction: nothing in the browser reaches this package,
 and the app's frontend-boundary test fails the build if that changes, so
 `node:crypto` lives on the root entry rather than behind a subpath.
 
+The package does not depend on better-auth in any form — not a dependency,
+not a peer, not a type import. The ceremonies take plain row shapes, and the
+app is what knows they came from a hook.
+
 Spec: `specs/identity/identifier-model.feature`,
-`specs/identity/auth-path-redis-loss.feature`.
+`specs/identity/identity-packages.feature`.

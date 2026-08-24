@@ -86,10 +86,17 @@ enforceable (a forbidden import fails to resolve) and visible."*
 
 Identity takes the authz shape: a pure core package, a server package of
 services over ports, and one composition root in the app. ADR-101's
-decisions — the calling-path dispatch order, the routing facade over the
-stock prismaAdapter, the per-user write gate, `tenantId = userId`, the
-payload rule, erasure — are untouched; they move into the layer that owns
-them.
+decisions — the dispatch order, the write seam, the per-user write gate,
+`tenantId = userId`, the payload rule, erasure — move into the layer that
+owns them.
+
+This ADR originally said those decisions were *untouched* by the reshape,
+and for the reshape itself that was true. Two of them were then revised on
+their own merits on 2026-08-24, and this document records the result rather
+than the original: ADR-101 §2 replaced the routing facade with better-auth's
+`databaseHooks`, and withdrew the calling-path fold along with the D02
+Redis-loss requirement it existed for. The layering below is unchanged by
+either.
 
 ### 1. The three layers
 
@@ -126,8 +133,8 @@ them.
  │                                               prove — one user)           │
  │  crypto       deriveIdentifierId, computeIdentifierHash, mintUserHashKey, │
  │               s256Challenge, sha256Hex, safeEqualHex   (node:crypto)      │
- │  ./better-auth   createIdentityDatabase — the routing facade, the routing │
- │               table, account/user ceremonies, the transaction guard       │
+ │  ./better-auth   IdentityCeremonies — the four databaseHooks ceremonies   │
+ │               (attach, detach, hash-key mint, erase)                      │
  └───────────────────────────────────────────────────────────────────────────┘
                                       ▲
  ┌────────────────────────────────────┴──────────────────────────────────────┐
@@ -136,7 +143,8 @@ them.
  │  app-layer/identity/runtime.ts        THE composition root                 │
  │  app-layer/identity/ledger.ts         IdentityLedgerWriter implements      │
  │                                       IdentityLedger: envelope → append    │
- │                                       WAITED → fold apply → stage LAST     │
+ │                                       WAITED → stage → bounded wait for    │
+ │                                       the queue's fold (ADR-110)           │
  │  app-layer/identity/write-gate.ts     isUserOnIdentityWrites (cached gate) │
  │  app-layer/identity/repositories/     *.prisma.repository.ts, one per port │
  │  app-layer/identity/identifier-backfill.migration.ts  SystemMigration      │
@@ -145,8 +153,9 @@ them.
  │                                       package's payloads), THIN commands   │
  │                                       (reads → decide → envelope), fold    │
  │                                       projection over reduceIdentity       │
- │  better-auth/index.ts                 database: identityDatabase()         │
- │  app/api/identity/…/app.ts            the RPC family: routes → service     │
+ │  better-auth/index.ts                 stock prismaAdapter + four           │
+ │                                       databaseHooks → identityCeremonies() │
+ │  api/routers/identity.ts              the tRPC router: session → service   │
  └───────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -156,8 +165,7 @@ Dependency direction, enforced by resolution rather than convention:
   browser ──▶ @langwatch/identity  ◀── @langwatch/identity-server ◀── platform/app
                     ▲                          ▲                          │
                     └── zod, handled-error     └── actor, observability,  │
-                                                   ksuid, better-auth     │
-                                                   (types, peer)          │
+                                                   ksuid                  │
   never:  identity ──▶ anything;  identity-server ──▶ platform/app, Prisma, env,
           the event-sourcing framework;  better-auth/* ──▶ app-layer/identity
           (better-auth imports the RUNTIME only);  pipelines/authz-grants ──▶
@@ -291,15 +299,21 @@ dep is omitted, which is the app's gate leaking into a service. The
 package has no default to fall back to, so the wiring is visible in one
 place.
 
-**`./better-auth`** (`@langwatch/identity-server/better-auth`): the routing
-facade. `createIdentityDatabase({ base, heads, identity, isLatched, now })`
-where `base` is the app-constructed stock `prismaAdapter` (the row engine
-ADR-101 §2 chose) typed through better-auth's own `Adapter` types, and
-`heads` / `identity` are the package's own port and service. The routing
-table, `routeWrite`, `IdentityAdapterUnroutedWriteError`, the
-account/user ceremonies, the transaction guard, `findAllRows` and
-`pinnedToIds` all move here. `accountCeremonies.ts`'s two raw
-`prisma.identifier.*` queries become `heads.findIdentifierForAccount`.
+**`./better-auth`** (`@langwatch/identity-server/better-auth`): one class,
+`IdentityCeremonies`, holding the four methods the app binds to
+better-auth's own `databaseHooks` — attach, detach, hash-key mint, erase.
+Its collaborators are the package's own ports and service plus two closures
+the app composes (the write gate and the clock).
+
+**Revised 2026-08-24:** this subpath was originally the routing facade —
+`createIdentityDatabase`, the routing table, `IdentityAdapterUnroutedWriteError`,
+the transaction guard, `findAllRows` and `pinnedToIds` — over the stock
+`prismaAdapter` as its row engine. ADR-101 §2 withdrew that seam in favour
+of the hooks, and all of it is deleted. The package no longer depends on
+better-auth at all, in any form: not a dependency, not a peer, not a type
+import. `accountCeremonies.ts`'s two raw `prisma.identifier.*` queries
+became `heads.findIdentifierIdForAccount`, and the ceremony's one `User`
+read became `IdentityUsersRepository.findEmail`.
 `secondaryStorageResilience.ts` was excluded from the move as D02's Redis
 seam rather than identity-model code; **D02 was withdrawn on 2026-08-24 and
 the file is deleted**, so nothing is left to place.
@@ -309,11 +323,10 @@ the file is deleted**, so nothing is left to place.
 ```text
 platform/app/src/server/app-layer/identity/
   runtime.ts                     identityHeads, identityService(), verificationCeremony(),
-                                 identityBackfill(), identityDatabase(), registeredUserMigrations()
+                                 identityBackfill(), identityCeremonies(), registeredUserMigrations()
   ledger.ts                      IdentityLedgerWriter implements IdentityLedger;
-                                 identityCommandSenders() (lazy pipeline handle, wait,
-                                 IdentityLedgerUnavailableError — the authzGrantsCommands() shape);
-                                 IDENTITY_STAGING_TIMEOUT_MS; the metrics
+                                 the lazy pipeline handle (the authzGrantsCommands() shape);
+                                 IDENTITY_CONVERGENCE_TIMEOUT_MS; the metrics
   write-gate.ts                  isUserOnIdentityWrites over the cached gate + the state repository
   migration-name.ts              IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME (today it lives in the
                                  gate and the migration imports it back)
@@ -336,24 +349,24 @@ platform/app/src/server/event-sourcing/pipelines/identity/
   pipeline.ts                              unchanged shape
 ```
 
-`IdentityLedgerWriter.commit` is `IdentityCeremonies.dispatch` with its
-three foreign jobs removed: the command registry is the pipeline's, the
-service locator is `identityCommandSenders()` in the same file the authz
-ledger keeps its own, and the fold apply calls the pipeline's
-`IdentityStateFoldProjection.apply` under the projection store's cursor —
-no second hand-rolled fold loop. The pinned order (append waited → apply →
-stage bounded, best-effort, counted) is exactly as ADR-101 §2 states it.
+`IdentityLedgerWriter.commit` takes the old dispatcher's job with its three
+foreign ones removed: the command registry is the pipeline's, and the
+service locator is the lazy pipeline handle in the same file the authz
+ledger keeps its own. Its order is ADR-101 §2's, as revised 2026-08-24 —
+append waited → stage → bounded wait for the queue's fold. It never writes
+the projection; only the fold does.
 
-The route family (`app/api/identity/[[...route]]/app.ts`) becomes routes
-only: `.provide({ verification: () => verificationCeremony() })` from the
-runtime, `IdentitySessionRequiredError` deleted in favour of the existing
-unauthenticated handled error, and the module-level
-`setVerificationCeremoniesForTests` seam deleted — tests compose the
-service with in-memory ports the way the authz route tests do.
+**Revised 2026-08-24:** the identity REST family
+(`app/api/identity/[[...route]]/app.ts`) is deleted, not thinned. It was a
+versioned public API whose only credential was a browser session, which is
+the tRPC lane in this product; it had no callers. The surface is
+`api/routers/identity.ts` — `protectedProcedure`, `.noPermission()` with the
+family's own reason — and `IdentitySessionRequiredError` and the hand-rolled
+`sessionAuth` middleware go with it.
 
-`better-auth/index.ts` reads `database: identityDatabase()` from the
-identity runtime; nothing under `better-auth/` imports `app-layer/identity`
-internals any more.
+`better-auth/index.ts` keeps the stock `prismaAdapter` and binds four
+`databaseHooks` to `identityCeremonies()` from the identity runtime; nothing
+under `better-auth/` imports `app-layer/identity` internals any more.
 
 `eventIdempotencyKey` moves to
 `event-sourcing/commands/idempotencyKey.ts` (the framework owns the
@@ -407,9 +420,9 @@ constructs an `IdentityService`.
 | `app-layer/identity/migration/identifier-backfill.migration.ts` | policy → `identity/backfill.ts`; orchestration → `identity-server/identity-backfill.service.ts`; a thin `SystemMigration` adapter stays in the app |
 | `app-layer/identity/repositories/identity-guard-reads.prisma.repository.ts` + `PrismaVerifiableIdentifierReads` | `identity-heads.prisma.repository.ts` |
 | `app-layer/identity/repositories/identity-backfill.prisma.repository.ts` | reads stay; the hash-key write → `identity-users.prisma.repository.ts` |
-| `better-auth/identityDatabase.ts`, `identityAdapterContext.ts`, `identityRouting.ts`, `accountCeremonies.ts`, `userCeremonies.ts`, `transactionGuard.ts` | `identity-server/src/better-auth/` (`identifierProviderFor` → the pure package; raw Prisma → `heads.findIdentifierForAccount`) |
+| `better-auth/identityDatabase.ts`, `identityAdapterContext.ts`, `identityRouting.ts`, `accountCeremonies.ts`, `userCeremonies.ts`, `transactionGuard.ts` | `identity-server/src/better-auth/identity-ceremonies.ts` — one class on better-auth's `databaseHooks`; the routing table, the unrouted-write error, the transaction guard, `findAllRows` and `pinnedToIds` are deleted outright (ADR-101 §2, revised 2026-08-24) |
 | `better-auth/secondaryStorageResilience.ts` | deleted (D02 withdrawn 2026-08-24) |
-| `app/api/identity/[[...route]]/app.ts` | routes only; composition and the error class removed |
+| `app/api/identity/[[...route]]/app.ts` | deleted; the surface is `api/routers/identity.ts` (tRPC), and the session middleware + error class go with it (revised 2026-08-24) |
 | `app-layer/system-migrations/runtime.ts` (identity part) | `registeredUserMigrations()` moves to `app-layer/identity/runtime.ts`; the migrations runtime imports it |
 | `presets.ts` (identity repositories) | unchanged in role: the projection store and heads repository stay in the repositories bag for the pipeline registry |
 

@@ -38,39 +38,58 @@ Three architectural questions have to be settled before that code exists:
 
 Aggregate tenancy: `user_identity` uses `tenantId = userId` — the user is the tenant of their own identity history, so erasure and support lookup are a single tenant scan (ADR-029 §4). The event store treats tenant ids as opaque (the ledger already appends under a reserved non-org `"platform"` tenant), so a user-rooted tenant is infrastructure-clean. Org-rooted aggregates in later deliverables (`sso_connection`, `join_request`) use `tenantId = organizationId`.
 
-### 2. The identity adapter — better-auth never writes the database
+### 2. The identity ceremonies — better-auth's own hooks carry the meaning
 
-We implement better-auth's `database` contract — the same first-class plug point the stock Prisma adapter implements — as a **routing facade whose row engine is the stock prismaAdapter** (decided 2026-08-20; reimplementing the adapter's query/field-mapping translation from scratch would duplicate hundreds of lines of the stock adapter on the most sensitive surface we own, for no structural gain). The facade is uniform across core and every plugin, and the guarantees live in the facade, not the engine: every write is routed, gated, and vetoable before the engine sees it. Inside the adapter:
+**Revised 2026-08-24.** This section previously specified a routing facade
+implementing better-auth's `database` contract, with the stock prismaAdapter
+as its row engine. That is withdrawn: better-auth keeps the stock adapter,
+and identity binds to its **`databaseHooks`** instead. §Rationale records why
+the original reasoning did not survive contact.
+
+Four hooks, four ceremonies (`IdentityCeremonies`, one class):
 
 ```text
-                             better-auth (protocol engine)
-                                        │
-                            identity adapter (routing facade)
-                                        │
-        ┌───────────────────────────────┼─────────────────────────────────┐
-        │ READS                         │ DOMAIN-SIGNIFICANT WRITES       │ PROTOCOL WRITES
-        │                               │ account create/delete,          │ session rows, OAuth
-        │ pass through to PG            │ verification, passkey,          │ token refresh, and the
-        │ (protocol reads hit           │ MFA enroll/disable, user create │ protocol row of every
-        │ Account/Session as            │                                 │ domain write
-        │ always; domain reads          │ WRITE GATE (per user):          │
-        │ hit Identifier from           │  latched   → identity COMMAND:  │ row-truth repository
-        │ D03 on)                       │    guards veto before any row   │ writes to Account /
-        │                               │    exists → events appended to  │ Session — identical to
-        │                               │    CH (waited) → fold applies   │ stock adapter behavior,
-        │                               │    to Identifier on the calling │ NO events
-        │                               │    path → row returned          │ (SessionRepository /
-        │                               │  unlatched → protocol write     │ credentials repo)
-        │                               │    only, no events (yet)        │
-        └───────────────────────────────┴─────────────────────────────────┘
-          every (model, operation) is declared in a ROUTING TABLE in the module;
-          an unrouted write is refused, loudly, naming itself — and the routing
-          coverage test pins the full mounted surface in CI
+                     better-auth (protocol engine)
+                                │
+        ┌───────────────────────┴────────────────────────┐
+        │                                                │
+   databaseHooks                              stock prismaAdapter
+        │                                     (every row write, untouched)
+        │  account.create.before  → attach the identifier, pin the row id
+        │  account.delete.before  → detach what the row mirrors
+        │  user.create.after      → mint the user's HMAC hash key
+        │  user.delete.before     → erase the user
+        │
+        └── WRITE GATE (per user)
+              latched   → identity COMMAND: guards veto while no row
+                          exists → events appended to CH (waited) →
+                          command staged onto the user's queue lane →
+                          bounded wait for the fold
+              unlatched → nothing; the row write proceeds untouched and
+                          the backfill adopts the row on its next pass
+
+   A `before` hook that returns false refuses the row write, which is what
+   keeps veto-before-write true. better-auth resolves the row for the delete
+   hooks itself and fires them PER ROW on a deleteMany, so a batch cannot
+   skip one. It also calls the adapter with `forceAllowId: true` on every
+   create, so returning `{ data: { id } }` from the create hook pins the
+   Account id — which is what makes the live identifier id and the id the
+   backfill later derives from that row the same id.
+
+   Reads are untouched: protocol reads hit Account/Session as always;
+   domain reads hit Identifier from D03 on.
 ```
 
-Command → event → projection, never a hand-written upsert in a handler. Protocol values (password hash, tokens) ride only on the command — transient, never durably stored in events — and land through the credentials repository as row-truth on `Account`. Read-your-writes holds because the ledger waits, bounded, for the queue's fold to move the projection cursor past the events it just appended. The wait is an observation, never a second writer: a fold that cannot run makes the wait expire, the facts stay durable, and the next pass restates whatever the heads do not yet carry. A thin endpoint-hook plugin stamps ceremony context (flow, actor, request metadata) onto request-scoped storage so the adapter knows why a row is written.
+**What this gives up, stated plainly.** `databaseHooks` cover `user`,
+`session`, `account` and `verification`. A future plugin table (MFA in D06,
+passkeys in D07) has no hook, so it gets no ceremony *and no alarm* — where
+an unrouted write used to fail loudly. That gap is the backfill's: it already
+reconciles rows the live path missed, and a deliverable that adds a table
+adds its ceremony in the same change.
 
-**The write gate** is the authz engine gate re-tenanted (ADR-110: finishing the migration IS the switch): the command-emitting branch fires only for users whose `identity-d01-identifier-backfill` migration state is **`finalized`** — read from `SystemMigrationTenantState` with tenant = the user, cached per user with the shared per-subject cache (`_shared/per-subject-cached-gate.ts`, the same module `engine-gate.ts` uses keyed by organization), fail-safe to the protocol-only path. `migrated` is the **held** state, exactly as for the engine gate: the history landed but the proof found the projection behind or disagreeing, so the user stays protocol-only and the next pass restates and heals. The gate ships **closed for everyone**: deploying the adapter changes nothing on its own; a user's events start only after their backfill has proven itself, so live events never precede their history. Protocol writes are identical on both sides of the gate — the gate governs *whether events are also emitted*, never whether better-auth works. Both directions of the gate (a latch opening, an operator rollback closing) take effect within the cache TTL — there is no cross-pod invalidation, and that bound is documented rather than discovered.
+Command → event → projection, never a hand-written upsert in a handler. Protocol values (password hash, tokens) ride only on the command — transient, never durably stored in events — and land through the credentials repository as row-truth on `Account`. Read-your-writes holds because the ledger waits, bounded, for the queue's fold to move the projection cursor past the events it just appended. The wait is an observation, never a second writer: a fold that cannot run makes the wait expire, the facts stay durable, and the next pass restates whatever the heads do not yet carry. A thin endpoint-hook plugin stamps ceremony context (flow, actor, request metadata) onto request-scoped storage so a ceremony knows why a row is written.
+
+**The write gate** is the authz engine gate re-tenanted (ADR-110: finishing the migration IS the switch): the command-emitting branch fires only for users whose `identity-d01-identifier-backfill` migration state is **`finalized`** — read from `SystemMigrationTenantState` with tenant = the user, cached per user with the shared per-subject cache (`_shared/per-subject-cached-gate.ts`, the same module `engine-gate.ts` uses keyed by organization), fail-safe to the protocol-only path. `migrated` is the **held** state, exactly as for the engine gate: the history landed but the proof found the projection behind or disagreeing, so the user stays protocol-only and the next pass restates and heals. The gate ships **closed for everyone**: wiring the ceremonies changes nothing on its own; a user's events start only after their backfill has proven itself, so live events never precede their history. Protocol writes are identical on both sides of the gate — the gate governs *whether events are also emitted*, never whether better-auth works. Both directions of the gate (a latch opening, an operator rollback closing) take effect within the cache TTL — there is no cross-pod invalidation, and that bound is documented rather than discovered.
 
 **Dispatch order is pinned**, and it is the grants ledger's order: durable append to ClickHouse first (waited), the command staged onto the per-user GroupQueue second (awaited — the fold is the queue's, so a staging failure is a real failure, not a metric), and a bounded read-your-writes wait third. Nothing applies the projection except the fold.
 
@@ -90,7 +109,7 @@ Identifier (NEW Postgres table — pure event-truth, fold-written, replay rebuil
 
 Account (UNCHANGED in role — 100% row-truth protocol table, like Session)
   password · access_token · refresh_token · id_token · providerAccountId · …
-  written by repositories from the adapter; NOT a projection; NOT in replay;
+  written by repositories and by better-auth itself; NOT a projection; NOT in replay;
   deleted on erasure
 ```
 
@@ -113,12 +132,18 @@ The rollout is the ADR-110 rollout, re-tenanted: one migration, and finishing it
 - **Tenant = user.** The runner is generic over its `TenantSource`; identity registers a user-rooted source alongside the existing organization source and the pass runs a second leg over it (same lease, same state table, same ops page). Migration state (`SystemMigrationTenantState`), the latch, and the gate are all per-user.
 - **Enrollment = organization, and it is a switch.** On cloud, the ops page enrolls *organizations* — the one pacing lever ADR-110 leaves — and a user is in the cohort when any organization they belong to is enrolled. There is no everyone-else cohort, no sampling and no pacing ladder. A user outside every organization has nothing to enroll them on cloud and simply stays on the legacy path (gate closed, protocol-only writes, D03 falls back to legacy routing) until they join one. Self-hosted runs everything a release declares ready (`runsAutomaticallyOnSelfHosted`) for every user, silently, as always.
 - **`identity-d01-identifier-backfill` does not wait.** Each pass re-reads the user's `Account`/`User` rows, states only the facts the heads do not carry (deterministic command ids `backfill:<accountId>`, backdated `occurredAt` from the source row; the guards read the projection first, so a restated fact emits nothing — the store's dedupe is read-side, and a restated row would still be a row written, PR #7429), **detaches identifiers whose account row is gone** (`backfill:detach:<identifierId>:<accountId>`), and proves the fold-built `Identifier` rows against the rows it just read. It consults no `previous` record. Agreement ⇒ `finalized`; a missing or disagreeing row ⇒ **held** at `migrated` with the outstanding identifiers *named* in the report on the ops migrations page, and the next pass revisits. Held is a normal outcome, not an error; parked is what a thrown pass is.
-- **Writes flip per user** via the adapter's write gate (§2) the moment the user's backfill finalizes. **Reads flip in D03** (the router), gated per user by the *same* status row: resolve the identifier in the new table for finalized users, fall back to legacy routing for everyone else. One source of truth for both forks, as ADR-110 has it.
+- **Writes flip per user** via the ceremonies' write gate (§2) the moment the user's backfill finalizes. **Reads flip in D03** (the router), gated per user by the *same* status row: resolve the identifier in the new table for finalized users, fall back to legacy routing for everyone else. One source of truth for both forks, as ADR-110 has it.
 - **Rollback is a status change.** An operator moves the user's row to `rolled_back`; the gate closes within its TTL, the events stay and are inert until the user is finalized again.
 
 ## Rationale / Trade-offs
 
-**Adapter over hooks.** The rejected shape — endpoint hooks emitting events *after* better-auth's own Prisma adapter wrote the row — is less code, but it makes coverage a promise instead of a structure: every new plugin adds tables the hooks don't know, guards can only refuse after the fact, and the row-vs-event drift window is permanent. The adapter costs us implementing the full model surface up front (the routing table is the discipline that keeps that honest: unrouted writes fail at startup, not silently pass through), and buys veto-before-write, uniform plugin coverage, and read-your-writes on the calling path.
+**Database hooks over an adapter (revised 2026-08-24).** The original decision here was "adapter over hooks", and it rejected *endpoint* hooks emitting events **after** better-auth's own Prisma adapter wrote the row — on three grounds: coverage becomes a promise rather than a structure, guards can only refuse after the fact, and the row-vs-event drift window is permanent.
+
+Two of those three were arguments against the wrong mechanism. `databaseHooks` are not endpoint hooks: `before` fires while no row exists, returning `false` refuses the write, and returning `{ data }` replaces it. So guards refuse *before* the fact and there is no drift window — the same two properties the adapter was chosen to buy.
+
+What the adapter cost, meanwhile, was five mechanisms that existed only because the seam sat below intent: reconstructing which ceremony a write was from a row bag; minting the Account id early and passing `forceAllowId` (better-auth already sets it on every create); pinning deletes to pre-selected ids (better-auth resolves the rows itself); paging `findMany` around its silent 100-row default; and a transaction guard that could only *log* an event gap it had no way to close. It also meant the app carried two interception layers over the same table writes, since `databaseHooks` were already wired for four other concerns.
+
+The third objection stands and is accepted, in §2: a plugin table better-auth has no hook for gets no ceremony and no alarm. The backfill covers it, as it covers every other way the live path can miss a row.
 
 **New table over adapting `Account` in place.** The first draft chose adapt-in-place to avoid a dual-write window on the front door, at the price of amending two doctrine ADRs, building per-pipeline column scoping into the replay tooling, lint-enforcing a column ownership split inside one table, and keeping identity out of replay discovery until all of that shipped. The grants ledger's merged shape showed the window was never the real cost: with one writer (the fold), deterministic ids, a per-subject latch that ships closed, and a parity proof gating every flip, a parallel head has no drift to leak — and the doctrine amendments, the column scoping, and the load-bearing PR seam all disappear. We now pay for a second table and a backfill (both machinery we already own) and keep both doctrine ADRs pristine.
 
@@ -131,7 +156,7 @@ The rollout is the ADR-110 rollout, re-tenanted: one migration, and finishing it
 - Identity state becomes queryable data with history — the foundation D03–D13 build on. No product behavior changes in D01 itself.
 - No doctrine amendment: ADR-022/015 stand; the replay tooling gains nothing identity-specific; identity projections are in replay discovery from the first release.
 - The rollout inherits the ADR-110 guarantees: every release ships gated closed by data; flips are per-user, enrolled per-org, proven before they happen, and rolled back by a status change, not a deploy. Rollback applies within the gate's cache window, and that bound is stated (§2).
-- better-auth version upgrades now review one seam (the adapter + routing table) instead of a hook inventory; a new better-auth model shows up as a startup error until explicitly routed — deliberately noisy.
+- better-auth version upgrades review the four hook bindings. A new better-auth model with no binding is silent, unlike the routing table's startup error — the trade §2 records, and the backfill is what closes it.
 - The erasure path owns a ClickHouse mutation — operationally heavier than a PG delete, bounded by `tenantId = userId` making it a single-tenant scan.
 - Commands carrying transient secrets means command payloads must never be durably logged; the dispatch path already holds this (commands are queue jobs, not events), and review keeps it true.
 - The system-migrations runner gains a second tenant source (users) and a second leg per pass. That is new surface in the runner's app composition, not in the generic engine — the engine was generic over tenants from birth. The ops migrations page lists held and parked tenants by id, so a held identity tenant shows as a user id; naming the user is a D05 surface.
@@ -142,4 +167,4 @@ The rollout is the ADR-110 rollout, re-tenanted: one migration, and finishing it
 - Epic: `dev/docs/identity-platform-redesign.md` (decisions R8, R10–R13) · Plan: `dev/docs/identity-platform/delivery-plan.md` (Wave 1 PR breakdown) · Deliverable: `dev/docs/identity-platform/D01-identity-pipeline-and-identifiers.md` (schemas, payload examples, state machine)
 - Doctrine anchor: `specs/event-sourcing/pipeline-model.feature`
 - Rollout shape mirrored: ADR-110 (a grant is an aggregate; finishing the migration is the switch — #7358, #7404) on top of ADR-092 §13's engine; `@langwatch/system-migrations` (#7079, #7337)
-- better-auth adapter contract: the `database` option's sanctioned "you handle reading and writing" plug point — implemented as the routing facade over the stock prismaAdapter row engine (§2)
+- better-auth `databaseHooks`: the sanctioned before/after hooks on `user`, `session`, `account` and `verification` writes — where the ceremonies bind (§2)

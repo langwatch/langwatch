@@ -12,22 +12,27 @@ Feature: The identifier model - identity as an event-sourced pipeline
   # The truth split - no table mixes truths, ADR-022/015 stand unamended:
   #
   #   ClickHouse event_log ──fold──► Identifier (PG, pure event-truth,
-  #        │  (waited append,          whole-row replay, born clean)
-  #        │   calling-path apply,
-  #        │   staging best-effort)
+  #        │  (waited append, then       whole-row replay, born clean)
+  #        │   staged onto the queue;
+  #        │   the fold is the queue's)
   #        └── never carries secrets; emails yes (erasure wipes them, R11)
   #
   #   Account / Session / VerificationToken (PG) - pure row-truth protocol
   #   tables written by repositories; never projections, never in replay.
   #
   # Rollout is ADR-110's shape re-tenanted to users - one migration, and
-  # finishing it IS the switch: the adapter's command-emitting paths sit
-  # behind a per-user write gate that ships CLOSED and opens only when the
-  # user's backfill is finalized (migrated is HELD: the proof found the
-  # projection behind or disagreeing, and the next pass heals it).
-  # Enrollment is a switch, not a programme: the ops page enrolls
-  # organizations and their members migrate; there is no everyone-else
-  # cohort. Deploying the adapter changes nothing on its own.
+  # finishing it IS the switch: the ceremonies sit behind a per-user write
+  # gate that ships CLOSED and opens only when the user's backfill is
+  # finalized (migrated is HELD: the proof found the projection behind or
+  # disagreeing, and the next pass heals it). Enrollment is a switch, not a
+  # programme: the ops page enrolls organizations and their members migrate;
+  # there is no everyone-else cohort. Wiring the ceremonies changes nothing
+  # on its own.
+  #
+  # The ceremonies bind to better-auth's own databaseHooks - account
+  # create/delete and user create/delete - so better-auth keeps the stock
+  # prismaAdapter. A `before` hook runs while no row exists and can refuse,
+  # which is what keeps veto-before-write true.
 
   Background:
     Given the identity pipeline is registered with the event-sourcing framework
@@ -58,6 +63,29 @@ Feature: The identifier model - identity as an event-sourced pipeline
   Scenario: A retried command dedupes at the event store
     When an attach_identifier command with commandId "idcmd_1" is handled twice
     Then both emissions carry the idempotency key "idcmd_1:0"
+
+  @unit
+  Scenario: An identity ceremony appends durably and stages its fold
+    Given "sam"'s identifier backfill has latched
+    When an attach ceremony commits its facts
+    Then the ClickHouse append is waited on before anything else happens
+    And the command is staged onto "sam"'s queue lane
+    And the ceremony waits, bounded, for the fold to move the projection cursor
+    But the ceremony never writes the projection itself
+
+  @unit
+  Scenario: A ceremony whose command cannot be staged fails
+    Given the group queue cannot accept the staged command
+    When an attach ceremony commits its facts
+    Then the ceremony fails, because nothing else would fold the appended facts
+    But the append stays durable, and the backfill restates what the heads lack
+
+  @unit
+  Scenario: A lagging fold does not fail the ceremony
+    Given the fold does not land inside the convergence window
+    When an attach ceremony commits its facts
+    Then the ceremony still succeeds and the timeout is counted
+    And the projection converges when the queue drains
 
   @unit
   Scenario: A fact the heads already carry is not stated again
@@ -110,39 +138,48 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And replaying "sam"'s history reproduces the tombstone, never the email
 
   @unit
-  Scenario: The adapter's write gate ships closed for every user
-    Given the identity adapter is deployed and no backfill has run
-    When better-auth writes any protocol row for "sam"
-    Then the row is written exactly as the stock adapter would
+  Scenario: The write gate ships closed for every user
+    Given the identity ceremonies are wired and no backfill has run
+    When better-auth writes any row for "sam"
+    Then the row is written exactly as it would be with no ceremonies wired
     And no identity command is dispatched and no event is emitted
 
   @unit
   Scenario: A latched user's domain-significant writes produce events structurally
     Given "sam"'s identifier backfill has latched
-    When better-auth creates an account row for "sam" through the adapter
+    When better-auth is about to create an account row for "sam"
     Then the attach ceremony runs as an identity command before the row exists
-    And a vetoed ceremony refuses the protocol write too
+    And a vetoed ceremony refuses the row write too
+    And the ceremony pins the row's id, so the backfill later derives the same identifier id
 
   @unit
   Scenario: Deleting a latched user runs the erase ceremony before the row delete
     Given "sam"'s identifier backfill has latched
-    When better-auth deletes "sam"'s user row through the adapter
+    When better-auth is about to delete "sam"'s user row
     Then the erase ceremony runs as an identity command before the row delete
-    And the protocol delete is pinned to exactly the rows the ceremony saw
+    And better-auth runs the hook once per row it resolved, so a batch delete cannot skip one
 
   @unit
   Scenario: Deleting an unlatched user runs no ceremony; the erasure service reconciles
     Given "sam"'s identifier backfill has not latched
-    When better-auth deletes "sam"'s user row through the adapter
-    Then the row is deleted exactly as the stock adapter would
+    When better-auth is about to delete "sam"'s user row
+    Then the row is deleted exactly as it would be with no ceremonies wired
     And no identity command is dispatched
 
   @unit
-  Scenario: An unrouted better-auth write is refused and named
-    Given a better-auth model+operation missing from the adapter routing table
-    When better-auth writes to it
-    Then the write is refused naming the model and operation
-    And the routing coverage test pins the full mounted surface in CI
+  Scenario: An Account row no identifier mirrors still deletes
+    Given "sam"'s identifier backfill has latched
+    And no unambiguous Identifier mirrors the Account row being deleted
+    When better-auth is about to delete that row
+    Then no detach command is dispatched and the row delete proceeds
+    And the backfill's next pass detaches whatever the row's absence implies
+
+  @unit
+  Scenario: A failed hash-key mint never fails a sign-up
+    Given minting the new user's userHashKey fails
+    When better-auth finishes creating the user row
+    Then the sign-up still succeeds
+    And that user's identifiers carry null hashes until the backfill mints the key
 
   @unit
   Scenario: Email verification completes only with the ceremony's proof
@@ -185,7 +222,7 @@ Feature: The identifier model - identity as an event-sourced pipeline
   Scenario: Finalizing a user's backfill opens their write gate
     Given "sam"'s backfill pass concludes with matching rows
     When the migration state records "sam" as finalized
-    Then the adapter's write gate answers open for "sam"
+    Then the write gate answers open for "sam"
     But a user held at migrated stays closed
     And an operator rollback closes it again
 

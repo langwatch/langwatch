@@ -12,8 +12,9 @@ Feature: Identity ships as two packages with one composition root
   #   @langwatch/identity          pure, isomorphic — vocabulary, facts,
   #                                reducer, errors, parity policy
   #   @langwatch/identity-server   services over ports — guards, the five
-  #                                verbs, the ceremonies, the better-auth
-  #                                facade; no Prisma, no env, no framework
+  #                                verbs, the ceremonies better-auth's own
+  #                                databaseHooks call; no Prisma, no env,
+  #                                no framework, and no better-auth either
   #   platform/app                 Prisma repositories, the ledger writer,
   #                                the gate, and ONE runtime that composes
   #                                everything

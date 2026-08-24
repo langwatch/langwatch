@@ -63,7 +63,7 @@ const accountRow = (overrides?: Record<string, unknown>) => ({
 
 describe("the identity ceremonies", () => {
   describe("given a user whose backfill has not latched", () => {
-    /** @scenario "An unlatched user's ceremonies emit no identity events" */
+    /** @scenario "The write gate ships closed for every user" */
     it("emits nothing and leaves the row write untouched", async () => {
       const { ceremonies, identity } = harness({ latched: false });
 
@@ -75,10 +75,22 @@ describe("the identity ceremonies", () => {
       expect(identity.detachIdentifier).not.toHaveBeenCalled();
       expect(identity.eraseUser).not.toHaveBeenCalled();
     });
+
+    /** @scenario "Deleting an unlatched user runs no ceremony; the erasure service reconciles" */
+    it("deletes the user with no erase ceremony; the backfill reconciles", async () => {
+      const { ceremonies, identity } = harness({ latched: false });
+
+      // The hook returns without refusing, so better-auth deletes the row
+      // exactly as it would with no ceremonies wired.
+      await expect(
+        ceremonies.beforeUserDelete({ id: USER }),
+      ).resolves.toBeUndefined();
+      expect(identity.eraseUser).not.toHaveBeenCalled();
+    });
   });
 
   describe("when a latched user's account row is about to be created", () => {
-    /** @scenario "A new sign-in method attaches an identifier" */
+    /** @scenario "A latched user's domain-significant writes produce events structurally" */
     it("attaches the identifier and pins the row id it derived from", async () => {
       const { ceremonies, identity } = harness();
 
@@ -121,7 +133,7 @@ describe("the identity ceremonies", () => {
       expect(identity.attachIdentifier).not.toHaveBeenCalled();
     });
 
-    /** @scenario "A refused ceremony refuses the row write with it" */
+    /** @scenario "A latched user's domain-significant writes produce events structurally" */
     it("propagates a guard refusal, so better-auth never writes the row", async () => {
       const { ceremonies } = harness({
         attach: async () => {
@@ -159,7 +171,7 @@ describe("the identity ceremonies", () => {
   });
 
   describe("when a latched user is about to be deleted", () => {
-    /** @scenario "Deleting a user erases their identifiers" */
+    /** @scenario "Deleting a latched user runs the erase ceremony before the row delete" */
     it("erases the user before the row goes", async () => {
       const { ceremonies, identity } = harness();
 
