@@ -52,6 +52,8 @@ database, request-framework, or Eventing runtime type.
 Anomaly-rule validation and lifecycle belong to the Governance contract and
 server service. The application router owns authentication and tRPC only;
 Postgres access stays in the feature's private Prisma repository.
+Governance also owns alert fan-out, bounded retries, signing and delivery
+outcomes. The application injects its SSRF-safe HTTP adapter.
 
 ## Persistence
 

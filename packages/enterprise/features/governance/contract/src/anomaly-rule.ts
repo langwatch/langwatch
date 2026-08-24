@@ -226,6 +226,67 @@ export type SpendSpikeEvaluationResult = z.infer<
   typeof spendSpikeEvaluationResultSchema
 >;
 
+export const anomalyAlertDispatchRuleSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  ruleType: z.string(),
+  severity: z.string(),
+  organizationId: z.string(),
+  destinationConfig: z.record(z.string(), z.unknown()),
+});
+export type AnomalyAlertDispatchRule = z.infer<
+  typeof anomalyAlertDispatchRuleSchema
+>;
+
+export const anomalyAlertDispatchRecordSchema = z.object({
+  id: z.string(),
+  triggerWindowStart: z.date(),
+  triggerWindowEnd: z.date(),
+  triggerSpendUsd: z.string().nullable(),
+  triggerEventCount: z.number().int().nullable(),
+  detail: z.unknown(),
+  detectedAt: z.date(),
+});
+export type AnomalyAlertDispatchRecord = z.infer<
+  typeof anomalyAlertDispatchRecordSchema
+>;
+
+export const anomalyAlertDispatchInputSchema = z.object({
+  rule: anomalyAlertDispatchRuleSchema,
+  alert: anomalyAlertDispatchRecordSchema,
+});
+export type AnomalyAlertDispatchInput = z.infer<
+  typeof anomalyAlertDispatchInputSchema
+>;
+
+export const anomalyAlertDispatchOutcomeSchema = z.discriminatedUnion(
+  "status",
+  [
+    z.object({
+      destinationIndex: z.number().int().nonnegative(),
+      type: z.literal("webhook"),
+      status: z.literal("succeeded"),
+    }),
+    z.object({
+      destinationIndex: z.number().int().nonnegative(),
+      type: z.literal("webhook"),
+      status: z.literal("failed"),
+      reason: z.string(),
+    }),
+  ],
+);
+export type AnomalyAlertDispatchOutcome = z.infer<
+  typeof anomalyAlertDispatchOutcomeSchema
+>;
+
+export const anomalyAlertDispatchResultSchema = z.object({
+  dispatchTag: z.string(),
+  outcomes: z.array(anomalyAlertDispatchOutcomeSchema),
+});
+export type AnomalyAlertDispatchResult = z.infer<
+  typeof anomalyAlertDispatchResultSchema
+>;
+
 export function evaluateSpendSpike(
   input: SpendSpikeEvaluationInput,
 ): SpendSpikeEvaluationResult {

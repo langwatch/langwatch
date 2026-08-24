@@ -1,6 +1,7 @@
 {
   "layoutVersion": 0,
   "subjects": [
+    "anomaly-alert",
     "anomaly-rule",
     "canonical-cost",
     "cost-attribution-policy",

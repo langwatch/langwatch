@@ -61,6 +61,13 @@ Feature: Enterprise governance package boundary
     Then an existing open alert takes precedence over another firing
     And the decision fires only when the minimum baseline and configured ratio are met
 
+  Scenario: Anomaly delivery delegates network safety
+    Given a fired anomaly has one or more webhook destinations
+    When Governance dispatches the alert
+    Then Governance signs the exact payload and applies bounded retries
+    And every destination produces an auditable outcome
+    And the application supplies the SSRF-safe HTTP adapter
+
   Scenario: Contracts are transport independent
     Given a browser imports the governance contract root
     Then no server, Eventing, application, environment, or generated database module loads

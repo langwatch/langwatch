@@ -33,6 +33,7 @@
  * are ee/-only).
  */
 import { createLogger } from "@langwatch/observability";
+import { AnomalyAlertDispatcherService } from "@langwatch/enterprise-governance-server";
 import {
   evaluateSpendSpike,
   safeParseSpendSpikeThresholdConfig,
@@ -43,7 +44,7 @@ import type {
   Prisma,
   PrismaClient,
 } from "~/generated/prisma/client";
-import { AnomalyAlertDispatcherService } from "./activity-monitor/anomalyAlertDispatcher.service";
+import { SsrfSafeAnomalyAlertHttpAdapter } from "./activity-monitor/ssrf-safe.anomaly-alert-http.adapter";
 import type { GovernanceKpisClickHouseRepository } from "./governanceKpis.clickhouse.repository";
 import { PROJECT_KIND } from "./governanceProject.service";
 
@@ -69,7 +70,10 @@ export class SpendSpikeAnomalyEvaluator {
     private readonly kpisRepository:
       | GovernanceKpisClickHouseRepository
       | undefined,
-    private readonly dispatcher: AnomalyAlertDispatcherService = AnomalyAlertDispatcherService.create(),
+    private readonly dispatcher: AnomalyAlertDispatcherService =
+      AnomalyAlertDispatcherService.create({
+        http: SsrfSafeAnomalyAlertHttpAdapter.create(),
+      }),
   ) {}
 
   static create({
@@ -292,8 +296,24 @@ export class SpendSpikeAnomalyEvaluator {
     let dispatchOutcomes: Prisma.InputJsonValue = [];
     try {
       const dispatchResult = await this.dispatcher.dispatchAlert({
-        rule,
-        alert,
+        rule: {
+          id: rule.id,
+          name: rule.name,
+          ruleType: rule.ruleType,
+          severity: rule.severity,
+          organizationId: rule.organizationId,
+          destinationConfig:
+            (rule.destinationConfig as Record<string, unknown>) ?? {},
+        },
+        alert: {
+          id: alert.id,
+          triggerWindowStart: alert.triggerWindowStart,
+          triggerWindowEnd: alert.triggerWindowEnd,
+          triggerSpendUsd: alert.triggerSpendUsd?.toString() ?? null,
+          triggerEventCount: alert.triggerEventCount,
+          detail: alert.detail,
+          detectedAt: alert.detectedAt,
+        },
       });
       dispatchTag = dispatchResult.dispatchTag;
       dispatchOutcomes =
