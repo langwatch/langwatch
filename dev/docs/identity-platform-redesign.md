@@ -58,7 +58,10 @@ Requirements are stated here at domain level; the normative, implementable versi
 
 ## Domain: MFA → D06
 
-- TOTP + hashed one-time backup codes; never SMS. Org policy `mfaRequired`; enforced at session mint and step-up. Sessions carry `identifierId`, `amr`, `mfaVerifiedAt`; per-identifier revocation; impersonation rides the authz `Principal {actor, subject}` — actor must be MFA-verified when policy demands.
+- TOTP + one-time backup codes; never SMS. **MFA belongs to the account, not the organization** (revised 2026-08-24): one enrollment per person, keyed on the user exactly as better-auth models it, and every sign-in for an enrolled account is challenged — so a session that never answered a challenge cannot exist for them, and there is no step-up.
+- `Organization.mfaRequired` is therefore a **membership condition** — "every member can prove a second factor" — enforced as an **enrollment gate** on the way into that org's data, never as a session policy. Turning it on ends no session and touches no other organization the member belongs to. Three ways to satisfy it: an enrollment on the account, a passkey (`phw`), or an identity provider that asserted a factor at sign-in; a provider asserting nothing satisfies nothing.
+- Disabling while an org requires it is refused; the ways out are leaving that org or an admin reset.
+- Sessions carry `identifierId` and `amr`; `mfaVerifiedAt` was dropped as dead weight once the step-up disappeared. Per-identifier revocation; impersonation rides the authz `Principal {actor, subject}` — the actor's own account must have MFA enabled when the subject's org requires it.
 
 ## Domain: Passkeys → D07
 
@@ -190,11 +193,11 @@ The deployment env (`NEXTAUTH_PROVIDER`) is the hidden eighth table: it selects 
 |---|---|---|
 | `User.email` UNIQUE = identity key | `provider="email"` identifier row (PRIMARY); `User.email` = display default | D01 |
 | `Account` rows | Stay pure protocol storage; the new `Identifier` projection carries lifecycle + widened provider vocabulary | D01 |
-| (no passkey/MFA) | `Passkey` + `TwoFactor` plugin tables; passkey mirror `Identifier` rows; `Session.{identifierId, amr, mfaVerifiedAt}` (nullable) and `Organization.mfaRequired` | D06, D07 |
+| (no passkey/MFA) | `Passkey` + `TwoFactor` plugin tables (both keyed on the user); passkey mirror `Identifier` rows; `Session.{identifierId, amr}` (nullable) and `Organization.mfaRequired` as a membership condition | D06, D07 |
 | `Organization.ssoDomain/ssoProvider` | `SsoConnection` aggregate + projection; grandfathered VERIFIED | D04 |
 | `NEXTAUTH_PROVIDER` one-method | Identifier-first router; env = self-hosted default method set | D03 |
 | `pendingSsoSetup` flag | Mismatch visible as data (events + states); column dropped | D03 |
-| `Session.impersonating` JSON | authz `Principal {actor, subject}`; session + `identifierId`, `amr`, `mfaVerifiedAt` | D06 |
+| `Session.impersonating` JSON | authz `Principal {actor, subject}`; session + `identifierId`, `amr` | D06 |
 | `ScimToken` per-org, direct writes | Per-connection tokens; SCIM = command producer; `grants.*` only writer | D08 |
 | Invites: 2-day, method-sensitive, ops-only resend | Identifier-aware, 14-day, one-click resend, explicit states | D11 |
 | (no join path without invite) | Domain join-requests: admin approval or opt-in auto-join | D12 |
@@ -210,7 +213,7 @@ The deployment env (`NEXTAUTH_PROVIDER`) is the hidden eighth table: it selects 
 flowchart TB
     subgraph Edge["Edge (login hot path — reads PG only)"]
         R[Identifier-first router] --> MW["authz edge middleware<br/>(any credential → Principal)"]
-        MW --> SE["Session {identifierId, amr, mfaVerifiedAt}<br/>Principal {actor, subject}"]
+        MW --> SE["Session {identifierId, amr}<br/>Principal {actor, subject}"]
         SE --> EN["authz engine (one resolver)"]
     end
 
@@ -259,10 +262,12 @@ flowchart TD
     G -->|no match| J{"connection allows JIT?"}
     J -->|yes| H
     J -->|no| X[deny with guidance]
-    F --> H{"MFA enrolled or org requires?"}
-    H -->|yes| I["TOTP / backup-code step-up"]
+    F --> H{"account has MFA enabled?"}
+    H -->|yes| I["TOTP / backup-code challenge"]
     H -->|no| K
-    I --> K["Session {identifierId, amr, mfaVerifiedAt}<br/>Principal {actor, subject} via authz edge middleware"]
+    I --> K["Session {identifierId, amr}<br/>Principal {actor, subject} via authz edge middleware"]
+    K --> MG{"org requires MFA and<br/>member cannot prove one?"}
+    MG -->|yes| MGE["enrollment gate for THAT org<br/>(every other org stays reachable)"] --> K
     K --> JR{"new verified email +<br/>colleagues' org exists<br/>on this domain?"}
     JR -->|yes| JRO["'Acme Corp — 12 colleagues here.'<br/>join (auto if org allows) / request to join<br/>/ create own workspace (explicit choice)"]
     JR -->|no| DONE[workspace home]
@@ -311,12 +316,13 @@ See `identity-platform/delivery-plan.md` — dependency graph, flags, exit gates
 - **Domain claim abuse**: ops manual approval; DNS proof before routing; disputes resolved from event history.
 - **Break-glass local path**: bound to break-glass bindings only, audited, rate-limited.
 - **Teardown lockout**: invariant guard (no user left with only the torn-down connection's identifiers) + live break-glass binding with expiry warnings.
-- **MFA bypass paths**: disable requires password+TOTP or audited org-admin action; impersonation requires an MFA-verified actor when policy demands; a session that cannot prove `amr` is stepped up or revoked **when its organization turns `mfaRequired` on** — per org, by the admin who chose it, not fleet-wide at deploy (D06, revised 2026-08-24).
+- **MFA bypass paths**: disable requires password+TOTP, and is refused outright while an org requires it; an admin reset starts a fresh setup rather than removing the requirement; impersonation requires the actor's own account to have MFA enabled when the subject's org requires it. A member who cannot prove a factor is **held at an enrollment gate for that organization**, not signed out — and never for any other organization they belong to (D06, revised 2026-08-24).
+- **SSO members and MFA**: somebody signing in through a connection has no enrollment of ours, so "account has MFA" cannot be their test — a provider-asserted factor on the session satisfies the condition, a provider that asserts nothing does not, and nothing is inferred that was not asserted.
 - **PII in the log**: emails appear in events only where the fact needs them; erasure wipes those fields via ClickHouse mutation, deletes PG rows and protocol tables, and shreds the per-user HMAC key; secrets never appear in any event.
 - **SCIM token scope**: per-connection; cross-org writes impossible; de-enroll failures are visible dead-letters.
 - **Plugin protocol secrets**: TOTP secrets and backup codes live in plugin tables (encrypted/hashed), never in events.
 - **Rate limiting**: better-auth's existing limiter only; one acceptance check that the router endpoint is covered. When the Redis breaker is open, rate limiting fails open (logged) — accepted for outage windows.
-- **Forced re-login (D06)**: ~~one-time, communicated~~ — **there isn't one** (revised 2026-08-24). The session columns land nullable and nothing reads them until an organization turns `mfaRequired` on, at which point that organization's unproven sessions are stepped up or revoked. The only deploy-time revoke is sessions holding the legacy `impersonating` payload: LangWatch operators, one click to resume.
+- **Forced re-login (D06)**: ~~one-time, communicated~~ — **there isn't one, and there is no session revoke at all** (revised 2026-08-24). The requirement is a condition on an account, so turning it on ends zero sessions; a member who cannot prove a factor simply meets the enrollment gate on the way into that org. The only deploy-time revoke is sessions holding the legacy `impersonating` payload: LangWatch operators, one click to resume.
 
 # Open Questions
 
@@ -342,7 +348,7 @@ See `identity-platform/delivery-plan.md` — dependency graph, flags, exit gates
 
 - Email-change flow in the identifiers world (attach new + verify + markPrimary + detach old — needs a guided UI).
 - A "manage emails / sign-in methods" self-serve screen (add/remove alias, switch PRIMARY) — R8 semantics support it; UI undesigned.
-- Org-level `mfaRequired` rollout vs existing sessions (grace window vs immediate step-up).
+- ~~Org-level `mfaRequired` rollout vs existing sessions (grace window vs immediate step-up)~~ — **settled 2026-08-24**: MFA is a condition on the account, so the rollout touches no session at all; members who cannot prove a factor meet an enrollment gate for that org. No grace window to design, no step-up to schedule.
 - Join-request → invite interplay (convert a pending request into a formal invite with team assignments) — nice-to-have, not v1.
 - How the org-admin surface and the authz Access surface read as one settings area — IA decision when both exist.
 - Metrics/observability pack per deliverable (routing decisions, link proposals, ceremony success, SCIM dead-letters, breaker state, join funnel) — dashboards before flags flip.
