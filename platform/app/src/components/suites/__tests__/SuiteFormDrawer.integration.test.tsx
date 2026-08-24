@@ -233,6 +233,7 @@ function makeSuiteConfig(
     projectId: "proj_1",
     name: "My Suite",
     slug: "my-suite",
+    kind: "custom",
     description: "A test suite",
     scenarioIds: ["scen_1", "scen_2"],
     targets: [{ type: "http", referenceId: "agent_1" }],

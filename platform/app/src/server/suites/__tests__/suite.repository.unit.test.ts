@@ -20,6 +20,7 @@ function makeSuiteRow(
     projectId: "proj_1",
     name: "Critical Path",
     slug: "critical-path",
+    kind: "custom",
     description: null,
     scenarioIds: ["scen_1", "scen_2"],
     targets: [{ type: "http", referenceId: "agent_1" }],

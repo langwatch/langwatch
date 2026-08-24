@@ -13,7 +13,10 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import {
+  ScenarioRunStatus,
+  Verdict,
+} from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { RunPlanDetail } from "../results/RunPlanDetail";
@@ -115,7 +118,7 @@ function makeRun(overrides: Partial<ScenarioRunData> = {}): ScenarioRunData {
     description: null,
     metadata: null,
     status: ScenarioRunStatus.SUCCESS,
-    results: { verdict: "success", metCriteria: ["a"], unmetCriteria: [] },
+    results: { verdict: Verdict.SUCCESS, metCriteria: ["a"], unmetCriteria: [] },
     messages: [],
     timestamp: NOW,
     durationInMs: 6300,
@@ -143,7 +146,7 @@ function threeBatches(): ScenarioRunData[] {
       scenarioRunId: "run_1",
       timestamp: NOW - 2 * 86_400_000,
       status: ScenarioRunStatus.FAILED,
-      results: { verdict: "failure", metCriteria: [], unmetCriteria: ["a"] },
+      results: { verdict: Verdict.FAILURE, metCriteria: [], unmetCriteria: ["a"] },
     }),
   ];
 }
@@ -329,7 +332,7 @@ describe("<RunPlanDetail/>", () => {
         scenarioRunId: "run_a",
         name: "Angry refund request",
         results: {
-          verdict: "success",
+          verdict: Verdict.SUCCESS,
           metCriteria: ["a", "b", "c"],
           unmetCriteria: [],
         },
@@ -429,7 +432,7 @@ describe("<RunPlanDetail/>", () => {
       makeRun({
         scenarioRunId: "run_live",
         status: ScenarioRunStatus.SUCCESS,
-        results: { verdict: "success", metCriteria: ["a"], unmetCriteria: [] },
+        results: { verdict: Verdict.SUCCESS, metCriteria: ["a"], unmetCriteria: [] },
       }),
     ]);
     view.rerender(
