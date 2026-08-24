@@ -26,6 +26,7 @@ import { authzGrantsCommands } from "../authz/ledger";
 import { PrismaAuthzMigrationRepository } from "../authz/repositories/authz-migration.prisma.repository";
 import {
   identifierBackfillMigration,
+  identityNewbornReconciliation,
   identitySecretHealMigration,
 } from "../identity/runtime";
 import {
@@ -464,7 +465,10 @@ export async function runSystemMigrationPass(args?: {
   const userCohort =
     userMigrations.length === 0 ? null : await userMigrationPassCohort();
   const organizationSummary = await runner.runPass({ signal: args?.signal });
-  if (userCohort === null) return organizationSummary;
+  if (userCohort === null) {
+    await sweepAbandonedNewborns();
+    return organizationSummary;
+  }
   const userRunner = new SystemMigrationRunnerService({
     state: systemMigrationState,
     lease: new RedisMigrationLeaseRepository(redis),
@@ -472,8 +476,36 @@ export async function runSystemMigrationPass(args?: {
     cohort: userCohort,
     migrations: userMigrations,
   });
-  return mergeSummaries(
+  const summary = mergeSummaries(
     organizationSummary,
     await userRunner.runPass({ signal: args?.signal }),
   );
+  await sweepAbandonedNewborns();
+  return summary;
+}
+
+/**
+ * The born-finalized entrance's reconciliation sweep (ADR-116 §3), on the
+ * same cadence as the passes and never terminal — a required companion to the
+ * entrance rather than optional hygiene.
+ *
+ * A LEG of the pass rather than a registered `SystemMigration`, because what
+ * it hunts has no tenant a runner could visit. The runner drives the tenants
+ * a source enumerates, and the user tenant source enumerates `User` rows; an
+ * abandoned entrance is precisely a claim with no user row behind it, so a
+ * per-tenant migration would never reach one.
+ *
+ * Its failure is never the pass's: the sweep removes rows the pass did not
+ * write, and a pass that reported nothing because a sweep threw would hide
+ * the migration outcome an operator asked for.
+ */
+async function sweepAbandonedNewborns(): Promise<void> {
+  try {
+    await identityNewbornReconciliation().runPass();
+  } catch (error) {
+    logger.warn(
+      { error },
+      "the abandoned-newborn sweep failed; the claims stay and the next pass retries",
+    );
+  }
 }

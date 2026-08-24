@@ -611,11 +611,21 @@ export class SystemMigrationsService {
       organizationId,
       migrationName,
     });
-    if (summary.claimed > 0) throw new MigrationPassAlreadyRunningError();
+    // Every tenant the run covered was claimed elsewhere, so this run did
+    // nothing and the operator should retry. For an organization-rooted run
+    // that is one tenant, so `claimed > 0` and this condition are the same
+    // thing. For a USER-rooted run the tenants are the organization's
+    // members, and one contended member is partial progress: aborting on it
+    // would discard the outcomes of every member that finalized, and the
+    // operator would be told to retry a run that mostly succeeded.
+    if (summary.claimed > 0 && summary.claimed === summary.tenantsSeen) {
+      throw new MigrationPassAlreadyRunningError();
+    }
     if ((migration.tenant ?? "organization") === "user") {
       // The tenants were the organization's members, so there is no single
-      // record to read back: the pass summary is the answer. Any held or
-      // parked member keeps the organization on the operator's list.
+      // record to read back: the pass summary is the answer. Any held,
+      // parked or still-contended member keeps the organization on the
+      // operator's list.
       return { status: statusOfMemberSummary(summary), waiting: false };
     }
     return this.organizationRecordStatus({ migrationName, organizationId });
@@ -867,12 +877,15 @@ function rollbackDecidedAt(report: Record<string, unknown>): string | null {
  * operator's pin is never a successful finalization), and a membership
  * finished earlier answers "finalized" - done, not "nobody was in the
  * cohort".
+ *
+ * A member another pass was working reads as held, for the same reason: the
+ * organization is not finished, and the next pass picks that member up.
  */
 function statusOfMemberSummary(
   summary: MigrationPassSummary,
 ): TenantMigrationStatus | null {
   if (summary.parked > 0) return "parked";
-  if (summary.held > 0) return "migrated";
+  if (summary.held > 0 || summary.claimed > 0) return "migrated";
   if (summary.alreadyRolledBack > 0) return "rolled_back";
   if (summary.finalized > 0 || summary.alreadyFinalized > 0) {
     return "finalized";
