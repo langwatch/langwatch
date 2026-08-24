@@ -40,6 +40,10 @@ import { newIdentityCommandId } from "../identity-command-id";
 import type { IdentityLedger } from "../identity-ledger";
 import type { IdentityUsersRepository } from "../identity-users.repository";
 import { IdentityService } from "../identity.service";
+import {
+  InMemoryIdentityEventStore,
+  inMemoryIdentityLedger,
+} from "./support/in-memory-event-store";
 import { InMemoryHeads, T0 } from "./support/in-memory-heads";
 import { InMemoryReservations } from "./support/in-memory-reservations";
 
@@ -53,21 +57,10 @@ function harness() {
   const commands: IdentityCommand[] = [];
   const gateOpen = { value: false };
 
-  /** The ledger, folding straight into the heads: what the app's pipeline
-   *  does once ClickHouse holds the append and the projection catches up. */
-  const ledger: IdentityLedger = {
-    async commit({
-      command,
-      facts,
-    }: {
-      command: IdentityCommand;
-      facts: IdentityFactInput[];
-    }): Promise<IdentityFact[]> {
-      commands.push(command);
-      heads.fold((command.data as { userId: string }).userId, facts, T0);
-      return facts.map((f) => ({ ...f, occurredAt: T0 }) as IdentityFact);
-    },
-  };
+  /** The event store the ledger appends through, idempotency and all: the
+   *  same double every in-memory identity stack runs on. */
+  const events = new InMemoryIdentityEventStore();
+  const ledger = inMemoryIdentityLedger({ heads, events, commands });
 
   const users: IdentityUsersRepository = {
     async storeUserHashKeyIfMissing() {},

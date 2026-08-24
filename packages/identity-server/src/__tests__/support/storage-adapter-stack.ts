@@ -31,6 +31,10 @@ import {
 import type { IdentityLedger } from "../../identity-ledger";
 import type { IdentityUsersRepository } from "../../identity-users.repository";
 import { IdentityService } from "../../identity.service";
+import {
+  InMemoryIdentityEventStore,
+  inMemoryIdentityLedger,
+} from "./in-memory-event-store";
 import { InMemoryHeads, T0 } from "./in-memory-heads";
 import { InMemoryReservations } from "./in-memory-reservations";
 import {
@@ -99,6 +103,10 @@ export interface IdentityStack {
   /** The event-sourcing stack, as the entrance finds it. Turned off, the
    *  append throws and the sign-up must fail rather than fall back. */
   engine: { available: boolean };
+  /** Every fact that LANDED, by its `commandId:index` key. A retry
+   *  restates facts the store already holds and they are absorbed, so
+   *  this is also the count of what a retry did NOT duplicate. */
+  events: InMemoryIdentityEventStore;
 }
 
 /**
@@ -131,29 +139,22 @@ export function identityStack({
       migrationState.get(userId) === "finalized" || gate.open(userId),
   };
 
-  /** The ledger, folding straight into the heads: what the app's pipeline
-   *  does once ClickHouse holds the append and the projection catches up. */
-  const ledger: IdentityLedger = {
-    async commit({
-      command,
-      facts,
-    }: {
-      command: IdentityCommand;
-      facts: IdentityFactInput[];
-    }): Promise<IdentityFact[]> {
-      if (!engine.available) {
-        // The shape the app's ledger fails in when the event stack is down:
-        // a plain Error, which the entrance is what turns into a handled
-        // `identity_engine_unavailable`.
-        throw new Error(
-          "identity ledger cannot append: the event-sourcing stack is unavailable",
-        );
-      }
-      commands.push(command);
-      heads.fold((command.data as { userId: string }).userId, facts, T0);
-      return facts.map((f) => ({ ...f, occurredAt: T0 }) as IdentityFact);
-    },
-  };
+  /** The event store the ledger appends through — carrying the real store's
+   *  `commandId:index` idempotency, which is what makes a retried ceremony
+   *  converge here for the same reason it converges in production. */
+  const events = new InMemoryIdentityEventStore();
+  const ledger = inMemoryIdentityLedger({
+    heads,
+    events,
+    commands,
+    // The shape the app's ledger fails in when the event stack is down: a
+    // plain Error, which the entrance is what turns into a handled
+    // `identity_engine_unavailable`.
+    refuse: () =>
+      engine.available
+        ? null
+        : "identity ledger cannot append: the event-sourcing stack is unavailable",
+  });
 
   /** `User` as identity reads it: the memory engine's own rows, so the
    *  legacy population the collision guard consults is the same one
@@ -290,6 +291,7 @@ export function identityStack({
     finalized,
     migrationState,
     engine,
+    events,
   };
 }
 

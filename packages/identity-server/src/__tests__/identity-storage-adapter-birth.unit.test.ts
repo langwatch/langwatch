@@ -18,7 +18,11 @@
  * Hermetic: the ledger folds in memory and better-auth's own `memoryAdapter`
  * stands in for Prisma on the legacy branch.
  */
-import { describe, expect, it } from "vitest";
+import {
+  ATTACH_IDENTIFIER_COMMAND_TYPE,
+  IDENTIFIER_ATTACHED_EVENT_TYPE,
+} from "@langwatch/identity";
+import { describe, expect, it, vi } from "vitest";
 import type { IdentityStack } from "./support/storage-adapter-stack";
 import {
   flaggedSignUp,
@@ -32,6 +36,19 @@ const EMAIL = "newborn@acme.com";
 type Stack = IdentityStack;
 
 const userIdOf = (stack: Stack): string => stack.db.user?.[0]?.id as string;
+
+/**
+ * The email attach facts the STORE holds, by their `commandId:index` key.
+ *
+ * The projection can converge for its own reasons — the guard reads the heads
+ * — so the store is where "the retry cost no row" is actually visible.
+ */
+const emailFactsHeld = (stack: Stack) =>
+  [...stack.events.rows.values()].filter(
+    (fact) =>
+      fact.type === IDENTIFIER_ATTACHED_EVENT_TYPE &&
+      fact.data.provider === "email",
+  );
 
 const statedIdentifiers = (stack: Stack) =>
   [...stack.heads.heads.values()].flatMap((heads) =>
@@ -101,9 +118,11 @@ describe("better-auth over the born-finalized entrance", () => {
         await flaggedSignUp(stack.auth, EMAIL);
 
         // The retry derived the same user id from the same address, so it
-        // restated the same command — which the guard absorbs against heads
-        // that already carry the identifier — and wrote the rows the first
-        // attempt never did.
+        // restated the same command, and wrote the rows the first attempt
+        // never did. WHICH layer absorbs the restatement depends on the
+        // clock — inside a second the guard finds the identifier already in
+        // the heads, across one the store finds the key already taken — so
+        // this asserts the outcome and the test below pins the harder path.
         expect(userIdOf(stack)).toBe(firstUserId);
         expect(stack.db.user).toHaveLength(1);
         expect(
@@ -111,6 +130,54 @@ describe("better-auth over the born-finalized entrance", () => {
             (identifier) => identifier.provider === "email",
           ),
         ).toHaveLength(1);
+        expect(emailFactsHeld(stack)).toHaveLength(1);
+      });
+
+      /**
+       * The same convergence, with the one thing that used to break it forced
+       * rather than waited for.
+       *
+       * An identifier id is derived from `(user, provider, subject, value,
+       * occurredAt)`, and `occurredAt` is the row's own `createdAt` quantized
+       * to SECONDS — so a retry on the far side of a second boundary derives a
+       * genuinely different identifier id. What makes the two the same fact is
+       * the command id, which the entrance pins to the address. Left to the
+       * wall clock this case appeared once in a while and read as flake; here
+       * it is the case under test.
+       */
+      /** @scenario "A retried flagged sign-up converges instead of duplicating" */
+      it("converges even when the retry lands in a later second", async () => {
+        vi.useFakeTimers();
+        try {
+          vi.setSystemTime(new Date("2026-08-24T12:00:00.000Z"));
+          const stack = identityStack();
+          const firstUserId = await bearWithoutRows(stack, EMAIL);
+
+          vi.setSystemTime(new Date("2026-08-24T12:00:01.500Z"));
+          await flaggedSignUp(stack.auth, EMAIL);
+
+          expect(userIdOf(stack)).toBe(firstUserId);
+          expect(
+            statedIdentifiers(stack).filter(
+              (identifier) => identifier.provider === "email",
+            ),
+          ).toHaveLength(1);
+          // Two dispatches of ONE command id, and one fact held under it.
+          // The guard cannot be what absorbed this retry — it derived an
+          // identifier id the heads had never seen — so the store is, which
+          // is the convergence production relies on.
+          const emailCommandIds = stack.commands
+            .filter(
+              (command) => command.type === ATTACH_IDENTIFIER_COMMAND_TYPE,
+            )
+            .filter((command) => command.data.provider === "email")
+            .map((command) => command.data.commandId);
+          expect(emailCommandIds).toHaveLength(2);
+          expect(new Set(emailCommandIds).size).toBe(1);
+          expect(emailFactsHeld(stack)).toHaveLength(1);
+        } finally {
+          vi.useRealTimers();
+        }
       });
 
       /** @scenario "An abandoned flagged sign-up leaves no reachable identity" */
