@@ -3,6 +3,7 @@ import type {
   IdentifierProvider,
   IdentityHeads,
 } from "@langwatch/identity";
+import { LIVE_IDENTIFIER_STATES } from "@langwatch/identity";
 import type { IdentityHeadsRepository } from "@langwatch/identity-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { rowToFact } from "./identifier-row";
@@ -90,5 +91,36 @@ export class PrismaIdentityHeadsRepository implements IdentityHeadsRepository {
       take: 2,
     });
     return byProvider.length === 1 ? (byProvider[0]?.id ?? null) : null;
+  }
+
+  async findLiveIdentifierByProviderAccount({
+    provider,
+    providerAccountId,
+  }: {
+    provider: IdentifierProvider;
+    providerAccountId: string;
+  }): Promise<IdentifierFact | null> {
+    // Live states only: a DETACHED or DEAD_END identifier is a tombstone and
+    // must never sign anyone in. Indexed on (provider, providerAccountId).
+    const row = await this.prisma.identifier.findFirst({
+      where: {
+        provider,
+        providerAccountId,
+        state: { in: [...LIVE_IDENTIFIER_STATES] },
+      },
+    });
+    return row === null ? null : rowToFact(row);
+  }
+
+  async findLiveIdentifiers({
+    userId,
+  }: {
+    userId: string;
+  }): Promise<IdentifierFact[]> {
+    const rows = await this.prisma.identifier.findMany({
+      where: { userId, state: { in: [...LIVE_IDENTIFIER_STATES] } },
+      orderBy: { attachedAt: "asc" },
+    });
+    return rows.map(rowToFact);
   }
 }

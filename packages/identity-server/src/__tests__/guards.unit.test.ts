@@ -43,6 +43,10 @@ describe("attachIdentifier guard", () => {
         "identifierHash",
         "identifierId",
         "provider",
+        // The provider's own subject (ADR-116). An identifier, not a secret:
+        // it is the public `sub` an IdP puts in a token, and the projection
+        // needs it to answer a callback without the legacy Account row.
+        "providerAccountId",
         "state",
         "userId",
         "value",

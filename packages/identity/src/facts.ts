@@ -60,6 +60,12 @@ export const identifierAttachedPayloadSchema = z.object({
    *  exists (an email alias attached for routing has none). */
   accountId: z.string().min(1).nullable(),
   provider: identifierProviderSchema,
+  /** The provider's own subject for this user - `sub` for OIDC, the
+   *  mailbox for `email`. It is what an IdP callback arrives holding, so
+   *  the projection has to carry it to answer "who is this?" without the
+   *  legacy Account row (ADR-116). Part of the identifier's derived id
+   *  since D01, but only stated on the fact from ADR-116 on. */
+  providerAccountId: z.string().nullable(),
   /** Normalized identifier value (the email for `email` and OAuth
    *  providers, the provider subject otherwise). Wiped by erasure. */
   value: z.string().nullable(),
@@ -164,6 +170,8 @@ export interface IdentifierFact {
   /** `hmac:`-prefixed; null once erased or when no key existed at attach. */
   identifierHash: string | null;
   accountId: string | null;
+  /** The provider's own subject (ADR-116) - the IdP callback's lookup key. */
+  providerAccountId: string | null;
   connectionId: string | null;
   state: IdentifierLifecycleState;
   verifiedAtMs: number | null;
@@ -248,7 +256,9 @@ export const attachIdentifierCommandDataSchema = commandDataSchema({
   accountId: z.string().min(1).nullable(),
   provider: identifierProviderSchema,
   /** The provider's own account id (OAuth `providerAccountId`) — part of
-   *  the identifier's deterministic identity when present. */
+   *  the identifier's deterministic identity when present, and from
+   *  ADR-116 stated on the fact so the projection can answer an IdP
+   *  callback without the legacy Account row. */
   providerAccountId: z.string().min(1).nullable(),
   /** RAW value as the ceremony delivered it — normalized by the guard,
    *  never stored in a fact un-normalized. */

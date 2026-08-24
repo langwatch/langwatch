@@ -86,6 +86,7 @@ export class IdentityGuards {
         userId,
         accountId,
         provider,
+        providerAccountId,
         value: normalizedValue,
         identifierHash:
           userHashKey === null

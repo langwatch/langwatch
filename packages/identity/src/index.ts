@@ -75,6 +75,7 @@ export {
   arrivalStateForProvider,
   IDENTIFIER_LIFECYCLE_STATES,
   IDENTIFIER_PROVIDERS,
+  LIVE_IDENTIFIER_STATES,
   type IdentifierArrivalState,
   type IdentifierLifecycleState,
   type IdentifierProvider,

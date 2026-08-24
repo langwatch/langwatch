@@ -47,6 +47,10 @@ const GLOBAL_MODELS = [
   // `User` by email above.
   "Identifier",
   "IdentityProjectionCursor",
+  // The credential half of the old `Account` row (ADR-116) - same posture as
+  // `Account` above, which it replaces: per-user, keyed by the identifier it
+  // belongs to, and read on the sign-in path before any tenant is known.
+  "AccountCredential",
   // Top-level tenancy entities, addressed by their own id / slug.
   "Organization",
   "Project",

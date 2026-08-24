@@ -42,6 +42,7 @@ function applyAttached(
     domain: data.domain,
     identifierHash: data.identifierHash,
     accountId: data.accountId,
+    providerAccountId: data.providerAccountId,
     connectionId: data.connectionId,
     state: data.state,
     verifiedAtMs: data.state === "VERIFIED" ? fact.occurredAt : null,

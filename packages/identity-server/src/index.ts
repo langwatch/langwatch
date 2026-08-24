@@ -63,6 +63,11 @@ export {
   establishUserEmailCommandId,
   newIdentityCommandId,
 } from "./identity-command-id";
+export type {
+  AccountCredentialPatch,
+  AccountCredentialRow,
+  AccountCredentialsRepository,
+} from "./account-credentials.repository";
 export type { IdentityHeadsRepository } from "./identity-heads.repository";
 export type { IdentityLedger } from "./identity-ledger";
 export type { IdentityUserGate } from "./identity-user-gate";

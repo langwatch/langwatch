@@ -43,4 +43,19 @@ export interface IdentityHeadsRepository {
     accountId: string;
     provider: IdentifierProvider;
   }): Promise<string | null>;
+  /**
+   * The identifier an IdP callback names, whoever holds it (ADR-116): the
+   * `(providerId, subject)` pair better-auth arrives with. Cross-user by
+   * necessity — the whole question is which user this is — and live states
+   * only, so a detached or dead-ended identifier can never sign anyone in.
+   *
+   * Null when nothing matches, which during migration means "not on identity
+   * yet" and sends the caller to the legacy `Account` row.
+   */
+  findLiveIdentifierByProviderAccount(args: {
+    provider: IdentifierProvider;
+    providerAccountId: string;
+  }): Promise<IdentifierFact | null>;
+  /** The user's live identifiers — the account-list read (ADR-116). */
+  findLiveIdentifiers(args: { userId: string }): Promise<IdentifierFact[]>;
 }

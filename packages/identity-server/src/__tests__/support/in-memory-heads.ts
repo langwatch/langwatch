@@ -1,5 +1,6 @@
 import {
   emptyIdentityHeads,
+  isLiveIdentifierState,
   type IdentifierFact,
   type IdentifierProvider,
   type IdentityFact,
@@ -80,6 +81,37 @@ export class InMemoryHeads implements IdentityHeadsRepository {
     return byProvider.length === 1 ? (byProvider[0]?.identifierId ?? null) : null;
   }
 
+  async findLiveIdentifierByProviderAccount({
+    provider,
+    providerAccountId,
+  }: {
+    provider: IdentifierProvider;
+    providerAccountId: string;
+  }): Promise<IdentifierFact | null> {
+    for (const heads of this.heads.values()) {
+      for (const head of Object.values(heads.identifiers)) {
+        if (
+          head.provider === provider &&
+          head.providerAccountId === providerAccountId &&
+          isLiveIdentifierState(head.state)
+        ) {
+          return head;
+        }
+      }
+    }
+    return null;
+  }
+
+  async findLiveIdentifiers({
+    userId,
+  }: {
+    userId: string;
+  }): Promise<IdentifierFact[]> {
+    return Object.values(this.heads.get(userId)?.identifiers ?? {}).filter(
+      (head) => isLiveIdentifierState(head.state),
+    );
+  }
+
   /** Fold facts into a user's heads, the way the app's projection would. */
   fold(userId: string, facts: IdentityFactInput[], occurredAt = T0): void {
     const heads = facts.reduce(
@@ -103,6 +135,7 @@ export function fact(overrides?: Partial<IdentifierFact>): IdentifierFact {
     domain: "acme.com",
     identifierHash: "hmac:abc",
     accountId: null,
+    providerAccountId: null,
     connectionId: null,
     state: "VERIFIED",
     verifiedAtMs: T0,

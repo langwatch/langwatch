@@ -44,6 +44,32 @@ model Account {
   @@index([userId])
 }
 
+// The credential half of the old `Account` row (ADR-116). Row-truth, never
+// events: the payload rule forbids secrets in the event log, and OAuth
+// refresh rewrites these on a cadence events should never carry. The LINKAGE
+// half - who holds which sign-in method - is `Identifier`, built by the fold.
+//
+// `id` IS the old `Account.id`, and `Identifier.accountId` already points at
+// it, so nothing is re-keyed and better-auth's account id keeps its meaning.
+model AccountCredential {
+  id           String    @id
+  identifierId String
+  type         String    @default("oauth")
+  refreshToken String?   @db.Text
+  accessToken  String?   @db.Text
+  expiresAt    DateTime?
+  extExpiresIn Int?
+  tokenType    String?
+  scope        String?
+  idToken      String?   @db.Text
+  sessionState String?
+  password     String?   @db.Text
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now()) @updatedAt
+
+  @@unique([identifierId])
+}
+
 model Session {
   id            String   @id @default(nanoid())
   sessionToken  String   @unique
@@ -143,25 +169,31 @@ model VerificationToken {
 // itself remains as the tombstone replay reproduces.
 // Spec: specs/identity/identifier-model.feature.
 model Identifier {
-  id             String    @id
-  userId         String
-  provider       String
-  value          String?
-  domain         String?
-  identifierHash String?
-  accountId      String?
-  state          String
-  connectionId   String?
-  verifiedAt     DateTime?
-  attachedAt     DateTime
-  detachedAt     DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @default(now()) @updatedAt
+  id                String    @id
+  userId            String
+  provider          String
+  value             String?
+  domain            String?
+  identifierHash    String?
+  accountId         String?
+  // The provider's own subject (ADR-116). What an IdP callback arrives
+  // holding, so the projection can answer "who is this?" without the legacy
+  // Account row.
+  providerAccountId String?
+  state             String
+  connectionId      String?
+  verifiedAt        DateTime?
+  attachedAt        DateTime
+  detachedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now()) @updatedAt
 
   @@index([userId])
   @@index([identifierHash])
   @@index([value])
   @@index([domain])
+  @@index([provider, providerAccountId])
+  @@index([accountId])
 }
 
 // One row per user: the identity fold's event cursor (the AuthzProjectionCursor

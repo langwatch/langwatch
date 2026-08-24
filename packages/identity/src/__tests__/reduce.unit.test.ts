@@ -25,6 +25,7 @@ function attached(
       userId: USER,
       accountId: null,
       provider: "email",
+      providerAccountId: null,
       value: "sam@acme.com",
       identifierHash: "hmac:abc",
       domain: "acme.com",

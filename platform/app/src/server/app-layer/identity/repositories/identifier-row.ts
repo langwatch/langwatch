@@ -18,6 +18,7 @@ export interface IdentifierRowShape {
   domain: string | null;
   identifierHash: string | null;
   accountId: string | null;
+  providerAccountId: string | null;
   state: string;
   connectionId: string | null;
   verifiedAt: Date | null;
@@ -44,6 +45,7 @@ export function rowToFact(row: IdentifierRowShape): IdentifierFact {
     domain: row.domain,
     identifierHash: row.identifierHash,
     accountId: row.accountId,
+    providerAccountId: row.providerAccountId,
     connectionId: row.connectionId,
     state: parseLifecycleState(row.state),
     verifiedAtMs: row.verifiedAt?.getTime() ?? null,
@@ -61,6 +63,7 @@ export function factToRow(fact: IdentifierFact): IdentifierRowShape {
     domain: fact.domain,
     identifierHash: fact.identifierHash,
     accountId: fact.accountId,
+    providerAccountId: fact.providerAccountId,
     state: fact.state,
     connectionId: fact.connectionId,
     verifiedAt: fact.verifiedAtMs === null ? null : new Date(fact.verifiedAtMs),

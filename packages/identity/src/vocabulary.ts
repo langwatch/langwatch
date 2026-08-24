@@ -95,8 +95,21 @@ export function identifierProviderFor(providerId: string): IdentifierProvider {
   }
 }
 
-/** ATTACHED, VERIFIED or PRIMARY: a row that still holds its value for the
- *  user. DEAD_END and DETACHED are tombstones. */
+/**
+ * ATTACHED, VERIFIED or PRIMARY: a row that still holds its value for the
+ * user. DEAD_END and DETACHED are tombstones.
+ *
+ * The list and the predicate live together on purpose — a repository needs
+ * the list for a SQL `IN`, everything else needs the predicate, and two
+ * hand-maintained copies would eventually disagree about whether a tombstone
+ * can sign someone in.
+ */
+export const LIVE_IDENTIFIER_STATES = [
+  "ATTACHED",
+  "VERIFIED",
+  "PRIMARY",
+] as const satisfies readonly IdentifierLifecycleState[];
+
 export function isLiveIdentifierState(state: string): boolean {
-  return state === "ATTACHED" || state === "VERIFIED" || state === "PRIMARY";
+  return (LIVE_IDENTIFIER_STATES as readonly string[]).includes(state);
 }
