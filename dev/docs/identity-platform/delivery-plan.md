@@ -137,15 +137,48 @@ D11 (invitations) forks off after PR 2 for a second engineer; D03/D13 start only
 >
 > **Re-based 2026-08-23 on ADR-110:** the authz cutover gate the write gate was transplanted from no longer exists on `main`; the gate now opens on `finalized` only through the shared per-subject cache the engine gate uses; the everyone-else cohort and the org-paced enrollment expansion's synthetic ids are deleted (enrollment is a switch); the backfill restates every pass and detaches identifiers whose account row is gone. ADR-101 carries the revision note.
 
+# Wave 2 — PR breakdown
+
+Proposed 2026-08-24 (spike, with [ADR-117](../adr/117-identifier-first-front-door.md) and the four Wave 2 spec files — all scenarios `@unimplemented` until their PR binds them). Same discipline as Wave 1: every PR ships gated closed and is production-safe alone; gates and data protect the rollout, not PR boundaries.
+
+**Precondition inside the wave:** ADR-116's Phase 2 (the identity storage adapter) is its own PR on the D01 line, not a Wave 2 PR — but D03's identifier-first resolution is served *by* that adapter, so the router PR lands after it. D11 needs neither and starts immediately.
+
+```text
+ PR 3  Wave 2 docs + specs (this PR)      PR 4  D11 — resilient invitations
+ ADR-117 spike · signin-router ·          identifier-aware acceptance ·
+ signin-signup-screens ·                  conditional-claim transitions ·
+ sso-connection-lifecycle ·               14-day expiry + one-click resend ·
+ resilient-invitations · this section     support-pain replay tests
+                                          (needs only D01 — starts now)
+
+ PR 5  D03 — the router, dark             PR 6  D13 — the screens, dark
+ decision engine + reason codes ·         screen set over the routing
+ ADR-027 amendment (policy +         ──►  contract · interstitial hook ·
+ enforcement backstop) · shadow           timing normalization · then the
+ comparison plumbing · dashboards         IDENTITY_ROUTER_V2 flip + bake
+
+ PR 7  D04 — SsoConnection                (after the D03/D13 enforce flip)
+ aggregate + projection + guards ·        SSOCONN_ROUTING shadow → enforce ·
+ grandfather migration ·                  string columns become derived
+ backoffice parity via commands
+```
+
+- **PR 4 gate** (= the D11 exit gate): the two support-pain replay tests green; invite → wrong-method → accepted and expiry → resend → accepted round-trips green; changes additive, old acceptance flag-restorable during bake.
+- **PR 5 gate:** router decisions computed in shadow on every live login with zero behavior change; the ADR-027 constants table and route canary green against the amended mechanism; reason-code vocabulary registered with presentation copy. Rollback: revert — nothing user-visible exists.
+- **PR 6 gate** (= the D03+D13 exit gate): zero unexplained shadow mismatches over the bake window; every unauthenticated journey round-trips in the new UI; sign-in success and sign-up completion ≥ baseline on dashboards that exist before the flip; zero Auth0-hosted pages. Rollback: flag off, legacy path and screens intact until bake end.
+- **PR 7 gate** (= the D04 exit gate): routing parity silent over the bake; grandfathered orgs sign in unchanged; `ssoDomain` writes stopped. Rollback: flag off — strings still dual-written until the flip.
+
+Spec amendments ride the PR that makes them true (the amendment table below): PR 4 amends `update-pending-invitation.feature` (WAITING_APPROVAL retires) and `enforcement-members.feature`; PR 6 retires the `NEXTAUTH_PROVIDER` matrix scenarios and ports the sign-in flow specs; PR 7 ports `sso-wrong-provider-recovery.feature` to connections.
+
 # ADRs to write (before or with the gated deliverable)
 
 Plain design docs, written before the code they cover:
 
 1. **Identity platform + identifiers** (D01) — **written: [ADR-101](../adr/101-identity-pipeline-and-identifiers.md)** (revised 2026-08-20; re-based on ADR-110 2026-08-23). The identity adapter (R10) with its per-user write gate; the truth split — a new pure event-truth Postgres `Identifier` projection, `Account` stays 100% row-truth protocol — which leaves **ADR-022 and ADR-015 unamended** (the earlier column-truth carve-out and replay column scoping are deleted from the program); the ADR-110-shaped rollout re-tenanted to users (org enrollment expanding to members, per-user `finalized` latch, calling-path apply as the one recorded divergence). Carries the payload rule (the email rides in the event where the fact is about one; HMAC-keyed hashes; secrets never) and erasure-as-event-plus-log-wipe (R11).
-3. **Sign-in router, screens + SSO self-service** (D03/D13–D05) — identifier-first routing, auto-link rules, the first-party screen set; **explicitly amends ADR-027 (`027-license-gated-sso.md`; the number is collided)** (hook → per-method router policy; carries over the constants table and the route-table canary; answers the license-timing question, Open Q11).
+3. **Sign-in router, screens + SSO self-service** (D03/D13–D05) — **spiked for review: [ADR-117](../adr/117-identifier-first-front-door.md)** (2026-08-24). Identifier-first routing, auto-link rules, the first-party screen set; explicitly amends ADR-027 (`027-license-gated-sso.md`; the number is collided) — hook → per-method router policy with the hook kept as enforcement backstop; carries over the constants table and the route-table canary; answers Open Q11 (startup semantics kept), Q9 (reset follows the identifier) and Q12 (no-oracle scoped to sign-in). The SAML engine choice is the spike's named debt, due at D04 implementation.
 4. **MFA + session shape** (D06) — `amr` semantics incl. the passkey/`phw` decision (Open Q4); the forced re-login.
 
-Gherkin specs to write fresh (no existing coverage): join-request lifecycle including domain auto-join and the join-before-create sign-up path (D12/D13), the full sign-in & sign-up screen set with its deny/guidance states (D13), org-admin surface panels (D05), ops lookup actions (D05), MFA enrollment/step-up (D06), connection self-service lifecycle (D05). Use `/write-spec` per deliverable.
+Gherkin specs to write fresh (no existing coverage): join-request lifecycle including domain auto-join and the join-before-create sign-up path (D12/D13), org-admin surface panels (D05), ops lookup actions (D05), MFA enrollment/step-up (D06), connection self-service lifecycle (D05). Use `/write-spec` per deliverable. **Written 2026-08-24 (Wave 2, `@unimplemented` until bound):** `specs/identity/signin-router.feature` (D03), `specs/identity/signin-signup-screens.feature` (D13), `specs/identity/sso-connection-lifecycle.feature` (D04), `specs/identity/resilient-invitations.feature` (D11).
 
 # Spec-amendment table (existing corpus)
 
