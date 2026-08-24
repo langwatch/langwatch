@@ -957,9 +957,9 @@ follows it, and we accept that order as **best-effort FIFO**: it is the
 order ClickHouse accepted the events, which is the only order the system
 has. **No fold ever runs inline — not in normal operation and not during an
 outage.** If Redis is down, ADR-007's "Redis-loss circuit breaker" amendment
-(which names this pipeline, and expects the identity pipeline to join it
-later — identity programme D02) guarantees exactly three things, and inline
-processing is deliberately not among them:
+(which names this pipeline; the identity pipeline was expected to join it
+later, but that deliverable was withdrawn on 2026-08-24) guarantees exactly
+three things, and inline processing is deliberately not among them:
 
 - **Appends still land.** The event store is ClickHouse and the append is
   waited, so the fact is durable whether or not a queue job could be staged.
