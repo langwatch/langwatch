@@ -1663,6 +1663,51 @@ const presentations = {
       "This is a self-hosted deployment, so plans are managed outside the app.",
   },
 
+  // ---- identity ----
+  identity_verification_invalid: {
+    title: "That verification link didn't work",
+    describe: () =>
+      "Open the newest verification email and finish confirming from the place where you requested it.",
+  },
+  identity_verification_expired: {
+    title: "That verification link has expired",
+    describe: () => "Request a new verification email and use the newest link.",
+  },
+  identity_identifier_not_found: {
+    title: "That sign-in method is no longer on your account",
+    describe: () =>
+      "Refresh the page to see your current sign-in methods, then try again.",
+  },
+  identity_identifier_not_verifiable: {
+    title: "That sign-in method can't be verified right now",
+    describe: () =>
+      "It is already verified, or it was removed. Refresh the page to see its current state.",
+  },
+  identity_primary_must_demote_first: {
+    title: "Your primary sign-in method can't be removed",
+    describe: () =>
+      "Make another verified sign-in method primary first, then remove this one.",
+  },
+  identity_primary_requires_verified: {
+    title: "Only a verified sign-in method can be primary",
+    describe: () => "Verify this sign-in method first, then make it primary.",
+  },
+  identity_unsupported_storage_query: {
+    title: "We couldn't read your sign-in methods",
+    describe: () =>
+      "Nothing was changed, and we've been alerted. Try again in a moment, and contact support if it keeps happening.",
+  },
+  identity_email_in_use: {
+    title: "That email address is already in use",
+    describe: () =>
+      "Another account already holds it. Sign in with that account, or use a different address here.",
+  },
+  identity_engine_unavailable: {
+    title: "We couldn't finish creating your account",
+    describe: () =>
+      "Nothing was created, and we've been alerted. Try again in a moment, and contact support if it keeps happening.",
+  },
+
   // ---- governance ----
   anomaly_rule_not_found: {
     title: "Anomaly rule not found",
