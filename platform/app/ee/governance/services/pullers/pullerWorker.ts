@@ -342,6 +342,21 @@ async function writePulledEvents({
  * must not stall the audit pull forever. Any other routing failure throws:
  * the audit rows are already durable on their replacing key and trace ids
  * are deterministic, so the whole-window retry is a safe no-op re-send.
+ *
+ * That includes the failures the trace door *returns* instead of throwing.
+ * `handleOtlpTraceRequest` swallows per-span outcomes into counters, so a
+ * queue or Redis outage comes back as a resolved promise carrying
+ * `ingestionFailures`. Left unread, `writePulledEvents` completes, the cursor
+ * advances, and the conversation is lost with nothing to retry it — the audit
+ * row survives but the trace never existed. So a nonzero `ingestionFailures`
+ * throws, exactly like a thrown routing failure.
+ *
+ * Drops are the other half of `rejectedSpans` and deliberately do NOT throw:
+ * a span that fails `spanSchema` fails it identically on every retry, and a
+ * span past `SPAN_MAX_PAST_MS` is the 31-day door of Decision 11 doing its job
+ * (old messages are still fetched and audited; only their spans drop). Failing
+ * the run on those would stall the audit pull on the exact history the door
+ * exists to let through.
  */
 export async function routeConversationsToTraceDestination({
   events,
@@ -385,11 +400,20 @@ export async function routeConversationsToTraceDestination({
     request,
     DEFAULT_PII_REDACTION_LEVEL,
   );
+  const rejectedSpans = result?.rejectedSpans ?? 0;
+  const ingestionFailures = result?.ingestionFailures ?? 0;
+  if (ingestionFailures > 0) {
+    throw new Error(
+      `Trace door failed to dispatch ${ingestionFailures} span(s) for ingestion source ${source.id}` +
+        (result?.errorMessage ? `: ${result.errorMessage}` : ""),
+    );
+  }
   logger.info(
     {
       ingestionSourceId: source.id,
       traceProjectId: destination.id,
-      rejectedSpans: result?.rejectedSpans ?? 0,
+      // Past the throw above, every rejection left is a permanent drop.
+      droppedSpans: rejectedSpans,
     },
     "routed pulled conversations to trace destination",
   );

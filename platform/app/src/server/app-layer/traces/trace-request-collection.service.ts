@@ -69,7 +69,24 @@ function normalizeSpanIds(span: OtlpSpan): NormalizedIdSpan {
 }
 
 export interface TraceRequestCollectionResult {
+  /**
+   * Spans that did not reach storage: parse/age drops plus dispatch failures.
+   * Kept as the single headline number the HTTP receivers echo back.
+   */
   rejectedSpans: number;
+  /**
+   * The subset of `rejectedSpans` that failed to *dispatch* — an exception out
+   * of `recordSpan`, i.e. the queue, Redis, or the edge hook being unavailable.
+   *
+   * Split out from the total because the two halves have opposite retry
+   * answers. A drop is permanent (a span that fails `spanSchema` fails it every
+   * time; a span older than `SPAN_MAX_PAST_MS` is older still on the next
+   * attempt), so a caller that retries on drops never stops retrying. A
+   * dispatch failure is transient, so a caller with a durable cursor — the
+   * ingestion puller — MUST treat it as a failed run or the window advances
+   * over spans that never landed.
+   */
+  ingestionFailures: number;
   errorMessage: string;
 }
 
@@ -200,6 +217,7 @@ export class TraceRequestCollectionService {
         const rejectedSpans = droppedSpanCount + ingestionFailureCount;
         return {
           rejectedSpans,
+          ingestionFailures: ingestionFailureCount,
           errorMessage: errors.join("; "),
         };
       },

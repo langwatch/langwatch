@@ -145,3 +145,50 @@ describe("given a destination that is archived, deleted, or another org's", () =
     expect(handleOtlpTraceRequest).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * The trace door reports per-span outcomes as counters on a RESOLVED promise,
+ * so an outage on the far side of it looks like success to a caller that only
+ * reads the return value. For a caller with a durable cursor that is data
+ * loss: the audit row lands, the cursor advances, and the conversation never
+ * reaches the explorer with nothing left to retry it.
+ */
+describe("given the trace door could not dispatch the spans", () => {
+  beforeEach(() => {
+    projectFindFirst.mockResolvedValue({ id: "proj-dest" });
+  });
+
+  describe("when the failure is a dispatch failure (queue or Redis down)", () => {
+    it("fails the run so the cursor holds and the whole window is re-sent", async () => {
+      handleOtlpTraceRequest.mockResolvedValue({
+        rejectedSpans: 2,
+        ingestionFailures: 2,
+        errorMessage: "Connection is closed",
+      });
+
+      await expect(
+        routeConversationsToTraceDestination({
+          events: [genieEvent()],
+          source: SOURCE,
+        }),
+      ).rejects.toThrow(/failed to dispatch 2 span\(s\).*Connection is closed/);
+    });
+  });
+
+  describe("when the rejections are permanent drops", () => {
+    it("completes the run — a span past the 31-day door or failing the schema is no better on a retry", async () => {
+      handleOtlpTraceRequest.mockResolvedValue({
+        rejectedSpans: 2,
+        ingestionFailures: 0,
+        errorMessage: "span start time is more than 31 days in the past",
+      });
+
+      await expect(
+        routeConversationsToTraceDestination({
+          events: [genieEvent()],
+          source: SOURCE,
+        }),
+      ).resolves.toBeUndefined();
+    });
+  });
+});
