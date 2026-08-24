@@ -16,12 +16,14 @@ import { createLogger } from "@langwatch/observability";
 import { RedisConfigService } from "@langwatch/redis-client";
 import { compare, hash } from "bcrypt";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
-import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError } from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { env } from "~/env.mjs";
 import { tryGetApp } from "~/server/app-layer/app";
-import { identityCeremonies } from "~/server/app-layer/identity/runtime";
+import {
+  identityCeremonies,
+  identityStorageAdapter,
+} from "~/server/app-layer/identity/runtime";
 import { prisma } from "~/server/db";
 import { fireActivityTrackingNurturing } from "../../../ee/billing/nurturing/hooks/activityTracking";
 import { ensureUserSyncedToCio } from "../../../ee/billing/nurturing/hooks/userSync";
@@ -217,15 +219,20 @@ export const auth = betterAuth({
       ],
   secret: isBuildTime ? "build-time-only" : env.NEXTAUTH_SECRET,
   /**
-   * The stock adapter — ADR-116's bridge phase. `Account` is a PROJECTION
-   * of the identity event log: better-auth reads and writes it exactly as
-   * it always has, and the fold maintains its linkage columns. Wrapping
-   * this adapter can never intercept a model — the factory's own traffic
-   * (its join emulation, its transactions) runs below a wrapper — which is
-   * why ADR-116's identity storage adapter takes over AT the factory in
-   * its later phases, not in front of this one.
+   * The identity storage adapter (ADR-116 §1) — one `database:` entry,
+   * forever. It IS the implementation `createAdapterFactory` is built
+   * around, which is what puts better-auth's own traffic (its join
+   * emulation, its transactions) on it rather than below it, and inside it
+   * a per-user gate routes between the stock Prisma behaviour and
+   * event-sourced storage.
+   *
+   * The gate ships CLOSED, so every user takes the legacy branch — the
+   * stock engine, byte for byte — until an operator enrols one and their
+   * identifier backfill finalizes. Deploying this changes nothing on its
+   * own; `identity-storage-adapter-legacy.unit.test.ts` is the proof,
+   * walking the whole flow over both engines and comparing transcripts.
    */
-  database: prismaAdapter(prisma, { provider: "postgresql" }),
+  database: identityStorageAdapter(),
 
   /**
    * Tell BetterAuth's rate limiter (and session IP tracking) which

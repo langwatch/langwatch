@@ -17,20 +17,30 @@ import {
   newIdentityCommandId,
   VerificationCeremonyService,
 } from "@langwatch/identity-server";
-import { IdentityCeremonies } from "@langwatch/identity-server/better-auth";
+import {
+  createIdentityStorageAdapter,
+  IdentityCeremonies,
+} from "@langwatch/identity-server/better-auth";
+import type { BetterAuthOptions } from "better-auth";
+import type { AdapterFactory } from "better-auth/adapters";
+import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "../../db";
 import { PrismaSystemMigrationStateRepository } from "../system-migrations/repositories/system-migration-state.prisma.repository";
 import { IdentityIdentifierBackfillMigration } from "./identifier-backfill.migration";
 import { IdentityLedgerWriter } from "./ledger";
+import { PrismaIdentityAccountsRepository } from "./repositories/identity-accounts.prisma.repository";
 import { PrismaIdentityBackfillRepository } from "./repositories/identity-backfill.prisma.repository";
 import { PrismaIdentityHeadsRepository } from "./repositories/identity-heads.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./repositories/identity-projection.prisma.repository";
+import { PrismaIdentityResolutionRepository } from "./repositories/identity-resolution.prisma.repository";
 import { PrismaIdentityUsersRepository } from "./repositories/identity-users.prisma.repository";
 import { PrismaIdentityVerificationRepository } from "./repositories/identity-verification.prisma.repository";
 import { isUserOnIdentityWrites } from "./write-gate";
 
 const identityHeads = new PrismaIdentityHeadsRepository(prisma);
 const identityUsers = new PrismaIdentityUsersRepository(prisma);
+const identityAccounts = new PrismaIdentityAccountsRepository(prisma);
+const identityResolution = new PrismaIdentityResolutionRepository(prisma);
 const migrationState = new PrismaSystemMigrationStateRepository(prisma);
 
 /** The per-user fork as the services take it: one closure, one state
@@ -104,4 +114,29 @@ export function identityCeremonies(): IdentityCeremonies {
     isLatched,
     { now: Date.now, newCommandId: newIdentityCommandId },
   );
+}
+
+/**
+ * better-auth's whole `database:` entry (ADR-116 §1): the identity storage
+ * adapter, composed here like every other identity collaborator.
+ *
+ * The legacy branch is better-auth's own published Prisma engine rather than
+ * a re-implementation, so an unlatched user's storage traffic is
+ * byte-for-byte what it has always been — and the gate ships closed, which
+ * makes that every user until an operator enrolls one.
+ *
+ * Built once, at module load, because `betterAuth()` is: the ceremonies it
+ * carries resolve the pipeline handle lazily, so an adapter composed before
+ * the App exists still appends once one does.
+ */
+const identityStorage = createIdentityStorageAdapter({
+  legacyEngine: prismaAdapter(prisma, { provider: "postgresql" }),
+  accounts: identityAccounts,
+  resolution: identityResolution,
+  ceremonies: identityCeremonies(),
+  isUserOnIdentityWrites: isLatched,
+});
+
+export function identityStorageAdapter(): AdapterFactory<BetterAuthOptions> {
+  return identityStorage;
 }

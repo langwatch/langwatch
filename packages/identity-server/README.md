@@ -32,9 +32,10 @@ package.
                                mintUserHashKey · s256Challenge
  identity-command-id           every form a command id takes, in one place
  identity-backfill-plan        what the legacy rows imply, as a pure plan
- ./better-auth                 IdentityCeremonies — the ceremonies the app binds
-                               to better-auth's databaseHooks, and the whole of
-                               this package's contact with the library
+ ./better-auth                 IdentityCeremonies — what a row write MEANS,
+                               bound to better-auth's databaseHooks — and
+                               createIdentityStorageAdapter, better-auth's whole
+                               `database:` entry. The only contact with the library
 ```
 
 Nothing here reads the environment or a database. The write gate, the
@@ -51,17 +52,29 @@ and the app's frontend-boundary test fails the build if that changes, so
 `node:crypto` lives on the root entry rather than behind a subpath.
 
 better-auth appears only as a PEER, and only on the `./better-auth` subpath.
-Even there the contact is thin: the ceremonies take plain row shapes and
-never learn that a hook called them, so the root entry — and therefore every
-service — is free of the library entirely.
+The root entry — and therefore every service — is free of the library
+entirely.
 
-Nothing here implements a `DBAdapter` today. Wrapping a built adapter can
-never intercept a model completely — better-auth satisfies its own
-`join: { account: true }` with a query issued *below* any wrapper — so
-`Account` is a PROJECTION of the event log written by the fold, and
-better-auth reads it with the completely stock `prismaAdapter` (ADR-116's
-bridge phase). ADR-116's later phases put an identity-owned adapter AT the
-factory, where the library's own traffic lands on it by construction.
+`createIdentityStorageAdapter` IS better-auth's `database:` entry (ADR-116
+§1): the implementation `createAdapterFactory` is built AROUND, never a
+wrapper over a finished one. That distinction is mechanical, not stylistic.
+better-auth satisfies its own `join: { account: true }` with a second query
+issued through the instance the factory was built around, and runs sign-up
+inside `adapter.transaction` — both below any wrapper, and both on this
+adapter at this level. Inside it, the per-user gate routes between
+better-auth's own published Prisma engine (legacy users, verbatim) and
+event-sourced storage (latched users: linkage as facts, secrets in
+`AccountCredential`, reads from `Identifier` ⋈ `AccountCredential`). It still
+implements no storage of its own — the identity branch runs on the
+`IdentityAccountsPort` / `IdentityResolutionPort` ports the app fills with
+Prisma, and the legacy branch is the library's engine handed in.
+
+The gate ships closed, so every user takes the legacy branch until an
+operator enrolls one;
+`src/__tests__/identity-storage-adapter-legacy.unit.test.ts` walks the whole
+flow over both engines and compares the transcripts, which is what makes
+that a checked claim rather than an asserted one.
 
 Spec: `specs/identity/identifier-model.feature`,
+`specs/identity/identity-storage-adapter.feature`,
 `specs/identity/identity-packages.feature`.

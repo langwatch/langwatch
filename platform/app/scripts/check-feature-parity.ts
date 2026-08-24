@@ -453,10 +453,6 @@ const LEGACY_INERT: string[] = [
   "specs/features/workflow-cli.feature",
   "specs/home/onboarding-progress-ui.feature",
   "specs/home/voice-agents-home-banner.feature",
-  // ADR-116's design contract, every scenario @unimplemented on purpose: the
-  // ADR ships ahead of the identity storage adapter, and the adapter PR binds
-  // these as it lands. Remove this entry with the first binding.
-  "specs/identity/identity-storage-adapter.feature",
   "specs/langy/langy-agent-service-conventions.feature",
   "specs/langy/langy-baseline.feature",
   "specs/langy/langy-card-taxonomy.feature",

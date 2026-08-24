@@ -1639,6 +1639,11 @@ const presentations = {
     title: "Only a verified sign-in method can be primary",
     describe: () => "Verify this sign-in method first, then make it primary.",
   },
+  identity_unsupported_storage_query: {
+    title: "We couldn't read your sign-in methods",
+    describe: () =>
+      "Nothing was changed, and we've been alerted. Try again in a moment, and contact support if it keeps happening.",
+  },
 
   // ---- governance ----
   anomaly_rule_not_found: {

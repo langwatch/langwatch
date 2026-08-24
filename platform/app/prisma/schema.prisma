@@ -44,6 +44,41 @@ model Account {
   @@index([userId])
 }
 
+// The credential half of the old `Account` row (ADR-116 §1). Row-truth
+// permanently: ADR-101's payload rule bars secrets from the event log, and
+// OAuth refresh rewrites these on a cadence no event log should carry. The
+// LINKAGE half - who holds which sign-in method - is `Identifier`, built by
+// the fold.
+//
+// `id` IS the pinned account id: the KSUID an attach pins, which
+// `Identifier.accountId` carries and which doubles as the `Account` row's id
+// while the bridge table exists. Nothing is re-keyed, and better-auth's
+// account id keeps its meaning after `Account` is dropped.
+//
+// Column names are better-auth's own canonical field names rather than
+// `Account`'s NextAuth-era snake_case, so the identity branch needs no field
+// mapping of its own. `userId` and `provider` are denormalized copies of the
+// identifier's, and are read-side only: they scope a delete and answer "whose
+// row is this?" without a second read. No foreign keys, like `Identifier` -
+// the identity branch deletes these rows itself (ADR-116 §8).
+// Spec: specs/identity/identity-storage-adapter.feature.
+model AccountCredential {
+  id                    String    @id
+  userId                String
+  provider              String
+  password              String?   @db.Text
+  accessToken           String?   @db.Text
+  refreshToken          String?   @db.Text
+  idToken               String?   @db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @default(now()) @updatedAt
+
+  @@index([userId])
+}
+
 model Session {
   id            String   @id @default(nanoid())
   sessionToken  String   @unique

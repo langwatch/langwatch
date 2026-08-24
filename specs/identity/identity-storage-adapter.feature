@@ -44,7 +44,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
 
   # ── Routing ────────────────────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: An unlatched user's storage traffic is the stock adapter's, byte for byte
     Given a user "olga" whose identifier backfill has not finalized
     When better-auth creates, reads, updates and deletes "olga"'s account rows
@@ -52,7 +52,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And no identity event is appended
     And no AccountCredential row is written
 
-  @unit @unimplemented
+  @unit
   Scenario: A latched user's account create states the fact instead of owning the row
     Given a user "sam" whose identifier backfill is finalized
     When better-auth creates an account for "sam" with provider "google"
@@ -61,14 +61,14 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And the secret columns of the create land in an AccountCredential row
     And no secret appears in any event payload
 
-  @unit @unimplemented
+  @unit
   Scenario: Sessions and verifications take the stock branch for everyone
     Given a user "sam" whose identifier backfill is finalized
     When better-auth writes a session and a verification for "sam"
     Then both writes execute the stock Prisma behavior
     And no identity event is appended
 
-  @unit @unimplemented
+  @unit
   Scenario: A read that names no user routes by resolution, then by gate
     Given "sam" is finalized and "olga" is not
     When better-auth looks up each user by email
@@ -94,7 +94,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
 
   # ── The reads the adapter must serve ───────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: The joined sign-in read is served from the identity tables
     Given a finalized user "sam" with a credential account
     When better-auth signs "sam" in by email with the account join
@@ -102,7 +102,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And the account rows returned are assembled from Identifier and AccountCredential
     And sign-in succeeds with the password held in AccountCredential
 
-  @unit @unimplemented
+  @unit
   Scenario: Sign-in resolves by any verified email, not only the primary
     Given a finalized user "sam" with verified identifiers "sam@acme.com" and "sam@home.net"
     And "sam@acme.com" is the PRIMARY identifier
@@ -110,7 +110,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     Then the identity branch resolves "sam"
     And the user record presents "sam@acme.com" as the email
 
-  @unit @unimplemented
+  @unit
   Scenario: A plus-addressed sign-in still resolves after the latch
     Given a finalized user "sam" whose identifier is "sam.j@acme.com"
     When better-auth looks up the user by "Sam.J+news@Acme.com"
@@ -118,7 +118,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And "sam" is resolved
     And the same address resolved the same user before she latched
 
-  @integration @unimplemented
+  @integration
   Scenario: The OAuth callback resolves the provider subject through the identity tables
     Given a finalized user "sam" with a google identifier whose provider subject is "g-123"
     When the callback looks up the account by "google" and "g-123" with its user join
@@ -128,7 +128,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
 
   # ── Secrets stay row-truth ─────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: A token refresh writes a credential row and states nothing
     Given a finalized user "sam" with a Google account on the identity branch
     When the provider rotates "sam"'s access and refresh tokens
@@ -136,7 +136,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And no identity event is appended
     And a from-scratch replay reproduces the Identifier row and never touches the credential row
 
-  @unit @unimplemented
+  @unit
   Scenario: Bridge mirroring keeps the fail-closed direction safe
     Given a finalized user "sam" changes their password on the identity branch
     And the Account bridge table still exists
@@ -158,7 +158,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     Then the adapter serves every routed write from the legacy branch
     And write outcomes are unchanged for the duration of the cache TTL
 
-  @unit @unimplemented
+  @unit
   Scenario: Resolution reads do not depend on the gate cache
     Given the gate cache cannot be read
     When a finalized user signs in with a secondary verified email
@@ -258,7 +258,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
 
   # ── Unlink and erasure ─────────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: Unlink on the identity branch detaches the fact and the secrets together
     Given a finalized user "sam" with google and credential identifiers
     When better-auth lists "sam"'s accounts
@@ -289,7 +289,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
 
   # ── Upgrade discipline ─────────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: An account query shape the identity branch does not recognize fails loudly
     Given a finalized user "sam"
     When better-auth issues an account query with an operator the identity branch has not enumerated
@@ -298,7 +298,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And no user-model query can raise it
     But the same query for an unlatched user executes on the legacy branch untouched
 
-  @integration @unimplemented
+  @integration
   Scenario: The end-to-end suite is the upgrade net
     Given the real betterAuth library composed over the identity adapter
     When a user signs up, signs in with the account join, lists accounts, changes password, links a provider and deletes the account

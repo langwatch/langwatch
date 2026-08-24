@@ -5,19 +5,13 @@ import type { IdentityHeadsRepository } from "../identity-heads.repository";
 import type { IdentityUsersRepository } from "../identity-users.repository";
 import type { IdentityUserGate } from "../identity-user-gate";
 import type { IdentityCeremonyWrites } from "../identity-writes";
-import type { IdentityCeremonyClock } from "./ceremony-types";
+import type {
+  CeremonyAccountRow,
+  IdentityAccountCeremonies,
+  IdentityCeremonyClock,
+} from "./ceremony-types";
 
 const logger = createLogger("langwatch:better-auth:identity-ceremonies");
-
-/** The `Account` fields a ceremony reads. Structural on purpose: this
- *  package should not track better-auth's row type version to version. */
-interface AccountRow {
-  id?: unknown;
-  userId?: unknown;
-  providerId?: unknown;
-  accountId?: unknown;
-  createdAt?: unknown;
-}
 
 /** The `User` fields a ceremony reads. */
 interface UserRow {
@@ -68,7 +62,7 @@ interface UserRow {
  * rejected was *endpoint* hooks firing AFTER the row write; the database
  * hooks used here fire before it and can refuse.
  */
-export class IdentityCeremonies {
+export class IdentityCeremonies implements IdentityAccountCeremonies {
   constructor(
     private readonly heads: IdentityHeadsRepository,
     private readonly users: IdentityUsersRepository,
@@ -83,7 +77,7 @@ export class IdentityCeremonies {
    * with the id this ceremony pinned — or nothing, when no ceremony ran.
    */
   async beforeAccountCreate(
-    account: AccountRow,
+    account: CeremonyAccountRow,
   ): Promise<{ data: { id: string } } | undefined> {
     const { userId, providerId } = account;
     if (typeof userId !== "string" || typeof providerId !== "string") return;
@@ -122,7 +116,7 @@ export class IdentityCeremonies {
   }
 
   /** An `Account` row is about to be deleted: detach what it mirrors. */
-  async beforeAccountDelete(account: AccountRow): Promise<void> {
+  async beforeAccountDelete(account: CeremonyAccountRow): Promise<void> {
     const { id, userId, providerId } = account;
     if (
       typeof id !== "string" ||

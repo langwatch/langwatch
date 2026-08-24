@@ -113,6 +113,7 @@ export const APP_ERROR_CODES = [
   "identity_identifier_not_verifiable",
   "identity_primary_must_demote_first",
   "identity_primary_requires_verified",
+  "identity_unsupported_storage_query",
   "identity_verification_expired",
   "identity_verification_invalid",
   "ingestion_source_cap_reached",
