@@ -170,8 +170,10 @@ Feature: Internal feature flag system for system-level kill switches
       Given a flag key is exposed to the frontend
       Then it resolves to a registry entry, whether SYSTEM or PRODUCT scoped, so
            /ops/feature-flags can list it and target it per organization
-      And an unregistered key is reported instead, because it would resolve from
-          the legacy in-memory path where the operator store cannot see it
+      And an unregistered key is reported instead, because the resolver never
+          consults the operator store for one — it falls through to the legacy
+          in-memory path — so /ops/feature-flags would still list the row and
+          offer a toggle that silently changes nothing
       And the one historical exception is named explicitly rather than counted
 
     @unit
@@ -179,8 +181,9 @@ Feature: Internal feature flag system for system-level kill switches
       Given the flags exposed to the frontend that resolve to a SYSTEM-scoped definition
       Then they match the declared register of such flags exactly
       And a new SYSTEM classification therefore arrives as a visible edit for
-          review, because scope decides how /ops/feature-flags groups, badges
-          and warns on the flag even though it no longer decides resolution
+          review, because scope decides which section the flag lands in and
+          which badge it carries, and moving one out of PRODUCT also drops the
+          fleet-reach warning, even though scope no longer decides resolution
 
   Rule: Operators manage flags from the Ops Feature Flags page
 
@@ -192,6 +195,20 @@ Feature: Internal feature flag system for system-level kill switches
       And rows whose effective value comes from an env override show an
           "env override" badge so operators do not get confused by an
           unresponsive toggle
+
+    @integration
+    Scenario: The Product section tells operators what the value they set actually reaches
+      Given an operator opens /ops/feature-flags on a shared install
+      Then the Product section says customers get the value set here when no
+           targeting rule matches and no env override is configured
+      And it names no external flag service, because none is in the chain
+
+    @integration
+    Scenario: The System section names the same chain, so the two cannot disagree
+      Given an operator opens /ops/feature-flags
+      Then the System section names env, this postgres store, and the registry
+           default as the places a value comes from, in that order
+      And it names no external flag service either
 
     Scenario: Operator without ops:manage permission cannot toggle flags
       Given an operator with only ops:view permission opens the page
@@ -217,18 +234,24 @@ Feature: Internal feature flag system for system-level kill switches
     @integration
     Scenario: Ops page warns about the blast radius of a PRODUCT flag on a shared install
       Given the installation is running in SaaS mode
-      And the operator focuses a PRODUCT-scoped flag row
-      Then the page surfaces a note that the row-level value reaches every
-          organization no targeting rule matches, which on a shared install is
-          the whole fleet
-      And the note points the operator at a per-organization or per-project rule
-          for a rollout
+      And a PRODUCT-scoped flag is listed
+      Then the row carries a fleet-reach badge that a self-hosted install does
+           not show
+      And the badge explains that a value set here reaches every organization
+          that no targeting rule matches, which on a shared install is the
+          whole fleet
+      And the explanation points the operator at a per-organization or
+          per-project rule for a rollout
+      And that explanation is rendered into the page rather than living only in
+          hover-only tooltip content, so an operator who never hovers — or who
+          reads the page with a screen reader — is warned too
 
   Rule: Self-hosted parity
 
-    Scenario: Self-hosted install with no third-party flag service can still flip kill switches
-      Given the installation is self-hosted with no external flag service configured
+    Scenario: Flipping a kill switch works the same self-hosted as on a shared install
+      Given the installation is self-hosted
       When an operator toggles a SYSTEM kill switch from the Ops UI
-      Then the change persists in postgres
-      And every pod observes the new value
-      And no PostHog call is ever attempted at any point in the chain
+      Then the change persists in postgres and every pod observes it, exactly
+           as it would on a shared install
+      And nothing in the chain reaches outside the install, because the
+          resolver has no third-party service in it on any deployment

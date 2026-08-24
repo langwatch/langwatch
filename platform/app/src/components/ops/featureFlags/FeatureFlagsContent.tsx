@@ -119,8 +119,8 @@ export function FeatureFlagsContent() {
         heading="Product"
         description={
           isSaas
-            ? "Customer-facing features. The value here is the source of truth; set a targeting rule to reach a subset of organizations."
-            : "Customer-facing features. The value here is the source of truth."
+            ? "Customer-facing features. Customers get the value set here when no targeting rule matches and no env override is configured; set a targeting rule to reach a subset of organizations."
+            : "Customer-facing features. Customers get the value set here when no targeting rule matches and no env override is configured."
         }
         rows={grouped.product}
         canManage={canManage}
@@ -233,6 +233,23 @@ function ScopeSection({
   );
 }
 
+/**
+ * Blast-radius note for a PRODUCT flag on a shared install. Held as one
+ * constant because it is rendered twice: as the tooltip content for a sighted
+ * operator, and as screen-reader-only text inside the badge for everyone else.
+ * Tooltip content is not in the DOM until hover, so a note kept only there
+ * reaches neither a screen reader nor any assertion — which is how the
+ * previous wording survived being replaced wholesale with "x" while its bound
+ * test stayed green.
+ *
+ * The srOnly copy is deliberate rather than an `aria-label` on the badge:
+ * Chakra renders Badge as a role-less <span>, and ARIA prohibits naming a
+ * generic element, so an aria-label there is ignored by screen readers even
+ * though Testing Library's getByLabelText happily matches it.
+ */
+const FLEET_REACH_NOTE =
+  "This flag gates a customer-facing feature, and a value set here applies to every organization that no targeting rule matches. On a shared install that is the whole fleet, so prefer a per-organization or per-project rule when rolling one out.";
+
 function FlagRowView({
   row,
   canManage,
@@ -337,9 +354,10 @@ function FlagRowView({
             </Text>
             <ScopeBadge scope={row.scope} />
             {showProductWarning && (
-              <Tooltip content="This flag gates a customer-facing feature, and a value set here applies to every organization no targeting rule matches. On a shared install that is the whole fleet, so prefer a per-organization or per-project rule when rolling one out.">
+              <Tooltip content={FLEET_REACH_NOTE}>
                 <Badge colorPalette="yellow" size="sm" variant="subtle">
                   All customers
+                  <Text srOnly>{FLEET_REACH_NOTE}</Text>
                 </Badge>
               </Tooltip>
             )}
