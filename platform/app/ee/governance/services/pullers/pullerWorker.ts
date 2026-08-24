@@ -404,8 +404,14 @@ export async function routeConversationsToTraceDestination({
   const ingestionFailures = result?.ingestionFailures ?? 0;
   if (ingestionFailures > 0) {
     throw new Error(
+      // Quote ONLY the dispatch failures. This message is what the process
+      // manager persists on `recordRunFailed` and renders on the source detail
+      // page; `errorMessage` also carries drop reasons, which describe other
+      // spans and run to kilobytes of serialized schema errors.
       `Trace door failed to dispatch ${ingestionFailures} span(s) for ingestion source ${source.id}` +
-        (result?.errorMessage ? `: ${result.errorMessage}` : ""),
+        (result?.ingestionFailureMessage
+          ? `: ${result.ingestionFailureMessage}`
+          : ""),
     );
   }
   logger.info(

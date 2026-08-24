@@ -163,6 +163,7 @@ describe("given the trace door could not dispatch the spans", () => {
       handleOtlpTraceRequest.mockResolvedValue({
         rejectedSpans: 2,
         ingestionFailures: 2,
+        ingestionFailureMessage: "Connection is closed",
         errorMessage: "Connection is closed",
       });
 
@@ -172,6 +173,27 @@ describe("given the trace door could not dispatch the spans", () => {
           source: SOURCE,
         }),
       ).rejects.toThrow(/failed to dispatch 2 span\(s\).*Connection is closed/);
+    });
+  });
+
+  describe("when a drop and a dispatch failure land in the same batch", () => {
+    it("quotes only the dispatch failure — the run-failed record must not name another span's schema error as the cause", async () => {
+      handleOtlpTraceRequest.mockResolvedValue({
+        rejectedSpans: 2,
+        ingestionFailures: 1,
+        ingestionFailureMessage: "Connection is closed",
+        errorMessage:
+          'Connection is closed; span validation failed: [{"code":"invalid_type","path":["traceId"]}]',
+      });
+
+      await expect(
+        routeConversationsToTraceDestination({
+          events: [genieEvent()],
+          source: SOURCE,
+        }),
+      ).rejects.toThrow(
+        /^Trace door failed to dispatch 1 span\(s\) for ingestion source [^:]+: Connection is closed$/,
+      );
     });
   });
 

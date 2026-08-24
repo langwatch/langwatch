@@ -87,6 +87,16 @@ export interface TraceRequestCollectionResult {
    * over spans that never landed.
    */
   ingestionFailures: number;
+  /**
+   * Only the dispatch failures' messages, for a caller that retries on them and
+   * has to say what it is retrying for.
+   *
+   * `errorMessage` below is unsuitable for that: it also carries drop reasons,
+   * which describe a different span than the one that failed to dispatch, and a
+   * rejected span's serialized schema error runs to kilobytes — a payload that
+   * would follow the caller into whatever durable store it records failures in.
+   */
+  ingestionFailureMessage: string;
   errorMessage: string;
 }
 
@@ -106,6 +116,66 @@ export interface TraceRequestCollectionDeps {
   processCommandData?: (
     data: RecordSpanCommandData,
   ) => Promise<RecordSpanCommandData>;
+}
+
+/**
+ * Per-request tally of span outcomes, and the one place that decides what each
+ * outcome means to a caller.
+ *
+ * It exists as its own unit because two of those decisions are load-bearing and
+ * were previously inline: filtered spans are NOT rejections, and drops and
+ * dispatch failures are rejections with opposite retry answers (see
+ * `TraceRequestCollectionResult`).
+ */
+class SpanIngestionTally {
+  private collected = 0;
+  private dropped = 0;
+  private deduped = 0;
+  private filtered = 0;
+  private failed = 0;
+  private readonly errors: string[] = [];
+  private readonly failureErrors: string[] = [];
+
+  record(result: SpanIngestionResult): void {
+    switch (result.status) {
+      case "collected":
+        this.collected++;
+        break;
+      case "dropped":
+        this.dropped++;
+        break;
+      case "deduped":
+        this.deduped++;
+        break;
+      case "filtered":
+        this.filtered++;
+        break;
+      case "failed":
+        this.failed++;
+        if (result.error) this.failureErrors.push(result.error);
+        break;
+    }
+    if (result.error) this.errors.push(result.error);
+  }
+
+  annotate(span: OtelSpan): void {
+    span.setAttribute("spans.ingestion.successes", this.collected);
+    span.setAttribute("spans.ingestion.failures", this.failed);
+    span.setAttribute("spans.ingestion.drops", this.dropped);
+    span.setAttribute("spans.ingestion.deduped", this.deduped);
+    span.setAttribute("spans.ingestion.filtered", this.filtered);
+  }
+
+  toResult(): TraceRequestCollectionResult {
+    return {
+      // Filtered spans are intentionally not stored (coding-agent infra
+      // noise), so they are NOT rejections.
+      rejectedSpans: this.dropped + this.failed,
+      ingestionFailures: this.failed,
+      ingestionFailureMessage: this.failureErrors.join("; "),
+      errorMessage: this.errors.join("; "),
+    };
+  }
 }
 
 /**
@@ -144,12 +214,7 @@ export class TraceRequestCollectionService {
         },
       },
       async (span) => {
-        let collectedSpanCount = 0;
-        let droppedSpanCount = 0;
-        let dedupedSpanCount = 0;
-        let ingestionFailureCount = 0;
-        let filteredSpanCount = 0;
-        const errors: string[] = [];
+        const tally = new SpanIngestionTally();
 
         for (const resourceSpan of traceRequest.resourceSpans ?? []) {
           const resource = resourceSpan?.resource;
@@ -182,44 +247,13 @@ export class TraceRequestCollectionService {
                 otelSpanRef: span,
               });
 
-              switch (result.status) {
-                case "collected":
-                  collectedSpanCount++;
-                  break;
-                case "dropped":
-                  droppedSpanCount++;
-                  break;
-                case "deduped":
-                  dedupedSpanCount++;
-                  break;
-                case "filtered":
-                  filteredSpanCount++;
-                  break;
-                case "failed":
-                  ingestionFailureCount++;
-                  break;
-              }
-              if (result.error) {
-                errors.push(result.error);
-              }
+              tally.record(result);
             }
           }
         }
 
-        span.setAttribute("spans.ingestion.successes", collectedSpanCount);
-        span.setAttribute("spans.ingestion.failures", ingestionFailureCount);
-        span.setAttribute("spans.ingestion.drops", droppedSpanCount);
-        span.setAttribute("spans.ingestion.deduped", dedupedSpanCount);
-        span.setAttribute("spans.ingestion.filtered", filteredSpanCount);
-
-        // Filtered spans are intentionally not stored (coding-agent infra
-        // noise), so they are NOT rejections.
-        const rejectedSpans = droppedSpanCount + ingestionFailureCount;
-        return {
-          rejectedSpans,
-          ingestionFailures: ingestionFailureCount,
-          errorMessage: errors.join("; "),
-        };
+        tally.annotate(span);
+        return tally.toResult();
       },
     );
   }
