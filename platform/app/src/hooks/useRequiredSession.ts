@@ -44,6 +44,8 @@ export const noOrgBouncerRoutes = [
   // is org-scoped).
   "/governance",
   "/governance/inventory",
+  "/governance/costs",
+  "/governance/billed",
   "/governance/ingestion-sources",
   "/governance/ingestion-sources/[id]",
   "/governance/anomaly-rules",

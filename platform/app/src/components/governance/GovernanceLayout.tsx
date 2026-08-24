@@ -1,6 +1,6 @@
 import type { PropsWithChildren } from "react";
 import { SectionNavigationLayout } from "~/components/ui/layouts/SectionNavigationLayout";
-import { governanceNavItems } from "~/features/navigation/sectionNavItems";
+import { useGovernanceNavItems } from "~/features/navigation/useGovernanceNavItems";
 
 /**
  * Layout for `/governance/*` - wraps DashboardLayout in `orgScope` mode
@@ -8,7 +8,7 @@ import { governanceNavItems } from "~/features/navigation/sectionNavItems";
  * + "Organization-scoped" indicator) and renders a thin org-level
  * sub-navigation in the left column. The item list itself lives in
  * `~/features/navigation/sectionNavItems` so every shell renders the
- * same navigation.
+ * same navigation; the flag gating comes from useGovernanceNavItems.
  *
  * Spec: specs/ai-gateway/governance/governance-home-routing.feature
  */
@@ -16,6 +16,8 @@ export default function GovernanceLayout({
   children,
   pageTitle,
 }: PropsWithChildren<{ pageTitle?: string }>) {
+  const governanceNavItems = useGovernanceNavItems();
+
   return (
     <SectionNavigationLayout
       sectionLabel="AI Governance"

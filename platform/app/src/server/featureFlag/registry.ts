@@ -248,6 +248,15 @@ export const FEATURE_FLAGS = [
     description:
       "Gates the personal keys, admin oversight, RoutingPolicy, IngestionSource UI surfaces, the onboarding intent fork, and the org Primary use setting (ADR-038). On by default; switch off per org via the operator store (or deployment-wide via RELEASE_UI_AI_GOVERNANCE_ENABLED=0) to hide governance and refuse AI-tools device login. Distinct from release_ui_ai_gateway_menu_enabled: the gateway product ships on its own flag.",
   },
+  {
+    key: "release_ui_governance_billed_cost_enabled",
+    scope: "PRODUCT",
+    // The Costs / Billed pages are placeholders; the flag stays off until
+    // the views carry data, then PostHog targeting rolls them out per org.
+    defaultValue: false,
+    description:
+      "Gates the governance spend views (the Costs and Billed pages under /governance) and their navigation items. Off by default while the pages are placeholders. Sits on top of release_ui_ai_governance_enabled, which gates the whole governance section.",
+  },
   // ADR-034 Phase 3 — routes analytics getTimeseries reads to the slim
   // `trace_analytics` / rollup `trace_analytics_rollup` tables (Phases 1+2)
   // when the query shape allows. OFF (default) = legacy trace_summaries reads

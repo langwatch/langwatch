@@ -19,11 +19,8 @@ import { featureIcons } from "~/utils/featureIcons";
 import { readLastVisitedProduct } from "../logic/productMemory";
 import { resolveSettingsBackTarget } from "../logic/resolveSettingsBackTarget";
 import { isPathUnder, type ProductId } from "../products";
-import {
-  gatewayNavItems,
-  governanceNavItems,
-  type SectionNavItemData,
-} from "../sectionNavItems";
+import { gatewayNavItems, type SectionNavItemData } from "../sectionNavItems";
+import { useGovernanceNavItems } from "../useGovernanceNavItems";
 import { useLlmOpsProjectSlug } from "../useLlmOpsProjectSlug";
 import { useReachableProducts } from "../useReachableProducts";
 import { isSettingsMenuItemActive, useSettingsMenu } from "../useSettingsMenu";
@@ -268,9 +265,7 @@ function ProductSidebarBody({
     );
   }
   if (surface === "governance") {
-    return (
-      <SectionItemsNav items={governanceNavItems} showExpanded={showExpanded} />
-    );
+    return <GovernanceSurfaceItems showExpanded={showExpanded} />;
   }
   return (
     <MainMenuSections
@@ -278,6 +273,19 @@ function ProductSidebarBody({
       shouldIncludeGovernSection={false}
       shouldIncludeOpsSection={false}
     />
+  );
+}
+
+/**
+ * The governance surface's items, filtered through the same flag gate the
+ * legacy governance layout uses, so both shells show Costs / Billed under
+ * one switch.
+ */
+function GovernanceSurfaceItems({ showExpanded }: { showExpanded: boolean }) {
+  const governanceNavItems = useGovernanceNavItems();
+
+  return (
+    <SectionItemsNav items={governanceNavItems} showExpanded={showExpanded} />
   );
 }
 

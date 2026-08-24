@@ -1,13 +1,13 @@
 import {
   AlertTriangle,
   Brain,
+  CircleDollarSign,
   Eye,
   Gauge,
   KeyRound,
   LineChart,
   type LucideIcon,
   PackageOpen,
-  PlugZap,
   ReceiptText,
   Route,
   Shield,
@@ -15,6 +15,8 @@ import {
   Webhook,
   Zap,
 } from "lucide-react";
+
+import type { FrontendFeatureFlag } from "~/server/featureFlag/frontendFeatureFlags";
 
 /**
  * The Gateway and Governance section navigations as data. The legacy
@@ -27,6 +29,11 @@ export interface SectionNavItemData {
   href: string;
   includePath?: string;
   icon: LucideIcon;
+  /**
+   * When set, the item renders only while that frontend feature flag is
+   * on for the reader (see useGovernanceNavItems).
+   */
+  featureFlag?: FrontendFeatureFlag;
 }
 
 export const gatewayNavItems: readonly SectionNavItemData[] = [
@@ -91,6 +98,21 @@ export const governanceNavItems: readonly SectionNavItemData[] = [
     label: "Overview",
     href: "/governance",
     icon: Eye,
+  },
+  {
+    label: "Costs",
+    href: "/governance/costs",
+    includePath: "/governance/costs",
+    icon: CircleDollarSign,
+    // Placeholder pages; both items share one switch.
+    featureFlag: "release_ui_governance_billed_cost_enabled",
+  },
+  {
+    label: "Billed",
+    href: "/governance/billed",
+    includePath: "/governance/billed",
+    icon: ReceiptText,
+    featureFlag: "release_ui_governance_billed_cost_enabled",
   },
   {
     label: "Inventory",

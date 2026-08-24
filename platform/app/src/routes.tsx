@@ -254,6 +254,17 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/governance/people")),
       },
       {
+        // Spend views behind release_ui_governance_billed_cost_enabled;
+        // the pages carry their own flag guard, so a deep link with the
+        // switch off reads as a missing page.
+        path: "/governance/costs",
+        ...page(() => import("./pages/governance/costs")),
+      },
+      {
+        path: "/governance/billed",
+        ...page(() => import("./pages/governance/billed")),
+      },
+      {
         // The people page was named departments, and before that cost
         // centers; both old addresses chain onto the current one.
         path: "/governance/departments",

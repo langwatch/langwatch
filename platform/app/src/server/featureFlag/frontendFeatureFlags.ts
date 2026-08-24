@@ -94,6 +94,12 @@ export const FRONTEND_FEATURE_FLAGS = [
   // (issue #5103, specs/experiments/comparison-leaderboard.feature). Off by
   // default — power-user surface, additive to the existing win-rate chart.
   "release_ui_comparison_leaderboard_enabled",
+  // The governance spend views (Costs and Billed placeholder pages under
+  // /governance). Off by default: the pages are placeholders, so only
+  // orgs opted in through PostHog targeting see their navigation items.
+  // Sits ON TOP of `release_ui_ai_governance_enabled`, which gates the
+  // whole governance section.
+  "release_ui_governance_billed_cost_enabled",
 ] as const;
 
 /**

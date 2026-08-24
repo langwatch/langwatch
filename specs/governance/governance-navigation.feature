@@ -53,3 +53,16 @@ Feature: Governance navigation names what the pages show
     Given a reader opens /governance/tool-catalog or /governance/ingestion-sources from a bookmark
     When both addresses are resolved by the mounted routes
     Then each lands on /governance/inventory with its view's tab selected
+
+  @unit
+  Scenario: The spend views stay hidden until their switch is on
+    Given the governance sidebar renders for an organization without the spend views
+    When the item lists are captured
+    Then no item names Costs or Billed
+
+  @unit
+  Scenario: A switched-on organization sees and reaches the spend pages
+    Given the governance sidebar renders for an organization with the spend views on
+    When the item lists are captured and the two spend addresses are opened
+    Then items name Costs and Billed between Overview and Inventory
+    And each address renders its placeholder page instead of a missing page
