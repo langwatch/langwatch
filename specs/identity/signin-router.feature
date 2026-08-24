@@ -27,7 +27,7 @@ Feature: The identifier-first sign-in router - one front door, routed by data
 
   # ── Routing decisions ──────────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: An email on an SSO domain routes to that connection's provider
     Given "acme.com" belongs to an ACTIVE SSO connection
     When "Sam.J+news@Acme.com" is submitted to the router
@@ -35,28 +35,28 @@ Feature: The identifier-first sign-in router - one front door, routed by data
     And the value was normalized exactly as attach-time normalization does
     And the decision carries the reason code "domain_routed"
 
-  @unit @unimplemented
+  @unit
   Scenario: An email with no domain match offers the uniform method picker
     Given "home.net" belongs to no ACTIVE connection
     When "sam@home.net" is submitted to the router
     Then the decision is the instance's default method set
     And the decision carries the reason code "no_domain_match"
 
-  @unit @unimplemented
+  @unit
   Scenario: The decision never depends on whether an account exists
     Given "home.net" belongs to no ACTIVE connection
     When an email with an account and an email without one are submitted
     Then both decisions are the same decision, field for field
     And nothing in either response names the account's existence
 
-  @unit @unimplemented
+  @unit
   Scenario: A suspended connection stops routing its domain
     Given "acme.com" belongs to a connection in state SUSPENDED
     When "sam@acme.com" is submitted to the router
     Then the decision is the method picker, not a redirect
     And the decision carries a reason code the guidance screens can name
 
-  @unit @unimplemented
+  @unit
   Scenario: Every routing decision is logged with its reason
     When any email is submitted to the router
     Then the decision and its reason code are logged
@@ -64,21 +64,21 @@ Feature: The identifier-first sign-in router - one front door, routed by data
 
   # ── Self-hosted priority ───────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: A sole ACTIVE connection auto-redirects before any email is asked
     Given a self-hosted installation with exactly one ACTIVE connection
     When the sign-in page is requested
     Then the decision is an immediate redirect to that identity provider
     And the decision carries the reason code "sole_active_connection"
 
-  @unit @unimplemented
+  @unit
   Scenario: The break-glass path always reaches a local sign-in
     Given a self-hosted installation with exactly one ACTIVE connection
     When the sign-in page is requested with the break-glass parameter
     Then the decision is the local method set and no redirect happens
     And the break-glass sign-in is audited and rate-limited
 
-  @unit @unimplemented
+  @unit
   Scenario: The provider env becomes the default method set
     Given a self-hosted installation configured with a single OAuth provider
     And the identifier-first router is enforced
@@ -88,7 +88,7 @@ Feature: The identifier-first sign-in router - one front door, routed by data
 
   # ── The license gate rides along (ADR-027, mechanism amended) ──────────
 
-  @unit @unimplemented
+  @unit
   Scenario: A never-licensed installation offers no federated method
     Given a self-hosted installation whose license gate denies
     When the sign-in page is requested
@@ -96,7 +96,7 @@ Feature: The identifier-first sign-in router - one front door, routed by data
     And the email and password method set is offered
     And a direct request to an SSO callback path is still refused
 
-  @unit @unimplemented
+  @unit
   Scenario: The license gate still freezes at startup
     Given the license gate resolved at startup
     When a license is activated mid-process
@@ -104,14 +104,14 @@ Feature: The identifier-first sign-in router - one front door, routed by data
 
   # ── Callback linking ───────────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: A known provider subject signs straight in
     Given a user whose identifier matches the callback's connection and subject
     When the SSO callback completes
     Then the user is signed in
     And no link is created and no event is emitted
 
-  @unit @unimplemented
+  @unit
   Scenario: An unambiguous verified match is auto-linked with an audit trail
     Given a callback asserting a verified email that exactly one user holds as a VERIFIED identifier
     And that user's identifiers raise no ambiguity
@@ -119,7 +119,7 @@ Feature: The identifier-first sign-in router - one front door, routed by data
     Then the identifier is attached through the pipeline and the user signs in
     And before and after audit events record the link
 
-  @unit @unimplemented
+  @unit
   Scenario: An unverified orphan is never auto-linked
     Given a user row holding the callback's email without any verification evidence
     When the SSO callback completes
@@ -127,14 +127,14 @@ Feature: The identifier-first sign-in router - one front door, routed by data
     And a link proposal is recorded for an admin to confirm
     And the sign-in is refused with guidance
 
-  @unit @unimplemented
+  @unit
   Scenario: An ambiguous match becomes a proposal, not a guess
     Given the callback's verified email matches a user with identifiers the organization cannot vouch for
     When the SSO callback completes
     Then a LinkProposed event is recorded and the sign-in is refused with guidance
     And confirming the proposal later attaches the identifier and admits the user
 
-  @unit @unimplemented
+  @unit
   Scenario: No match provisions just-in-time only where the connection allows
     Given a callback subject and email matching no user
     When the SSO callback completes on a connection that allows JIT
@@ -144,7 +144,7 @@ Feature: The identifier-first sign-in router - one front door, routed by data
 
   # ── Cutover ────────────────────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: Shadow mode compares every login and changes nothing
     Given the router flag is in shadow
     When a user signs in through the legacy path
@@ -152,7 +152,7 @@ Feature: The identifier-first sign-in router - one front door, routed by data
     And a mismatch is logged with both decisions and the reason code
     And the user's sign-in is untouched either way
 
-  @unit @unimplemented
+  @unit
   Scenario: The flag off restores the legacy path entirely
     Given the router flag is enforced and then turned off
     When the sign-in page is requested
