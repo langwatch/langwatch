@@ -115,9 +115,11 @@ function harness(options?: {
       storeUserHashKeyIfMissing: async (args) => {
         minted.push(args);
       },
-      // The backfill never reads it - the plan takes the email off the user
-      // row it already read - but the double is the whole port.
+      // The backfill never reads either of these - the plan takes the email
+      // off the user row it already read, and the collision guard is the one
+      // asking who holds an address - but the double is the whole port.
       findEmail: async () => user?.email ?? null,
+      findUserIdByEmail: async () => null,
     },
     { attachIdentifier, verifyIdentifier, detachIdentifier },
     { now: () => 1_800_000_000_000 },

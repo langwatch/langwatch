@@ -10,6 +10,13 @@
  *   3. a bounded read-your-writes wait, watching the projection's cursor
  *      reach the events just appended.
  *
+ * `commit` runs all three back to back, which is what every ceremony wants.
+ * The born-finalized entrance (ADR-116 §3) is the one caller that has to
+ * interleave: its Postgres row writes belong between the append and the
+ * fold, because the fold declines to project a user that does not exist yet.
+ * It reaches `append` and `stageAndAwait` directly rather than reimplementing
+ * either.
+ *
  * The wait is an OBSERVATION, not inline processing. A fold that cannot run
  * makes it time out; the facts are still durable, the caller still succeeds,
  * and the rows appear when the queue drains. That is why the guards read the
@@ -146,29 +153,60 @@ export class IdentityLedgerWriter implements IdentityLedger {
   }): Promise<IdentityFact[]> {
     const events = identityEventsFor({ command, facts });
     if (events.length === 0) return [];
-    const { userId, tenantId } = command.data;
     const done = identityCommitDurationSeconds.startTimer();
     try {
-      // 1. The durable append, waited — the fact lands before we return.
-      const eventStore = await this.eventStore();
-      await eventStore.storeEvents(
-        events,
-        { tenantId: createTenantId(tenantId) },
-        USER_IDENTITY_AGGREGATE_TYPE as AggregateType,
-      );
-
-      // 2. Staging — the fold is the queue's, so this is how the projection
-      //    ever learns. A failure here is a real failure: unlike the old
-      //    best-effort leg, nothing else would apply these events.
-      await this.stage({ command });
-
-      // 3. Read-your-writes, bounded. The backfill's own pass depends on it:
-      //    it verifies an identifier the same pass just attached.
-      await this.awaitFold({ userId, tenantId, events });
+      await this.append({ command, events });
+      await this.stageAndAwait({ command, events });
       return events;
     } finally {
       done();
     }
+  }
+
+  /**
+   * Leg one on its own: the durable append, waited — the fact lands before
+   * this returns, and nothing has been projected yet.
+   *
+   * Public because ADR-116 §3's born-finalized entrance has to put its
+   * Postgres row writes BETWEEN the append and the fold: the fold declines
+   * to project a user that does not exist, so staging before the rows commit
+   * would leave the newborn's `Identifier` row missing when sign-up returns.
+   * The entrance sequences the same two legs this method and the next
+   * implement, rather than a second copy of them.
+   */
+  async append({
+    command,
+    events,
+  }: {
+    command: IdentityCommand;
+    events: IdentityEvent[];
+  }): Promise<void> {
+    const { tenantId } = command.data;
+    const eventStore = await this.eventStore();
+    await eventStore.storeEvents(
+      events,
+      { tenantId: createTenantId(tenantId) },
+      USER_IDENTITY_AGGREGATE_TYPE as AggregateType,
+    );
+  }
+
+  /**
+   * Legs two and three: staging — the fold is the queue's, so this is how
+   * the projection ever learns; a failure here is a real failure, because
+   * nothing else would apply these events — followed by the bounded
+   * read-your-writes wait. The backfill's own pass depends on that wait: it
+   * verifies an identifier the same pass just attached.
+   */
+  async stageAndAwait({
+    command,
+    events,
+  }: {
+    command: IdentityCommand;
+    events: IdentityEvent[];
+  }): Promise<void> {
+    const { userId, tenantId } = command.data;
+    await this.stage({ command });
+    await this.awaitFold({ userId, tenantId, events });
   }
 
   private async stage({

@@ -28,6 +28,17 @@ export {
   IdentityUnsupportedStorageQueryError,
   parseAccountQuery,
 } from "./better-auth/account-queries";
+export {
+  birthAwareGate,
+  currentIdentityBirth,
+  IdentityEngineUnavailableError,
+  type IdentityBirthPort,
+  type IdentityBirthScope,
+  type IdentityNewborn,
+  recordIdentityBirth,
+  runWithIdentityBirth,
+  wasBornInThisRequest,
+} from "./better-auth/identity-birth";
 export { IdentityCeremonies } from "./better-auth/identity-ceremonies";
 export {
   createIdentityStorageAdapter,

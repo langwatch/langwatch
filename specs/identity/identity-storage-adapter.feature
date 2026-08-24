@@ -167,7 +167,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
 
   # ── Born finalized ─────────────────────────────────────────────────────
 
-  @unit @unimplemented
+  @unit
   Scenario: A flagged sign-up is born finalized
     Given the sign-up request carries the identity-branch opt-in for its organization
     When better-auth creates the user
@@ -176,28 +176,28 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And the user's migration-state row is finalized
     And the user's next write takes the identity branch
 
-  @unit @unimplemented
+  @unit
   Scenario: The whole flagged request routes to the identity branch
     Given the sign-up request carries the identity-branch opt-in
     When better-auth creates the user and then the credential account in the same request
     Then the account create states its fact and writes an AccountCredential row
     And no legacy Account write occurs for the newborn
 
-  @unit @unimplemented
+  @unit
   Scenario: A retried flagged sign-up converges instead of duplicating
     Given a flagged sign-up appended its facts and failed before the rows committed
     When the sign-up is retried
     Then the event store dedupes on the idempotency key and exactly one fact set exists
     And exactly one Identifier row and one user row exist after the retry
 
-  @unit @unimplemented
+  @unit
   Scenario: An abandoned flagged sign-up leaves no reachable identity
     Given a flagged sign-up appended its facts and was never retried
     When the address it used is looked up
     Then no user resolves on either branch
     And the reconciliation sweep removes the orphaned stream
 
-  @unit @unimplemented
+  @unit
   Scenario: A flagged sign-up fails loudly when the engine is unavailable
     Given the sign-up request carries the identity-branch opt-in
     And the event-sourcing engine cannot accept an append
@@ -206,7 +206,7 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And no user row is created on either branch
     But an unflagged sign-up at the same moment succeeds on the legacy branch
 
-  @unit @unimplemented
+  @unit
   Scenario: An unflagged sign-up is untouched
     Given the sign-up request carries no identity-branch opt-in
     When better-auth creates the user

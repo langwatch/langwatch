@@ -1,9 +1,11 @@
+import { HandledError } from "@langwatch/handled-error";
 import {
   identifierProviderFor,
   normalizeIdentifierValue,
 } from "@langwatch/identity";
 import { createLogger } from "@langwatch/observability";
 import type { BetterAuthOptions } from "better-auth";
+import { APIError } from "better-auth/api";
 import type {
   AdapterFactory,
   AdapterFactoryConfig,
@@ -21,6 +23,12 @@ import {
   parseAccountQuery,
 } from "./account-queries";
 import type { IdentityAccountCeremonies } from "./ceremony-types";
+import {
+  birthAwareGate,
+  currentIdentityBirth,
+  type IdentityBirthPort,
+  recordIdentityBirth,
+} from "./identity-birth";
 import type {
   IdentityAccountRow,
   IdentityAccountSecrets,
@@ -59,6 +67,12 @@ export interface IdentityStorageAdapterDeps {
   ceremonies: IdentityAccountCeremonies;
   /** ADR-116 §2: `finalized` and nothing else, cached, fail-closed. */
   isUserOnIdentityWrites: IdentityUserGate;
+  /**
+   * ADR-116 §3's entrance, reached only inside a request the auth route
+   * boundary marked. Outside one this is never called, which is what keeps a
+   * deploy of the entrance from changing anything on its own.
+   */
+  birth: IdentityBirthPort;
 }
 
 /**
@@ -142,11 +156,24 @@ function identityCustomAdapter({
   resolution,
   ceremonies,
   isUserOnIdentityWrites,
+  birth,
 }: Omit<IdentityStorageAdapterDeps, "legacyEngine"> & {
   legacy: DBAdapter;
 }): AdapterFactoryCustomizeAdapterCreator {
   return ({ getDefaultModelName, getDefaultFieldName, getFieldName }) => {
     const modelOf = (model: string): string => getDefaultModelName(model);
+
+    /**
+     * The write fork, as every routed write asks it (ADR-116 §2, §3).
+     *
+     * The gate, plus the answer it cannot give for a user this request just
+     * bore: their state row says `finalized`, but the gate reads it on
+     * another connection behind a TTL cache that answered before they
+     * existed. Wrapped HERE as well as at the composition root, so an
+     * application that composes the adapter without wrapping still cannot
+     * route a newborn's account write to the legacy table.
+     */
+    const routesToIdentity = birthAwareGate(isUserOnIdentityWrites);
 
     const toCanonicalKeys = (model: string, data: Row): Row =>
       Object.fromEntries(
@@ -253,7 +280,7 @@ function identityCustomAdapter({
           if (rows.length === 0) return null;
           const served: IdentityAccountRow[] = [];
           for (const row of rows) {
-            if (await isUserOnIdentityWrites({ userId: row.userId })) {
+            if (await routesToIdentity({ userId: row.userId })) {
               served.push(row);
             }
           }
@@ -292,7 +319,7 @@ function identityCustomAdapter({
     }): Promise<IdentityAccountRow[] | null> => {
       const canonical = canonicalWhere(model, where);
       const named = namedUserId(canonical);
-      if (named !== null && !(await isUserOnIdentityWrites({ userId: named }))) {
+      if (named !== null && !(await routesToIdentity({ userId: named }))) {
         return null;
       }
       return serveAccounts(parseAccountQuery({ operation, where: canonical }));
@@ -408,14 +435,53 @@ function identityCustomAdapter({
       ];
     };
 
+    /**
+     * A `user` create inside a marked request: the born-finalized entrance
+     * (ADR-116 §3), or nothing at all.
+     *
+     * Only a create that carries an email is a birth. better-auth's own
+     * sign-up always does; anything else — a plugin minting a placeholder
+     * user, an anonymous session — has no address to derive an identifier
+     * from and takes the legacy branch, marker or not.
+     */
+    const bearOnIdentityBranch = async (
+      canonical: Row,
+    ): Promise<Row | null> => {
+      if (currentIdentityBirth() === undefined) return null;
+      const { email, createdAt } = canonical;
+      if (typeof email !== "string" || email.length === 0) {
+        logger.warn(
+          { model: "user" },
+          "a flagged request created a user with no email; the born-finalized entrance has no identifier to state, so the create takes the legacy branch",
+        );
+        return null;
+      }
+      const born = await birth.bear({
+        row: canonical,
+        email,
+        createdAtMs:
+          createdAt instanceof Date ? createdAt.getTime() : Date.now(),
+      });
+      // From here the request's remaining routed writes are this user's, and
+      // the gate — which cannot see a state row written moments ago on
+      // another connection — is answered by the marker instead.
+      const bornId = born.id;
+      if (typeof bornId === "string") recordIdentityBirth({ userId: bornId });
+      return born;
+    };
+
     const adapter: CustomAdapter = {
       create: async ({ model, data, select }) => {
         const canonical = toCanonicalKeys(model, data);
+        if (modelOf(model) === "user") {
+          const born = await bearOnIdentityBranch(canonical);
+          if (born) return toStorageKeys(model, { ...born }) as never;
+        }
         if (modelOf(model) === "account") {
           const userId = canonical.userId;
           if (
             typeof userId === "string" &&
-            (await isUserOnIdentityWrites({ userId }))
+            (await routesToIdentity({ userId }))
           ) {
             const written = await createOnIdentityBranch(canonical);
             if (written) return toStorageKeys(model, { ...written }) as never;
@@ -634,6 +700,71 @@ function identityCustomAdapter({
       return rows.length;
     }
 
-    return adapter;
+    // Every method, wrapped once, rather than ten try/catch blocks that a
+    // new method could silently be added beside.
+    return Object.fromEntries(
+      Object.entries(adapter).map(([name, method]) => [
+        name,
+        async (...args: never[]) =>
+          surfaceHandledRefusals(() =>
+            (method as (...called: never[]) => Promise<unknown>)(...args),
+          ),
+      ]),
+    ) as unknown as CustomAdapter;
   };
+}
+
+/**
+ * The adapter boundary's translation (ADR-116 §6): a `HandledError` becomes
+ * a better-auth `APIError` carrying the stable `code`.
+ *
+ * Without it the code dies here. better-auth wraps a storage failure in its
+ * own generic error — sign-up answers `FAILED_TO_CREATE_USER` and nothing
+ * else — unless what it caught is already an `APIError`, which it re-throws
+ * verbatim. So being an `APIError` is precisely what carries `code` out to
+ * the auth error surface, where the client presentation registry turns it
+ * into the words a customer reads. The original rides on `cause` for the log.
+ *
+ * Plain errors pass through untouched: they are the ones that SHOULD degrade
+ * to a generic failure plus a trace id.
+ */
+async function surfaceHandledRefusals<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    if (!HandledError.isHandled(error)) throw error;
+    throw new APIError(
+      httpStatusFor(error.httpStatus),
+      { code: error.code, message: error.message, cause: error },
+      undefined,
+      error.httpStatus,
+    );
+  }
+}
+
+/** better-auth's status vocabulary, from ours. Anything unmapped is a 500,
+ *  which is the honest answer for a status the library cannot name. */
+function httpStatusFor(httpStatus: number): "BAD_REQUEST" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "GONE" | "UNPROCESSABLE_ENTITY" | "TOO_MANY_REQUESTS" | "SERVICE_UNAVAILABLE" | "INTERNAL_SERVER_ERROR" {
+  switch (httpStatus) {
+    case 400:
+      return "BAD_REQUEST";
+    case 401:
+      return "UNAUTHORIZED";
+    case 403:
+      return "FORBIDDEN";
+    case 404:
+      return "NOT_FOUND";
+    case 409:
+      return "CONFLICT";
+    case 410:
+      return "GONE";
+    case 422:
+      return "UNPROCESSABLE_ENTITY";
+    case 429:
+      return "TOO_MANY_REQUESTS";
+    case 503:
+      return "SERVICE_UNAVAILABLE";
+    default:
+      return "INTERNAL_SERVER_ERROR";
+  }
 }

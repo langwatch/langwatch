@@ -18,6 +18,7 @@ import {
   VerificationCeremonyService,
 } from "@langwatch/identity-server";
 import {
+  birthAwareGate,
   createIdentityStorageAdapter,
   IdentityCeremonies,
 } from "@langwatch/identity-server/better-auth";
@@ -26,21 +27,25 @@ import type { AdapterFactory } from "better-auth/adapters";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "../../db";
 import { PrismaSystemMigrationStateRepository } from "../system-migrations/repositories/system-migration-state.prisma.repository";
+import { IdentityBirthService } from "./birth";
 import { IdentityIdentifierBackfillMigration } from "./identifier-backfill.migration";
 import { IdentityLedgerWriter } from "./ledger";
+import { IdentityNewbornReconciliationService } from "./newborn-reconciliation";
 import { PrismaIdentityAccountsRepository } from "./repositories/identity-accounts.prisma.repository";
 import { PrismaIdentityBackfillRepository } from "./repositories/identity-backfill.prisma.repository";
 import { PrismaIdentityHeadsRepository } from "./repositories/identity-heads.prisma.repository";
+import { PrismaIdentityNewbornRepository } from "./repositories/identity-newborn.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./repositories/identity-projection.prisma.repository";
 import { PrismaIdentityResolutionRepository } from "./repositories/identity-resolution.prisma.repository";
 import { PrismaIdentityUsersRepository } from "./repositories/identity-users.prisma.repository";
 import { PrismaIdentityVerificationRepository } from "./repositories/identity-verification.prisma.repository";
-import { isUserOnIdentityWrites } from "./write-gate";
+import { forgetIdentityWriteGate, isUserOnIdentityWrites } from "./write-gate";
 
 const identityHeads = new PrismaIdentityHeadsRepository(prisma);
 const identityUsers = new PrismaIdentityUsersRepository(prisma);
 const identityAccounts = new PrismaIdentityAccountsRepository(prisma);
 const identityResolution = new PrismaIdentityResolutionRepository(prisma);
+const identityNewborns = new PrismaIdentityNewbornRepository(prisma);
 const migrationState = new PrismaSystemMigrationStateRepository(prisma);
 
 /** The per-user fork as the services take it: one closure, one state
@@ -111,9 +116,42 @@ export function identityCeremonies(): IdentityCeremonies {
     identityHeads,
     identityUsers,
     identityService(),
-    isLatched,
+    // The ceremonies fork on the SAME question the storage adapter does, so
+    // they take the same birth-aware gate (ADR-116 §3). A newborn whose
+    // adapter routed to the identity branch while their ceremony declined
+    // would end up with a legacy `Account` row anyway, which is exactly what
+    // the entrance exists to prevent.
+    birthAwareGate(isLatched),
     { now: Date.now, newCommandId: newIdentityCommandId },
   );
+}
+
+/**
+ * ADR-116 §3's born-finalized entrance. Composed per call like every other
+ * identity write surface, because the ledger writer it sequences resolves
+ * the pipeline handle lazily — better-auth builds its adapter at module
+ * load, before any App exists.
+ */
+export function identityBirth(): IdentityBirthService {
+  return new IdentityBirthService({
+    guards: new IdentityGuards(identityHeads, identityUsers),
+    ledger: new IdentityLedgerWriter({
+      projectionStore: new PrismaIdentityProjectionRepository(prisma),
+    }),
+    rows: identityNewborns,
+    forgetGate: forgetIdentityWriteGate,
+  });
+}
+
+/**
+ * The sweep that removes abandoned newborn streams — a required companion to
+ * the entrance, not optional hygiene (ADR-116 §3).
+ */
+export function identityNewbornReconciliation(): IdentityNewbornReconciliationService {
+  return new IdentityNewbornReconciliationService({
+    newborns: identityNewborns,
+    identity: identityService(),
+  });
 }
 
 /**
@@ -135,6 +173,7 @@ const identityStorage = createIdentityStorageAdapter({
   resolution: identityResolution,
   ceremonies: identityCeremonies(),
   isUserOnIdentityWrites: isLatched,
+  birth: identityBirth(),
 });
 
 export function identityStorageAdapter(): AdapterFactory<BetterAuthOptions> {

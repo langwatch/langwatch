@@ -128,6 +128,28 @@ export async function isUserOnIdentityWrites({
   });
 }
 
+/**
+ * Drop this user's cached answer, and the fleet-wide "has anyone finalized"
+ * one with it (ADR-116 §3).
+ *
+ * The born-finalized entrance is what needs this, and needs it explicitly.
+ * When a newborn's rows commit, two cached answers are freshly wrong: their
+ * own, if anything asked before the state row existed, and — far more
+ * damaging — the anyone-finalized short-circuit, which may have cached
+ * `false` for the whole pod and would keep EVERY user off the identity
+ * branch for the rest of its TTL, including the user just born.
+ *
+ * Invalidating rather than seeding `true` on purpose: the next read goes to
+ * the state row, which is the actual truth. A seeded `true` would be this
+ * module asserting a row it never read.
+ */
+export function forgetIdentityWriteGate({ userId }: { userId: string }): void {
+  gate.invalidate({ subject: userId });
+  anyoneGate.invalidate({
+    subject: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
+  });
+}
+
 /** The caches, dropped — for tests that latch a user mid-suite. */
 export function resetIdentityWriteGateForTests(): void {
   gate.resetForTesting();

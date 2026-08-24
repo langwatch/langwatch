@@ -397,16 +397,23 @@ describe("better-auth over the identity storage adapter", () => {
           ],
         });
 
+        // The boundary translates a handled refusal into better-auth's own
+        // error carrying the stable code (ADR-116 §6) — which is what makes
+        // it survive better-auth's error paths instead of being flattened
+        // into a generic storage failure.
         await expect(refused).rejects.toMatchObject({
+          body: { code: "identity_unsupported_storage_query" },
+          statusCode: 500,
+        });
+        const surfaced = await refused.catch(
+          (error: { body?: { cause?: unknown } }) => error.body?.cause,
+        );
+        expect(surfaced).toBeInstanceOf(IdentityUnsupportedStorageQueryError);
+        expect(surfaced).toMatchObject({
           code: "identity_unsupported_storage_query",
           fault: "platform",
-        });
-        await expect(refused).rejects.toBeInstanceOf(
-          IdentityUnsupportedStorageQueryError,
-        );
-        // The model and the operator name the failure in the log, through
-        // `reasons`, and never in the customer-facing message.
-        await expect(refused).rejects.toMatchObject({
+          // The model and the operator name the failure in the log, through
+          // `reasons`, and never in the customer-facing message.
           message: "identity_unsupported_storage_query",
         });
 

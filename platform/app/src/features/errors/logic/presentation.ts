@@ -1649,6 +1649,11 @@ const presentations = {
     describe: () =>
       "Another account already holds it. Sign in with that account, or use a different address here.",
   },
+  identity_engine_unavailable: {
+    title: "We couldn't finish creating your account",
+    describe: () =>
+      "Nothing was created, and we've been alerted. Try again in a moment, and contact support if it keeps happening.",
+  },
 
   // ---- governance ----
   anomaly_rule_not_found: {

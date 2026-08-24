@@ -37,6 +37,7 @@
 export {
   computeIdentifierHash,
   deriveIdentifierId,
+  deriveNewbornUserId,
 } from "./crypto/identifier-identity";
 export { s256Challenge } from "./crypto/pkce";
 export { mintUserHashKey } from "./crypto/user-hash-key";

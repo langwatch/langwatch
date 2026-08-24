@@ -46,6 +46,8 @@ vi.mock(
     identityService: () => ({}),
     identityBackfill: () => ({}),
     identifierBackfillMigration: () => ({}),
+    identityBirth: () => ({}),
+    identityNewbornReconciliation: () => ({}),
     isLatched: async () => false,
     // `betterAuth()` builds its adapter EAGERLY at module load, so this one
     // has to be real enough to initialise. better-auth's own memory engine
