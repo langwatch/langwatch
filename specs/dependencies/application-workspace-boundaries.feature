@@ -8,6 +8,8 @@
 # Enterprise package shape remains owned by
 # ../../packages/architecture-lint/specs/feature-package-boundaries.feature and
 # ../../packages/architecture-lint/specs/strict-feature-layout.feature.
+# Product ownership, singular names and canonical cross-feature services remain
+# owned by singular-feature-ownership.feature.
 # License and plan behaviour remains owned by
 # ../../packages/features/entitlements/specs/entitlement-resolution.feature and
 # ../licensing/license-validation.feature. Locked capability discovery remains
@@ -94,6 +96,14 @@ Feature: Physical application workspace boundaries
       And it starts no queue consumer, process manager, scheduler or one-shot product task
       And it imports no UI source or worker application source
 
+    @architecture @api @runtime
+    Scenario: API transports share one composed application
+      Given the API process has constructed its LangWatch App
+      When Hono and tRPC transport handlers run
+      Then Hono receives that App through c.var.langwatchApp
+      And tRPC receives that same App through ctx.app
+      And neither transport constructs feature services or repositories per request
+
     @architecture @worker @typecheck
     Scenario: The worker package owns background execution
       Given the worker application is built
@@ -151,6 +161,7 @@ Feature: Physical application workspace boundaries
       And its package names use the @langwatch/enterprise-<feature>-<surface> form
       And it obeys the same class, filename, repository and public-export rules as a core feature
       And product licensing lives at packages/enterprise/features/licensing rather than in an aggregate package
+      And every Enterprise feature uses its singular identifier from the ownership catalogue
 
     @architecture @enterprise @licensing
     Scenario: Signed licenses feed rather than replace provider-neutral entitlements
@@ -323,6 +334,7 @@ Feature: Physical application workspace boundaries
       Then portable schemas and capabilities move to the feature contract
       And backend services and adapters move to the feature server package
       And browser behaviour moves to the feature web package when present
+      And the owner is the singular feature registered by the product ownership catalogue
       And route, consumer and task installers move with the owning feature
       And the still-runnable application consumes those package exports
       And no application root becomes a replacement product implementation package

@@ -1,4 +1,4 @@
-Feature: Enterprise platform administration package boundary
+Feature: Platform administration package boundary
   Platform-admin access and impersonation are explicitly composed.
 
   @unit

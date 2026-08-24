@@ -7,7 +7,8 @@ Feature: Feature package boundary lint
 
   @unit @architecture
   Scenario: A valid feature graph passes
-    Given a contract package with portable dependencies
+    Given a singular feature and its subjects are registered in the ownership catalogue
+    And it has a contract package with portable dependencies
     And server and web packages that depend on their own contract
     And another feature is referenced only through its contract
     When architecture lint checks the fixture workspace
@@ -15,17 +16,25 @@ Feature: Feature package boundary lint
 
   @unit @architecture
   Scenario: Physical package names match their feature roles
-    Given a feature surface package name does not match its path and role
+    Given a feature surface package name does not match its registered singular identifier, path and role
     When architecture lint checks the workspace
     Then it fails with the expected package name and manifest path
 
   @unit @architecture
   Scenario: A broad feature cannot silently acquire a new subject
-    Given a feature declares the product subjects it owns in feature.json
+    Given the central ownership catalogue assigns each product subject to one feature
     And contract or server source introduces a filename outside those subjects
     When architecture lint checks the workspace
     Then it reports a feature-source-subject violation
-    And adding that subject requires an ordered feature.json change alongside the feature ADR and spec
+    And adding that subject to feature.json does not suppress the violation
+    And a catalogue expansion requires the owning feature ADR and spec
+
+  @unit @architecture
+  Scenario: Two features cannot own the same subject
+    Given the ownership catalogue assigns one product subject to two feature roots
+    When architecture lint checks the workspace
+    Then it reports both conflicting owners
+    And neither feature is accepted as the implicit winner
 
   @unit @architecture @enterprise
   Scenario: Enterprise aggregate packages have fixed roles and names
