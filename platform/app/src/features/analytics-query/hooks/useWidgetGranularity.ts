@@ -110,9 +110,9 @@ export function useWidgetGranularity(): WidgetGranularityState {
       const { [WIDGET_GRANULARITY_QUERY_PARAMETER]: _replaced, ...rest } =
         router.query;
 
-      // Shallow, like the period control: the picks are read from the URL on
-      // render, so a full navigation would re-run every card's query for a
-      // change one card asked for.
+      // Same route, query only: the picks are read from the URL on render, so
+      // the dashboard re-renders without remounting and only the card whose
+      // step changed re-runs.
       void router.push(
         {
           query: {
@@ -120,8 +120,6 @@ export function useWidgetGranularity(): WidgetGranularityState {
             ...(next ? { [WIDGET_GRANULARITY_QUERY_PARAMETER]: next } : {}),
           },
         },
-        undefined,
-        { shallow: true },
       );
     },
     [encodedValue, router],

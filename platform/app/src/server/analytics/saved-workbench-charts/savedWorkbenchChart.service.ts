@@ -447,11 +447,12 @@ export class SavedWorkbenchChartService {
     // Refused before anything else is resolved, so a member placing onto
     // another project's dashboard learns only that it is not here — the same
     // shape of refusal `getById` already gives for a foreign chart id.
-    const belongs = await this.deps.dashboardBelongsToProject({
+    const isDashboardInProject = await this.deps.dashboardBelongsToProject({
       dashboardId: parsed.data.dashboardId,
       projectId,
     });
-    if (!belongs) throw new SavedWorkbenchChartDashboardNotFoundError();
+    if (!isDashboardInProject)
+      throw new SavedWorkbenchChartDashboardNotFoundError();
 
     const gridRow =
       parsed.data.gridRow ??

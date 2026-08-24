@@ -215,7 +215,10 @@ export function lwqlRequestReducer(
     case "timeWindowChanged":
       return withTimeWindow(state, action.timeWindow);
     case "granularityChanged":
-      return withGranularity(state, action.granularitySeconds);
+      return withGranularity({
+        state,
+        granularitySeconds: action.granularitySeconds,
+      });
     case "submitted":
       return withSubmission(state, action.snapshot);
     case "settled":
@@ -253,10 +256,13 @@ function withTimeWindow(
   };
 }
 
-function withGranularity(
-  state: LangWatchQLRequestState,
-  granularitySeconds: LangWatchQLGranularityStep | undefined,
-): LangWatchQLRequestState {
+function withGranularity({
+  state,
+  granularitySeconds,
+}: {
+  state: LangWatchQLRequestState;
+  granularitySeconds: LangWatchQLGranularityStep | undefined;
+}): LangWatchQLRequestState {
   if (granularitySeconds === state.draft.granularitySeconds) return state;
   // Dropped rather than set to `undefined`, matching the window above: the
   // request builder spreads the draft, and a present-but-undefined key is a

@@ -21,6 +21,7 @@ export async function allocateNextGridRow(
   const lastGraph = await prisma.customGraph.findFirst({
     where: { dashboardId, projectId },
     orderBy: { gridRow: "desc" },
+    select: { gridRow: true },
   });
   return (lastGraph?.gridRow ?? -1) + 1;
 }

@@ -20,10 +20,9 @@ import type { Protections } from "../../../traces/protections";
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
 import {
   applyLangWatchQLResultLimits,
-  type LangWatchQLExecutionRequest,
-  type LangWatchQLExecutionResult,
   type LangWatchQLExecutor,
 } from "../executor";
+import { recordingExecutor } from "../executor.testFakes";
 import {
   closeLangWatchQLService,
   LangWatchQLService,
@@ -82,34 +81,6 @@ const WITHOUT_CONTENT: Protections = {
 const BOUNDED_COUNT =
   "SELECT count() AS value FROM analytics.traces " +
   "WHERE OccurredAt >= toDateTime64('2026-02-01 00:00:00', 3)";
-
-interface RecordingExecutor extends LangWatchQLExecutor {
-  readonly calls: LangWatchQLExecutionRequest[];
-}
-
-function recordingExecutor(
-  result: Partial<LangWatchQLExecutionResult> = {},
-): RecordingExecutor {
-  const calls: LangWatchQLExecutionRequest[] = [];
-  return {
-    calls,
-    async execute(request) {
-      calls.push(request);
-      return {
-        columns: [{ name: "value", type: "UInt64" }],
-        rows: [{ value: 1 }],
-        truncated: false,
-        statistics: {
-          elapsedMs: 3,
-          rowsRead: 10,
-          bytesRead: 100,
-          rowsReturned: 1,
-        },
-        ...result,
-      };
-    },
-  };
-}
 
 function serviceWith(executor: LangWatchQLExecutor | null): LangWatchQLService {
   return new LangWatchQLService({ executor, database: DATABASE });

@@ -154,7 +154,7 @@ const registry = {
   },
   saved_workbench_chart_dashboard_not_found: {
     tips: [
-      "Check the dashboard id — a dashboard from another project cannot be placed on from this one",
+      "Check the dashboard id — a dashboard from another project cannot be used for placement in this project",
       "List the project's dashboards to see which ids exist",
     ],
   },

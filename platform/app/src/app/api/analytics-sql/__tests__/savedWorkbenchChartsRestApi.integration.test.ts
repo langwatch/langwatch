@@ -121,6 +121,19 @@ describe("given the saved workbench chart REST endpoints", () => {
   const placementPath = (project: Project, chartId: string) =>
     `${chartPath(project, chartId)}/placement`;
 
+  /** Runs one request with the switch off, whatever else the suite set. */
+  const withFlagOff = async <T>(request: () => Promise<T>): Promise<T> => {
+    // The env override is consulted before the force-enable list, so `0`
+    // really does switch it off on a deployment (and in this repository's
+    // own `.env`) that force-enables the flag.
+    process.env.RELEASE_LWQL_WORKBENCH = "0";
+    try {
+      return await request();
+    } finally {
+      process.env.RELEASE_LWQL_WORKBENCH = "1";
+    }
+  };
+
   /** A dashboard owned by the given project, straight into the store. */
   const createDashboard = async (owner: Project): Promise<Dashboard> =>
     await prisma.dashboard.create({
@@ -567,19 +580,6 @@ describe("given the saved workbench chart REST endpoints", () => {
   });
 
   describe("when the LangWatchQL feature switch is off for the project", () => {
-    /** Runs one request with the switch off, whatever else the suite set. */
-    const withFlagOff = async <T>(request: () => Promise<T>): Promise<T> => {
-      // The env override is consulted before the force-enable list, so `0`
-      // really does switch it off on a deployment (and in this repository's
-      // own `.env`) that force-enables the flag.
-      process.env.RELEASE_LWQL_WORKBENCH = "0";
-      try {
-        return await request();
-      } finally {
-        process.env.RELEASE_LWQL_WORKBENCH = "1";
-      }
-    };
-
     /** @scenario "Every chart endpoint stays dark while the workbench switch is off" */
     it("refuses all five verbs with the named refusal", async () => {
       const created = await createChart(openProject, { name: "Volume" });
@@ -995,15 +995,6 @@ describe("given the saved workbench chart REST endpoints", () => {
   });
 
   describe("when the switch is off for the project placing a chart", () => {
-    const withFlagOff = async <T>(request: () => Promise<T>): Promise<T> => {
-      process.env.RELEASE_LWQL_WORKBENCH = "0";
-      try {
-        return await request();
-      } finally {
-        process.env.RELEASE_LWQL_WORKBENCH = "1";
-      }
-    };
-
     /** @scenario "Placement routes stay dark while the workbench switch is off" */
     it("refuses both placement verbs with the named refusal, mutating nothing", async () => {
       const chart = await createChart(openProject, { name: "Dark" });

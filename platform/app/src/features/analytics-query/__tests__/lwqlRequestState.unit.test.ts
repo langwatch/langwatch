@@ -167,7 +167,7 @@ describe("the LangWatchQL request machine", () => {
         );
       });
 
-      /** @scenario "Editing SQL or parameters marks the result stale and restores Run query" */
+      /** @scenario "Changing the granularity step marks the result stale and restores Run query" */
       it("marks the visible result stale, since it answers a different question", async () => {
         const { calls, controller } = controllerWith({ sql: "SELECT 1" });
 
@@ -185,7 +185,7 @@ describe("the LangWatchQL request machine", () => {
         expect(lwqlActionLabel(state)).toBe("Run query");
       });
 
-      /** @scenario "A granularity declared with no step supplied runs on its own authored bucketing" */
+      /** @scenario "Clearing the chosen step sends no step at all, not an empty one" */
       it("sends no step at all once it is cleared", () => {
         const { calls, controller } = controllerWith({ sql: "SELECT 1" });
 

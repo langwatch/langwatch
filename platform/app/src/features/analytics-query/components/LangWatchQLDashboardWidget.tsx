@@ -86,7 +86,7 @@ export function LangWatchQLDashboardWidget({
   const { result, error } = useLangWatchQLWidgetRun({
     chartId,
     projectId,
-    chartLoaded: !!chartQuery.data,
+    isChartLoaded: !!chartQuery.data,
     start: period.startDate.getTime(),
     end: period.endDate.getTime(),
     granularitySeconds:

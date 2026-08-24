@@ -424,7 +424,7 @@ describe("Feature: Dashboard REST API", () => {
   // other's rows. This is that promise on the way *out*: the REST reader
   // serialises each graph row wholesale, so a workbench row reaching it would
   // publish a member's stored SQL to any project API key.
-  describe("GET /api/dashboards/:id with a workbench chart placed on it", () => {
+  describe("when a workbench chart is placed on the dashboard being read", () => {
     /** @scenario "A saved workbench chart is not exposed through the dashboard REST API" */
     it("omits the workbench chart from the graphs it returns", async () => {
       const dashboard = await createDashboard({ name: "Mixed" });

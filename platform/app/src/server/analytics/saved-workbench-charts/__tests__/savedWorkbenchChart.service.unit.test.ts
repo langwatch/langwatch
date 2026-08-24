@@ -17,10 +17,8 @@ import type { CustomGraph } from "~/generated/prisma/client";
 
 import type { Protections } from "../../../traces/protections";
 import { WORKBENCH_SQL_CHART_KIND } from "../../chartKinds";
-import type {
-  LangWatchQLExecutionRequest,
-  LangWatchQLExecutor,
-} from "../../lwql/executor";
+import type { LangWatchQLExecutor } from "../../lwql/executor";
+import { recordingExecutor } from "../../lwql/executor.testFakes";
 import { LangWatchQLService } from "../../lwql/lwql.service";
 import type {
   CreateSavedWorkbenchChartInput,
@@ -242,35 +240,6 @@ class FakeStore implements SavedWorkbenchChartStore {
     this.rows.delete(id);
     return 1;
   }
-}
-
-/**
- * An executor that records what it was asked to run and answers a fixed small
- * result — the same fake the LangWatchQL service suite drives, because the
- * claims worth making about a run are "what reached the database", which is an
- * artifact to inspect rather than a call sequence to verify.
- */
-function recordingExecutor(): LangWatchQLExecutor & {
-  readonly calls: LangWatchQLExecutionRequest[];
-} {
-  const calls: LangWatchQLExecutionRequest[] = [];
-  return {
-    calls,
-    async execute(request) {
-      calls.push(request);
-      return {
-        columns: [{ name: "value", type: "UInt64" }],
-        rows: [{ value: 7 }],
-        truncated: false,
-        statistics: {
-          elapsedMs: 2,
-          rowsRead: 4,
-          bytesRead: 40,
-          rowsReturned: 1,
-        },
-      };
-    },
-  };
 }
 
 function build(
@@ -900,7 +869,7 @@ describe("running a saved workbench chart", () => {
           period_end: "2026-02-27 00:00:00",
           period_granularity_seconds: 3600,
         });
-        expect(result.rows).toEqual([{ value: 7 }]);
+        expect(result.rows).toEqual([{ value: 1 }]);
         expect(result.followsTimeWindow).toBe(true);
         expect(result.followsGranularity).toBe(true);
         expect(result.granularitySeconds).toBe(3600);

@@ -22,10 +22,7 @@ import type { CustomGraph } from "~/generated/prisma/client";
 
 import type { Protections } from "../../../traces/protections";
 import { WORKBENCH_SQL_CHART_KIND } from "../../chartKinds";
-import type {
-  LangWatchQLExecutionRequest,
-  LangWatchQLExecutor,
-} from "../../lwql/executor";
+import { recordingExecutor } from "../../lwql/executor.testFakes";
 import { LangWatchQLService } from "../../lwql/lwql.service";
 import type {
   CreateSavedWorkbenchChartInput,
@@ -131,29 +128,6 @@ class FakeStore implements SavedWorkbenchChartStore {
   }): Promise<CustomGraph | null> {
     throw new Error("not used by this suite");
   }
-}
-
-function recordingExecutor(): LangWatchQLExecutor & {
-  readonly calls: LangWatchQLExecutionRequest[];
-} {
-  const calls: LangWatchQLExecutionRequest[] = [];
-  return {
-    calls,
-    async execute(request) {
-      calls.push(request);
-      return {
-        columns: [{ name: "value", type: "UInt64" }],
-        rows: [{ value: 7 }],
-        truncated: false,
-        statistics: {
-          elapsedMs: 2,
-          rowsRead: 4,
-          bytesRead: 40,
-          rowsReturned: 1,
-        },
-      };
-    },
-  };
 }
 
 function build() {

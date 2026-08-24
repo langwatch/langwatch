@@ -31,7 +31,7 @@ export interface UseLangWatchQLWidgetRunInput {
   readonly chartId: string;
   readonly projectId: string;
   /** The saved chart definition has loaded; nothing runs before it has. */
-  readonly chartLoaded: boolean;
+  readonly isChartLoaded: boolean;
   /** Period start, epoch milliseconds. */
   readonly start: number;
   /** Period end, epoch milliseconds. */
@@ -43,7 +43,7 @@ export interface UseLangWatchQLWidgetRunInput {
 export function useLangWatchQLWidgetRun({
   chartId,
   projectId,
-  chartLoaded,
+  isChartLoaded,
   start,
   end,
   granularitySeconds,
@@ -65,7 +65,7 @@ export function useLangWatchQLWidgetRun({
   const requestKey = `${chartId}:${projectId}:${start}:${end}:${granularitySeconds}`;
 
   useEffect(() => {
-    if (!chartLoaded) return;
+    if (!isChartLoaded) return;
     if (lastRequest.current === requestKey) return;
     lastRequest.current = requestKey;
 
@@ -99,7 +99,7 @@ export function useLangWatchQLWidgetRun({
       },
     );
   }, [
-    chartLoaded,
+    isChartLoaded,
     requestKey,
     mutate,
     chartId,

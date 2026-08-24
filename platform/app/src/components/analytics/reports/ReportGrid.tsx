@@ -26,10 +26,10 @@ interface ReportGridProps {
   dashboardId?: string;
   onGraphDelete: (graphId: string) => void;
   onGraphSizeChange: (graphId: string, size: SizeOption) => void;
-  onGraphGranularityChange?: (
-    graphId: string,
-    granularitySeconds: number,
-  ) => void;
+  onGraphGranularityChange?: (input: {
+    graphId: string;
+    granularitySeconds: number;
+  }) => void;
   onGraphsReorder: (layouts: GridLayout[]) => void;
   deletingGraphId: string | null;
 }
@@ -109,7 +109,10 @@ export function ReportGrid({
               {...(onGraphGranularityChange
                 ? {
                     onGranularityChange: (granularitySeconds: number) =>
-                      onGraphGranularityChange(graph.id, granularitySeconds),
+                      onGraphGranularityChange({
+                        graphId: graph.id,
+                        granularitySeconds,
+                      }),
                   }
                 : {})}
               isDeleting={deletingGraphId === graph.id}

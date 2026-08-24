@@ -185,10 +185,13 @@ function ReportsContent() {
   // is the follow-up that adds the column.
   const { granularityByGraphId, setGranularity } = useWidgetGranularity();
 
-  const handleGraphGranularityChange = (
-    graphId: string,
-    granularitySeconds: number,
-  ) => {
+  const handleGraphGranularityChange = ({
+    graphId,
+    granularitySeconds,
+  }: {
+    graphId: string;
+    granularitySeconds: number;
+  }) => {
     setGranularity(graphId, granularitySeconds);
   };
 

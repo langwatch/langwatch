@@ -274,7 +274,9 @@ function assertSurfaceStepIsClean({
   readonly granularitySeconds?: number;
 }): void {
   if (!isLangWatchQLGranularityParameterType(declaredType)) {
-    throw new LangWatchQLReservedGranularityTypeError([declaredName]);
+    throw new LangWatchQLReservedGranularityTypeError({
+      mistyped: [declaredName],
+    });
   }
 
   // Only this resolver's own reserved name: the window sweep owns the other
@@ -292,10 +294,10 @@ function assertSurfaceStepIsClean({
   if (granularitySeconds !== undefined && !isOfferedStep(granularitySeconds)) {
     // A zero, fractional or off-list step is a malformed surface value, not a
     // caller choice -- the input schemas refuse it first; this is the backstop.
-    throw new LangWatchQLReservedGranularityTypeError(
-      [declaredName],
-      "step-value",
-    );
+    throw new LangWatchQLReservedGranularityTypeError({
+      mistyped: [declaredName],
+      fault: "step-value",
+    });
   }
 }
 
@@ -387,9 +389,9 @@ export function assertLangWatchQLGranularityDeclaration(
   if (!declaredGranularity) return;
 
   if (!isLangWatchQLGranularityParameterType(declaredGranularity.type)) {
-    throw new LangWatchQLReservedGranularityTypeError([
-      declaredGranularity.name,
-    ]);
+    throw new LangWatchQLReservedGranularityTypeError({
+      mistyped: [declaredGranularity.name],
+    });
   }
 
   const periodNames = [LWQL_PERIOD_START_PARAMETER, LWQL_PERIOD_END_PARAMETER];

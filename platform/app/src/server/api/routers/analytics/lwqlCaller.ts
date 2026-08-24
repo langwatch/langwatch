@@ -22,10 +22,13 @@ import { getUserProtectionsForProject } from "../../utils";
  * query runs under. It is read server-side and must never leave the calling
  * procedure — no field of it may appear in a response.
  */
-export async function resolveLangWatchQLCaller(
-  ctx: { prisma: PrismaClient; session: Session | null },
-  projectId: string,
-) {
+export async function resolveLangWatchQLCaller({
+  ctx,
+  projectId,
+}: {
+  ctx: { prisma: PrismaClient; session: Session | null };
+  projectId: string;
+}) {
   const project = await ctx.prisma.project.findUnique({
     where: { id: projectId },
     select: { id: true, lwqlKey: true },

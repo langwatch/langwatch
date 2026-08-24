@@ -114,8 +114,8 @@ describe("resolveLangWatchQLGranularity", () => {
       });
     });
 
-    /** @scenario "A granularity declared with no step supplied runs on its own authored bucketing" */
-    it("runs without a step when the surface offers none, without inventing one", () => {
+    /** @scenario "The resolver reports an unfilled declared granularity rather than inventing a step" */
+    it("resolves without a step when the surface offers none, without inventing one", () => {
       const resolution = resolveLangWatchQLGranularity({
         declared: [...PERIOD, ...GRANULARITY],
         timeWindow: WINDOW,

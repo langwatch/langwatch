@@ -145,6 +145,20 @@ Feature: LangWatchQL query workbench — native tables and LangWatchQL Vega-Lite
     Then the visible result is marked stale
     And the action reads Run query again
 
+  @unit
+  Scenario: Changing the granularity step marks the result stale and restores Run query
+    Given a successful result for a submitted snapshot at one granularity step
+    When the member picks a different granularity step
+    Then the visible result is marked stale
+    And the action reads Run query again
+
+  @unit
+  Scenario: Clearing the chosen step sends no step at all, not an empty one
+    Given a submission that had chosen a granularity step
+    When the member clears the step and runs the query
+    Then the request carries no granularity field at all
+    And it is not sent as a present field holding no value
+
   @integration
   Scenario: A stale result stays labelled as belonging to the previous submission
     Given a result marked stale by an edit
@@ -372,6 +386,13 @@ Feature: LangWatchQL query workbench — native tables and LangWatchQL Vega-Lite
     When the entry, Table-mode, and unrelated route chunks are inspected
     Then no Vega runtime code is present in them
     And the Vega runtime loads only when Chart mode is first entered
+
+  @unit
+  Scenario: Each lazy Vega wrapper defers its own module, in Chart mode and on the dashboard widget
+    Given the lazy wrapper for Chart mode and the lazy wrapper for the dashboard widget chart
+    When each wrapper's own static import graph is walked
+    Then neither wrapper's graph reaches Vega or the module it defers
+    And each wrapper's source still names its deferred module in a dynamic import
 
   @unit
   Scenario: Policy modules stay pure and server-import-safe
@@ -936,12 +957,12 @@ Scenario: A step too fine for the window is refused where the member chose it
   Then the refusal is shown against the query
 
 @unit
-Scenario: A granularity declared with no step supplied runs on its own authored bucketing
+Scenario: The resolver reports an unfilled declared granularity rather than inventing a step
   Given SQL declaring period_granularity_seconds as UInt32
-  And the surface supplies no step
-  When the member runs the query
-  Then no granularity value is bound
-  And the result is still labelled as following the granularity, since the statement declares it
+  And no step supplied
+  When the declaration is resolved on its own, apart from the run path that would refuse it
+  Then the resolution still says the statement follows the granularity
+  And it carries no granularity value, since inventing one would change what a member's chart shows without them asking
 
 @unit
 Scenario: A caller that supplies period_granularity_seconds itself is refused

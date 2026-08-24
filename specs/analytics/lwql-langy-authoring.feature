@@ -21,12 +21,9 @@ Feature: Langy authors saved workbench charts and places them on dashboards
     LangWatchQL analytics SQL family and the same feature switch and
     permissions;
   - the CLI verbs, the skill and the Langy routing row that let an agent reach
-    both without a human touching the workbench. Those scenarios are stated
-    here because they are implied by the same acceptance criteria, but they are
-    bound by commits later than this slice's service and REST work — a `chart`
-    CLI family, a `lwql-charts` recipe and an `AGENTS.md` row do not exist yet
-    at the point this file is written, and the parity check reports them
-    unbound until those commits land.
+    both without a human touching the workbench: a `chart` CLI family
+    (`sdks/typescript/src/cli/commands/charts/`) and a `lwql-charts` skill
+    (`skills/recipes/lwql-charts/`), each bound below.
 
   The design under proof:
   - Placing a chart is a service operation, not a side effect of creating one.

@@ -27,6 +27,9 @@ describe("the notice a coarsened widget shows", () => {
 
     expect(notice).toContain("1-hour");
     expect(notice).toContain("1-minute");
+    // The step used comes first: a swapped pair reads as a refinement, the
+    // opposite of what happened.
+    expect(notice.indexOf("1-hour")).toBeLessThan(notice.indexOf("1-minute"));
   });
 
   it("cites the datapoint ceiling that forced the change", () => {

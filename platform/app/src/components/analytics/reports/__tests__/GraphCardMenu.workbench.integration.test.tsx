@@ -39,7 +39,6 @@ beforeEach(() => {
 });
 
 function mount(overrides: Partial<Parameters<typeof GraphCardMenu>[0]> = {}) {
-  const onGranularityChange = vi.fn();
   const onSizeChange = vi.fn();
   const onDelete = vi.fn();
 
@@ -57,7 +56,7 @@ function mount(overrides: Partial<Parameters<typeof GraphCardMenu>[0]> = {}) {
     />,
   );
 
-  return { onGranularityChange, onSizeChange, onDelete };
+  return { onSizeChange, onDelete };
 }
 
 describe("the dashboard card menu", () => {

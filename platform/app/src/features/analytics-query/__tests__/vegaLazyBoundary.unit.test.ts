@@ -186,7 +186,7 @@ describe("where the Vega runtime can be reached from", () => {
         expect(leaks.map((file) => file.replace(FEATURE_DIR, ""))).toEqual([]);
       });
 
-      /** @scenario "Vega loads lazily from Chart mode only" */
+      /** @scenario "Each lazy Vega wrapper defers its own module, in Chart mode and on the dashboard widget" */
       it.each(
         LAZY_BOUNDARIES.map((boundary) => [boundary.wrapper, boundary]),
       )("keeps %s free of everything it defers", (_name, {

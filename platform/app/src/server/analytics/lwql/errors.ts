@@ -241,12 +241,15 @@ export type LangWatchQLGranularityFault =
 export class LangWatchQLReservedGranularityTypeError extends HandledError {
   declare readonly code: "lwql_granularity_parameter_type";
 
-  constructor(
+  constructor({
+    mistyped,
+    fault = "declared-type",
+  }: {
     /** The reserved names declared (or valued) wrongly. Sorted. */
-    mistyped: readonly string[],
+    mistyped: readonly string[];
     /** Which failure this is; the declaration one when unstated. */
-    fault: LangWatchQLGranularityFault = "declared-type",
-  ) {
+    fault?: LangWatchQLGranularityFault;
+  }) {
     super(
       "lwql_granularity_parameter_type",
       fault === "step-value"

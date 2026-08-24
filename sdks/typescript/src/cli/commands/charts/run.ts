@@ -11,14 +11,6 @@ import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
 /**
- * Runs a saved chart by id: reads the chart, then executes its own statement
- * and stored parameter values through the LangWatchQL query door — the same
- * governed execution path every other surface uses, so what this prints is
- * what the workbench would show. `--start`/`--end` fill the reserved
- * `period_start`/`period_end` parameters for statements that declare them,
- * and `--granularity` the reserved datapoint step, in seconds.
- */
-/**
  * The datapoint steps the platform offers, in seconds. The API is the source
  * of truth (`LWQL_GRANULARITY_STEPS`, restricted in the route schema); this
  * local copy only exists to refuse an off-list value before a request is made,
@@ -28,6 +20,14 @@ const OFFERED_GRANULARITY_STEPS = [1, 60, 3600] as const;
 
 const OFFERED_GRANULARITY_STEP_NAMES = "1 (1 second), 60 (1 minute), 3600 (1 hour)";
 
+/**
+ * Runs a saved chart by id: reads the chart, then executes its own statement
+ * and stored parameter values through the LangWatchQL query door — the same
+ * governed execution path every other surface uses, so what this prints is
+ * what the workbench would show. `--start`/`--end` fill the reserved
+ * `period_start`/`period_end` parameters for statements that declare them,
+ * and `--granularity` the reserved datapoint step, in seconds.
+ */
 export const runChartCommand = async (
   id: string,
   options: {

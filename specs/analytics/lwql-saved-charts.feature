@@ -535,7 +535,26 @@ Feature: Saved LangWatchQL workbench charts — the persistence model and its wr
 # carrying neither field is a refusal rather than a silent no-op:
 #   → Scenario: An update naming neither a name nor a definition is refused rather than quietly doing nothing
 #
+# Issue #6582, slice 3 ("dashboard placement and rendering").
+#
+# AC "a placed workbench card draws the widget, never the builder renderer,
+#    and the reverse"
+#   → Scenario: A placed workbench card draws the widget, not the builder
+#   → Scenario: A builder card keeps the builder renderer and its alert bell
+#   → Scenario: The dashboard list counts exactly the cards the grid will render
+# AC "a saved statement has no series to threshold, so it is offered no alert"
+#   → Scenario: A workbench card is not offered an alert it cannot evaluate
+# AC "a placed widget's run asks to coarsen on budget overflow, and names what
+#    it substituted"
+#   → Scenario: A placed widget asks the run to coarsen rather than refuse
+#   → Scenario: A coarsened widget says which step it actually ran at
+# AC "a widget settles on the newest run for its period, not the newest to resolve"
+#   → Scenario: A widget ignores an answer for a period it has left
+# AC "a run refusal is named from the error registry, and only falls back to
+#    the generic card for a code the registry does not carry"
+#   → Scenario: A widget names a run refusal instead of the generic card
+#   → Scenario: A widget falls back to the generic card only for unknown failures
+#
 # Deliberately NOT in this feature file, because they are not in these slices:
-# dashboard placement and rendering (with #6631's time-window contract),
 # per-viewer re-execution and its degraded cards, and the MCP/langy authoring
-# tools. Each lands with its own scenarios in slices 3 and 5.
+# tools. Each lands with its own scenarios in slice 5.

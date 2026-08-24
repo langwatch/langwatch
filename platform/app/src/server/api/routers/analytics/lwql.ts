@@ -144,10 +144,10 @@ const query = protectedProcedure
   .permission("analytics:view")
   .use(enforceWorkbenchEnabled)
   .mutation(async ({ ctx, input }) => {
-    const { project, protections } = await resolveLangWatchQLCaller(
+    const { project, protections } = await resolveLangWatchQLCaller({
       ctx,
-      input.projectId,
-    );
+      projectId: input.projectId,
+    });
 
     return getLangWatchQLService().execute({
       project,

@@ -556,7 +556,7 @@ describe("the saved workbench chart router", () => {
    * instance. Replacing the whole service would also replace `validate`, which
    * the save-gate tests above depend on being the genuine one.
    */
-  describe("running a saved chart through the router", () => {
+  describe("given a saved chart run through the router", () => {
     const WEEK = {
       start: new Date("2026-02-20T00:00:00Z"),
       end: new Date("2026-02-27T00:00:00Z"),
