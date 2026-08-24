@@ -987,7 +987,7 @@ function endOfHourMs(ms: number): number {
  * A message with no status at all is left alone: some responses omit it, and
  * treating absent as in-flight would hold the watermark on every sweep forever.
  */
-const TERMINAL_MESSAGE_STATUSES = new Set([
+export const TERMINAL_MESSAGE_STATUSES: ReadonlySet<string> = new Set([
   "COMPLETED",
   "FAILED",
   "CANCELLED",
