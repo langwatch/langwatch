@@ -7,12 +7,12 @@ import {
 } from "~/experiments-v3/types";
 import { extractPersistedState } from "~/experiments-v3/types/persistence";
 import type { PrismaClient } from "~/generated/prisma/client";
+import type { ExperimentService } from "@langwatch/experiment-contract";
 import type {
   Entry,
   Field,
   Workflow as WorkflowDSL,
 } from "~/optimization_studio/types/dsl";
-import { ExperimentService } from "~/server/experiments/experiment.service";
 import { loadExecutionData } from "~/server/experiments-v3/execution/dataLoader";
 import { startPollingRun } from "~/server/experiments-v3/execution/experimentRunner";
 
@@ -58,10 +58,16 @@ const WORKFLOW_DATASET_ID = "workflow-dataset";
  * the evaluations-v3 run API.
  */
 export class WorkflowEvaluationService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly experiments: ExperimentService,
+  ) {}
 
-  static create(prisma: PrismaClient): WorkflowEvaluationService {
-    return new WorkflowEvaluationService(prisma);
+  static create(
+    prisma: PrismaClient,
+    experiments: ExperimentService,
+  ): WorkflowEvaluationService {
+    return new WorkflowEvaluationService(prisma, experiments);
   }
 
   async triggerEvaluation({
@@ -243,9 +249,7 @@ export class WorkflowEvaluationService {
       ui: createInitialUIState(),
     };
 
-    const experiment = await ExperimentService.create(
-      this.prisma,
-    ).findOrCreateForWorkflow({
+    const experiment = await this.experiments.findOrCreateForWorkflow({
       projectId,
       workflowId: workflow.id,
       name: workflow.name,

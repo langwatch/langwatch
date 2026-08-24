@@ -28,7 +28,7 @@ import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
-import { DatasetNotReadyError } from "~/server/datasets/errors";
+import { DatasetNotReadyError } from "@langwatch/dataset-contract";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 

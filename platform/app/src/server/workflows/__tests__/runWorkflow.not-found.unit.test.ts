@@ -1,42 +1,72 @@
-/**
- * Found via a systematic MCP tool sweep: platform_run_workflow on a
- * nonexistent workflow ID returned a raw 500 ("Workflow not found.") while
- * platform_get_workflow/platform_delete_workflow on the exact same ID
- * correctly returned 404. runWorkflow() threw a plain Error, which falls
- * through every case in error-handler.ts's determineErrorResponse() and
- * lands in the generic 500 catch-all -- the same bug class as
- * ModelNotConfiguredError (see fix/model-not-configured-error-500).
- */
 import { describe, expect, it, vi } from "vitest";
+import type { Workflow } from "../../../optimization_studio/types/dsl";
+import {
+  WorkflowNlpExecutor,
+  type WorkflowExecutionRuntime,
+} from "../runWorkflow";
 
-const { findUniqueMock } = vi.hoisted(() => ({ findUniqueMock: vi.fn() }));
-vi.mock("../../db", () => ({
-  prisma: {
-    workflow: { findUnique: (...args: unknown[]) => findUniqueMock(...args) },
+const workflow: Workflow = {
+  spec_version: "1.5",
+  workflow_id: "workflow_1",
+  name: "Triage",
+  icon: "",
+  description: "",
+  version: "1",
+  nodes: [],
+  edges: [],
+  state: {},
+  template_adapter: "default",
+  enable_tracing: true,
+};
+
+const input = {
+  projectId: "project_1",
+  workflowId: "workflow_1",
+  inputs: { ticket: "42" },
+  version: {
+    id: "version_1",
+    workflowId: "workflow_1",
+    projectId: "project_1",
+    version: "1",
+    autoSaved: false,
+    commitMessage: "first",
+    authorId: null,
+    parentId: null,
+    dsl: { name: "Triage", version: "1", nodes: [], edges: [] },
+    createdAt: new Date(),
+    updatedAt: new Date(),
   },
-}));
+};
 
-import { NotFoundError, ValidationError } from "@langwatch/handled-error";
-import { runWorkflow } from "../runWorkflow";
-
-describe("runWorkflow()", () => {
-  describe("when the workflow does not exist", () => {
-    it("throws a HandledError NotFoundError instead of a plain Error", async () => {
-      findUniqueMock.mockResolvedValue(null);
-
-      await expect(
-        runWorkflow("nonexistent-workflow", "project_123", {}),
-      ).rejects.toBeInstanceOf(NotFoundError);
+describe("WorkflowNlpExecutor", () => {
+  it("dispatches the already-resolved version without a persistence dependency", async () => {
+    const dispatchNlp = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => ({ result: {}, status: "success" }),
     });
-  });
+    const runtime: WorkflowExecutionRuntime = {
+      migrateDsl: vi.fn().mockReturnValue(workflow),
+      getProjectModelProviders: vi.fn().mockResolvedValue({}),
+      stripUnsupportedParams: vi.fn().mockResolvedValue(undefined),
+      addEnvs: async (event) => event,
+      dispatchNlp,
+      createTraceId: () => "trace_generated",
+    };
 
-  describe("when the workflow exists but has never been published", () => {
-    it("throws a HandledError ValidationError instead of a plain Error", async () => {
-      findUniqueMock.mockResolvedValue({ id: "wf_1", publishedId: null });
+    const result = await WorkflowNlpExecutor.create(runtime).execute(input);
 
-      await expect(
-        runWorkflow("wf_1", "project_123", {}),
-      ).rejects.toBeInstanceOf(ValidationError);
-    });
+    expect(result).toEqual({ result: {}, status: "success" });
+    expect(runtime.migrateDsl).toHaveBeenCalledWith(input.version.dsl);
+    expect(dispatchNlp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: "project_1",
+        origin: "workflow",
+        body: expect.objectContaining({
+          payload: expect.objectContaining({ trace_id: "trace_generated" }),
+        }),
+      }),
+    );
   });
 });

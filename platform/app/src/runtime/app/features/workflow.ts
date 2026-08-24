@@ -5,6 +5,7 @@ import {
   WorkflowExecutionPort,
 } from "@langwatch/workflow-server";
 import type { WorkflowService } from "@langwatch/workflow-contract";
+import { WorkflowNlpExecutor } from "~/server/workflows/runWorkflow";
 
 /**
  * Application-owned composition seam for Workflow. The App root supplies the
@@ -24,24 +25,18 @@ export type AppWorkflowRuntimeOptions = {
 
 type WorkflowExecutionInput = Parameters<WorkflowExecutionPort["execute"]>[0];
 
-/** Adapts the existing NLP execution engine without leaking it into Workflow. */
+/** Binds the process-owned Workflow NLP executor to the canonical port. */
 export class AppWorkflowExecutionPort extends WorkflowExecutionPort {
-  static create(
-    execute: (input: WorkflowExecutionInput) => Promise<unknown>,
-  ): AppWorkflowExecutionPort {
-    return new AppWorkflowExecutionPort(execute);
+  static create(executor: WorkflowNlpExecutor): AppWorkflowExecutionPort {
+    return new AppWorkflowExecutionPort(executor);
   }
 
-  private constructor(
-    private readonly executeWorkflow: (
-      input: WorkflowExecutionInput,
-    ) => Promise<unknown>,
-  ) {
+  private constructor(private readonly executor: WorkflowNlpExecutor) {
     super();
   }
 
   execute(input: WorkflowExecutionInput): Promise<unknown> {
-    return this.executeWorkflow(input);
+    return this.executor.execute(input);
   }
 }
 

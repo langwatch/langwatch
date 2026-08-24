@@ -341,6 +341,7 @@ secured.access(requires("workflows:create")).post(
     try {
       const result = await WorkflowEvaluationService.create(
         prisma,
+        c.app.experiments,
       ).triggerEvaluation({
         projectId: project.id,
         projectSlug: project.slug,

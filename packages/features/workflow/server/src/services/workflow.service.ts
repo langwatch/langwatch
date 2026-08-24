@@ -4,6 +4,7 @@ import {
   copyWorkflowCommandSchema,
   createWorkflowCommandSchema,
   publishWorkflowCommandSchema,
+  runWorkflowCommandSchema,
   saveWorkflowVersionCommandSchema,
   updateWorkflowCommandSchema,
   WorkflowDslValidationError,
@@ -237,10 +238,17 @@ export class WorkflowService extends WorkflowServiceContract {
     return { pushedTo: selected.length, selectedCopies: selected.length };
   }
 
-  async run(input: Parameters<WorkflowServiceContract["run"]>[0]): Promise<unknown> {
+  async run(
+    input: Parameters<WorkflowServiceContract["run"]>[0],
+  ): Promise<unknown> {
     if (!this.options.execution) throw new Error("Workflow execution is not configured.");
-    const version = await this.getPublishedVersion({ workflowId: input.workflowId, projectId: input.projectId, versionId: input.versionId });
-    return this.options.execution.execute({ ...input, version });
+    const command = this.parse(runWorkflowCommandSchema, input);
+    const version = await this.getPublishedVersion({
+      workflowId: command.workflowId,
+      projectId: command.projectId,
+      versionId: command.versionId,
+    });
+    return this.options.execution.execute({ ...command, version });
   }
 
   private async latestVersion(workflowId: string, projectId: string): Promise<WorkflowVersion> {

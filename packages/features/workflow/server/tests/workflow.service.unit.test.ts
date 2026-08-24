@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Workflow, WorkflowVersion, WorkflowWithVersion } from "@langwatch/workflow-contract";
-import { WorkflowNotPublishedError } from "@langwatch/workflow-contract";
+import {
+  WorkflowNotPublishedError,
+  type RunWorkflowCommand,
+} from "@langwatch/workflow-contract";
+import { WorkflowExecutionPort } from "../src/ports/workflow.port";
 import { WorkflowService as ServerWorkflowService } from "../src/services/workflow.service";
 import { WorkflowRepository, type PersistWorkflowInput, type PersistWorkflowVersionInput } from "../src/repositories/workflow.repository";
 
@@ -36,6 +40,17 @@ class FakeWorkflowRepository extends WorkflowRepository {
   async findCopies(): Promise<Workflow[]> { return []; }
 }
 
+class FakeWorkflowExecutionPort extends WorkflowExecutionPort {
+  readonly calls: Parameters<WorkflowExecutionPort["execute"]>[0][] = [];
+
+  async execute(
+    input: Parameters<WorkflowExecutionPort["execute"]>[0],
+  ): Promise<unknown> {
+    this.calls.push(input);
+    return { status: "success" };
+  }
+}
+
 describe("WorkflowService", () => {
   it("creates, versions and publishes through the repository boundary", async () => {
     const service = ServerWorkflowService.create({ repository: new FakeWorkflowRepository(), generateId: () => "id" });
@@ -69,5 +84,41 @@ describe("WorkflowService", () => {
     const fields = await service.getFields({ workflowId: "workflow_1", projectId: "project_1" });
     expect(fields).toMatchObject({ workflowId: "workflow_1", workflowName: "Triage" });
     expect(fields.outputFields.map((field) => field.identifier)).toEqual(["passed", "score", "label"]);
+  });
+
+  it("validates and dispatches a resolved published version through the execution port", async () => {
+    const repository = new FakeWorkflowRepository();
+    const execution = new FakeWorkflowExecutionPort();
+    const service = ServerWorkflowService.create({ repository, execution });
+    const version = await repository.createVersion({
+      id: "version_1",
+      workflowId: "workflow_1",
+      projectId: "project_1",
+      parentId: null,
+      version: "1",
+      autoSaved: false,
+      commitMessage: "first",
+      dsl: { name: "Triage", version: "1", nodes: [], edges: [] },
+    });
+    await repository.publish({
+      id: "workflow_1",
+      projectId: "project_1",
+      versionId: version.id,
+    });
+
+    await expect(
+      service.run({
+        workflowId: "workflow_1",
+        projectId: "project_1",
+        inputs: { ticket: "42" },
+      } satisfies RunWorkflowCommand),
+    ).resolves.toEqual({ status: "success" });
+
+    expect(execution.calls).toHaveLength(1);
+    expect(execution.calls[0]).toMatchObject({
+      workflowId: "workflow_1",
+      version: { id: "version_1" },
+      inputs: { ticket: "42" },
+    });
   });
 });

@@ -3,10 +3,11 @@ import type {
   CopyWorkflowCommand,
   CreateWorkflowCommand,
   PublishWorkflowCommand,
+  RunWorkflowCommand,
   SaveWorkflowVersionCommand,
   UpdateWorkflowCommand,
 } from "./workflow.commands";
-import type { Workflow, WorkflowEvaluatorFields, WorkflowRunOrigin, WorkflowVersion, WorkflowWithVersion } from "./workflow";
+import type { Workflow, WorkflowEvaluatorFields, WorkflowVersion, WorkflowWithVersion } from "./workflow";
 
 export abstract class WorkflowService {
   abstract getById(input: { id: string; projectId: string; includeVersion?: boolean }): Promise<WorkflowWithVersion>;
@@ -24,5 +25,5 @@ export abstract class WorkflowService {
   abstract copy(input: CopyWorkflowCommand): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }>;
   abstract getCopies(input: { workflowId: string; projectId: string }): Promise<Workflow[]>;
   abstract pushToCopies(input: { workflowId: string; projectId: string; copyIds?: string[]; allowedProjectIds?: string[] }): Promise<{ pushedTo: number; selectedCopies: number }>;
-  abstract run(input: { workflowId: string; projectId: string; inputs: Record<string, unknown>; versionId?: string; doNotTrace?: boolean; runEvaluations?: boolean; origin?: WorkflowRunOrigin; causalityDepth?: number; parentTrace?: { traceId: string; parentSpanId: string } }): Promise<unknown>;
+  abstract run(input: RunWorkflowCommand): Promise<unknown>;
 }

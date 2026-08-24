@@ -5,6 +5,7 @@ import {
 import { setupModelEnv } from "~/server/app-layer/evaluations/evaluation-execution.factories";
 import { codeEvaluatorIdFromCheckType } from "~/server/evaluators/codeEvaluator";
 import { runCodeEvaluator } from "~/server/evaluators/runCodeEvaluator";
+import { getApp } from "~/server/app-layer/app";
 import { stagedLangevalsFetch } from "~/server/langevals/stagedFetch";
 import type { Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
@@ -45,7 +46,7 @@ import {
   type TRACE_MAPPINGS,
   tryAndConvertTo,
 } from "../tracer/tracesMapping";
-import { runEvaluationWorkflow } from "../workflows/runWorkflow";
+import { WorkflowEvaluationRunner } from "../workflows/runWorkflow";
 import {
   DEFAULT_MAPPINGS,
   mappingsReadEvaluationsSource,
@@ -645,7 +646,8 @@ const customEvaluation = async (
 
   const parentTrace = extractParentTraceForNlpgo(trace);
 
-  const response = await runEvaluationWorkflow(
+  const response = await WorkflowEvaluationRunner.run(
+    getApp().workflows,
     resolvedWorkflowId,
     projectId,
     requestBody,
