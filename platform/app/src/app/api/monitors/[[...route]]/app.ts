@@ -1,16 +1,11 @@
 import { createLogger } from "@langwatch/observability";
 import { describeRoute, resolver } from "hono-openapi";
-import { nanoid } from "nanoid";
 import { z } from "zod";
-import type { Prisma } from "~/generated/prisma/client";
 import { createProjectApp, requires } from "~/server/api/security";
+import { appFromContext } from "~/app/api/middleware/app-context";
 import { validator as zValidator } from "~/server/api/validation";
-import { EvaluatorNotFoundError } from "~/server/app-layer/evaluations/errors";
-import { MonitorEvaluatorRequiredError } from "~/server/app-layer/monitors/errors";
-import { prisma } from "~/server/db";
 import { monitorMappingsSchema } from "~/server/tracer/tracesMapping";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { slugify } from "~/utils/slugify";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 import { badRequestSchema } from "../../shared/schemas";
@@ -47,8 +42,18 @@ const createMonitorSchema = z.object({
   name: z.string().min(1, "name is required"),
   checkType: z.string().min(1, "checkType is required"),
   executionMode: executionModeEnum.default("ON_MESSAGE"),
-  preconditions: z.array(z.unknown()).default([]),
-  parameters: z.record(z.string(), z.unknown()).default({}),
+  preconditions: z
+    .array(
+      z.object({
+        field: z.string().min(1),
+        rule: z.string().min(1),
+        value: z.string().min(1),
+        key: z.string().optional(),
+        subkey: z.string().optional(),
+      }),
+    )
+    .default([]),
+  parameters: z.record(z.string(), z.json()).default({}),
   mappings: monitorMappingsSchema,
   sample: z.number().min(0).max(1).default(1.0),
   evaluatorId: z.string().min(1).optional(),
@@ -61,8 +66,18 @@ const updateMonitorSchema = z.object({
   enabled: z.boolean().optional(),
   checkType: z.string().optional(),
   executionMode: executionModeEnum.optional(),
-  preconditions: z.array(z.unknown()).optional(),
-  parameters: z.record(z.string(), z.unknown()).optional(),
+  preconditions: z
+    .array(
+      z.object({
+        field: z.string().min(1),
+        rule: z.string().min(1),
+        value: z.string().min(1),
+        key: z.string().optional(),
+        subkey: z.string().optional(),
+      }),
+    )
+    .optional(),
+  parameters: z.record(z.string(), z.json()).optional(),
   mappings: monitorMappingsSchema,
   sample: z.number().min(0).max(1).optional(),
   evaluatorId: z.string().min(1).nullable().optional(),
@@ -129,9 +144,8 @@ secured.access(requires("evaluations:view")).get(
     const project = c.get("project");
     logger.info({ projectId: project.id }, "Listing monitors");
 
-    const monitors = await prisma.monitor.findMany({
-      where: { projectId: project.id },
-      orderBy: { createdAt: "asc" },
+    const monitors = await appFromContext(c).monitors.getAllForProject({
+      projectId: project.id,
     });
 
     return c.json(
@@ -174,8 +188,9 @@ secured.access(requires("evaluations:view")).get(
     const { id } = c.req.param();
     logger.info({ projectId: project.id, monitorId: id }, "Getting monitor");
 
-    const monitor = await prisma.monitor.findFirst({
-      where: { id, projectId: project.id },
+    const monitor = await appFromContext(c).monitors.tryGetMonitorById({
+      id,
+      projectId: project.id,
     });
 
     if (!monitor) {
@@ -223,42 +238,18 @@ secured.access(requires("evaluations:create")).post(
     const body = c.req.valid("json");
     logger.info({ projectId: project.id }, "Creating monitor");
 
-    // A monitor without an evaluator sits enabled but evaluates nothing —
-    // the edit drawer shows an empty evaluator selection and no evaluation
-    // ever runs off it. Reject at the boundary instead of creating it broken.
-    if (!body.evaluatorId) {
-      throw new MonitorEvaluatorRequiredError();
-    }
-
-    const evaluator = await prisma.evaluator.findFirst({
-      where: {
-        id: body.evaluatorId,
-        projectId: project.id,
-        archivedAt: null,
-      },
-    });
-    if (!evaluator) {
-      throw new EvaluatorNotFoundError(body.evaluatorId);
-    }
-
-    const slug = `${slugify(body.name)}-${nanoid(5)}`;
-
-    const monitor = await prisma.monitor.create({
-      data: {
-        projectId: project.id,
-        name: body.name,
-        slug,
-        checkType: body.checkType,
-        executionMode: body.executionMode,
-        preconditions: body.preconditions as Prisma.InputJsonValue,
-        parameters: body.parameters as Prisma.InputJsonValue,
-        mappings: (body.mappings ?? null) as Prisma.InputJsonValue,
-        sample: body.sample,
-        enabled: true,
-        evaluatorId: body.evaluatorId,
-        level: body.level,
-        threadIdleTimeout: body.threadIdleTimeout ?? null,
-      },
+    const monitor = await appFromContext(c).monitors.create({
+      projectId: project.id,
+      name: body.name,
+      checkType: body.checkType,
+      executionMode: body.executionMode,
+      preconditions: body.preconditions,
+      parameters: body.parameters,
+      mappings: body.mappings,
+      sample: body.sample,
+      evaluatorId: body.evaluatorId,
+      level: body.level,
+      threadIdleTimeout: body.threadIdleTimeout,
     });
 
     return c.json(
@@ -304,53 +295,33 @@ secured.access(requires("evaluations:update")).patch(
     const body = c.req.valid("json");
     logger.info({ projectId: project.id, monitorId: id }, "Updating monitor");
 
-    const existing = await prisma.monitor.findFirst({
-      where: { id, projectId: project.id },
+    const existing = await appFromContext(c).monitors.tryGetMonitorById({
+      id,
+      projectId: project.id,
     });
 
     if (!existing) {
       return c.json({ error: "Monitor not found" }, 404);
     }
 
-    // Stripping the evaluator would leave the monitor unable to evaluate
-    // anything — legacy monitors without one keep working as long as the
-    // update leaves `evaluatorId` untouched.
-    if (body.evaluatorId === null) {
-      throw new MonitorEvaluatorRequiredError();
-    }
-
-    if (body.evaluatorId) {
-      const evaluator = await prisma.evaluator.findFirst({
-        where: {
-          id: body.evaluatorId,
-          projectId: project.id,
-          archivedAt: null,
-        },
-      });
-      if (!evaluator) {
-        throw new EvaluatorNotFoundError(body.evaluatorId);
-      }
-    }
-
-    const data: Record<string, unknown> = {};
-    if (body.name !== undefined) data.name = body.name;
-    if (body.enabled !== undefined) data.enabled = body.enabled;
-    if (body.checkType !== undefined) data.checkType = body.checkType;
-    if (body.executionMode !== undefined)
-      data.executionMode = body.executionMode;
-    if (body.preconditions !== undefined)
-      data.preconditions = body.preconditions;
-    if (body.parameters !== undefined) data.parameters = body.parameters;
-    if (body.mappings !== undefined) data.mappings = body.mappings;
-    if (body.sample !== undefined) data.sample = body.sample;
-    if (body.evaluatorId !== undefined) data.evaluatorId = body.evaluatorId;
-    if (body.level !== undefined) data.level = body.level;
-    if (body.threadIdleTimeout !== undefined)
-      data.threadIdleTimeout = body.threadIdleTimeout;
-
-    const monitor = await prisma.monitor.update({
-      where: { id, projectId: project.id },
-      data,
+    const monitor = await appFromContext(c).monitors.update({
+      id,
+      projectId: project.id,
+      name: body.name ?? existing.name,
+      checkType: body.checkType ?? existing.checkType,
+      executionMode: body.executionMode ?? existing.executionMode,
+      preconditions: body.preconditions ?? existing.preconditions,
+      parameters: body.parameters ?? existing.parameters,
+      mappings:
+        body.mappings !== undefined ? body.mappings : existing.mappings,
+      sample: body.sample ?? existing.sample,
+      enabled: body.enabled,
+      evaluatorId: body.evaluatorId,
+      level: body.level ?? (existing.level as "trace" | "thread"),
+      threadIdleTimeout:
+        body.threadIdleTimeout !== undefined
+          ? body.threadIdleTimeout
+          : existing.threadIdleTimeout,
     });
 
     return c.json({
@@ -399,17 +370,19 @@ secured.access(requires("evaluations:update")).post(
       "Toggling monitor",
     );
 
-    const existing = await prisma.monitor.findFirst({
-      where: { id, projectId: project.id },
+    const existing = await appFromContext(c).monitors.tryGetMonitorById({
+      id,
+      projectId: project.id,
     });
 
     if (!existing) {
       return c.json({ error: "Monitor not found" }, 404);
     }
 
-    await prisma.monitor.update({
-      where: { id, projectId: project.id },
-      data: { enabled },
+    await appFromContext(c).monitors.toggle({
+      id,
+      projectId: project.id,
+      enabled,
     });
 
     return c.json({ id, enabled });
@@ -447,16 +420,18 @@ secured.access(requires("evaluations:manage")).delete(
     const { id } = c.req.param();
     logger.info({ projectId: project.id, monitorId: id }, "Deleting monitor");
 
-    const existing = await prisma.monitor.findFirst({
-      where: { id, projectId: project.id },
+    const existing = await appFromContext(c).monitors.tryGetMonitorById({
+      id,
+      projectId: project.id,
     });
 
     if (!existing) {
       return c.json({ error: "Monitor not found" }, 404);
     }
 
-    await prisma.monitor.delete({
-      where: { id, projectId: project.id },
+    await appFromContext(c).monitors.delete({
+      id,
+      projectId: project.id,
     });
 
     return c.json({ id, deleted: true });

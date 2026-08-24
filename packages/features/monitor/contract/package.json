@@ -1,0 +1,26 @@
+{
+  "name": "@langwatch/monitor-contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable Monitor feature contract and Zod 4 schemas.",
+  "type": "module",
+  "exports": { ".": { "types": "./src/index.ts", "default": "./src/index.ts" } },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": ["src"],
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}

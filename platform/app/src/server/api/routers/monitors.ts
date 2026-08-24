@@ -5,7 +5,7 @@ import { ZodError, z } from "zod";
 import { EvaluationExecutionMode, Prisma } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer";
 import { checkDeclaredPermission } from "~/server/app-layer/authz/trpc-middleware";
-import { MonitorEvaluatorRequiredError } from "~/server/app-layer/monitors/errors";
+import { MonitorNotFoundError } from "@langwatch/monitor-contract";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
@@ -16,7 +16,6 @@ import {
 } from "../../evaluations/evaluators";
 import { getEvaluatorDefinitions } from "../../evaluations/getEvaluator";
 import { validatedPreconditionsSchema } from "../../evaluations/preconditionValidation";
-import { coerceMonitorMappings } from "../../tracer/tracesMapping";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { currentVsPreviousDates } from "./analytics/common";
 import { copyEvaluatorToProject } from "./copyEvaluatorToProject";
@@ -38,75 +37,13 @@ const generateMonitorSlug = (name: string): string => {
  * Finds a unique name for a monitor by appending (2), (3), etc. if needed.
  * Checks existing monitors in the project to avoid conflicts.
  */
-const findUniqueMonitorName = async (
-  prisma: {
-    monitor: {
-      findFirst: (args: {
-        where: { projectId: string; name: string };
-      }) => Promise<unknown>;
-      findMany: (args: {
-        where: { projectId: string; name: { startsWith: string } };
-        select: { name: true };
-      }) => Promise<{ name: string }[]>;
-    };
-  },
-  projectId: string,
-  baseName: string,
-): Promise<string> => {
-  // First, check if the base name is available
-  const existing = await prisma.monitor.findFirst({
-    where: { projectId, name: baseName },
-  });
-
-  if (!existing) {
-    return baseName;
-  }
-
-  // Find all monitors with names like "baseName" or "baseName (N)"
-  const pattern = `${baseName} (`;
-  const existingWithSuffix = await prisma.monitor.findMany({
-    where: {
-      projectId,
-      name: { startsWith: pattern },
-    },
-    select: { name: true },
-  });
-
-  // Extract the numbers from existing names
-  const usedNumbers = new Set<number>();
-  usedNumbers.add(1); // Base name counts as (1)
-
-  for (const monitor of existingWithSuffix) {
-    const match = monitor.name.match(/\((\d+)\)$/);
-    if (match?.[1]) {
-      usedNumbers.add(parseInt(match[1], 10));
-    }
-  }
-
-  // Find the next available number
-  let nextNumber = 2;
-  while (usedNumbers.has(nextNumber)) {
-    nextNumber++;
-  }
-
-  return `${baseName} (${nextNumber})`;
-};
-
 export const monitorsRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .permission("evaluations:view")
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
-      const prisma = ctx.prisma;
-
-      const checks = await prisma.monitor.findMany({
-        where: { projectId },
-        orderBy: { createdAt: "asc" },
-        include: { evaluator: true },
-      });
-
-      return checks;
+      return ctx.app.monitors.getAllForProject({ projectId });
     }),
   getPerformanceForProject: protectedProcedure
     .input(
@@ -122,10 +59,8 @@ export const monitorsRouter = createTRPCRouter({
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     .use(checkDeclaredPermission({ permission: "analytics:view" }) as any)
     .query(async ({ input, ctx }) => {
-      const monitors = await ctx.prisma.monitor.findMany({
-        where: { projectId: input.projectId },
-        orderBy: { createdAt: "asc" },
-        select: { id: true, checkType: true },
+      const monitors = await ctx.app.monitors.getAllForProject({
+        projectId: input.projectId,
       });
 
       if (monitors.length === 0) return [];
@@ -161,15 +96,7 @@ export const monitorsRouter = createTRPCRouter({
     )
     .permission("evaluations:update")
     .mutation(async ({ input, ctx }) => {
-      const { id, enabled, projectId } = input;
-      const prisma = ctx.prisma;
-
-      await prisma.monitor.update({
-        where: { id, projectId },
-        data: { enabled },
-      });
-
-      return { success: true };
+      return ctx.app.monitors.toggle(input);
     }),
   create: protectedProcedure
     .input(
@@ -206,51 +133,20 @@ export const monitorsRouter = createTRPCRouter({
         level,
         threadIdleTimeout,
       } = input;
-      const prisma = ctx.prisma;
-
-      // A monitor without an evaluator sits enabled but evaluates nothing —
-      // reject at the boundary instead of creating it broken.
-      if (!evaluatorId) {
-        throw new MonitorEvaluatorRequiredError();
-      }
-
-      const evaluator = await prisma.evaluator.findFirst({
-        where: { id: evaluatorId, projectId, archivedAt: null },
-      });
-      if (!evaluator) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Evaluator not found or does not belong to this project",
-        });
-      }
-
       validateCheckSettings(checkType, parameters);
-
-      // Find a unique name (appends (2), (3), etc. if needed)
-      const uniqueName = await findUniqueMonitorName(prisma, projectId, name);
-      // Slug uses nanoid for true uniqueness
-      const slug = generateMonitorSlug(name);
-
-      const newCheck = await prisma.monitor.create({
-        data: {
-          id: generate(KSUID_RESOURCES.MONITOR).toString(),
-          projectId,
-          name: uniqueName,
-          checkType,
-          slug,
-          preconditions,
-          parameters,
-          mappings: coerceMonitorMappings(mappings),
-          sample,
-          enabled: true,
-          executionMode,
-          evaluatorId,
-          level: level ?? "trace",
-          threadIdleTimeout,
-        },
+      return ctx.app.monitors.create({
+        projectId,
+        name,
+        checkType,
+        preconditions,
+        parameters,
+        mappings,
+        sample,
+        executionMode,
+        evaluatorId,
+        level,
+        threadIdleTimeout,
       });
-
-      return newCheck;
     }),
   copy: protectedProcedure
     .input(
@@ -309,11 +205,19 @@ export const monitorsRouter = createTRPCRouter({
         newWorkflowId = copiedEvaluator.workflowId;
       }
 
-      const uniqueName = await findUniqueMonitorName(
-        prisma,
-        projectId,
-        source.name,
-      );
+      let uniqueName = source.name;
+      let suffix = 2;
+      while (
+        !(
+          await ctx.app.monitors.isNameAvailable({
+            projectId,
+            name: uniqueName,
+          })
+        ).available
+      ) {
+        uniqueName = `${source.name} (${suffix})`;
+        suffix += 1;
+      }
 
       try {
         // Replicas start disabled: a real-time evaluator runs (and bills) on
@@ -344,8 +248,8 @@ export const monitorsRouter = createTRPCRouter({
         // Roll back the evaluator (and its workflow) we copied for this monitor
         // so a failed insert doesn't orphan them in the target project.
         if (newEvaluatorId) {
-          await prisma.evaluator
-            .deleteMany({ where: { id: newEvaluatorId, projectId } })
+          await ctx.app.evaluators
+            .archive({ id: newEvaluatorId, projectId })
             .catch(() => undefined);
         }
         if (newWorkflowId) {
@@ -395,84 +299,42 @@ export const monitorsRouter = createTRPCRouter({
         level,
         threadIdleTimeout,
       } = input;
-      const prisma = ctx.prisma;
-      const slug = slugify(name, { lower: true, strict: true });
-
-      // Stripping the evaluator would leave the monitor unable to evaluate
-      // anything — legacy monitors without one keep working as long as the
-      // update leaves `evaluatorId` untouched.
-      if (evaluatorId === null) {
-        throw new MonitorEvaluatorRequiredError();
-      }
-
-      // Validate evaluator exists and belongs to project if provided
-      if (evaluatorId) {
-        const evaluator = await prisma.evaluator.findFirst({
-          where: { id: evaluatorId, projectId, archivedAt: null },
-        });
-        if (!evaluator) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Evaluator not found or does not belong to this project",
-          });
-        }
-      }
-
       validateCheckSettings(checkType, parameters);
-
-      const updatedCheck = await prisma.monitor.update({
-        where: { id, projectId },
-        data: {
-          name,
-          checkType,
-          slug,
-          preconditions,
-          parameters,
-          sample,
-          ...(enabled !== undefined && { enabled }),
-          executionMode,
-          mappings: coerceMonitorMappings(mappings),
-          ...(evaluatorId !== undefined && { evaluatorId }),
-          ...(level !== undefined && { level }),
-          ...(threadIdleTimeout !== undefined && { threadIdleTimeout }),
-        },
+      return ctx.app.monitors.update({
+        id,
+        projectId,
+        name,
+        checkType,
+        preconditions,
+        parameters,
+        mappings,
+        sample,
+        enabled,
+        executionMode,
+        evaluatorId,
+        level,
+        threadIdleTimeout,
       });
-
-      return updatedCheck;
     }),
   getById: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
     .permission("evaluations:view")
     .query(async ({ input, ctx }) => {
-      const { id, projectId } = input;
-      const prisma = ctx.prisma;
-
-      const check = await prisma.monitor.findUnique({
-        where: { id, projectId },
-        include: { evaluator: true },
-      });
-
-      if (!check) {
+      try {
+        return await ctx.app.monitors.getById(input);
+      } catch (error) {
+        if (!(error instanceof MonitorNotFoundError)) throw error;
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "TraceCheck config not found",
         });
       }
-
-      return check;
     }),
   delete: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
     .permission("evaluations:delete")
     .mutation(async ({ input, ctx }) => {
-      const { id, projectId } = input;
-      const prisma = ctx.prisma;
-
-      await prisma.monitor.delete({
-        where: { id, projectId },
-      });
-
-      return { success: true };
+      return ctx.app.monitors.delete(input);
     }),
   isNameAvailable: protectedProcedure
     .input(
@@ -484,14 +346,7 @@ export const monitorsRouter = createTRPCRouter({
     )
     .permission("evaluations:view")
     .mutation(async ({ input, ctx }) => {
-      const { projectId, name } = input;
-      const prisma = ctx.prisma;
-
-      const check = await prisma.monitor.findFirst({
-        where: { projectId, name },
-      });
-
-      return { available: check === null || check.id === input.checkId };
+      return ctx.app.monitors.isNameAvailable(input);
     }),
 });
 
