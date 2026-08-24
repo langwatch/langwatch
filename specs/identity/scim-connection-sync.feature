@@ -67,6 +67,9 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
 
   # ── A token reaches one connection ─────────────────────────────────────
 
+  # Needs Postgres: a stored token row read back through verifyEntitled,
+  # and a push authenticated with it landing a sync fact that names the
+  # connection. Attribution cannot be observed without a real push.
   @integration @unimplemented
   Scenario: A token is issued against exactly one connection
     When a directory token is minted for "okta-primary"
@@ -85,6 +88,9 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     Then the request is refused with code scim_connection_not_found and status 404
     And nothing about the other organization is revealed
 
+  # Needs Postgres: a ScimExternalId row held by the other connection, and
+  # the person's rows read back UNCHANGED after the refusal. A mock proves
+  # no write was attempted, which is a weaker claim than nothing moved.
   @integration @unimplemented
   Scenario: One connection's token cannot touch another connection's people
     Given a person provisioned through "entra-contractors"
@@ -92,6 +98,8 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     Then the push is refused with code scim_write_outside_connection and status 403
     And that person is unchanged
 
+  # Needs Postgres: the connection's ScimToken rows gone, its ScimSyncState
+  # folded to REVOKED, and the other connection's token still verifying.
   @integration @unimplemented
   Scenario: Tearing a connection down ends its tokens
     Given "okta-primary" has a working directory token
@@ -131,6 +139,8 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
 
   # ── A push is a command, and membership is a grant ─────────────────────
 
+  # Needs Postgres and the HTTP boundary: a full push, group and deactivate
+  # cycle replayed against the real routes, compared response by response.
   @integration @unimplemented
   Scenario: The protocol is unchanged and the writes underneath are not
     Given an identity provider configured against "acme" before the flip
@@ -138,6 +148,9 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     Then every request is answered exactly as it was before
     And nothing in its configuration had to change
 
+  # Needs Postgres and the event store: the appended event read back, and the
+  # grant row carrying it as its cause. Nothing reads that causation link
+  # yet - building the read is what unblocks this.
   @integration @unimplemented
   Scenario: A push asserts membership through a command, not by writing a row
     When "okta-primary" pushes a new person into "acme"
@@ -172,6 +185,8 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     Then each change appears on "acme"'s audit page
     And it is told apart from a change an administrator made by hand
 
+  # Needs Postgres: the grant row's actor column after a settings-page write,
+  # and the group's scimSource still refusing hand edits.
   @integration @unimplemented
   Scenario: An administrator mapping a directory group is attributed to the administrator
     Given a directory group "engineering" received from "okta-primary"
@@ -200,7 +215,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
   # nobody deciding that. So deactivation is a deprovision like any other,
   # and coming back is re-entry rather than undo.
 
-  @integration @unimplemented
+  @integration
   Scenario: Marking somebody inactive is a deprovision, not a flag
     Given a person in "acme" with access through a group and a direct role binding
     When "okta-primary" pushes them as inactive
@@ -208,6 +223,9 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     And their next permission check in "acme" answers no
     And no grant of theirs in "acme" is left standing behind the flag
 
+  # Needs Postgres: the collector answering nothing for them after a
+  # reactivating push. `reinstateSignIn` covers the sign-in half at unit
+  # level; the holds-nothing half is a real permission collection.
   @integration @unimplemented
   Scenario: Coming back restores nothing on its own
     Given somebody in "acme" was pushed inactive and their access was removed
@@ -216,6 +234,8 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     And they hold no access in "acme" until the directory asserts it again
     And what they held before their removal is not restored by the reactivation
 
+  # Needs Postgres: the grants attached by the next push, and the ones an
+  # administrator gave by hand still absent.
   @integration @unimplemented
   Scenario: The next full push is what puts a returning person back
     Given somebody in "acme" was pushed active again and holds no access
@@ -252,7 +272,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
 
   # ── When a push fails ──────────────────────────────────────────────────
 
-  @integration @unimplemented
+  @unit
   Scenario: A failed apply moves the sync into ERROR where somebody can see it
     When an apply fails for "okta-primary"
     Then the sync for "okta-primary" is ERROR
@@ -266,14 +286,14 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     Then the sync is SYNCING again
     And the recovery is visible in the same place the failure was
 
-  @integration @unimplemented
+  @unit
   Scenario: A failure that will never succeed is retired visibly, never silently
     Given an apply for "okta-primary" that cannot succeed however often it runs
     When it stops being retried
     Then it is retired as a visible dead letter naming what could not be applied
     And it is never dropped, and the directory's state is never assumed applied
 
-  @integration @unimplemented
+  @unit
   Scenario: A deactivate that cannot be applied is as visible as any other failure
     Given "okta-primary" pushes somebody inactive and the removal cannot be applied
     When it stops being retried

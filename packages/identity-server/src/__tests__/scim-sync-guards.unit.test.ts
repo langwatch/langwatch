@@ -147,6 +147,7 @@ describe("ScimSyncGuards", () => {
     });
 
     describe("given the failure can never succeed", () => {
+      /** @scenario A failure that will never succeed is retired visibly, never silently */
       it("retires it as a dead letter in the same append as the failure", async () => {
         const facts = await guardsOver(syncing()).recordScimApplyFailure({
           ...commandIdentity,
@@ -164,6 +165,7 @@ describe("ScimSyncGuards", () => {
     });
 
     describe("given the directory has retried the identical failure to the limit", () => {
+      /** @scenario A deactivate that cannot be applied is as visible as any other failure */
       it("retires it naming the person and the removal", async () => {
         const state = syncing({
           state: "ERROR",

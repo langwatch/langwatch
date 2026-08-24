@@ -232,6 +232,7 @@ describe("ScimService, on the grants write path", () => {
       });
 
       /** @scenario A removal that cannot prove itself empty fails loudly */
+      /** @scenario A deactivate that cannot be applied is as visible as any other failure */
       it("refuses, and never marks them inactive while they still hold access", async () => {
         await expect(
           service.updateUser({

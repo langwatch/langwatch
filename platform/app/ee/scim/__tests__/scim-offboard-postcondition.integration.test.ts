@@ -168,6 +168,7 @@ describe("a directory deprovision, against real storage", () => {
 
     /** @scenario The proof runs on every path a directory can remove somebody by */
     /** @scenario Deactivating a user deprovisions them with the same proof */
+    /** @scenario Marking somebody inactive is a deprovision, not a flag */
     it("proves the same thing when the removal came from a push marking them inactive", async () => {
       await new ScimDeprovisionService({
         grants: grantsService(),

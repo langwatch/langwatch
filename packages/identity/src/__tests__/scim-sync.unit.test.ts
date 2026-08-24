@@ -91,6 +91,7 @@ describe("reduceScimSync", () => {
   });
 
   describe("when an apply fails", () => {
+    /** @scenario A failed apply moves the sync into ERROR where somebody can see it */
     it("moves the sync to ERROR naming the operation and a reason code", () => {
       const state = fold([tokenIssued(), userPushed(), applyFailed()]);
 
@@ -102,6 +103,54 @@ describe("reduceScimSync", () => {
         retiredAtMs: null,
         userId: "user_sam",
       });
+    });
+
+    /**
+     * One connection's sync is one aggregate, so a second connection has no
+     * shared state for a failure to reach. Folded side by side here rather
+     * than asserted about a table: the isolation is structural, and this is
+     * where the structure is.
+     */
+    /** @scenario A failed apply moves the sync into ERROR where somebody can see it */
+    it("leaves another connection's sync untouched", () => {
+      const other = "conn_entra_contractors";
+      const otherIdentity = {
+        scimSyncId: scimSyncIdFor({ connectionId: other }),
+        connectionId: other,
+        organizationId: ORGANIZATION,
+      };
+      const healthy: ScimSyncFact[] = [
+        {
+          type: SCIM_TOKEN_ISSUED_EVENT_TYPE,
+          occurredAt: T0,
+          data: {
+            ...otherIdentity,
+            tokenId: "tok_2",
+            actor: { type: "system", id: "system:scim" },
+          },
+        },
+        {
+          type: SCIM_USER_PUSHED_EVENT_TYPE,
+          occurredAt: T0 + 1,
+          data: {
+            ...otherIdentity,
+            userId: "user_kim",
+            externalId: "c-99",
+            op: "create",
+          },
+        },
+      ];
+
+      const failing = fold([tokenIssued(), userPushed(), applyFailed()]);
+      const untouched = healthy.reduce(
+        (state, fact) => reduceScimSync({ state, fact }),
+        emptyScimSync({ scimSyncId: otherIdentity.scimSyncId }),
+      );
+
+      expect(failing.state).toBe("ERROR");
+      expect(untouched.state).toBe("SYNCING");
+      expect(untouched.lastFailure).toBeNull();
+      expect(untouched.deadLetters).toEqual([]);
     });
 
     describe("when the identity provider retries the identical failure", () => {
@@ -167,6 +216,7 @@ describe("reduceScimSync", () => {
   });
 
   describe("when a failure is retired", () => {
+    /** @scenario A failure that will never succeed is retired visibly, never silently */
     it("keeps it as a dead letter and refuses to call the sync healthy", () => {
       const state = fold([
         tokenIssued(),
@@ -196,6 +246,7 @@ describe("reduceScimSync", () => {
       });
     });
 
+    /** @scenario A deactivate that cannot be applied is as visible as any other failure */
     it("keeps the dead letter after the directory carries on working", () => {
       const state = fold([
         tokenIssued(),

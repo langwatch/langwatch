@@ -50,6 +50,8 @@ Feature: SCIM tokens REST API
   # it is here. The two anchors above are untouched by any of it: the secret
   # is still shown exactly once, and listing still hands out no secrets.
 
+  # Needs the REST boundary: a 201 from the authenticated route, and the
+  # listing endpoint reading the stored connection back.
   @integration @unimplemented
   Scenario: Creating a SCIM token names the connection it is for
     Given the organization has an SSO connection
@@ -58,12 +60,16 @@ Feature: SCIM tokens REST API
     And the response carries the token value and names the connection
     And listing tokens afterwards shows the connection and still no value
 
+  # Needs the REST boundary: a 422 from the authenticated route, and the
+  # token count unchanged in Postgres.
   @integration @unimplemented
   Scenario: Creating a SCIM token without a connection is refused
     When I create a SCIM token without naming a connection
     Then the request is refused with code scim_connection_required and status 422
     And no token is created
 
+  # Needs the REST boundary: a 404 whose body is inspected for anything
+  # naming the other organization.
   @integration @unimplemented
   Scenario: Creating a SCIM token for another organization's connection is refused
     Given a connection belonging to a different organization
@@ -71,6 +77,9 @@ Feature: SCIM tokens REST API
     Then the request is refused with code scim_connection_not_found and status 404
     And nothing about the other organization appears in the response
 
+  # Needs the REST boundary: a SCIM request with the revoked token refused,
+  # the sibling connection's token still working, and the listing endpoint
+  # no longer offering it.
   @integration @unimplemented
   Scenario: Tearing down a connection revokes the tokens issued for it
     Given the organization has SCIM tokens for two different connections
