@@ -10,9 +10,10 @@ import {
   safeEqual,
   sha256Hex,
 } from "./crypto/pkce";
+import { newIdentityCommandId } from "./identity-command-id";
 import type { IdentityHeadsRepository } from "./identity-heads.repository";
 import type { IdentityVerificationRepository } from "./identity-verification.repository";
-import { newIdentityCommandId, type IdentityService } from "./identity.service";
+import type { IdentityVerificationWrites } from "./identity-writes";
 
 const logger = createLogger("langwatch:identity:verification-ceremony");
 
@@ -58,8 +59,8 @@ export class VerificationCeremonyService {
 
   constructor(
     private readonly store: IdentityVerificationRepository,
-    private readonly heads: Pick<IdentityHeadsRepository, "findIdentifier">,
-    private readonly identity: Pick<IdentityService, "verifyIdentifier">,
+    private readonly heads: IdentityHeadsRepository,
+    private readonly identity: IdentityVerificationWrites,
     private readonly deps: VerificationCeremonyDeps,
   ) {
     this.now = deps.now ?? Date.now;

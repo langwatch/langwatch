@@ -6,13 +6,18 @@
  *   IdentityGuards               veto-before-write over IdentityHeadsRepository;
  *                                one implementation for the calling path AND
  *                                the queue's staged re-run
- *   IdentityService              the five verbs: parse → guard → IdentityLedger.commit
+ *   IdentityService              the five verbs: parse → guard → IdentityLedger.commit,
+ *                                sliced by role into IdentityCeremonyWrites /
+ *                                IdentityVerificationWrites / IdentityAdoptionWrites
  *   VerificationCeremonyService  PKCE magic-link mint / complete
  *   IdentityBackfillService      one user's ADR-101 §6 pass: adopt, establish,
  *                                detach orphans, prove
  *   crypto                       deriveIdentifierId, computeIdentifierHash,
  *                                mintUserHashKey, the PKCE helpers
- *   ./better-auth                the routing facade over the stock adapter
+ *   identity-command-id          every form a command id takes, in one place
+ *   identity-backfill-plan       what the legacy rows imply, as a pure plan
+ *   ./better-auth                the routing facade over the stock adapter:
+ *                                IdentityDatabase + its ceremony collaborators
  *
  * No storage engine lives here, no environment read, and no event-sourcing
  * framework: the heads, the ledger and the records are ports the app
@@ -39,12 +44,22 @@ export {
   type IdentityBackfillRepository,
 } from "./identity-backfill.repository";
 export {
-  expectedIdentifiers,
+  type PlannedIdentifier,
+  planIdentifiers,
+} from "./identity-backfill-plan";
+export {
   IDENTITY_BACKFILL_ACTOR,
   type IdentityBackfillOutcome,
   IdentityBackfillService,
   type IdentityBackfillServiceDeps,
 } from "./identity-backfill.service";
+export {
+  adoptAccountCommandId,
+  adoptUserEmailCommandId,
+  detachOrphanCommandId,
+  establishUserEmailCommandId,
+  newIdentityCommandId,
+} from "./identity-command-id";
 export type { IdentityHeadsRepository } from "./identity-heads.repository";
 export type { IdentityLedger } from "./identity-ledger";
 export type { IdentityUsersRepository } from "./identity-users.repository";
@@ -52,7 +67,12 @@ export type {
   IdentityVerificationRecord,
   IdentityVerificationRepository,
 } from "./identity-verification.repository";
-export { IdentityService, newIdentityCommandId } from "./identity.service";
+export { IdentityService } from "./identity.service";
+export type {
+  IdentityAdoptionWrites,
+  IdentityCeremonyWrites,
+  IdentityVerificationWrites,
+} from "./identity-writes";
 export {
   IDENTITY_VERIFICATION_TTL_MS,
   type MintedEmailVerification,

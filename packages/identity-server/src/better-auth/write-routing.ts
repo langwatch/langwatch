@@ -12,6 +12,10 @@ export type WriteOperation = (typeof WRITE_OPERATIONS)[number];
 
 export type Route = "protocol" | "domain";
 
+export type RoutingTable = Readonly<
+  Record<string, Readonly<Record<WriteOperation, Route>>>
+>;
+
 /**
  * The routing table — every better-auth model this deployment mounts, every
  * write operation, explicitly classified. Keys are better-auth's CANONICAL
@@ -27,7 +31,7 @@ export type Route = "protocol" | "domain";
  * brand-new user has no migration row, so the gate answers false) and their
  * email identifier is adopted by the backfill instead.
  */
-const ROUTING: Record<string, Record<WriteOperation, Route>> = {
+const DEFAULT_ROUTING: RoutingTable = {
   user: {
     create: "domain",
     update: "protocol",
@@ -79,8 +83,6 @@ const ROUTING: Record<string, Record<WriteOperation, Route>> = {
   },
 };
 
-export const ROUTED_MODELS = Object.keys(ROUTING);
-
 /** An unclassified (model, operation) — deliberately noisy (ADR-101 §2). */
 export class IdentityAdapterUnroutedWriteError extends Error {
   constructor(
@@ -89,14 +91,37 @@ export class IdentityAdapterUnroutedWriteError extends Error {
   ) {
     super(
       `identity adapter: better-auth wrote to an unrouted (model, operation): ("${model}", "${operation}"). ` +
-        "Classify it in the routing table (@langwatch/identity-server/better-auth routing.ts) as protocol or domain.",
+        "Classify it in the routing table (@langwatch/identity-server/better-auth write-routing.ts) as protocol or domain.",
     );
     this.name = "IdentityAdapterUnroutedWriteError";
   }
 }
 
-export function routeWrite(model: string, operation: WriteOperation): Route {
-  const route = ROUTING[model]?.[operation];
-  if (!route) throw new IdentityAdapterUnroutedWriteError(model, operation);
-  return route;
+/**
+ * Which writes are domain-significant. An object rather than a bare
+ * function so the table is a value a test can substitute and enumerate:
+ * the coverage test asserts the real deployment's model list against
+ * better-auth's, and a routing experiment does not have to mutate a module
+ * constant to run.
+ */
+export class WriteRouting {
+  constructor(private readonly table: RoutingTable = DEFAULT_ROUTING) {}
+
+  /** The route, or a loud throw on first use of an unclassified write. */
+  routeOf({
+    model,
+    operation,
+  }: {
+    model: string;
+    operation: WriteOperation;
+  }): Route {
+    const route = this.table[model]?.[operation];
+    if (!route) throw new IdentityAdapterUnroutedWriteError(model, operation);
+    return route;
+  }
+
+  /** Every model this routing classifies — the coverage test's subject. */
+  models(): string[] {
+    return Object.keys(this.table);
+  }
 }

@@ -1,22 +1,24 @@
 import {
-  arrivalStateForProvider,
   type BackfillDiff,
   backfillParityDiffs,
-  type ExpectedIdentifier,
   IdentityCommandRefusedError,
-  identifierProviderFor,
-  normalizeIdentifierValue,
   orphanedIdentifierRows,
 } from "@langwatch/identity";
-import { deriveIdentifierId } from "./crypto/identifier-identity";
 import { mintUserHashKey } from "./crypto/user-hash-key";
+import {
+  type PlannedIdentifier,
+  planIdentifiers,
+} from "./identity-backfill-plan";
 import type {
   BackfillAccountRow,
-  BackfillUserRow,
   IdentityBackfillRepository,
 } from "./identity-backfill.repository";
+import {
+  detachOrphanCommandId,
+  establishUserEmailCommandId,
+} from "./identity-command-id";
 import type { IdentityUsersRepository } from "./identity-users.repository";
-import type { IdentityService } from "./identity.service";
+import type { IdentityAdoptionWrites } from "./identity-writes";
 
 export const IDENTITY_BACKFILL_ACTOR = {
   type: "system" as const,
@@ -31,14 +33,6 @@ export type IdentityBackfillOutcome =
   | { status: "finalized"; report: { kind: "adopted"; identifiers: number } }
   | { status: "migrated"; report: { kind: "parity"; diffs: BackfillDiff[] } };
 
-/** An identifier the backfill adopts, with the command that attaches it. */
-type Adoption = ExpectedIdentifier & {
-  commandId: string;
-  accountId: string | null;
-  providerAccountId: string | null;
-  occurredAtMs: number;
-};
-
 export interface IdentityBackfillServiceDeps {
   now?: () => number;
 }
@@ -49,11 +43,10 @@ export interface IdentityBackfillServiceDeps {
  * genesis-import discipline re-tenanted to users. The app's `SystemMigration`
  * adapter drives this per tenant; the runner's contract stays the app's.
  *
- * Adoption, not re-creation: command ids derive from the source rows
- * (`backfill:<accountId>`, `backfill:user-email:<userId>`), business time is
- * each row's own `createdAt`, and the deterministic identifier ids derive
- * from both — so a re-run states the same facts and live emission of the
- * same fact converges on the same projection row.
+ * Adoption, not re-creation. What the legacy rows imply is
+ * `identity-backfill-plan.ts`'s to say, and every id in that plan is
+ * derived from the rows themselves — so a re-run states the same facts, and
+ * live emission of the same fact converges on the same projection row.
  *
  * A pass states only what the heads do not carry (PR #7429): every guard
  * reads the projection first and emits nothing for a fact already folded,
@@ -81,10 +74,7 @@ export class IdentityBackfillService {
   constructor(
     private readonly reads: IdentityBackfillRepository,
     private readonly users: IdentityUsersRepository,
-    private readonly identity: Pick<
-      IdentityService,
-      "attachIdentifier" | "verifyIdentifier" | "detachIdentifier"
-    >,
+    private readonly identity: IdentityAdoptionWrites,
     deps: IdentityBackfillServiceDeps = {},
   ) {
     this.now = deps.now ?? Date.now;
@@ -118,53 +108,42 @@ export class IdentityBackfillService {
     }
 
     const accounts = await this.reads.findAccountRows({ userId });
-    const expected = expectedIdentifiers({
+    const planned = planIdentifiers({
       user: { ...user, email: user.email },
       accounts,
     });
 
-    await this.adoptExpected({ userId, email: user.email, expected });
+    await this.adoptPlanned({ userId, email: user.email, planned });
     await this.establishEmail({
       userId,
       emailVerified: user.emailVerified,
       createdAtMs: user.createdAtMs,
-      expected,
+      planned,
     });
     await this.detachOrphanedIdentifiers({ userId, accounts });
 
-    const rows = await this.reads.findIdentifierRows({ userId });
-    const diffs = backfillParityDiffs({ rows, expected });
-    if (diffs.length > 0) {
-      return {
-        status: "migrated",
-        report: { kind: "parity", diffs: diffs.slice(0, MAX_REPORTED_DIFFS) },
-      };
-    }
-    return {
-      status: "finalized",
-      report: { kind: "adopted", identifiers: expected.length },
-    };
+    return this.prove({ userId, planned });
   }
 
-  private async adoptExpected({
+  private async adoptPlanned({
     userId,
     email,
-    expected,
+    planned,
   }: {
     userId: string;
     email: string;
-    expected: Adoption[];
+    planned: PlannedIdentifier[];
   }): Promise<void> {
-    for (const adoption of expected) {
+    for (const plan of planned) {
       await this.identity.attachIdentifier({
         tenantId: userId,
         userId,
-        commandId: adoption.commandId,
-        accountId: adoption.accountId,
-        provider: adoption.provider,
-        providerAccountId: adoption.providerAccountId,
+        commandId: plan.commandId,
+        accountId: plan.accountId,
+        provider: plan.provider,
+        providerAccountId: plan.providerAccountId,
         value: email,
-        occurredAtMs: adoption.occurredAtMs,
+        occurredAtMs: plan.occurredAtMs,
         ceremony: { flow: "backfill" },
         actor: IDENTITY_BACKFILL_ACTOR,
       });
@@ -182,23 +161,21 @@ export class IdentityBackfillService {
     userId,
     emailVerified,
     createdAtMs,
-    expected,
+    planned,
   }: {
     userId: string;
     emailVerified: boolean;
     createdAtMs: number;
-    expected: ExpectedIdentifier[];
+    planned: PlannedIdentifier[];
   }): Promise<void> {
-    const emailExpectation = expected.find(
-      (candidate) => candidate.provider === "email",
-    );
-    if (!emailExpectation || !emailVerified) return;
+    const emailPlan = planned.find((plan) => plan.provider === "email");
+    if (!emailPlan || !emailVerified) return;
     await tolerateRefusal(() =>
       this.identity.verifyIdentifier({
         tenantId: userId,
         userId,
-        commandId: `backfill:verify-email:${userId}`,
-        identifierId: emailExpectation.identifierId,
+        commandId: establishUserEmailCommandId({ userId }),
+        identifierId: emailPlan.identifierId,
         verificationId: null,
         method: "creation",
         occurredAtMs: createdAtMs,
@@ -231,13 +208,46 @@ export class IdentityBackfillService {
         this.identity.detachIdentifier({
           tenantId: userId,
           userId,
-          commandId: `backfill:detach:${row.id}:${row.accountId}`,
+          commandId: detachOrphanCommandId({
+            identifierId: row.id,
+            // `orphanedIdentifierRows` only ever returns rows carrying an
+            // accountId - an identifier without one is never the backfill's
+            // to detach.
+            accountId: row.accountId as string,
+          }),
           identifierId: row.id,
           occurredAtMs: this.now(),
           actor: IDENTITY_BACKFILL_ACTOR,
         }),
       );
     }
+  }
+
+  /**
+   * The exit gate: the fold-built rows against the plan, both directions.
+   * Re-read here rather than reused from the detach step — the adoptions
+   * this pass just stated may have folded in between, and proving against
+   * a stale read would hold a user the projection has already caught up on.
+   */
+  private async prove({
+    userId,
+    planned,
+  }: {
+    userId: string;
+    planned: PlannedIdentifier[];
+  }): Promise<IdentityBackfillOutcome> {
+    const rows = await this.reads.findIdentifierRows({ userId });
+    const diffs = backfillParityDiffs({ rows, expected: planned });
+    if (diffs.length > 0) {
+      return {
+        status: "migrated",
+        report: { kind: "parity", diffs: diffs.slice(0, MAX_REPORTED_DIFFS) },
+      };
+    }
+    return {
+      status: "finalized",
+      report: { kind: "adopted", identifiers: planned.length },
+    };
   }
 }
 
@@ -248,55 +258,4 @@ async function tolerateRefusal(run: () => Promise<unknown>): Promise<void> {
   } catch (error) {
     if (!(error instanceof IdentityCommandRefusedError)) throw error;
   }
-}
-
-/**
- * What the legacy rows imply: the email identifier from `User.email`
- * (VERIFIED when `emailVerified`), and one identifier per `Account` row in
- * the state its provider arrives in (R8) — with the deterministic ids live
- * emission would derive for the same facts.
- */
-export function expectedIdentifiers({
-  user,
-  accounts,
-}: {
-  user: BackfillUserRow & { email: string };
-  accounts: BackfillAccountRow[];
-}): Adoption[] {
-  const normalizedValue = normalizeIdentifierValue(user.email);
-  const expected = [
-    {
-      provider: "email" as const,
-      providerAccountId: null,
-      accountId: null,
-      occurredAtMs: user.createdAtMs,
-      commandId: `backfill:user-email:${user.id}`,
-      value: normalizedValue,
-      expectedState: user.emailVerified
-        ? ("VERIFIED" as const)
-        : ("ATTACHED" as const),
-    },
-    ...accounts.map((account) => {
-      const provider = identifierProviderFor(account.provider);
-      return {
-        provider,
-        providerAccountId: account.providerAccountId,
-        accountId: account.id,
-        occurredAtMs: account.createdAtMs,
-        commandId: `backfill:${account.id}`,
-        value: normalizedValue,
-        expectedState: arrivalStateForProvider(provider),
-      };
-    }),
-  ];
-  return expected.map((expectation) => ({
-    ...expectation,
-    identifierId: deriveIdentifierId({
-      userId: user.id,
-      provider: expectation.provider,
-      providerAccountId: expectation.providerAccountId,
-      normalizedValue,
-      occurredAtMs: expectation.occurredAtMs,
-    }),
-  }));
 }

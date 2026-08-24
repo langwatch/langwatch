@@ -1,4 +1,5 @@
 import {
+  emptyIdentityHeads,
   IdentityVerificationInvalidError,
   type VerifyIdentifierCommandData,
 } from "@langwatch/identity";
@@ -64,6 +65,12 @@ function harness(options?: {
               state: options?.identifierState ?? "ATTACHED",
             })
           : null,
+      // The ceremony reads exactly one head; the rest of the port is
+      // present so the double is the contract, not a slice of it.
+      findUserHashKey: async () => null,
+      findHeads: async ({ userId }) => emptyIdentityHeads({ userId }),
+      findActiveIdentifierByValue: async () => null,
+      findIdentifierIdForAccount: async () => null,
     },
     { verifyIdentifier: verifyIdentifier as never },
     {

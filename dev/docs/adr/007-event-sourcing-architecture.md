@@ -153,42 +153,13 @@ unhealthy, a named pipeline's breaker guarantees exactly this much:
   product benefit.
 
 Named pipelines: `authz_grants` (ADR-092 §13 — grant writes per day, not
-traces per second; its revocation class is defined there) and `identity`
-(identity programme D02, 2026-08-20 — see below). No other pipeline gets
-this: high-volume pipelines stall and drain, which is the correct behavior
-for them.
-
-### `identity` joins the amendment (2026-08-20, identity programme D02)
-
-**Volume analysis:** identity commands are ceremonies — sign-ups, account
-links/unlinks, verifications, primary changes, erasures — hundreds per day
-at current scale, not traces per second. The sign-in hot path emits **no
-commands at all** (ADR-101 R12: session rows and token refreshes are
-row-truth repository writes), so a Redis outage meets identity only at
-ceremony time, and calling-path applies are safe at ceremony volume.
-
-**How identity satisfies the guarantees, structurally:** ADR-101 §2 pins the
-dispatch order — guards veto, the ClickHouse append lands waited, the fold
-applies to the `Identifier` projection **on the calling path**, and
-GroupQueue staging runs last and best-effort. Every identity ceremony
-therefore already completes without Redis; staging exists only as the
-convergence re-apply, and the cursor-guarded fold makes the missed re-apply
-a no-op later. This is the amendment's discipline applied at design time
-rather than as a recovery mode — deliberately the reverse of an
-append-after-staging ordering, where a down Redis blocks the durable fact
-(the class of hole filed as langwatch#7329 against the grants revocation
-path).
-
-**Timeout budgets** (D02, flag `AUTH_REDIS_FAIL_OPEN`; off = pre-D02
-behavior): identity's GroupQueue staging leg is bounded at **2s**
-(`IDENTITY_STAGING_TIMEOUT_MS` — an overrun is a drop: metric
-`identity_staging_dropped_total` + warn, never a failed ceremony); better-auth's
-Redis secondary storage is bounded at **500ms** per call
-(`SECONDARY_STORAGE_TIMEOUT_MS` — get fails open to Postgres, where sessions
-dual-write; set/delete drop with metric
-`betterauth_secondary_storage_fail_open_total` + warn). Rate limiting lives in
-secondary storage only, so it degrades to fail-open for the outage window —
-accepted and logged, per D02's security note.
+traces per second; its revocation class is defined there). The identity
+pipeline was expected to join under its own deliverable (identity programme
+D02); **that deliverable was withdrawn on 2026-08-24** — identity takes
+ADR-110's position instead (every write through the group queue, no inline
+fold), so no amendment applies to it. No other pipeline gets this:
+high-volume pipelines stall and drain, which is the correct behavior for
+them.
 
 ## References
 

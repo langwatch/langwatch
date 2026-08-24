@@ -17,7 +17,7 @@ layering).
 
 Wave 1 of the identity platform (PR #7333) landed the identity pipeline,
 the `Identifier` projection, the better-auth adapter facade, the PKCE
-verification ceremony, the backfill rider and the D02 Redis-loss seams.
+verification ceremony and the backfill rider.
 The behaviour is right and ADR-101 records why. The shape is not, and the
 comparison that makes it obvious is the feature next to it.
 
@@ -300,9 +300,9 @@ table, `routeWrite`, `IdentityAdapterUnroutedWriteError`, the
 account/user ceremonies, the transaction guard, `findAllRows` and
 `pinnedToIds` all move here. `accountCeremonies.ts`'s two raw
 `prisma.identifier.*` queries become `heads.findIdentifierForAccount`.
-`secondaryStorageResilience.ts` does **not** move: it is D02's Redis seam
-around better-auth's secondary storage, not identity-model code, and it
-stays in `platform/app/src/server/better-auth/`.
+`secondaryStorageResilience.ts` was excluded from the move as D02's Redis
+seam rather than identity-model code; **D02 was withdrawn on 2026-08-24 and
+the file is deleted**, so nothing is left to place.
 
 ### 4. `platform/app` — one composition root, thin everything else
 
@@ -408,7 +408,7 @@ constructs an `IdentityService`.
 | `app-layer/identity/repositories/identity-guard-reads.prisma.repository.ts` + `PrismaVerifiableIdentifierReads` | `identity-heads.prisma.repository.ts` |
 | `app-layer/identity/repositories/identity-backfill.prisma.repository.ts` | reads stay; the hash-key write → `identity-users.prisma.repository.ts` |
 | `better-auth/identityDatabase.ts`, `identityAdapterContext.ts`, `identityRouting.ts`, `accountCeremonies.ts`, `userCeremonies.ts`, `transactionGuard.ts` | `identity-server/src/better-auth/` (`identifierProviderFor` → the pure package; raw Prisma → `heads.findIdentifierForAccount`) |
-| `better-auth/secondaryStorageResilience.ts` | stays |
+| `better-auth/secondaryStorageResilience.ts` | deleted (D02 withdrawn 2026-08-24) |
 | `app/api/identity/[[...route]]/app.ts` | routes only; composition and the error class removed |
 | `app-layer/system-migrations/runtime.ts` (identity part) | `registeredUserMigrations()` moves to `app-layer/identity/runtime.ts`; the migrations runtime imports it |
 | `presets.ts` (identity repositories) | unchanged in role: the projection store and heads repository stay in the repositories bag for the pipeline registry |
@@ -438,7 +438,7 @@ the suite green. Six commits, in this order, each reviewable alone:
 5. **Repository integration tests** for the five Prisma repositories.
 6. **Docs:** ADR-101 §1/§2/§6 path references and the §6 sentence "a
    restated fact dedupes at the event store" → "a pass states only what the
-   heads do not carry"; D01/D02 and the delivery plan; this ADR to
+   heads do not carry"; D01 and the delivery plan; this ADR to
    Accepted; the two CI steps.
 
 Where the commits land is the one open call: as further commits on

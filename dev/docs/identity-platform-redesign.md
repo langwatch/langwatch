@@ -4,7 +4,7 @@ Self-hosted auth, per-org SSO, MFA, passkeys, SCIM, join-requests — built on t
 
 **Status:** epic spec. Deliverable specs live in `dev/docs/identity-platform/D*.md`; sequencing and gates in `dev/docs/identity-platform/delivery-plan.md`.
 **Working branch/worktree:** `feat/sso-thinking` (`.claude/worktrees/sso-thinking`)
-**Precondition:** the unified authorization program (**ADR-092**, as reshaped by **ADR-110** — a grant is its own aggregate, one migration per organization, and finishing it IS the switch; #7358, #7404) has **landed on `main`** (checked 2026-08-23): `GrantsService.attach/offboard` is the membership writer, checks go through `.permission()` / `getApp().permissions`, and the engine gate reads the migration's `finalized` status and nothing else. This epic consumes that API; it does not build it. The authz program hands this one three ready-made pieces: ADR-007's Redis-loss doctrine amendment (doctrine, deliberately not a primitive; identity joins it in D02 — and deliberately does **not** adopt ADR-110's "Redis down ⇒ writes down" position, since sign-in is the one write path that must survive Redis loss, ADR-101 §Revision 2026-08-23), the `@langwatch/system-migrations` package (landed, #7079, #7337; carries D01's backfill and D04's grandfathering; cloud pacing is per-organization enrollment and nothing else), and the ADR-110 in-place rollout shape (new head born clean, adoption by ids stable across retries, a migration that states facts and checks once, `finalized` as the only switch for reads and writes, held tenants with outstanding facts named, rollback as a status change) this epic transplants wholesale, re-tenanted to users.
+**Precondition:** the unified authorization program (**ADR-092**, as reshaped by **ADR-110** — a grant is its own aggregate, one migration per organization, and finishing it IS the switch; #7358, #7404) has **landed on `main`** (checked 2026-08-23): `GrantsService.attach/offboard` is the membership writer, checks go through `.permission()` / `getApp().permissions`, and the engine gate reads the migration's `finalized` status and nothing else. This epic consumes that API; it does not build it. The authz program hands this one two ready-made pieces: the `@langwatch/system-migrations` package (landed, #7079, #7337; carries D01's backfill and D04's grandfathering; cloud pacing is per-organization enrollment and nothing else), and the ADR-110 in-place rollout shape (new head born clean, adoption by ids stable across retries, a migration that states facts and checks once, `finalized` as the only switch for reads and writes, held tenants with outstanding facts named, rollback as a status change) this epic transplants wholesale, re-tenanted to users.
 **Review history:** Notion round 1 (identifiers storage, Redis resilience, self-hosted single-SSO priority, join-requests + invitation resilience); corpus audit round 2 (`review-spec` against `specs/` + `dev/docs/adr/` — findings folded in below); restructure round 3 (RBAC assumed done; epic → deliverables → delivery plan).
 
 # Overview
@@ -20,7 +20,7 @@ This program makes identity first-class and self-service:
 - **MFA (TOTP + backup codes, never SMS)** and **passkeys**, using better-auth plugins for protocol while our domain model remains the record.
 - SCIM scoped per connection, producing commands/events, writing membership exclusively through `grants.*`.
 - **Two separate identity surfaces**: a platform-ops identity lookup (cross-org support tooling) and an org-admin surface inside org settings.
-- **Sign-in never touches the event pipeline**: sessions and OAuth tokens are repository-written rows, never events (R12), so the hot path reads and writes Postgres only. Ceremony commands ride the standard pipeline on the one shared ClickHouse event log (R13); they complete on the calling path (append + apply, staging best-effort), so D02 only has to harden the seams for a Redis outage and degrade sessions to PG-only.
+- **Sign-in never touches the event pipeline**: sessions and OAuth tokens are repository-written rows, never events (R12), so the hot path reads and writes Postgres only. Ceremony commands ride the standard pipeline on the one shared ClickHouse event log (R13), staged through the per-user group queue like every other pipeline (ADR-110).
 - Auth0 dies slowly: enterprise customers migrate one at a time onto direct OIDC; then Auth0 code, config, and spend are deleted.
 
 Everything runs on the existing event-sourcing framework — commands → events → applies/projections, process managers — appending to the same ClickHouse `event_log` as every other pipeline (R13: one log, no identity-private event store). Postgres holds the projections and the row-truth values (emails, credentials, sessions); the sign-in hot path touches only Postgres because sessions and tokens never become events (R12). Authorization is expressed entirely in the unified authz API (`registry`, `authz.require`, `grants.*`, `useCan`) — no seams, no interim verbs.
@@ -49,9 +49,6 @@ Requirements are stated here at domain level; the normative, implementable versi
 - Join requests (D12, needs the router, the D13 interstitial hook + org-admin surface): verified email → see colleagues' org → request → org-admin approval (default role, no picker) — or immediate auto-join where the org sets `domainJoin = auto`. Modes `off | request | auto`; default `request` for cloud self-serve orgs; forced `off` for SSO-connected orgs and self-hosted; public email domains never match in any mode.
 - Orphaned-organization prevention (D12 + D13): the join decision comes **before** workspace creation; an org is only created on explicit choice or no-match. Metric: orphaned-org creation rate.
 
-## Domain: Resilience (Redis loss) → D02
-
-- Sign-in must survive Redis being down. The hot path emits no commands (sessions and tokens are repository rows, R12); ceremony commands complete on the calling path by construction (durable append + fold apply, queue staging last and best-effort — D01's pinned dispatch order); better-auth session reads/writes degrade to PG-only on the secondary-storage seam under a bounded timeout (D02, per ADR-007's Redis-loss doctrine amendment — no in-memory processor exists or gets built); process managers and subscribers stall and drain by design; rate limiting fails open with logging for the window.
 
 ## Domain: Enterprise SSO connections → D04, D05
 
@@ -137,7 +134,6 @@ Decisions settled in design discussion:
 | Q9 | Auth0 migration ownership | Engineering/CS-run playbook (wizard shape pending — Open Questions) |
 | Q10 | Legacy sessions | One forced re-login at D06 (precedent: better-auth cutover) |
 | R1 | Identifiers storage | A new pure event-truth Postgres `Identifier` projection, born clean, backfilled + rolled out grants-style (per-user latch, org-paced); `Account` stays 100% row-truth protocol. ADR-022/015 stand unamended (ADR-101, revised 2026-08-20) |
-| R2 | Redis resilience | The sign-in hot path emits no commands (R12); ceremony commands complete on the calling path (durable append + fold apply; staging best-effort — no in-memory processor, per ADR-007's Redis-loss doctrine); sessions degrade to PG-only on better-auth's secondary-storage seam under bounded timeouts, PMs stall and drain, rate limiting fails open (ADR ships with D02) |
 | R3 | Multi-method sign-in | Cloud priority; self-hosted = single SSO + auto-redirect + break-glass local path |
 | R4 | Rate limiting | Nothing beyond better-auth's existing limiter |
 | R5 | Join requests & invites | `domainJoin` modes `off \| request \| auto` (default `request` for cloud self-serve; forced `off` for SSO orgs/self-hosted; public domains never match); fixed default role; identifier-aware invites + one-click resend + 14-day expiry |
@@ -205,7 +201,6 @@ The deployment env (`NEXTAUTH_PROVIDER`) is the hidden eighth table: it selects 
 | Auth0-hosted front-door screens | Complete first-party sign-in/sign-up/reset/verification UI | D13 |
 | Sign-up always mints a fresh org (orphans) | Join-before-create interstitial; org creation is an explicit choice | D12, D13 |
 | (no support visibility) | Platform-ops lookup + org-admin surface | D05 |
-| Redis hard dependency on auth | Redis-loss doctrine: calling-path ceremonies + PG-only sessions | D02 |
 | super-admin hand-sets `ssoDomain` | Org-admin self-service + ops approval; `sso:manage`/`scim:manage` in registry | D05 |
 | Auth0 broker + password service + webhook | Direct OIDC per customer; then deletion | D09, D10 |
 
@@ -283,7 +278,6 @@ Thirteen deliverables, each independently shippable and flag-gated. Normative de
 | # | Deliverable spec | One-liner |
 |---|---|---|
 | D01 | `identity-platform/D01-identity-pipeline-and-identifiers.md` | ES pipeline skeleton + `Identifier` projection (`Account` stays row-truth) + backfill + lifecycle events |
-| D02 | `identity-platform/D02-auth-path-circuit-breaker.md` | Redis-loss resilience for the auth path |
 | D03 | `identity-platform/D03-identifier-first-signin-router.md` | Router, uniform picker, self-hosted auto-redirect, cutover |
 | D04 | `identity-platform/D04-sso-connection-aggregate.md` | SsoConnection aggregate + grandfathering + routing parity |
 | D05 | `identity-platform/D05-self-service-onboarding-and-surfaces.md` | Org-admin SSO UI, domain verification, both identity surfaces, registry permissions |

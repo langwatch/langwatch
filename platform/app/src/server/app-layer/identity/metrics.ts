@@ -3,9 +3,8 @@ import { Counter, Histogram, register } from "prom-client";
 // Remove existing metrics if they exist (for hot reload)
 const metricNames = [
   "identity_write_gate_read_failures_total",
-  "identity_staging_dropped_total",
-  "identity_calling_path_apply_failures_total",
-  "identity_calling_path_apply_duration_seconds",
+  "identity_projection_convergence_timeouts_total",
+  "identity_commit_duration_seconds",
 ] as const;
 
 for (const name of metricNames) {
@@ -26,35 +25,20 @@ export const identityWriteGateReadFailuresTotal = new Counter({
 });
 
 /**
- * GroupQueue staging of an identity command failed after the durable append
- * and the calling-path apply both landed (ADR-101 §2's pinned order —
- * staging is convergence, not the primary apply). Each drop is a re-apply
- * the queue never runs; the cursor-guarded fold converges on the aggregate's
- * next event or on replay. The `reason` label separates the expected kind
- * from the defective one: `redis_drop` moves only while Redis is down (D02);
- * `sender_unavailable` is a wiring defect — the pipeline exposed no sender —
- * and should never move in a healthy deployment.
+ * A ceremony's read-your-writes wait expired before the fold landed its
+ * events in the `Identifier` projection (the grants ledger's
+ * `awaitProjection` shape). The facts are durable either way — this counts
+ * the callers that returned before the projection agreed, which is the
+ * signal that the fold is lagging.
  */
-export const identityStagingDroppedTotal = new Counter({
-  name: "identity_staging_dropped_total",
-  help: "Identity command stagings dropped after the durable append; convergence re-apply deferred to the next event or replay.",
-  labelNames: ["reason"] as const,
+export const identityProjectionConvergenceTimeoutsTotal = new Counter({
+  name: "identity_projection_convergence_timeouts_total",
+  help: "Identity ceremonies that returned before the fold landed their events; the append is durable and the projection converges later.",
 });
 
-/**
- * The calling-path fold apply failed after the durable append. The ceremony
- * still succeeds (the fact is durable; staging or the next event repairs the
- * projection), but read-your-writes is lost for this ceremony — worth paging
- * on if it moves outside a Postgres incident.
- */
-export const identityCallingPathApplyFailuresTotal = new Counter({
-  name: "identity_calling_path_apply_failures_total",
-  help: "Calling-path applies of identity events that failed after the durable append; the projection converges via staging or replay.",
-});
-
-/** The D02 latency budget's measurement (ADR-101 §2 dispatch order). */
-export const identityCallingPathApplyDurationSeconds = new Histogram({
-  name: "identity_calling_path_apply_duration_seconds",
-  help: "Duration of the calling-path append+apply for identity ceremonies.",
-  buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5],
+/** End-to-end cost of one identity commit: append, stage, and the wait. */
+export const identityCommitDurationSeconds = new Histogram({
+  name: "identity_commit_duration_seconds",
+  help: "Duration of an identity ledger commit: durable append, queue staging, and the read-your-writes wait.",
+  buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5],
 });

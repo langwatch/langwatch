@@ -1,28 +1,31 @@
 /**
  * The identity ledger writer: the app's implementation of
- * `@langwatch/identity-server`'s IdentityLedger port, and the calling-path
- * dispatch ADR-101 §2 pins — envelope, the durable ClickHouse append landed
- * WAITED, the fold applied to the `Identifier` projection on the calling
- * path, and GroupQueue staging LAST and best-effort. Staging exists for the
- * convergence re-apply, and a failed staging is a metric, never a failed
- * ceremony. This is deliberately the reverse of the ledger's merged
- * revocation path (#7329): nothing between the caller and the durable fact
- * depends on Redis.
+ * `@langwatch/identity-server`'s IdentityLedger port, in the shape the
+ * grants ledger already has (`app-layer/authz/ledger.ts`, ADR-110):
  *
- * Idempotency is what makes the redundancy safe, and the heads are what
- * make it cheap: the staged re-run runs the same guards against a
- * projection the calling path already folded, sees the fact it would state,
- * and emits nothing — no second event_log row (the store's dedupe is
- * read-side; a restated row is still a row written). Only when the
- * calling-path apply failed after the append is the projection behind, and
- * then the re-run restates the fact — same deterministic ids, same
- * idempotency keys, deduped on read — and the cursor-guarded fold repairs
- * the projection. Failing that, the aggregate's next event or replay does.
+ *   1. the durable ClickHouse append, WAITED — the fact lands before the
+ *      caller returns;
+ *   2. the command staged onto the per-user GroupQueue, awaited — the fold
+ *      is the queue's, and this package never applies a projection itself;
+ *   3. a bounded read-your-writes wait, watching the projection's cursor
+ *      reach the events just appended.
  *
- * Like the grants ledger (authz/ledger.ts), the pipeline handle is resolved
- * lazily off the App: better-auth constructs its adapter at module load,
- * before any App exists, and a bare script that never composes one must
- * still be able to import the runtime.
+ * The wait is an OBSERVATION, not inline processing. A fold that cannot run
+ * makes it time out; the facts are still durable, the caller still succeeds,
+ * and the rows appear when the queue drains. That is why the guards read the
+ * heads and state only what the heads do not carry (#7429): a pass that runs
+ * against a lagging projection restates, and restating is the repair.
+ *
+ * Identity used to fold on the calling path here, to keep ceremonies working
+ * through a Redis outage (the D02 deliverable). That requirement was dropped
+ * — the complexity was not worth it at ceremony volume — so identity no
+ * longer diverges from ADR-110's queue-only rule and this writer has no
+ * second apply path to keep in agreement with the fold.
+ *
+ * Like the grants ledger, the pipeline handle is resolved lazily off the
+ * App: better-auth constructs its adapter at module load, before any App
+ * exists, and a bare script that never composes one must still be able to
+ * import the runtime.
  */
 import {
   ATTACH_IDENTIFIER_COMMAND_TYPE,
@@ -41,25 +44,17 @@ import { tryGetApp } from "~/server/app-layer/app";
 import { createTenantId } from "~/server/event-sourcing";
 import type { AggregateType } from "~/server/event-sourcing/domain/aggregateType";
 import { identityEventsFor } from "~/server/event-sourcing/pipelines/identity/envelope";
-import {
-  type IdentityFoldState,
-  IdentityStateFoldProjection,
-} from "~/server/event-sourcing/pipelines/identity/projections/identityState.foldProjection";
+import type { IdentityFoldState } from "~/server/event-sourcing/pipelines/identity/projections/identityState.foldProjection";
 import {
   IDENTITY_PIPELINE_NAME,
   USER_IDENTITY_AGGREGATE_TYPE,
 } from "~/server/event-sourcing/pipelines/identity/schemas/constants";
 import type { IdentityEvent } from "~/server/event-sourcing/pipelines/identity/schemas/events";
-import type {
-  StateProjectionStore,
-  StoredProjection,
-} from "~/server/event-sourcing/projections/stateProjection.types";
+import type { StateProjectionStore } from "~/server/event-sourcing/projections/stateProjection.types";
 import type { EventStore } from "~/server/event-sourcing/stores/eventStore.types";
-import { withinBudget } from "../_shared/within-budget";
 import {
-  identityCallingPathApplyDurationSeconds,
-  identityCallingPathApplyFailuresTotal,
-  identityStagingDroppedTotal,
+  identityCommitDurationSeconds,
+  identityProjectionConvergenceTimeoutsTotal,
 } from "./metrics";
 
 const logger = createLogger("langwatch:identity:ledger");
@@ -67,14 +62,9 @@ const logger = createLogger("langwatch:identity:ledger");
 /** How long a ceremony waits for the App handle before the append gives up. */
 const IDENTITY_APP_HANDLE_WAIT_MS = 5_000;
 
-/**
- * The budget for the best-effort GroupQueue staging leg (D02 seam a). The
- * append and the calling-path apply have already landed when staging runs,
- * so the only thing a hung Redis could still cost is the CALLER's latency —
- * this bound is the ceiling on that. An overrun is a drop like any other:
- * metric + warn, the cursor-guarded fold converges later.
- */
-export const IDENTITY_STAGING_TIMEOUT_MS = 2_000;
+/** The read-your-writes window, the grants ledger's convergence shape. */
+export const IDENTITY_CONVERGENCE_TIMEOUT_MS = 2_000;
+export const IDENTITY_CONVERGENCE_POLL_MS = 25;
 
 export type IdentityStagedSender = {
   send(data: unknown): Promise<unknown>;
@@ -100,8 +90,8 @@ async function resolveEventStore(): Promise<EventStore<IdentityEvent>> {
     : undefined;
   if (!eventStore) {
     // A plain Error on purpose (error doctrine): the caller cannot act on an
-    // unavailable event stack, and the adapter degrades the ceremony to a
-    // retryable failure with a trace id.
+    // unavailable event stack, and the ceremony degrades to a retryable
+    // failure with a trace id.
     throw new Error(
       "identity ledger cannot append: the event-sourcing stack is unavailable",
     );
@@ -127,26 +117,24 @@ export interface IdentityLedgerWriterDeps {
   /** Production resolves the App's event store lazily; tests hand one in. */
   eventStore?: () => Promise<EventStore<IdentityEvent>>;
   stagedSender?: (name: string) => IdentityStagedSender | null;
-  /** The staging leg's budget; production uses IDENTITY_STAGING_TIMEOUT_MS. */
-  stagingTimeoutMs?: number;
+  /** The read-your-writes window; production uses the constants above. */
+  convergence?: { timeoutMs: number; pollMs: number };
 }
 
 export class IdentityLedgerWriter implements IdentityLedger {
-  private readonly projection: IdentityStateFoldProjection;
   private readonly projectionStore: StateProjectionStore<IdentityFoldState>;
   private readonly eventStore: () => Promise<EventStore<IdentityEvent>>;
   private readonly stagedSender: (name: string) => IdentityStagedSender | null;
-  private readonly stagingTimeoutMs: number;
+  private readonly convergence: { timeoutMs: number; pollMs: number };
 
   constructor(deps: IdentityLedgerWriterDeps) {
     this.projectionStore = deps.projectionStore;
-    this.projection = new IdentityStateFoldProjection({
-      store: deps.projectionStore,
-    });
     this.eventStore = deps.eventStore ?? resolveEventStore;
     this.stagedSender = deps.stagedSender ?? resolveStagedSender;
-    this.stagingTimeoutMs =
-      deps.stagingTimeoutMs ?? IDENTITY_STAGING_TIMEOUT_MS;
+    this.convergence = deps.convergence ?? {
+      timeoutMs: IDENTITY_CONVERGENCE_TIMEOUT_MS,
+      pollMs: IDENTITY_CONVERGENCE_POLL_MS,
+    };
   }
 
   async commit({
@@ -159,65 +147,54 @@ export class IdentityLedgerWriter implements IdentityLedger {
     const events = identityEventsFor({ command, facts });
     if (events.length === 0) return [];
     const { userId, tenantId } = command.data;
-
-    // 1. The durable append, waited — the fact lands with no Redis between.
-    const eventStore = await this.eventStore();
-    await eventStore.storeEvents(
-      events,
-      { tenantId: createTenantId(tenantId) },
-      USER_IDENTITY_AGGREGATE_TYPE as AggregateType,
-    );
-
-    // 2. The calling-path fold apply — read-your-writes for the ceremony.
-    const applyTimer = identityCallingPathApplyDurationSeconds.startTimer();
+    const done = identityCommitDurationSeconds.startTimer();
     try {
-      await this.applyOnCallingPath({ userId, tenantId, events });
-    } catch (error) {
-      identityCallingPathApplyFailuresTotal.inc();
-      logger.warn(
-        { userId, commandType: command.type, error },
-        "calling-path apply failed after the durable append; the projection converges via staging or replay",
+      // 1. The durable append, waited — the fact lands before we return.
+      const eventStore = await this.eventStore();
+      await eventStore.storeEvents(
+        events,
+        { tenantId: createTenantId(tenantId) },
+        USER_IDENTITY_AGGREGATE_TYPE as AggregateType,
       );
-    } finally {
-      applyTimer();
-    }
 
-    // 3. Staging LAST, best-effort — the convergence re-apply. Bounded (D02
-    // seam a): a hung Redis may cost the caller at most the staging budget,
-    // never an unbounded wait, and an overrun is a drop like any error here.
-    // A missing sender is NOT a Redis drop — it is a wiring defect, counted
-    // under its own reason so the two cannot masquerade as one another.
+      // 2. Staging — the fold is the queue's, so this is how the projection
+      //    ever learns. A failure here is a real failure: unlike the old
+      //    best-effort leg, nothing else would apply these events.
+      await this.stage({ command });
+
+      // 3. Read-your-writes, bounded. The backfill's own pass depends on it:
+      //    it verifies an identifier the same pass just attached.
+      await this.awaitFold({ userId, tenantId, events });
+      return events;
+    } finally {
+      done();
+    }
+  }
+
+  private async stage({
+    command,
+  }: {
+    command: IdentityCommand;
+  }): Promise<void> {
     const senderName = SENDER_NAME_BY_COMMAND[command.type];
     const sender = this.stagedSender(senderName);
     if (!sender) {
-      identityStagingDroppedTotal.inc({ reason: "sender_unavailable" });
-      logger.error(
-        { userId, commandType: command.type, senderName },
-        "identity pipeline sender unavailable: staging skipped — a wiring defect, not a Redis drop",
-      );
-      return events;
-    }
-    try {
-      await withinBudget({
-        work: sender.send(command.data),
-        timeoutMs: this.stagingTimeoutMs,
-        onTimeout: () =>
-          new Error(
-            `identity staging exceeded its ${this.stagingTimeoutMs}ms budget; dropped`,
-          ),
-      });
-    } catch (error) {
-      identityStagingDroppedTotal.inc({ reason: "redis_drop" });
-      logger.warn(
-        { userId, commandType: command.type, error },
-        "identity command staging dropped after the durable append; convergence deferred to the next event or replay",
+      // A wiring defect, not a transient: the pipeline exposed no sender for
+      // a command type it declares. Loud, because nothing downstream folds.
+      throw new Error(
+        `identity ledger cannot stage: the identity pipeline exposes no "${senderName}" sender`,
       );
     }
-
-    return events;
+    await sender.send(command.data);
   }
 
-  private async applyOnCallingPath({
+  /**
+   * Wait for the projection's cursor to reach the last event appended. The
+   * same comparison the fold uses to decide an event is already applied,
+   * read here instead of written — which is what makes this an observation
+   * of the queue's work rather than a second writer racing it.
+   */
+  private async awaitFold({
     userId,
     tenantId,
     events,
@@ -226,41 +203,53 @@ export class IdentityLedgerWriter implements IdentityLedger {
     tenantId: string;
     events: IdentityEvent[];
   }): Promise<void> {
-    // The same field the append leg keys on — the pipeline defines
-    // tenantId = userId by design, and both legs must read the same source.
+    const last = events[events.length - 1];
+    if (!last) return;
     const context = { aggregateId: userId, tenantId: createTenantId(tenantId) };
-    const stored = await this.projectionStore.load(userId, context);
-
-    let state = stored?.state ?? this.projection.init();
-    let cursor = stored?.cursor ?? { acceptedAt: 0, eventId: "" };
-    let occurredAt = stored?.occurredAt ?? 0;
-    let advanced = false;
-
-    for (const event of events) {
-      // Cursor guard: an event the queue's fold already committed re-applies
-      // as a no-op and must not rewind the cursor.
-      if (
-        event.createdAt < cursor.acceptedAt ||
-        (event.createdAt === cursor.acceptedAt && event.id <= cursor.eventId)
-      ) {
-        continue;
+    // Wall-clock, not injectable business time: a frozen test clock would
+    // otherwise make this loop unable to time out.
+    const deadline = Date.now() + this.convergence.timeoutMs;
+    for (;;) {
+      if (await this.foldReached({ userId, context, last })) return;
+      if (Date.now() >= deadline) {
+        identityProjectionConvergenceTimeoutsTotal.inc();
+        logger.warn(
+          { userId, commandCount: events.length },
+          "identity projection did not land a ceremony's events within the read-your-writes window; the append is durable and the fold will converge",
+        );
+        return;
       }
-      state = this.projection.apply(state, event);
-      cursor = { acceptedAt: event.createdAt, eventId: event.id };
-      occurredAt = Math.max(occurredAt, event.occurredAt);
-      advanced = true;
+      await new Promise((resolve) =>
+        setTimeout(resolve, this.convergence.pollMs),
+      );
     }
-    if (!advanced) return;
+  }
 
-    const now = Date.now();
-    const projection: StoredProjection<IdentityFoldState> = {
-      state,
-      cursor,
-      occurredAt,
-      createdAt: stored?.createdAt ?? now,
-      updatedAt: now,
-      version: this.projection.version,
-    };
-    await this.projectionStore.store(projection, context);
+  private async foldReached({
+    userId,
+    context,
+    last,
+  }: {
+    userId: string;
+    context: { aggregateId: string; tenantId: ReturnType<typeof createTenantId> };
+    last: IdentityEvent;
+  }): Promise<boolean> {
+    try {
+      const stored = await this.projectionStore.load(userId, context);
+      const cursor = stored?.cursor;
+      if (!cursor) return false;
+      return (
+        cursor.acceptedAt > last.createdAt ||
+        (cursor.acceptedAt === last.createdAt && cursor.eventId >= last.id)
+      );
+    } catch (error) {
+      // An unreadable projection is not a failed ceremony: the facts are
+      // durable. Stop waiting and let the caller proceed.
+      logger.warn(
+        { userId, error },
+        "could not read the identity projection while waiting for convergence; continuing",
+      );
+      return true;
+    }
   }
 }

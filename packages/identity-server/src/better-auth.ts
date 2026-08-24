@@ -1,13 +1,25 @@
 // The better-auth routing facade (ADR-101 §2): its own subpath so the root
 // entry does not force better-auth's types onto every importer of the
 // services. The app wires it once, in its identity runtime.
-export { createIdentityDatabase, type IdentityDatabaseDeps } from "./better-auth/adapter";
-export { type DbAdapter, findAllRows, pinnedToIds } from "./better-auth/context";
+export { AccountCeremony } from "./better-auth/account-ceremony";
+export { AdapterRows } from "./better-auth/adapter-rows";
+export type {
+  DbAdapter,
+  IdentityCeremonyClock,
+  IdentityWriteGate,
+} from "./better-auth/adapter-types";
+export { IdentityDatabase } from "./better-auth/identity-database";
+export {
+  createIdentityDatabase,
+  type IdentityDatabaseDeps,
+} from "./better-auth/identity-database.factory";
+export { TransactionWriteGuard } from "./better-auth/transaction-write-guard";
+export { UserCeremony } from "./better-auth/user-ceremony";
 export {
   IdentityAdapterUnroutedWriteError,
-  ROUTED_MODELS,
   type Route,
-  routeWrite,
+  type RoutingTable,
   WRITE_OPERATIONS,
+  WriteRouting,
   type WriteOperation,
-} from "./better-auth/routing";
+} from "./better-auth/write-routing";

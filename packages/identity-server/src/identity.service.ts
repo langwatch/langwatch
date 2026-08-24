@@ -17,14 +17,13 @@ import {
   type VerifyIdentifierCommandData,
   verifyIdentifierCommandDataSchema,
 } from "@langwatch/identity";
-import { generate } from "@langwatch/ksuid";
 import type { IdentityGuards } from "./guards";
 import type { IdentityLedger } from "./identity-ledger";
-
-/** Ceremony paths mint a random command id; retries reuse it. */
-export function newIdentityCommandId(): string {
-  return generate("idcmd").toString();
-}
+import type {
+  IdentityAdoptionWrites,
+  IdentityCeremonyWrites,
+  IdentityVerificationWrites,
+} from "./identity-writes";
 
 /**
  * The identity write surface (ADR-101 §2, ADR-115 §3): five verbs, each
@@ -34,7 +33,12 @@ export function newIdentityCommandId(): string {
  * A verb whose guard states nothing (the heads already carry the fact)
  * returns without touching the ledger at all.
  */
-export class IdentityService {
+export class IdentityService
+  implements
+    IdentityCeremonyWrites,
+    IdentityVerificationWrites,
+    IdentityAdoptionWrites
+{
   constructor(
     private readonly guards: IdentityGuards,
     private readonly ledger: IdentityLedger,

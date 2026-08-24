@@ -1,4 +1,4 @@
-import { emptyIdentityHeads } from "@langwatch/identity";
+import { emptyIdentityHeads, reduceIdentity } from "@langwatch/identity";
 import {
   IdentityGuards,
   type IdentityHeadsRepository,
@@ -14,7 +14,7 @@ import type {
 } from "~/server/event-sourcing/projections/stateProjection.types";
 import type { EventStore } from "~/server/event-sourcing/stores/eventStore.types";
 import { IdentityLedgerWriter } from "../ledger";
-import { identityStagingDroppedTotal } from "../metrics";
+import { identityProjectionConvergenceTimeoutsTotal } from "../metrics";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };
@@ -23,7 +23,6 @@ const T0 = 1_690_000_000_000;
 class InMemoryStateStore implements StateProjectionStore<IdentityFoldState> {
   readonly stored = new Map<string, StoredProjection<IdentityFoldState>>();
   readonly storeContexts: ProjectionStoreContext[] = [];
-  shouldFailNextStore = false;
 
   async load(key: string, _context: ProjectionStoreContext) {
     return this.stored.get(key) ?? null;
@@ -33,17 +32,13 @@ class InMemoryStateStore implements StateProjectionStore<IdentityFoldState> {
     projection: StoredProjection<IdentityFoldState>,
     context: ProjectionStoreContext,
   ) {
-    if (this.shouldFailNextStore) {
-      this.shouldFailNextStore = false;
-      throw new Error("postgres unavailable");
-    }
     this.storeContexts.push(context);
     this.stored.set(context.aggregateId, projection);
   }
 }
 
-/** The heads as the Prisma repository would read them: off the projection
- *  the calling path just wrote — read-your-writes, which is the point. */
+/** The heads as the Prisma repository reads them: off the projection the
+ *  QUEUE's fold wrote. Nothing else ever writes it. */
 class ProjectionHeads implements IdentityHeadsRepository {
   constructor(private readonly store: InMemoryStateStore) {}
 
@@ -79,11 +74,46 @@ class ProjectionHeads implements IdentityHeadsRepository {
   }
 }
 
+/**
+ * What the queue's fold does when it drains the staged command: apply the
+ * events to the user's projection and advance the cursor. The ledger never
+ * does this itself — it only waits to observe it.
+ */
+function foldInto(store: InMemoryStateStore, events: IdentityEvent[]): void {
+  const previous = store.stored.get(USER);
+  let state: IdentityFoldState =
+    previous?.state ??
+    ({
+      ...emptyIdentityHeads({ userId: USER }),
+      CreatedAt: T0,
+      UpdatedAt: T0,
+      LastEventOccurredAt: T0,
+    } as IdentityFoldState);
+  let cursor = previous?.cursor ?? { acceptedAt: 0, eventId: "" };
+  for (const event of events) {
+    state = {
+      ...state,
+      ...reduceIdentity({ heads: state, fact: event }),
+      userId: USER,
+    } as IdentityFoldState;
+    cursor = { acceptedAt: event.createdAt, eventId: event.id };
+  }
+  store.stored.set(USER, {
+    state,
+    cursor,
+    occurredAt: events[events.length - 1]?.occurredAt ?? T0,
+    createdAt: previous?.createdAt ?? T0,
+    updatedAt: T0,
+    version: 1,
+  });
+}
+
 function harness(overrides?: {
   shouldAppendFail?: boolean;
   shouldStagingFail?: boolean;
-  shouldStagingHang?: boolean;
-  stagingTimeoutMs?: number;
+  /** The queue never drains: the read-your-writes wait must expire. */
+  foldNeverLands?: boolean;
+  noSender?: boolean;
 }) {
   const store = new InMemoryStateStore();
   const appended: IdentityEvent[][] = [];
@@ -100,32 +130,24 @@ function harness(overrides?: {
   } as unknown as EventStore<IdentityEvent>;
 
   const sender = {
-    send: vi.fn((data: unknown) => {
+    send: vi.fn(async (data: unknown) => {
       order.push("stage");
-      if (overrides?.shouldStagingHang) return new Promise<unknown>(() => {});
-      if (overrides?.shouldStagingFail) {
-        return Promise.reject(new Error("redis unavailable"));
-      }
+      if (overrides?.shouldStagingFail) throw new Error("redis unavailable");
       staged.push(data);
-      return Promise.resolve(undefined as unknown);
+      if (overrides?.foldNeverLands) return undefined;
+      // The queue drains immediately in this harness: the fold lands the
+      // events the append just wrote, which is what the ledger waits for.
+      order.push("fold");
+      foldInto(store, appended[appended.length - 1] ?? []);
+      return undefined;
     }),
   };
 
-  const trackedStore: StateProjectionStore<IdentityFoldState> = {
-    load: (key, context) => store.load(key, context),
-    store: async (projection, context) => {
-      order.push("apply");
-      return store.store(projection, context);
-    },
-  };
-
   const ledger = new IdentityLedgerWriter({
-    projectionStore: trackedStore,
+    projectionStore: store,
     eventStore: async () => eventStore,
-    stagedSender: () => sender,
-    ...(overrides?.stagingTimeoutMs !== undefined
-      ? { stagingTimeoutMs: overrides.stagingTimeoutMs }
-      : {}),
+    stagedSender: () => (overrides?.noSender ? null : sender),
+    convergence: { timeoutMs: 40, pollMs: 5 },
   });
   const identity = new IdentityService(
     new IdentityGuards(new ProjectionHeads(store)),
@@ -160,17 +182,18 @@ async function counterValue(counter: {
 
 describe("the identity ledger writer", () => {
   describe("when a ceremony commits facts", () => {
-    it("appends durably, applies on the calling path, and stages last", async () => {
+    /** @scenario "An identity ceremony appends durably and stages its fold" */
+    it("appends durably, stages the command, then waits for the fold", async () => {
       const { identity, store, appended, staged, order } = harness();
 
       const events = await identity.attachIdentifier(attachData());
 
       expect(events).toHaveLength(1);
-      expect(order).toEqual(["append", "apply", "stage"]);
+      expect(order).toEqual(["append", "stage", "fold"]);
       expect(appended[0]).toHaveLength(1);
       expect(staged).toHaveLength(1);
 
-      // Read-your-writes: the projection holds the row before commit returns.
+      // Read-your-writes: the wait returned only once the fold had landed.
       const projection = store.stored.get(USER)!;
       const facts = Object.values(projection.state.identifiers);
       expect(facts[0]!.value).toBe("sam.j@acme.com");
@@ -185,71 +208,64 @@ describe("the identity ledger writer", () => {
         value: "Sam.J@Acme.com",
       });
     });
-  });
 
-  describe("when the calling-path fold builds its projection context", () => {
-    it("reads the command's tenantId — the same field the append leg keys on", async () => {
+    it("never writes the projection itself — only the fold does", async () => {
       const { identity, store } = harness();
-
       await identity.attachIdentifier(attachData());
-
-      expect(store.storeContexts).toHaveLength(1);
-      expect(store.storeContexts[0]?.tenantId).toBe(USER);
+      // The ledger's only projection access is `load`; every `store` call in
+      // this harness came from the simulated fold.
+      expect(store.storeContexts).toHaveLength(0);
     });
   });
 
   describe("when GroupQueue staging fails after the durable append", () => {
-    it("the ceremony still succeeds; the drop is absorbed", async () => {
-      const { identity, store, appended, order } = harness({
+    /** @scenario "A ceremony whose command cannot be staged fails" */
+    it("the ceremony fails: nothing would ever fold the appended facts", async () => {
+      const { identity, appended, order } = harness({
         shouldStagingFail: true,
       });
 
-      const events = await identity.attachIdentifier(attachData());
-
-      expect(events).toHaveLength(1);
+      await expect(identity.attachIdentifier(attachData())).rejects.toThrow(
+        "redis unavailable",
+      );
+      // The append is durable regardless — the facts are not lost, and the
+      // backfill restates whatever the heads end up lacking.
       expect(appended).toHaveLength(1);
-      expect(order).toEqual(["append", "apply", "stage"]);
-      expect(store.stored.get(USER)).toBeDefined();
+      expect(order).toEqual(["append", "stage"]);
     });
   });
 
-  describe("when GroupQueue staging hangs instead of failing fast", () => {
-    /** @scenario "A hanging Redis cannot fail or stall an identity ceremony" */
-    it("the staging budget drops it, counted; append and apply landed and the ceremony succeeds", async () => {
-      const { identity, appended, store, sender } = harness({
-        shouldStagingHang: true,
-        stagingTimeoutMs: 20,
-      });
-      const droppedBefore = await counterValue(identityStagingDroppedTotal);
+  describe("when the pipeline exposes no sender for the command", () => {
+    it("fails loudly: a wiring defect, never a silent drop", async () => {
+      const { identity } = harness({ noSender: true });
 
-      const events = await identity.attachIdentifier(attachData());
-
-      expect(events).toHaveLength(1);
-      expect(appended).toHaveLength(1);
-      expect(store.stored.size).toBe(1);
-      expect(sender.send).toHaveBeenCalledTimes(1);
-      expect(await counterValue(identityStagingDroppedTotal)).toBe(
-        droppedBefore + 1,
+      await expect(identity.attachIdentifier(attachData())).rejects.toThrow(
+        /exposes no "attachIdentifier" sender/,
       );
     });
   });
 
-  describe("when the calling-path apply fails after the durable append", () => {
-    it("the ceremony still succeeds and staging still runs", async () => {
-      const { identity, store, appended, order } = harness();
-      store.shouldFailNextStore = true;
+  describe("when the fold does not land inside the convergence window", () => {
+    /** @scenario "A lagging fold does not fail the ceremony" */
+    it("the ceremony still succeeds, and the timeout is counted", async () => {
+      const { identity, appended, staged } = harness({ foldNeverLands: true });
+      const before = await counterValue(
+        identityProjectionConvergenceTimeoutsTotal,
+      );
 
       const events = await identity.attachIdentifier(attachData());
 
       expect(events).toHaveLength(1);
       expect(appended).toHaveLength(1);
-      expect(order).toEqual(["append", "apply", "stage"]);
-      expect(store.stored.get(USER)).toBeUndefined();
+      expect(staged).toHaveLength(1);
+      expect(
+        await counterValue(identityProjectionConvergenceTimeoutsTotal),
+      ).toBe(before + 1);
     });
   });
 
   describe("when the durable append itself fails", () => {
-    it("the ceremony fails: no apply, no staging, no phantom state", async () => {
+    it("the ceremony fails: no staging, no phantom state", async () => {
       const { identity, store, order } = harness({ shouldAppendFail: true });
 
       await expect(identity.attachIdentifier(attachData())).rejects.toThrow(
@@ -261,7 +277,7 @@ describe("the identity ledger writer", () => {
   });
 
   describe("when a guard vetoes the command", () => {
-    it("nothing is appended, applied, or staged", async () => {
+    it("nothing is appended or staged", async () => {
       const { identity, order } = harness();
 
       await expect(
@@ -280,7 +296,7 @@ describe("the identity ledger writer", () => {
 
   describe("when the same command runs again after its fact was folded", () => {
     /** @scenario "A fact the heads already carry is not stated again" */
-    it("appends, applies and stages nothing; the projection and cursor stand", async () => {
+    it("appends and stages nothing; the projection and cursor stand", async () => {
       const { identity, store, appended, staged, order } = harness();
 
       const events = await identity.attachIdentifier(attachData());
@@ -295,28 +311,6 @@ describe("the identity ledger writer", () => {
       expect(staged).toHaveLength(1);
       expect(order).toEqual([]);
       expect(store.stored.get(USER)).toEqual(after);
-    });
-  });
-
-  describe("when the projection is behind the durable append", () => {
-    it("the re-run restates the fact and the cursor-guarded fold repairs the row", async () => {
-      const { identity, store, appended } = harness();
-      store.shouldFailNextStore = true;
-
-      await identity.attachIdentifier(attachData());
-      expect(store.stored.get(USER)).toBeUndefined();
-
-      // The heads lack the fact, so the re-run states it again: the same
-      // deterministic id and idempotency key, deduped on read.
-      const restated = await identity.attachIdentifier(attachData());
-      expect(restated).toHaveLength(1);
-      expect((restated[0] as IdentityEvent).idempotencyKey).toBe(
-        appended[0]![0]!.idempotencyKey,
-      );
-      expect(appended).toHaveLength(2);
-      expect(
-        Object.keys(store.stored.get(USER)!.state.identifiers),
-      ).toHaveLength(1);
     });
   });
 });

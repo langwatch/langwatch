@@ -1,6 +1,6 @@
 # D03 — Identifier-first sign-in router + cutover
 
-Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 2 · Depends on: D01, D02 · Flag: `IDENTITY_ROUTER_V2` (shadow → enforce) · **Highest-risk deliverable**
+Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 2 · Depends on: D01 · Flag: `IDENTITY_ROUTER_V2` (shadow → enforce) · **Highest-risk deliverable**
 
 # Overview
 

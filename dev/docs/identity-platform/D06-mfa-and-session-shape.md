@@ -57,7 +57,7 @@ Session
 # Research
 
 - better-auth 1.6.23: `twoFactor` is built in; plugin migrations are Kysely-only ⇒ hand-written Prisma models; `databaseHooks` don't fire for plugin tables — moot under R10: the identity adapter sees plugin-table writes uniformly.
-- Session today: PG + Redis dual-write (D02 keeps sign-in alive if Redis dies), 30-day TTL, `impersonating` JSON.
+- Session today: PG + Redis dual-write, 30-day TTL, `impersonating` JSON.
 - Corpus-audit spec impacts: `phase-1-better-auth-config.feature:119-137` (locks in legacy impersonating — retire, replace with `{actor, subject}` scenarios); `sessions-and-devices.feature` (inventory gains `identifierId`/`amr`; `maxSessionDurationDays` × forced re-login interplay); anchors that survive: `impersonation-banner.feature`, `dejaview-impersonation-access.feature` (already conceptually actor/subject), `backoffice-user-impersonation-reason.feature` (reason requirement inherited), `password-reset.feature:90-93` (revoke-all on reset — consistent with per-identifier revocation).
 
 # Technical Plan
