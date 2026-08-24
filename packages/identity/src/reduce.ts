@@ -146,5 +146,12 @@ export function reduceIdentity({
       return applyDetached(heads, fact);
     case "lw.identity.user_erased":
       return applyUserErased(heads);
+    case "lw.identity.link_proposed":
+      // A proposal changes no head, on purpose: it states that a link was NOT
+      // made and needs a human. The identifier arrives only when someone
+      // confirms it, through the ordinary attach ceremony — so a fold that
+      // moved a head here would be the auto-link the proposal exists to
+      // refuse.
+      return heads;
   }
 }

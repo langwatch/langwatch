@@ -111,6 +111,8 @@ export const APP_ERROR_CODES = [
   "idempotency_error",
   "identity_identifier_not_found",
   "identity_identifier_not_verifiable",
+  "identity_jit_disabled",
+  "identity_link_proposed",
   "identity_primary_must_demote_first",
   "identity_primary_requires_verified",
   "identity_verification_expired",

@@ -36,6 +36,7 @@ import {
   type IdentityFact,
   type IdentityFactInput,
   MARK_PRIMARY_COMMAND_TYPE,
+  PROPOSE_LINK_COMMAND_TYPE,
   VERIFY_IDENTIFIER_COMMAND_TYPE,
 } from "@langwatch/identity";
 import type { IdentityLedger } from "@langwatch/identity-server";
@@ -76,6 +77,7 @@ const SENDER_NAME_BY_COMMAND: Record<IdentityCommandType, string> = {
   [MARK_PRIMARY_COMMAND_TYPE]: "markPrimary",
   [DETACH_IDENTIFIER_COMMAND_TYPE]: "detachIdentifier",
   [ERASE_USER_COMMAND_TYPE]: "eraseUser",
+  [PROPOSE_LINK_COMMAND_TYPE]: "proposeLink",
 };
 
 async function resolveEventStore(): Promise<EventStore<IdentityEvent>> {

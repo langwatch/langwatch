@@ -5,6 +5,7 @@ import { AttachIdentifierCommand } from "./commands/attachIdentifier.command";
 import { DetachIdentifierCommand } from "./commands/detachIdentifier.command";
 import { EraseUserCommand } from "./commands/eraseUser.command";
 import { MarkPrimaryCommand } from "./commands/markPrimary.command";
+import { ProposeLinkCommand } from "./commands/proposeLink.command";
 import { VerifyIdentifierCommand } from "./commands/verifyIdentifier.command";
 import {
   type IdentityFoldState,
@@ -75,6 +76,11 @@ export function createIdentityPipeline(deps: IdentityPipelineDeps) {
       "eraseUser",
       EraseUserCommand,
       new EraseUserCommand(deps.identityGuards),
+    )
+    .withCommandInstance(
+      "proposeLink",
+      ProposeLinkCommand,
+      new ProposeLinkCommand(deps.identityGuards),
     )
     .build();
 }

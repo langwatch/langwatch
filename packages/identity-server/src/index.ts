@@ -86,8 +86,23 @@ export {
 export type {
   IdentityAdoptionWrites,
   IdentityCeremonyWrites,
+  IdentityLinkProposalWrites,
   IdentityVerificationWrites,
 } from "./identity-writes";
+export {
+  IdentityJitDisabledError,
+  IdentityLinkProposedError,
+} from "./signin-callback-errors";
+export {
+  type CallbackAssertion,
+  type CallbackAuditRecord,
+  type CallbackLinkOutcome,
+  type CallbackUserMatch,
+  type SignInCallbackAudit,
+  type SignInCallbackDirectoryPort,
+  SignInCallbackLinkingService,
+  type SignInCallbackLinkingDeps,
+} from "./signin-callback-linking.service";
 export {
   IDENTITY_VERIFICATION_TTL_MS,
   type MintedEmailVerification,

@@ -38,6 +38,7 @@ export const PRIMARY_CHANGED_EVENT_TYPE =
 export const IDENTIFIER_DETACHED_EVENT_TYPE =
   "lw.identity.identifier_detached" as const;
 export const USER_ERASED_EVENT_TYPE = "lw.identity.user_erased" as const;
+export const LINK_PROPOSED_EVENT_TYPE = "lw.identity.link_proposed" as const;
 
 export const IDENTITY_EVENT_TYPES = [
   IDENTIFIER_ATTACHED_EVENT_TYPE,
@@ -46,6 +47,7 @@ export const IDENTITY_EVENT_TYPES = [
   PRIMARY_CHANGED_EVENT_TYPE,
   IDENTIFIER_DETACHED_EVENT_TYPE,
   USER_ERASED_EVENT_TYPE,
+  LINK_PROPOSED_EVENT_TYPE,
 ] as const;
 export type IdentityEventType = (typeof IDENTITY_EVENT_TYPES)[number];
 
@@ -116,6 +118,47 @@ export const userErasedPayloadSchema = z.object({
 });
 
 /**
+ * Why a callback's link was not made automatically (ADR-117 §3). Each value is
+ * a refusal a human has to resolve, and the org-admin surface renders it.
+ */
+export const linkProposalReasonSchema = z.enum([
+  /** The matched row holds the address with no verification evidence at all —
+   *  the "unverified orphan cannot be hijacked" invariant, kept. */
+  "unverified_orphan",
+  /** More than one user holds the asserted address. */
+  "ambiguous_candidates",
+  /** The matched user holds identifiers on domains the organization cannot
+   *  vouch for, so the connection may not claim the whole row. */
+  "unvouched_identifiers",
+]);
+export type LinkProposalReason = z.infer<typeof linkProposalReasonSchema>;
+
+/**
+ * A callback matched somebody, but not unambiguously enough to link without a
+ * human (ADR-117 §3). Stated as a fact rather than a row so the proposal has
+ * the same history, the same erasure and the same replay as every other thing
+ * we know about an identity — and so the refusal an operator is asked about
+ * later is evidenced rather than reconstructed.
+ */
+export const linkProposedPayloadSchema = z.object({
+  proposalId: z.string().min(1),
+  /** The user the callback would have been linked to. */
+  userId: z.string().min(1),
+  /** The connection whose callback proposed it; null until D04 gives the
+   *  legacy env provider a connection of its own. */
+  connectionId: z.string().nullable(),
+  provider: identifierProviderSchema,
+  /** The IdP's own subject — an opaque identifier, never a secret. */
+  providerAccountId: z.string().min(1),
+  /** Normalized asserted value; wiped by erasure, like every other value. */
+  value: z.string().nullable(),
+  /** Org-level fact; survives erasure. */
+  domain: z.string().nullable(),
+  reason: linkProposalReasonSchema,
+  actor: identityActorSchema,
+});
+
+/**
  * A fact as a command decides it: the type and the payload. The framework
  * envelope (aggregate, tenant, ids, idempotency key) and `occurredAt` are
  * stamped by whoever appends — the app's pipeline envelope — from the
@@ -145,6 +188,10 @@ export const identityFactInputSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal(USER_ERASED_EVENT_TYPE),
     data: userErasedPayloadSchema,
+  }),
+  z.object({
+    type: z.literal(LINK_PROPOSED_EVENT_TYPE),
+    data: linkProposedPayloadSchema,
   }),
 ]);
 export type IdentityFactInput = z.infer<typeof identityFactInputSchema>;
@@ -216,6 +263,7 @@ export const MARK_PRIMARY_COMMAND_TYPE = "lw.identity.mark_primary" as const;
 export const DETACH_IDENTIFIER_COMMAND_TYPE =
   "lw.identity.detach_identifier" as const;
 export const ERASE_USER_COMMAND_TYPE = "lw.identity.erase_user" as const;
+export const PROPOSE_LINK_COMMAND_TYPE = "lw.identity.propose_link" as const;
 
 export const IDENTITY_COMMAND_TYPES = [
   ATTACH_IDENTIFIER_COMMAND_TYPE,
@@ -223,6 +271,7 @@ export const IDENTITY_COMMAND_TYPES = [
   MARK_PRIMARY_COMMAND_TYPE,
   DETACH_IDENTIFIER_COMMAND_TYPE,
   ERASE_USER_COMMAND_TYPE,
+  PROPOSE_LINK_COMMAND_TYPE,
 ] as const;
 export type IdentityCommandType = (typeof IDENTITY_COMMAND_TYPES)[number];
 
@@ -313,10 +362,26 @@ export const eraseUserCommandDataSchema = commandDataSchema({
 });
 export type EraseUserCommandData = z.infer<typeof eraseUserCommandDataSchema>;
 
+export const proposeLinkCommandDataSchema = commandDataSchema({
+  proposalId: z.string().min(1),
+  connectionId: z.string().min(1).nullable(),
+  provider: identifierProviderSchema,
+  providerAccountId: z.string().min(1),
+  /** RAW value as the callback asserted it — normalized by the guard. */
+  value: z.string().min(1),
+  reason: linkProposalReasonSchema,
+  occurredAtMs: z.number().int().nonnegative(),
+  actor: identityActorSchema,
+});
+export type ProposeLinkCommandData = z.infer<
+  typeof proposeLinkCommandDataSchema
+>;
+
 /** One identity command, typed on its verb — what the ledger stages. */
 export type IdentityCommand =
   | { type: typeof ATTACH_IDENTIFIER_COMMAND_TYPE; data: AttachIdentifierCommandData }
   | { type: typeof VERIFY_IDENTIFIER_COMMAND_TYPE; data: VerifyIdentifierCommandData }
   | { type: typeof MARK_PRIMARY_COMMAND_TYPE; data: MarkPrimaryCommandData }
   | { type: typeof DETACH_IDENTIFIER_COMMAND_TYPE; data: DetachIdentifierCommandData }
-  | { type: typeof ERASE_USER_COMMAND_TYPE; data: EraseUserCommandData };
+  | { type: typeof ERASE_USER_COMMAND_TYPE; data: EraseUserCommandData }
+  | { type: typeof PROPOSE_LINK_COMMAND_TYPE; data: ProposeLinkCommandData };

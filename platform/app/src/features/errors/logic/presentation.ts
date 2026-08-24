@@ -1644,6 +1644,19 @@ const presentations = {
     title: "Only a verified sign-in method can be primary",
     describe: () => "Verify this sign-in method first, then make it primary.",
   },
+  identity_link_proposed: {
+    title: "An administrator needs to confirm this sign-in",
+    // Deliberately says nothing about whether an account exists, who holds the
+    // address, or what the evidence was. This is answered to whoever arrived,
+    // and that is not necessarily the owner of the address.
+    describe: () =>
+      "Your workspace administrator has been asked to confirm it. Try again once they have.",
+  },
+  identity_jit_disabled: {
+    title: "This workspace does not create accounts automatically",
+    describe: () =>
+      "Ask a workspace administrator to invite you, then sign in again.",
+  },
 
   // ---- governance ----
   anomaly_rule_not_found: {

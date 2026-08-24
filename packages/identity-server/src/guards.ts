@@ -14,9 +14,11 @@ import {
   IdentityPrimaryRequiresVerifiedError,
   type IdentityFactInput,
   identifierDomain,
+  LINK_PROPOSED_EVENT_TYPE,
   type MarkPrimaryCommandData,
   normalizeIdentifierValue,
   PRIMARY_CHANGED_EVENT_TYPE,
+  type ProposeLinkCommandData,
   USER_ERASED_EVENT_TYPE,
   type VerifyIdentifierCommandData,
 } from "@langwatch/identity";
@@ -222,6 +224,47 @@ export class IdentityGuards {
         data: {
           userId,
           erasedIdentifierIds: Object.keys(heads.identifiers),
+          actor,
+        },
+      },
+    ];
+  }
+
+  /**
+   * A callback's link was refused and handed to a human (ADR-117 §3). There is
+   * nothing for a guard to veto: a proposal states that no identifier was
+   * attached, so it can never violate an invariant the heads hold. What it
+   * does do is what every other verb does — normalize the value once, here,
+   * so only the normalized form ever reaches a fact.
+   *
+   * A retried callback dedupes on the command's idempotency key, the same way
+   * every other repeated command does, so this states its fact unconditionally
+   * rather than reading heads it would not use.
+   */
+  async proposeLink(data: ProposeLinkCommandData): Promise<IdentityFactInput[]> {
+    const {
+      proposalId,
+      userId,
+      connectionId,
+      provider,
+      providerAccountId,
+      value,
+      reason,
+      actor,
+    } = data;
+    const normalizedValue = normalizeIdentifierValue(value);
+    return [
+      {
+        type: LINK_PROPOSED_EVENT_TYPE,
+        data: {
+          proposalId,
+          userId,
+          connectionId,
+          provider,
+          providerAccountId,
+          value: normalizedValue,
+          domain: identifierDomain(normalizedValue),
+          reason,
           actor,
         },
       },
