@@ -625,10 +625,13 @@ export class Microsoft365AuditPuller
         signal: options.signal,
         deadlineAtMs: options.deadlineMs,
       });
-      // Only a first-ever start reaches here; every later run is AF20024
-      // below. Worth saying out loud, because the feed does not backfill:
-      // this line is the moment from which content exists at all, and any
-      // Copilot activity before it is gone.
+      // A start that was NOT already running — which is not the same as a
+      // first-ever start, and the difference is the point. As the doc above
+      // says, a subscription stopped outside this system is indistinguishable
+      // from one that never existed, and both answer 200 here. That second
+      // case is a silent gap: the feed does not backfill, so everything
+      // between the stop and this line is gone and no later run will ask for
+      // it again. This is the only place that moment is observable.
       logger.info(
         {
           ingestionSourceId: options.context?.ingestionSourceId,
