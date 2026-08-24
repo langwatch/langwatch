@@ -13,7 +13,7 @@
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { datasetDisplayRecordCount } from "~/server/datasets/record-count";
+import { datasetDisplayRecordCount } from "@langwatch/dataset-contract";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { getTestUser } from "../../../../utils/testUtils";

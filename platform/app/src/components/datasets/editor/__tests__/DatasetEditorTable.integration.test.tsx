@@ -18,7 +18,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { DatasetColumns } from "~/server/datasets/types";
+import type { DatasetColumns } from "@langwatch/dataset-contract";
 import {
   DatasetEditorTable,
   type InMemoryDataset,

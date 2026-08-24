@@ -1,12 +1,12 @@
 import type { MiddlewareHandler } from "hono";
-import { DatasetService } from "~/server/datasets/dataset.service";
-import { prisma } from "~/server/db";
+import type { DatasetService } from "@langwatch/dataset-contract";
+import { appFromContext } from "./app-context";
 
 export type DatasetServiceMiddlewareVariables = {
   datasetService: DatasetService;
 };
 
 export const datasetServiceMiddleware: MiddlewareHandler = async (c, next) => {
-  c.set("datasetService", DatasetService.create(prisma));
+  c.set("datasetService", appFromContext(c).dataset);
   await next();
 };

@@ -20,7 +20,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import type {
   DatasetColumns,
   DatasetRecordEntry,
-} from "../../server/datasets/types";
+} from "@langwatch/dataset-contract";
 import type { MappingState } from "../../server/tracer/tracesMapping";
 import { api } from "../../utils/api";
 import {

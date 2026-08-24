@@ -1,23 +1,21 @@
 import { Readable } from "node:stream";
+import {
+  datasetColumnsSchema,
+  datasetColumnTypeSchema,
+  datasetConfirmColumnsSchema,
+  type DatasetColumns,
+  type DatasetConfirmColumns,
+  DatasetNotReadyError,
+  UploadValidationError,
+} from "@langwatch/dataset-contract";
 import { describeRoute, resolver } from "hono-openapi";
-import { z } from "zod";
+import { z } from "zod/v4";
 import {
   createProjectApp,
   handlerManagedAuth,
   requires,
 } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import { UploadValidationError } from "../../../../server/datasets/dataset.service";
-import type { DatasetNotReadyError } from "../../../../server/datasets/errors";
-import type {
-  DatasetColumns,
-  DatasetConfirmColumns,
-} from "../../../../server/datasets/types";
-import {
-  datasetColumnsSchema,
-  datasetColumnTypeSchema,
-  datasetConfirmColumnsSchema,
-} from "../../../../server/datasets/types";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import {
   type DatasetServiceMiddlewareVariables,
@@ -926,7 +924,7 @@ secured.access(requires("datasets:update")).patch(
         slugOrId,
         projectId: project.id,
         recordId,
-        entry,
+        updatedRecord: entry,
       });
 
       return c.json(record, created ? 201 : 200);

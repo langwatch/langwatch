@@ -10,9 +10,9 @@
  *   - admit a valid API key for the project (and bump lastUsedAt).
  *
  * The boundaries (`getServerAuthSession`, `probeProjectPermission`,
- * `extractCredentials`, `TokenResolver`, `enforceApiKeyCeiling`,
- * `apiKeyCeilingDenialResponse`, `prisma`) are mocked so the test exercises only
- * the authorization decision logic. Mirrors the experiments-v3 auth-test style.
+ * `extractCredentials`, the process App services, `enforceApiKeyCeiling`, and
+ * `apiKeyCeilingDenialResponse`) are mocked so the test exercises only the
+ * authorization decision logic. Mirrors the experiments-v3 auth-test style.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -37,36 +37,34 @@ vi.mock("~/server/api-key/auth-middleware", () => ({
     apiKeyCeilingDenialResponse(...args),
 }));
 
-const resolve = vi.fn();
+const tryResolveToken = vi.fn();
 const markUsed = vi.fn();
-vi.mock("~/server/api-key/token-resolver", () => ({
-  TokenResolver: {
-    create: () => ({
-      resolve: (...args: unknown[]) => resolve(...args),
-      markUsed: (...args: unknown[]) => markUsed(...args),
-    }),
-  },
-}));
+const tryGetProject = vi.fn();
 
-const projectFindUnique = vi.fn();
-vi.mock("~/server/db", () => ({
-  prisma: {
-    project: { findUnique: (...args: unknown[]) => projectFindUnique(...args) },
+const processApp = {
+  apiKeys: {
+    tryResolveToken,
+    markUsed,
   },
-}));
+  projects: {
+    tryGetById: tryGetProject,
+  },
+};
 
 import { authorizeDirectUpload } from "../direct-upload-auth";
 
 const PROJECT_ID = "project_OWNED";
 const TEAM_ID = "team_OWNED";
 
-/** Minimal Hono `Context` stand-in: only `req.raw` and `req.header` are read. */
+/** Minimal Hono Context stand-in for request and process-App access. */
 const makeContext = (headers: Record<string, string> = {}) =>
   ({
     req: {
       raw: new Request("http://localhost/api/dataset/direct-upload"),
       header: (name: string) => headers[name],
     },
+    get: (name: string) =>
+      name === "langwatchApp" ? processApp : undefined,
   }) as never;
 
 beforeEach(() => {
@@ -77,7 +75,7 @@ beforeEach(() => {
     status: 403,
     message: "denied",
   });
-  projectFindUnique.mockResolvedValue({ teamId: TEAM_ID });
+  tryGetProject.mockResolvedValue({ id: PROJECT_ID, teamId: TEAM_ID });
 });
 
 describe("authorizeDirectUpload", () => {
@@ -103,7 +101,7 @@ describe("authorizeDirectUpload", () => {
           teamId: TEAM_ID,
         });
         // Session path must never touch the API-key resolver.
-        expect(resolve).not.toHaveBeenCalled();
+        expect(tryResolveToken).not.toHaveBeenCalled();
       });
     });
 
@@ -120,7 +118,7 @@ describe("authorizeDirectUpload", () => {
 
         expect(result.ok).toBe(false);
         expect(result).toMatchObject({ ok: false, status: 403 });
-        expect(projectFindUnique).not.toHaveBeenCalled();
+        expect(tryGetProject).not.toHaveBeenCalled();
       });
     });
 
@@ -136,7 +134,7 @@ describe("authorizeDirectUpload", () => {
         expect(result).toMatchObject({ ok: false, status: 403 });
         // The CSRF gate fires before the permission check and team resolve.
         expect(probeProjectPermission).not.toHaveBeenCalled();
-        expect(projectFindUnique).not.toHaveBeenCalled();
+        expect(tryGetProject).not.toHaveBeenCalled();
       });
 
       it("rejects when the Origin host differs from the Host (older browser, no Sec-Fetch-Site)", async () => {
@@ -163,7 +161,7 @@ describe("authorizeDirectUpload", () => {
 
         expect(result).toMatchObject({ ok: false, status: 403 });
         expect(probeProjectPermission).not.toHaveBeenCalled();
-        expect(projectFindUnique).not.toHaveBeenCalled();
+        expect(tryGetProject).not.toHaveBeenCalled();
       });
     });
 
@@ -199,7 +197,7 @@ describe("authorizeDirectUpload", () => {
 
         expect(result.ok).toBe(false);
         expect(result).toMatchObject({ ok: false, status: 401 });
-        expect(resolve).not.toHaveBeenCalled();
+        expect(tryResolveToken).not.toHaveBeenCalled();
       });
     });
 
@@ -209,7 +207,7 @@ describe("authorizeDirectUpload", () => {
           token: "sk-lw-other",
           projectId: null,
         });
-        resolve.mockResolvedValue({
+        tryResolveToken.mockResolvedValue({
           type: "apiKey",
           apiKeyId: "ak_other",
           project: { id: "project_DIFFERENT", teamId: "team_DIFFERENT" },
@@ -229,7 +227,7 @@ describe("authorizeDirectUpload", () => {
           token: "sk-lw-owned",
           projectId: null,
         });
-        resolve.mockResolvedValue({
+        tryResolveToken.mockResolvedValue({
           type: "apiKey",
           apiKeyId: "ak_owned",
           project: { id: PROJECT_ID, teamId: TEAM_ID },
@@ -243,7 +241,7 @@ describe("authorizeDirectUpload", () => {
           teamId: TEAM_ID,
         });
         // Telemetry parity: lastUsedAt bumped for the resolved API key.
-        expect(markUsed).toHaveBeenCalledWith({ apiKeyId: "ak_owned" });
+        expect(markUsed).toHaveBeenCalledWith({ id: "ak_owned" });
       });
     });
   });

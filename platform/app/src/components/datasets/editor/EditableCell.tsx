@@ -9,9 +9,9 @@ import {
   useState,
 } from "react";
 import { ExternalImage, getImageUrl } from "~/components/ExternalImage";
-import type { DatasetColumnType } from "~/server/datasets/types";
+import type { DatasetColumnType } from "@langwatch/dataset-contract";
 import { isTextLikelyOverflowing } from "~/utils/textOverflowHeuristic";
-import { useDatasetTable } from "./DatasetTableContext";
+import { useDatasetTable } from "@langwatch/dataset-web";
 
 // Max characters to display before truncating (for rendering performance)
 const MAX_DISPLAY_CHARS = 5000;

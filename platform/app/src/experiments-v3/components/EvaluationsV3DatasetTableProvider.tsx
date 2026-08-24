@@ -9,7 +9,7 @@ import type { PropsWithChildren } from "react";
 import {
   type DatasetTableContextValue,
   DatasetTableProvider,
-} from "~/components/datasets/editor/DatasetTableContext";
+} from "@langwatch/dataset-web";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 
 export function EvaluationsV3DatasetTableProvider({

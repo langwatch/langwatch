@@ -29,23 +29,17 @@ import { useRouter } from "~/utils/compat/next-router";
 import type {
   DatasetColumns,
   DatasetRecordEntry,
-} from "../../server/datasets/types";
+} from "@langwatch/dataset-contract";
 import {
   MAX_FILE_SIZE_BYTES,
   MAX_ROWS_LIMIT,
-} from "../../server/datasets/upload-utils";
+} from "@langwatch/dataset-contract";
 import {
   type AddDatasetDrawerProps,
   AddOrEditDatasetDrawer,
 } from "../AddOrEditDatasetDrawer";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
-import {
-  DROPZONE_DOTTED_STYLE,
-  DropzonePrompt,
-  dropzoneSurfaceProps,
-  RAINBOW_TEXT_CSS,
-} from "./datasetDropzoneStyles";
 import {
   abortPendingUpload,
   DirectUploadUnavailableError,
@@ -54,9 +48,13 @@ import {
   putFileToPresignedUrl,
   requestDirectUpload,
   retryDatasetNormalize,
-} from "./services/directUpload";
-import { parseHeaderColumns } from "./utils/parseHeaderColumns";
-import { getSafeColumnName } from "./utils/reservedColumns";
+  DROPZONE_DOTTED_STYLE,
+  DropzonePrompt,
+  dropzoneSurfaceProps,
+  RAINBOW_TEXT_CSS,
+  parseHeaderColumns,
+  getSafeColumnName,
+} from "@langwatch/dataset-web";
 
 const logger = createLogger("UploadCSVDrawer");
 

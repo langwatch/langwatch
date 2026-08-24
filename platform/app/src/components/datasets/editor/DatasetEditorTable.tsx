@@ -55,7 +55,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
   DatasetColumns,
   DatasetRecordEntry,
-} from "~/server/datasets/types";
+} from "@langwatch/dataset-contract";
 import { api } from "~/utils/api";
 import { AddRowsFromCSVModal } from "../AddRowsFromCSVModal";
 import {
@@ -63,17 +63,15 @@ import {
   type DatasetTableContextValue,
   DatasetTableProvider,
   type DatasetTableRowData,
-} from "./DatasetTableContext";
-import { formatRecordCount } from "./datasetEditorCopy";
-import { datasetTableCss } from "./datasetTableStyles";
-import {
+  formatRecordCount,
+  datasetTableCss,
   createDatasetEditorStore,
   type EditorColumn,
   type EditorRecord,
   rekeyEditorRecords,
-} from "./useDatasetEditorStore";
+  useTableKeyboardNavigation,
+} from "@langwatch/dataset-web";
 import { useDatasetRecordSync } from "./useDatasetRecordSync";
-import { useTableKeyboardNavigation } from "./useTableKeyboardNavigation";
 import { VirtualizedTableBody } from "./VirtualizedTableBody";
 
 export type InMemoryDataset = {

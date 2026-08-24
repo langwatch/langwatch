@@ -1,5 +1,5 @@
 import type { Node } from "@xyflow/react";
-import { getFullDataset } from "../../server/api/routers/datasetRecord.utils";
+import { getApp } from "../../server/app-layer/app";
 import type { Component, Workflow } from "../types/dsl";
 import type { StudioClientEvent } from "../types/events";
 import {
@@ -90,15 +90,21 @@ export const loadDatasets = async (
       // ADR-032 I-READY: a non-ready (uploading/processing/failed) s3_jsonl
       // dataset throws DatasetNotReadyError here — it must NOT be silently
       // treated as empty. The throw propagates as a clear run error.
-      const dataset = await getFullDataset({
-        datasetId: node.data.dataset.id,
+      const loadedDataset = await getApp().dataset.getDatasetWithRecords({
+        slugOrId: node.data.dataset.id,
         projectId,
         entrySelection,
+        limitMb: null,
       });
-      if (!dataset) {
-        throw new Error("Dataset not found");
-      }
-      const inMemoryDataset = datasetDatabaseRecordsToInMemoryDataset(dataset);
+      const dataset = {
+        ...loadedDataset.dataset,
+        datasetRecords: loadedDataset.records,
+      };
+      const inMemoryDataset = datasetDatabaseRecordsToInMemoryDataset(
+        dataset as unknown as Parameters<
+          typeof datasetDatabaseRecordsToInMemoryDataset
+        >[0],
+      );
       delete inMemoryDataset.datasetId;
       const inlineDataset = inMemoryDatasetToNodeDataset(inMemoryDataset);
 

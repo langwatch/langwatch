@@ -7,7 +7,7 @@ import type { AppRouter } from "../../server/api/root";
 import type {
   DatasetColumns,
   DatasetRecordEntry,
-} from "../../server/datasets/types";
+} from "@langwatch/dataset-contract";
 import { api } from "../../utils/api";
 import type { Entry } from "../types/dsl";
 import {

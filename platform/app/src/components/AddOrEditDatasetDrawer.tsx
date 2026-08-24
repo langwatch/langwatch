@@ -13,6 +13,7 @@ import { useEffect } from "react";
 import { Eye, EyeOff, Trash2 } from "react-feather";
 import { type FieldErrors, useFieldArray, useForm } from "react-hook-form";
 import type { InMemoryDataset } from "~/components/datasets/editor/DatasetEditorTable";
+import { convertDatasetRecordsToColumnTypes } from "@langwatch/dataset-web";
 import {
   describeError,
   readHandledError,
@@ -26,9 +27,8 @@ import { tryToMapPreviousColumnsToNewColumns } from "../optimization_studio/util
 import {
   type DatasetColumns,
   type DatasetRecordForm,
-  type DatasetRecordInput,
   datasetRecordFormSchema,
-} from "../server/datasets/types";
+} from "@langwatch/dataset-contract";
 import { api } from "../utils/api";
 import { DatasetSlugDisplay } from "./datasets/DatasetSlugDisplay";
 import { useDatasetSlugValidation } from "./datasets/useDatasetSlugValidation";
@@ -197,7 +197,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
         columnTypes: data.columnTypes,
         ...(props.datasetToSave?.datasetRecords
           ? {
-              datasetRecords: tryToConvertRowsToAppropriateType(
+              datasetRecords: convertDatasetRecordsToColumnTypes(
                 tryToMapPreviousColumnsToNewColumns(
                   props.datasetToSave.datasetRecords,
                   props.datasetToSave.columnTypes,
@@ -415,62 +415,3 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
     </Drawer.Root>
   );
 }
-
-export const tryToConvertRowsToAppropriateType = (
-  datasetRecords: DatasetRecordInput[],
-  columnTypes: DatasetColumns,
-): DatasetRecordInput[] => {
-  const typeForColumn = Object.fromEntries(
-    columnTypes.map((col) => [col.name, col.type]),
-  );
-  return datasetRecords.map((record) => {
-    const convertedRecord = { ...record };
-    for (const [key, value] of Object.entries(record)) {
-      const type = typeForColumn[key];
-      if (type === "number") {
-        if (!value) {
-          convertedRecord[key] = null;
-        } else if (!isNaN(value)) {
-          convertedRecord[key] = parseFloat(value);
-        }
-      } else if (type === "boolean") {
-        if (
-          ["true", "1", "yes", "y", "on", "ok"].includes(
-            `${value ?? ""}`.toLowerCase(),
-          )
-        ) {
-          convertedRecord[key] = true;
-        } else if (
-          [
-            "false",
-            "0",
-            "null",
-            "undefined",
-            "nan",
-            "inf",
-            "no",
-            "n",
-            "off",
-          ].includes(`${value ?? ""}`.toLowerCase())
-        ) {
-          convertedRecord[key] = false;
-        }
-      } else if (type === "date") {
-        const dateAttempt = new Date(value);
-        if (dateAttempt.toString() !== "Invalid Date") {
-          convertedRecord[key] = dateAttempt.toISOString().split("T")[0];
-        }
-      } else if (type === "image") {
-        // Image type should be treated as a string (URL)
-        convertedRecord[key] = value;
-      } else if (type !== "string") {
-        try {
-          convertedRecord[key] = JSON.parse(value);
-        } catch {
-          /* */
-        }
-      }
-    }
-    return convertedRecord;
-  });
-};

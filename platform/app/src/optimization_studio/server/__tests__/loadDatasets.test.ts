@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { StudioClientEvent } from "../../types/events";
 
-vi.mock("../../../server/api/routers/datasetRecord.utils", () => ({
-  getFullDataset: vi.fn(),
+vi.mock("../../../server/app-layer/app", () => ({
+  getApp: vi.fn(),
 }));
 
 vi.mock("../../utils/datasetUtils", async () => {
@@ -12,7 +12,7 @@ vi.mock("../../utils/datasetUtils", async () => {
   return actual;
 });
 
-import { getFullDataset } from "../../../server/api/routers/datasetRecord.utils";
+import { getApp } from "../../../server/app-layer/app";
 import { loadDatasets } from "../loadDatasets";
 
 const PROJECT_ID = "project-123";
@@ -55,8 +55,13 @@ const makeEvent = (
   }) as unknown as StudioClientEvent;
 
 describe("loadDatasets", () => {
+  const getDatasetWithRecords = vi.fn();
+
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getApp).mockReturnValue({
+      dataset: { getDatasetWithRecords },
+    } as never);
   });
 
   // Regression pin for the 3.2.0 prod break (a customer saw
@@ -68,10 +73,13 @@ describe("loadDatasets", () => {
   // rejected it. Now loadDatasets always fetches + inlines on the
   // database path, regardless of evaluate_on/entry_selection mode.
   it("inlines saved (database) datasets on execute_evaluation when entry_selection is all", async () => {
-    (getFullDataset as ReturnType<typeof vi.fn>).mockResolvedValue({
-      id: "ds_xyz",
-      name: "Saved",
-      datasetRecords: [
+    getDatasetWithRecords.mockResolvedValue({
+      dataset: {
+        id: "ds_xyz",
+        name: "Saved",
+        columnTypes: [{ name: "question", type: "string" }],
+      },
+      records: [
         {
           id: "r1",
           entry: { question: "q1" },
@@ -85,9 +93,7 @@ describe("loadDatasets", () => {
           updatedAt: new Date(),
         },
       ],
-      count: 2,
       truncated: false,
-      columnTypes: [{ name: "question", type: "string" }],
     });
 
     const event = makeEvent(
@@ -102,10 +108,11 @@ describe("loadDatasets", () => {
 
     const enriched = await loadDatasets(event, PROJECT_ID);
 
-    expect(getFullDataset).toHaveBeenCalledWith({
-      datasetId: "ds_xyz",
+    expect(getDatasetWithRecords).toHaveBeenCalledWith({
+      slugOrId: "ds_xyz",
       projectId: PROJECT_ID,
       entrySelection: "all",
+      limitMb: null,
     });
 
     if (!("workflow" in enriched.payload)) {
@@ -140,7 +147,7 @@ describe("loadDatasets", () => {
 
     const enriched = await loadDatasets(event, PROJECT_ID);
 
-    expect(getFullDataset).not.toHaveBeenCalled();
+    expect(getDatasetWithRecords).not.toHaveBeenCalled();
     if (!("workflow" in enriched.payload)) {
       throw new Error("expected workflow in payload");
     }
@@ -162,7 +169,7 @@ describe("loadDatasets", () => {
 
     const enriched = await loadDatasets(event, PROJECT_ID);
 
-    expect(getFullDataset).not.toHaveBeenCalled();
+    expect(getDatasetWithRecords).not.toHaveBeenCalled();
     if (!("workflow" in enriched.payload)) {
       throw new Error("expected workflow in payload");
     }

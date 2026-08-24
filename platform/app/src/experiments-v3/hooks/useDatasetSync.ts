@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import type { AutosaveState } from "~/components/datasets/editor/DatasetTableContext";
+import type { AutosaveState } from "@langwatch/dataset-web";
 import { useDatasetRecordSync } from "~/components/datasets/editor/useDatasetRecordSync";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { DatasetReference } from "../types";

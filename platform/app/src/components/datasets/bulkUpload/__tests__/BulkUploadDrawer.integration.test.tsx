@@ -11,15 +11,15 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import type { DatasetConfirmColumns } from "~/server/datasets/types";
+import type { DatasetConfirmColumns } from "@langwatch/dataset-contract";
 
 const requestDirectUpload = vi.fn();
 const putFileToPresignedUrl = vi.fn();
 const finalizeDirectUpload = vi.fn();
 const abortPendingUpload = vi.fn();
 const retryDatasetNormalize = vi.fn();
-vi.mock("../../services/directUpload", async (orig) => {
-  const actual = await orig<typeof import("../../services/directUpload")>();
+vi.mock("@langwatch/dataset-web", async (orig) => {
+  const actual = await orig<typeof import("@langwatch/dataset-web")>();
   return {
     ...actual,
     requestDirectUpload: (...a: unknown[]) => requestDirectUpload(...a),
@@ -27,14 +27,12 @@ vi.mock("../../services/directUpload", async (orig) => {
     finalizeDirectUpload: (...a: unknown[]) => finalizeDirectUpload(...a),
     abortPendingUpload: (...a: unknown[]) => abortPendingUpload(...a),
     retryDatasetNormalize: (...a: unknown[]) => retryDatasetNormalize(...a),
+    HEADER_PARSE_MAX_BYTES: 262144,
+    parseHeaderColumns: (...a: unknown[]) => parseHeaderColumns(...a),
   };
 });
 
 const parseHeaderColumns = vi.fn();
-vi.mock("../../utils/parseHeaderColumns", () => ({
-  HEADER_PARSE_MAX_BYTES: 262144,
-  parseHeaderColumns: (...a: unknown[]) => parseHeaderColumns(...a),
-}));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({

@@ -50,9 +50,9 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-vi.mock("../services/directUpload", async (importActual) => {
+vi.mock("@langwatch/dataset-web", async (importActual) => {
   const actual =
-    await importActual<typeof import("../services/directUpload")>();
+    await importActual<typeof import("@langwatch/dataset-web")>();
   return {
     ...actual,
     retryDatasetNormalize: (...args: unknown[]) =>

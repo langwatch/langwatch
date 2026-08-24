@@ -7,7 +7,7 @@
  *
  * Exercises the REAL production wiring end-to-end: `migrateDatasetToS3` with
  * `resolveStorage: resolveProjectStorageDestination` and
- * `getStorage: getDatasetStorage` (the real dispatcher, unmocked) — only the
+ * `getStorage: the injected storage resolver` (the real dispatcher, unmocked) — only the
  * env boundary is stubbed (STORED_OBJECTS_BACKEND=azure + AZURE_BLOB_* aimed
  * at a real Azurite testcontainer) and the BYOC lookup (no per-project bucket
  * for this test project). Everything from "env says azure" through
@@ -40,8 +40,8 @@ import { nanoid } from "nanoid";
 import { projectFactory } from "~/factories/project.factory";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
-import { DatasetRecordRepository } from "../../server/datasets/dataset-record.repository";
-import { getDatasetStorage } from "../../server/datasets/dataset-storage";
+import { DatasetMigrationService } from "@langwatch/dataset-server";
+import { AppDatasetStorageResolver } from "../../runtime/app/features/dataset-storage";
 import {
   ensureAzuriteContainer,
   type StartedAzurite,
@@ -53,6 +53,8 @@ import {
   type BackfillDeps,
   migrateDatasetToS3,
 } from "../backfillDatasetContentToS3";
+
+const datasetStorageResolver = new AppDatasetStorageResolver();
 
 const CONTAINER = "datasets";
 
@@ -134,11 +136,13 @@ describe("migrateDatasetToS3 onto the Azure Blob backend", () => {
         });
       }
 
+      const migration = DatasetMigrationService.create(prisma);
       const deps: BackfillDeps = {
         prisma,
-        recordRepository: new DatasetRecordRepository(prisma),
+        recordRepository: migration,
+        migration,
         resolveStorage: resolveProjectStorageDestination,
-        getStorage: getDatasetStorage,
+        getStorage: datasetStorageResolver.forProject.bind(datasetStorageResolver),
       };
 
       const outcome = await migrateDatasetToS3(
@@ -155,10 +159,10 @@ describe("migrateDatasetToS3 onto the Azure Blob backend", () => {
       expect(updated.rowCount).toBe(3);
       expect(updated.chunkCount).toBeGreaterThan(0);
 
-      // Reading back through the real dispatcher (getDatasetStorage) proves
+      // Reading back through the injected storage resolver proves
       // the migrated content is actually retrievable via the production read
       // path, not just that SOME bytes landed somewhere.
-      const storage = await getDatasetStorage(project.id);
+      const storage = await datasetStorageResolver.forProject(project.id);
       const rows = await storage.readChunks({
         projectId: project.id,
         datasetId: dataset.id,

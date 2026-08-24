@@ -3,7 +3,7 @@ import { FlaskConical } from "lucide-react";
 import { useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { DatasetEditorTable } from "~/components/datasets/editor/DatasetEditorTable";
-import { retryDatasetNormalize } from "~/components/datasets/services/directUpload";
+import { retryDatasetNormalize } from "@langwatch/dataset-web";
 import { showErrorToast } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";

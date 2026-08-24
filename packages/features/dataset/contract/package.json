@@ -1,0 +1,31 @@
+{
+  "name": "@langwatch/dataset-contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable Dataset feature contract.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": ["src"],
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "papaparse": "^5.5.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/papaparse": "^5.3.15",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}

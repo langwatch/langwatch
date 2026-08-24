@@ -13,23 +13,22 @@
  *   1. NextAuth session cookie (the upload UI) — verified with
  *      `probeProjectPermission`.
  *   2. Project API key / legacy key / PAT (parity with the rest of the surface)
- *      — resolved via `TokenResolver` + `enforceApiKeyCeiling`.
+ *      — resolved by the process-owned API Key service and checked with
+ *        `enforceApiKeyCeiling`.
  *
  * `projectId` comes from the request (the route reads it from the body/param
  * and passes it in) since there is no `authMiddleware` to set `c.get("project")`.
  */
 
 import type { Context } from "hono";
-import type { Project } from "~/generated/prisma/client";
 import {
   apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
   extractCredentials,
 } from "~/server/api-key/auth-middleware";
-import { TokenResolver } from "~/server/api-key/token-resolver";
+import { appFromContext } from "~/app/api/middleware/app-context";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
-import { prisma } from "~/server/db";
 
 const PERMISSION = "datasets:manage" as const;
 
@@ -114,10 +113,7 @@ export async function authorizeDirectUpload(
         error: "You do not have permission to upload to this dataset.",
       };
     }
-    const project = await prisma.project.findUnique({
-      where: { id: projectId },
-      select: { teamId: true },
-    });
+    const project = await appFromContext(c).projects.tryGetById(projectId);
     if (!project) {
       return { ok: false, status: 403, error: "Project not found" };
     }
@@ -134,8 +130,8 @@ export async function authorizeDirectUpload(
     };
   }
 
-  const resolver = TokenResolver.create(prisma);
-  const resolved = await resolver.resolve({
+  const app = appFromContext(c);
+  const resolved = await app.apiKeys.tryResolveToken({
     token: credentials.token,
     projectId: credentials.projectId ?? projectId,
   });
@@ -161,12 +157,12 @@ export async function authorizeDirectUpload(
   // bump of `lastUsedAt` on a successful API-key auth (no-op for legacy keys,
   // which carry no `apiKeyId`). Matches the experiments-v3 `markUsed` pattern.
   if (resolved.type === "apiKey") {
-    resolver.markUsed({ apiKeyId: resolved.apiKeyId });
+    app.apiKeys.markUsed({ id: resolved.apiKeyId });
   }
 
   return {
     ok: true,
     projectId,
-    teamId: (resolved.project as Project).teamId,
+    teamId: resolved.project.teamId,
   };
 }

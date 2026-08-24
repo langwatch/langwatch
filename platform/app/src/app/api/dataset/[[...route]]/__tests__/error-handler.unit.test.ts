@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import { describe, expect, it } from "vitest";
-import { DatasetNotReadyError } from "../../../../../server/datasets/errors";
+import { DatasetNotReadyError } from "@langwatch/dataset-contract";
 import { handleDatasetError } from "../error-handler";
 
 /**

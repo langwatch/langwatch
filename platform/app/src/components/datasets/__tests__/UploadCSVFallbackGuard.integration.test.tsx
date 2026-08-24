@@ -17,7 +17,7 @@ import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import { MAX_FILE_SIZE_BYTES } from "../../../server/datasets/upload-utils";
+import { MAX_FILE_SIZE_BYTES } from "@langwatch/dataset-contract";
 
 // Force the direct-upload request to report "no browser-reachable storage" so
 // the modal takes the fallback path under test.
@@ -25,9 +25,9 @@ const requestDirectUpload = vi.fn();
 const putFileToPresignedUrl = vi.fn();
 const finalizeDirectUpload = vi.fn();
 const abortPendingUpload = vi.fn();
-vi.mock("../services/directUpload", async (importActual) => {
+vi.mock("@langwatch/dataset-web", async (importActual) => {
   const actual =
-    await importActual<typeof import("../services/directUpload")>();
+    await importActual<typeof import("@langwatch/dataset-web")>();
   return {
     ...actual,
     requestDirectUpload: (...args: unknown[]) => requestDirectUpload(...args),
@@ -65,7 +65,7 @@ vi.mock("~/utils/api", () => ({
 import {
   DirectUploadUnavailableError,
   PresignedUploadFailedError,
-} from "../services/directUpload";
+} from "@langwatch/dataset-web";
 import { UploadCSVForm } from "../UploadCSVDrawer";
 
 const renderForm = () =>

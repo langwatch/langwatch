@@ -20,14 +20,14 @@ import {
 import { type RefObject, useMemo, useState } from "react";
 
 import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
-import type { DatasetColumns } from "~/server/datasets/types";
+import type { DatasetColumns } from "@langwatch/dataset-contract";
 import {
   type CellPosition,
   type DatasetTableContextValue,
   DatasetTableProvider,
   type DatasetTableRowData,
-} from "./DatasetTableContext";
-import { datasetTableCss } from "./datasetTableStyles";
+  datasetTableCss,
+} from "@langwatch/dataset-web";
 import { JSON_LIKE_TYPES } from "./EditableCell";
 import { TableCell } from "./TableCell";
 

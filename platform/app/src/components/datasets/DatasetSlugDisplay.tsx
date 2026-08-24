@@ -7,9 +7,11 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useCallback } from "react";
+import {
+  SlugChangeWarningAlert,
+  SlugConflictAlert,
+} from "@langwatch/dataset-web";
 import { CopyButton } from "../CopyButton";
-import { SlugChangeWarningAlert } from "./SlugChangeWarningAlert";
-import { SlugConflictAlert } from "./SlugConflictAlert";
 import type { SlugValidationResult } from "./useDatasetSlugValidation";
 
 /**

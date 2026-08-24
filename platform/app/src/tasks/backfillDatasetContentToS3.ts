@@ -42,13 +42,13 @@ import {
   Prisma,
   type PrismaClient,
 } from "~/generated/prisma/client";
-import { StreamingChunkWriter } from "../server/datasets/dataset-chunk-writer";
-import { withDatasetLock } from "../server/datasets/dataset-lock";
-import { DatasetRecordRepository } from "../server/datasets/dataset-record.repository";
 import {
+  DatasetMigrationService,
+  type DatasetMigrationRepository,
+  type DatasetMigrationTransaction,
   type DatasetStorage,
-  getDatasetStorage,
-} from "../server/datasets/dataset-storage";
+} from "@langwatch/dataset-server";
+import { AppDatasetStorageResolver } from "../runtime/app/features/dataset-storage";
 import { prisma } from "../server/db";
 import { resolveProjectStorageDestination } from "../server/stored-objects/project-storage-destination";
 
@@ -94,7 +94,9 @@ export type MigrateOutcome =
  */
 export type BackfillDeps = {
   prisma: PrismaClient;
-  recordRepository: DatasetRecordRepository;
+  recordRepository: DatasetMigrationRepository;
+  /** Package-owned migration service. Optional for focused unit-test seams. */
+  migration?: DatasetMigrationService;
   /** Resolve a project's storage destination — used to detect S3 is configured. */
   resolveStorage: (
     projectId: string,
@@ -182,7 +184,7 @@ export const migrateDatasetToS3 = async (
   // dataset's corpus is frozen during migration) and a crash here is re-runnable.
   //
   // STREAM, don't slurp (I-MEM): keyset-paginate the records and feed them to the
-  // StreamingChunkWriter, which rolls a chunk at CHUNK_MAX_BYTES — so peak memory
+  // The package migration service rolls a chunk at CHUNK_MAX_BYTES — so peak memory
   // is one page + one chunk, NOT the whole dataset. Prod has multi-GB / million-
   // row datasets (a 708 MB / 57k-row and a 1.6M-row one) that would OOM the Job
   // if read whole; the legacy 25MB/10k upload cap does NOT bound pre-existing or
@@ -202,26 +204,21 @@ export const migrateDatasetToS3 = async (
     projectId,
   });
 
-  const writer = new StreamingChunkWriter({
+  const writeDatasetChunks = deps.migration
+    ? deps.migration.writeDatasetChunks.bind(deps.migration)
+    : DatasetMigrationService.writeDatasetChunks;
+  const meta = await writeDatasetChunks({
     storage,
     projectId,
     datasetId: dataset.id,
+    readPage: (cursorId) =>
+      deps.recordRepository.findDatasetRecordsPage({
+        datasetId: dataset.id,
+        projectId,
+        take: MIGRATE_PAGE_SIZE,
+        cursorId,
+      }),
   });
-  let cursorId: string | undefined;
-  for (;;) {
-    const page = await deps.recordRepository.findDatasetRecordsPage({
-      datasetId: dataset.id,
-      projectId,
-      take: MIGRATE_PAGE_SIZE,
-      cursorId,
-    });
-    if (page.length === 0) break;
-    for (const row of page) {
-      await writer.push(row.entry, { id: row.id });
-    }
-    cursorId = page[page.length - 1]!.id;
-  }
-  const meta = await writer.finalize();
 
   // Defensive orphan-chunk cleanup (I-IDEM): drop any tail chunks a crashed prior
   // run wrote beyond what THIS run writes, so a shorter re-run never leaves
@@ -237,9 +234,14 @@ export const migrateDatasetToS3 = async (
   // to win the race against a concurrent run (our idempotent S3 writes make a
   // redundant write harmless), then commit the counter update + `contentLayout`
   // flip atomically. `status` is left untouched (existing datasets are `ready`).
-  return withDatasetLock(
-    { prisma: deps.prisma, datasetId: dataset.id },
-    async (tx) => {
+  const withLock: (
+    datasetId: string,
+    fn: (tx: DatasetMigrationTransaction) => Promise<MigrateOutcome>,
+  ) => Promise<MigrateOutcome> = deps.migration
+    ? deps.migration.withDatasetLock.bind(deps.migration)
+    : (datasetId, fn) =>
+        DatasetMigrationService.withDatasetLock(deps.prisma, datasetId, fn);
+  return withLock(dataset.id, async (tx) => {
       const current = await tx.dataset.findFirst({
         where: { id: dataset.id, projectId },
       });
@@ -302,8 +304,7 @@ export const migrateDatasetToS3 = async (
         "Migrated dataset content to chunked JSONL (s3_jsonl)",
       );
       return "migrated";
-    },
-  );
+    });
 };
 
 /** Running tally of per-dataset outcomes. */
@@ -417,11 +418,14 @@ export default async function execute(): Promise<void> {
     return;
   }
 
+  const storageResolver = new AppDatasetStorageResolver();
+  const migration = DatasetMigrationService.create(prisma);
   const deps: BackfillDeps = {
     prisma,
-    recordRepository: new DatasetRecordRepository(prisma),
+    recordRepository: migration,
+    migration,
     resolveStorage: resolveProjectStorageDestination,
-    getStorage: getDatasetStorage,
+    getStorage: storageResolver.forProject.bind(storageResolver),
   };
 
   // Dry-run: report what WOULD migrate (and to which backend) without taking a

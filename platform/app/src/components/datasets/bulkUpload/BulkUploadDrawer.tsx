@@ -38,7 +38,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Trash2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   AlertTriangle,
@@ -50,7 +50,7 @@ import {
 } from "react-feather";
 import { formatFileSize } from "react-papaparse";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { DatasetConfirmColumns } from "~/server/datasets/types";
+import type { DatasetConfirmColumns } from "@langwatch/dataset-contract";
 import { api } from "~/utils/api";
 import { ColumnTypeIcon } from "../../shared/ColumnTypeIcon";
 import {
@@ -63,10 +63,17 @@ import {
   DropzonePrompt,
   dropzoneSurfaceProps,
   RAINBOW_TEXT_CSS,
-} from "../datasetDropzoneStyles";
-import { reorderColumnsBySourceHeader } from "./columnReorder";
-import { invalidColumnNameKeys } from "./columnValidation";
-import { type BulkFile, useBulkUpload } from "./useBulkUpload";
+  reorderColumnsBySourceHeader,
+  invalidColumnNameKeys,
+  type BulkFile,
+  abortPendingUpload,
+  finalizeDirectUpload,
+  putFileToPresignedUrl,
+  requestDirectUpload,
+  retryDatasetNormalize,
+  type BulkUploadTransport,
+  useBulkUpload,
+} from "@langwatch/dataset-web";
 
 // Visually hidden but kept in the tab order (not display:none) so the picker is
 // reachable + operable by keyboard.
@@ -668,7 +675,17 @@ export function BulkUploadDrawer({
 }) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
-  const bulk = useBulkUpload(projectId);
+  const bulkTransport: BulkUploadTransport = useMemo(
+    () => ({
+      requestDirectUpload,
+      putFileToPresignedUrl,
+      finalizeDirectUpload,
+      abortPendingUpload,
+      retryDatasetNormalize,
+    }),
+    [],
+  );
+  const bulk = useBulkUpload(projectId, bulkTransport);
   const [zoneHover, setZoneHover] = useState(false);
 
   // Block the upload while any pending file has a blank or duplicated column

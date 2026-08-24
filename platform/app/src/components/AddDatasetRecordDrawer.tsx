@@ -15,7 +15,7 @@ import { api } from "~/utils/api";
 import type {
   DatasetColumns,
   DatasetRecordEntry,
-} from "../server/datasets/types";
+} from "@langwatch/dataset-contract";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
 import { DatasetMappingPreview } from "./datasets/DatasetMappingPreview";
 import { DatasetSelector } from "./datasets/DatasetSelector";

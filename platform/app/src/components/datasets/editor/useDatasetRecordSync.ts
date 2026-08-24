@@ -13,19 +13,14 @@
  * silent success on error.
  */
 import { useCallback, useEffect, useRef } from "react";
+import type { AutosaveState, PendingSavedChanges } from "@langwatch/dataset-web";
 
 import { api } from "~/utils/api";
-import type { AutosaveState } from "./DatasetTableContext";
 
 export const DATASET_SYNC_DEBOUNCE_MS = 500;
 
 /** pendingChanges shape: dbDatasetId -> recordId -> column changes.
  *  A record with `_delete: true` is a pending deletion. */
-export type PendingSavedChanges = Record<
-  string,
-  Record<string, Record<string, unknown>>
->;
-
 export type DatasetRecordSyncParams = {
   projectId: string | undefined;
   pendingSavedChanges: PendingSavedChanges;

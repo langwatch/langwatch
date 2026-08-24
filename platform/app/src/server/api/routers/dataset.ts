@@ -1,16 +1,11 @@
 import { TRPCError } from "@trpc/server";
-import { nanoid } from "nanoid";
-import { z } from "zod";
-import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
-import { slugify } from "~/utils/slugify";
-import { DatasetService } from "../../datasets/dataset.service";
-import { attachDatasetRecordCounts } from "../../datasets/dataset-record-counts";
-import { datasetErrorHandler } from "../../datasets/middleware";
+import { z } from "zod/v4";
 import {
-  datasetColumnsSchema,
   datasetRecordFormSchema,
   datasetRecordInputSchema,
-} from "../../datasets/types";
+} from "@langwatch/dataset-contract";
+import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
+import { datasetErrorHandler } from "../middleware/dataset-error";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -56,10 +51,8 @@ export const datasetRouter = createTRPCRouter({
     .permission("datasets:manage")
     .use(datasetErrorHandler)
     .mutation(async ({ ctx, input }) => {
-      const datasetService = DatasetService.create(ctx.prisma);
-
       // Delegate all business logic to service
-      return await datasetService.upsertDataset({
+      return await ctx.app.dataset.upsertDataset({
         projectId: input.projectId,
         name: "name" in input ? input.name : undefined,
         experimentId: "experimentId" in input ? input.experimentId : undefined,
@@ -84,8 +77,7 @@ export const datasetRouter = createTRPCRouter({
     .permission("datasets:view")
     .use(datasetErrorHandler)
     .query(async ({ input, ctx }) => {
-      const datasetService = DatasetService.create(ctx.prisma);
-      return await datasetService.validateDatasetName(input);
+      return await ctx.app.dataset.validateDatasetName(input);
     }),
 
   /**
@@ -96,27 +88,12 @@ export const datasetRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("datasets:view")
     .query(async ({ input, ctx }) => {
-      const { projectId } = input;
-      const prisma = ctx.prisma;
-
-      const datasets = await attachDatasetRecordCounts({
-        prisma,
-        projectId,
-        datasets: await prisma.dataset.findMany({
-          where: { projectId, archivedAt: null },
-          orderBy: { createdAt: "desc" },
-        }),
+      const result = await ctx.app.dataset.listDatasets({
+        projectId: input.projectId,
+        page: 1,
+        limit: 200,
       });
-
-      return datasets.map((dataset) => ({
-        ...dataset,
-        // columnTypes is a JSON column. Keep malformed legacy rows visible so
-        // they can be deleted/repaired, but never leak a non-array into every
-        // dataset consumer and crash the page during render.
-        columnTypes: datasetColumnsSchema.safeParse(dataset.columnTypes).success
-          ? dataset.columnTypes
-          : [],
-      }));
+      return result.data;
     }),
 
   /**
@@ -127,18 +104,15 @@ export const datasetRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
     .permission("datasets:view")
     .query(async ({ input, ctx }) => {
-      const { projectId, datasetId } = input;
-      const dataset = await ctx.prisma.dataset.findFirst({
-        where: { id: datasetId, projectId, archivedAt: null },
-      });
-
-      if (!dataset) return dataset;
-      return {
-        ...dataset,
-        columnTypes: datasetColumnsSchema.safeParse(dataset.columnTypes).success
-          ? dataset.columnTypes
-          : [],
-      };
+      try {
+        return await ctx.app.dataset.getBySlugOrId({
+          projectId: input.projectId,
+          slugOrId: input.datasetId,
+        });
+      } catch (error) {
+        if (error instanceof Error && error.name === "DatasetNotFoundError") return null;
+        throw error;
+      }
     }),
   deleteById: protectedProcedure
     .input(
@@ -150,28 +124,17 @@ export const datasetRouter = createTRPCRouter({
     )
     .permission("datasets:delete")
     .mutation(async ({ ctx, input }) => {
-      const datasetName = (
-        await ctx.prisma.dataset.findFirst({
-          where: {
-            id: input.datasetId,
-            projectId: input.projectId,
-          },
-        })
-      )?.name;
-      const slug = slugify(datasetName ?? "");
-
-      await ctx.prisma.dataset.update({
-        where: {
-          id: input.datasetId,
+      if (input.undo) {
+        return ctx.app.dataset.restoreDataset({
+          datasetId: input.datasetId,
           projectId: input.projectId,
-        },
-        data: {
-          slug: input.undo ? slug : `${slug}-archived-${nanoid()}`,
-          archivedAt: input.undo ? null : new Date(),
-        },
+        });
+      }
+      await ctx.app.dataset.archiveDataset({
+        slugOrId: input.datasetId,
+        projectId: input.projectId,
       });
-
-      return { success: true };
+      return { success: true as const };
     }),
   updateMapping: protectedProcedure
     .input(
@@ -193,27 +156,7 @@ export const datasetRouter = createTRPCRouter({
     )
     .permission("datasets:update")
     .mutation(async ({ ctx, input }) => {
-      const { projectId, datasetId, mapping, threadMapping } = input;
-
-      // Get existing dataset to preserve existing mappings
-      const existingDataset = await ctx.prisma.dataset.findUnique({
-        where: { id: datasetId, projectId },
-        select: { mapping: true },
-      });
-
-      const existingMapping = (existingDataset?.mapping as any) || {};
-
-      // Merge with existing mappings
-      const updatedMapping = {
-        ...existingMapping,
-        ...(mapping ? { traceMapping: mapping } : {}),
-        ...(threadMapping ? { threadMapping } : {}),
-      };
-
-      return await ctx.prisma.dataset.update({
-        where: { id: datasetId, projectId },
-        data: { mapping: updatedMapping },
-      });
+      return ctx.app.dataset.updateMapping(input);
     }),
   /**
    * Find next available name for a dataset, given proposed name
@@ -223,11 +166,7 @@ export const datasetRouter = createTRPCRouter({
     .permission("datasets:view")
     .use(datasetErrorHandler)
     .query(async ({ input, ctx }) => {
-      const datasetService = DatasetService.create(ctx.prisma);
-      return await datasetService.findNextAvailableName(
-        input.projectId,
-        input.proposedName,
-      );
+      return await ctx.app.dataset.findNextAvailableName(input);
     }),
   /**
    * Copy a dataset to a target project.
@@ -261,8 +200,7 @@ export const datasetRouter = createTRPCRouter({
         });
       }
 
-      const datasetService = DatasetService.create(ctx.prisma);
-      return await datasetService.copyDataset({
+      return await ctx.app.dataset.copyDataset({
         sourceDatasetId: input.datasetId,
         sourceProjectId: input.sourceProjectId,
         targetProjectId: input.projectId,

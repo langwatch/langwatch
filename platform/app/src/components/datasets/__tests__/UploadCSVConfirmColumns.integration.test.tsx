@@ -19,9 +19,9 @@ import "@testing-library/jest-dom/vitest";
 const requestDirectUpload = vi.fn();
 const putFileToPresignedUrl = vi.fn();
 const finalizeDirectUpload = vi.fn();
-vi.mock("../services/directUpload", async (importActual) => {
+vi.mock("@langwatch/dataset-web", async (importActual) => {
   const actual =
-    await importActual<typeof import("../services/directUpload")>();
+  await importActual<typeof import("@langwatch/dataset-web")>();
   return {
     ...actual,
     requestDirectUpload: (...args: unknown[]) => requestDirectUpload(...args),
@@ -29,17 +29,13 @@ vi.mock("../services/directUpload", async (importActual) => {
       putFileToPresignedUrl(...args),
     finalizeDirectUpload: (...args: unknown[]) => finalizeDirectUpload(...args),
     abortPendingUpload: vi.fn(),
+    HEADER_PARSE_MAX_BYTES: 262144,
+    parseHeaderColumns: vi.fn(async () => [
+      { name: "score", type: "string" },
+      { name: "name", type: "string" },
+    ]),
   };
 });
-
-// Deterministic header parse: always two string columns, no slice/timing.
-vi.mock("../utils/parseHeaderColumns", () => ({
-  HEADER_PARSE_MAX_BYTES: 262144,
-  parseHeaderColumns: vi.fn(async () => [
-    { name: "score", type: "string" },
-    { name: "name", type: "string" },
-  ]),
-}));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({

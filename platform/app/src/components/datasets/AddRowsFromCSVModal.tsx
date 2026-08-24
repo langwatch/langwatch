@@ -16,9 +16,9 @@ import {
   type DatasetColumns,
   type DatasetRecordEntry,
   newDatasetEntriesSchema,
-} from "../../server/datasets/types";
+} from "@langwatch/dataset-contract";
+import { convertDatasetRecordsToColumnTypes } from "@langwatch/dataset-web";
 import { api } from "../../utils/api";
-import { tryToConvertRowsToAppropriateType } from "../AddOrEditDatasetDrawer";
 import { CSVReaderComponent } from "./UploadCSVDrawer";
 
 export function AddRowsFromCSVModal({
@@ -106,7 +106,7 @@ export function AddRowsFromCSVModal({
     let entries;
     try {
       entries = newDatasetEntriesSchema.parse({
-        entries: tryToConvertRowsToAppropriateType(recordEntries, columnTypes),
+        entries: convertDatasetRecordsToColumnTypes(recordEntries, columnTypes),
       });
     } catch (error) {
       console.error(error);

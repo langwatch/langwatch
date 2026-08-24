@@ -44,11 +44,11 @@ import { toaster } from "../../components/ui/toaster";
 import { useLiteMemberGuard } from "../../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { AppRouter } from "../../server/api/root";
-import { datasetDisplayRecordCount } from "../../server/datasets/record-count";
+import { datasetDisplayRecordCount } from "@langwatch/dataset-contract";
 import {
   type DatasetColumns,
   datasetColumnsSchema,
-} from "../../server/datasets/types";
+} from "@langwatch/dataset-contract";
 import { api } from "../../utils/api";
 import { isHandledByGlobalHandler } from "../../utils/trpcError";
 

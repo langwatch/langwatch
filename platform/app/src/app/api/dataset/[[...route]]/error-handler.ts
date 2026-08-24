@@ -9,7 +9,7 @@ import { errorSchema } from "../../shared/schemas";
 const logger = createLogger("langwatch:api:dataset:errors");
 
 /**
- * Framework-agnostic dataset domain errors (see `server/datasets/errors.ts`) →
+ * Framework-agnostic dataset domain errors (see `@langwatch/dataset-contract`) →
  * their HTTP status + wire `error` code. The service layer throws typed domain
  * errors with no knowledge of HTTP; the route layer owns this mapping. Routes
  * that let these propagate to `onError` (the direct-upload family) get one
