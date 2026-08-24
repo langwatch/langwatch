@@ -24,10 +24,17 @@ const logger = createLogger("langwatch:feature-flag-router");
  * would get for it, so the response cannot distinguish "not a member" from
  * "flag off" and the procedure cannot be used as a membership oracle.
  *
- * A project is reached through its owning organization: project membership in
- * this codebase IS current membership of the organization that owns the team
- * the project sits in, the same boundary `resolveProjectPermissionContext`
- * fails closed on.
+ * A project is reached through the organization that owns its team. That is
+ * the tenancy boundary — the one `resolveProjectPermissionContext` fails
+ * closed on before it reads a single binding — and deliberately not the whole
+ * of project access, which additionally needs a binding walk
+ * (`resolveProjectPermission`). So an org member can be targeted by any
+ * project id in their own organization, including one in a team they hold no
+ * binding to. That is the intended level: what leaks at worst is which
+ * features are on for a project inside a tenant the caller already belongs to,
+ * and charging a full permission walk to every flag check on the page would
+ * cost more than it buys. The cross-tenant answer is the one that mattered,
+ * and that one is closed.
  */
 async function allowedTargeting(
   ctx: { prisma: PrismaClient; session: { user: { id: string } } },
