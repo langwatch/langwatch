@@ -90,3 +90,84 @@ export class IdentityVerificationExpiredError extends HandledError {
     this.name = "IdentityVerificationExpiredError";
   }
 }
+
+/**
+ * An SSO connection guard's refusal (ADR-117 §5, D04). Handled for the same
+ * reason the identifier refusals are: each names a cause an operator can act
+ * on, and the words they read live in the app's presentation registry keyed
+ * by code. The detail string is logged, never shown.
+ */
+export abstract class SsoConnectionCommandRefusedError extends HandledError {}
+
+export class SsoConnectionInvalidTransitionError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super(
+      "sso_connection_invalid_transition",
+      "sso_connection_invalid_transition",
+      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "SsoConnectionInvalidTransitionError";
+  }
+}
+
+/**
+ * First verifier owns, and the loser is told plainly. The refusal names the
+ * domain and nothing about who holds it: which organization configured SSO
+ * for a domain is not a fact a second claimant is entitled to.
+ */
+export class SsoConnectionDomainTakenError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_connection_domain_taken", "sso_connection_domain_taken", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoConnectionDomainTakenError";
+  }
+}
+
+/** Activation's preconditions are unmet: no verified domain, no live
+ *  break-glass binding, or no recorded test login. */
+export class SsoConnectionActivationBlockedError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super(
+      "sso_connection_activation_blocked",
+      "sso_connection_activation_blocked",
+      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "SsoConnectionActivationBlockedError";
+  }
+}
+
+/**
+ * Teardown would leave people with no way in. The detail carries how many
+ * users for the log; the copy tells the operator what to do about it, which
+ * is give those people another verified method first.
+ */
+export class SsoConnectionTeardownStrandsUsersError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super(
+      "sso_connection_teardown_strands_users",
+      "sso_connection_teardown_strands_users",
+      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "SsoConnectionTeardownStrandsUsersError";
+  }
+}
+
+/**
+ * A legacy `ssoDomain` / `ssoProvider` edit after the routing flip. Refused
+ * rather than ignored: once the connection projection decides sign-in, a
+ * string edit changes nothing a person would experience, and silently
+ * accepting one leaves a staff member believing they fixed something.
+ */
+export class SsoConnectionStringEditRetiredError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super(
+      "sso_connection_string_edit_retired",
+      "sso_connection_string_edit_retired",
+      { httpStatus: 409, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "SsoConnectionStringEditRetiredError";
+  }
+}

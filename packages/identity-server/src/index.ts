@@ -104,6 +104,35 @@ export {
   type SignInCallbackLinkingDeps,
 } from "./signin-callback-linking.service";
 export {
+  type LegacySsoOrganizationRepository,
+  type SsoConnectionGrandfatherDeps,
+  type SsoConnectionGrandfatherOutcome,
+  SsoConnectionGrandfatherService,
+} from "./sso-connection-grandfather.service";
+export {
+  SsoConnectionGuards,
+  type SsoConnectionGuardsDeps,
+} from "./sso-connection-guards";
+export {
+  grandfatherCommandId,
+  grandfatheredSsoConnectionId,
+  newSsoConnectionCommandId,
+  newSsoConnectionId,
+} from "./sso-connection-id";
+export type { SsoConnectionLedger } from "./sso-connection-ledger";
+export {
+  ShadowComparingDomainRoutingRepository,
+  type SsoConnectionRoutingShadowDeps,
+  type SsoConnectionRoutingShadowRecord,
+  type SsoConnectionRoutingShadowRecorder,
+} from "./sso-connection-routing-shadow";
+export type {
+  SsoBreakGlassBindingRepository,
+  SsoConnectionReadRepository,
+  SsoConnectionStrandingRepository,
+} from "./sso-connection.repository";
+export { SsoConnectionService } from "./sso-connection.service";
+export {
   IDENTITY_VERIFICATION_TTL_MS,
   type MintedEmailVerification,
   VerificationCeremonyService,
