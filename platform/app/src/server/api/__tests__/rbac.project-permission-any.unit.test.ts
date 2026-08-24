@@ -35,7 +35,7 @@ const buildPrisma = (teamRole: TeamUserRole) => {
   });
   const organizationUserFindFirst = vi
     .fn()
-    .mockResolvedValue({ role: OrganizationUserRole.MEMBER });
+    .mockResolvedValue({ role: OrganizationUserRole.MEMBER, disabledAt: null });
   const prisma = {
     project: { findUnique: projectFindUnique },
     organizationUser: { findFirst: organizationUserFindFirst },

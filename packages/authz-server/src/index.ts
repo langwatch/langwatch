@@ -31,6 +31,7 @@ export {
 export type {
   AuthzReadRepository,
   CustomRolePermissionsRow,
+  OrganizationMembership,
   OrganizationRole,
   ScopeLineageRepository,
   ShareLinkRow,
