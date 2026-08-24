@@ -3,7 +3,7 @@
  * @integration
  *
  * Verifies the bloom_filter skip-index on coding_agent_sessions.SessionId
- * (migration 00085).
+ * (migration 00086).
  *
  * coding_agent_sessions is ORDER BY (TenantId, StartedAt, SessionId), which
  * leads with time. The single-session read's dedup subquery must stay
@@ -22,7 +22,7 @@
  * the production case needs parts in Wide format, since a small Compact part
  * picks the index up on ADD alone, and that needs a fixture heavy enough to
  * cross the wide-part threshold. The justification for materialising inline is
- * the production EXPLAIN evidence in migration 00085's comment, not this suite.
+ * the production EXPLAIN evidence in migration 00086's comment, not this suite.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
