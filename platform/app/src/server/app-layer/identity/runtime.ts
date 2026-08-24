@@ -19,7 +19,10 @@ import {
   VerificationCeremonyService,
 } from "@langwatch/identity-server";
 import { IdentityCeremonies } from "@langwatch/identity-server/better-auth";
+import { hash } from "bcrypt";
 import { prisma } from "../../db";
+import { sendSignUpVerificationEmail } from "../../mailer/signUpVerificationEmail";
+import { createCredentialUser } from "../../users/credential-user";
 import { PrismaSystemMigrationStateRepository } from "../system-migrations/repositories/system-migration-state.prisma.repository";
 import { InProcessBreakGlassLimiter } from "./break-glass-limiter";
 import { IdentityIdentifierBackfillMigration } from "./identifier-backfill.migration";
@@ -31,9 +34,15 @@ import { PrismaIdentityUsersRepository } from "./repositories/identity-users.pri
 import { PrismaIdentityVerificationRepository } from "./repositories/identity-verification.prisma.repository";
 import { LegacySsoDomainRoutingRepository } from "./repositories/legacy-sso-domain.prisma.repository";
 import {
+  PrismaSignUpAccountDirectory,
+  PrismaSignUpVerificationTokenStore,
+} from "./repositories/signup-verification.prisma.repository";
+import {
   resolveFederatedMethod,
   signInMethodPolicyPort,
 } from "./signin-method-policy";
+import { SignUpVerificationService } from "./signup-verification.service";
+import { buildSignUpVerificationUrl } from "./signup-verification-link";
 import { isUserOnIdentityWrites } from "./write-gate";
 
 const identityHeads = new PrismaIdentityHeadsRepository(prisma);
@@ -120,6 +129,38 @@ const signInRouterService = new SignInRouterService({
 
 export function signInRouter(): SignInRouterService {
   return signInRouterService;
+}
+
+/**
+ * Sign-up's address confirmation (D13, ADR-117 §6). Composed per call like
+ * the write surface above: it reaches the mailer, and the mailer is the one
+ * dependency a test routinely replaces.
+ */
+export function signUpVerification(): SignUpVerificationService {
+  return new SignUpVerificationService({
+    tokens: new PrismaSignUpVerificationTokenStore(prisma),
+    directory: new PrismaSignUpAccountDirectory(prisma),
+    mailer: {
+      sendVerificationLink: ({ email, verificationUrl }) =>
+        sendSignUpVerificationEmail({ email, verificationUrl }),
+    },
+    accounts: {
+      createCredentialAccount: async ({ email, passwordHash }) => {
+        // Nobody has been asked for a name on this path: the person typed an
+        // address and a password into a log-in form. Onboarding asks.
+        await createCredentialUser({
+          prisma,
+          name: null,
+          email,
+          passwordHash,
+        });
+      },
+    },
+    // The same cost factor every other credential in the platform is hashed
+    // at, in the one place this path hashes anything.
+    hashPassword: (password) => hash(password, 10),
+    buildVerificationUrl: ({ token }) => buildSignUpVerificationUrl(token),
+  });
 }
 
 /**

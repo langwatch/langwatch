@@ -25,6 +25,7 @@ import { trackServerEvent } from "~/server/posthog";
 import { rateLimit } from "~/server/rateLimit";
 import { AvatarRateLimitedError } from "~/server/user-avatar/avatar";
 import { UserAvatarService } from "~/server/user-avatar/avatar.service";
+import { createCredentialUser } from "~/server/users/credential-user";
 import { EmailAlreadyRegisteredError } from "~/server/users/errors";
 import { UserService } from "~/server/users/user.service";
 import { getClientIp } from "~/utils/getClientIp";
@@ -153,30 +154,12 @@ export const userRouter = createTRPCRouter({
         throw new EmailAlreadyRegisteredError();
       }
 
-      const hashedPassword = await hash(password, 10);
-
-      const newUser = await ctx.prisma.$transaction(async (tx) => {
-        const created = await tx.user.create({
-          data: {
-            name,
-            email,
-          },
-        });
-        await tx.account.create({
-          data: {
-            userId: created.id,
-            type: "credential",
-            provider: "credential",
-            providerAccountId: created.id,
-            password: hashedPassword,
-          },
-        });
-        return created;
+      const newUser = await createCredentialUser({
+        prisma: ctx.prisma,
+        name,
+        email,
+        passwordHash: await hash(password, 10),
       });
-
-      // Email-mode signups bypass the BetterAuth user-create hooks, so the
-      // `signed_up` analytics event fires here instead.
-      trackServerEvent({ userId: newUser.id, event: "signed_up" });
 
       return { id: newUser.id };
     }),
