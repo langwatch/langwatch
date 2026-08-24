@@ -411,7 +411,7 @@ describe("saved workbench charts (integration)", () => {
           projectId: project.id,
           input: {
             dashboardId: dashboard.id,
-            gridColumn: 1,
+            gridColumn: 0,
             gridRow: 2,
             colSpan: 2,
             rowSpan: 1,
@@ -419,7 +419,7 @@ describe("saved workbench charts (integration)", () => {
         });
 
         expect(placed.dashboardId).toBe(dashboard.id);
-        expect(placed.gridColumn).toBe(1);
+        expect(placed.gridColumn).toBe(0);
         expect(placed.gridRow).toBe(2);
         expect(placed.colSpan).toBe(2);
         expect(placed.rowSpan).toBe(1);
@@ -429,7 +429,7 @@ describe("saved workbench charts (integration)", () => {
           projectId: project.id,
         });
         expect(reread.dashboardId).toBe(dashboard.id);
-        expect(reread.gridColumn).toBe(1);
+        expect(reread.gridColumn).toBe(0);
         expect(reread.gridRow).toBe(2);
         expect(reread.colSpan).toBe(2);
         expect(reread.rowSpan).toBe(1);
@@ -588,7 +588,7 @@ describe("saved workbench charts (integration)", () => {
           projectId: project.id,
           input: {
             dashboardId: dashboard.id,
-            gridColumn: 1,
+            gridColumn: 0,
             gridRow: 1,
             colSpan: 2,
             rowSpan: 2,

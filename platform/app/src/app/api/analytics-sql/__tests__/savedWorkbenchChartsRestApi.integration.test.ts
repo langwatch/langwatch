@@ -890,7 +890,7 @@ describe("given the saved workbench chart REST endpoints", () => {
         auth: asProject(openProject),
         body: {
           dashboardId: dashboard.id,
-          gridColumn: 1,
+          gridColumn: 0,
           gridRow: 3,
           colSpan: 2,
           rowSpan: 2,
@@ -898,14 +898,14 @@ describe("given the saved workbench chart REST endpoints", () => {
       });
       expect(placed.id).toBe(chart.id);
       expect(placed.dashboardId).toBe(dashboard.id);
-      expect(placed.gridColumn).toBe(1);
+      expect(placed.gridColumn).toBe(0);
       expect(placed.gridRow).toBe(3);
       expect(placed.colSpan).toBe(2);
       expect(placed.rowSpan).toBe(2);
 
       expect(await placementOf(openProject, chart.id)).toEqual({
         dashboardId: dashboard.id,
-        gridColumn: 1,
+        gridColumn: 0,
         gridRow: 3,
         colSpan: 2,
         rowSpan: 2,
