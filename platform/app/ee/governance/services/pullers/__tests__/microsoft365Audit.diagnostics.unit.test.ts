@@ -62,68 +62,95 @@ const ALREADY_ENABLED_BODY = JSON.stringify({
   },
 });
 
-describe("managementApiErrorCode", () => {
-  it("returns the documented AF code when the API sends one", () => {
-    expect(managementApiErrorCode(failure(ALREADY_ENABLED_BODY))).toBe(
-      "AF20024",
-    );
-  });
-
-  it("finds an AF code that only appears in the message text", () => {
-    const body = JSON.stringify({
-      error: { code: "", message: "Request failed with AF20023 for tenant." },
+describe("given the API answered with its documented AF code", () => {
+  describe("when the code is asked for", () => {
+    it("returns the AF code", () => {
+      expect(managementApiErrorCode(failure(ALREADY_ENABLED_BODY))).toBe(
+        "AF20024",
+      );
     });
-    expect(managementApiErrorCode(failure(body))).toBe("AF20023");
   });
 
-  it("reports no code rather than the diagnostic dump in `error.code`", () => {
-    // The regression this ordering exists for: taking `error.code` at its word
-    // puts 200 characters of correlation ids into the field meant for a code.
-    expect(managementApiErrorCode(failure(NO_TENANT_BODY))).toBeUndefined();
-  });
-
-  it("accepts a short non-AF code, since not every code is AF-prefixed", () => {
-    const body = JSON.stringify({ error: { code: "InvalidContentType" } });
-    expect(managementApiErrorCode(failure(body))).toBe("InvalidContentType");
-  });
-
-  it("returns nothing for a body that is not JSON and carries no AF code", () => {
-    expect(
-      managementApiErrorCode(failure("<html>gateway</html>")),
-    ).toBeUndefined();
-  });
-
-  it("returns nothing for an error that is not an HTTP response", () => {
-    expect(managementApiErrorCode(new Error("socket hang up"))).toBeUndefined();
+  describe("when the code sits only in the message text", () => {
+    it("still finds it, because the field it belongs in is not reliable", () => {
+      const body = JSON.stringify({
+        error: { code: "", message: "Request failed with AF20023 for tenant." },
+      });
+      expect(managementApiErrorCode(failure(body))).toBe("AF20023");
+    });
   });
 });
 
-describe("managementApiErrorDetail", () => {
-  it("surfaces the sentence naming the cause, without the stack trace", () => {
-    const detail = managementApiErrorDetail(failure(NO_TENANT_BODY));
-    expect(detail).toContain(`Tenant ${TENANT} does not exist.`);
-    expect(detail).not.toContain("MoveNext");
-  });
-
-  it("stops at the first line", () => {
-    const body = JSON.stringify({
-      error: { code: "AF20024", message: "First line.\r\nSecond line." },
+describe("given a tenant that owns no Microsoft 365 estate", () => {
+  describe("when the code is asked for", () => {
+    it("reports no code rather than the diagnostic dump `error.code` holds", () => {
+      // The regression this ordering exists for: taking `error.code` at its
+      // word puts 200 characters of correlation ids into the log field meant
+      // for a code.
+      expect(managementApiErrorCode(failure(NO_TENANT_BODY))).toBeUndefined();
     });
-    expect(managementApiErrorDetail(failure(body))).toBe("First line.");
   });
 
-  it("bounds the detail so a long body cannot fill the log line", () => {
-    const body = JSON.stringify({ error: { message: "x".repeat(5_000) } });
-    expect(managementApiErrorDetail(failure(body))?.length).toBe(200);
+  describe("when the detail is asked for", () => {
+    it("surfaces the sentence naming the cause, without the stack trace", () => {
+      const detail = managementApiErrorDetail(failure(NO_TENANT_BODY));
+      expect(detail).toContain(`Tenant ${TENANT} does not exist.`);
+      expect(detail).not.toContain("MoveNext");
+    });
+  });
+});
+
+describe("given an error body in a shape the API does not document", () => {
+  describe("when the code is a short non-AF string", () => {
+    it("accepts it, since not every code this API sends is AF-prefixed", () => {
+      const body = JSON.stringify({ error: { code: "InvalidContentType" } });
+      expect(managementApiErrorCode(failure(body))).toBe("InvalidContentType");
+    });
   });
 
-  it("falls back to the raw body when the response is not JSON", () => {
-    expect(managementApiErrorDetail(failure("Bad Gateway"))).toBe(
-      "Bad Gateway",
-    );
+  describe("when the body is not JSON and carries no AF code", () => {
+    it("reports no code", () => {
+      expect(
+        managementApiErrorCode(failure("<html>gateway</html>")),
+      ).toBeUndefined();
+    });
+
+    it("falls back to the raw body for the detail", () => {
+      expect(managementApiErrorDetail(failure("Bad Gateway"))).toBe(
+        "Bad Gateway",
+      );
+    });
   });
 
-  it("returns nothing for an empty body", () => {
-    expect(managementApiErrorDetail(failure(""))).toBeUndefined();
+  describe("when the body is empty", () => {
+    it("reports no detail rather than an empty one", () => {
+      expect(managementApiErrorDetail(failure(""))).toBeUndefined();
+    });
+  });
+});
+
+describe("given a failure that is not an HTTP response at all", () => {
+  describe("when either extractor is asked", () => {
+    it("reports nothing rather than inventing a code", () => {
+      const transport = new Error("socket hang up");
+      expect(managementApiErrorCode(transport)).toBeUndefined();
+      expect(managementApiErrorDetail(transport)).toBeUndefined();
+    });
+  });
+});
+
+describe("given an explanation far longer than a log line should carry", () => {
+  describe("when the detail is asked for", () => {
+    it("stops at the first line", () => {
+      const body = JSON.stringify({
+        error: { code: "AF20024", message: "First line.\r\nSecond line." },
+      });
+      expect(managementApiErrorDetail(failure(body))).toBe("First line.");
+    });
+
+    it("bounds a single unbroken line so it cannot fill the log entry", () => {
+      const body = JSON.stringify({ error: { message: "x".repeat(5_000) } });
+      expect(managementApiErrorDetail(failure(body))?.length).toBe(200);
+    });
   });
 });
