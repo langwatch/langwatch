@@ -60,3 +60,16 @@ Feature: Dashboard REST API
     When I call GET /api/dashboards/:id
     Then I receive only the builder graph
     And the workbench chart's stored SQL appears nowhere in the response
+
+  # The list's `graphCount` and the detail response's `graphs` array are two
+  # views of the same resource, and the workbench chart is invisible to both
+  # — see the exposure scenario above. Before this, the list counted the
+  # workbench chart while the detail response omitted it, so a caller who
+  # read graphCount and then fetched the detail saw a number the response
+  # could never actually produce.
+  @integration
+  Scenario: The list's graphCount matches what the detail response actually returns
+    Given the project has a dashboard carrying both a builder graph and a saved workbench chart
+    When I call GET /api/dashboards/:id
+    And I call GET /api/dashboards
+    Then the list's graphCount for that dashboard equals the number of graphs in the detail response
