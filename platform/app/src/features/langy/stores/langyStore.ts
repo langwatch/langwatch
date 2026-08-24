@@ -356,7 +356,12 @@ interface LangyState extends TurnPhaseState {
   setDraft: (draft: string) => void;
   /** Per-session model override for the next send. "" = use the project default. */
   modelOverride: string;
-  /** Seeding: the panel writing the resolved default, or an allowlist snap. */
+  /**
+   * Seeding: the panel writing the resolved default, or an allowlist snap.
+   * Either way the model is not the user's choice, so this clears the pick
+   * flag. An allowlist snap in particular OVERRULES a pick, and a pick the
+   * panel has taken away must not go on holding the pill off the default.
+   */
   setModelOverride: (model: string) => void;
   /** The user choosing a model in the picker. Their pick, not a seed. */
   pickModel: (model: string) => void;
@@ -844,7 +849,8 @@ export const useLangyStore = create<LangyState>()(
       draft: "",
       setDraft: (draft) => set({ draft }),
       modelOverride: "",
-      setModelOverride: (modelOverride) => set({ modelOverride }),
+      setModelOverride: (modelOverride) =>
+        set({ modelOverride, isModelPickedByUser: false }),
       pickModel: (modelOverride) =>
         set({ modelOverride, isModelPickedByUser: true }),
       isModelPickedByUser: false,

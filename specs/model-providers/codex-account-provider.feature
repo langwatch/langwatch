@@ -164,7 +164,7 @@ Feature: Codex, the sign-in-with-OpenAI model provider
     When the gateway forwards the call to the codex backend
     Then the backend accepts the call and the user gets their answer
     And what the user asked for is unchanged: the question, the tools and the reasoning all arrive
-    And an option the backend starts to refuse later cannot fail a call that worked before
+    And an option we have not named is left out, so a caller adding one cannot fail their own call
 
   Scenario: Langy resolves its own feature key without breaking older setups
     Given Langy resolves its model through the langy.chat feature key

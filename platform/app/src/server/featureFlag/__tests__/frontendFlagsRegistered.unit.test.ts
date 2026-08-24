@@ -21,9 +21,9 @@ import { resolveFlagDefinition } from "../registry";
  * directly, so they exercise the same predicate the service does — including
  * family-prefix matches — instead of a copy that can drift from it.
  *
- * Two keys predate this check and are pinned below rather than changed here;
- * altering either is a behavior change that belongs in its own PR, not in a
- * test that exists to stop the NEXT one.
+ * The keys pinned below are listed rather than changed here; altering one is
+ * a behavior change that belongs in its own PR, not in a test that exists to
+ * stop the NEXT one.
  */
 
 /**
@@ -35,10 +35,21 @@ import { resolveFlagDefinition } from "../registry";
 const UNREGISTERED_GRANDFATHERED = ["ops_ui_ops_menu_pinned"];
 
 /**
- * Registered but deliberately not PRODUCT-scoped. `release_langy_enabled`
- * is SYSTEM with `envOverridable: false`, which reads as intentional.
+ * Registered but deliberately not PRODUCT-scoped. Both are SYSTEM with
+ * `envOverridable: false` and are managed from the internal flag store only,
+ * which reads as intentional in each description.
+ *
+ * SYSTEM costs these two nothing that the router's cast promises: the service
+ * takes ONE branch for both scopes (`featureFlag.service.ts`), so a SYSTEM
+ * flag is read from the operator store with the same per-project and per-org
+ * targeting, and the registry says so as well ("both scopes resolve
+ * identically today"). The branch this test really guards is the one for
+ * UNREGISTERED keys, and the first test above is what holds it.
  */
-const NON_PRODUCT_GRANDFATHERED = ["release_langy_enabled"];
+const NON_PRODUCT_GRANDFATHERED = [
+  "release_langy_enabled",
+  "release_langy_ui_actions",
+];
 
 describe("frontend feature flags", () => {
   describe("when a flag is exposed to the frontend via tRPC", () => {
@@ -69,9 +80,12 @@ describe("frontend feature flags", () => {
   });
 
   describe("when the grandfathered exceptions are listed", () => {
-    it("names exactly the two keys that predate this check", () => {
+    it("names exactly the keys this check allows through", () => {
       expect(UNREGISTERED_GRANDFATHERED).toEqual(["ops_ui_ops_menu_pinned"]);
-      expect(NON_PRODUCT_GRANDFATHERED).toEqual(["release_langy_enabled"]);
+      expect(NON_PRODUCT_GRANDFATHERED).toEqual([
+        "release_langy_enabled",
+        "release_langy_ui_actions",
+      ]);
     });
   });
 });

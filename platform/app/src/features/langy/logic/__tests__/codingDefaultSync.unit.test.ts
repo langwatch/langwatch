@@ -90,6 +90,26 @@ describe("syncLangyAfterDefaultModelWrite", () => {
     });
   });
 
+  describe("when the allowlist took the picked model away", () => {
+    /** @scenario A model the user picked on purpose is not hijacked */
+    it("follows the default again, because the pick no longer stands", async () => {
+      // The panel snaps the picker to an allowed model when the pick turns out
+      // to be outside the allowlist. That snap OVERRULES the user, so the pick
+      // is over: were the flag to survive it, the pill would sit on the forced
+      // model and refuse every later default for the rest of the conversation.
+      useLangyStore.getState().pickModel("anthropic/claude-sonnet-5");
+      useLangyStore.getState().setModelOverride(OLD_DEFAULT);
+      const { utils } = buildUtils({
+        previousModel: OLD_DEFAULT,
+        nextModel: CODEX_MODEL,
+      });
+
+      await syncLangyAfterDefaultModelWrite({ utils, projectId: "proj-1" });
+
+      expect(useLangyStore.getState().modelOverride).toBe(CODEX_MODEL);
+    });
+  });
+
   describe("when the user picked the model that just became the default", () => {
     /** @scenario A pick that matches the default is still the user's pick */
     it("keeps their pick, even when the resolver answers something else", async () => {
