@@ -5,7 +5,7 @@ import type {
   ProcessHandlerContext,
   WakeHandler,
 } from "@langwatch/eventing";
-import { runParameterValuesSchema } from "~/server/scenarios/parameters";
+import { runParameterValuesSchema } from "@langwatch/scenario-contract";
 import { runSecretCiphertextSchema } from "~/server/scenarios/run-secret-values";
 import { STALL_THRESHOLD_MS } from "~/server/scenarios/scenario.constants";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";

@@ -20,7 +20,7 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import { getApp } from "~/server/app-layer/app";
+import type { App } from "~/server/app-layer/app";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
 import {
@@ -91,7 +91,7 @@ secured
       });
 
       const exportId = generate(KSUID_RESOURCES.EXPORT).toString();
-      const broadcast = getApp().broadcast;
+      const broadcast = c.app.broadcast;
 
       const today = new Date().toISOString().slice(0, 10);
       // Content-Disposition's filename is a quoted-string. projectId is only
@@ -101,7 +101,7 @@ secured
       const safeProjectId = request.projectId.replace(/[^\w.-]/g, "_");
       const fileName = `${safeProjectId} - Scenario Runs - ${today} - ${request.mode}.csv`;
 
-      const service = getApp().simulations.export;
+      const service = c.app.simulationExports;
       const totalCount = await service.getTotalCount({ request });
 
       // CSV of repeated run-level values compresses ~9x, and the browser
@@ -185,7 +185,7 @@ function buildExportStream({
   exportId: string;
   totalCount: number;
   signal: AbortSignal;
-  broadcast: ReturnType<typeof getApp>["broadcast"];
+  broadcast: App["broadcast"];
 }) {
   const encoder = new TextEncoder();
   const publish = (payload: Record<string, unknown>) =>

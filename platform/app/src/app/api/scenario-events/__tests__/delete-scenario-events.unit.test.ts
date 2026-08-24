@@ -25,9 +25,7 @@ describe("archiveScenarioSetRuns()", () => {
 
     app = {
       simulations: {
-        runs: {
-          getRunIdsForSet: mockGetRunIdsForSet,
-        },
+        getRunIdsForSet: mockGetRunIdsForSet,
         deleteRun: mockDeleteRun,
       },
     } as Pick<App, "simulations">;

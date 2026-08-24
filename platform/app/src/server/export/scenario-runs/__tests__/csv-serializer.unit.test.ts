@@ -1,6 +1,6 @@
 import Parse from "papaparse";
+import type { SimulationExportRun } from "@langwatch/simulation-contract";
 import { describe, expect, it } from "vitest";
-import type { ExportableRun } from "~/server/app-layer/simulations/repositories/simulation.repository";
 import {
   ScenarioRunStatus,
   Verdict,
@@ -10,7 +10,9 @@ import {
   serializeRunsToFullCsv,
 } from "../csv-serializer";
 
-function buildRun(overrides: Partial<ExportableRun> = {}): ExportableRun {
+function buildRun(
+  overrides: Partial<SimulationExportRun> = {},
+): SimulationExportRun {
   return {
     scenarioRunId: "run_1",
     scenarioId: "scenario_1",
@@ -34,7 +36,7 @@ function buildRun(overrides: Partial<ExportableRun> = {}): ExportableRun {
     durationInMs: 8400,
     totalCost: 0.031,
     ...overrides,
-  } as ExportableRun;
+  };
 }
 
 function parse(csv: string): Record<string, string>[] {
@@ -266,14 +268,14 @@ describe("scenario run CSV serializers", () => {
               { role: "user", content: "first" },
               { role: "assistant", content: "second" },
               { role: "user", content: "third" },
-            ] as ExportableRun["messages"],
+            ] as SimulationExportRun["messages"],
           }),
           buildRun({
             scenarioRunId: "run_b",
             name: "Password Reset",
             messages: [
               { role: "user", content: "help" },
-            ] as ExportableRun["messages"],
+            ] as SimulationExportRun["messages"],
           }),
         ],
         includeHeader: true,
@@ -339,7 +341,7 @@ describe("scenario run CSV serializers", () => {
             messages: [
               { role: "user", content: "hi", trace_id: "trace_b" },
               { role: "assistant", content: "yo", trace_id: "trace_c" },
-            ] as unknown as ExportableRun["messages"],
+            ] as unknown as SimulationExportRun["messages"],
           }),
         ],
         includeHeader: true,
@@ -417,7 +419,7 @@ describe("scenario run CSV serializers", () => {
         { parameters: {} },
       ]) {
         const csv = serializeRunsToFullCsv({
-          runs: [buildRun({ metadata } as Partial<ExportableRun>)],
+          runs: [buildRun({ metadata } as Partial<SimulationExportRun>)],
           includeHeader: true,
         });
 
@@ -474,7 +476,7 @@ describe("scenario run CSV serializers", () => {
           buildRun({
             messages: [
               { role: "user", content: DANGEROUS },
-            ] as ExportableRun["messages"],
+            ] as SimulationExportRun["messages"],
           }),
         ],
         includeHeader: true,
@@ -543,7 +545,7 @@ describe("scenario run CSV serializers", () => {
             buildRun({
               messages: [
                 { role: "user", content: "hi", id: "=1+1", trace_id: "@evil" },
-              ] as unknown as ExportableRun["messages"],
+              ] as unknown as SimulationExportRun["messages"],
             }),
           ],
           includeHeader: true,
@@ -688,7 +690,7 @@ describe("scenario run CSV serializers", () => {
             messages: [
               { role: "user", content: "I want my money back" },
               { role: "assistant", content: "Let me check that order" },
-            ] as ExportableRun["messages"],
+            ] as SimulationExportRun["messages"],
           }),
         ],
         includeHeader: true,
@@ -716,7 +718,7 @@ describe("scenario run CSV serializers", () => {
             },
             messages: [
               { role: "user", content: "refund please" },
-            ] as ExportableRun["messages"],
+            ] as SimulationExportRun["messages"],
           }),
         ],
         includeHeader: true,
@@ -735,7 +737,9 @@ describe("scenario run CSV serializers", () => {
     /** @scenario A run with no messages still appears in Full mode */
     it("still writes one row for a run that produced no messages", () => {
       const csv = serializeRunsToFullCsv({
-        runs: [buildRun({ messages: [] as ExportableRun["messages"] })],
+        runs: [
+          buildRun({ messages: [] as SimulationExportRun["messages"] }),
+        ],
         includeHeader: true,
       });
 
@@ -751,7 +755,9 @@ describe("scenario run CSV serializers", () => {
       const csv = serializeRunsToFullCsv({
         runs: [
           buildRun({
-            messages: [{ role: "user", content }] as ExportableRun["messages"],
+            messages: [
+              { role: "user", content },
+            ] as SimulationExportRun["messages"],
           }),
         ],
         includeHeader: true,
@@ -767,7 +773,7 @@ describe("scenario run CSV serializers", () => {
           buildRun({
             messages: [
               { role: "user", content: parts },
-            ] as unknown as ExportableRun["messages"],
+            ] as unknown as SimulationExportRun["messages"],
           }),
         ],
         includeHeader: true,

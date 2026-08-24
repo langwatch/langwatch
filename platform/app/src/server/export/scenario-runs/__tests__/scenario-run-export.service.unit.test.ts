@@ -12,12 +12,15 @@
  */
 
 import Parse from "papaparse";
-import { describe, expect, it } from "vitest";
 import type {
-  ExportableRun,
-  SimulationRepository,
-} from "~/server/app-layer/simulations/repositories/simulation.repository";
-import { NullSimulationRepository } from "~/server/app-layer/simulations/repositories/simulation.repository";
+  SimulationExportRun,
+  SimulationService,
+} from "@langwatch/simulation-contract";
+import {
+  SimulationClickHouseAdapter,
+  SimulationExecutionPort,
+} from "@langwatch/simulation-server";
+import { describe, expect, it, vi } from "vitest";
 import {
   ScenarioRunStatus,
   Verdict,
@@ -25,7 +28,9 @@ import {
 import { ScenarioRunExportService } from "../scenario-run-export.service";
 import type { ScenarioRunExportRequest } from "../types";
 
-function buildRun(overrides: Partial<ExportableRun> = {}): ExportableRun {
+function buildRun(
+  overrides: Partial<SimulationExportRun> = {},
+): SimulationExportRun {
   return {
     scenarioRunId: "run_1",
     scenarioId: "scenario_1",
@@ -49,10 +54,29 @@ function buildRun(overrides: Partial<ExportableRun> = {}): ExportableRun {
     durationInMs: 8400,
     totalCost: 0.031,
     ...overrides,
-  } as ExportableRun;
+  };
 }
 
-type FindCall = Parameters<SimulationRepository["findRunsForExport"]>[0];
+type FindCall = Parameters<SimulationService["findRunsForExport"]>[0];
+
+const noop = async () => undefined;
+
+class NoopSimulationExecutionPort extends SimulationExecutionPort {
+  queueRun = noop;
+  startRun = noop;
+  messageSnapshot = noop;
+  textMessageStart = noop;
+  textMessageEnd = noop;
+  finishRun = noop;
+  cancelRun = noop;
+  deleteRun = noop;
+}
+
+function createSimulationService(): SimulationService {
+  return SimulationClickHouseAdapter.createNull({
+    execution: new NoopSimulationExecutionPort(),
+  });
+}
 
 /**
  * Serves the given pages in order, one per call, and remembers every request.
@@ -60,33 +84,30 @@ type FindCall = Parameters<SimulationRepository["findRunsForExport"]>[0];
  * that ignores the cursor loops forever and a caller that stops early is
  * visible in `calls`.
  */
-function pagingRepository(pages: ExportableRun[][]): {
-  repository: SimulationRepository;
+function pagingService(pages: SimulationExportRun[][]): {
+  simulations: SimulationService;
   calls: FindCall[];
 } {
   const calls: FindCall[] = [];
-  // Layered over the Null implementation rather than subclassing it: its
-  // `findRunsForExport()` declares no parameters, so an override that reads
-  // them is a signature mismatch — and reading them is the entire point here.
-  const repository: SimulationRepository = Object.assign(
-    new NullSimulationRepository(),
-    {
-      countRunsForExport: async () => pages.flat().length,
-      findRunsForExport: async (params: FindCall) => {
-        calls.push(params);
-        const index = params.cursor ? Number(params.cursor) : 0;
-        const runs = pages[index] ?? [];
-        const hasMore = index < pages.length - 1;
-        return {
-          runs,
-          hasMore,
-          ...(hasMore ? { nextCursor: String(index + 1) } : {}),
-        };
-      },
+  const simulations = createSimulationService();
+  vi.spyOn(simulations, "countRunsForExport").mockResolvedValue(
+    pages.flat().length,
+  );
+  vi.spyOn(simulations, "findRunsForExport").mockImplementation(
+    async (params: FindCall) => {
+      calls.push(params);
+      const index = params.cursor ? Number(params.cursor) : 0;
+      const runs = pages[index] ?? [];
+      const hasMore = index < pages.length - 1;
+      return {
+        runs,
+        hasMore,
+        ...(hasMore ? { nextCursor: String(index + 1) } : {}),
+      };
     },
   );
 
-  return { repository, calls };
+  return { simulations, calls };
 }
 
 function request(
@@ -127,11 +148,11 @@ describe("ScenarioRunExportService", () => {
      */
     /** @scenario The header row is written once */
     it("writes the header on the first batch only", async () => {
-      const { repository } = pagingRepository([
+      const { simulations } = pagingService([
         [buildRun({ scenarioRunId: "a" }), buildRun({ scenarioRunId: "b" })],
         [buildRun({ scenarioRunId: "c" })],
       ]);
-      const service = new ScenarioRunExportService(repository);
+      const service = new ScenarioRunExportService(simulations);
 
       const { csv } = await collect(
         service.exportRuns({ request: request({ mode: "full" }) }),
@@ -150,11 +171,11 @@ describe("ScenarioRunExportService", () => {
 
     /** @scenario Progress is shown while a large export streams */
     it("reports runs visited against the total, reaching it at the end", async () => {
-      const { repository } = pagingRepository([
+      const { simulations } = pagingService([
         [buildRun({ scenarioRunId: "a" }), buildRun({ scenarioRunId: "b" })],
         [buildRun({ scenarioRunId: "c" })],
       ]);
-      const service = new ScenarioRunExportService(repository);
+      const service = new ScenarioRunExportService(simulations);
 
       const { progress } = await collect(
         service.exportRuns({ request: request({ mode: "full" }) }),
@@ -175,12 +196,12 @@ describe("ScenarioRunExportService", () => {
      */
     /** @scenario Cancelling an in-flight export stops it */
     it("stops asking the repository for more pages", async () => {
-      const { repository, calls } = pagingRepository([
+      const { simulations, calls } = pagingService([
         [buildRun({ scenarioRunId: "a" })],
         [buildRun({ scenarioRunId: "b" })],
         [buildRun({ scenarioRunId: "c" })],
       ]);
-      const service = new ScenarioRunExportService(repository);
+      const service = new ScenarioRunExportService(simulations);
       const controller = new AbortController();
 
       const generator = service.exportRuns({
@@ -208,7 +229,7 @@ describe("ScenarioRunExportService", () => {
      */
     /** @scenario Export honours the pass/fail filter */
     it("keeps only the runs in the requested outcome category", async () => {
-      const { repository } = pagingRepository([
+      const { simulations } = pagingService([
         [
           buildRun({
             scenarioRunId: "passed",
@@ -228,7 +249,7 @@ describe("ScenarioRunExportService", () => {
           }),
         ],
       ]);
-      const service = new ScenarioRunExportService(repository);
+      const service = new ScenarioRunExportService(simulations);
 
       const { csv } = await collect(
         service.exportRuns({
@@ -249,7 +270,7 @@ describe("ScenarioRunExportService", () => {
      * file a spreadsheet will open, not a zero-byte download.
      */
     it("still writes a header when every run is filtered out", async () => {
-      const { repository } = pagingRepository([
+      const { simulations } = pagingService([
         [
           buildRun({
             scenarioRunId: "passed",
@@ -257,7 +278,7 @@ describe("ScenarioRunExportService", () => {
           }),
         ],
       ]);
-      const service = new ScenarioRunExportService(repository);
+      const service = new ScenarioRunExportService(simulations);
 
       const { csv } = await collect(
         service.exportRuns({
@@ -278,8 +299,8 @@ describe("ScenarioRunExportService", () => {
      * than the user was looking at.
      */
     it("passes the whole scope through to the repository", async () => {
-      const { repository, calls } = pagingRepository([[buildRun()]]);
-      const service = new ScenarioRunExportService(repository);
+      const { simulations, calls } = pagingService([[buildRun()]]);
+      const service = new ScenarioRunExportService(simulations);
 
       await collect(
         service.exportRuns({

@@ -2,11 +2,22 @@ import type {
   SimulationBatchHistory,
   SimulationBatchRunData,
   SimulationBatchSummary,
+  SimulationExportRun,
   SimulationAllSuitesRunData,
   SimulationExternalSetSummary,
   SimulationRunData,
   SimulationSetData,
 } from "./simulation";
+import type {
+  SimulationCancelRun,
+  SimulationDeleteRun,
+  SimulationFinishRun,
+  SimulationMessageSnapshot,
+  SimulationQueueRun,
+  SimulationStartRun,
+  SimulationTextMessageEnd,
+  SimulationTextMessageStart,
+} from "./simulation.commands";
 
 /** Shared Simulation read capability. Transports depend on this, never a repository. */
 export abstract class SimulationService {
@@ -24,4 +35,14 @@ export abstract class SimulationService {
   abstract getLastUpdatedAt(input: { projectId: string; scenarioSetId?: string; startDate?: number; endDate?: number }): Promise<number>;
   abstract getRunIdsForSet(input: { projectId: string; scenarioSetId: string }): Promise<{ runIds: string[]; reachedCap: boolean }>;
   abstract getDistinctExternalSetIds(input: { projectIds: string[] }): Promise<Set<string>>;
+  abstract countRunsForExport(input: { projectId: string; scenarioSetId?: string; scenarioId?: string; startDate?: number; endDate?: number }): Promise<number>;
+  abstract findRunsForExport(input: { projectId: string; scenarioSetId?: string; scenarioId?: string; startDate?: number; endDate?: number; limit: number; cursor?: string }): Promise<{ runs: SimulationExportRun[]; nextCursor?: string; hasMore: boolean }>;
+  abstract queueRun(input: SimulationQueueRun): Promise<void>;
+  abstract startRun(input: SimulationStartRun): Promise<void>;
+  abstract messageSnapshot(input: SimulationMessageSnapshot): Promise<void>;
+  abstract textMessageStart(input: SimulationTextMessageStart): Promise<void>;
+  abstract textMessageEnd(input: SimulationTextMessageEnd): Promise<void>;
+  abstract finishRun(input: SimulationFinishRun): Promise<void>;
+  abstract cancelRun(input: SimulationCancelRun): Promise<void>;
+  abstract deleteRun(input: SimulationDeleteRun): Promise<void>;
 }

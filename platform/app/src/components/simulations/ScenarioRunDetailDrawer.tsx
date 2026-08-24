@@ -29,7 +29,7 @@ import { useScenarioTarget } from "~/hooks/useScenarioTarget";
 import { useSimulationStreamingState } from "~/hooks/useSimulationStreamingState";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
-import { runParameterValuesSchema } from "~/server/scenarios/parameters";
+import { runParameterValuesSchema } from "@langwatch/scenario-contract";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";

@@ -83,6 +83,13 @@ export const simulationRunDataSchema = z.object({
 });
 export type SimulationRunData = z.infer<typeof simulationRunDataSchema>;
 
+/** Complete run record used by the paged CSV export. */
+export const simulationExportRunSchema = simulationRunDataSchema.extend({
+  scenarioSetId: z.string(),
+  traceIds: z.array(z.string()),
+});
+export type SimulationExportRun = z.infer<typeof simulationExportRunSchema>;
+
 export const simulationSetDataSchema = z.object({
   scenarioSetId: z.string(),
   scenarioCount: z.number(),

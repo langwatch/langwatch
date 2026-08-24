@@ -19,7 +19,7 @@
  */
 
 import Parse from "papaparse";
-import type { ExportableRun } from "~/server/app-layer/simulations/repositories/simulation.repository";
+import type { SimulationExportRun } from "@langwatch/simulation-contract";
 import { categorizeRunStatus } from "~/server/scenarios/scenario-run-category";
 
 /**
@@ -120,7 +120,7 @@ export function serializeRunsToCriteriaCsv({
   runs,
   includeHeader,
 }: {
-  runs: ExportableRun[];
+  runs: SimulationExportRun[];
   includeHeader: boolean;
 }): string {
   const rows: string[][] = [];
@@ -147,7 +147,7 @@ export function serializeRunsToFullCsv({
   runs,
   includeHeader,
 }: {
-  runs: ExportableRun[];
+  runs: SimulationExportRun[];
   includeHeader: boolean;
 }): string {
   const rows: string[][] = [];
@@ -182,7 +182,7 @@ export function serializeRunsToFullCsv({
 // Shared row construction — one builder per column group, in header order
 // ---------------------------------------------------------------------------
 
-function buildCoreValues(run: ExportableRun): string[] {
+function buildCoreValues(run: SimulationExportRun): string[] {
   const results = run.results;
   return [
     text(run.name ?? ""),
@@ -204,7 +204,7 @@ function buildCoreValues(run: ExportableRun): string[] {
   ];
 }
 
-function buildCriteriaListValues(run: ExportableRun): string[] {
+function buildCriteriaListValues(run: SimulationExportRun): string[] {
   return [
     jsonArray(run.results?.metCriteria),
     jsonArray(run.results?.unmetCriteria),
@@ -221,7 +221,7 @@ function buildCriteriaListValues(run: ExportableRun): string[] {
  * that never needed it costs a leading apostrophe on an id no spreadsheet
  * would have parsed as a number anyway.
  */
-function buildTailValues(run: ExportableRun): string[] {
+function buildTailValues(run: SimulationExportRun): string[] {
   const target = extractTarget(run.metadata);
   return [
     text(run.scenarioRunId),
@@ -284,7 +284,7 @@ function extractTarget(metadata: Record<string, unknown> | null | undefined): {
  * by independent code paths and a run can record traces without ever emitting
  * a message snapshot. Cheap enough to keep rather than rely on that holding.
  */
-function collectTraceIds(run: ExportableRun): string[] {
+function collectTraceIds(run: SimulationExportRun): string[] {
   const ids = new Set<string>();
   for (const traceId of run.traceIds ?? []) {
     if (traceId !== "") ids.add(traceId);

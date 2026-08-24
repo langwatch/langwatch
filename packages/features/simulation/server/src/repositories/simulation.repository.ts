@@ -2,17 +2,13 @@ import type {
   SimulationBatchHistory,
   SimulationBatchRunData,
   SimulationBatchSummary,
+  SimulationExportRun,
   SimulationExternalSetSummary,
   SimulationRunData,
   SimulationSetData,
 } from "@langwatch/simulation-contract";
 
 /** A run carrying the stored columns an export needs beyond the display model. */
-export type ExportableSimulationRun = SimulationRunData & {
-  scenarioSetId: string;
-  traceIds: string[];
-};
-
 export type AllSimulationSuitesRunData =
   | { changed: false; lastUpdatedAt: number }
   | {
@@ -41,7 +37,7 @@ export abstract class SimulationRepository {
   abstract findAllRunIdsForSet(input: { projectId: string; scenarioSetId: string }): Promise<{ runIds: string[]; reachedCap: boolean }>;
   abstract getDistinctExternalSetIds(input: { projectIds: string[] }): Promise<Set<string>>;
   abstract countRunsForExport(input: { projectId: string; scenarioSetId?: string; scenarioId?: string; startDate?: number; endDate?: number }): Promise<number>;
-  abstract findRunsForExport(input: { projectId: string; scenarioSetId?: string; scenarioId?: string; startDate?: number; endDate?: number; limit: number; cursor?: string }): Promise<{ runs: ExportableSimulationRun[]; nextCursor?: string; hasMore: boolean }>;
+  abstract findRunsForExport(input: { projectId: string; scenarioSetId?: string; scenarioId?: string; startDate?: number; endDate?: number; limit: number; cursor?: string }): Promise<{ runs: SimulationExportRun[]; nextCursor?: string; hasMore: boolean }>;
 }
 
 /** Deliberate disabled-store implementation for local and test composition. */
@@ -61,5 +57,5 @@ export class NullSimulationRepository extends SimulationRepository {
   async findAllRunIdsForSet(): Promise<{ runIds: string[]; reachedCap: boolean }> { return { runIds: [], reachedCap: false }; }
   async getDistinctExternalSetIds(): Promise<Set<string>> { return new Set(); }
   async countRunsForExport(): Promise<number> { return 0; }
-  async findRunsForExport(): Promise<{ runs: ExportableSimulationRun[]; nextCursor?: string; hasMore: boolean }> { return { runs: [], hasMore: false }; }
+  async findRunsForExport(): Promise<{ runs: SimulationExportRun[]; nextCursor?: string; hasMore: boolean }> { return { runs: [], hasMore: false }; }
 }

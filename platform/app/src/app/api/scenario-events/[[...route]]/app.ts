@@ -389,7 +389,7 @@ export async function archiveScenarioSetRuns({
   hasMore: boolean;
 }> {
   const { runIds, reachedCap } =
-    await app.simulations.runs.getRunIdsForSet({
+    await app.simulations.getRunIdsForSet({
       projectId,
       scenarioSetId,
     });

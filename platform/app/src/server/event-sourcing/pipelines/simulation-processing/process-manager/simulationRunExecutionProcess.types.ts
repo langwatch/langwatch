@@ -1,6 +1,6 @@
 import type { IntentSpec } from "@langwatch/eventing";
-import { z } from "zod";
-import { runParameterValuesSchema } from "~/server/scenarios/parameters";
+import { runParameterValuesSchema } from "@langwatch/scenario-contract";
+import { z } from "zod/v4";
 import { runSecretCiphertextSchema } from "~/server/scenarios/run-secret-values";
 
 export const SIMULATION_RUN_EXECUTION_PROCESS_NAME =

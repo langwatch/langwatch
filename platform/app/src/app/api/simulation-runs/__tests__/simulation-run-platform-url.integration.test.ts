@@ -9,15 +9,13 @@
  */
 
 import { nanoid } from "nanoid";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { appContextBindingsFor } from "~/app/api/middleware/app-context";
 import { projectFactory } from "~/factories/project.factory";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
-import { NullSimulationRepository } from "~/server/app-layer/simulations/repositories/simulation.repository";
-import { SimulationRunService } from "~/server/app-layer/simulations/simulation-run.service";
 import { prisma } from "~/server/db";
-import { ScenarioRunExportService } from "~/server/export/scenario-runs/scenario-run-export.service";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { app } from "../[[...route]]/app";
@@ -78,29 +76,20 @@ describe("Feature: simulation-runs platform link addresses the run", () => {
     await prisma.organization.delete({ where: { id: testOrganization.id } });
   });
 
-  class TestSimulationRepository extends NullSimulationRepository {
-    constructor(private readonly run: ScenarioRunData | null) {
-      super();
-    }
-    override async getScenarioRunData(): Promise<ScenarioRunData | null> {
-      return this.run;
-    }
-  }
-
   function withRuns(over: { getScenarioRunData?: ScenarioRunData | null }) {
-    const repository = new TestSimulationRepository(
+    const testApp = createTestApp();
+    vi.spyOn(testApp.simulations, "tryGetScenarioRunData").mockResolvedValue(
       over.getScenarioRunData ?? null,
     );
-    globalForApp.__langwatch_app = createTestApp({
-      simulations: {
-        runs: new SimulationRunService(repository),
-        export: ScenarioRunExportService.create(repository),
-      },
-    });
+    globalForApp.__langwatch_app = testApp;
   }
 
   const get = (path: string) =>
-    app.request(path, { headers: { "X-Auth-Token": testApiKey } });
+    app.request(
+      path,
+      { headers: { "X-Auth-Token": testApiKey } },
+      appContextBindingsFor(globalForApp.__langwatch_app!),
+    );
 
   // The link is BASE_HOST + the project-scoped path, and BASE_HOST is
   // deployment config (CI carries a scheme-less `localhost:3000`). What this

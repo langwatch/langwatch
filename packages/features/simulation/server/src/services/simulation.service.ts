@@ -3,20 +3,38 @@ import {
   simulationBatchHistorySchema,
   simulationBatchRunDataSchema,
   simulationBatchSummarySchema,
+  simulationCancelRunSchema,
+  simulationDeleteRunSchema,
+  simulationExportRunSchema,
+  simulationFinishRunSchema,
+  simulationMessageSnapshotSchema,
+  simulationQueueRunSchema,
   simulationAllSuitesRunDataSchema,
   simulationExternalSetSummarySchema,
   simulationRunDataSchema,
   simulationSetDataSchema,
+  simulationStartRunSchema,
+  simulationTextMessageEndSchema,
+  simulationTextMessageStartSchema,
 } from "@langwatch/simulation-contract";
+import type { SimulationExecutionPort } from "../ports/simulation-execution.port";
 import type { SimulationRepository } from "../repositories/simulation.repository";
 
 /** Canonical read capability; its only persistence dependency is Simulation's repository. */
 export class SimulationService extends SimulationServiceContract {
-  static create(repository: SimulationRepository): SimulationService {
-    return new SimulationService(repository);
+  static create(
+    repository: SimulationRepository,
+    execution: SimulationExecutionPort,
+  ): SimulationService {
+    return new SimulationService(repository, execution);
   }
 
-  constructor(readonly repository: SimulationRepository) { super(); }
+  constructor(
+    private readonly repository: SimulationRepository,
+    private readonly execution: SimulationExecutionPort,
+  ) {
+    super();
+  }
 
   async getScenarioSetsData(
     input: Parameters<SimulationRepository["getScenarioSetsData"]>[0],
@@ -121,4 +139,65 @@ export class SimulationService extends SimulationServiceContract {
   ) {
     return this.repository.getDistinctExternalSetIds(input);
   }
+
+  countRunsForExport(
+    input: Parameters<SimulationRepository["countRunsForExport"]>[0],
+  ) {
+    return this.repository.countRunsForExport(input);
+  }
+
+  async findRunsForExport(
+    input: Parameters<SimulationRepository["findRunsForExport"]>[0],
+  ) {
+    const result = await this.repository.findRunsForExport(input);
+    return {
+      ...result,
+      runs: simulationExportRunSchema.array().parse(result.runs),
+    };
+  }
+
+  queueRun(input: Parameters<SimulationExecutionPort["queueRun"]>[0]) {
+    return this.execution.queueRun(simulationQueueRunSchema.parse(input));
+  }
+
+  startRun(input: Parameters<SimulationExecutionPort["startRun"]>[0]) {
+    return this.execution.startRun(simulationStartRunSchema.parse(input));
+  }
+
+  messageSnapshot(
+    input: Parameters<SimulationExecutionPort["messageSnapshot"]>[0],
+  ) {
+    return this.execution.messageSnapshot(
+      simulationMessageSnapshotSchema.parse(input),
+    );
+  }
+
+  textMessageStart(
+    input: Parameters<SimulationExecutionPort["textMessageStart"]>[0],
+  ) {
+    return this.execution.textMessageStart(
+      simulationTextMessageStartSchema.parse(input),
+    );
+  }
+
+  textMessageEnd(
+    input: Parameters<SimulationExecutionPort["textMessageEnd"]>[0],
+  ) {
+    return this.execution.textMessageEnd(
+      simulationTextMessageEndSchema.parse(input),
+    );
+  }
+
+  finishRun(input: Parameters<SimulationExecutionPort["finishRun"]>[0]) {
+    return this.execution.finishRun(simulationFinishRunSchema.parse(input));
+  }
+
+  cancelRun(input: Parameters<SimulationExecutionPort["cancelRun"]>[0]) {
+    return this.execution.cancelRun(simulationCancelRunSchema.parse(input));
+  }
+
+  deleteRun(input: Parameters<SimulationExecutionPort["deleteRun"]>[0]) {
+    return this.execution.deleteRun(simulationDeleteRunSchema.parse(input));
+  }
+
 }

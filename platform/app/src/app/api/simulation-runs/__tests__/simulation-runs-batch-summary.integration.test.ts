@@ -7,15 +7,13 @@
  */
 
 import { nanoid } from "nanoid";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { appContextBindingsFor } from "~/app/api/middleware/app-context";
 import { projectFactory } from "~/factories/project.factory";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
-import { NullSimulationRepository } from "~/server/app-layer/simulations/repositories/simulation.repository";
-import { SimulationRunService } from "~/server/app-layer/simulations/simulation-run.service";
 import { prisma } from "~/server/db";
-import { ScenarioRunExportService } from "~/server/export/scenario-runs/scenario-run-export.service";
 import type { BatchSummary } from "~/server/scenarios/scenario-event.types";
 import { app } from "../[[...route]]/app";
 
@@ -74,36 +72,17 @@ describe("Feature: a batch of simulation runs reports when it is complete", () =
     await prisma.organization.delete({ where: { id: testOrganization.id } });
   });
 
-  /** Serves one prepared summary and records how the route addressed it. */
-  class RecordingSimulationRepository extends NullSimulationRepository {
-    summaryCalls: Array<{ projectId: string; batchRunId: string }> = [];
-
-    constructor(private readonly summary: BatchSummary | null) {
-      super();
-    }
-
-    // The base class declares the method parameterless, so the override's
-    // parameter must be optional to stay assignable; the route always passes
-    // it.
-    override async getBatchSummary(params?: {
-      projectId: string;
-      batchRunId: string;
-    }) {
-      if (!params) throw new Error("expected params");
-      this.summaryCalls.push(params);
-      return this.summary;
-    }
-  }
-
   function withSummary(summary: BatchSummary | null) {
-    const repository = new RecordingSimulationRepository(summary);
-    globalForApp.__langwatch_app = createTestApp({
-      simulations: {
-        runs: new SimulationRunService(repository),
-        export: ScenarioRunExportService.create(repository),
+    const testApp = createTestApp();
+    const summaryCalls: Array<{ projectId: string; batchRunId: string }> = [];
+    vi.spyOn(testApp.simulations, "tryGetBatchSummary").mockImplementation(
+      async (input) => {
+        summaryCalls.push(input);
+        return summary;
       },
-    });
-    return repository;
+    );
+    globalForApp.__langwatch_app = testApp;
+    return { summaryCalls };
   }
 
   const get = ({
@@ -112,7 +91,12 @@ describe("Feature: a batch of simulation runs reports when it is complete", () =
   }: {
     path: string;
     headers?: Record<string, string>;
-  }) => app.request(path, { headers });
+  }) =>
+    app.request(
+      path,
+      { headers },
+      appContextBindingsFor(globalForApp.__langwatch_app!),
+    );
 
   const getAuthenticated = (path: string) =>
     get({ path, headers: { "X-Auth-Token": testApiKey } });

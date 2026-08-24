@@ -8,15 +8,13 @@
  */
 
 import { nanoid } from "nanoid";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { appContextBindingsFor } from "~/app/api/middleware/app-context";
 import { projectFactory } from "~/factories/project.factory";
 import type { Organization, Project, Team } from "~/generated/prisma/client";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
-import { NullSimulationRepository } from "~/server/app-layer/simulations/repositories/simulation.repository";
-import { SimulationRunService } from "~/server/app-layer/simulations/simulation-run.service";
 import { prisma } from "~/server/db";
-import { ScenarioRunExportService } from "~/server/export/scenario-runs/scenario-run-export.service";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { app } from "../[[...route]]/app";
@@ -82,63 +80,58 @@ describe("Feature: simulation runs list filters by batch id alone", () => {
    * The batch method serves only the batch's runs; the all-suites method
    * serves the whole project, which is the fall-through the fix removes.
    */
-  class RecordingSimulationRepository extends NullSimulationRepository {
-    batchCalls: Array<{
+  function withRepository() {
+    const testApp = createTestApp();
+    const batchCalls: Array<{
       projectId: string;
       scenarioSetId?: string;
       batchRunId: string;
     }> = [];
-    allSuitesCalls = 0;
-
-    // The base class declares the method parameterless, so the override's
-    // parameter must be optional to stay assignable; the route always passes
-    // it.
-    override async getRunDataForBatchRun(params?: {
-      projectId: string;
-      scenarioSetId?: string;
-      batchRunId: string;
-    }) {
-      if (!params) throw new Error("expected params");
-      this.batchCalls.push(params);
-      return {
-        changed: true as const,
-        lastUpdatedAt: Date.now(),
-        runs: [makeRun({ batchRunId: params.batchRunId })],
-      };
-    }
-
-    override async getRunDataForAllSuites() {
-      this.allSuitesCalls += 1;
-      return {
-        changed: true as const,
-        lastUpdatedAt: Date.now(),
-        runs: [
-          makeRun({ batchRunId: "batch_1" }),
-          makeRun({
-            batchRunId: "batch_stale",
-            scenarioRunId: "run_stale",
-            status: ScenarioRunStatus.IN_PROGRESS,
-          }),
-        ],
-        scenarioSetIds: {},
-        hasMore: false,
-      };
-    }
-  }
-
-  function withRepository() {
-    const repository = new RecordingSimulationRepository();
-    globalForApp.__langwatch_app = createTestApp({
-      simulations: {
-        runs: new SimulationRunService(repository),
-        export: ScenarioRunExportService.create(repository),
+    let allSuitesCalls = 0;
+    vi.spyOn(testApp.simulations, "getRunDataForBatchRun").mockImplementation(
+      async (params) => {
+        batchCalls.push(params);
+        return {
+          changed: true as const,
+          lastUpdatedAt: Date.now(),
+          runs: [makeRun({ batchRunId: params.batchRunId })],
+        };
       },
-    });
-    return repository;
+    );
+    vi.spyOn(testApp.simulations, "getRunDataForAllSuites").mockImplementation(
+      async () => {
+        allSuitesCalls += 1;
+        return {
+          changed: true as const,
+          lastUpdatedAt: Date.now(),
+          runs: [
+            makeRun({ batchRunId: "batch_1" }),
+            makeRun({
+              batchRunId: "batch_stale",
+              scenarioRunId: "run_stale",
+              status: ScenarioRunStatus.IN_PROGRESS,
+            }),
+          ],
+          scenarioSetIds: {},
+          hasMore: false,
+        };
+      },
+    );
+    globalForApp.__langwatch_app = testApp;
+    return {
+      batchCalls,
+      get allSuitesCalls() {
+        return allSuitesCalls;
+      },
+    };
   }
 
   const get = (path: string) =>
-    app.request(path, { headers: { "X-Auth-Token": testApiKey } });
+    app.request(
+      path,
+      { headers: { "X-Auth-Token": testApiKey } },
+      appContextBindingsFor(globalForApp.__langwatch_app!),
+    );
 
   describe("when the list is requested with only a batchRunId", () => {
     /** @scenario "A batch id alone filters the list" */

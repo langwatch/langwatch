@@ -63,7 +63,7 @@ vi.mock("~/server/app-layer/app", () => ({
       textMessageEnd: vi.fn().mockResolvedValue(undefined),
       finishRun: vi.fn().mockResolvedValue(undefined),
       deleteRun: mockDeleteRun,
-      runs: { getRunIdsForSet: mockGetRunIdsForSet },
+      getRunIdsForSet: mockGetRunIdsForSet,
     },
     broadcast: {
       broadcastToTenantRateLimited: vi.fn().mockResolvedValue(undefined),

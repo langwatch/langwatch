@@ -1,10 +1,9 @@
 import { createLogger } from "@langwatch/observability";
 import { describeRoute, resolver } from "hono-openapi";
-import { z } from "zod";
+import { z } from "zod/v4";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
-import { getApp } from "~/server/app-layer/app";
 import type { BatchSummary } from "~/server/scenarios/scenario-event.types";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { baseResponses } from "../../shared/base-responses";
@@ -141,13 +140,13 @@ secured.access(requires("scenarios:view")).get(
       "Listing simulation runs",
     );
 
-    const simulationRuns = getApp().simulations.runs;
+    const simulations = c.app.simulations;
 
     if (batchRunId) {
       // Get runs for a specific batch. The scenario set id narrows the query
       // when given, but the batch id alone is enough: the CLI's --wait polls
       // with just the batch id it was handed at scheduling time.
-      const result = await simulationRuns.getRunDataForBatchRun({
+      const result = await simulations.getRunDataForBatchRun({
         projectId: project.id,
         scenarioSetId,
         batchRunId,
@@ -172,7 +171,7 @@ secured.access(requires("scenarios:view")).get(
 
     if (scenarioSetId) {
       // Get runs for a scenario set
-      const result = await simulationRuns.getRunDataForScenarioSet({
+      const result = await simulations.getRunDataForScenarioSet({
         projectId: project.id,
         scenarioSetId,
         limit,
@@ -193,7 +192,7 @@ secured.access(requires("scenarios:view")).get(
     }
 
     // No filter - get all suite runs
-    const result = await simulationRuns.getRunDataForAllSuites({
+    const result = await simulations.getRunDataForAllSuites({
       projectId: project.id,
       limit,
       cursor,
@@ -248,8 +247,8 @@ secured.access(requires("scenarios:view")).get(
       "Getting simulation run",
     );
 
-    const simulationRuns = getApp().simulations.runs;
-    const run = await simulationRuns.getScenarioRunData({
+    const simulations = c.app.simulations;
+    const run = await simulations.tryGetScenarioRunData({
       projectId: project.id,
       scenarioRunId,
     });
@@ -301,8 +300,8 @@ secured.access(requires("scenarios:view")).get(
       "Listing batch history",
     );
 
-    const simulationRuns = getApp().simulations.runs;
-    const result = await simulationRuns.getBatchHistoryForScenarioSet({
+    const simulations = c.app.simulations;
+    const result = await simulations.getBatchHistoryForScenarioSet({
       projectId: project.id,
       scenarioSetId,
       limit,
@@ -344,8 +343,8 @@ secured.access(requires("scenarios:view")).get(
     const { batchRunId } = c.req.param();
     logger.info({ projectId: project.id, batchRunId }, "Getting batch summary");
 
-    const simulationRuns = getApp().simulations.runs;
-    const batch = await simulationRuns.getBatchSummary({
+    const simulations = c.app.simulations;
+    const batch = await simulations.tryGetBatchSummary({
       projectId: project.id,
       batchRunId,
     });

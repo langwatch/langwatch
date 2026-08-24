@@ -10,9 +10,9 @@
 
 import { createLogger } from "@langwatch/observability";
 import type {
-  ExportableRun,
-  SimulationRepository,
-} from "~/server/app-layer/simulations/repositories/simulation.repository";
+  SimulationExportRun,
+  SimulationService,
+} from "@langwatch/simulation-contract";
 import { traced } from "~/server/app-layer/tracing";
 import {
   categorizeRunStatus,
@@ -55,17 +55,15 @@ const FILTER_TO_CATEGORY: Record<
 };
 
 export class ScenarioRunExportService {
-  constructor(private readonly repository: SimulationRepository) {}
+  constructor(private readonly simulations: SimulationService) {}
 
   /**
-   * Built from the same repository instance `SimulationRunService` already
-   * holds, so the export reads through exactly the store the run history does
-   * — and the API layer asks the app for the service instead of assembling one
-   * out of a repository it should not know about.
+   * Composes the canonical Simulation service. The export never receives or
+   * reconstructs Simulation's private ClickHouse repository.
    */
-  static create(repository: SimulationRepository): ScenarioRunExportService {
+  static create(simulations: SimulationService): ScenarioRunExportService {
     return traced(
-      new ScenarioRunExportService(repository),
+      new ScenarioRunExportService(simulations),
       "ScenarioRunExportService",
     );
   }
@@ -80,7 +78,7 @@ export class ScenarioRunExportService {
   }: {
     request: ScenarioRunExportRequest;
   }): Promise<number> {
-    return this.repository.countRunsForExport({
+    return this.simulations.countRunsForExport({
       projectId: request.projectId,
       scenarioSetId: request.scenarioSetId,
       scenarioId: request.scenarioId,
@@ -131,7 +129,7 @@ export class ScenarioRunExportService {
         return;
       }
 
-      const page = await this.repository.findRunsForExport({
+      const page = await this.simulations.findRunsForExport({
         projectId: request.projectId,
         scenarioSetId: request.scenarioSetId,
         scenarioId: request.scenarioId,
@@ -176,9 +174,9 @@ function applyStatusFilter({
   runs,
   passFailStatus,
 }: {
-  runs: ExportableRun[];
+  runs: SimulationExportRun[];
   passFailStatus?: ScenarioRunExportStatusFilter;
-}): ExportableRun[] {
+}): SimulationExportRun[] {
   if (!passFailStatus) return runs;
   const wanted = FILTER_TO_CATEGORY[passFailStatus];
   return runs.filter((run) => categorizeRunStatus(run.status) === wanted);
@@ -189,7 +187,7 @@ function serializeBatch({
   mode,
   includeHeader,
 }: {
-  runs: ExportableRun[];
+  runs: SimulationExportRun[];
   mode: ScenarioRunExportRequest["mode"];
   includeHeader: boolean;
 }): string {

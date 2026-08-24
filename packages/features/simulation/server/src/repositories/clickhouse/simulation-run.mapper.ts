@@ -1,7 +1,10 @@
-import { ScenarioRunStatus, Verdict } from "../scenarios/scenario-event.enums";
-import type { ScenarioRunData } from "../scenarios/scenario-event.types";
-
-type ScenarioMessages = ScenarioRunData["messages"];
+import {
+  SimulationRunStatus,
+  SimulationVerdict,
+  type SimulationRunData,
+  simulationMessageSchema,
+  simulationRunDataSchema,
+} from "@langwatch/simulation-contract";
 
 /**
  * ClickHouse row interface for simulation_runs table.
@@ -40,39 +43,39 @@ export interface ClickHouseSimulationRunRow {
   ArchivedAt: string | null;
 }
 
-export function mapStatus(status: string): ScenarioRunStatus {
+export function mapStatus(status: string): SimulationRunStatus {
   switch (status) {
     case "SUCCESS":
-      return ScenarioRunStatus.SUCCESS;
+      return SimulationRunStatus.SUCCESS;
     case "FAILURE":
     case "FAILED":
-      return ScenarioRunStatus.FAILED;
+      return SimulationRunStatus.FAILED;
     case "ERROR":
-      return ScenarioRunStatus.ERROR;
+      return SimulationRunStatus.ERROR;
     case "CANCELLED":
-      return ScenarioRunStatus.CANCELLED;
+      return SimulationRunStatus.CANCELLED;
     case "IN_PROGRESS":
-      return ScenarioRunStatus.IN_PROGRESS;
+      return SimulationRunStatus.IN_PROGRESS;
     case "PENDING":
-      return ScenarioRunStatus.PENDING;
+      return SimulationRunStatus.PENDING;
     case "QUEUED":
-      return ScenarioRunStatus.QUEUED;
+      return SimulationRunStatus.QUEUED;
     case "STALLED":
-      return ScenarioRunStatus.STALLED;
+      return SimulationRunStatus.STALLED;
     default:
-      return ScenarioRunStatus.IN_PROGRESS;
+      return SimulationRunStatus.IN_PROGRESS;
   }
 }
 
-function mapVerdict(verdict: string | null): Verdict | undefined {
+function mapVerdict(verdict: string | null): SimulationVerdict | undefined {
   if (!verdict) return undefined;
   switch (verdict.toLowerCase()) {
     case "success":
-      return Verdict.SUCCESS;
+      return SimulationVerdict.SUCCESS;
     case "failure":
-      return Verdict.FAILURE;
+      return SimulationVerdict.FAILURE;
     case "inconclusive":
-      return Verdict.INCONCLUSIVE;
+      return SimulationVerdict.INCONCLUSIVE;
     default:
       return undefined;
   }
@@ -86,7 +89,7 @@ function mapVerdict(verdict: string | null): Verdict | undefined {
  */
 export function mapClickHouseRowToScenarioRunData(
   row: ClickHouseSimulationRunRow,
-): ScenarioRunData {
+): SimulationRunData {
   const baseStatus = mapStatus(row.Status);
   const updatedAt = Number(row.UpdatedAt);
   const startedAt = row.StartedAt != null ? Number(row.StartedAt) : null;
@@ -100,7 +103,7 @@ export function mapClickHouseRowToScenarioRunData(
   // Unfinished runs collapse to IN_PROGRESS; only a finished run keeps its
   // stored status.
   const resolvedStatus =
-    finishedAt != null ? baseStatus : ScenarioRunStatus.IN_PROGRESS;
+    finishedAt != null ? baseStatus : SimulationRunStatus.IN_PROGRESS;
 
   const verdictEnum = mapVerdict(row.Verdict);
 
@@ -110,7 +113,7 @@ export function mapClickHouseRowToScenarioRunData(
   // and the flat Messages.Content column is empty — surface the parts array
   // to the renderer instead.
   const roles = row["Messages.Role"] ?? [];
-  const messages = roles.map((role, i) => {
+  const messages = simulationMessageSchema.array().parse(roles.map((role, i) => {
     const restStr = row["Messages.Rest"]?.[i];
     const restFields = restStr
       ? (() => {
@@ -132,7 +135,7 @@ export function mapClickHouseRowToScenarioRunData(
       content,
       trace_id: row["Messages.TraceId"]?.[i] || undefined,
     };
-  }) as ScenarioMessages;
+  }));
 
   const metCriteria = row.MetCriteria ?? [];
   const unmetCriteria = row.UnmetCriteria ?? [];
@@ -172,7 +175,7 @@ export function mapClickHouseRowToScenarioRunData(
       })()
     : null;
 
-  return {
+  return simulationRunDataSchema.parse({
     scenarioId: row.ScenarioId,
     batchRunId: row.BatchRunId,
     scenarioRunId: row.ScenarioRunId,
@@ -202,5 +205,5 @@ export function mapClickHouseRowToScenarioRunData(
       row.RoleLatencies && Object.keys(row.RoleLatencies).length > 0
         ? row.RoleLatencies
         : undefined,
-  };
+  });
 }

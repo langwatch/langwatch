@@ -11,12 +11,9 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { SimulationExportRun } from "@langwatch/simulation-contract";
 import { globalForApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
-import type { ExportableRun } from "~/server/app-layer/simulations/repositories/simulation.repository";
-import { NullSimulationRepository } from "~/server/app-layer/simulations/repositories/simulation.repository";
-import { SimulationRunService } from "~/server/app-layer/simulations/simulation-run.service";
-import { ScenarioRunExportService } from "~/server/export/scenario-runs/scenario-run-export.service";
 import {
   ScenarioRunStatus,
   Verdict,
@@ -50,7 +47,9 @@ vi.mock(
   }),
 );
 
-function buildRun(overrides: Partial<ExportableRun> = {}): ExportableRun {
+function buildRun(
+  overrides: Partial<SimulationExportRun> = {},
+): SimulationExportRun {
   return {
     scenarioRunId: "run_1",
     scenarioId: "scenario_1",
@@ -74,68 +73,17 @@ function buildRun(overrides: Partial<ExportableRun> = {}): ExportableRun {
     durationInMs: 8400,
     totalCost: 0.031,
     ...overrides,
-  } as ExportableRun;
-}
-
-class OneRunRepository extends NullSimulationRepository {
-  override async countRunsForExport(): Promise<number> {
-    return 1;
-  }
-  override async findRunsForExport(): Promise<{
-    runs: ExportableRun[];
-    nextCursor?: string;
-    hasMore: boolean;
-  }> {
-    return { runs: [buildRun()], hasMore: false };
-  }
-}
-
-/** Fails partway through the sweep, the way a ClickHouse error would. */
-class FailingRepository extends NullSimulationRepository {
-  override async countRunsForExport(): Promise<number> {
-    return 100;
-  }
-  override async findRunsForExport(): Promise<{
-    runs: ExportableRun[];
-    nextCursor?: string;
-    hasMore: boolean;
-  }> {
-    throw new Error("clickhouse blew up");
-  }
-}
-
-/** Serves an endless supply of pages and counts how many were asked for. */
-class EndlessRepository extends NullSimulationRepository {
-  calls = 0;
-
-  override async countRunsForExport(): Promise<number> {
-    return 10_000;
-  }
-
-  override async findRunsForExport(): Promise<{
-    runs: ExportableRun[];
-    nextCursor?: string;
-    hasMore: boolean;
-  }> {
-    this.calls += 1;
-    return {
-      runs: [buildRun({ scenarioRunId: `run_${this.calls}` })],
-      hasMore: true,
-      nextCursor: String(this.calls),
-    };
-  }
+  };
 }
 
 function installApp() {
-  // One repository behind both services, the way the app assembles them — the
-  // export reads through exactly the store the run history does.
-  const repository = new OneRunRepository();
-  globalForApp.__langwatch_app = createTestApp({
-    simulations: {
-      runs: new SimulationRunService(repository),
-      export: ScenarioRunExportService.create(repository),
-    },
+  const testApp = createTestApp();
+  vi.spyOn(testApp.simulations, "countRunsForExport").mockResolvedValue(1);
+  vi.spyOn(testApp.simulations, "findRunsForExport").mockResolvedValue({
+    runs: [buildRun()],
+    hasMore: false,
   });
+  globalForApp.__langwatch_app = testApp;
 }
 
 function download(body: Record<string, unknown> = {}) {
@@ -271,19 +219,28 @@ describe("POST /api/export/scenario-runs/download", () => {
      * unread stream stops asking for pages.
      */
     it("stops sweeping when nobody is reading the response", async () => {
-      const repository = new EndlessRepository();
-      globalForApp.__langwatch_app = createTestApp({
-        simulations: {
-          runs: new SimulationRunService(repository),
-          export: ScenarioRunExportService.create(repository),
+      const testApp = createTestApp();
+      let calls = 0;
+      vi.spyOn(testApp.simulations, "countRunsForExport").mockResolvedValue(
+        10_000,
+      );
+      vi.spyOn(testApp.simulations, "findRunsForExport").mockImplementation(
+        async () => {
+          calls += 1;
+          return {
+            runs: [buildRun({ scenarioRunId: `run_${calls}` })],
+            hasMore: true,
+            nextCursor: String(calls),
+          };
         },
-      });
+      );
+      globalForApp.__langwatch_app = testApp;
 
       const response = await download();
       const reader = response.body!.getReader();
       await reader.read();
 
-      const afterFirstRead = repository.calls;
+      const afterFirstRead = calls;
       await reader.cancel();
       // Let any queued pulls settle before measuring.
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -293,10 +250,10 @@ describe("POST /api/export/scenario-runs/download", () => {
       // Bounded in bytes by the gzip pipe, not unbounded: a start()-driven
       // producer piped through CompressionStream ran to ~65,000 pages here.
       expect(afterFirstRead).toBeLessThan(20_000);
-      const afterCancel = repository.calls;
+      const afterCancel = calls;
       await new Promise((resolve) => setTimeout(resolve, 50));
       // Cancelling returns the generator, so the sweep is over for good.
-      expect(repository.calls).toBe(afterCancel);
+      expect(calls).toBe(afterCancel);
     });
 
     /**
@@ -307,13 +264,14 @@ describe("POST /api/export/scenario-runs/download", () => {
      * The client has to see a broken stream, not a truncated-but-clean file.
      */
     it("breaks the stream when the sweep fails mid-flight", async () => {
-      const repository = new FailingRepository();
-      globalForApp.__langwatch_app = createTestApp({
-        simulations: {
-          runs: new SimulationRunService(repository),
-          export: ScenarioRunExportService.create(repository),
-        },
-      });
+      const testApp = createTestApp();
+      vi.spyOn(testApp.simulations, "countRunsForExport").mockResolvedValue(
+        100,
+      );
+      vi.spyOn(testApp.simulations, "findRunsForExport").mockRejectedValue(
+        new Error("clickhouse blew up"),
+      );
+      globalForApp.__langwatch_app = testApp;
 
       const response = await download();
       expect(response.status).toBe(200);
