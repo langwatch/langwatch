@@ -18,10 +18,10 @@
 
 import { describe, expect, it } from "vitest";
 
-import { hasPollerCursor } from "../ingestionSources";
+import { hasPollerCursor } from "../pollerCursor";
 
 describe("hasPollerCursor", () => {
-  describe("a source that has never pulled", () => {
+  describe("given a source that has never pulled", () => {
     it("treats SQL NULL as no cursor", () => {
       expect(hasPollerCursor(null)).toBe(false);
     });
@@ -41,9 +41,18 @@ describe("hasPollerCursor", () => {
     it("treats an object with no content as no cursor", () => {
       expect(hasPollerCursor({})).toBe(false);
     });
+
+    /**
+     * `cursorOf` turns the empty object above into this string, so the two
+     * have to answer alike — otherwise the same absent cursor locks the
+     * backfill start on one path and leaves it editable on the other.
+     */
+    it("treats a serialised empty object as no cursor", () => {
+      expect(hasPollerCursor("{}")).toBe(false);
+    });
   });
 
-  describe("a source that has pulled", () => {
+  describe("given a source that has pulled", () => {
     it("reads a cursor stored as a JSON object", () => {
       expect(
         hasPollerCursor({ startingAt: "2026-08-20T00:00:00Z", page: null }),
@@ -62,6 +71,14 @@ describe("hasPollerCursor", () => {
 
     it("reads a cursor whose only content is a falsy value", () => {
       expect(hasPollerCursor({ page: 0 })).toBe(true);
+    });
+
+    /**
+     * An adapter's page token is opaque: not JSON, and not required to be.
+     * Reading content out of the parse must not cost it its answer.
+     */
+    it("reads an opaque page token that is not JSON", () => {
+      expect(hasPollerCursor("eyJwYWdlIjoyfQ")).toBe(true);
     });
   });
 });

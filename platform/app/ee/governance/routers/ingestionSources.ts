@@ -29,6 +29,7 @@ import {
   isOttlEnabledSourceType,
   OTTL_ENABLED_SOURCE_TYPES,
 } from "@ee/governance/services/activity-monitor/ottlStarterTemplates";
+import { hasPollerCursor } from "@ee/governance/services/pullers/pollerCursor";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
@@ -39,32 +40,6 @@ const sourceTypeSchema = z.enum(
 );
 
 const statusSchema = z.enum(["active", "disabled", "awaiting_first_event"]);
-
-/**
- * Whether `pollerCursor` holds a real cursor.
- *
- * `pollerCursor` is `Json?`, and the write path stores either `Prisma.JsonNull`
- * or a string — see ingestion-pull-run-projection.prisma.repository.ts. Both
- * SQL NULL and JSON null read back as JS `null`, so `!= null` would be correct
- * for everything that writer produces.
- *
- * It is not the only thing that has produced values here: `cursorOf` in
- * ingestionPullLifecycle.ts still stringifies an object-shaped cursor, which
- * only makes sense if object-shaped rows exist. So the question asked is
- * whether there is any content, which answers correctly for the string and
- * JSON-null cases the writer produces *and* for the object case it does not.
- *
- * Getting this wrong is quiet in both directions: answer "yes" for a source
- * that never pulled and an editable backfill start disappears; answer "no" for
- * one that did and the form accepts a start the usage cursor will ignore,
- * because that cursor deliberately never rewinds.
- */
-export function hasPollerCursor(value: unknown): boolean {
-  if (value == null) return false;
-  if (typeof value === "string") return value.length > 0 && value !== "null";
-  if (typeof value === "object") return Object.keys(value).length > 0;
-  return false;
-}
 
 /**
  * Strip the secret-hash + private rotation slot before serialising
