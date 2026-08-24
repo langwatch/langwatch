@@ -8,7 +8,6 @@
  * before rendering any of this, and the legacy screens answer until the flip.
  */
 export { FrontDoorShell } from "./components/FrontDoorShell";
-export { FrontDoorTraceDemo } from "./components/FrontDoorTraceDemo";
 export { FrontDoorValuePanel } from "./components/FrontDoorValuePanel";
 export { IdentifierFirstSignIn } from "./components/IdentifierFirstSignIn";
 export { InviteLanding } from "./components/InviteLanding";

@@ -25,18 +25,12 @@ export function FrontDoorValuePanel({
   headline,
   headlineAccent,
   tagline,
-  liveTrace,
   trustStrip,
 }: {
   headline: string;
   /** The one word in the headline that carries the gradient. */
   headlineAccent?: string;
   tagline?: string;
-  /**
-   * The page arguing for itself: a live span list of what this browser just
-   * did. Sign-up only — somebody logging in has already been convinced.
-   */
-  liveTrace?: ReactNode;
   /** Empty until there is something true to put in it. */
   trustStrip?: ReactNode;
 }) {
@@ -96,17 +90,6 @@ export function FrontDoorValuePanel({
           >
             {tagline}
           </Text>
-        ) : null}
-        {liveTrace ? (
-          <Box
-            display={{ base: "none", md: "block" }}
-            width="full"
-            maxWidth="42ch"
-            paddingTop={2}
-            data-testid="front-door-live-trace"
-          >
-            {liveTrace}
-          </Box>
         ) : null}
         {trustStrip ? (
           <Box
