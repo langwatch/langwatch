@@ -15,6 +15,7 @@ import { annotationRouter } from "./routers/annotation";
 import { annotationScoreRouter } from "./routers/annotationScore";
 import { apiKeyRouter } from "./routers/apiKey";
 import { authzRouter } from "./routers/authz";
+import { identityRouter } from "./routers/identity";
 import { automationRouter } from "./routers/automations";
 import { batchRecordRouter } from "./routers/batchRecord";
 import { bugReportsRouter } from "./routers/bugReports";
@@ -118,6 +119,7 @@ const coreRouters = {
   limits: limitsRouter,
   automation: automationRouter,
   authz: authzRouter,
+  identity: identityRouter,
   experiments: experimentsRouter,
   featureFlag: featureFlagRouter,
   annotation: annotationRouter,

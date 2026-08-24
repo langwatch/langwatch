@@ -5,7 +5,7 @@ import { AuthCard } from "../../components/auth/AuthCard";
  * The email verification ceremony's magic-link LANDING page (D01). It
  * renders, and only ever renders: a mail scanner or a preview prefetch that
  * follows the link consumes nothing and verifies nothing. Completion is the
- * identity RPC `POST /api/identity/verification.complete`, which needs the
+ * tRPC mutation `identity.completeVerification`, which needs the
  * signed-in user, the emailed token AND the PKCE code verifier the initiating
  * window kept — so this page only sends the person back to that window and
  * makes no request of its own. The link's proof stays in the URL: nothing is

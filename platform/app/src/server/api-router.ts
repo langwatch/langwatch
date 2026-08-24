@@ -28,7 +28,6 @@ import { app as gatewaySpendApp } from "../app/api/gateway-spend/[[...route]]/ap
 import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
 import { app as groupsApp } from "../app/api/groups/[[...route]]/app";
-import { app as identityApp } from "../app/api/identity/[[...route]]/app";
 import { app as meApp } from "../app/api/me/[[...route]]/app";
 import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
@@ -207,10 +206,6 @@ export function createApiRouter() {
 
   api.route("/", adminApp);
   api.route("/", bugReportsApp); // /api/bug-reports — public issue-report intake
-  // The identity family owns /api/identity outright, so no sibling namespace
-  // competes for the prefix and this mount position carries no ordering
-  // constraint.
-  api.route("/", identityApp); // /api/identity/verification.complete — RPC family (D01)
   api.route("/", annotationsApp);
   // ORDERING: authCliApp MUST be registered BEFORE authApp.
   // authApp owns the BetterAuth catch-all (`/auth/*`), which would
