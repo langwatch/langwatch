@@ -54,6 +54,34 @@ async function deleteAllTestDatasets() {
     console.log(`[setup] Deleted ${test.length} stale test datasets`);
 }
 
+/**
+ * A prompt for a scenario to be run against.
+ *
+ * A scenario run needs something to run, and this project has no configured
+ * agents, so a turn that says "run it" is answered with a question about what
+ * to run it against rather than a run.
+ */
+async function seedRunTargetPrompt(handle: string): Promise<void> {
+  const res = await fetch(`${LW_BASE}/api/prompts`, {
+    method: "POST",
+    headers: {
+      "X-Auth-Token": LW_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      handle,
+      prompt: "You are a customer support bot. Greet the customer by name.",
+    }),
+    signal: AbortSignal.timeout(20_000),
+  });
+  // 409 is the prompt already being there, which is the state this wants.
+  if (!res.ok && res.status !== 409) {
+    throw new Error(
+      `Seeding the run target prompt failed: ${res.status} ${await res.text()}`,
+    );
+  }
+}
+
 const model = openai("gpt-5-mini");
 
 describe("Langy via HTTP wrapper", () => {
@@ -1432,14 +1460,22 @@ describe("Langy via HTTP wrapper", () => {
 
     it("multi-turn: create scenario then run it (2 turns)", async () => {
       const langy = makeLangyAdapter();
+      // Stamped like every other creating case here. Asking for a fixed name
+      // passed once and then failed forever: the second run found the scenario
+      // its predecessor had made, declined to make a duplicate, and spent the
+      // turn asking whether to reuse it, so the chaining under test never ran.
+      const stamp = Date.now();
+      const scenarioName = `langy-greeting-check-${stamp}`;
+      const targetHandle = `langy-greeting-target-${stamp}`;
+      await seedRunTargetPrompt(targetHandle);
+
       const before = await listScenarios();
       const beforeIds = new Set(before.map((s) => s.id));
 
       const result = await runScenarioAndLog({
         config: {
           name: "create scenario then run",
-          description:
-            "Turn 1: create a simple greeting scenario. Turn 2: run it. Tests that Langy can chain create→run without re-asking which scenario.",
+          description: `Turn 1: create a greeting scenario named "${scenarioName}". Turn 2: run it against the prompt "${targetHandle}". Tests that Langy can chain create→run without re-asking which scenario.`,
           agents: [
             langy,
             scenario.userSimulatorAgent({ model }),
@@ -1453,10 +1489,10 @@ describe("Langy via HTTP wrapper", () => {
           ],
           script: [
             scenario.user(
-              "create a simple greeting-bot scenario that checks the agent says hello",
+              `create a simple greeting-bot scenario named "${scenarioName}" that checks the agent says hello`,
             ),
             scenario.agent(),
-            scenario.user("run it"),
+            scenario.user(`run it against the prompt "${targetHandle}"`),
             scenario.agent(),
             scenario.judge(),
           ],
