@@ -215,9 +215,15 @@ export type DeclaredScopeId = { tier: BindingScopeTier; id: string };
 /**
  * Why a declared check could not name a scope. The two are not the same
  * failure and must not answer alike: `blank` is a request that named the
- * field and left it empty — the caller's to fix — while `absent` is a
- * declaration whose input has no scope field at all, which the types prevent
+ * field and left no usable id in it — the caller's to fix — while `absent` is
+ * a declaration whose input has no scope field at all, which the types prevent
  * and the runtime treats as a wiring bug.
+ *
+ * The split is decided by whose mistake it is, not by the value's type. A
+ * field the caller was asked to fill and filled badly — empty, undefined, or
+ * (past a bypassed type layer) not a string at all — is `blank` in every case:
+ * answering it as a wiring bug would page us for a caller's malformed request,
+ * which is the exact failure this distinction exists to end.
  */
 export type UnresolvedDeclaredScope =
   | { reason: "blank"; field: ScopeTierField }
@@ -269,9 +275,9 @@ export function resolveDeclaredScope({
     }
   }
 
-  // Named the field and left it empty: the caller's mistake, not ours. The
-  // narrowest such field is the one to name back, matching the tier order the
-  // resolution walk itself prefers.
+  // Named the field and left no usable id in it: the caller's mistake, not
+  // ours. The narrowest such field is the one to name back, matching the tier
+  // order the resolution walk itself prefers.
   const blank = fields.find((field) => namesField(input, field));
   return {
     resolved: false,

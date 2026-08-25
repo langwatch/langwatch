@@ -154,6 +154,51 @@ describe("resolveDeclaredScope", () => {
     });
   });
 
+  describe("when the input names the scope field with a value that is not a string", () => {
+    /**
+     * Only reachable past a bypassed type layer — every declaration parses its
+     * input before this runs, so a wrong-typed id is already a 400 by here.
+     * Pinned because the tempting "fix" is to call it `absent`, which would
+     * page an engineer for a caller's malformed request: the caller named the
+     * field, so the mistake is theirs to correct whatever they put in it.
+     */
+    it("answers the caller rather than reporting a wiring bug", () => {
+      expect(
+        resolveDeclaredScope({
+          permission: "traces:view",
+          input: { projectId: 42 as unknown as string },
+        }),
+      ).toEqual({
+        resolved: false,
+        unresolved: { reason: "blank", field: "projectId" },
+      });
+      expect(
+        resolveDeclaredScope({
+          permission: "traces:view",
+          input: { projectId: undefined },
+        }),
+      ).toEqual({
+        resolved: false,
+        unresolved: { reason: "blank", field: "projectId" },
+      });
+    });
+
+    it("still walks past it to a wider tier the caller did fill in", () => {
+      expect(
+        resolveDeclaredScope({
+          permission: "traces:view",
+          input: {
+            projectId: 42 as unknown as string,
+            organizationId: "org_1",
+          },
+        }),
+      ).toEqual({
+        resolved: true,
+        scope: { tier: "organization", id: "org_1" },
+      });
+    });
+  });
+
   describe("when the input names no scope field the permission can use", () => {
     /** @scenario "An input carrying no scope id at all is still a wiring bug" */
     it("reports the declaration as miswired, not the caller as wrong", () => {
