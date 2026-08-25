@@ -46,7 +46,10 @@ export function SettingRow({
     <HStack
       width="full"
       gap={4}
-      paddingY={2.5}
+      // Tight enough that six rows read as one table rather than as six
+      // paragraphs: a settings card earns its place by how many questions it
+      // answers in a glance, and every row of padding is one fewer.
+      paddingY={1.5}
       // CENTRED for the ordinary row, where a name sits level with the badge
       // beside it. Tall rows are handled by the value's own alignment below —
       // centring a three-line value against a one-line name is what made this

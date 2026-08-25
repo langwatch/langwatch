@@ -14,6 +14,7 @@ import { Smartphone } from "lucide-react";
 import { useState } from "react";
 import { BackupCodesPanel } from "~/components/me/twoFactor/BackupCodesPanel";
 import { TwoFactorSetupFlow } from "~/components/me/twoFactor/TwoFactorSetupFlow";
+import { SettingsRowsSkeleton } from "~/components/settings/kit/SettingsSkeleton";
 import { SettingsEmptyState } from "~/components/settings/SettingsEmptyState";
 import {
   SettingsSection,
@@ -82,7 +83,7 @@ export function TwoFactorSection() {
         gap={4}
         data-testid="two-factor-section"
       >
-        {account.isPending ? <Spinner size="sm" /> : null}
+        {account.isPending ? <SettingsRowsSkeleton rows={1} /> : null}
 
         {!account.isPending && !enabled ? (
           <SettingsEmptyState

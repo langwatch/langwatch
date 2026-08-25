@@ -64,7 +64,11 @@ export function JoinRequestsTable({
   );
 }
 
-function JoinRequestRow({
+/**
+ * Exported for the same reason the invitation row is: somebody asking to join
+ * is one cut of the Directory's single list of people, not a table apart.
+ */
+export function JoinRequestRow({
   request,
   isAdmin,
   answering,

@@ -185,6 +185,13 @@ export default function SettingsLayout({
             )}
           </NavSection>
 
+          {/* FOUR ENTRIES, NOT SEVEN. Members, Teams & Projects and Access
+              were three of them, and they answered one question in three
+              vocabularies: a list of people, a list of the containers those
+              people sit in, and the rules by which somebody becomes one. All
+              three are the Directory now, as tabs, and their old addresses
+              forward onto the tab each became. Groups and Role Bindings had
+              already gone the same way. */}
           <NavSection
             label="People & access"
             paths={[
@@ -206,20 +213,18 @@ export default function SettingsLayout({
                 somebody who had already opened the page it lives on.
                 Unlike the tab's count, this is hidden at zero: a badge in a
                 menu means "something needs you", and one that is always
-                present means nothing at all. */}
+                present means nothing at all.
+
+                Never behind the enterprise nav: Directory is where the
+                members are, and every organization has those. Its
+                provisioning tab carries its own permission. */}
             <MenuLink
-              href="/settings/members"
-              includePath="members"
+              href="/settings/directory"
+              includePath="directory"
               menuEnd={<PendingJoinRequestsBadge />}
             >
-              Members
+              Directory
             </MenuLink>
-            <MenuLink href="/settings/teams">Teams & Projects</MenuLink>
-            {/* Definitions and the grants of those definitions are two tabs
-                of one page now; /settings/role-bindings forwards onto the
-                second and no longer has an entry of its own. Groups is the
-                same shape: it is a tab of Directory, and /settings/groups
-                forwards onto it. */}
             {showEnterpriseNav && !isLiteMember && (
               <MenuLink href="/settings/roles">Roles</MenuLink>
             )}
@@ -235,10 +240,6 @@ export default function SettingsLayout({
                   Authentication
                 </MenuLink>
               )}
-            {showEnterpriseNav && !isLiteMember && (
-              <MenuLink href="/settings/directory">Directory</MenuLink>
-            )}
-            <MenuLink href="/settings/access">Access</MenuLink>
             {showEnterpriseNav &&
               !isLiteMember &&
               hasPermission("auditLog:view") && (

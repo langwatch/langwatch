@@ -86,6 +86,40 @@ vi.mock("~/utils/auth-client", () => ({
   authClient: { signIn: { sso: mockSignInSso } },
 }));
 
+// The two rules that arrived from the page called Access. Each is covered
+// where it lives — the joining policy reads the plan, the public environment
+// and the join ledger before it can draw a single radio — so here they are
+// only required to be present, and in the right place.
+vi.mock("~/components/access/JoinPolicyCard", () => ({
+  JoinPolicyCard: () => <div data-testid="join-policy-card">joining</div>,
+}));
+
+vi.mock("~/components/members/useJoinRequests", () => ({
+  useJoinRequests: () => ({
+    requests: [],
+    answeringId: null,
+    approve: vi.fn(),
+    reject: vi.fn(),
+    automaticJoins: [],
+    joining: { domainJoin: "off", joinDomains: [] },
+    savingJoining: false,
+    setJoining: vi.fn(),
+  }),
+}));
+
+vi.mock("~/components/members/useTwoStepRequirement", () => ({
+  useTwoStepRequirement: () => ({
+    show: false,
+    mfaRequired: false,
+    byUser: new Map(),
+    members: [],
+    heldCount: 0,
+    connection: { connected: false, assertsSecondFactor: false },
+    saving: false,
+    setRequirement: vi.fn(),
+  }),
+}));
+
 const SERVICE_PROVIDER = {
   redirectUrl: "https://app.test/api/auth/sso/callback/ssoc_acme",
   assertionConsumerServiceUrl:
@@ -212,7 +246,60 @@ beforeEach(() => {
 });
 
 describe("the organization's authentication page", () => {
+  describe("given the three ways somebody gets in", () => {
+    /** @scenario Who may join is asked beside the connection whose domains it reads */
+    it("asks who may join on the same page as the connection", async () => {
+      await open();
+
+      expect(screen.getByTestId("join-policy-card")).toBeInTheDocument();
+      expect(
+        screen.getByText("Who may join without an invitation"),
+      ).toBeInTheDocument();
+    });
+
+    /** @scenario The second-factor requirement is asked with the sign-in it guards */
+    it("asks what everybody must prove where the deployment offers it", async () => {
+      // The requirement's own card decides whether it applies at all; where it
+      // does not, the heading over it must not appear either — a heading over
+      // an absence is worse than silence.
+      await open();
+
+      expect(screen.queryByText("What everybody has to prove")).toBeNull();
+    });
+  });
+
   describe("given a live connection", () => {
+    /** @scenario A connection that is on but carrying nobody says both */
+    it("says whether anybody is actually being sent through it", async () => {
+      await open();
+
+      const card = screen.getByTestId("single-sign-on-card");
+      expect(within(card).getByTestId("sso-routing-chip")).toHaveTextContent(
+        "Everybody goes through it",
+      );
+    });
+
+    /** @scenario The overview names the connection by the protocol it speaks */
+    it("asks its rows as questions rather than labelling fields", async () => {
+      await open();
+
+      const card = screen.getByTestId("single-sign-on-card");
+      // The reader arrives with questions; the card asks them back rather
+      // than printing the connection row's field names.
+      expect(
+        within(card).getByText("Who signs people in?"),
+      ).toBeInTheDocument();
+      expect(
+        within(card).getByText("Is anybody going through it?"),
+      ).toBeInTheDocument();
+      expect(
+        within(card).getByText("Did it work last time?"),
+      ).toBeInTheDocument();
+      expect(
+        within(card).getByText("Can anybody get back in without it?"),
+      ).toBeInTheDocument();
+    });
+
     /** @scenario "The overview names the connection by the protocol it speaks" */
     it("titles the sign-on card for the protocol and names the provider", async () => {
       await open();

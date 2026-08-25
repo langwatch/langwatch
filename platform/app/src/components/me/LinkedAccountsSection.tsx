@@ -12,6 +12,7 @@ import type { SignInMethod } from "@langwatch/identity";
 import { LuX } from "react-icons/lu";
 
 import { SETTINGS_ACTION_BUTTON_WIDTH } from "~/components/settings/actionRow";
+import { SettingsRowsSkeleton } from "~/components/settings/kit/SettingsSkeleton";
 import { SectionErrorNotice } from "~/components/settings/SectionErrorNotice";
 import { SettingsSectionRow } from "~/components/settings/SettingsSection";
 import { toaster } from "~/components/ui/toaster";
@@ -300,7 +301,7 @@ export function LinkedAccountRows() {
         </Text>
       ) : null}
 
-      {isLoading ? <Spinner size="sm" /> : null}
+      {isLoading ? <SettingsRowsSkeleton rows={3} /> : null}
 
       {linked.map((account) => (
         <LinkedAccountRow

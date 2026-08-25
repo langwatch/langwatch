@@ -84,7 +84,12 @@ interface InviteRowProps extends Omit<InvitesTableProps, "invites"> {
   invite: OrganizationInvite;
 }
 
-const InviteRow = ({
+/**
+ * Exported because an invitation is one cut of the Directory's single list of
+ * people rather than a table of its own — the row travels, the table around it
+ * does not.
+ */
+export const InviteRow = ({
   invite,
   isAdmin,
   teams,

@@ -1,5 +1,6 @@
-import { Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { KeySquare } from "lucide-react";
+import { SettingsRowsSkeleton } from "~/components/settings/kit/SettingsSkeleton";
 import { api } from "~/utils/api";
 import { useSession } from "~/utils/auth-client";
 import RouterLink from "~/utils/compat/next-link";
@@ -78,7 +79,7 @@ export function PersonalApiKeysSummary({
           fallbackTitle="Couldn't read your API keys"
         />
       ) : keys.isPending ? (
-        <Spinner size="sm" />
+        <SettingsRowsSkeleton rows={2} />
       ) : mine.length === 0 ? (
         <Text fontSize="sm" color="fg.muted">
           No key has been issued to you yet.

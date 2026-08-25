@@ -11,6 +11,7 @@ import { KeyRound } from "lucide-react";
 import { useState } from "react";
 
 import { ChangePasswordDialog } from "~/components/settings/ChangePasswordDialog";
+import { SettingsRowsSkeleton } from "~/components/settings/kit/SettingsSkeleton";
 import { SectionErrorNotice } from "~/components/settings/SectionErrorNotice";
 import { SettingsEmptyState } from "~/components/settings/SettingsEmptyState";
 import {
@@ -200,7 +201,7 @@ export function PasswordSection() {
         gap={4}
         data-testid="password-section"
       >
-        {accounts.isLoading ? <Spinner size="sm" /> : null}
+        {accounts.isLoading ? <SettingsRowsSkeleton rows={1} /> : null}
 
         {hasPassword ? (
           // The same row a passkey and an authenticator get: one thing this

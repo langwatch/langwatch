@@ -19,12 +19,35 @@ import { Badge } from "@chakra-ui/react";
  * flips to 7 has told the reader something false on the way — so nothing is
  * drawn until there is a number to draw.
  */
+/**
+ * The palette for each condition. Grey is the default and stays the default:
+ * a row of tabs where every badge is coloured has no colour left to mean
+ * anything, so a tab only spends one when the count itself carries a
+ * condition — how many directories are connected, and whether they are working.
+ */
+const TONE_PALETTE = {
+  neutral: "gray",
+  good: "green",
+  warning: "orange",
+  bad: "red",
+} as const;
+
 export function TabCount({
   value,
+  tone = "neutral",
+  title,
   "data-testid": testId,
 }: {
   /** The count, or undefined while it is still being read. */
   value: number | undefined;
+  /**
+   * The condition the count is in, where the count has one. Most tabs have
+   * none — a number of groups is not healthy or unhealthy — and those stay
+   * grey.
+   */
+  tone?: keyof typeof TONE_PALETTE;
+  /** What the colour means, in words, for the reader who does not see it. */
+  title?: string;
   "data-testid"?: string;
 }) {
   if (value === undefined) return null;
@@ -33,7 +56,8 @@ export function TabCount({
     <Badge
       size="sm"
       variant="subtle"
-      colorPalette="gray"
+      colorPalette={TONE_PALETTE[tone]}
+      title={title}
       // Tabular figures so a count ticking 9 → 10 does not shift the label
       // beside it, and a fixed minimum so single digits are not narrower
       // circles than double ones.

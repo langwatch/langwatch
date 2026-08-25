@@ -1,5 +1,6 @@
-import { Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Monitor } from "lucide-react";
+import { SettingsRowsSkeleton } from "~/components/settings/kit/SettingsSkeleton";
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
 import { IdentityChip } from "../access/IdentityRow";
@@ -65,7 +66,7 @@ export function BrowserSessionsSection() {
           fallbackTitle="Couldn't read where you are signed in"
         />
       ) : sessions.isLoading ? (
-        <Spinner size="sm" />
+        <SettingsRowsSkeleton rows={2} />
       ) : (sessions.data ?? []).length === 0 ? (
         <Text fontSize="sm" color="fg.muted">
           Nothing is signed in but the browser you are reading this in.

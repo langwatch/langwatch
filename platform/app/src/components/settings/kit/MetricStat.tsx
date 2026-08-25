@@ -36,7 +36,7 @@ export function MetricStat({
 
   return (
     <Card.Root width="full" data-testid={testId}>
-      <Card.Body paddingX={4} paddingY={3}>
+      <Card.Body paddingX={3.5} paddingY={2.5}>
         <VStack align="start" gap={0.5}>
           <Text
             fontSize="10.5px"

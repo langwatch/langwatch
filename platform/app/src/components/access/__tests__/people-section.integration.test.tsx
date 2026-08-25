@@ -1,7 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The members area as three tabs of one page (D05, D11, D12).
+ * Everybody in the organization as three cuts of one list, on the Directory's
+ * people tab (D05, D11, D12).
  *
  * Spec: specs/identity/org-access-cluster.feature
  */
@@ -101,16 +102,6 @@ vi.mock("~/components/members/useJoinRequests", () => ({
   }),
 }));
 
-vi.mock("~/components/SettingsLayout", () => ({
-  default: ({ children }: { children?: React.ReactNode }) => (
-    <div data-testid="settings-layout">{children}</div>
-  ),
-}));
-
-vi.mock("~/components/WithPermissionGuard", () => ({
-  withPermissionGuard: () => (Component: unknown) => Component,
-}));
-
 vi.mock("~/utils/api", () => ({
   api: {
     useUtils: () => ({
@@ -155,42 +146,43 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-const Members = (await import("../members")).default;
+const { PeopleSection } = await import("../PeopleSection");
 
-function renderMembers() {
+function renderPeople() {
   return render(
-    // Inside a matched route, not bare under the router: which tab is open is
+    // Inside a matched route, not bare under the router: which cut is open is
     // a search parameter, and the setter navigates relative to the route it
     // is called from. A component with no route to be relative to keeps the
-    // address it started with, and every tab silently stops switching.
-    <MemoryRouter initialEntries={["/settings/members"]}>
+    // address it started with, and every chip silently stops switching.
+    <MemoryRouter initialEntries={["/settings/directory"]}>
       <ChakraProvider value={defaultSystem}>
         <Routes>
-          <Route path="/settings/members" element={<Members />} />
+          <Route
+            path="/settings/directory"
+            element={<PeopleSection organizationId="org_acme" />}
+          />
         </Routes>
       </ChakraProvider>
     </MemoryRouter>,
   );
 }
 
+/** A cut chip, by the accessible name FilterChips builds from label and count. */
+const cut = (name: RegExp) => screen.getByRole("button", { name });
+
 /**
- * Open a tab and wait for it to actually be open.
+ * Select a cut and wait for it to actually be selected.
  *
- * The tab state settles a tick after the click — the machine behind the tabs
- * is asynchronous — so asserting straight after it reads the tab the reader
- * came from. This throws rather than asserting, so a switch that never
- * happened names itself instead of surfacing as a puzzling missing element
- * three lines later.
+ * This throws rather than asserting, so a switch that never happened names
+ * itself instead of surfacing as a puzzling missing element three lines later.
  */
-async function selectTab(name: RegExp) {
-  await userEvent.click(screen.getByRole("tab", { name }));
+async function selectCut(name: RegExp) {
+  await userEvent.click(cut(name));
   await waitFor(() => {
-    const selected = screen
-      .getByRole("tab", { name })
-      .getAttribute("aria-selected");
-    if (selected !== "true") {
+    const pressed = cut(name).getAttribute("aria-pressed");
+    if (pressed !== "true") {
       throw new Error(
-        `The ${name} tab is aria-selected="${selected}" after the click, so it never opened.`,
+        `The ${name} cut is aria-pressed="${pressed}" after the click, so it never opened.`,
       );
     }
   });
@@ -222,7 +214,7 @@ const ana = {
   },
 };
 
-describe("given an organization's members page", () => {
+describe("given the directory's people tab", () => {
   beforeEach(() => {
     state.members = [sam, ana];
     state.invites = [];
@@ -234,33 +226,28 @@ describe("given an organization's members page", () => {
   afterEach(() => cleanup());
 
   describe("when an administrator opens it", () => {
-    /** @scenario The members page opens on the people who are here */
-    it("shows three tabs and opens on the members", () => {
-      renderMembers();
+    /** @scenario The directory's people tab opens on everybody */
+    it("opens on everybody, with the three cuts offered beside it", () => {
+      renderPeople();
 
-      // Each tab now carries its count in a badge, so the accessible name is
-      // the label and the number together.
-      expect(screen.getByRole("tab", { name: /^Members/ })).toHaveAttribute(
-        "aria-selected",
-        "true",
-      );
-      expect(screen.getByRole("tab", { name: /Invitations/ })).toBeTruthy();
-      expect(screen.getByRole("tab", { name: /Join requests/ })).toBeTruthy();
-      expect(screen.getByTestId("members-list")).toBeInTheDocument();
+      expect(cut(/^Everybody/)).toHaveAttribute("aria-pressed", "true");
+      expect(cut(/^Members/)).toBeTruthy();
+      expect(cut(/^Invited/)).toBeTruthy();
+      expect(cut(/^Waiting to join/)).toBeTruthy();
+      expect(screen.getByTestId("people-list")).toBeInTheDocument();
       expect(screen.getByTestId("seat-usage")).toBeInTheDocument();
     });
 
-    /** @scenario The rules about people are not on the page about people */
-    it("carries neither the second-factor requirement nor the joining policy", () => {
-      renderMembers();
+    /** @scenario The second-factor requirement is asked with the sign-in it guards */
+    it("carries the second-factor requirement nowhere on it", () => {
+      renderPeople();
 
       expect(screen.queryByTestId("two-step-requirement-card")).toBeNull();
-      expect(screen.queryByTestId("join-policy-card")).toBeNull();
     });
 
     /** @scenario One identity row carries a person wherever they appear */
     it("gives every person the same row of name and address", () => {
-      renderMembers();
+      renderPeople();
 
       const rows = screen.getAllByTestId("member-row");
       expect(rows).toHaveLength(2);
@@ -270,7 +257,7 @@ describe("given an organization's members page", () => {
 
     /** @scenario Opening a person puts them in the address bar */
     it("opens the person drawer with the person's id", async () => {
-      renderMembers();
+      renderPeople();
 
       await userEvent.click(screen.getByLabelText("Open Sam Rivera"));
 
@@ -322,47 +309,64 @@ describe("given an organization's members page", () => {
       ];
     });
 
-    /** @scenario A tab that is waiting on somebody says how many */
-    it("counts only what is still waiting on the tab", () => {
-      renderMembers();
+    /** @scenario A cut that is waiting on somebody says how many */
+    it("counts only what is still waiting on the chip", () => {
+      renderPeople();
 
       // The accepted invitation is history, not a thing anybody is waiting on.
-      // The count rides in a badge beside the label rather than in the label,
-      // so it reads as "Invitations 2" to an assistive reader.
-      expect(
-        screen.getByRole("tab", { name: "Invitations 2" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("tab", { name: "Join requests 1" }),
-      ).toBeInTheDocument();
+      expect(cut(/^Invited, 2 people/)).toBeInTheDocument();
+      expect(cut(/^Waiting to join, 1 person/)).toBeInTheDocument();
+      // Everybody is the three cuts added up, and it is what somebody who
+      // asked "how big is this organization" is actually reading.
+      expect(cut(/^Everybody, 5 people/)).toBeInTheDocument();
+    });
+
+    /** @scenario The directory's people tab opens on everybody */
+    it("lists members, invitations and requests in one table", () => {
+      renderPeople();
+
+      const list = screen.getByTestId("people-list");
+      expect(within(list).getAllByTestId("member-row")).toHaveLength(2);
+      expect(within(list).getAllByTestId("invite-row")).toHaveLength(2);
+      expect(within(list).getAllByTestId("join-request-row")).toHaveLength(1);
     });
 
     /** @scenario One identity row carries a person wherever they appear */
     it("uses the same row for an invitation and for a request", async () => {
-      renderMembers();
+      renderPeople();
 
-      await selectTab(/Invitations/);
+      await selectCut(/^Invited/);
       const invite = screen.getAllByTestId("invite-row")[0]!;
       expect(within(invite).getByText("dana@acme.com")).toBeInTheDocument();
       expect(within(invite).getByTestId("invite-status").textContent).toBe(
         "Invited",
       );
 
-      await selectTab(/Join requests/);
+      await selectCut(/^Waiting to join/);
       const request = screen.getByTestId("join-request-row");
       expect(within(request).getByText("Rex Ford")).toBeInTheDocument();
       expect(within(request).getByText("acme.com")).toBeInTheDocument();
     });
+
+    /** @scenario A cut that is waiting on somebody says how many */
+    it("shows the whole invitation history under its own cut", async () => {
+      renderPeople();
+
+      // Everybody carries only what somebody is still waiting on; the invited
+      // cut is where a revoked or accepted invitation stays readable.
+      await selectCut(/^Invited/);
+      expect(screen.getAllByTestId("invite-row")).toHaveLength(3);
+    });
   });
 
   describe("when nothing is waiting", () => {
-    /** @scenario An empty tab says it is empty */
-    it("says the tab is empty rather than showing a blank panel", async () => {
-      renderMembers();
+    /** @scenario A cut with nobody in it says so rather than emptying the table */
+    it("says the cut is empty rather than showing a blank panel", async () => {
+      renderPeople();
 
-      await selectTab(/Join requests/);
+      await selectCut(/^Waiting to join/);
 
-      expect(screen.getByTestId("join-requests-list").textContent).toContain(
+      expect(screen.getByTestId("people-list").textContent).toContain(
         "Nobody is waiting to join",
       );
     });
@@ -377,7 +381,7 @@ describe("given an organization's members page", () => {
 
     /** @scenario A member the directory owns says so */
     it("marks them as the directory's", () => {
-      renderMembers();
+      renderPeople();
 
       expect(screen.getByTestId("provenance-directory")).toBeInTheDocument();
     });
@@ -392,7 +396,7 @@ describe("given an organization's members page", () => {
 
     /** @scenario A member who walked in on the domain policy says nobody approved */
     it("names the domain and says nobody approved it", () => {
-      renderMembers();
+      renderPeople();
 
       const chip = screen.getByTestId("provenance-domain");
       expect(chip).toBeInTheDocument();
@@ -408,7 +412,7 @@ describe("given an organization's members page", () => {
 
     /** @scenario A member we cannot explain carries no chip rather than a guess */
     it("shows no chip at all", () => {
-      renderMembers();
+      renderPeople();
 
       expect(screen.queryByTestId("provenance-invited")).toBeNull();
       expect(screen.queryByTestId("provenance-domain")).toBeNull();
@@ -423,7 +427,7 @@ describe("given an organization's members page", () => {
 
     /** @scenario The reason somebody is here is asked for separately */
     it("still lists everybody, and degrades only the chips", () => {
-      renderMembers();
+      renderPeople();
 
       expect(screen.getAllByTestId("member-row")).toHaveLength(2);
       expect(screen.getByTestId("section-error-notice")).toBeInTheDocument();

@@ -22,13 +22,34 @@ Feature: The people and access settings, as one cluster
   #                          the organization's own control, so it sits with
   #                          the organization's keys and its audit trail
   #   People & access
-  #     ├ Members ────────── members · invitations (n) · join requests (n)
+  #     ├ Directory ──────── status first, then people · teams & projects ·
+  #     │    │               groups · provisioning, and the rules by which
+  #     │    │               somebody becomes a member
   #     │    └ one person ── a URL-routed drawer: how they sign in, why they
   #     │                    are here, what they can reach, what to do
-  #     ├ Teams & Projects ─ the teams, and the projects each holds
-  #     ├ Roles ──────────── roles · role assignments
-  #     ├ Directory ─────── status first, then groups, then tokens
-  #     └ Access ─────────── who may join, and the second-factor requirement
+  #     └ Roles ──────────── roles · role assignments
+  #
+  # ONE PAGE FOR "WHO IS HERE". Members, Teams & Projects and Access were
+  # three navigation entries answering one question in three vocabularies: a
+  # list of people, a list of the containers those people sit in, and the
+  # rules by which a person becomes one of them. An administrator asking "who
+  # is in my organization and how did they get here" had to visit all three
+  # and hold the answer in their head. They are the Directory now — the page
+  # already named after who exists — and the three old addresses forward onto
+  # the tab each became.
+  #
+  # AUTHENTICATION IS THE OTHER HALF. Directory answers who is here;
+  # Authentication answers how anybody gets in. There are three ways in — an
+  # identity provider, an invitation, and a domain that admits people without
+  # one — and all three are now asked on the one page, beside each other,
+  # because they interact: automatic joining reads the domains the connection
+  # proved, and an identity provider that asserts a factor at sign-in already
+  # satisfies the second-factor requirement. Neither of those was ever on
+  # screen with the thing it depends on.
+  #
+  # A domain is proved in exactly one place — the connection that rests on it —
+  # and the join policy sits beside that connection rather than drawing a
+  # second proof flow of its own.
   #
   # TWO SECTIONS, AND THE FIRST IS THE READER'S. How you prove who you are is
   # not an organization setting, and it was filed as one: the page sat between
@@ -58,37 +79,47 @@ Feature: The people and access settings, as one cluster
     Given an organization "acme" whose administrator "ana" may manage it
     And "sam" is a member of "acme"
 
-  # ── The members area ───────────────────────────────────────────────────
+  # ── The people area, on Directory ───────────────────────────────────────
 
-  Rule: people, invitations and requests are three tabs of one page
+  # THREE CUTS OF ONE LIST, NOT THREE LISTS. A member, somebody invited and
+  # somebody asking to join are the same person at three distances from the
+  # door, and they were three tabs so that each could carry a count. Chips
+  # carry the count just as well and keep everybody in one table, which is
+  # what makes "who is here" a single read — and it frees the tab bar for the
+  # things that genuinely are different subjects: teams, groups, provisioning.
+
+  Rule: people, invitations and requests are three cuts of one list
 
     @integration
-    Scenario: The members page opens on the people who are here
-      When "ana" opens the members page
-      Then she sees the members, the invitations and the join requests as tabs
-      And the members tab is the one open
+    Scenario: The directory's people tab opens on everybody
+      When "ana" opens the directory page
+      Then she sees the people tab open, listing members, invitations and
+      requests together
       And the seat usage is on the page without being the subject of it
 
     @integration
-    Scenario: A tab that is waiting on somebody says how many
+    Scenario: A cut that is waiting on somebody says how many
       Given two invitations are outstanding and one colleague has asked to join
-      When "ana" opens the members page
-      Then the invitations tab carries the number two
-      And the join requests tab carries the number one
+      When "ana" opens the directory page
+      Then the invited chip carries the number two
+      And the waiting-to-join chip carries the number one
 
     @integration
-    Scenario: An empty tab says it is empty
+    Scenario: A cut with nobody in it says so rather than emptying the table
       Given nobody has asked to join
-      When "ana" opens the join requests tab
+      When "ana" selects the waiting-to-join cut
       Then it says nobody is waiting
       And it offers nothing to approve
 
     @integration
-    Scenario: The rules about people are not on the page about people
-      When "ana" opens the members page
-      Then the second-factor requirement is not on it
-      And the who-can-join policy is not on it
-      And both are on the access page instead
+    Scenario: The old members address forwards onto the tab it became
+      When somebody opens the old members address
+      Then they are taken to the directory page's people tab
+
+    @integration
+    Scenario: The old teams address forwards onto the tab it became
+      When somebody opens the old teams and projects address
+      Then they are taken to the directory page's teams and projects tab
 
   Rule: everybody who is listed is listed the same way
 
@@ -379,6 +410,26 @@ Feature: The people and access settings, as one cluster
       Then the navigation entry says "Directory"
       And the page still says SCIM, for the administrator who searched for it
 
+  # FOUR TABS, EACH A DIFFERENT SUBJECT. People, the containers people sit
+  # in, the groups a provider sends, and the credential it sends them with.
+  # They share one table treatment, one place for the tab's own action, and
+  # one heading rhythm, so moving between them is a change of subject rather
+  # than a change of product.
+
+  Rule: the tabs are four subjects drawn one way
+
+    @integration
+    Scenario: Every tab puts its action in the same place
+      When "ana" moves between the directory tabs
+      Then each tab's own action sits at the end of that tab's first heading row
+      And no two tabs draw that action differently
+
+    @integration
+    Scenario: A tab that names a count names it the same way as its siblings
+      When "ana" opens the directory page
+      Then every tab that carries a number carries it as a badge on the tab
+      And a tab with nothing in it still carries its zero
+
   # A COUNT IS THE ONE ANSWER NOBODY CAN CHECK. The band says the directory
   # manages twelve people, and an administrator asking whether the sync is
   # right is asking about a PERSON: did Sam come through Okta, is Ana still
@@ -569,16 +620,48 @@ Feature: The people and access settings, as one cluster
   # control that does not exist is a promise the product has not made, and a
   # disabled one is worse, because it reads as a thing somebody switched off.
 
-  # ── Access ─────────────────────────────────────────────────────────────
+  # ── The rules by which somebody gets in ────────────────────────────────
+
+  # THESE WERE A PAGE CALLED ACCESS, WHICH NAMED NOTHING. "Access" is what
+  # every page in this cluster is about, so a page carrying that word and two
+  # switches told a reader nothing about which two. Both switches are
+  # conditions of getting in, so both went to Authentication — beside the
+  # connection they interact with, which is the thing neither of them was ever
+  # on screen with.
+
+  Rule: the three ways in are asked on one page
+
+    @unit
+    Scenario: The old access address forwards onto the page it became
+      When somebody opens the old access address
+      Then they are taken to the directory page
+
+    @integration
+    Scenario: Who may join is asked beside the connection whose domains it reads
+      When "ana" opens the authentication page
+      Then the who-may-join policy is on it
+      And it is not on the directory page
+
+    @integration
+    Scenario: The second-factor requirement is asked with the sign-in it guards
+      When "ana" opens the authentication page
+      Then the second-factor requirement is on it
+      And it is not on the directory page
+
+    @integration
+    Scenario: The rules are not on the page about the people they admit
+      When "ana" opens the directory page
+      Then the who-may-join policy is not on it
+      And the second-factor requirement is not on it
 
   Rule: opening the door is a paid control and closing it is not
 
     @integration
     Scenario: Opening the door needs the plan that carries it
       Given "acme" is not on the Enterprise plan
-      When "ana" opens the access page
-      Then both open settings are on screen, greyed, with the reason on them
-      And she is offered the way to the plan that carries them
+      When "ana" opens the authentication page
+      Then the who-may-join setting is on screen, greyed, with the reason on it
+      And she is offered the way to the plan that carries it
 
     @unit
     Scenario: The refusal holds at the boundary, not only on the screen
@@ -602,7 +685,8 @@ Feature: The people and access settings, as one cluster
       because "ana" approves each request herself
 
     @integration
-    Scenario: Verifying a domain is answerable from here
-      When "ana" opens the access page
-      Then she sees which domains have been proved and which have not
-      And she is offered the way to prove one
+    Scenario: A domain is proved in one place, and the policy points at it
+      When "ana" reads the who-can-join policy
+      Then she is told which of her domains are proved
+      And she is offered the way to the connection that proves them
+      And no second proof flow is drawn beside the policy

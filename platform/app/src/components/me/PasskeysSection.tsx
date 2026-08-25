@@ -12,6 +12,7 @@ import {
 import { Fingerprint, MoreVertical, Usb } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { SettingsRowsSkeleton } from "~/components/settings/kit/SettingsSkeleton";
 import { QuietNotice } from "~/components/settings/QuietNotice";
 import { SettingsEmptyState } from "~/components/settings/SettingsEmptyState";
 import {
@@ -466,7 +467,7 @@ export function PasskeysSection() {
     >
       <VStack width="full" align="start" gap={4} data-testid="passkeys-section">
         <LastWayInNotice />
-        {passkeys.isPending ? <Spinner size="sm" /> : null}
+        {passkeys.isPending ? <SettingsRowsSkeleton rows={2} /> : null}
 
         {!passkeys.isPending && held.length === 0 ? (
           // Said in terms of what somebody already does with their device,

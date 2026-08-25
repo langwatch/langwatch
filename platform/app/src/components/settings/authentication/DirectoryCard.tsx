@@ -99,11 +99,12 @@ export function DirectoryCard({
         )
       }
     >
-      {/* "Sources" alone left a reader guessing what kind of source, on a
-          page whose other half is the connection these ARE. Naming them for
-          what they are also makes the trip back obvious: the thing listed
-          here is configured on Authentication. */}
-      <OverviewDetail label="Authentication source">
+      {/* THE ROWS ARE QUESTIONS, the same way the sign-on card beside this
+          one asks them. "Sources" left a reader guessing what kind of source
+          on a page whose other half is the connection these ARE; asking where
+          people come from names the thing and makes the trip back obvious in
+          one line. */}
+      <OverviewDetail label="Where do people come from?">
         <DirectorySourceChips connections={facts.connections} />
       </OverviewDetail>
 
@@ -138,7 +139,7 @@ export function DirectoryCard({
               the number: a whole sentence in the value column squeezed the
               name into one word per line and then overlapped it. */}
           <OverviewDetail
-            label="Members it manages"
+            label="How many members does it manage?"
             hint={
               facts.outsideDirectory > 0
                 ? `${facts.outsideDirectory} arrived another way, so removing them from your identity provider will not remove them here.`
@@ -160,15 +161,15 @@ export function DirectoryCard({
             </DirectoryFactUnavailable>
           </OverviewDetail>
 
-          <OverviewDetail label="Last sync">
+          <OverviewDetail label="When did it last push?">
             <Text fontSize="13px" whiteSpace="nowrap">
               {facts.lastPushedAtMs === null
-                ? "No push yet"
+                ? "It never has"
                 : new Date(facts.lastPushedAtMs).toLocaleString()}
             </Text>
           </OverviewDetail>
 
-          <OverviewDetail label="Groups it sent">
+          <OverviewDetail label="Which groups has it sent?">
             <DirectoryFactUnavailable canRead={canReadMembership} read={groups}>
               {facts.directoryGroups.length === 0 ? (
                 <Text fontSize="13px" color="fg.muted">

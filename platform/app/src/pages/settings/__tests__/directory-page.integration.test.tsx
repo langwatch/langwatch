@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * The Directory page: named for what it holds, leading with its status, with
- * groups and tokens as tabs under it.
+ * people, teams, groups and provisioning as four tabs under it.
  *
  * Spec: specs/identity/org-access-cluster.feature
  */
@@ -30,7 +30,7 @@ vi.mock("~/components/SettingsLayout", () => ({
   ),
 }));
 
-// The reconciliation panel, the summary band and the groups list all have
+// The reconciliation panel, the summary band and the four tab bodies all have
 // their own tests; here they only have to be present and in the right place.
 vi.mock("~/components/settings/ScimReconciliationPanel", () => ({
   ScimReconciliationPanel: () => (
@@ -51,6 +51,40 @@ vi.mock("~/components/access/DirectoryMembersSection", () => ({
 vi.mock("~/components/access/GroupsSection", () => ({
   GroupsSection: () => <div data-testid="groups-section">groups</div>,
 }));
+
+vi.mock("~/components/access/PeopleSection", () => ({
+  PeopleSection: () => <div data-testid="people-section">people</div>,
+}));
+
+vi.mock("~/components/access/TeamsAndProjectsSection", () => ({
+  TeamsAndProjectsSection: () => <div data-testid="teams-section">teams</div>,
+}));
+
+vi.mock("~/components/access/JoinPolicyCard", () => ({
+  JoinPolicyCard: () => <div data-testid="join-policy-card">joining</div>,
+}));
+
+vi.mock("~/components/members/useJoinRequests", () => ({
+  useJoinRequests: () => ({
+    joining: { domainJoin: "off", joinDomains: [] },
+    savingJoining: false,
+    setJoining: vi.fn(),
+    requests: [],
+    automaticJoins: [],
+    answeringId: null,
+    approve: vi.fn(),
+    reject: vi.fn(),
+  }),
+}));
+
+const emptyQuery = (data: unknown) => ({
+  useQuery: () => ({
+    data,
+    isLoading: false,
+    isError: false,
+    error: null,
+  }),
+});
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -73,6 +107,15 @@ vi.mock("~/utils/api", () => ({
         }),
       },
     },
+    // The four tab counts. Each is the same read its own tab runs, so the
+    // number on a closed tab can never disagree with the list behind it.
+    group: { listAll: emptyQuery([]) },
+    team: { getTeamsWithRoleBindings: emptyQuery([]) },
+    organization: {
+      getOrganizationWithMembersAndTheirTeams: emptyQuery({ members: [] }),
+      getOrganizationPendingInvites: emptyQuery([]),
+    },
+    joinRequests: { pending: emptyQuery([]) },
   },
 }));
 
@@ -87,6 +130,12 @@ function renderPage(initialEntry = "/settings/directory") {
     </MemoryRouter>,
   );
 }
+
+/** The tab labels carry their counts, so every lookup is by prefix. */
+const tab = (label: string) =>
+  screen.getByRole("tab", { name: RegExp(`^${label}`) });
+const noTab = (label: string) =>
+  screen.queryByRole("tab", { name: RegExp(`^${label}`) });
 
 describe("given the directory page", () => {
   beforeEach(() => {
@@ -104,30 +153,34 @@ describe("given the directory page", () => {
       renderPage();
 
       const summary = screen.getByTestId("directory-summary");
-      const tabs = screen.getByRole("tab", { name: "Overview" });
       expect(
-        summary.compareDocumentPosition(tabs) &
+        summary.compareDocumentPosition(tab("People")) &
           Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     });
 
-    /** @scenario The page leads with whether it is working */
-    it("opens on the overview, which carries the connection detail", () => {
-      const { container } = renderPage();
+    /** @scenario The directory's people tab opens on everybody */
+    it("opens on the people", () => {
+      renderPage();
 
-      expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute(
-        "aria-selected",
-        "true",
-      );
-      expect(screen.getByTestId("reconciliation-panel")).toBeInTheDocument();
-      expect(container.textContent).toContain(
-        "Where your identity provider sends it",
-      );
+      expect(tab("People")).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByTestId("people-section")).toBeInTheDocument();
+    });
+
+    /** @scenario The rules by which somebody arrives are asked on Authentication */
+    it("carries neither of the rules that admit people", () => {
+      renderPage();
+
+      // Who may join and what everybody must prove are both conditions of
+      // getting in, so both are asked on Authentication beside the connection
+      // they interact with. This page lists who is already here.
+      expect(screen.queryByTestId("join-policy-card")).toBeNull();
+      expect(screen.queryByTestId("two-step-requirement-card")).toBeNull();
     });
 
     /** @scenario The protocol keeps its name in the body copy */
     it("is called Directory, and still says SCIM for the reader who searched for it", () => {
-      const { container } = renderPage();
+      const { container } = renderPage("/settings/directory?tab=provisioning");
 
       expect(
         screen.getByRole("heading", { name: "Directory" }),
@@ -137,12 +190,37 @@ describe("given the directory page", () => {
       expect(container.textContent).toContain("SCIM");
     });
 
-    it("offers the overview, the groups and the tokens as three tabs", () => {
+    /** @scenario The tabs are four subjects drawn one way */
+    it("offers people, teams, groups and provisioning as four tabs", () => {
       renderPage();
 
-      expect(screen.getByRole("tab", { name: "Overview" })).toBeInTheDocument();
-      expect(screen.getByRole("tab", { name: "Groups" })).toBeInTheDocument();
-      expect(screen.getByRole("tab", { name: "Tokens" })).toBeInTheDocument();
+      expect(tab("People")).toBeInTheDocument();
+      expect(tab("Teams")).toBeInTheDocument();
+      expect(tab("Groups")).toBeInTheDocument();
+      expect(tab("Provisioning")).toBeInTheDocument();
+    });
+
+    /** @scenario A tab that names a count names it the same way as its siblings */
+    it("carries a zero on a tab with nothing behind it", () => {
+      renderPage();
+
+      // A zero is an answer, and it is the one somebody checking on a quiet
+      // week came to read.
+      expect(tab("Groups")).toHaveAccessibleName(/0/);
+      expect(tab("Teams")).toHaveAccessibleName(/0/);
+    });
+  });
+
+  describe("when the address names the provisioning tab", () => {
+    /** @scenario The old directory sync address forwards onto the page it became */
+    it("opens on the provisioning, which carries the connection detail", () => {
+      const { container } = renderPage("/settings/directory?tab=provisioning");
+
+      expect(tab("Provisioning")).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByTestId("reconciliation-panel")).toBeInTheDocument();
+      expect(container.textContent).toContain(
+        "Where your identity provider sends it",
+      );
     });
   });
 
@@ -151,22 +229,31 @@ describe("given the directory page", () => {
     it("opens on the groups, which is where the old address forwards to", () => {
       renderPage("/settings/directory?tab=groups");
 
-      expect(screen.getByRole("tab", { name: "Groups" })).toHaveAttribute(
-        "aria-selected",
-        "true",
-      );
+      expect(tab("Groups")).toHaveAttribute("aria-selected", "true");
       expect(screen.getByTestId("groups-section")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the address names the teams tab", () => {
+    /** @scenario The old teams address forwards onto the tab it became */
+    it("opens on the teams and projects", () => {
+      renderPage("/settings/directory?tab=teams");
+
+      expect(tab("Teams")).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByTestId("teams-section")).toBeInTheDocument();
     });
   });
 
   describe("when the reader may see the sync but not manage the organization", () => {
     /** @scenario A reader who may not read groups is told nothing they cannot have */
-    it("offers no groups tab at all rather than one that refuses them", () => {
+    it("offers only the provisioning tab rather than ones that refuse them", () => {
       state.permissions = new Set(["sso:view"]);
       renderPage();
 
-      expect(screen.queryByRole("tab", { name: "Groups" })).toBeNull();
-      expect(screen.getByRole("tab", { name: "Overview" })).toBeInTheDocument();
+      expect(noTab("Groups")).toBeNull();
+      expect(noTab("People")).toBeNull();
+      expect(noTab("Teams")).toBeNull();
+      expect(tab("Provisioning")).toBeInTheDocument();
     });
 
     it("keeps the groups tab shut even when the address asks for it", () => {
@@ -174,19 +261,16 @@ describe("given the directory page", () => {
       renderPage("/settings/directory?tab=groups");
 
       expect(screen.queryByTestId("groups-section")).toBeNull();
-      expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute(
-        "aria-selected",
-        "true",
-      );
+      expect(tab("Provisioning")).toHaveAttribute("aria-selected", "true");
     });
 
-    /** @scenario "A reader who may not read membership is not shown a roster" */
+    /** @scenario A reader who may not read membership is not shown a roster */
     it("leaves out the roster, which reads the membership they may not have", () => {
       state.permissions = new Set(["sso:view"]);
       renderPage();
 
       expect(screen.queryByTestId("directory-managed-members")).toBeNull();
-      // The half of the overview they may read is still there.
+      // The half of the page they may read is still there.
       expect(screen.getByTestId("reconciliation-panel")).toBeInTheDocument();
     });
   });
@@ -197,7 +281,7 @@ describe("given the directory page", () => {
       renderPage("/settings/directory?tab=groups");
 
       expect(screen.getByTestId("groups-section")).toBeInTheDocument();
-      expect(screen.queryByRole("tab", { name: "Overview" })).toBeNull();
+      expect(noTab("Provisioning")).toBeNull();
       // The status band reads the sync, which this reader may not.
       expect(screen.queryByTestId("directory-summary")).toBeNull();
     });
@@ -208,7 +292,7 @@ describe("given the directory page", () => {
       state.permissions = new Set();
       renderPage();
 
-      expect(screen.queryByRole("tab", { name: "Overview" })).toBeNull();
+      expect(noTab("People")).toBeNull();
       expect(screen.queryByTestId("groups-section")).toBeNull();
       expect(screen.queryByRole("heading", { name: "Directory" })).toBeNull();
     });

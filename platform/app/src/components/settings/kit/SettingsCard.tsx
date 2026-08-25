@@ -45,9 +45,14 @@ export function SettingsCard({
   "data-testid"?: string;
 }) {
   return (
+    /* TIGHT ON PURPOSE. These cards answer questions, and a question that
+       takes half a screen to ask reads as more important than it is — two of
+       them side by side pushed everything else below the fold. The padding is
+       the smallest that still separates the card from its neighbour; the
+       density comes from the rows inside, not from the box. */
     <Card.Root width="full" height="full" data-testid={testId}>
-      <Card.Body paddingX={4} paddingY={3.5}>
-        <VStack align="stretch" gap={2} height="full">
+      <Card.Body paddingX={3.5} paddingY={2.5}>
+        <VStack align="stretch" gap={1.5} height="full">
           <VStack align="stretch" gap={0.5}>
             <HStack width="full" gap={2} align="center">
               {tone && <StatusDot tone={tone} />}
@@ -84,7 +89,7 @@ export function SettingsCard({
               neighbour; the empty space now falls below the action, where it
               reads as a card that is simply shorter. */}
           {actions && (
-            <HStack gap={2} flexWrap="wrap" paddingTop={2}>
+            <HStack gap={2} flexWrap="wrap" paddingTop={1.5}>
               {actions}
             </HStack>
           )}

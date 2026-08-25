@@ -14,7 +14,6 @@ import {
   EyeOff,
   Fingerprint,
   Flag,
-  FolderKanban,
   FolderOpen,
   Gauge,
   KeyRound,
@@ -25,13 +24,11 @@ import {
   RefreshCw,
   ScrollText,
   Settings2,
-  ShieldAlert,
   ShieldCheck,
   Sparkles,
   UserCog,
   UserRound,
   UserSearch,
-  Users,
   Workflow,
 } from "lucide-react";
 import { isPathUnder } from "~/features/navigation/products";
@@ -210,35 +207,37 @@ function accessGroup({
     label: "People & access",
     items: [
       {
-        label: "Members",
-        href: "/settings/members",
-        includePath: "/settings/members",
-        icon: Users,
-      },
-      {
-        label: "Teams & Projects",
-        href: "/settings/teams",
-        icon: FolderKanban,
+        // Named for what it holds, not for the protocol that fills it. "SCIM"
+        // survives in the page's own copy, for the administrator who searches
+        // for the protocol by name.
+        //
+        // ON EVERY PLAN, because this is where the members are. Members,
+        // Teams & Projects and Access were three entries answering one
+        // question; they are three tabs of this one now, and every old
+        // address forwards onto the tab it became. The provisioning tab is
+        // the only enterprise part, and it carries its own permission.
+        label: "Directory",
+        href: "/settings/directory",
+        includePath: "/settings/directory",
+        icon: BookUser,
+        alsoActiveAt: [
+          "/settings/scim",
+          "/settings/groups",
+          "/settings/members",
+          "/settings/teams",
+          "/settings/access",
+        ],
       },
       ...(showEnterpriseNav && !isLiteMember ? enterpriseAccessItems() : []),
-      // Last, and on every plan: the rules apply to every organization, and
-      // the card that is enterprise-only carries its own lock.
-      {
-        label: "Access",
-        href: "/settings/access",
-        icon: ShieldAlert,
-      },
     ],
   };
 }
 
 function enterpriseAccessItems(): SettingsMenuItem[] {
   return [
-    // Groups has no entry of its own: a group is what a directory sends and
-    // what an administrator grants a role to, so it is a tab of Directory and
-    // the old address forwards onto it. Authentication is not here either:
-    // how the organization signs in is the organization's own control, so it
-    // sits in the Organization group beside its keys and its audit log.
+    // Authentication is not here: how the organization signs in is the
+    // organization's own control, so it sits in the Organization group beside
+    // its keys and its audit log.
     {
       // Definitions and the grants of those definitions are two tabs of one
       // page now; the old Role Bindings address forwards onto the second.
@@ -246,17 +245,6 @@ function enterpriseAccessItems(): SettingsMenuItem[] {
       href: "/settings/roles",
       icon: ShieldCheck,
       alsoActiveAt: ["/settings/role-bindings"],
-      isEnterprise: true,
-    },
-    {
-      // Named for what it holds, not for the protocol that fills it. "SCIM"
-      // survives in the page's own copy, for the administrator who searches
-      // for the protocol by name. The old address forwards here, and so does
-      // the old groups address, onto the tab groups became.
-      label: "Directory",
-      href: "/settings/directory",
-      icon: BookUser,
-      alsoActiveAt: ["/settings/scim", "/settings/groups"],
       isEnterprise: true,
     },
   ];

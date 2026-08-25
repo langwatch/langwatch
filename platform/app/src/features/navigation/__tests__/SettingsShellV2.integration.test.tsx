@@ -205,6 +205,9 @@ vi.mock("~/utils/api", () => ({
     },
     joinRequests: {
       offer: { useQuery: () => ({ data: undefined }) },
+      // The menu's own "somebody is waiting" badge asks this on every settings
+      // page, so a mock that names it not takes the whole menu down.
+      pending: { useQuery: () => ({ data: undefined }) },
       dismissOffer: {
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
@@ -351,9 +354,11 @@ describe("the settings shell in a new navigation mode", () => {
         "href",
         "/settings",
       );
-      expect(screen.getByRole("link", { name: "Members" })).toHaveAttribute(
+      // Members, Teams & Projects and Access became tabs of Directory, so the
+      // group's people entry is Directory now and their old addresses forward.
+      expect(screen.getByRole("link", { name: "Directory" })).toHaveAttribute(
         "href",
-        "/settings/members",
+        "/settings/directory",
       );
       expect(screen.getByTestId("settings-page-content")).toBeInTheDocument();
     });
@@ -422,18 +427,24 @@ describe("the settings shell in a new navigation mode", () => {
         "href",
         "/settings/directory",
       );
-      expect(screen.getByRole("link", { name: "Access" })).toHaveAttribute(
-        "href",
-        "/settings/access",
-      );
+      // Access named the subject of every page in the group and therefore none
+      // of them. Its two switches went to Authentication, where the connection
+      // they interact with already is.
+      expect(screen.queryByRole("link", { name: "Access" })).toBeNull();
+      expect(screen.queryByRole("link", { name: "Members" })).toBeNull();
+      expect(
+        screen.queryByRole("link", { name: "Teams & Projects" }),
+      ).toBeNull();
     });
 
     /** @scenario The access group is named for people and holds the organization's pages */
-    it("offers Access on every plan, since only one of its cards is enterprise", () => {
+    it("offers Directory on every plan, since it is where the members are", () => {
       mockIsEnterprise = false;
       renderSettings();
 
-      expect(screen.getByRole("link", { name: "Access" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: "Directory" }),
+      ).toBeInTheDocument();
     });
 
     /** @scenario "Enterprise entries carry a quiet grey pill" */
@@ -462,14 +473,16 @@ describe("the settings shell in a new navigation mode", () => {
       expect(
         screen.getAllByRole("button", { name: /^Collapse / }).length,
       ).toBeGreaterThan(1);
-      expect(screen.getByRole("link", { name: "Members" })).toBeInTheDocument();
+      expect(
+        screen.getByRole("link", { name: "Directory" }),
+      ).toBeInTheDocument();
 
       await user.click(
         screen.getByRole("button", { name: "Collapse People & access" }),
       );
 
       expect(
-        screen.queryByRole("link", { name: "Members" }),
+        screen.queryByRole("link", { name: "Directory" }),
       ).not.toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: "Collapse Organization" }),
@@ -483,7 +496,7 @@ describe("the settings shell in a new navigation mode", () => {
         screen.getByRole("button", { name: "Expand People & access" }),
       ).toHaveAttribute("aria-expanded", "false");
       expect(
-        screen.queryByRole("link", { name: "Members" }),
+        screen.queryByRole("link", { name: "Directory" }),
       ).not.toBeInTheDocument();
       expect(screen.getByRole("link", { name: "General" })).toBeInTheDocument();
     });
@@ -508,7 +521,7 @@ describe("the settings shell in a new navigation mode", () => {
       );
       // The pages themselves are what scrolls, so they stay inside it.
       expect(scrollRegion).toContainElement(
-        screen.getByRole("link", { name: "Members" }),
+        screen.getByRole("link", { name: "Directory" }),
       );
     });
 
@@ -541,9 +554,9 @@ describe("the settings shell in a new navigation mode", () => {
       // an index lookup on its own would read as the move having worked.
       expect(entries.filter((entry) => entry === "API Keys")).toHaveLength(1);
       expect(entries.indexOf("API Keys")).toBe(entries.indexOf("General") + 1);
-      // Members opens ACCESS, so an entry before it is in ORGANIZATION.
+      // Directory opens ACCESS, so an entry before it is in ORGANIZATION.
       expect(entries.indexOf("API Keys")).toBeLessThan(
-        entries.indexOf("Members"),
+        entries.indexOf("Directory"),
       );
     });
 
@@ -567,9 +580,12 @@ describe("the settings shell in a new navigation mode", () => {
       expect(
         screen.queryByRole("link", { name: "Roles" }),
       ).not.toBeInTheDocument();
+      // Directory is not one of them any more: it is where the members are,
+      // and every organization has those. Only its provisioning tab is
+      // enterprise, and that carries its own permission.
       expect(
-        screen.queryByRole("link", { name: "Directory" }),
-      ).not.toBeInTheDocument();
+        screen.getByRole("link", { name: "Directory" }),
+      ).toBeInTheDocument();
       expect(screen.queryByText("ENT")).not.toBeInTheDocument();
       // The reader's own pages are not the organization's, so no plan gates
       // them.

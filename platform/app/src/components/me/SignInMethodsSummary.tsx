@@ -1,5 +1,6 @@
-import { Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { KeyRound } from "lucide-react";
+import { SettingsRowsSkeleton } from "~/components/settings/kit/SettingsSkeleton";
 import { signInMethodLabel } from "~/features/auth/logic/methodLabels";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { api } from "~/utils/api";
@@ -92,7 +93,10 @@ export function SignInMethodsSummary() {
         // Both reads gate the first row: drawing "None yet" for the half a
         // second before the account's own address lands is the bug this
         // section just had, with a shorter run time.
-        <Spinner size="sm" />
+        //
+        // Four rows, because that is what this section almost always holds —
+        // an address, a password, a passkey and a second step.
+        <SettingsRowsSkeleton rows={4} />
       ) : (
         <VStack align="stretch" gap={2} width="full">
           {methodRows({

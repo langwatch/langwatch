@@ -1,6 +1,11 @@
 import { Button, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { ArrowLeft, Settings2 } from "lucide-react";
 import { useSearchParams } from "react-router";
+import { JoinPolicyCard } from "~/components/access/JoinPolicyCard";
+import { TwoStepRequirementCard } from "~/components/members/TwoStepRequirementCard";
+import { useJoinRequests } from "~/components/members/useJoinRequests";
+import { useTwoStepRequirement } from "~/components/members/useTwoStepRequirement";
+import { SectionTitle } from "~/components/settings/kit/SettingRow";
 import { Link } from "~/components/ui/link";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -39,6 +44,13 @@ const MANAGE_CONNECTION = "connection";
  * start sits above as a banner naming the one thing that would change it.
  * Answering somebody's navigation click with nothing but "you can't use this"
  * teaches them neither what the feature is nor what their organization does.
+ *
+ * WHAT EVERYBODY MUST PROVE IS THE THIRD THING ON THE PAGE. The second-factor
+ * requirement used to sit on a page called Access, one entry away from the
+ * connection it interacts with — an identity provider that asserts a factor
+ * at sign-in already satisfies it, and the two facts were never on screen
+ * together. It is a condition of signing in, so it is asked with the sign-in
+ * it guards.
  *
  * WHAT IS NOT HERE. Requiring single sign-on of everybody, a password
  * fallback, and session lifetimes are all things this organization cannot
@@ -88,6 +100,14 @@ export function AuthenticationSettings({
             canReadMembership={canReadMembership}
           />
         </SimpleGrid>
+        <JoiningRule
+          organizationId={organizationId}
+          canManage={canReadMembership}
+        />
+        <SignInRequirements
+          organizationId={organizationId}
+          canManage={canReadMembership}
+        />
         <PersonalMethodsFooter />
       </VStack>
     );
@@ -95,13 +115,27 @@ export function AuthenticationSettings({
 
   // The overview is for a connection that is actually on. Everything else —
   // still loading, half-built, suspended — is the journey, which already says
-  // all of those things in its own words.
+  // all of those things in its own words. The requirement stands under either,
+  // because what everybody must prove does not depend on whether an identity
+  // provider is set up yet.
   if (
     data === undefined ||
     connection === null ||
     connection.state !== "ACTIVE"
   ) {
-    return <SingleSignOnSetup organizationId={organizationId} />;
+    return (
+      <VStack align="stretch" gap={6} width="full">
+        <SingleSignOnSetup organizationId={organizationId} />
+        <JoiningRule
+          organizationId={organizationId}
+          canManage={canReadMembership}
+        />
+        <SignInRequirements
+          organizationId={organizationId}
+          canManage={canReadMembership}
+        />
+      </VStack>
+    );
   }
 
   if (searchParams.get(MANAGE_PARAM) === MANAGE_CONNECTION) {
@@ -150,7 +184,99 @@ export function AuthenticationSettings({
         </Text>
       </VStack>
 
+      <JoiningRule
+        organizationId={organizationId}
+        canManage={canReadMembership}
+      />
+
+      <SignInRequirements
+        organizationId={organizationId}
+        canManage={canReadMembership}
+      />
+
       <PersonalMethodsFooter />
+    </VStack>
+  );
+}
+
+/**
+ * Who may become a member without anybody inviting them.
+ *
+ * The third way in, beside an identity provider and an invitation, and it
+ * belongs on the page that answers "how does anybody get in here" rather than
+ * on a page of its own called Access — a word that described every page in
+ * this cluster and therefore none of them.
+ *
+ * The domains this rule reads are the ones the connection above proved. That
+ * is why the two are on one page: a reader turning automatic joining on can
+ * see, without leaving, whether there is a proved domain for it to work with.
+ */
+function JoiningRule({
+  organizationId,
+  canManage,
+}: {
+  organizationId: string;
+  canManage: boolean;
+}) {
+  const joinRequests = useJoinRequests({ organizationId, canManage });
+
+  return (
+    <VStack align="stretch" gap={3} width="full">
+      <SectionTitle
+        title="Who may join without an invitation"
+        hint="Everybody admitted by this rule turns up in your Directory, marked with the domain that let them in."
+      />
+      <JoinPolicyCard
+        // Re-mounted when the saved setting changes, so the radio and the
+        // domain box start from what was actually saved rather than from a
+        // draft the reader has moved on from.
+        key={`${joinRequests.joining.domainJoin}:${joinRequests.joining.joinDomains.join(",")}`}
+        domainJoin={joinRequests.joining.domainJoin}
+        joinDomains={joinRequests.joining.joinDomains}
+        saving={joinRequests.savingJoining}
+        onSave={joinRequests.setJoining}
+      />
+    </VStack>
+  );
+}
+
+/**
+ * What this organization requires of everybody who signs in.
+ *
+ * One requirement today, and the section exists rather than the bare card so
+ * the next one — a session lifetime, a required method — lands somewhere that
+ * already reads as a group instead of as a second loose card.
+ *
+ * The card carries its own plan lock and its own copy; this only decides
+ * where it sits. It renders nothing where the deployment offers no second
+ * step at all, because a heading over an absence is worse than silence.
+ */
+function SignInRequirements({
+  organizationId,
+  canManage,
+}: {
+  organizationId: string;
+  /** `organization:manage`: reading who can prove what is a membership read. */
+  canManage: boolean;
+}) {
+  const twoStep = useTwoStepRequirement({ organizationId, canManage });
+
+  if (!twoStep.show) return null;
+
+  return (
+    <VStack align="stretch" gap={3} width="full">
+      <SectionTitle
+        title="What everybody has to prove"
+        hint="Applies to every member of this organization, however they sign in."
+      />
+      <TwoStepRequirementCard
+        mfaRequired={twoStep.mfaRequired}
+        heldCount={twoStep.heldCount}
+        memberCount={twoStep.members.length}
+        connection={twoStep.connection}
+        saving={twoStep.saving}
+        onChange={twoStep.setRequirement}
+      />
     </VStack>
   );
 }

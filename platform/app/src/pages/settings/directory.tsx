@@ -19,6 +19,8 @@ import { useSearchParams } from "react-router";
 import { DirectoryMembersSection } from "../../components/access/DirectoryMembersSection";
 import { DirectorySummary } from "../../components/access/DirectorySummary";
 import { GroupsSection } from "../../components/access/GroupsSection";
+import { PeopleSection } from "../../components/access/PeopleSection";
+import { TeamsAndProjectsSection } from "../../components/access/TeamsAndProjectsSection";
 import { CopyInput } from "../../components/CopyInput";
 import { PermissionAlert } from "../../components/PermissionAlert";
 import SettingsLayout from "../../components/SettingsLayout";
@@ -26,15 +28,26 @@ import { CopyValueRows } from "../../components/settings/CopyValueRows";
 import { ScimReconciliationPanel } from "../../components/settings/ScimReconciliationPanel";
 import { SettingsDisclosure } from "../../components/settings/SettingsDisclosure";
 import { SettingsPageHeader } from "../../components/settings/SettingsPageHeader";
+import { TabCount } from "../../components/settings/TabCount";
 import { Dialog } from "../../components/ui/dialog";
 import { toaster } from "../../components/ui/toaster";
+import { isRunningConnection } from "../../features/directory/logic/connectionLifecycle";
+import { directoryConnectionsBadge } from "../../features/directory/logic/directorySyncChip";
 import { showErrorToast } from "../../features/errors";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 
 /**
- * The Directory: who an identity provider provisions here, and the groups it
- * sends (D08 + ADR-122).
+ * The Directory: who is in this organization, how they got here, and which
+ * system says so (D05, D08, D11, D12, ADR-122).
+ *
+ * ONE PAGE FOR "WHO IS HERE". Members, Teams & Projects and Access were three
+ * navigation entries answering one question in three vocabularies: a list of
+ * people, a list of the containers those people sit in, and the rules by which
+ * somebody becomes one of them. An administrator asking "who is in my
+ * organization and how did they get here" had to visit all three and hold the
+ * answer in their head. They are the Directory now, and the three old
+ * addresses forward onto the tab each became.
  *
  * NAMED FOR WHAT IT HOLDS, NOT FOR THE PROTOCOL THAT FILLS IT. The navigation
  * entry says Directory, because "SCIM" is a thing an IT administrator has
@@ -42,34 +55,42 @@ import { api } from "../../utils/api";
  * the administrator who searches for the protocol still lands here.
  *
  * STATUS LEADS, AND STANDS ABOVE THE TABS. Which sources are connected, when
- * the last push landed, how many people the directory manages, how many
- * groups it sent, and how many members it does NOT manage: those five are the
- * reason anybody opens this page, and every tab under them is what to do
- * about the answer. Putting the band inside a tab would hide the question
- * from two thirds of the page.
+ * the last push landed, how many people the directory manages and how many
+ * members it does NOT manage are the reason anybody opens this page, and every
+ * tab under them is what to do about the answer. Putting the band inside a tab
+ * would hide the question from three quarters of the page.
  *
- * THREE TABS, ONE SUBJECT.
+ * FOUR TABS, FOUR SUBJECTS, DRAWN ONE WAY.
  *
- *   Overview ─ what the directory has been doing, per connection, and where
- *              it should send it
- *   Groups ─── every group in the organization, the sent ones and the
- *              hand-made ones alike
- *   Tokens ─── the write authority each connection syncs with
+ *   People ────── everybody here and everybody on their way in, as three cuts
+ *                 of one list, with the rule that admits them underneath
+ *   Teams ─────── the teams, and the projects each one holds
+ *   Groups ────── every group in the organization, the sent ones and the
+ *                 hand-made ones alike
+ *   Provisioning ─ what the directory has been doing, per connection, the
+ *                 people it created, and the credential it syncs with
  *
- * Groups used to be a navigation entry of its own, one click away from the
- * page that reports whether the directory sent the group in question. They
- * are one subject and they are one page now; the old address forwards onto
- * the tab.
+ * Each tab puts its own action at the end of its own first heading row, and
+ * each carries its count on the tab itself. Four tabs that each placed those
+ * somewhere else read as four products rather than one page.
+ *
+ * THE RULE LIVES WITH THE PEOPLE IT ADMITS. Who may join without an invitation
+ * governs exactly who turns up in the list above it, so it sits under that
+ * list rather than on a page of its own called Access — a word that described
+ * every page in this cluster and therefore none of them. The second-factor
+ * requirement went the other way, to Authentication, because it is a condition
+ * of signing in rather than of becoming a member.
  *
  * TWO PERMISSIONS, TWO JOBS, AND NEITHER IS THE WHOLE PAGE. Reading what a
  * directory did takes `sso:view` — the D05 "see single sign-on" permission —
- * because it is a security reviewer's job. Managing groups takes
- * `organization:manage`. A reader holding either gets the page with the tabs
- * they may open and no others, rather than the page refusing them outright
- * for lacking the half they did not come for. Issuing and revoking a token
- * takes `sso:manage`: a reader without it is offered no control at all, since
- * a disabled button is still an invitation, and inviting somebody to do a
- * thing they will be refused for is worse than not offering it.
+ * because it is a security reviewer's job. The people, the teams, the groups
+ * and the joining rule take `organization:manage`. A reader holding either
+ * gets the page with the tabs they may open and no others, rather than the
+ * page refusing them outright for lacking the half they did not come for.
+ * Issuing and revoking a token takes `sso:manage`: a reader without it is
+ * offered no control at all, since a disabled button is still an invitation,
+ * and inviting somebody to do a thing they will be refused for is worse than
+ * not offering it.
  *
  * A TOKEN NAMES ITS CONNECTION. There is no way to mint one without choosing,
  * because the connection IS the token's write authority and defaulting it
@@ -85,37 +106,53 @@ export default function DirectorySettings() {
   return <DirectorySettingsContent organizationId={organization.id} />;
 }
 
-const TABS = ["overview", "groups", "tokens"] as const;
+const TABS = ["people", "teams", "groups", "provisioning"] as const;
 type DirectoryTab = (typeof TABS)[number];
 
 /** What the reader may open here. */
 interface DirectoryReach {
   /** `sso:view`: the status band, the connection detail and the tokens. */
   maySeeSync: boolean;
-  /** `organization:manage`: the groups, and the counts that read membership. */
-  mayManageGroups: boolean;
+  /**
+   * `organization:manage`: the people, the teams, the groups, the joining
+   * rule, and the counts that read membership.
+   */
+  mayManageMembership: boolean;
 }
+
+/** Which permission each tab is behind, in one table rather than four
+ *  conditionals scattered around a `<Tabs.Root>`. */
+const TAB_NEEDS_MEMBERSHIP: Record<DirectoryTab, boolean> = {
+  people: true,
+  teams: true,
+  groups: true,
+  provisioning: false,
+};
 
 /**
  * The tab actually opened, given what the address asked for and what the
  * reader may have.
  *
  * A tab a reader may not open never becomes the open one, however the address
- * arrived — a link a colleague pasted, a bookmark, or the old groups address
- * forwarding onto its tab. Pure, so the decision can be read in one place
- * rather than inferred from three conditionals around a `<Tabs.Root>`.
+ * arrived — a link a colleague pasted, a bookmark, or one of the three old
+ * addresses forwarding onto the tab it became. Pure, so the decision can be
+ * read in one place.
  */
 export function resolveDirectoryTab({
   requested,
   maySeeSync,
-  mayManageGroups,
+  mayManageMembership,
 }: DirectoryReach & { requested: string | null }): DirectoryTab {
   const asked: DirectoryTab = TABS.includes(requested as DirectoryTab)
     ? (requested as DirectoryTab)
-    : "overview";
-  const mayOpen = asked === "groups" ? mayManageGroups : maySeeSync;
+    : "people";
+  const mayOpen = TAB_NEEDS_MEMBERSHIP[asked]
+    ? mayManageMembership
+    : maySeeSync;
   if (mayOpen) return asked;
-  return maySeeSync ? "overview" : "groups";
+  // Whichever half of the page the reader actually holds. People first,
+  // because a reader with membership came for the people.
+  return mayManageMembership ? "people" : "provisioning";
 }
 
 function DirectorySettingsContent({
@@ -128,9 +165,66 @@ function DirectorySettingsContent({
   });
   const reach: DirectoryReach = {
     maySeeSync: hasPermission("sso:view"),
-    mayManageGroups: hasPermission("organization:manage"),
+    mayManageMembership: hasPermission("organization:manage"),
   };
   const mayManageTokens = hasPermission("sso:manage");
+
+  // The counts the tabs carry. Read here rather than inside each tab, because
+  // a number on a closed tab is the reason somebody opens it — a count that
+  // only appears once you are already looking answers nothing.
+  const groups = api.group.listAll.useQuery(
+    { organizationId },
+    { enabled: reach.mayManageMembership && !!organizationId },
+  );
+  const teams = api.team.getTeamsWithRoleBindings.useQuery(
+    { organizationId },
+    { enabled: reach.mayManageMembership && !!organizationId },
+  );
+  // The same reads the People tab runs, so react-query serves both from one
+  // request and the tab's number can never disagree with its own list.
+  const members =
+    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
+      { organizationId, includeDeactivated: true },
+      { enabled: reach.mayManageMembership && !!organizationId },
+    );
+  const invites = api.organization.getOrganizationPendingInvites.useQuery(
+    { organizationId },
+    { enabled: reach.mayManageMembership && !!organizationId },
+  );
+  const waiting = api.joinRequests.pending.useQuery(
+    { organizationId },
+    { enabled: reach.mayManageMembership && !!organizationId },
+  );
+
+  // HOW MANY DIRECTORIES, AND WHETHER THEY ARE WORKING — on the closed tab.
+  // The count says there are two; the colour says whether either has stopped,
+  // which is the half an administrator wants before deciding to open it.
+  // Retired connections are left out: they provision nobody, so counting them
+  // makes one working directory read as three.
+  const reconciliation = api.scimReconciliation.getAll.useQuery(
+    { organizationId },
+    { enabled: reach.maySeeSync && !!organizationId },
+  );
+  const connectionsBadge = directoryConnectionsBadge(
+    reconciliation.data?.connections.filter(isRunningConnection),
+  );
+
+  /**
+   * Everybody the People tab would list: the members, the invitations still
+   * waiting on somebody, and the people asking to join. Undefined until all
+   * three have answered, so the tab shows no number rather than a number that
+   * is about to grow.
+   */
+  const peopleCount =
+    members.data && invites.data && waiting.data
+      ? members.data.members.length +
+        invites.data.filter(
+          (invite) =>
+            invite.displayStatus === "PENDING" ||
+            invite.displayStatus === "EXPIRED",
+        ).length +
+        waiting.data.length
+      : undefined;
 
   // Which tab is open lives in the address, so "the group you mapped is
   // here" is a link that opens on the groups rather than on the status.
@@ -152,7 +246,7 @@ function DirectorySettingsContent({
       { replace: true },
     );
 
-  if (!reach.maySeeSync && !reach.mayManageGroups) {
+  if (!reach.maySeeSync && !reach.mayManageMembership) {
     return (
       <SettingsLayout>
         <PermissionAlert permission="sso:view" />
@@ -164,19 +258,19 @@ function DirectorySettingsContent({
     <SettingsLayout>
       <VStack gap={6} width="full" align="start">
         {/* THE WAY BACK to Authentication is on the Authentication source
-            fact below, as a plus beside the sources themselves. A whole
-            sentence of a button under the page title said the same thing
+            fact in the band below, as a plus beside the sources themselves. A
+            whole sentence of a button under the page title said the same thing
             louder, in the one place a reader is looking for the page's own
             subject rather than for somewhere else to go. */}
         <SettingsPageHeader
           title="Directory"
-          description="Your identity provider creates, updates and removes people here on its own, over SCIM."
+          description="Who is in this organization, how they got here, and which system says so."
         />
 
         {reach.maySeeSync && (
           <DirectorySummary
             organizationId={organizationId}
-            canReadMembership={reach.mayManageGroups}
+            canReadMembership={reach.mayManageMembership}
           />
         )}
 
@@ -188,46 +282,90 @@ function DirectorySettingsContent({
         >
           {/* The same gap Roles leaves under its own tabs. Two tabbed
               settings pages sitting one menu item apart must not breathe
-              differently. */}
+              differently.
+
+              The explicit space before each count is not decoration: a flex
+              container drops whitespace-only children from layout but keeps
+              them in the text the accessible name is computed from, so
+              without it a tab announces as "Groups4", one run-together
+              token. */}
           <Tabs.List marginBottom={6}>
-            {reach.maySeeSync && (
-              <Tabs.Trigger value="overview">Overview</Tabs.Trigger>
+            {reach.mayManageMembership && (
+              <Tabs.Trigger value="people" gap={2}>
+                People <TabCount value={peopleCount} />
+              </Tabs.Trigger>
             )}
-            {reach.mayManageGroups && (
-              <Tabs.Trigger value="groups">Groups</Tabs.Trigger>
+            {reach.mayManageMembership && (
+              <Tabs.Trigger value="teams" gap={2}>
+                Teams &amp; projects <TabCount value={teams.data?.length} />
+              </Tabs.Trigger>
+            )}
+            {reach.mayManageMembership && (
+              <Tabs.Trigger value="groups" gap={2}>
+                Groups <TabCount value={groups.data?.length} />
+              </Tabs.Trigger>
             )}
             {reach.maySeeSync && (
-              <Tabs.Trigger value="tokens">Tokens</Tabs.Trigger>
+              <Tabs.Trigger value="provisioning" gap={2}>
+                Provisioning{" "}
+                <TabCount
+                  value={connectionsBadge.count}
+                  tone={connectionsBadge.tone}
+                  title={connectionsBadge.title}
+                  data-testid="provisioning-connections-count"
+                />
+              </Tabs.Trigger>
             )}
           </Tabs.List>
 
-          {reach.maySeeSync && (
-            <Tabs.Content value="overview">
-              <OverviewTab
-                organizationId={organizationId}
-                mayReadMembership={reach.mayManageGroups}
-                maySetUpSingleSignOn={mayManageTokens}
-              />
+          {reach.mayManageMembership && (
+            <Tabs.Content value="people">
+              {/* Only the tab being read is mounted: a closed tab must not
+                  hold a read of every member in the organization open behind
+                  it, nor offer its actions to somebody looking elsewhere. */}
+              {tab === "people" && (
+                <PeopleSection organizationId={organizationId} />
+              )}
             </Tabs.Content>
           )}
 
-          {reach.mayManageGroups && (
+          {reach.mayManageMembership && (
+            <Tabs.Content value="teams">
+              {tab === "teams" && (
+                <TeamsAndProjectsSection organizationId={organizationId} />
+              )}
+            </Tabs.Content>
+          )}
+
+          {reach.mayManageMembership && (
             <Tabs.Content value="groups">
-              <GroupsSection organizationId={organizationId} canManage={true} />
+              {tab === "groups" && (
+                <GroupsSection
+                  organizationId={organizationId}
+                  canManage={true}
+                />
+              )}
             </Tabs.Content>
           )}
 
           {reach.maySeeSync && (
-            <Tabs.Content value="tokens">
-              {/* TokensSection is a fragment of stacked blocks, so the tab
+            <Tabs.Content value="provisioning">
+              {/* ProvisioningTab is a fragment of stacked blocks, so the tab
                   supplies the column that spaces them — the same column every
                   other tab on this page uses. */}
-              <VStack gap={6} width="full" align="stretch">
-                <TokensSection
-                  organizationId={organizationId}
-                  mayManage={mayManageTokens}
-                />
-              </VStack>
+              {tab === "provisioning" && (
+                <VStack gap={6} width="full" align="stretch">
+                  <ProvisioningTab
+                    organizationId={organizationId}
+                    mayReadMembership={reach.mayManageMembership}
+                    maySetUpSingleSignOn={mayManageTokens}
+                  />
+                  <TokensSection
+                    organizationId={organizationId}
+                    mayManage={mayManageTokens}
+                  />
+                </VStack>
+              )}
             </Tabs.Content>
           )}
         </Tabs.Root>
@@ -241,14 +379,19 @@ function DirectorySettingsContent({
  * send the next one.
  *
  *   connections ──► the people they manage ──► the address to point at
+ *                                              ──► the token to point with
  *
  * The order is the reader's own question narrowing: is it working, is it
  * working on the right people, and — only if they are still setting it up —
  * what do I paste into the identity provider. The people sit in the middle
  * because they are what the connections above them are FOR, and they are the
  * one thing the status band can count but cannot show.
+ *
+ * The address and the token are one errand and are now on one tab. They were
+ * two, so an administrator halfway through configuring a provider had to copy
+ * a value, change tab, and come back for the other half.
  */
-function OverviewTab({
+function ProvisioningTab({
   organizationId,
   mayReadMembership,
   maySetUpSingleSignOn,
@@ -280,15 +423,21 @@ function OverviewTab({
 
       <VStack gap={2} align="stretch" width="full">
         <Heading size="sm">Where your identity provider sends it</Heading>
+        {/* THE PROTOCOL, NAMED. The navigation entry says Directory because
+            that is what the page holds, but an IT administrator arrives here
+            having searched for SCIM — and this address is the SCIM endpoint,
+            so this is the honest place for the word rather than a sentence
+            about it under the page title. */}
         <Text color="fg.muted" fontSize="sm">
-          Each token works against one single sign-on connection and only
-          manages the people that connection provisioned.
+          Your identity provider talks to us over SCIM. Each token works against
+          one single sign-on connection and only manages the people that
+          connection provisioned.
         </Text>
         <CopyValueRows
           rows={[
             {
               label: "Provisioning address",
-              hint: "Paste this into your identity provider, with a token from the Tokens tab",
+              hint: "Paste this into your identity provider, with a token from below",
               value: scimBaseUrl,
             },
           ]}

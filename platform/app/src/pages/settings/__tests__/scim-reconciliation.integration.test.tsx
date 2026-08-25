@@ -52,10 +52,46 @@ const apiDouble = {
         }),
       },
     },
+    team: {
+      getTeamsWithRoleBindings: {
+        useQuery: () => ({
+          data: [],
+          isLoading: false,
+          isError: false,
+          error: null,
+        }),
+      },
+    },
+    joinRequests: {
+      pending: {
+        useQuery: () => ({
+          data: [],
+          isLoading: false,
+          isError: false,
+          error: null,
+        }),
+      },
+    },
     organization: {
       getMemberProvenance: {
         useQuery: () => ({
           data: {},
+          isLoading: false,
+          isError: false,
+          error: null,
+        }),
+      },
+      getOrganizationWithMembersAndTheirTeams: {
+        useQuery: () => ({
+          data: { members: [] },
+          isLoading: false,
+          isError: false,
+          error: null,
+        }),
+      },
+      getOrganizationPendingInvites: {
+        useQuery: () => ({
+          data: [],
           isLoading: false,
           isError: false,
           error: null,
