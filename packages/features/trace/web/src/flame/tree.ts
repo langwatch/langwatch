@@ -1,12 +1,17 @@
-import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
-import { formatDuration } from "../../../utils/formatters";
-import type { BuiltTree, FlameNode, SpanContext, Viewport } from "./types";
+import { formatDuration } from "../display-formatters";
+import type {
+  BuiltTree,
+  FlameNode,
+  SpanContext,
+  TraceFlameSpan,
+  Viewport,
+} from "./types";
 
-export function buildTree(spans: SpanTreeNode[]): BuiltTree {
-  const spanById = new Map<string, SpanTreeNode>();
+export function buildTree(spans: TraceFlameSpan[]): BuiltTree {
+  const spanById = new Map<string, TraceFlameSpan>();
   for (const s of spans) spanById.set(s.spanId, s);
 
-  const childrenMap = new Map<string | null, SpanTreeNode[]>();
+  const childrenMap = new Map<string | null, TraceFlameSpan[]>();
   for (const s of spans) {
     const parentExists = s.parentSpanId ? spanById.has(s.parentSpanId) : false;
     const key = parentExists ? s.parentSpanId : null;

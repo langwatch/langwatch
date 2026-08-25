@@ -20,3 +20,5 @@ export * from "./find-scroll-trace-into-view";
 export * from "./find-match-highlight";
 export * from "./find-match-counter";
 export * from "./trace-find-bar";
+export { FlameView } from "./flame/flame-view";
+export type { FlameViewProps, TraceFlameSpan } from "./flame/types";

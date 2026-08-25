@@ -1,7 +1,7 @@
 import { Box, Text } from "@chakra-ui/react";
-import { Tooltip } from "~/components/ui/tooltip";
-import { formatDuration, SPAN_TYPE_COLORS } from "../../../utils/formatters";
-import { BlockLabel } from "./BlockLabel";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { formatDuration } from "../display-formatters";
+import { BlockLabel } from "./block-label";
 import {
   DEPTH_FADE_FLOOR,
   DEPTH_FADE_STEP,
@@ -10,6 +10,7 @@ import {
   TINY_BLOCK_ALPHA_FACTOR,
   TINY_BLOCK_PCT,
 } from "./constants";
+import { getSpanColor } from "./colors";
 import { formatPercent } from "./tree";
 import type { FlameNode, Viewport } from "./types";
 
@@ -64,7 +65,7 @@ export function FlameBlock({
   // Skip ultra-narrow blocks at large traces (perf).
   if (widthPct < 0.05 && totalSpanCount > 200) return null;
 
-  const color = (SPAN_TYPE_COLORS[span.type ?? "span"] as string) ?? "gray.solid";
+  const color = getSpanColor(span.type);
   // `gray.solid` is too low-saturation for the white-on-fill recipe
   // every other palette uses — at 85% alpha on a white canvas the
   // result is a pale grey that white text dissolves into (operator

@@ -28,7 +28,8 @@ reader until that complete migration.
 preview formatting, prompt/SDK/origin labels, time and URL display state, the
 input/output and media-strip views, and the billed-versus-bundled cost split.
 It also owns the loaded-trace find index, match cycling, browser highlighting,
-and find-bar presentation. The app keeps thin compatibility adapters while
+and find-bar presentation, plus the controlled flame-graph presentation and
+viewport/tree behaviour. The app keeps thin compatibility adapters while
 page composition, authentication, data fetching, and every trace transport
 response remain in the app.
 

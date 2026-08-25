@@ -1,4 +1,4 @@
-import { formatDuration } from "../../../utils/formatters";
+import { formatDuration } from "../display-formatters";
 import { formatPercent } from "./tree";
 
 export function BlockLabel({

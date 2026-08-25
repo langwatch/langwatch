@@ -1,5 +1,5 @@
 import { Flex, HStack, Text } from "@chakra-ui/react";
-import { formatDuration } from "../../../utils/formatters";
+import { formatDuration } from "../display-formatters";
 import { formatPercent } from "./tree";
 import type { FlameNode, SpanContext } from "./types";
 

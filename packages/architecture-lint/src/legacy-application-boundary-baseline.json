@@ -1283,12 +1283,6 @@
       "platform/app/src/features/traces-v2/components/TraceDrawer/evalCards/EvalCard.tsx": [
         "~/server/app-layer/evaluations/azure-safety-env"
       ],
-      "platform/app/src/features/traces-v2/components/TraceDrawer/flameView/tree.ts": [
-        "~/server/api/routers/tracesV2.schemas"
-      ],
-      "platform/app/src/features/traces-v2/components/TraceDrawer/flameView/types.ts": [
-        "~/server/api/routers/tracesV2.schemas"
-      ],
       "platform/app/src/features/traces-v2/components/TraceDrawer/LangwatchSignalBadges.tsx": [
         "~/server/api/routers/tracesV2.schemas"
       ],

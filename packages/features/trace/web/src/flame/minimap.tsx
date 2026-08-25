@@ -1,13 +1,14 @@
 import { Box, Flex, Text } from "@chakra-ui/react";
 import { useCallback, useRef } from "react";
-import { Tooltip } from "~/components/ui/tooltip";
-import { formatDuration, SPAN_TYPE_COLORS } from "../../../utils/formatters";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { formatDuration } from "../display-formatters";
 import {
   MIN_VIEWPORT_MS,
   MINIMAP_HANDLE_PX,
   MINIMAP_HEIGHT,
   MINIMAP_WIDTH,
 } from "./constants";
+import { getSpanColor } from "./colors";
 import type { FlameNode, Viewport } from "./types";
 
 export function Minimap({
@@ -215,8 +216,7 @@ export function Minimap({
               ((node.span.endTimeMs - node.span.startTimeMs) / fullDur) * 100,
             );
             const top = 2 + node.depth * rowH;
-            const color =
-              (SPAN_TYPE_COLORS[node.span.type ?? "span"] as string) ?? "gray.solid";
+            const color = getSpanColor(node.span.type);
             return (
               <Box
                 key={node.span.spanId}

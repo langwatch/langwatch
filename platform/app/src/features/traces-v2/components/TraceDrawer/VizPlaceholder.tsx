@@ -30,7 +30,7 @@ import { useOverflowVisibility } from "../../hooks/useOverflowVisibility";
 import { useDrawerStore, type VizTab } from "../../stores/drawerStore";
 import { SPAN_TYPE_COLORS } from "../../utils/formatters";
 import { OverflowMenu } from "../shared/OverflowMenu";
-import { FlameView } from "./flameView/FlameView";
+import { FlameView } from "@langwatch/trace-web";
 import { SequenceSkeleton } from "./sequenceView/SequenceSkeleton";
 import { TopologySkeleton } from "./sequenceView/TopologySkeleton";
 import { WaterfallView } from "./waterfallView";
@@ -564,6 +564,7 @@ export function VizPlaceholder({
                 selectedSpanId={selectedSpanId}
                 onSelectSpan={onSelectSpan}
                 onClearSpan={onClearSpan}
+                renderShortcutKey={(label) => <Kbd>{label}</Kbd>}
               />
             ) : (
               // Default — waterfall. Any unrecognised vizTab (e.g. a

@@ -1,14 +1,26 @@
-import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
+import type { ReactNode } from "react";
+
+export type TraceFlameSpan = {
+  spanId: string;
+  parentSpanId: string | null;
+  name: string;
+  type: string | null;
+  startTimeMs: number;
+  endTimeMs: number;
+  status: "ok" | "error" | "unset";
+  model: string | null;
+};
 
 export interface FlameViewProps {
-  spans: SpanTreeNode[];
+  spans: TraceFlameSpan[];
   selectedSpanId: string | null;
   onSelectSpan: (spanId: string) => void;
   onClearSpan: () => void;
+  renderShortcutKey: (label: string) => ReactNode;
 }
 
 export interface FlameNode {
-  span: SpanTreeNode;
+  span: TraceFlameSpan;
   depth: number;
   parent: FlameNode | null;
   children: FlameNode[];
@@ -18,6 +30,18 @@ export interface FlameNode {
 export interface Viewport {
   startMs: number;
   endMs: number;
+}
+
+export interface FlameTick {
+  time: number;
+  label: string;
+}
+
+export interface FlameRelatedSpanIds {
+  ancestors: Set<string>;
+  descendants: Set<string>;
+  parent: FlameNode | null;
+  children: Set<string>;
 }
 
 export interface BuiltTree {

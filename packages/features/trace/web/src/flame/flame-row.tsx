@@ -1,7 +1,7 @@
 import { Box } from "@chakra-ui/react";
 import type { VirtualItem } from "@tanstack/react-virtual";
 import { ROW_HEIGHT } from "./constants";
-import { FlameBlock } from "./FlameBlock";
+import { FlameBlock } from "./flame-block";
 import type { FlameNode, Viewport } from "./types";
 
 interface RelatedSpanIds {

@@ -1,8 +1,8 @@
 import { Flex, HStack, Icon, Text } from "@chakra-ui/react";
-import { LuChevronRight, LuRotateCcw } from "react-icons/lu";
-import { Kbd } from "~/components/ops/shared/Kbd";
-import { Tooltip } from "~/components/ui/tooltip";
-import { formatDuration } from "../../../utils/formatters";
+import { ChevronRight, RotateCcw } from "lucide-react";
+import type { ReactNode } from "react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { formatDuration } from "../display-formatters";
 import { formatPercent } from "./tree";
 import type { FlameNode } from "./types";
 
@@ -11,6 +11,7 @@ interface FlameBreadcrumbsProps {
   isZoomed: boolean;
   onResetZoom: () => void;
   onSpanDoubleClick: (spanId: string) => void;
+  renderShortcutKey: (label: string) => ReactNode;
 }
 
 /**
@@ -22,6 +23,7 @@ export function FlameBreadcrumbs({
   isZoomed,
   onResetZoom,
   onSpanDoubleClick,
+  renderShortcutKey,
 }: FlameBreadcrumbsProps) {
   return (
     <Flex
@@ -54,7 +56,9 @@ export function FlameBreadcrumbs({
             parentDur !== null && parentDur > 0 ? (crumbDur / parentDur) * 100 : null;
           return (
             <HStack key={node.span.spanId} gap={0} minWidth={0}>
-              <Icon as={LuChevronRight} boxSize={3} color="fg.subtle" />
+              <Icon boxSize={3} color="fg.subtle">
+                <ChevronRight size={12} />
+              </Icon>
               <HStack
                 as="button"
                 gap={1}
@@ -88,7 +92,7 @@ export function FlameBreadcrumbs({
           content={
             <HStack gap={1}>
               <Text>Reset zoom</Text>
-              <Kbd>Esc</Kbd>
+              {renderShortcutKey("Esc")}
             </HStack>
           }
           positioning={{ placement: "top" }}
@@ -106,7 +110,9 @@ export function FlameBreadcrumbs({
             onClick={onResetZoom}
             flexShrink={0}
           >
-            <Icon as={LuRotateCcw} boxSize={3} />
+            <Icon boxSize={3}>
+              <RotateCcw size={12} />
+            </Icon>
             <Text textStyle="xs">Reset</Text>
           </Flex>
         </Tooltip>

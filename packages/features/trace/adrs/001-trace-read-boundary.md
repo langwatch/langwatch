@@ -21,8 +21,10 @@ This slice does not move headers, full/detail reads, list/search, projections,
 eventing, overlays, evaluations, enrichment, resources, logs, or signals.
 The browser package contains only dependency-free display helpers and cannot
 fetch, authorize, compose, or reshape a trace response. It also owns the
-transport-neutral loaded-row find behaviour; the app supplies rows, its Kbd
-skin, and shortcut composition. Those paths move only
+transport-neutral loaded-row find behaviour and the flame-graph presentation.
+The app supplies loaded span rows, selection callbacks, its Kbd skin, and
+shortcut composition; a small `TraceFlameSpan` input keeps the response schema
+out of the web package. Those paths move only
 with their complete response parity characterized.
 
 ## Compatibility gate

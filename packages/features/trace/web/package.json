@@ -21,6 +21,8 @@
   },
   "dependencies": {
     "@chakra-ui/react": "^3.36.0",
+    "@langwatch/design-system": "workspace:*",
+    "@tanstack/react-virtual": "^3.14.5",
     "lucide-react": "^1.22.0",
     "react": "^19.2.7",
     "zustand": "^4.5.7"
