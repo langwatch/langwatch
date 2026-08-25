@@ -60,9 +60,9 @@ describe("given a fresh checkout without generated files", () => {
         expect.fail("CONTRIBUTING.md lost its bash block naming the command");
       }
 
-      const named = [
-        ...setupBlock.matchAll(/pnpm ([a-z:.-]+)/g),
-      ].flatMap((match) => (match[1] ? [match[1]] : []));
+      const named = [...setupBlock.matchAll(/pnpm ([a-z:.-]+)/g)].flatMap(
+        (match) => (match[1] ? [match[1]] : []),
+      );
       expect(named.length).toBeGreaterThan(0);
       for (const name of named) {
         expect(root[name]).toBeDefined();
