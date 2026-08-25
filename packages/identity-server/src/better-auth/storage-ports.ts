@@ -35,6 +35,10 @@ export interface IdentityAccountRow {
   id: string;
   userId: string;
   providerId: string;
+  /** better-auth 1.7's account key half. Not stored — `Identifier` keys on
+   *  `providerId` — so the adapter stamps it on the way out and nothing
+   *  below this interface is asked to keep it. */
+  issuer?: string;
   accountId: string;
   password: string | null;
   accessToken: string | null;

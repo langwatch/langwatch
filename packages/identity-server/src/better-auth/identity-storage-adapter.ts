@@ -17,6 +17,7 @@ import {
   type AccountQuery,
   type AccountWhere,
   IdentityUnsupportedStorageQueryError,
+  issuerForProviderId,
   parseAccountQuery,
 } from "./account-queries";
 import type { IdentityAccountCeremonies } from "./ceremony-types";
@@ -290,6 +291,14 @@ function identityCustomAdapter({
      * An empty array is an ANSWER — this user holds no such account — and
      * is never a reason to read the legacy table as well.
      */
+    /** The row as better-auth 1.7 expects it: carrying the issuer the
+     *  identity tables do not store. Stamped on the way OUT, once, so the
+     *  storage ports stay free of better-auth's schema. */
+    const withIssuer = (row: IdentityAccountRow): IdentityAccountRow => ({
+      ...row,
+      issuer: issuerForProviderId(row.providerId),
+    });
+
     const serveAccounts = async (
       query: AccountQuery,
     ): Promise<IdentityAccountRow[] | null> => {
@@ -299,6 +308,19 @@ function identityCustomAdapter({
         case "byUserAndProvider": {
           const rows = await accounts.findByUser({ userId: query.userId });
           return rows.filter((row) => row.providerId === query.providerId);
+        }
+        case "byUserProviderSubject": {
+          // The user is named, so the gate is decidable without resolving the
+          // subject first — and the row is read under that user, which is
+          // what keeps a subject collision between two IdPs from answering
+          // with the wrong person's account.
+          if (!(await routesToIdentity({ userId: query.userId }))) return null;
+          const row = await accounts.findByProviderSubject({
+            userId: query.userId,
+            providerId: query.providerId,
+            providerAccountId: query.accountId,
+          });
+          return row === null ? null : [row];
         }
         case "byId":
         case "byIds": {
@@ -367,7 +389,10 @@ function identityCustomAdapter({
         // operator has enrolled anyone.
         return null;
       }
-      return serveAccounts(parseAccountQuery({ operation, where: canonical }));
+      const served = await serveAccounts(
+        parseAccountQuery({ operation, where: canonical }),
+      );
+      return served === null ? null : served.map(withIssuer);
     };
 
     const applySecrets = async ({

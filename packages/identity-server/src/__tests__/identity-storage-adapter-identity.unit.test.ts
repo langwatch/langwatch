@@ -32,6 +32,20 @@ const EMAIL = "member@acme.com";
 
 type Stack = IdentityStack;
 
+/**
+ * The issuer better-auth 1.7 keys an account by, for a provider that declares
+ * none of its own.
+ *
+ * 1.7 re-keyed the account identity from `(providerId, accountId)` to
+ * `(issuer, accountId)`, and synthesises this value for every social provider
+ * that does not name an issuer. Inlined rather than imported: the builder is
+ * exported only from `@better-auth/core/db`, and this package peer-depends on
+ * `better-auth` alone — taking the core package as a dependency to reach two
+ * lines of string construction would widen the seam for a test's convenience.
+ */
+const oauthIssuer = (providerId: string): string =>
+  `local:oauth:${encodeURIComponent(providerId)}`;
+
 const userIdOf = (stack: Stack): string => stack.db.user?.[0]?.id as string;
 
 /** One user's id when a suite holds more than one of them. */
@@ -102,6 +116,7 @@ describe("better-auth over the identity storage adapter", () => {
         await context.internalAdapter.linkAccount({
           userId,
           providerId: "google",
+          issuer: oauthIssuer("google"),
           accountId: "sub-google-1",
         });
         expect(
@@ -274,8 +289,11 @@ describe("better-auth over the identity storage adapter", () => {
 
         // After it: the identifier holds the D01-normalized value, so the
         // same address only resolves if the branch normalizes the query too.
+        // The case is folded and the TAG SURVIVES (6b62a98725): the tag is
+        // part of the address, so this stays a different mailbox from
+        // `sam.j@acme.com` rather than being merged onto it.
         await signUp(stack.auth, "sam.j+news@acme.com");
-        expect(statedIdentifiers(stack)[0]?.value).toBe("sam.j@acme.com");
+        expect(statedIdentifiers(stack)[0]?.value).toBe("sam.j+news@acme.com");
         stack.db.account = [];
 
         const signedIn = await stack.auth.api.signInEmail({
@@ -294,27 +312,30 @@ describe("better-auth over the identity storage adapter", () => {
         await context.internalAdapter.linkAccount({
           userId,
           providerId: "google",
+          issuer: oauthIssuer("google"),
           accountId: "g-123",
         });
         stack.db.account = [];
 
-        const resolved = await context.internalAdapter.findOAuthUser(
-          EMAIL,
-          "g-123",
-          "google",
-        );
+        const resolved = await context.internalAdapter.findAccountOwnerByKey({
+          issuer: oauthIssuer("google"),
+          accountId: "g-123",
+        });
 
-        expect(resolved?.user.id).toBe(userId);
-        expect(resolved?.linkedAccount?.providerId).toBe("google");
+        expect(resolved?.kind).toBe("owned");
+        expect(
+          resolved?.kind === "owned" ? resolved.user.id : null,
+        ).toBe(userId);
+        expect(resolved?.account.providerId).toBe("google");
 
         // A held user — the projection holds them, the gate does not open —
         // falls through to the legacy branch, which is still their truth.
         stack.gate.open = () => false;
         expect(
-          await context.internalAdapter.findAccountByProviderId(
-            "g-123",
-            "google",
-          ),
+          await context.internalAdapter.findAccountByKey({
+            issuer: oauthIssuer("google"),
+            accountId: "g-123",
+          }),
         ).toBeNull();
       });
     });
@@ -328,6 +349,7 @@ describe("better-auth over the identity storage adapter", () => {
         await context.internalAdapter.linkAccount({
           userId,
           providerId: "google",
+          issuer: oauthIssuer("google"),
           accountId: "sub-google-1",
         });
 
@@ -368,6 +390,7 @@ describe("better-auth over the identity storage adapter", () => {
         await context.internalAdapter.linkAccount({
           userId,
           providerId: "google",
+          issuer: oauthIssuer("google"),
           accountId: "sub-google-1",
         });
         const kept = (await context.internalAdapter.findAccounts(userId))[0];
@@ -398,6 +421,7 @@ describe("better-auth over the identity storage adapter", () => {
         await context.internalAdapter.linkAccount({
           userId,
           providerId: "google",
+          issuer: oauthIssuer("google"),
           accountId: "sub-google-1",
         });
         const google = (await context.internalAdapter.findAccounts(userId)).find(
@@ -631,6 +655,7 @@ describe("better-auth over the identity storage adapter", () => {
         await context.internalAdapter.linkAccount({
           userId,
           providerId: "google",
+          issuer: oauthIssuer("google"),
           accountId: "sub-google-1",
         });
 
@@ -670,6 +695,7 @@ describe("better-auth over the identity storage adapter", () => {
         await context.internalAdapter.linkAccount({
           userId,
           providerId: "google",
+          issuer: oauthIssuer("google"),
           accountId: "sub-google-1",
         });
         const google = (stack.db.account ?? []).find(
@@ -820,16 +846,17 @@ describe("better-auth over the identity storage adapter", () => {
         await context.internalAdapter.linkAccount({
           userId,
           providerId: "auth0",
+          issuer: oauthIssuer("auth0"),
           accountId: "auth0|abc123",
         });
         // Every legacy row gone: whatever answers below came out of
         // `Identifier` joined to its credential, and nothing else.
         stack.db.account = [];
 
-        const found = await context.internalAdapter.findAccountByProviderId(
-          "auth0|abc123",
-          "auth0",
-        );
+        const found = await context.internalAdapter.findAccountByKey({
+          issuer: oauthIssuer("auth0"),
+          accountId: "auth0|abc123",
+        });
 
         expect(found?.userId).toBe(userId);
         // The folded vocabulary must never leak back: `oidc` here would mean
@@ -839,13 +866,15 @@ describe("better-auth over the identity storage adapter", () => {
 
         // The same lookup through the callback's own entry point, which is
         // what better-auth actually calls when the IdP returns.
-        const resolved = await context.internalAdapter.findOAuthUser(
-          EMAIL,
-          "auth0|abc123",
-          "auth0",
-        );
-        expect(resolved?.user.id).toBe(userId);
-        expect(resolved?.linkedAccount?.providerId).toBe("auth0");
+        const resolved = await context.internalAdapter.findAccountOwnerByKey({
+          issuer: oauthIssuer("auth0"),
+          accountId: "auth0|abc123",
+        });
+        expect(resolved?.kind).toBe("owned");
+        expect(
+          resolved?.kind === "owned" ? resolved.user.id : null,
+        ).toBe(userId);
+        expect(resolved?.account.providerId).toBe("auth0");
         // The fact carries the folded vocabulary, so the verbatim id in the
         // answer above came from the row, not from the query echoing back.
         expect(
@@ -865,14 +894,15 @@ describe("better-auth over the identity storage adapter", () => {
         await context.internalAdapter.linkAccount({
           userId,
           providerId: "okta",
+          issuer: oauthIssuer("okta"),
           accountId: "00u1a2b3c4",
         });
         stack.db.account = [];
 
-        const found = await context.internalAdapter.findAccountByProviderId(
-          "00u1a2b3c4",
-          "okta",
-        );
+        const found = await context.internalAdapter.findAccountByKey({
+          issuer: oauthIssuer("okta"),
+          accountId: "00u1a2b3c4",
+        });
 
         expect(found?.userId).toBe(userId);
         expect(found?.providerId).toBe("okta");
@@ -900,23 +930,25 @@ describe("better-auth over the identity storage adapter", () => {
         await context.internalAdapter.linkAccount({
           userId: samId,
           providerId: "auth0",
+          issuer: oauthIssuer("auth0"),
           accountId: "user-1",
         });
         await context.internalAdapter.linkAccount({
           userId: olgaId,
           providerId: "okta",
+          issuer: oauthIssuer("okta"),
           accountId: "user-1",
         });
         stack.db.account = [];
 
-        const fromAuth0 = await context.internalAdapter.findAccountByProviderId(
-          "user-1",
-          "auth0",
-        );
-        const fromOkta = await context.internalAdapter.findAccountByProviderId(
-          "user-1",
-          "okta",
-        );
+        const fromAuth0 = await context.internalAdapter.findAccountByKey({
+          issuer: oauthIssuer("auth0"),
+          accountId: "user-1",
+        });
+        const fromOkta = await context.internalAdapter.findAccountByKey({
+          issuer: oauthIssuer("okta"),
+          accountId: "user-1",
+        });
 
         expect(fromAuth0?.userId).toBe(samId);
         expect(fromOkta?.userId).toBe(olgaId);
