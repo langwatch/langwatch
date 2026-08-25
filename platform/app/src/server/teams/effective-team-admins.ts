@@ -3,6 +3,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { liveGroupMemberships } from "~/server/app-layer/authz/repositories/live-rows";
 
 /**
  * Who effectively administers a team.
@@ -66,7 +67,7 @@ async function groupMemberUserIds({
   groupIds: string[];
 }): Promise<string[]> {
   if (groupIds.length === 0) return [];
-  const memberships = await tx.groupMembership.findMany({
+  const memberships = await liveGroupMemberships(tx).findMany({
     where: { groupId: { in: groupIds } },
     select: { userId: true },
   });
@@ -147,7 +148,7 @@ export async function isUserAdminViaGroup({
   });
   if (groupIds.length === 0) return false;
 
-  const count = await tx.groupMembership.count({
+  const count = await liveGroupMemberships(tx).count({
     where: { userId, groupId: { in: groupIds } },
   });
   return count > 0;

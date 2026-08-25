@@ -241,16 +241,19 @@ function buildRepository({
   grantIds,
   survivingGrantRows = 0,
   survivingBindingRows = 0,
+  removedMembershipIds = ["groupmember_1"],
 }: {
   bindingIds: string[];
   grantIds: string[];
+  /** The live memberships the ledger ended, in the order the sweep reports
+   *  them — the count the offboard result answers with. */
+  removedMembershipIds?: string[];
   /** Grant-head rows still present INSIDE the transaction - the shape of a
    *  revocation that never actually landed. */
   survivingGrantRows?: number;
   survivingBindingRows?: number;
 }) {
   const tx = {
-    groupMembership: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
     teamUser: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     organizationUser: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
     user: {
@@ -272,10 +275,20 @@ function buildRepository({
     $transaction: vi.fn(async (run: (t: typeof tx) => unknown) => run(tx)),
   } as unknown as PrismaClient;
   const offboardMember = vi.fn().mockResolvedValue(undefined);
-  const writer = { offboardMember } as unknown as GrantsLedgerWriter;
+  // Group memberships END through the ledger now, ahead of the transaction:
+  // the sweep used to `deleteMany` them, which threw away which groups the
+  // leaver was in and when they left (ADR-125's gap 3).
+  const removeGroupMembersWhere = vi
+    .fn()
+    .mockResolvedValue(removedMembershipIds);
+  const writer = {
+    offboardMember,
+    removeGroupMembersWhere,
+  } as unknown as GrantsLedgerWriter;
   return {
     repository: new LedgerAuthzGrantsRepository(prisma, writer),
     offboardMember,
+    removeGroupMembersWhere,
     grantFindMany,
     tx,
   };
@@ -315,6 +328,36 @@ describe("given a member being offboarded", () => {
           revokedGrantIds: ["shared-1", "compat-only-2", "lite-member-3"],
         }),
       );
+    });
+  });
+
+  describe("when the leaver is in groups", () => {
+    /** @scenario "The record still shows they were in it and when they left" */
+    it("ends their memberships through the ledger rather than deleting them", async () => {
+      const { repository, removeGroupMembersWhere, tx } = buildRepository({
+        bindingIds: [],
+        grantIds: [],
+        removedMembershipIds: ["groupmember_1", "groupmember_2"],
+      });
+
+      const result = await repository.offboardUser({
+        userId: OFFBOARD_USER_ID,
+        organizationId: OFFBOARD_ORG_ID,
+        actor: ACTOR,
+        prove: async () => undefined,
+      });
+
+      expect(removeGroupMembersWhere).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: OFFBOARD_ORG_ID,
+          where: { userId: OFFBOARD_USER_ID },
+          bypass: "offboard",
+        }),
+      );
+      // Nothing in the transaction touches the table any more: the sweep's
+      // `deleteMany` is what erased which groups the leaver was in.
+      expect(tx).not.toHaveProperty("groupMembership");
+      expect(result.groupMemberships).toBe(2);
     });
   });
 

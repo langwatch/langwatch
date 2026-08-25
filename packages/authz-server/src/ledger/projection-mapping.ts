@@ -11,6 +11,7 @@ import type {
 import type {
   GrantEventSource,
   GrantFact,
+  GroupMembershipFact,
   LedgerPrincipalType,
   LedgerScopeType,
   LegacyBindingRole,
@@ -205,6 +206,52 @@ export function grantRowToFact(row: GrantRowShape): GrantFact {
         }
       : {}),
     source: row.source as GrantEventSource,
+    occurredAtMs: row.occurredAt.getTime(),
+  };
+}
+
+/**
+ * The `GroupMembership` table as the fold writes it.
+ *
+ * `removedAt` is absent from the shape rather than merely unset, for the
+ * reason `viewCount` is absent from `CompatShareLinkRowShape`: a full-row
+ * write must never be able to state it. The mark has its own event and its
+ * own guarded statement, and an `added` redelivered after a `removed` would
+ * otherwise un-remove the membership — which is the fail-open direction.
+ */
+export interface GroupMembershipRowShape {
+  id: string;
+  groupId: string;
+  userId: string;
+  occurredAt: Date;
+}
+
+export function groupMembershipFactToRow({
+  membership,
+}: {
+  membership: GroupMembershipFact;
+}): GroupMembershipRowShape {
+  return {
+    id: membership.membershipId,
+    groupId: membership.groupId,
+    userId: membership.userId,
+    occurredAt: new Date(membership.occurredAtMs),
+  };
+}
+
+/**
+ * The inverse. `source` is not on the row — the table has no column for it
+ * and adding one would say nothing a reader uses — so a fact read back out of
+ * the projection names the writer it can prove: the ledger itself.
+ */
+export function groupMembershipRowToFact(
+  row: GroupMembershipRowShape,
+): GroupMembershipFact {
+  return {
+    membershipId: row.id,
+    groupId: row.groupId,
+    userId: row.userId,
+    source: "grants-service",
     occurredAtMs: row.occurredAt.getTime(),
   };
 }

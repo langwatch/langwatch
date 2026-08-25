@@ -8,6 +8,8 @@ import {
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,
   GRANT_ROLE_CHANGED_EVENT_TYPE,
+  GROUP_MEMBER_ADDED_EVENT_TYPE,
+  GROUP_MEMBER_REMOVED_EVENT_TYPE,
   ROLE_DEFINED_EVENT_TYPE,
   ROLE_DELETED_EVENT_TYPE,
   ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
@@ -28,6 +30,11 @@ export const AUTHZ_AUDIT_EVENT_TYPES = [
   ROLE_DEFINED_EVENT_TYPE,
   ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
   ROLE_DELETED_EVENT_TYPE,
+  // A membership change is an access change: it moves what every grant the
+  // group holds reaches. A reviewer asking "what changed since last quarter"
+  // who cannot see somebody joining `sec-eng` is reading half a log.
+  GROUP_MEMBER_ADDED_EVENT_TYPE,
+  GROUP_MEMBER_REMOVED_EVENT_TYPE,
 ] as const;
 
 /**
@@ -50,6 +57,8 @@ const AUDIT_VERB_BY_EVENT_TYPE: Record<AuditableEventType, AuthzAuditVerb> = {
   [ROLE_DEFINED_EVENT_TYPE]: "role_defined",
   [ROLE_PERMISSIONS_CHANGED_EVENT_TYPE]: "role_permissions_changed",
   [ROLE_DELETED_EVENT_TYPE]: "role_deleted",
+  [GROUP_MEMBER_ADDED_EVENT_TYPE]: "group_member_added",
+  [GROUP_MEMBER_REMOVED_EVENT_TYPE]: "group_member_removed",
 };
 
 const logger = createLogger("langwatch:authz:audit-trail");
@@ -159,6 +168,21 @@ const AUDIT_METADATA_FIELDS: Record<AuditableEventType, readonly string[]> = {
   ],
   [ROLE_PERMISSIONS_CHANGED_EVENT_TYPE]: ["roleId", "permissions"],
   [ROLE_DELETED_EVENT_TYPE]: ["roleId"],
+  // The membership row is gone by the time a group is deleted, so the audit
+  // row has to name the group and the user itself — `membershipId` alone
+  // would be a key into a table that no longer holds it.
+  [GROUP_MEMBER_ADDED_EVENT_TYPE]: [
+    "membershipId",
+    "groupId",
+    "userId",
+    "source",
+  ],
+  [GROUP_MEMBER_REMOVED_EVENT_TYPE]: [
+    "membershipId",
+    "groupId",
+    "userId",
+    "reason",
+  ],
 };
 
 /** The named fields this event actually carries. An absent optional field
@@ -214,8 +238,13 @@ export function toAuthzAuditRow(event: AuthzGrantsEvent): AuthzAuditRow {
     // actually changed.
     createdAt: new Date(event.occurredAt),
     userId: actor?.type === "user" ? actor.id : null,
-    // One aggregate per organization (ADR-092 §13).
-    organizationId: event.aggregateId,
+    // The organization is the event's TENANT (ADR-110), never its aggregate:
+    // the aggregate is the grant, the role, or the membership the event is
+    // about, so the owning organization can only come from the envelope. This
+    // read `event.aggregateId` while the aggregate still WAS the organization,
+    // and kept reading it afterwards — which filed every audit row under a
+    // grant id, in a column the audit page queries by organization.
+    organizationId: event.tenantId,
     action: `${AUTHZ_AUDIT_ACTION_PREFIX}${verb}`,
     metadata: auditMetadata(event),
   };

@@ -99,12 +99,24 @@ export interface GroupRepository {
     }>
   >;
 
+  /**
+   * Membership writes carry an actor and an organization now, because they are
+   * grant facts: the ledger records who made the change, and the organization
+   * is the tenant of the events it appends.
+   */
   addMember(params: {
     groupId: string;
+    organizationId: string;
     userId: string;
+    actor: LedgerActor;
   }): Promise<GroupMembership>;
 
-  removeMember(params: { groupId: string; userId: string }): Promise<void>;
+  removeMember(params: {
+    groupId: string;
+    organizationId: string;
+    userId: string;
+    actor: LedgerActor;
+  }): Promise<void>;
 
   findBindings(params: {
     organizationId: string;
@@ -127,7 +139,11 @@ export interface GroupRepository {
     actor: LedgerActor;
   }): Promise<void>;
 
-  deleteAllMemberships(params: { groupId: string }): Promise<void>;
+  deleteAllMemberships(params: {
+    groupId: string;
+    organizationId: string;
+    actor: LedgerActor;
+  }): Promise<void>;
 
   deleteAllBindings(params: {
     groupId: string;

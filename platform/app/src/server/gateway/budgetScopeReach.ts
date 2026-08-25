@@ -16,7 +16,7 @@
  * traffic that accrued nothing.
  */
 import type { GatewayBudget, PrismaClient } from "~/generated/prisma/client";
-
+import { liveGroupMemberships } from "~/server/app-layer/authz/repositories/live-rows";
 import { traceProjectsByIds } from "./scopeResolver";
 
 /**
@@ -128,7 +128,7 @@ async function loadGroupIdsByPrincipal(
   );
   if (distinct.length === 0) return byPrincipal;
 
-  const memberships = await prisma.groupMembership.findMany({
+  const memberships = await liveGroupMemberships(prisma).findMany({
     where: { userId: { in: distinct }, group: { organizationId } },
     select: { userId: true, groupId: true },
   });

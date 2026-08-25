@@ -248,8 +248,14 @@ describe("GrantsAuthzReadRepository", () => {
         organizationId: "org-1",
       });
 
+      // Live memberships only. Without `removedAt: null` a group alice left
+      // still hands her every grant that group holds.
       expect(groupFindMany).toHaveBeenCalledWith({
-        where: { userId: "alice", group: { organizationId: "org-1" } },
+        where: {
+          userId: "alice",
+          group: { organizationId: "org-1" },
+          removedAt: null,
+        },
         select: { groupId: true },
       });
       expect(grantFindMany).toHaveBeenCalledWith({

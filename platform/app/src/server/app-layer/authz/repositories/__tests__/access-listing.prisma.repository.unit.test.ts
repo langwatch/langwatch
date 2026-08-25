@@ -231,7 +231,13 @@ describe("PrismaAccessListingRepository", () => {
             organizationId: { in: ["org-1", "org-2"] },
             OR: [
               { userId: "alice" },
-              { group: { members: { some: { userId: "alice" } } } },
+              // `removedAt: null` is the fence: a group alice LEFT must not
+              // synthesize its bindings onto her.
+              {
+                group: {
+                  members: { some: { userId: "alice", removedAt: null } },
+                },
+              },
             ],
             scopeType: { in: ["TEAM", "ORGANIZATION", "PROJECT"] },
           },

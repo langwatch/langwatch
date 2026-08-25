@@ -21,6 +21,7 @@ import type { TenantMigrationStatus } from "@langwatch/system-migrations";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 
 import { queryOrganizationOnAuthzEngine } from "../engine-gate";
+import { liveGroupMemberships } from "./live-rows";
 
 /** Seeds per budget statement. Four binds a row, so this sits well under
  *  Postgres' 65535-parameter ceiling. */
@@ -239,15 +240,19 @@ export class PrismaAuthzMigrationRepository
     }));
   }
 
-  /** Every (userId, groupId) membership in the organization — what lets the
-   *  migration mirror the legacy fallback's suppression predicate, which
-   *  counts bindings held THROUGH a group as bindings the user holds. */
+  /** Every LIVE (userId, groupId) membership in the organization — what lets
+   *  the migration mirror the legacy fallback's suppression predicate, which
+   *  counts bindings held THROUGH a group as bindings the user holds.
+   *
+   *  Live, not every row: the inventory states what the organization's access
+   *  IS at the moment of the import, and a membership that ended suppresses
+   *  nothing. The ENDED ones are history the ledger already holds. */
   async findGroupMemberships({
     organizationId,
   }: {
     organizationId: string;
   }): Promise<Array<{ userId: string; groupId: string }>> {
-    return this.prisma.groupMembership.findMany({
+    return liveGroupMemberships(this.prisma).findMany({
       where: { group: { organizationId } },
       select: { userId: true, groupId: true },
     });

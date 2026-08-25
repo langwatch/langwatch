@@ -50,7 +50,7 @@ import {
   ACCESS_LISTING_GROUP_SELECT,
   ACCESS_LISTING_USER_SELECT,
 } from "./access-listing.repository";
-import { liveGrants, liveRoles } from "./live-rows";
+import { liveGrants, liveGroupMemberships, liveRoles } from "./live-rows";
 
 /** The three scope tiers a listed binding can carry - RESOURCE rows are the
  *  share tier and PLATFORM rows are dormant facts; neither is a binding the
@@ -403,7 +403,7 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
     groupIdsByOrg: Map<string, Set<string>>;
     allGroupIds: string[];
   }> {
-    const memberships = await this.prisma.groupMembership.findMany({
+    const memberships = await liveGroupMemberships(this.prisma).findMany({
       where: { userId, group: { organizationId: { in: [...orgIds] } } },
       select: { groupId: true, group: { select: { organizationId: true } } },
     });

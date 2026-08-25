@@ -5,6 +5,8 @@ import {
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,
   GRANT_ROLE_CHANGED_EVENT_TYPE,
+  GROUP_MEMBER_ADDED_EVENT_TYPE,
+  GROUP_MEMBER_REMOVED_EVENT_TYPE,
   ROLE_DEFINED_EVENT_TYPE,
   ROLE_DELETED_EVENT_TYPE,
   ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
@@ -259,6 +261,66 @@ export const roleDeletedEventSchema = EventSchema.extend({
 });
 export type RoleDeletedEvent = z.infer<typeof roleDeletedEventSchema>;
 
+/**
+ * One person joined one group (ADR-125's named prerequisite).
+ *
+ * The membership names no role, no scope and no permission, because a
+ * membership grants nothing by itself — what it does is make every grant the
+ * GROUP holds reach the user, since COLLECT unions `{user} ∪ groups`. That
+ * indirection is exactly why the fact has to be on the ledger: without it a
+ * removal left no trace anywhere, and a past-tense access answer computed
+ * afterwards understated the access that really existed.
+ *
+ * `membershipId` is the aggregate id, minted per fact rather than derived from
+ * the pair: the pair repeats. Somebody removed from a group can be added back,
+ * and that is a new membership with its own beginning and its own end — a
+ * second `group_member_added` on the SAME id would read as a redelivery of
+ * the first and fold to nothing.
+ *
+ * No `actor.type: "anyone"` question arises here and no principal union is
+ * needed: a membership names one user and one group, both required.
+ */
+export const groupMemberAddedEventSchema = EventSchema.extend({
+  type: z.literal(GROUP_MEMBER_ADDED_EVENT_TYPE),
+  data: z.object({
+    membershipId: z.string().min(1),
+    groupId: z.string().min(1),
+    userId: z.string().min(1),
+    source: grantEventSourceSchema,
+    actor: grantsLedgerActorSchema,
+  }),
+});
+export type GroupMemberAddedEvent = z.infer<typeof groupMemberAddedEventSchema>;
+
+/**
+ * A removal names one membership, and only one: a selector cannot address an
+ * aggregate, so a caller with a set of them sends a command each — the same
+ * rule `grant_revoked` follows.
+ *
+ * It carries `groupId` and `userId` as well as the membership id, and both are
+ * load-bearing rather than decoration. They are what the command derives its
+ * AGGREGATE from (`groupMembershipAggregateId`), which is what puts this event
+ * in the same FIFO lane as the `added` for its pair — including the `added`
+ * for a LATER membership of the same pair, which is the ordering the row id
+ * alone cannot express. They are also what lets the audit row name who left
+ * which group once the membership row itself is gone.
+ */
+export const groupMemberRemovedEventSchema = EventSchema.extend({
+  type: z.literal(GROUP_MEMBER_REMOVED_EVENT_TYPE),
+  data: z.object({
+    membershipId: z.string().min(1),
+    groupId: z.string().min(1),
+    userId: z.string().min(1),
+    /** Carried where the caller stated one, exactly as `grant_revoked` does:
+     *  "when did this access end, and why" is one question, not two. */
+    reason: z.string().min(1).optional(),
+    actor: grantsLedgerActorSchema,
+  }),
+});
+export type GroupMemberRemovedEvent = z.infer<
+  typeof groupMemberRemovedEventSchema
+>;
+
 export const authzGrantsEventSchema = z.discriminatedUnion("type", [
   grantAttachedEventSchema,
   grantRoleChangedEventSchema,
@@ -266,5 +328,7 @@ export const authzGrantsEventSchema = z.discriminatedUnion("type", [
   roleDefinedEventSchema,
   rolePermissionsChangedEventSchema,
   roleDeletedEventSchema,
+  groupMemberAddedEventSchema,
+  groupMemberRemovedEventSchema,
 ]);
 export type AuthzGrantsEvent = z.infer<typeof authzGrantsEventSchema>;

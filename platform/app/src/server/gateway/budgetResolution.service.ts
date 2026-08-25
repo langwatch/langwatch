@@ -32,6 +32,7 @@ import type {
   Prisma,
   PrismaClient,
 } from "~/generated/prisma/client";
+import { liveGroupMemberships } from "~/server/app-layer/authz/repositories/live-rows";
 
 export type BudgetResolutionTarget = {
   organizationId: string;
@@ -273,7 +274,7 @@ async function memberGroupIds({
   organizationId: string;
   userId: string;
 }): Promise<string[]> {
-  const memberships = await client.groupMembership.findMany({
+  const memberships = await liveGroupMemberships(client).findMany({
     where: { userId, group: { organizationId } },
     select: { groupId: true },
   });

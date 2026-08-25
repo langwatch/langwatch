@@ -22,6 +22,7 @@ import type {
 } from "@langwatch/authz-server";
 import type { Prisma } from "~/generated/prisma/client";
 import { CUSTOM_ROLE_KIND } from "../../../role/role-kind";
+import { LIVE_MEMBERSHIP } from "./live-rows";
 
 export class PrismaAuthzReadRepository implements AuthzReadRepository {
   constructor(private readonly prisma: Prisma.TransactionClient) {}
@@ -91,13 +92,16 @@ export class PrismaAuthzReadRepository implements AuthzReadRepository {
       // A GroupMembership row outlives removal from the organization, so the
       // group member carries the same current-membership gate as a direct
       // binding - without it an offboarded user keeps whatever their groups
-      // granted.
+      // granted. It outlives the MEMBERSHIP too, since a removal marks the row
+      // rather than deleting it, so LIVE_MEMBERSHIP is the second half of the
+      // same gate: without it a group somebody left keeps granting.
       where: {
         organizationId,
         group: {
           members: {
             some: {
               userId,
+              ...LIVE_MEMBERSHIP,
               user: {
                 orgMemberships: { some: { organizationId, disabledAt: null } },
               },

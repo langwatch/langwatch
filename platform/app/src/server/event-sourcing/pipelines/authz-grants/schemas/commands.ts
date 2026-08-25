@@ -165,3 +165,51 @@ export const deleteRoleCommandDataSchema = commandDataSchema({
   occurredAtMs: z.number().int().nonnegative(),
 });
 export type DeleteRoleCommandData = z.infer<typeof deleteRoleCommandDataSchema>;
+
+/**
+ * One command, one membership, one aggregate (ADR-110) — the same rule the
+ * grant and role commands follow. A caller adding twenty people to a group
+ * sends twenty of these; they are independent and fold concurrently.
+ *
+ * `membershipId` is caller-minted, like a runtime grant's id (decision 23's
+ * house pattern): the caller mints it once, a retry reuses it and its
+ * `<commandId>:0` idempotency key, and a genuinely repeated add mints a new
+ * one — which is right, because a re-add after a removal IS a new membership.
+ */
+export const addGroupMemberCommandDataSchema = commandDataSchema({
+  membershipId: z.string().min(1),
+  groupId: z.string().min(1),
+  userId: z.string().min(1),
+  source: grantEventSourceSchema,
+  actor: grantsLedgerActorSchema,
+  /** Business time of the fact — an imported membership carries the legacy
+   *  row's createdAt; it becomes the emitted event's `occurredAt`. */
+  occurredAtMs: z.number().int().nonnegative(),
+});
+export type AddGroupMemberCommandData = z.infer<
+  typeof addGroupMemberCommandDataSchema
+>;
+
+/**
+ * One removal, one aggregate. A removal names one membership: a selector
+ * cannot address an aggregate, so resolving "every membership this user holds
+ * in this organization" into ids is the caller's job — and where the answer
+ * has to change before the request returns (offboarding), the mark is applied
+ * synchronously against the projection ahead of the fold, the same sanctioned
+ * direct write revocation uses.
+ *
+ * `groupId` and `userId` are REQUIRED, not conveniences: the command's
+ * aggregate is the pair, so without them it cannot be routed into the lane its
+ * `add` rides in (see `groupMembershipAggregateId`).
+ */
+export const removeGroupMemberCommandDataSchema = commandDataSchema({
+  membershipId: z.string().min(1),
+  groupId: z.string().min(1),
+  userId: z.string().min(1),
+  reason: z.string().min(1).optional(),
+  actor: grantsLedgerActorSchema,
+  occurredAtMs: z.number().int().nonnegative(),
+});
+export type RemoveGroupMemberCommandData = z.infer<
+  typeof removeGroupMemberCommandDataSchema
+>;

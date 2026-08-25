@@ -7,7 +7,12 @@ import type { Group, PrismaClient } from "~/generated/prisma/client";
 import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
+  newGroupMembershipId,
 } from "~/server/app-layer/authz/ledger";
+import {
+  LIVE_MEMBERSHIP,
+  liveGroupMemberships,
+} from "~/server/app-layer/authz/repositories/live-rows";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { slugify } from "~/utils/slugify";
 import type {
@@ -87,7 +92,10 @@ export class ScimGroupService {
       this.prisma.group.findMany({
         where,
         include: {
+          // LIVE members. A SCIM list says who is in each group NOW, and a
+          // membership the directory ended is not that.
           members: {
+            where: LIVE_MEMBERSHIP,
             include: {
               user: { select: { id: true, email: true, name: true } },
             },
@@ -124,7 +132,7 @@ export class ScimGroupService {
     if (!group)
       return this.scimError({ status: "404", detail: "Group not found" });
 
-    const members = await this.prisma.groupMembership.findMany({
+    const members = await liveGroupMemberships(this.prisma).findMany({
       where: { groupId: group.id },
       include: { user: { select: { id: true, email: true, name: true } } },
     });
@@ -178,7 +186,7 @@ export class ScimGroupService {
       });
     }
 
-    const members = await this.prisma.groupMembership.findMany({
+    const members = await liveGroupMemberships(this.prisma).findMany({
       where: { groupId: group.id },
       include: { user: { select: { id: true, email: true, name: true } } },
     });
@@ -216,7 +224,7 @@ export class ScimGroupService {
     }
 
     const requestedIds = new Set((request.members ?? []).map((m) => m.value));
-    const current = await this.prisma.groupMembership.findMany({
+    const current = await liveGroupMemberships(this.prisma).findMany({
       where: { groupId: group.id },
     });
     const currentIds = new Set(current.map((m) => m.userId));
@@ -231,12 +239,16 @@ export class ScimGroupService {
         memberIds: toAdd,
       });
     if (toRemove.length)
-      await this.removeMembers({ groupId: group.id, userIds: toRemove });
+      await this.removeMembers({
+        groupId: group.id,
+        organizationId,
+        userIds: toRemove,
+      });
 
     const updatedGroup = await this.prisma.group.findUniqueOrThrow({
       where: { id: group.id },
     });
-    const members = await this.prisma.groupMembership.findMany({
+    const members = await liveGroupMemberships(this.prisma).findMany({
       where: { groupId: group.id },
       include: { user: { select: { id: true, email: true, name: true } } },
     });
@@ -264,7 +276,7 @@ export class ScimGroupService {
     const updatedGroup = await this.prisma.group.findUniqueOrThrow({
       where: { id: group.id },
     });
-    const members = await this.prisma.groupMembership.findMany({
+    const members = await liveGroupMemberships(this.prisma).findMany({
       where: { groupId: group.id },
       include: { user: { select: { id: true, email: true, name: true } } },
     });
@@ -295,8 +307,15 @@ export class ScimGroupService {
       actor: { type: "system", id: SYSTEM_ACTORS.scim },
       mintBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
     });
-    await this.prisma.groupMembership.deleteMany({
+    // The memberships END before the group row goes, so the ledger and the
+    // audit trail carry who was in it and when the directory took them out.
+    // The group row's own deletion still cascades the marked rows away — the
+    // limit is stated on the `GroupMembership` model.
+    await this.writer.removeGroupMembersWhere({
+      organizationId,
       where: { groupId: group.id },
+      actor: { type: "system", id: SYSTEM_ACTORS.scim },
+      reason: "group deleted by the identity provider",
     });
     await this.prisma.group.delete({ where: { id: group.id } });
 
@@ -364,6 +383,16 @@ export class ScimGroupService {
     });
   }
 
+  /**
+   * The directory's members, as facts. `source: "scim"` is what marks the
+   * change as the IdP's rather than an admin's, and it stays auditable — a
+   * directory sync IS a change somebody made, unlike the backdated sources the
+   * audit subscriber skips.
+   *
+   * The per-member upsert this replaces is now the writer's own liveness
+   * pre-check plus one command per pair, so a repeated sync of an unchanged
+   * group emits nothing at all rather than N no-op upserts.
+   */
   private async addMembers({
     groupId,
     organizationId,
@@ -378,27 +407,46 @@ export class ScimGroupService {
       select: { userId: true },
     });
     const validIds = new Set(orgMembers.map((m) => m.userId));
+    const memberships = memberIds
+      .filter((userId) => validIds.has(userId))
+      .map((userId) => ({
+        membershipId: newGroupMembershipId(),
+        groupId,
+        userId,
+      }));
+    if (memberships.length === 0) return;
 
-    for (const userId of memberIds) {
-      if (!validIds.has(userId)) continue;
-      await this.prisma.groupMembership.upsert({
-        where: { userId_groupId: { userId, groupId } },
-        update: {},
-        create: { userId, groupId },
-      });
-    }
+    await this.writer.addGroupMembers({
+      organizationId,
+      memberships,
+      actor: { type: "system", id: SYSTEM_ACTORS.scim },
+      source: "scim",
+      onDuplicate: "skip",
+    });
   }
 
+  /**
+   * The directory dropped these people from the group, so the membership ENDS
+   * — it is not erased. A `deleteMany` here threw away when the IdP removed
+   * them, which is the one thing an access review asks about a leaver.
+   */
   private async removeMembers({
     groupId,
+    organizationId,
     userIds,
   }: {
     groupId: string;
+    organizationId: string;
     userIds: string[];
   }): Promise<void> {
-    await this.prisma.groupMembership.deleteMany({
-      where: { groupId, userId: { in: userIds } },
-    });
+    for (const userId of userIds) {
+      await this.writer.removeGroupMembersWhere({
+        organizationId,
+        where: { groupId, userId },
+        actor: { type: "system", id: SYSTEM_ACTORS.scim },
+        reason: "removed from group by the identity provider",
+      });
+    }
   }
 
   private async applyPatch({
@@ -427,7 +475,11 @@ export class ScimGroupService {
         operation.value,
       );
       if (ids.length)
-        await this.removeMembers({ groupId: group.id, userIds: ids });
+        await this.removeMembers({
+          groupId: group.id,
+          organizationId,
+          userIds: ids,
+        });
       return;
     }
 
@@ -489,7 +541,7 @@ export class ScimGroupService {
       }
       const members = instruction.ids;
 
-      const current = await this.prisma.groupMembership.findMany({
+      const current = await liveGroupMemberships(this.prisma).findMany({
         where: { groupId: group.id },
       });
       const requestedIds = new Set(members);
@@ -505,7 +557,11 @@ export class ScimGroupService {
           memberIds: toAdd,
         });
       if (toRemove.length)
-        await this.removeMembers({ groupId: group.id, userIds: toRemove });
+        await this.removeMembers({
+          groupId: group.id,
+          organizationId,
+          userIds: toRemove,
+        });
     }
   }
 
