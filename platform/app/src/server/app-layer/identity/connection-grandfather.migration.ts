@@ -39,6 +39,12 @@ export class IdentitySsoConnectionGrandfatherMigration
   // Ships inert on self-hosted until a release flips this after the cloud
   // rollout has soaked (the in-place doctrine's release act).
   readonly runsAutomaticallyOnSelfHosted = false;
+  // The soaking posture on cloud, and the same decision as the flag above
+  // for the same reason: this ships dark, so it reaches only the
+  // organizations an operator has enrolled, and the rollout widens
+  // deliberately. A release flips it once the pass has run for the
+  // organizations that existed and must start reaching new ones on its own.
+  readonly enrolledAutomatically = false;
 
   constructor(
     private readonly grandfather: Pick<

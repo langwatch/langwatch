@@ -38,6 +38,10 @@ export type PlannedIdentifier = ExpectedIdentifier & {
   /** The legacy row's own `provider` string, unfolded — what better-auth
    *  queries `Account` by, and therefore what the fact has to carry. */
   providerId: string | null;
+  /** The legacy row's own `issuer`, verbatim — the account key better-auth
+   *  1.7 looks the row up by, adopted rather than re-derived so the fact and
+   *  the row it was adopted from cannot disagree. */
+  issuer: string | null;
   providerAccountId: string | null;
   occurredAtMs: number;
 };
@@ -60,6 +64,7 @@ export function planIdentifiers({
     {
       provider: "email" as const,
       providerId: null,
+      issuer: null,
       providerAccountId: null,
       accountId: null,
       occurredAtMs: user.createdAtMs,
@@ -74,6 +79,10 @@ export function planIdentifiers({
       return {
         provider,
         providerId: account.provider,
+        // The row's own issuer, adopted rather than re-derived. Deriving it
+        // here would overwrite a real OIDC issuer with a synthetic one and
+        // re-key the very account the adoption is supposed to preserve.
+        issuer: account.issuer,
         providerAccountId: account.providerAccountId,
         accountId: account.id,
         occurredAtMs: account.createdAtMs,

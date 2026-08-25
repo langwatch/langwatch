@@ -50,6 +50,10 @@ describe("attachIdentifier guard", () => {
         "domain",
         "identifierHash",
         "identifierId",
+        // WHO asserted the subject. An identifier too, and the loudest kind:
+        // it is the IdP's own public issuer URL, which is what better-auth
+        // 1.7 keys the account by.
+        "issuer",
         "provider",
         // The provider's own subject (ADR-116). An identifier, not a secret:
         // it is the public `sub` an IdP puts in a token, and the projection

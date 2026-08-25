@@ -316,12 +316,22 @@ function identityCustomAdapter({
      * An empty array is an ANSWER — this user holds no such account — and
      * is never a reason to read the legacy table as well.
      */
-    /** The row as better-auth 1.7 expects it: carrying the issuer the
-     *  identity tables do not store. Stamped on the way OUT, once, so the
-     *  storage ports stay free of better-auth's schema. */
+    /**
+     * The row as better-auth 1.7 expects it, carrying the issuer half of its
+     * account key.
+     *
+     * The identifier STORES the issuer — stated on the attach, exactly as
+     * better-auth decided it — so the stored value is served verbatim. The
+     * derivation is a floor for a row attached before the fact carried one,
+     * and never a preference: a real OIDC connection's issuer is its own URL,
+     * and no rule of ours would arrive at it. Deriving over a stored value
+     * would hand back `local:oauth:google` for an account better-auth keyed
+     * by `https://accounts.google.com`, and it would look like a missing
+     * sign-in method rather than a wrong column.
+     */
     const withIssuer = (row: IdentityAccountRow): IdentityAccountRow => ({
       ...row,
-      issuer: issuerForProviderId(row.providerId),
+      issuer: row.issuer ?? issuerForProviderId(row.providerId),
     });
 
     const serveAccounts = async (
@@ -459,6 +469,11 @@ function identityCustomAdapter({
         id: canonical.id,
         userId,
         providerId,
+        // The issuer better-auth resolved for this write, passed through so
+        // the fact states the account key the library itself decided. Drop
+        // it and the ceremony falls back to deriving one, which is wrong for
+        // every provider that brings a real issuer of its own.
+        issuer: canonical.issuer,
         accountId: canonical.accountId,
         createdAt: canonical.createdAt,
       });

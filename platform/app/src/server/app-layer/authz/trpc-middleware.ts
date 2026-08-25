@@ -30,11 +30,12 @@
 import {
   type AuthzDenialReason,
   type AuthzPermission,
+  BlankScopeIdError,
   type DeclaredAuthzMiddleware,
   type DeclaredScopeId,
   declareAuthzMiddleware,
-  declaredScopeId,
   PermissionDeniedError,
+  resolveDeclaredScope,
   SCOPE_TIER_FIELDS,
   type ScopeTierField,
 } from "@langwatch/authz";
@@ -212,10 +213,14 @@ export const checkDeclaredPermissionAny = (
       if (!ctx.session?.user) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
-      const projectId = input.projectId;
-      if (typeof projectId !== "string" || projectId.length === 0) {
-        throw wiringBug({ permission: permissions[0] });
-      }
+      // Always the project tier, so the field is named outright — but read
+      // through the same resolution the single-permission seam uses, so the
+      // blank-versus-missing split is decided in exactly one place.
+      const { id: projectId } = requireDeclaredScope({
+        permission: permissions[0],
+        input,
+        via: "projectId",
+      });
       const { permitted, organizationRole, denialReason } = await appOf(
         ctx,
       ).permissions.getProjectAnyDecision({
@@ -308,16 +313,39 @@ function requireDeclaredScope({
   input: ScopeInput;
   via?: ScopeTierField;
 }): DeclaredScopeId {
-  const scope = declaredScopeId({ permission, input, via });
-  if (scope) return scope;
+  const resolution = resolveDeclaredScope({ permission, input, via });
+  if (resolution.resolved) return resolution.scope;
+  if (resolution.unresolved.reason === "blank") {
+    throw blankScopeId({ field: resolution.unresolved.field });
+  }
   throw wiringBug({ permission, via });
 }
 
 /**
- * Nothing the caller did can fix a declaration whose input carries no usable
- * id, so the sentence they read says only that; which procedure is miswired
- * goes to the log. The types make this unreachable — this is the runtime
- * backstop for the day they are bypassed.
+ * The caller named the scope field and left it empty. Answered as the bad
+ * request it is, rather than as the wiring bug below: a blank id is something
+ * the caller can fix, and reporting it as an internal error both misleads them
+ * and pages us for their typo.
+ */
+function blankScopeId({ field }: { field: string }): TRPCError {
+  const blank = new BlankScopeIdError({ field });
+  return new TRPCError({
+    code: "BAD_REQUEST",
+    message: blank.message,
+    cause: blank,
+  });
+}
+
+/**
+ * The input names no scope field at all. Nothing the caller did can fix that,
+ * so the sentence they read says only that; which procedure is miswired goes
+ * to the log. The types make this unreachable — this is the runtime backstop
+ * for the day they are bypassed.
+ *
+ * A field that is present and empty is NOT this: the types only ever promised
+ * the field would exist, never that a caller would fill it, and treating a
+ * blank id as a wiring bug is what put a routine bad request on the error
+ * dashboard at ERROR severity. That case answers through `blankScopeId`.
  */
 function wiringBug({
   permission,

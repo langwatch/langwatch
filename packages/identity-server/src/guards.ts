@@ -208,6 +208,7 @@ export class IdentityGuards {
       accountId,
       provider,
       providerId,
+      issuer,
       providerAccountId,
       value,
       occurredAtMs,
@@ -255,6 +256,7 @@ export class IdentityGuards {
         accountId,
         provider,
         providerId,
+        issuer,
         providerAccountId,
         value: normalizedValue,
         identifierHash:

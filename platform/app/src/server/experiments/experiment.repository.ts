@@ -409,12 +409,15 @@ export class ExperimentRepository {
   }
 
   /** Version list, newest first. `beforeVersion` pages backwards through it. */
-  async findVersions(input: {
-    projectId: string;
-    experimentId: string;
-    take: number;
-    beforeVersion?: number;
-  }): Promise<
+  async findVersions(
+    input: {
+      projectId: string;
+      experimentId: string;
+      take: number;
+      beforeVersion?: number;
+    },
+    options?: { tx?: Prisma.TransactionClient },
+  ): Promise<
     Array<{
       version: number;
       autoSaved: boolean;
@@ -424,7 +427,8 @@ export class ExperimentRepository {
       createdAt: Date;
     }>
   > {
-    return await this.prisma.experimentVersion.findMany({
+    const client = options?.tx ?? this.prisma;
+    return await client.experimentVersion.findMany({
       where: {
         projectId: input.projectId,
         experimentId: input.experimentId,

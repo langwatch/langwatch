@@ -77,6 +77,13 @@ const DENIED_COMMAND_PHRASES: readonly (readonly string[])[] = [
   // `agent` would take `agent list` with it, so the phrases are matched.
   ["agent", "dev"],
   ["agent", "tunnel"],
+  // `ingest context` reads the CALLER's identity out of its environment
+  // (CLAUDE_CODE_SESSION_ID, TRACEPARENT, CODEX_HOME) — none of which the
+  // forwarded-env allowlist carries, so a daemon-served run would resolve
+  // the wrong session or none. `ingest guidance` is a claude hook whose
+  // stdout is injected into the session; same caller-owned contract.
+  ["ingest", "context"],
+  ["ingest", "guidance"],
 ];
 
 /**

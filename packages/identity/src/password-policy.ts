@@ -39,6 +39,22 @@ export const PASSWORD_REQUIREMENTS_HINT = `At least ${PASSWORD_MINIMUM_LENGTH} c
  * One sentence, written to be shown to the person who typed it: it says what
  * to do, not which rule fired.
  */
+/**
+ * `TextEncoder` is a WHATWG global, present in every browser and in Node from
+ * 11 on — but its TYPE ships only in `lib.dom.d.ts` or `@types/node`, and this
+ * package takes neither on purpose (see the tsconfig: `types: []` is the
+ * isomorphism boundary, enforced by the compiler). Declaring the one member
+ * used here keeps that boundary intact without pulling a runtime's whole
+ * surface in behind it.
+ *
+ * Module-scoped rather than a `declare global`: an ambient global would travel
+ * to every consumer — the package ships its TypeScript sources — and collide
+ * with the real declaration in anything compiled with the DOM lib.
+ */
+declare const TextEncoder: {
+  new (): { encode(input: string): { length: number } };
+};
+
 export function passwordProblem(value: string): string | null {
   if (value.length < PASSWORD_MINIMUM_LENGTH) {
     return `Use at least ${PASSWORD_MINIMUM_LENGTH} characters`;

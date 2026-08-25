@@ -10,6 +10,7 @@ import {
   IdentityDetachStrandsUserError,
   passwordProblem,
 } from "@langwatch/identity";
+import { issuerForProviderId } from "@langwatch/identity-server/better-auth";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
@@ -595,6 +596,12 @@ export const userRouter = createTRPCRouter({
             userId: ctx.session.user.id,
             type: "credential",
             provider: "credential",
+            // better-auth 1.7 finds a credential account by
+            // `(providerId, issuer, accountId)` and nothing else. A row
+            // written without the issuer is a row its lookup cannot see, so
+            // the password set here would never sign anybody in — the
+            // customer would be told their correct password is wrong.
+            issuer: issuerForProviderId("credential"),
             providerAccountId: ctx.session.user.id,
             password: hashedPassword,
           },

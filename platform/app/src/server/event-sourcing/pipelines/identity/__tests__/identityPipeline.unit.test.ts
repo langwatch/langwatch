@@ -121,6 +121,7 @@ describe("identity pipeline", () => {
           accountId: "acc_1",
           provider: "google",
           providerId: "google",
+          issuer: "https://accounts.google.com",
           providerAccountId: "gid_123",
           value: "Sam.J+x@Acme.com",
           occurredAtMs: T0,

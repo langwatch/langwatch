@@ -73,6 +73,23 @@ const UNREGISTERED_BY_DESIGN = [
 ];
 
 /**
+ * Frontend flags that CANNOT resolve to a registry definition, because the
+ * surface they gate is reached SIGNED OUT.
+ *
+ * The registry exists to give operators a per-organization lever, and that
+ * lever is read through `featureFlag.isEnabled` — a protected procedure that
+ * answers 401, not false, to a visitor with no session. Registering one of
+ * these would advertise a control that cannot be exercised where it matters,
+ * so they resolve from the browser's own `?ff_<flag>=on` override and fall
+ * back to a deployment environment variable instead.
+ *
+ * Separate from {@link UNREGISTERED_BY_DESIGN} on purpose: that list is
+ * history nobody has cleaned up, this one is a design constraint. A flag
+ * belongs here only if its surface genuinely has no session to check.
+ */
+const SIGNED_OUT_FLAGS = ["release_ui_identity_front_door_enabled"];
+
+/**
  * Frontend-exposed flags that are SYSTEM on purpose: internal levers
  * (`envOverridable: false`, operator-store-only) that happen to gate a
  * product surface. The assertion compares the resolved set against this
@@ -91,7 +108,9 @@ describe("frontend feature flags", () => {
     it("resolves to a registry definition so operators can target it per organization", () => {
       const unregistered = FRONTEND_FEATURE_FLAGS.filter(
         (key) =>
-          !resolveFlagDefinition(key) && !UNREGISTERED_BY_DESIGN.includes(key),
+          !resolveFlagDefinition(key) &&
+          !UNREGISTERED_BY_DESIGN.includes(key) &&
+          !SIGNED_OUT_FLAGS.includes(key),
       );
 
       expect(unregistered).toEqual([]);

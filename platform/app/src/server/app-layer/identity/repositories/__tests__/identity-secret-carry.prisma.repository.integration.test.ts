@@ -42,6 +42,10 @@ async function seedLegacyUser(): Promise<void> {
       id: CREDENTIAL_ACCOUNT,
       userId: USER,
       provider: "credential",
+      // better-auth 1.7 keys an account by `(issuer, accountId)`; the local
+      // credential provider's issuer is `local:credential`, not
+      // `local:oauth:credential`. Without it sign-in cannot find this row.
+      issuer: "local:credential",
       providerAccountId: USER,
       password: "hashed-legacy-password",
       createdAt: ACCOUNT_CREATED_AT,
@@ -53,6 +57,9 @@ async function seedLegacyUser(): Promise<void> {
       id: GOOGLE_ACCOUNT,
       userId: USER,
       provider: "google",
+      // Google declares a real issuer of its own, so this is NOT the
+      // synthetic `local:oauth:google` the other providers get.
+      issuer: "https://accounts.google.com",
       providerAccountId: "g-1",
       access_token: "at-1",
       refresh_token: "rt-1",

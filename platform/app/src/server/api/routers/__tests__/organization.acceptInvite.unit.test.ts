@@ -6,6 +6,7 @@
  * retired WAITING_APPROVAL enum value no live row carries any more) must be
  * rejected with BAD_REQUEST.
  */
+import { memoryAdapter } from "better-auth/adapters/memory";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   INVITE_ALREADY_ACCEPTED_MESSAGE,
@@ -60,6 +61,12 @@ vi.mock("@ee/governance/services/personalWorkspace.service", () => ({
 const verifiedEmailsOfMock = vi.hoisted(() => vi.fn().mockResolvedValue(null));
 vi.mock("~/server/app-layer/identity/runtime", () => ({
   identityEmail: () => ({ verifiedEmailsOf: verifiedEmailsOfMock }),
+  // `betterAuth()` builds its adapter EAGERLY at module load, and this
+  // suite's import graph reaches it through the router. It has to be real
+  // enough to initialise; better-auth's own memory engine over an empty
+  // store is exactly that, and holds nothing this suite could assert
+  // against by accident.
+  identityStorageAdapter: () => memoryAdapter({}),
 }));
 
 // The invite's grants are ledger commands (ADR-092 delivery-plan PR 2).

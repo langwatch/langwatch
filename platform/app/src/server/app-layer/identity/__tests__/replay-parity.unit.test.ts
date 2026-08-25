@@ -46,6 +46,7 @@ function attached(
       accountId: null,
       provider: "email",
       providerId: null,
+      issuer: null,
       providerAccountId: null,
       value: "sam@acme.com",
       identifierHash: "hmac:abc",
@@ -62,6 +63,7 @@ const history: IdentityFact[] = [
   attached("idf_google", {
     provider: "google",
     providerId: "auth0",
+    issuer: "local:oauth:auth0",
     providerAccountId: "auth0|42",
     accountId: "acc_1",
     state: "VERIFIED",
@@ -139,6 +141,7 @@ describe("the Identifier projection", () => {
       // ones only ADR-116 added.
       expect(live.find((row) => row.id === "idf_google")).toMatchObject({
         providerId: "auth0",
+        issuer: "local:oauth:auth0",
         providerAccountId: "auth0|42",
         accountId: "acc_1",
       });

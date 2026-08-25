@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"unicode"
 )
@@ -53,6 +54,22 @@ var heavyCommands = []string{
 	"docker build",
 }
 
+// heavyBinaries are heavy runs matched on the BINARY INVOKED rather than by
+// substring, and they are the TypeScript compiler's two names because "tsc"
+// cannot go in the list above: it is a substring of "tsconfig.json", so `cat
+// tsconfig.json` and every `-p tsconfig.tsgo.json` argument would class heavy.
+// That is precisely the over-match heavyCommands' comment warns about, and the
+// developer wondering why `cat` was queued would be right.
+//
+// Matching the last path segment of a word keeps the rule as predictable as a
+// substring while staying honest about a three-letter name:
+// `./node_modules/.bin/tsc`, `pnpm exec tsc` and `/x/lib/tsc --noEmit` all
+// count, `tsconfig.json`, `mytsc`, `tsclint` and the shim's own `tsc.real`
+// (already inside the queue) do not. `tsgo` is here too rather than only in
+// heavyCommands: one compiler, one rule. It stays in heavyCommands as well, so
+// nothing that classes heavy today stops doing so.
+var heavyBinaries = typeScriptCompilerBinaries
+
 // integrationMarkers say a command drives the integration suite, which is never
 // narrowed: specs/setup/integration-file-serialism.feature owns its concurrency
 // and treats a worker count arriving from the environment as something to
@@ -69,7 +86,7 @@ var workerFlags = []string{"--maxWorkers", "--max-workers", "VITEST_MAX_WORKERS"
 
 // ClassifyCommand reports whether a command is heavy and, if so, what kind.
 func ClassifyCommand(command string) (RunKind, bool) {
-	if !containsAny(command, heavyCommands) {
+	if !containsAny(command, heavyCommands) && !invokesAny(command, heavyBinaries) {
 		return SingleProcessRun, false
 	}
 	switch {
@@ -321,8 +338,28 @@ func DurationKey(command string) string {
 				return marker
 			}
 		}
+		// A run reached only by binary name is the compiler, and the compiler
+		// is one population under both its names — a `tsc` run belongs in the
+		// same bucket its `tsgo` predecessor filled, not in no bucket at all
+		// (an unobserved command is treated as long, which disables narrowing).
+		if invokesAny(command, heavyBinaries) {
+			return TypeScriptCompilerClass
+		}
 		return ""
 	}
+}
+
+// invokesAny reports whether any word of the command invokes one of the named
+// binaries, comparing the word's last path segment so a binary is matched
+// however it was reached. A word is not a substring: `tsconfig.json` and
+// `tsc.real` are not `tsc`.
+func invokesAny(command string, binaries []string) bool {
+	for _, word := range strings.Fields(command) {
+		if slices.Contains(binaries, binaryBase(word)) {
+			return true
+		}
+	}
+	return false
 }
 
 func containsAny(s string, needles []string) bool {

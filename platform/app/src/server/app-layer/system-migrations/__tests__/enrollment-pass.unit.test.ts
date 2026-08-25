@@ -35,17 +35,6 @@ class InMemoryStateRepository implements SystemMigrationStateRepository {
     this.rows.set(`${record.migrationName}:${record.tenantId}`, record);
   }
 
-  async hasFinalizedTenant({
-    migrationName,
-  }: {
-    migrationName: string;
-  }): Promise<boolean> {
-    return [...this.rows.values()].some(
-      (row) =>
-        row.migrationName === migrationName && row.status === "finalized",
-    );
-  }
-
   async upsertRecordUnlessRolledBack(
     record: TenantMigrationRecord,
   ): Promise<boolean> {
