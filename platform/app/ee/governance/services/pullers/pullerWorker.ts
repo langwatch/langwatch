@@ -372,12 +372,16 @@ async function writePulledEvents({
  * all. The two are deliberately separate: that one shapes a form, this one
  * decides what reaches a customer's project.
  */
-const CONVERSATION_ROUTING_PROFILES: Record<
+// A Map, not an object literal: `sourceType` is a free-form column read back
+// from the database, and indexing an object with it answers "constructor",
+// "toString" or "__proto__" with a truthy prototype member. That would pass
+// the guard below with a profile whose `conversationAction` is undefined —
+// which an event carrying no action then matches, routing a fabricated span
+// into a customer's project. A Map has no prototype keys to inherit.
+const CONVERSATION_ROUTING_PROFILES = new Map<
   string,
-  ConversationRoutingProfile | undefined
-> = {
-  databricks_genie: GENIE_ROUTING_PROFILE,
-};
+  ConversationRoutingProfile
+>([["databricks_genie", GENIE_ROUTING_PROFILE]]);
 
 export async function routeConversationsToTraceDestination({
   events,
@@ -393,7 +397,7 @@ export async function routeConversationsToTraceDestination({
   // conversations at all — only the composer declines to offer the picker.
   // So the source type has to earn its way in here, and one we have no
   // conversation shape for routes nothing rather than being guessed at.
-  const profile = CONVERSATION_ROUTING_PROFILES[source.sourceType];
+  const profile = CONVERSATION_ROUTING_PROFILES.get(source.sourceType);
   if (!profile) return;
 
   const request = mapGenieEventsToTraceRequest(events, {

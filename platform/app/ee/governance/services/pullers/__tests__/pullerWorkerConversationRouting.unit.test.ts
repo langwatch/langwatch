@@ -187,6 +187,35 @@ describe("given a source type the worker has no conversation shape for", () => {
     });
     expect(handleOtlpTraceRequest).not.toHaveBeenCalled();
   });
+
+  /**
+   * `sourceType` is a free-form column read back from the database, so the
+   * lookup must not answer names every object inherits. Held as an object
+   * literal it did: "constructor" resolved to a truthy function, whose
+   * `conversationAction` is undefined, which an event carrying no action of
+   * its own then matched — routing a span nobody's source ever emitted.
+   */
+  it.each([
+    "constructor",
+    "toString",
+    "__proto__",
+    "valueOf",
+    "hasOwnProperty",
+  ])("routes nothing for the inherited name %s", async (sourceType) => {
+    await routeConversationsToTraceDestination({
+      events: [{ ...genieEvent(), action: undefined as unknown as string }],
+      source: { ...SOURCE, sourceType },
+    });
+    expect(handleOtlpTraceRequest).not.toHaveBeenCalled();
+  });
+
+  it("routes nothing for an event that carries no action at all", async () => {
+    await routeConversationsToTraceDestination({
+      events: [{ ...genieEvent(), action: undefined as unknown as string }],
+      source: SOURCE,
+    });
+    expect(handleOtlpTraceRequest).not.toHaveBeenCalled();
+  });
 });
 
 describe("given a source without a destination", () => {

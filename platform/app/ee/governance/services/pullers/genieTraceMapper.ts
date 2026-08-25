@@ -289,8 +289,13 @@ export function mapGenieEventsToTraceRequest(
   events: NormalizedPullEvent[],
   origin: GenieRoutingOrigin,
 ): IExportTraceServiceRequest | null {
-  const spans = events
-    .filter((event) => event.action === origin.profile.conversationAction)
+  // `action` is typed as a string but arrives from a puller's own mapping, so
+  // an event that never set one reads as undefined at runtime. Requiring a
+  // non-empty action on both sides keeps two absences from matching each
+  // other and routing an event nothing ever claimed.
+  const wanted = origin.profile.conversationAction;
+  const spans = (wanted ? events : [])
+    .filter((event) => !!event.action && event.action === wanted)
     .filter((event) => isSettledForRouting(event))
     .flatMap((event) => mapMessage(event, origin));
   if (spans.length === 0) return null;
