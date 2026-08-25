@@ -43,17 +43,19 @@ const OPTIONS: Array<{
   {
     value: "off",
     label: "Nobody",
-    help: "Your organization is not offered to colleagues, and nobody can ask to join it. Invitations still work.",
+    help: "Invitations still work.",
   },
   {
     value: "request",
-    label: "Anyone who asks, once you approve",
-    help: "Colleagues with a verified address on your domain can ask to join. You approve or reject each one.",
+    label: "They ask, you approve",
+    help: "On a verified address at your domain.",
   },
   {
     value: "auto",
-    label: "Anyone on a domain you verified, straight away",
-    help: "Colleagues on a domain you have verified as yours join with your default role, without anybody approving. You are emailed each time. Verify the domain on the Authentication page first.",
+    // The one option somebody should agree to on purpose, so it names its own
+    // cost in its own label rather than three lines below it.
+    label: "Straight in, nobody approves",
+    help: "On a domain you verified. You are emailed each time.",
   },
 ];
 
@@ -108,20 +110,14 @@ export function JoinPolicyCard({
                 <EnterprisePlanBadge data-testid="join-policy-plan-badge" />
               )}
             </HStack>
-            {/* WHICH PEOPLE THIS IS ABOUT. The first sentence alone reads as
-                if it covered everybody on the domain, including the ones an
-                identity provider already admits — and it does not: where a
-                connection is live for a domain, its own provisioning is the
-                way in and this is deliberately not offered beside it. So this
-                setting governs exactly the arrivals single sign-on does not
-                catch, and saying so is the difference between an
-                administrator understanding the control and guessing at it. */}
+            {/* WHICH PEOPLE THIS IS ABOUT, and it is the half a reader
+                guesses at: where a connection is live for a domain, its own
+                provisioning is the way in and this is deliberately not offered
+                beside it. So this governs exactly the arrivals single sign-on
+                does not catch — one clause, because the reader came to move a
+                radio and not to read a page. */}
             <Text color="fg.muted" fontSize="sm">
-              Colleagues who verify an address on your company domain can find
-              you instead of starting a workspace of their own. This is for
-              people who arrive without single sign-on — where an identity
-              provider already admits a domain, it is the way in and this is not
-              offered alongside it.
+              For colleagues who arrive without single sign-on.
             </Text>
             {lock.locked && (
               <HStack gap={2} paddingTop={1} data-testid="join-policy-notice">
@@ -190,13 +186,11 @@ export function JoinPolicyCard({
                 onChange={(event) => setDomains(event.target.value)}
                 data-testid="join-policy-domains"
               />
-              {/* The one sentence that names what opens this door: the same
-                  verification ceremony sign-in routing uses — never a count
-                  of who happens to receive mail on the domain. */}
+              {/* What opens this door is the same verification ceremony
+                  sign-in routing uses — never a count of who happens to
+                  receive mail on the domain. */}
               <Text color="fg.muted" fontSize="sm">
-                Company domains only, and each one must be verified as yours —
-                the record or file from the Authentication page — before anybody
-                walks in through it.
+                Each must be verified as yours first.
               </Text>
             </VStack>
           )}

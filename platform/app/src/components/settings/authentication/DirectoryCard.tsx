@@ -1,34 +1,36 @@
-import { Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { ArrowRight } from "lucide-react";
 import { IdentityChip } from "~/components/access/IdentityRow";
+import { formatRelativeTime } from "~/components/me/relativeTime";
 import { Link } from "~/components/ui/link";
-import {
-  DirectoryFactUnavailable,
-  DirectorySourceChips,
-} from "~/features/directory/components/DirectoryFacts";
+import { DirectoryFactUnavailable } from "~/features/directory/components/DirectoryFacts";
 import { useDirectoryFacts } from "~/features/directory/hooks/useDirectoryFacts";
 import { directorySyncChipFor } from "~/features/directory/logic/directorySyncChip";
+import { SettingsRowsSkeleton } from "../kit/SettingsSkeleton";
 import { SectionErrorNotice } from "../SectionErrorNotice";
 import { OverviewCard, OverviewDetail } from "./OverviewCard";
 
 /** Groups named before the rest collapse into a count. */
-const GROUPS_SHOWN = 3;
+const GROUPS_SHOWN = 4;
 
 /**
  * How accounts arrive, beside how people sign in (D08, ADR-122).
  *
  * The two belong on one page because they are one question asked twice: an
  * identity provider decides who may sign in AND who exists, and an
- * administrator checking the first almost always wants the second. The
- * numbers are the Directory page's own — read through `useDirectoryFacts`, so
- * the two screens cannot report different syncs — drawn small enough to sit
- * beside the connection rather than compete with it.
+ * administrator checking the first almost always wants the second.
+ *
+ * TWO ROWS AND THE GROUPS. This card is read at a glance, next to a card of
+ * the same size about the connection that feeds it, and every row it grows
+ * costs the pair their calm. So it answers the two questions somebody
+ * actually opens Authentication with — how much of my membership does this
+ * thing own, and is it still running — and then names what it sent.
  *
  * MEMBERS IT MANAGES IS A FRACTION, NOT A COUNT. "Forty people" sounds like
  * an answer and is not one: what an administrator needs to know before they
  * remove somebody from the identity provider is how many members that act
- * would NOT touch. The people who arrived another way are named right under
- * the fraction, whenever there are any.
+ * would NOT touch. The people who arrived another way are the hint under the
+ * name, whenever there are any.
  *
  * Spec: specs/identity/org-access-cluster.feature
  */
@@ -55,14 +57,11 @@ export function DirectoryCard({
   }
 
   if (reconciliation.isLoading) {
-    // The card's two detail rows, as placeholders: the shape is known
-    // before the data is, so nothing jumps when it arrives.
+    // The card's shape is known before its contents are, so nothing jumps
+    // when the answer arrives.
     return (
       <OverviewCard title="Directory" data-testid="directory-card">
-        <VStack align="stretch" gap={3}>
-          <Skeleton height="4" width="40%" />
-          <Skeleton height="4" width="60%" />
-        </VStack>
+        <SettingsRowsSkeleton rows={2} showLead={false} showTrailing={false} />
       </OverviewCard>
     );
   }
@@ -83,7 +82,7 @@ export function DirectoryCard({
       // members is an invitation to an empty table.
       actions={
         nothingHasArrived ? (
-          <Link href="/settings/directory?tab=tokens">
+          <Link href="/settings/directory?tab=provisioning">
             <Button size="sm" variant="solid" colorPalette="orange">
               Issue a token
               <ArrowRight size={14} />
@@ -92,30 +91,18 @@ export function DirectoryCard({
         ) : (
           <Link href="/settings/directory">
             <Button size="sm" variant="outline">
-              See provisioned members
+              See who it manages
               <ArrowRight size={14} />
             </Button>
           </Link>
         )
       }
     >
-      {/* THE ROWS ARE QUESTIONS, the same way the sign-on card beside this
-          one asks them. "Sources" left a reader guessing what kind of source
-          on a page whose other half is the connection these ARE; asking where
-          people come from names the thing and makes the trip back obvious in
-          one line. */}
-      <OverviewDetail label="Where do people come from?">
-        <DirectorySourceChips connections={facts.connections} />
-      </OverviewDetail>
-
-      {/* FOUR ROWS OF NOTHING IS NOT A STATUS. Until a provider has pushed
-          once, every fact this card holds is an absence — "0 of 1", "No push
-          yet", "No group has arrived yet" — and drawing them as a table makes
-          a connection that is merely NEW look like one that is broken. Worse,
-          it buries the single thing that would change any of it.
-          So before the first push the card says what is missing and what
-          fixes it, in one sentence, and the token becomes the action. The
-          facts come back the moment there are any. */}
+      {/* ROWS OF NOTHING ARE NOT A STATUS. Until a provider has pushed once,
+          every fact this card holds is an absence — "0 of 1", "No push yet",
+          "No group has arrived yet" — and drawing them as a table makes a
+          connection that is merely NEW look like one that is broken. Worse,
+          it buries the single thing that would change any of it. */}
       {nothingHasArrived ? (
         <VStack align="start" gap={1} paddingY={1}>
           <Text fontSize="13px" fontWeight="500">
@@ -135,11 +122,8 @@ export function DirectoryCard({
         </VStack>
       ) : (
         <>
-          {/* A FRACTION, and the caveat under its own name rather than beside
-              the number: a whole sentence in the value column squeezed the
-              name into one word per line and then overlapped it. */}
           <OverviewDetail
-            label="How many members does it manage?"
+            label="Members it manages"
             hint={
               facts.outsideDirectory > 0
                 ? `${facts.outsideDirectory} arrived another way, so removing them from your identity provider will not remove them here.`
@@ -161,22 +145,35 @@ export function DirectoryCard({
             </DirectoryFactUnavailable>
           </OverviewDetail>
 
-          <OverviewDetail label="When did it last push?">
+          <OverviewDetail label="Last sync">
             <Text fontSize="13px" whiteSpace="nowrap">
               {facts.lastPushedAtMs === null
-                ? "It never has"
-                : new Date(facts.lastPushedAtMs).toLocaleString()}
+                ? "No push yet"
+                : formatRelativeTime(facts.lastPushedAtMs)}
             </Text>
           </OverviewDetail>
 
-          <OverviewDetail label="Which groups has it sent?">
+          {/* NAMED, NOT COUNTED, and under an eyebrow rather than in the
+              value column of a row: group names are the one thing on this
+              card an administrator recognises at a glance, and squeezed
+              right-aligned against a label they wrapped one word per line. */}
+          <VStack align="start" gap={1.5} paddingTop={1} width="full">
+            <Text
+              fontSize="10.5px"
+              fontWeight="600"
+              letterSpacing="0.06em"
+              textTransform="uppercase"
+              color="fg.subtle"
+            >
+              Groups it sent
+            </Text>
             <DirectoryFactUnavailable canRead={canReadMembership} read={groups}>
               {facts.directoryGroups.length === 0 ? (
-                <Text fontSize="13px" color="fg.muted">
+                <Text fontSize="12px" color="fg.muted">
                   None yet
                 </Text>
               ) : (
-                <HStack gap={1} flexWrap="wrap" justify="end">
+                <HStack gap={1} flexWrap="wrap">
                   {shownGroups.map((group) => (
                     <IdentityChip
                       key={group.id}
@@ -185,15 +182,14 @@ export function DirectoryCard({
                     />
                   ))}
                   {restGroups > 0 && (
-                    <Text
-                      fontSize="xs"
-                      color="fg.muted"
-                    >{`+${restGroups} more`}</Text>
+                    <Text fontSize="11px" color="fg.subtle">
+                      {`+${restGroups} more`}
+                    </Text>
                   )}
                 </HStack>
               )}
             </DirectoryFactUnavailable>
-          </OverviewDetail>
+          </VStack>
         </>
       )}
     </OverviewCard>

@@ -1,5 +1,6 @@
 import { Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
+import "./identityChip.css";
 import { OverflownTextWithTooltip } from "~/components/OverflownText";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 
@@ -178,6 +179,7 @@ export function IdentityChip({
   tone = "neutral",
   title,
   icon,
+  shimmer = false,
   "data-testid": testId,
 }: {
   label: string;
@@ -190,6 +192,14 @@ export function IdentityChip({
    * colour is the one channel some readers do not have.
    */
   icon?: ReactNode;
+  /**
+   * A slow sweep across the chip, for the one state on a screen that is
+   * waiting on the READER rather than on a system. Never more than one at a
+   * time: two things moving is two things asking, and neither gets read.
+   * Honours reduced motion, and the chip still says the same thing standing
+   * still.
+   */
+  shimmer?: boolean;
   "data-testid"?: string;
 }) {
   const palette =
@@ -204,9 +214,16 @@ export function IdentityChip({
   return (
     <Badge
       size="sm"
-      variant="surface"
+      // SUBTLE, NOT SURFACE. `surface` draws a border as well as a wash, so a
+      // row carrying three of these — provenance, second factor, seat — read
+      // as three outlined objects competing with the name beside them. A wash
+      // alone is enough to separate a chip from the text it sits in, and a
+      // page of settled states should be quiet: colour is worth most where
+      // almost nothing else is using it.
+      variant="subtle"
       colorPalette={palette}
       title={title}
+      className={shimmer ? "lw-chip-shimmer" : undefined}
       data-testid={testId}
       gap={1}
     >

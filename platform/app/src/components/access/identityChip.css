@@ -1,0 +1,52 @@
+/*
+ * A chip that has something to announce.
+ *
+ * "Ready to turn on" is the one state in the whole setup journey that is
+ * waiting on the reader rather than on a system, and it drew in exactly the
+ * grey every settled label uses — so the step that had just become possible
+ * looked like the four that were merely finished. A slow sweep across the chip
+ * is enough to catch an eye scanning past it, and it stops being decoration
+ * because nothing else on the page moves.
+ *
+ * Under the same rule the auth screens' pulse follows: nothing runs at all for
+ * somebody who has asked for less motion, and the chip is still perfectly
+ * legible standing still — the sweep adds attention, never meaning.
+ */
+
+.lw-chip-shimmer {
+	position: relative;
+	overflow: hidden;
+	/* The sweep is drawn on top, so the chip's own text must not be painted
+	   over by its stacking context. */
+	isolation: isolate;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.lw-chip-shimmer::after {
+		content: "";
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		background: linear-gradient(
+			100deg,
+			transparent 30%,
+			color-mix(in srgb, currentColor 22%, transparent) 50%,
+			transparent 70%
+		);
+		transform: translateX(-100%);
+		animation: lw-chip-sweep 2.6s ease-in-out infinite;
+	}
+}
+
+@keyframes lw-chip-sweep {
+	0% {
+		transform: translateX(-100%);
+	}
+	/* Most of the cycle is the pause. A sweep that runs end to end without
+	   rest reads as a loading bar — as something in progress rather than as
+	   something waiting for you. */
+	45%,
+	100% {
+		transform: translateX(100%);
+	}
+}

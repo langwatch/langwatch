@@ -34,6 +34,8 @@ export function OverviewCard({
     label: string;
     tone: "neutral" | "good" | "warning" | "bad";
     title: string;
+    /** A state that is waiting on the reader rather than on a system. */
+    shimmer?: boolean;
   };
   children: ReactNode;
   actions?: ReactNode;
@@ -54,6 +56,7 @@ export function OverviewCard({
             label={chip.label}
             tone={chip.tone}
             title={chip.title}
+            shimmer={chip.shimmer}
           />
         )
       }

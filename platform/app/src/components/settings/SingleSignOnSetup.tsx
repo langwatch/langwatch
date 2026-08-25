@@ -397,6 +397,7 @@ function ConnectionSummary({
               label={chip.label}
               tone={chip.tone}
               title={chip.title}
+              shimmer={chip.shimmer}
             />
           </HStack>
           <HStack

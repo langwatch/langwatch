@@ -67,6 +67,19 @@ const apiDouble = {
     scimReconciliation: { getAll: { useQuery: mockReconciliation } },
     group: { listAll: { useQuery: mockGroups } },
     organization: { getMemberProvenance: { useQuery: mockProvenance } },
+    // The policy card reads the plan and the deployment kind to decide
+    // whether opening a door is locked. Enterprise and hosted here, so the
+    // card draws its controls rather than its lock — the lock is covered in
+    // the tests that own it.
+    limits: {
+      getUsage: {
+        useQuery: () => ({
+          data: { activePlan: { type: "ENTERPRISE", free: false } },
+          isLoading: false,
+        }),
+      },
+    },
+    publicEnv: { useQuery: () => ({ data: { IS_SAAS: true } }) },
     useUtils: () => ({
       ssoSetup: {
         getSetup: { invalidate: vi.fn() },
@@ -90,10 +103,6 @@ vi.mock("~/utils/auth-client", () => ({
 // where it lives — the joining policy reads the plan, the public environment
 // and the join ledger before it can draw a single radio — so here they are
 // only required to be present, and in the right place.
-vi.mock("~/components/access/JoinPolicyCard", () => ({
-  JoinPolicyCard: () => <div data-testid="join-policy-card">joining</div>,
-}));
-
 vi.mock("~/components/members/useJoinRequests", () => ({
   useJoinRequests: () => ({
     requests: [],
@@ -253,7 +262,7 @@ describe("the organization's authentication page", () => {
 
       expect(screen.getByTestId("join-policy-card")).toBeInTheDocument();
       expect(
-        screen.getByText("Who may join without an invitation"),
+        screen.getByText("Who can join your organization"),
       ).toBeInTheDocument();
     });
 
@@ -275,29 +284,22 @@ describe("the organization's authentication page", () => {
 
       const card = screen.getByTestId("single-sign-on-card");
       expect(within(card).getByTestId("sso-routing-chip")).toHaveTextContent(
-        "Everybody goes through it",
+        "Everybody",
       );
     });
 
     /** @scenario The overview names the connection by the protocol it speaks */
-    it("asks its rows as questions rather than labelling fields", async () => {
+    it("keeps to three short rows, so the pair of cards stays scannable", async () => {
       await open();
 
       const card = screen.getByTestId("single-sign-on-card");
-      // The reader arrives with questions; the card asks them back rather
-      // than printing the connection row's field names.
-      expect(
-        within(card).getByText("Who signs people in?"),
-      ).toBeInTheDocument();
-      expect(
-        within(card).getByText("Is anybody going through it?"),
-      ).toBeInTheDocument();
-      expect(
-        within(card).getByText("Did it work last time?"),
-      ).toBeInTheDocument();
-      expect(
-        within(card).getByText("Can anybody get back in without it?"),
-      ).toBeInTheDocument();
+      expect(within(card).getByText("Identity provider")).toBeInTheDocument();
+      expect(within(card).getByText("Sign-in")).toBeInTheDocument();
+      expect(within(card).getByText("Verified domains")).toBeInTheDocument();
+      // The issuer is a monospace URL nobody compares from here, and the last
+      // test and the ways back in are preconditions the journey already lists.
+      expect(within(card).queryByText(/^Issuer/i)).toBeNull();
+      expect(within(card).queryByText(/last tested/i)).toBeNull();
     });
 
     /** @scenario "The overview names the connection by the protocol it speaks" */
@@ -389,16 +391,19 @@ describe("the organization's authentication page", () => {
       await open();
 
       const card = screen.getByTestId("directory-card");
+      // A FRACTION, not a count: what an administrator needs before removing
+      // somebody from their identity provider is how many members that act
+      // would NOT touch.
       expect(
         within(card).getByTestId("directory-card-members").textContent,
       ).toBe("3 of 4");
       expect(within(card).getByText(/arrived another way/i)).toBeTruthy();
-      // Only the group the directory actually sent.
+      // Only the group the directory actually sent, named rather than counted.
       const groups = within(card).getAllByTestId("directory-card-group-chip");
       expect(groups.map((chip) => chip.textContent)).toEqual(["Engineering"]);
       expect(
         within(card)
-          .getByText(/see provisioned members/i)
+          .getByText(/see who it manages/i)
           .closest("a"),
       ).toHaveAttribute("href", "/settings/directory");
     });
@@ -453,6 +458,7 @@ describe("the organization's authentication page", () => {
       await open();
 
       const card = screen.getByTestId("directory-card");
+      // Both membership reads say so rather than drawing a zero.
       expect(within(card).getAllByText("Unavailable").length).toBe(2);
       expect(within(card).queryByTestId("directory-card-members")).toBeNull();
       // And no control they would be refused.

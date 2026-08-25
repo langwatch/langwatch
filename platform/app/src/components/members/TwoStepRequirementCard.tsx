@@ -124,18 +124,14 @@ export function TwoStepRequirementCard({
                   <EnterprisePlanBadge data-testid="two-step-requirement-plan-badge" />
                 )}
               </HStack>
+              {/* ONE LINE, AND IT SPENDS ITS SECOND HALF ON THE FEAR. What a
+                  second factor IS needs no explaining to the person who
+                  administers an organization; the belief that turning this on
+                  signs everybody out is the single commonest reason they do
+                  not, and that is what the sentence is for. */}
               <Text color="fg.muted" fontSize="sm">
-                Every member of this organization has to be able to prove a
-                second factor — a code from their phone, a passkey, or one their
-                identity provider confirms when they sign in.
-              </Text>
-              {/* Said in the same breath as the switch, because the belief
-                  that this signs everybody out is the single commonest
-                  reason an administrator does not turn it on. */}
-              <Text color="fg.muted" fontSize="sm">
-                Turning this on signs nobody out. Members who cannot prove one
-                yet are asked to set one up before they can reach this
-                organization, and everything else they use is untouched.
+                A code, a passkey, or one their identity provider confirms.
+                Turning it on signs nobody out.
               </Text>
               {locked && (
                 <HStack

@@ -74,6 +74,16 @@ export function useDirectoryFacts({
     groups,
     provenance,
     connections,
+    /**
+     * What the directory actually DID, newest first.
+     *
+     * A count cannot be wrong in a way anybody can see, and "38 of 41" is the
+     * same sentence whether the sync ran this morning or stopped in March.
+     * These are the acts themselves — somebody attached, somebody removed —
+     * and they are the only thing on either surface that proves the
+     * connection is alive rather than merely configured.
+     */
+    recentChanges: reconciliation.data?.recentChanges ?? [],
     lastPushedAtMs,
     managedPeople,
     directoryGroups,

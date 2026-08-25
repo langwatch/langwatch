@@ -25,6 +25,18 @@ export interface ConnectionStatusChip {
   tone: ConnectionChipTone;
   /** The longer explanation, on hover. */
   title: string;
+  /**
+   * Whether this state is waiting on the READER rather than on a system.
+   *
+   * Exactly one state is: a connection whose domain is proved and which has
+   * not been turned on. Everything else is either settled or waiting on
+   * somebody else, and drew in the same grey, so the one step that had just
+   * become possible looked like the four that were merely finished.
+   *
+   * The chip carries the same words either way — the sweep adds attention,
+   * never meaning — and nothing moves for a reader who asked for less motion.
+   */
+  shimmer?: boolean;
 }
 
 /**
@@ -114,6 +126,8 @@ const STEADY_STATES: Record<
     label: "Ready to turn on",
     tone: "neutral",
     title: "Your domain is proved. Turn the connection on when you are ready.",
+    // The one state on the journey that is waiting on the person reading it.
+    shimmer: true,
   },
   SUSPENDED: {
     label: "Paused",
