@@ -147,6 +147,19 @@ Feature: BetterAuth config (unmounted)
     Then signin succeeds
     And pendingSsoSetup is set to true
 
+  # An org can hold a `ssoDomain` with no `ssoProvider` — staff set the domain
+  # and never named the provider. There is then no provider to be wrong about,
+  # and flagging would be a one-way door: the flag is only ever cleared behind
+  # a provider match that a null `ssoProvider` can never satisfy, so the banner
+  # would stand forever with nothing the person could do to dismiss it.
+  @unit
+  Scenario: Org with ssoDomain but no ssoProvider never flags a user
+    Given an organization with ssoDomain "acme.com" and no ssoProvider exists
+    And a user exists with email "existing@acme.com" and pendingSsoSetup=false
+    When that user signs in via Google
+    Then signin succeeds
+    And pendingSsoSetup remains false
+
   # ============================================================================
   # Admin impersonation via the legacy Session.impersonating JSON column
   #

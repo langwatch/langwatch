@@ -405,6 +405,17 @@ export const beforeAccountCreate = async ({
   });
   if (!org) return;
 
+  // An org with a `ssoDomain` but no `ssoProvider` has not named a provider to
+  // be wrong about, so there is nothing here to soft-block. Falling through
+  // would be a one-way door: `isSsoProviderMatch` returns false for every
+  // account when `ssoProvider` is null, and the only writer of
+  // `pendingSsoSetup: false` — `reconcileSsoAccounts` — is reachable solely
+  // behind that same match, from here and from `afterAccountUpdate`. So the
+  // flag below would be set on the next sign-in and could never be cleared by
+  // any subsequent one: a permanent "Link your SSO account" banner with no
+  // action that dismisses it.
+  if (!org.ssoProvider) return;
+
   const matchesSso = isSsoProviderMatch(org, {
     providerId: account.providerId,
     accountId: account.accountId,

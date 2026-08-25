@@ -598,6 +598,87 @@ describe("beforeAccountCreate", () => {
     });
   });
 
+  describe("when the org has a ssoDomain but no ssoProvider", () => {
+    /** @scenario Org with ssoDomain but no ssoProvider never flags a user */
+    it("leaves pendingSsoSetup alone rather than setting a flag nothing can clear", async () => {
+      // Four production orgs reached this state: staff set `ssoDomain` and left
+      // `ssoProvider` null. Every account then failed `isSsoProviderMatch` (it
+      // returns false on a null ssoProvider), so the soft-block fired and the
+      // only path that clears the flag — reachable solely behind that same
+      // match — could never run again. The banner became permanent.
+      const update = vi.fn().mockResolvedValue(undefined);
+      const prisma = makePrismaMock({
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "user_1",
+            email: "existing@acme.com",
+            deactivatedAt: null,
+          }),
+          update,
+        },
+        organization: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "org_1",
+            ssoDomain: "acme.com",
+            ssoProvider: null,
+          }),
+        },
+        account: {
+          deleteMany: vi.fn(),
+          count: vi.fn().mockResolvedValue(1),
+        },
+      });
+
+      await beforeAccountCreate({
+        prisma,
+        account: { userId: "user_1", providerId: "google", accountId: "sub-1" },
+      });
+
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    /** @scenario Org with ssoDomain but no ssoProvider never flags a user */
+    it("does not hard-block a first-time signup either", async () => {
+      // The hard block was already guarded on `org.ssoProvider`, so a brand new
+      // user got in. Pinned so the new early return cannot turn a signup that
+      // used to succeed into an SSO_PROVIDER_NOT_ALLOWED rejection.
+      const update = vi.fn().mockResolvedValue(undefined);
+      const prisma = makePrismaMock({
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "user_1",
+            email: "brand-new@acme.com",
+            deactivatedAt: null,
+          }),
+          update,
+        },
+        organization: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "org_1",
+            ssoDomain: "acme.com",
+            ssoProvider: null,
+          }),
+        },
+        account: {
+          deleteMany: vi.fn(),
+          count: vi.fn().mockResolvedValue(0),
+        },
+      });
+
+      await expect(
+        beforeAccountCreate({
+          prisma,
+          account: {
+            userId: "user_1",
+            providerId: "google",
+            accountId: "sub-1",
+          },
+        }),
+      ).resolves.toBeUndefined();
+      expect(update).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the platform SSO gate DENIES (unlicensed deployment)", () => {
     /** @scenario Existing users on an unlicensed deployment self-recover via password reset */
     it("does not set pendingSsoSetup for a credential account at a matching ssoDomain", async () => {
