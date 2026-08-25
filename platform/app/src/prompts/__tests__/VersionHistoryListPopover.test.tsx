@@ -317,7 +317,7 @@ describe("VersionHistoryListPopover", () => {
     });
   });
 
-  describe("unsaved changes", () => {
+  describe("given the editor has unsaved changes", () => {
     /** @scenario "Discarding unsaved edits is offered above the list, not beside a version" */
     it("offers to discard them once, above the list", async () => {
       const onRestoreSuccess = vi.fn().mockResolvedValue(undefined);
@@ -363,7 +363,7 @@ describe("VersionHistoryListPopover", () => {
     });
   });
 
-  describe("what a version changed", () => {
+  describe("when a version is compared with the one before it", () => {
     /** @scenario "A version shows what it changed from the version before it" */
     it("shows the words removed and the words added", async () => {
       const user = userEvent.setup();
@@ -405,7 +405,7 @@ describe("VersionHistoryListPopover", () => {
     });
   });
 
-  describe("commit message of a version", () => {
+  describe("given a version carries a commit message", () => {
     describe("given the commit message is long", () => {
       describe("when displaying the version history", () => {
         /** @scenario "A long commit message is shown in full" */

@@ -100,6 +100,15 @@ export function DeployPromptDialog({
     setTagSelections((prev) => ({ ...prev, [tag]: versionId }));
   }, []);
 
+  // The dialog stays mounted between openings, so a draft left behind on close
+  // would still be staged the next time it opens and would be persisted by a
+  // later save. Clearing it makes the initialisation effect below re-derive the
+  // selections from the saved assignments on the next open.
+  const closeAndDiscardDraft = useCallback(() => {
+    setTagSelections({});
+    onClose();
+  }, [onClose]);
+
   // Initialize selections from current tag assignments whenever tags or assignments change.
   // Existing user edits (prev) take precedence over freshly derived values so that
   // a refetch triggered by add/delete does not wipe unsaved version selections.
@@ -147,7 +156,7 @@ export function DeployPromptDialog({
     }
 
     if (mutations.length === 0) {
-      onClose();
+      closeAndDiscardDraft();
       return;
     }
 
@@ -160,7 +169,7 @@ export function DeployPromptDialog({
         type: "success",
         duration: 2000,
       });
-      onClose();
+      closeAndDiscardDraft();
     } catch {
       toaster.create({
         title: "Failed to save tags",
@@ -177,7 +186,7 @@ export function DeployPromptDialog({
     assignTag,
     projectId,
     configId,
-    onClose,
+    closeAndDiscardDraft,
     utils,
   ]);
 
@@ -253,7 +262,7 @@ export function DeployPromptDialog({
   return (
     <DialogRoot
       open={isOpen}
-      onOpenChange={(e) => !e.open && onClose()}
+      onOpenChange={(e) => !e.open && closeAndDiscardDraft()}
       size="md"
     >
       <DialogContent
@@ -576,7 +585,7 @@ export function DeployPromptDialog({
         >
           <HStack gap={2}>
             {hasPendingTagChanges && (
-              <Button variant="ghost" size="sm" onClick={onClose}>
+              <Button variant="ghost" size="sm" onClick={closeAndDiscardDraft}>
                 Cancel
               </Button>
             )}

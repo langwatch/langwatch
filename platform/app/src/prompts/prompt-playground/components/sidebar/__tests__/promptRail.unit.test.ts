@@ -19,54 +19,76 @@ const prompt = (
   }) as VersionedPrompt;
 
 describe("the prompts rail model", () => {
-  it("filters by handle, model, author and live tag", () => {
+  describe("given a foldered prompt carrying a live tag", () => {
     const item = prompt({
       handle: "support/classifier",
       tags: [{ name: "production", versionId: "v2" }],
     });
 
-    expect(matchesPromptRailFilter({ prompt: item, rawQuery: "support" })).toBe(
-      true,
-    );
-    expect(matchesPromptRailFilter({ prompt: item, rawQuery: "gpt-5" })).toBe(
-      true,
-    );
-    expect(matchesPromptRailFilter({ prompt: item, rawQuery: "ada" })).toBe(
-      true,
-    );
-    expect(
-      matchesPromptRailFilter({ prompt: item, rawQuery: "production" }),
-    ).toBe(true);
-    expect(
-      matchesPromptRailFilter({ prompt: item, rawQuery: "summariser" }),
-    ).toBe(false);
+    describe("when the query matches the handle, model, author or tag", () => {
+      it("keeps the prompt", () => {
+        expect(
+          matchesPromptRailFilter({ prompt: item, rawQuery: "support" }),
+        ).toBe(true);
+        expect(
+          matchesPromptRailFilter({ prompt: item, rawQuery: "gpt-5" }),
+        ).toBe(true);
+        expect(matchesPromptRailFilter({ prompt: item, rawQuery: "ada" })).toBe(
+          true,
+        );
+        expect(
+          matchesPromptRailFilter({ prompt: item, rawQuery: "production" }),
+        ).toBe(true);
+      });
+    });
+
+    describe("when the query matches none of them", () => {
+      it("drops the prompt", () => {
+        expect(
+          matchesPromptRailFilter({ prompt: item, rawQuery: "summariser" }),
+        ).toBe(false);
+      });
+    });
   });
 
-  it("groups unfiled prompts first and sorts folders by name", () => {
-    const groups = groupPromptsForRail([
-      prompt({ handle: "sales/qualifier" }),
-      prompt({ handle: "standalone" }),
-      prompt({ handle: "onboarding/welcome" }),
-    ]);
+  describe("given prompts spread across folders and the top level", () => {
+    describe("when grouping them for the rail", () => {
+      it("puts the unfiled group first and sorts the folders by name", () => {
+        const groups = groupPromptsForRail([
+          prompt({ handle: "sales/qualifier" }),
+          prompt({ handle: "standalone" }),
+          prompt({ handle: "onboarding/welcome" }),
+        ]);
 
-    expect(groups.map((group) => group.folder)).toEqual([
-      undefined,
-      "onboarding",
-      "sales",
-    ]);
+        expect(groups.map((group) => group.folder)).toEqual([
+          undefined,
+          "onboarding",
+          "sales",
+        ]);
+      });
+    });
   });
 
-  it("moves a prompt between a folder and the top level without renaming it", () => {
-    expect(
-      movePromptHandleToFolder({
-        handle: "support/classifier",
-        folder: "routing",
-      }),
-    ).toBe("routing/classifier");
-    expect(
-      movePromptHandleToFolder({
-        handle: "support/classifier",
-      }),
-    ).toBe("classifier");
+  describe("given a prompt filed under a folder", () => {
+    describe("when moving it to another folder", () => {
+      it("reparents the handle and keeps the name", () => {
+        expect(
+          movePromptHandleToFolder({
+            handle: "support/classifier",
+            folder: "routing",
+          }),
+        ).toBe("routing/classifier");
+      });
+    });
+
+    describe("when moving it to the top level", () => {
+      it("drops the folder and keeps the name", () => {
+        expect(
+          movePromptHandleToFolder({
+            handle: "support/classifier",
+          }),
+        ).toBe("classifier");
+      });
+    });
   });
 });

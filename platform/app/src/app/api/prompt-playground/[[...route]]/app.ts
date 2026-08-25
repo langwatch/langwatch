@@ -354,9 +354,14 @@ async function streamPromptExecution({
   // callback settles, dropping anything still queued.
   let pendingWrites: Promise<unknown> = Promise.resolve();
   const send = (event: PlaygroundStreamEvent) => {
-    pendingWrites = pendingWrites.then(() =>
-      stream.writeSSE({ data: JSON.stringify(event) }),
-    );
+    pendingWrites = pendingWrites
+      .then(() => stream.writeSSE({ data: JSON.stringify(event) }))
+      // A reader who navigated away is the expected cause, and the chain is
+      // what `finally` awaits: unhandled, one rejection travels down every
+      // later `.then` and turns a disconnect into a route failure.
+      .catch((error) => {
+        logger.debug({ error, projectId }, "playground stream write failed");
+      });
   };
 
   let sentSoFar = "";

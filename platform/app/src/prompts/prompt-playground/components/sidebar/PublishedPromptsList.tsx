@@ -29,6 +29,7 @@ import {
   groupPromptsForRail,
   matchesPromptRailFilter,
   movePromptHandleToFolder,
+  type PromptRailGroup,
 } from "./promptRail";
 import { Sidebar } from "./ui/Sidebar";
 import { SidebarEmptyState } from "./ui/SidebarEmptyState";
@@ -159,10 +160,16 @@ export function PublishedPromptsList() {
       ),
     [prompts, query],
   );
-  const groups = useMemo(
-    () => groupPromptsForRail(visiblePrompts),
-    [visiblePrompts],
-  );
+  const groups = useMemo((): PromptRailGroup[] => {
+    const grouped = groupPromptsForRail(visiblePrompts);
+    // Folder membership is the handle prefix, so the unfiled group exists only
+    // while something is unfiled — and with every prompt filed there would be
+    // nothing that drops with `folder: undefined`, stranding rows in whatever
+    // folder they are in. Offer the group as an empty target for the drag.
+    if (!draggedPromptId) return grouped;
+    if (grouped.some((group) => group.folder === undefined)) return grouped;
+    return [{ folder: undefined, prompts: [] }, ...grouped];
+  }, [visiblePrompts, draggedPromptId]);
 
   const movePrompt = useCallback(
     async ({
@@ -248,7 +255,7 @@ export function PublishedPromptsList() {
         )}
       </HStack>
 
-      {groups.length === 0 ? (
+      {visiblePrompts.length === 0 ? (
         <VStack paddingX={4} paddingY={7} gap={1} textAlign="center">
           <Text fontSize="sm" fontWeight="medium">
             No matching prompts
@@ -292,21 +299,36 @@ export function PublishedPromptsList() {
                   </Text>
                 }
               >
-                {groupPrompts.map((prompt) => (
-                  <PromptRailRow
-                    key={prompt.id}
-                    prompt={prompt}
-                    active={prompt.id === selectedPromptId}
-                    moving={movingPromptId === prompt.id}
-                    dragging={draggedPromptId === prompt.id}
-                    onDragStart={() => setDraggedPromptId(prompt.id)}
-                    onDragEnd={() => {
-                      setDraggedPromptId(undefined);
-                      setDropFolder(null);
-                    }}
-                    onOpen={() => openPrompt(prompt)}
-                  />
-                ))}
+                {groupPrompts.length === 0 ? (
+                  <Box
+                    paddingY={3}
+                    textAlign="center"
+                    fontSize="xs"
+                    color="fg.muted"
+                    borderRadius="md"
+                    borderWidth="1px"
+                    borderStyle="dashed"
+                    borderColor="border.emphasized"
+                  >
+                    Drop here to take it out of its folder
+                  </Box>
+                ) : (
+                  groupPrompts.map((prompt) => (
+                    <PromptRailRow
+                      key={prompt.id}
+                      prompt={prompt}
+                      active={prompt.id === selectedPromptId}
+                      moving={movingPromptId === prompt.id}
+                      dragging={draggedPromptId === prompt.id}
+                      onDragStart={() => setDraggedPromptId(prompt.id)}
+                      onDragEnd={() => {
+                        setDraggedPromptId(undefined);
+                        setDropFolder(null);
+                      }}
+                      onOpen={() => openPrompt(prompt)}
+                    />
+                  ))
+                )}
               </Sidebar.List>
             </Box>
           );

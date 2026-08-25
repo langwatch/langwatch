@@ -287,7 +287,7 @@ describe("PromptMessagesField", () => {
       expect(screen.queryByText("USER")).not.toBeInTheDocument();
     });
 
-    it("does not show the role picker for adding a message", () => {
+    it("checks the Instructions-mode action rail", () => {
       renderComponent();
 
       // The mode button and the add-user-message button, and nothing else:

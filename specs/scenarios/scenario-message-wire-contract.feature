@@ -12,7 +12,9 @@ Feature: Scenario message wire contract
   # This matters because the validator STRIPS unknown keys: a field no member
   # of the union declares is not an error, it silently vanishes before storage.
   # A message that parses is therefore not the same as a message that survives,
-  # and both halves need pinning.
+  # so a scenario below claims BOTH of those for each shape — that the snapshot
+  # is accepted, and that the fields the message carried are still on it after
+  # validation.
 
   Background:
     Given a project with scenarios configured

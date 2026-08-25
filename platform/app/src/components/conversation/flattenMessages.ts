@@ -73,16 +73,41 @@ function readToolCalls(
   return Array.isArray(calls) ? calls : [];
 }
 
+/**
+ * The prefix every part of one message hangs off.
+ *
+ * `chatMessageSchema` makes `id` optional, so an id-less message is an
+ * ordinary shape rather than a broken one — and two of them used to build the
+ * same part ids (`-c0`, `-c0`). `ConversationThread` keys on `part.id`, so
+ * React reconciled the second message's content onto the first's nodes.
+ *
+ * The list position stands in. It is stable for as long as the list is, which
+ * is what reconciliation needs; a fresh UUID per flatten would instead remount
+ * every part of the message on every render. The `#` keeps a derived key out
+ * of the space of ids a provider actually mints.
+ */
+function messageKey({
+  msg,
+  index,
+}: {
+  msg: FlattenableMessage;
+  index: number;
+}): string {
+  return msg.id ?? `#${index}`;
+}
+
 /** Walks a typed content array into parts, preserving source order. */
 function flattenTypedParts({
   content,
   msg,
+  messageId,
 }: {
   content: unknown[];
   msg: FlattenableMessage;
+  messageId: string;
 }): DisplayPart[] {
   const base: Omit<PartContext, "index"> = {
-    id: String(msg.id ?? ""),
+    id: messageId,
     role: msg.role ?? "assistant",
     traceId: msg.trace_id,
   };
@@ -108,9 +133,15 @@ function flattenTypedParts({
   return collapsed;
 }
 
-function flattenContent(msg: FlattenableMessage): DisplayPart[] {
+function flattenContent({
+  msg,
+  messageId,
+}: {
+  msg: FlattenableMessage;
+  messageId: string;
+}): DisplayPart[] {
   const coerced = coerceContentToArray(msg.content);
-  if (coerced) return flattenTypedParts({ content: coerced, msg });
+  if (coerced) return flattenTypedParts({ content: coerced, msg, messageId });
 
   if (!msg.content || msg.content === NO_CONTENT_SENTINEL) return [];
 
@@ -122,7 +153,7 @@ function flattenContent(msg: FlattenableMessage): DisplayPart[] {
   return [
     {
       kind: "text",
-      id: msg.id ?? crypto.randomUUID(),
+      id: messageId,
       role: msg.role ?? "assistant",
       content: text,
       reasoning: readReasoning(msg),
@@ -132,7 +163,13 @@ function flattenContent(msg: FlattenableMessage): DisplayPart[] {
 }
 
 /** A whole message that is one tool's answer (OpenAI's `role: "tool"`). */
-function toolResultMessagePart(msg: FlattenableMessage): DisplayPart {
+function toolResultMessagePart({
+  msg,
+  messageId,
+}: {
+  msg: FlattenableMessage;
+  messageId: string;
+}): DisplayPart {
   const raw = msg as Record<string, unknown>;
   const body =
     typeof msg.content === "string"
@@ -141,7 +178,7 @@ function toolResultMessagePart(msg: FlattenableMessage): DisplayPart {
 
   return {
     kind: "tool",
-    id: msg.id ?? crypto.randomUUID(),
+    id: messageId,
     name: typeof raw.name === "string" ? raw.name : "Tool result",
     arguments: undefined,
     toolCallId:
@@ -152,7 +189,13 @@ function toolResultMessagePart(msg: FlattenableMessage): DisplayPart {
 }
 
 /** The calls a message requested, in the order it requested them. */
-function toolCallParts(msg: FlattenableMessage): DisplayPart[] {
+function toolCallParts({
+  msg,
+  messageId,
+}: {
+  msg: FlattenableMessage;
+  messageId: string;
+}): DisplayPart[] {
   return readToolCalls(msg).map((call, index) => ({
     kind: "tool",
     // `call.id` and not the function name: parallel calls to the SAME tool are
@@ -160,7 +203,7 @@ function toolCallParts(msg: FlattenableMessage): DisplayPart[] {
     // the same id. `ConversationThread` keys on it, so React reused the node
     // and the second call's arguments rendered under the first card. The index
     // is the fallback for a provider that sends no id.
-    id: `${msg.id ?? ""}-tool-${call.id ?? `${call.function?.name ?? "unknown"}-${index}`}`,
+    id: `${messageId}-tool-${call.id ?? `${call.function?.name ?? "unknown"}-${index}`}`,
     name: call.function?.name ?? "unknown",
     arguments: safeJsonParseOrStringFallback(call.function?.arguments ?? "{}"),
     toolCallId: call.id,
@@ -169,12 +212,23 @@ function toolCallParts(msg: FlattenableMessage): DisplayPart[] {
 }
 
 /** The parts a single message contributes, tool calls first. */
-function partsForMessage(msg: FlattenableMessage): DisplayPart[] {
+function partsForMessage({
+  msg,
+  index,
+}: {
+  msg: FlattenableMessage;
+  index: number;
+}): DisplayPart[] {
+  const messageId = messageKey({ msg, index });
+
   if (msg.role === "user" || msg.role === "assistant") {
-    return [...toolCallParts(msg), ...flattenContent(msg)];
+    return [
+      ...toolCallParts({ msg, messageId }),
+      ...flattenContent({ msg, messageId }),
+    ];
   }
   if (msg.role === "tool") {
-    return [toolResultMessagePart(msg)];
+    return [toolResultMessagePart({ msg, messageId })];
   }
   return [];
 }
@@ -239,14 +293,14 @@ export function flattenMessages({
    */
   errors?: Record<string, ParsedLLMError>;
 }): DisplayPart[] {
-  const parts = messages.flatMap<DisplayPart>((msg) => {
+  const parts = messages.flatMap<DisplayPart>((msg, index) => {
     const failure = msg.id ? errors?.[msg.id] : undefined;
     if (failure) {
       return [
         { kind: "error", id: msg.id!, error: failure, traceId: msg.trace_id },
       ];
     }
-    return partsForMessage(msg);
+    return partsForMessage({ msg, index });
   });
 
   return [

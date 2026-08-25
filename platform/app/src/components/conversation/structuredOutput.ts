@@ -11,14 +11,12 @@ export function tryParseJson(content: string | undefined): object | undefined {
   }
 
   const trimmed = content.trim();
-  // Quick check: must start with { to be a JSON object
   if (!trimmed.startsWith("{")) {
     return undefined;
   }
 
   try {
     const parsed = JSON.parse(trimmed);
-    // Only accept objects, not arrays or primitives
     if (
       typeof parsed === "object" &&
       parsed !== null &&

@@ -226,13 +226,18 @@ describe("SyncedChatInput", () => {
       const textarea = screen.getByPlaceholderText(/type your message/i);
 
       fireEvent.change(textarea, { target: { value: "two lines" } });
-      fireEvent.keyDown(textarea, {
+      // fireEvent reports false once a handler has called preventDefault, and
+      // preventing the default is exactly what would swallow the newline the
+      // browser inserts. Asserting only "did not send" would still pass if the
+      // key were eaten outright.
+      const defaultAllowed = fireEvent.keyDown(textarea, {
         key: "Enter",
         code: "Enter",
         shiftKey: true,
         ctrlKey: true,
       });
 
+      expect(defaultAllowed).toBe(true);
       expect(onSend).not.toHaveBeenCalled();
     });
   });

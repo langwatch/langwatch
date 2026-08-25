@@ -126,7 +126,7 @@ function EditingModeItem({
   onChange: (mode: PromptEditingMode) => void;
   description: string;
 }) {
-  const selected = mode === value;
+  const isSelected = mode === value;
   return (
     <Menu.Item
       value={value}
@@ -136,14 +136,14 @@ function EditingModeItem({
       <HStack width="full" gap={2} align="flex-start">
         {/* Kept in the layout when unselected so the two rows' labels line up. */}
         <Box
-          color={selected ? "fg" : "transparent"}
+          color={isSelected ? "fg" : "transparent"}
           paddingTop="2px"
           flexShrink={0}
         >
           <Check size={14} />
         </Box>
         <Box>
-          <Text fontWeight={selected ? "medium" : "normal"}>
+          <Text fontWeight={isSelected ? "medium" : "normal"}>
             {EDITING_MODE_LABELS[value]}
           </Text>
           <Text fontSize="xs" color="fg.muted">

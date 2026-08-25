@@ -231,6 +231,22 @@ const PromptPlaygroundChat = forwardRef<
 });
 
 /**
+ * The Clipboard API is absent on insecure origins and in some browsers, so
+ * `navigator.clipboard` can be undefined and reading `.writeText` off it throws
+ * synchronously — `void` catches nothing. A permission-denied write rejects
+ * rather than throwing, so both paths need handling. Failure is silent: the
+ * surface is an icon button with no room for an error string, and the reader
+ * can still select the text by hand.
+ */
+function copyMessageText(text: string) {
+  try {
+    void navigator.clipboard?.writeText(text).catch(() => undefined);
+  } catch {
+    // Clipboard unavailable — nothing to fall back to from here.
+  }
+}
+
+/**
  * Per-message actions, revealed with the pointer.
  *
  * Copy and delete are the two that were ever wired: the CopilotKit control row
@@ -260,7 +276,7 @@ function MessageActions({
             aria-label="Copy message"
             size="2xs"
             variant="ghost"
-            onClick={() => void navigator.clipboard.writeText(text)}
+            onClick={() => copyMessageText(text)}
           >
             <LuCopy />
           </IconButton>

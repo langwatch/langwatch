@@ -27,13 +27,13 @@ export interface ChatSendButtonProps {
  * as a stack of conditional style props.
  */
 function sendButtonAppearance({
-  stopping,
-  inactive,
+  isStopping,
+  isInactive,
 }: {
-  stopping: boolean;
-  inactive: boolean;
+  isStopping: boolean;
+  isInactive: boolean;
 }) {
-  if (stopping) {
+  if (isStopping) {
     return {
       background: "red.solid",
       color: "white",
@@ -41,7 +41,7 @@ function sendButtonAppearance({
       _hover: { filter: "brightness(1.08)" },
     } as const;
   }
-  if (inactive) {
+  if (isInactive) {
     return {
       background: "bg.muted",
       color: "fg.muted",
@@ -63,15 +63,15 @@ export function ChatSendButton({
   onSend,
   onStop,
 }: ChatSendButtonProps) {
-  const stopping = inProgress && !!onStop;
-  const inactive = stopping ? false : disabled || inProgress;
+  const isStopping = inProgress && !!onStop;
+  const isInactive = isStopping ? false : disabled || inProgress;
 
   return (
     <chakra.button
       type="button"
-      aria-label={stopping ? "Stop generating" : "Send message"}
-      onClick={() => (stopping ? onStop?.() : onSend())}
-      disabled={inactive}
+      aria-label={isStopping ? "Stop generating" : "Send message"}
+      onClick={() => (isStopping ? onStop?.() : onSend())}
+      disabled={isInactive}
       width="34px"
       height="34px"
       borderRadius="full"
@@ -79,13 +79,13 @@ export function ChatSendButton({
       flexShrink={0}
       display="grid"
       placeItems="center"
-      {...sendButtonAppearance({ stopping, inactive })}
+      {...sendButtonAppearance({ isStopping, isInactive })}
       transition="background 150ms ease"
     >
       {/* The paper-plane's ink sits low-left of its own box, so centring the
           glyph geometrically leaves it looking low and left. The nudge is
           optical, and the square needs none of it. */}
-      {stopping ? (
+      {isStopping ? (
         <LuSquare size={12} />
       ) : (
         <LuSend size={14} style={{ transform: "translate(-1px, 1px)" }} />

@@ -77,6 +77,17 @@ Feature: Instructions/Messages Editing Modes
     And the editing mode changes to "Messages"
     And the new user message is shown
 
+  # The user message is not always the last one. Revealing whichever row
+  # happens to be last would put the cursor in an assistant message.
+  @integration
+  Scenario: Adding a user message when an assistant message follows it
+    Given the editing mode is "Instructions"
+    And the prompt has a system, a user and an assistant message
+    When I click "Add user message"
+    Then the editing mode changes to "Messages"
+    And the user message that was already there is the one revealed
+    And no second user message is created
+
   # Mode Switching Preserves Content
   Scenario: Switching from Messages to Instructions mode preserves all messages
     Given the editing mode is "Messages"

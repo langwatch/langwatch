@@ -290,6 +290,52 @@ describe("flattenMessages", () => {
     });
   });
 
+  describe("given messages carrying no id", () => {
+    const idless = [
+      {
+        role: "assistant",
+        content: [{ type: "text", text: "first" }],
+      },
+      {
+        role: "assistant",
+        content: [{ type: "text", text: "second" }],
+      },
+      { role: "assistant", content: "plain" },
+      { role: "tool", tool_call_id: "orphan", content: "done" },
+      {
+        role: "assistant",
+        content: "",
+        tool_calls: [{ function: { name: "search", arguments: "{}" } }],
+      },
+    ];
+
+    it("gives every part its own id", () => {
+      const parts = flatten(idless);
+
+      const ids = parts.map((part) => part.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it("builds the same ids again from the same messages", () => {
+      // `ConversationThread` keys on `part.id`. A value that changes per
+      // flatten unmounts and remounts every part on every render, losing
+      // scroll position, focus and any open disclosure inside the card.
+      expect(flatten(idless).map((part) => part.id)).toEqual(
+        flatten(idless).map((part) => part.id),
+      );
+    });
+
+    it("keeps the id a message did supply", () => {
+      const [first, second] = flatten([
+        { id: "m1", role: "assistant", content: "kept" },
+        { role: "assistant", content: "derived" },
+      ]);
+
+      expect(first?.id).toBe("m1");
+      expect(second?.id).not.toBe("m1");
+    });
+  });
+
   describe("given a failed turn", () => {
     it("replaces the reply with an error part", () => {
       const parts = flattenMessages({

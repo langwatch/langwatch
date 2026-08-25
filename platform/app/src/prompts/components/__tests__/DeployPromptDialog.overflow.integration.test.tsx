@@ -2,7 +2,13 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DeployPromptDialog } from "../DeployPromptDialog";
 
@@ -250,6 +256,74 @@ describe("Scenario: Version Select inputs stay within the modal width", () => {
     selectRoots.forEach((root) => {
       expect(root).toHaveAttribute("data-flex", "1");
       expect(root).toHaveAttribute("data-max-width", "280px");
+    });
+  });
+});
+
+describe("given a tag is pointed at a different version", () => {
+  function setupOneAssignedTag() {
+    setupQueries({
+      versions: [
+        { version: 1, versionId: "v1-id", commitMessage: "First" },
+        { version: 2, versionId: "v2-id", commitMessage: "Second" },
+      ],
+      tags: [
+        {
+          tagId: "production-id",
+          promptTag: { name: "production" },
+          versionId: "v1-id",
+        },
+      ],
+    });
+  }
+
+  async function stageProductionOnVersionTwo() {
+    const select =
+      await screen.findByLabelText<HTMLSelectElement>("Production version");
+    await waitFor(() => expect(select.value).toBe("v1-id"));
+    fireEvent.change(select, { target: { value: "v2-id" } });
+    await waitFor(() => expect(select.value).toBe("v2-id"));
+  }
+
+  describe("when the change is cancelled", () => {
+    it("shows the saved version again the next time the dialog opens", async () => {
+      setupOneAssignedTag();
+      const onClose = vi.fn();
+      const { rerender } = render(
+        <ChakraProvider value={defaultSystem}>
+          <DeployPromptDialog {...defaultProps} onClose={onClose} />
+        </ChakraProvider>,
+      );
+
+      await stageProductionOnVersionTwo();
+
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(onClose).toHaveBeenCalled();
+      expect(mockMutateAsync).not.toHaveBeenCalled();
+
+      // The dialog stays mounted between openings, so reopening is what would
+      // resurrect an abandoned draft.
+      rerender(
+        <ChakraProvider value={defaultSystem}>
+          <DeployPromptDialog
+            {...defaultProps}
+            onClose={onClose}
+            isOpen={false}
+          />
+        </ChakraProvider>,
+      );
+      rerender(
+        <ChakraProvider value={defaultSystem}>
+          <DeployPromptDialog {...defaultProps} onClose={onClose} />
+        </ChakraProvider>,
+      );
+
+      const reopened =
+        await screen.findByLabelText<HTMLSelectElement>("Production version");
+      await waitFor(() => expect(reopened.value).toBe("v1-id"));
+      expect(
+        screen.queryByRole("button", { name: "Cancel" }),
+      ).not.toBeInTheDocument();
     });
   });
 });
