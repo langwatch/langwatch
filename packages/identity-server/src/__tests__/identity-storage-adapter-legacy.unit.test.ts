@@ -252,6 +252,39 @@ describe("better-auth over the identity storage adapter", () => {
       expect(row).not.toBeNull();
     });
 
+    /** @scenario "A connection is found by its own issuer, not refused for it" */
+    it("finds a connection's account by the real issuer its provider brings", async () => {
+      await signUp(identity.auth, EMAIL);
+      const context = await identity.auth.$context;
+      const userId = identity.db.user?.[0]?.id as string;
+      // A connection id, in the shape `newSsoConnectionId` mints under a
+      // non-production environment prefix.
+      const connectionId = "local_ssoc_00006mVlCMfpl4S67cYCs9ZC272Ho";
+      const subject = "t1-user-admin";
+
+      // The first sign-in, which is the one that used to work.
+      await context.internalAdapter.linkAccount({
+        userId,
+        providerId: connectionId,
+        issuer: "https://idp.acme1.test",
+        accountId: subject,
+      });
+
+      // The second sign-in: the same lookup the callback makes before it
+      // decides whether to create. Answering null here is what sent it into
+      // a duplicate insert and a unique-constraint failure.
+      const row = await context.adapter.findOne({
+        model: "account",
+        where: [
+          { field: "providerId", value: connectionId },
+          { field: "issuer", value: "https://idp.acme1.test" },
+          { field: "accountId", value: subject },
+        ],
+      });
+
+      expect(row).not.toBeNull();
+    });
+
     /** @scenario "An issuer the legacy table cannot answer returns no rows instead of throwing" */
     it("answers no rows for an issuer that contradicts the provider beside it", async () => {
       await signUp(identity.auth, EMAIL);

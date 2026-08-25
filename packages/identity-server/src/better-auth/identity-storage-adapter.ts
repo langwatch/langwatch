@@ -13,6 +13,7 @@ import type {
 } from "better-auth/adapters";
 import { createAdapterFactory } from "better-auth/adapters";
 import type { IdentityUserGate } from "../identity-user-gate";
+import { isSsoConnectionId } from "../sso-connection-id";
 import {
   type AccountQuery,
   type AccountWhere,
@@ -666,10 +667,29 @@ function identityCustomAdapter({
         (clause) => canonicalNameOf(clause) === "providerId",
       );
       if (providerClause !== undefined) {
-        return typeof providerClause.value === "string" &&
-          derived === providerClause.value
-          ? rest
-          : null;
+        const providerId = providerClause.value;
+        if (typeof providerId !== "string") return null;
+        // The issuer was minted from this very provider id: the same fact
+        // twice, and the table already keys by the half it holds.
+        if (derived === providerId) return rest;
+        // AN ISSUER WE DID NOT MINT, BESIDE A CONNECTION. This is not a
+        // contradiction, it is the ordinary shape of single sign-on: a
+        // connection's issuer is its identity provider's real URL, which
+        // decodes to no provider id because we never encoded one into it.
+        //
+        // Refusing it was refusing every RETURNING person on a connection.
+        // The first sign-in created the row, the next one could not find it,
+        // and better-auth created it again — straight into the unique
+        // constraint on (provider, providerAccountId), which reached the
+        // person as "Something went wrong signing you in".
+        //
+        // Nothing is widened by answering: the provider id is a connection
+        // id, unique to one identity provider by construction, so the key
+        // stays exactly as specific as it was. A built-in provider beside a
+        // foreign issuer stays unanswerable, which is the case that would
+        // resolve one provider's subject onto another's.
+        if (derived === null && isSsoConnectionId(providerId)) return rest;
+        return null;
       }
       if (derived === null) return null;
       return [...rest, { ...issuerClause, field: "providerId", value: derived }];

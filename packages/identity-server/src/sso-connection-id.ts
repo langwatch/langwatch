@@ -30,6 +30,24 @@ export function newSsoBreakGlassBindingId(): string {
 }
 
 /**
+ * Whether an id names a connection — in any form above, under any environment
+ * prefix (`generate` prefixes everything but production).
+ *
+ * Asked by the legacy storage branch, which has to tell two provider ids apart
+ * that look identical to it: one whose issuer we MINT synthetically, and one
+ * that brings a real issuer of its own. Only a connection does the latter, so
+ * only a connection may be found by a provider id standing beside an issuer
+ * the `Account` table could never have stored.
+ *
+ * `ssocmd_` and `ssobg_` deliberately do not match: neither ever appears as a
+ * provider id, and a prefix test loose enough to catch them would be loose
+ * enough to catch the next id minted with an `ssoc` stem.
+ */
+export function isSsoConnectionId(id: string): boolean {
+  return id.startsWith("ssoc_") || id.includes("_ssoc_");
+}
+
+/**
  * The connection the grandfather migration creates for an organization.
  * Derived from the organization so every pass names the same aggregate —
  * which is what lets the guard answer "this already exists" rather than

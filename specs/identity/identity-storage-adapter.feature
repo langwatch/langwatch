@@ -74,6 +74,25 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     Then the read answers no rows
     And the legacy engine is never queried with the issuer column
 
+  # A CONNECTION'S ISSUER IS NOT A CONTRADICTION. Refusing every issuer we
+  # did not mint refused the ordinary shape of single sign-on, where the
+  # issuer is the identity provider's real URL and decodes to no provider id
+  # because nothing ever encoded one into it. So the first sign-in on a
+  # connection created its account row, the next one could not find it, and
+  # better-auth created it again — into the unique constraint on the provider
+  # and its subject, which reached the person as a generic "something went
+  # wrong". Every RETURNING person on a connection hit it.
+  #
+  # The provider id beside the issuer is a connection id, unique to one
+  # identity provider by construction, so answering widens nothing.
+  @unit
+  Scenario: A connection is found by its own issuer, not refused for it
+    Given a user "olga" whose identifier backfill has not finalized
+    And "olga" has signed in once through a single sign-on connection
+    When better-auth reads that account keyed by the connection and its real issuer
+    Then the account row is returned
+    And the legacy engine is never queried with the issuer column
+
   @unit
   Scenario: A legacy account write never carries the issuer column
     Given a user "olga" whose identifier backfill has not finalized
