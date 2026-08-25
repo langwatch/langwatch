@@ -1,10 +1,10 @@
 ---
 title: Claude Code Integration Guide
 sidebarTitle: Claude Code
-description: Send Claude Code sessions, cost and traces to LangWatch with the LangWatch command line tool.
+description: Send Claude Code sessions, cost and traces to LangWatch with the LangWatch command-line tool.
 ---
 
-Claude Code reports every session over OpenTelemetry. The LangWatch command line tool connects that report to your workspace, so you can read the cost of each session, the tool call tree of each turn, and the prompt and the response behind both.
+Claude Code reports every session over OpenTelemetry. The LangWatch command-line tool connects that report to your workspace, so you can read the cost of each session, the tool call tree of each turn, and the prompt and the response behind both.
 
 There are two ways to set it up:
 
@@ -14,7 +14,7 @@ There are two ways to set it up:
 ## Before you start
 
 - Install Claude Code.
-- Install the LangWatch command line tool: `npm install -g langwatch`
+- Install the LangWatch command-line tool: `npm install -g langwatch`
 - Create an account at [app.langwatch.ai](https://app.langwatch.ai), or run your own instance with `npx @langwatch/server`.
 
 ## Run Claude Code through the wrapper
@@ -64,7 +64,7 @@ The wrapper accepts the same flags: `langwatch claude --project acme-app` pins t
 langwatch logout
 ```
 
-This deletes every connection the command line tool wrote, for every tool.
+This deletes every connection the command-line tool wrote, for every tool.
 
 ## What you get in LangWatch
 
@@ -74,7 +74,7 @@ Open your personal page at `/me`, or open the project you pinned Claude Code to.
 - **Traces**: one trace per turn, with the tool call tree, the latency of each step, and each subagent on its own branch.
 - **[Cost](/coding-agents/usage-analytics)**: the amount per session and per turn, the model of each turn, and the split between tokens written to the prompt cache and tokens read back from it.
 - **[Pull requests](/coding-agents/pull-requests)**: what each pull request cost across every session that drove it.
-- **Content**: the prompt of each turn, the input and the output of each tool call, and the response of the model.
+- **Content**: the prompt of each turn, the input and the output of each tool call, and the response of the model. Content is what a [data privacy policy](/coding-agents/privacy) can drop or restrict, so the terminal replay and these fields are only as complete as that policy allows.
 
 Your agent can read all of this back. See [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
 
@@ -147,7 +147,7 @@ For more failure modes see [CLI debug](/ai-governance/cli-debug).
 
 ## Manual OpenTelemetry setup
 
-Use this when you cannot install the LangWatch command line tool. The block below mirrors the variables `langwatch instrument claude` writes for you, plus the optional `OTEL_LOG_ASSISTANT_RESPONSES` flag, which the wrapper does not set. Drop that line if you only want what the wrapper gives you.
+Use this when you cannot install the LangWatch command-line tool. The block below mirrors the variables `langwatch instrument claude` writes for you, plus the optional `OTEL_LOG_ASSISTANT_RESPONSES` flag, which the wrapper does not set. Drop that line if you only want what the wrapper gives you.
 
 ### Environment variables
 

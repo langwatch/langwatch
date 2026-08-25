@@ -1,10 +1,10 @@
 ---
 title: Gemini CLI Integration Guide
 sidebarTitle: Gemini CLI
-description: Send Gemini CLI sessions, cost and traces to LangWatch with the LangWatch command line tool.
+description: Send Gemini CLI sessions, cost and traces to LangWatch with the LangWatch command-line tool.
 ---
 
-Gemini CLI reports every session over OpenTelemetry. The LangWatch command line tool connects that report to your workspace, so you can read the cost of each session, the trace of each turn, and the prompts behind both.
+Gemini CLI reports every session over OpenTelemetry. The LangWatch command-line tool connects that report to your workspace, so you can read the cost of each session, the trace of each turn, and the prompts behind both.
 
 There are two ways to set it up:
 
@@ -14,7 +14,7 @@ There are two ways to set it up:
 ## Before you start
 
 - Install Gemini CLI.
-- Install the LangWatch command line tool: `npm install -g langwatch`
+- Install the LangWatch command-line tool: `npm install -g langwatch`
 - Create an account at [app.langwatch.ai](https://app.langwatch.ai), or run your own instance with `npx @langwatch/server`.
 
 ## Run Gemini CLI through the wrapper
@@ -70,7 +70,7 @@ The wrapper accepts the same flags: `langwatch gemini --project acme-app` pins t
 langwatch logout
 ```
 
-This deletes every connection the command line tool wrote, for every tool.
+This deletes every connection the command-line tool wrote, for every tool.
 
 ## What you get in LangWatch
 
@@ -117,7 +117,7 @@ For more failure modes see [CLI debug](/ai-governance/cli-debug).
 
 ## Manual OpenTelemetry setup
 
-Use this when you cannot install the LangWatch command line tool. The block below mirrors the variables the setup writes for you:
+Use this when you cannot install the LangWatch command-line tool. The block below mirrors the variables the setup writes for you:
 
 ```bash
 export GEMINI_TELEMETRY_ENABLED=true

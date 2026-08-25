@@ -569,23 +569,23 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ### Claude Code
 
-- [Claude Code Integration Guide](https://langwatch.ai/docs/coding-agents/claude-code.md): Send Claude Code sessions, cost and traces to LangWatch with the LangWatch command line tool.
+- [Claude Code Integration Guide](https://langwatch.ai/docs/coding-agents/claude-code.md): Send Claude Code sessions, cost and traces to LangWatch with the LangWatch command-line tool.
 
 ### Codex
 
-- [OpenAI Codex CLI Integration Guide](https://langwatch.ai/docs/coding-agents/openai-codex.md): Send OpenAI Codex CLI sessions, cost and traces to LangWatch with the LangWatch command line tool.
+- [OpenAI Codex CLI Integration Guide](https://langwatch.ai/docs/coding-agents/openai-codex.md): Send OpenAI Codex CLI sessions, cost and traces to LangWatch with the LangWatch command-line tool.
 
 ### GitHub Copilot
 
-- [GitHub Copilot Integration Guide](https://langwatch.ai/docs/coding-agents/github-copilot-cli.md): Send GitHub Copilot CLI and Copilot Chat sessions, cost and traces to LangWatch with the LangWatch command line tool.
+- [GitHub Copilot Integration Guide](https://langwatch.ai/docs/coding-agents/github-copilot-cli.md): Send GitHub Copilot CLI and Copilot Chat sessions, cost and traces to LangWatch with the LangWatch command-line tool.
 
 ### Gemini CLI
 
-- [Gemini CLI Integration Guide](https://langwatch.ai/docs/coding-agents/gemini-cli.md): Send Gemini CLI sessions, cost and traces to LangWatch with the LangWatch command line tool.
+- [Gemini CLI Integration Guide](https://langwatch.ai/docs/coding-agents/gemini-cli.md): Send Gemini CLI sessions, cost and traces to LangWatch with the LangWatch command-line tool.
 
 ### opencode
 
-- [opencode Integration Guide](https://langwatch.ai/docs/coding-agents/opencode.md): Send opencode sessions, cost and traces to LangWatch with the LangWatch command line tool.
+- [opencode Integration Guide](https://langwatch.ai/docs/coding-agents/opencode.md): Send opencode sessions, cost and traces to LangWatch with the LangWatch command-line tool.
 
 ## See Your Usage
 

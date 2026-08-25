@@ -1,10 +1,10 @@
 ---
 title: opencode Integration Guide
 sidebarTitle: opencode
-description: Send opencode sessions, cost and traces to LangWatch with the LangWatch command line tool.
+description: Send opencode sessions, cost and traces to LangWatch with the LangWatch command-line tool.
 ---
 
-[opencode](https://opencode.ai) is an open-source terminal coding agent. It reports every session over OpenTelemetry. The LangWatch command line tool connects that report to your workspace, so you can read the cost of each session, the model calls of each turn, and every tool call with its arguments and its result.
+[opencode](https://opencode.ai) is an open-source terminal coding agent. It reports every session over OpenTelemetry. The LangWatch command-line tool connects that report to your workspace, so you can read the cost of each session, the model calls of each turn, and every tool call with its arguments and its result.
 
 There are two ways to set it up:
 
@@ -14,7 +14,7 @@ There are two ways to set it up:
 ## Before you start
 
 - Install opencode.
-- Install the LangWatch command line tool: `npm install -g langwatch`
+- Install the LangWatch command-line tool: `npm install -g langwatch`
 - Create an account at [app.langwatch.ai](https://app.langwatch.ai), or run your own instance with `npx @langwatch/server`.
 
 ## Run opencode through the wrapper
@@ -77,7 +77,7 @@ The wrapper accepts the same flags: `langwatch opencode --project acme-app` pins
 langwatch logout
 ```
 
-This deletes every connection the command line tool wrote, for every tool.
+This deletes every connection the command-line tool wrote, for every tool.
 
 ## What you get in LangWatch
 
@@ -132,7 +132,7 @@ For more failure modes see [CLI debug](/ai-governance/cli-debug).
 
 ## Manual OpenTelemetry setup
 
-Use this when you cannot install the LangWatch command line tool.
+Use this when you cannot install the LangWatch command-line tool.
 
 First turn the reporting on in `~/.config/opencode/opencode.jsonc`:
 

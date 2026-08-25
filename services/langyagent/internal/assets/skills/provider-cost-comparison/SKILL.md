@@ -8,7 +8,7 @@ compatibility: Works with Claude Code and similar AI assistants. The `langwatch`
 
 # Price Your Real Usage Mix Against Other Providers
 
-Price-card comparisons lie by omission: a provider that halves the per-token price and lacks cache discounts can cost more on a cache-heavy coding workload. This skill prices the user's own month of usage, with its real input/output/cache mix, under each candidate. It is read-only on the platform: the only thing it writes is a report file.
+Price-card comparisons lie by omission: a provider that halves the per-token price and lacks cache discounts can cost more on a cache-heavy coding workload. This skill prices the user's own month of usage, with its real input/output/cache mix, under each candidate. It is read-only on the platform. Locally it writes a trace export while it works and deletes it again, and leaves one report file behind.
 
 ## Step 1: Set up the LangWatch CLI
 
@@ -18,13 +18,18 @@ Personal coding-agent usage needs `langwatch login --device`; a team or applicat
 
 ## Step 2: Export the Real Mix
 
-Get the aggregate mix first, then the cache split that the aggregates hide:
+Both `analytics query` and `trace export` default to the last 7 days, so a report about a month has to state the window itself. Compute one start date and one end date first, 30 days back to now unless the user names another window, then pass the same pair to every command:
 
 ```bash
-langwatch analytics query --metric total-tokens --group-by metadata.model --format json
-langwatch analytics query --metric total-cost --group-by metadata.model --format json
-langwatch trace export --format jsonl --limit 1000 -o traces.jsonl
+langwatch analytics query --metric total-tokens --group-by metadata.model --format json \
+  --start-date <start> --end-date <end>
+langwatch analytics query --metric total-cost --group-by metadata.model --format json \
+  --start-date <start> --end-date <end>
+langwatch trace export --format jsonl --limit 1000 \
+  --start-date <start> --end-date <end> -o traces.jsonl
 ```
+
+Delete `traces.jsonl` once the analysis is done.
 
 For coding-agent usage add `--origin coding_agent` to the export, collect the distinct `metadata.thread_id` values, and pull the per-call rows, because the cache split lives there:
 
@@ -32,7 +37,7 @@ For coding-agent usage add `--origin coding_agent` to the export, collect the di
 langwatch session events <sessionId> --format json
 ```
 
-Compute, per model: input tokens, output tokens, cache-read tokens, cache-creation tokens, and the observed monthly totals. The cache-read share is the single most important number of the whole analysis; on coding agents it is often the large majority of all input.
+Compute, per model: input tokens, output tokens, cache-read tokens, cache-creation tokens, and the totals over the window you exported. The cache-read share is the single most important number of the whole analysis; on coding agents it is often the large majority of all input.
 
 ## Step 3: Fetch Current Prices
 
@@ -53,7 +58,7 @@ For each candidate, reprice the same mix:
 
 Write a single self-contained `provider-cost-report.html` in the project root (inline CSS, no external assets) with:
 
-- **The answer first**: "your last 30 days cost $X; under the candidate the same usage prices at $Y" with the cache assumption named in the same sentence
+- **The answer first**: "your usage from `<start>` to `<end>` cost $X; under the candidate the same usage prices at $Y" with the exported window and the cache assumption named in the same sentence
 - The mix table: tokens per model per kind (input, output, cache read, cache write)
 - The comparison table: one row per candidate, direct and no-cache columns, with the price-page links and their fetch date
 - The sensitivity chart or table across cache-hit shares

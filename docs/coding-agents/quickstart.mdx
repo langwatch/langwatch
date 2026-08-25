@@ -37,7 +37,9 @@ Run your agent through the LangWatch wrapper. The first run opens a browser sign
   </Tab>
 </Tabs>
 
-The billing question is "Using a subscription" against "Using an API key". Pick your subscription to keep your own plan and login, with LangWatch receiving telemetry only. Pick an API key to route the model calls through the LangWatch AI Gateway under your organization's budgets and policies. LangWatch remembers your answer.
+The billing question is "How should `langwatch claude` run?", and it offers two answers. The first names the tool's own plan, for example "Using a Claude subscription" or "Using a ChatGPT subscription": it keeps your own plan and login, and LangWatch receives telemetry only. The second is "Using an API key": the model calls route through the LangWatch AI Gateway under your organization's budgets and policies. LangWatch remembers your answer per tool.
+
+This is the wrapper's own question, and it is separate from `langwatch login`, which asks where to sign in and which credential to mint. See [the CLI reference](/integration/cli) for that flow.
 
 The wrapper changes nothing else: same flags, same subcommands, same exit code as the bare tool.
 
@@ -45,7 +47,7 @@ The wrapper changes nothing else: same flags, same subcommands, same exit code a
 
 Work with the agent for a minute, then open [/me](https://app.langwatch.ai/me):
 
-- Your session is on the [sessions list](/coding-agents/sessions), with its cost, the context it carried, and a terminal replay of the conversation.
+- Your session is on the [sessions list](/coding-agents/sessions), with its cost, the context it carried, and a terminal replay of the conversation. The replay shows what your organization's [data privacy policy](/coding-agents/privacy) lets it store: with content dropped, the session keeps its numbers and shows no conversation.
 - Your spend for the month is on the usage cards. See [Usage analytics](/coding-agents/usage-analytics).
 - Once the session works on a branch with a pull request, it shows under [Pull requests](/coding-agents/pull-requests).
 

@@ -1,14 +1,14 @@
 ---
 title: GitHub Copilot Integration Guide
 sidebarTitle: GitHub Copilot
-description: Send GitHub Copilot CLI and Copilot Chat sessions, cost and traces to LangWatch with the LangWatch command line tool.
+description: Send GitHub Copilot CLI and Copilot Chat sessions, cost and traces to LangWatch with the LangWatch command-line tool.
 ---
 
-GitHub Copilot reports its work over OpenTelemetry, in the command line tool and in the Visual Studio Code chat extension. The LangWatch command line tool connects that report to your workspace, so you can read the cost of each session, the trace of each turn, and the prompt and the response behind both.
+GitHub Copilot reports its work over OpenTelemetry, in the command-line tool and in the Visual Studio Code chat extension. The LangWatch command-line tool connects that report to your workspace, so you can read the cost of each session, the trace of each turn, and the prompt and the response behind both.
 
 This page covers two surfaces:
 
-- `copilot`, the GitHub Copilot command line tool. Version 1.0.41 or later.
+- `copilot`, the GitHub Copilot command-line tool. Version 1.0.41 or later.
 - `code`, Visual Studio Code, for the GitHub Copilot Chat extension inside it.
 
 Each one has two ways to set it up:
@@ -18,8 +18,8 @@ Each one has two ways to set it up:
 
 ## Before you start
 
-- Install the GitHub Copilot command line tool, Visual Studio Code, or both.
-- Install the LangWatch command line tool: `npm install -g langwatch`
+- Install the GitHub Copilot command-line tool, Visual Studio Code, or both.
+- Install the LangWatch command-line tool: `npm install -g langwatch`
 - Create an account at [app.langwatch.ai](https://app.langwatch.ai), or run your own instance with `npx @langwatch/server`.
 
 ## Run Copilot through the wrapper
@@ -39,7 +39,7 @@ The first run asks one question:
 LangWatch remembers the answer, so later runs do not ask again. Everything else is unchanged: `langwatch copilot` accepts the same flags and the same subcommands as `copilot`, and it returns the same exit code.
 
 <Warning>
-  The gateway answer moves the model spend off your Copilot seat and onto your organization's gateway budget. Pick it only when that is what you want. The command line tool names the change every time it takes that route.
+  The gateway answer moves the model spend off your Copilot seat and onto your organization's gateway budget. Pick it only when that is what you want. The command-line tool names the change every time it takes that route.
 </Warning>
 
 For Copilot Chat inside Visual Studio Code, start the editor the same way:
@@ -78,7 +78,7 @@ Pass one scope flag, and one only:
 | `langwatch instrument copilot --key <ingest-key>` | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
 | `langwatch instrument copilot --personal` | Back to your personal workspace |
 
-Replace `copilot` with `code` for the Visual Studio Code extension. The two are separate, so you can send the command line tool to a team project and keep the editor on your personal workspace.
+Replace `copilot` with `code` for the Visual Studio Code extension. The two are separate, so you can send the command-line tool to a team project and keep the editor on your personal workspace.
 
 The wrapper accepts the same flags: `langwatch copilot --project acme-app` pins the project and then starts Copilot. `--project` and `--personal` are LangWatch flags; LangWatch removes them from the command line before Copilot reads it.
 
@@ -88,7 +88,7 @@ The wrapper accepts the same flags: `langwatch copilot --project acme-app` pins 
 langwatch logout
 ```
 
-This deletes every connection the command line tool wrote, for every tool.
+This deletes every connection the command-line tool wrote, for every tool.
 
 ## The GitHub Copilot app
 
@@ -155,7 +155,7 @@ For more failure modes see [CLI debug](/ai-governance/cli-debug).
 
 ## Manual OpenTelemetry setup
 
-Use this when you cannot install the LangWatch command line tool. The variables below are the ones `langwatch instrument copilot` writes for you.
+Use this when you cannot install the LangWatch command-line tool. The variables below are the ones `langwatch instrument copilot` writes for you.
 
 ### GitHub Copilot CLI
 

@@ -19512,10 +19512,10 @@ A virtual key's effective policy is the deepest applicable: VK > Project > Team 
 ---
 title: Claude Code Integration Guide
 sidebarTitle: Claude Code
-description: Send Claude Code sessions, cost and traces to LangWatch with the LangWatch command line tool.
+description: Send Claude Code sessions, cost and traces to LangWatch with the LangWatch command-line tool.
 ---
 
-Claude Code reports every session over OpenTelemetry. The LangWatch command line tool connects that report to your workspace, so you can read the cost of each session, the tool call tree of each turn, and the prompt and the response behind both.
+Claude Code reports every session over OpenTelemetry. The LangWatch command-line tool connects that report to your workspace, so you can read the cost of each session, the tool call tree of each turn, and the prompt and the response behind both.
 
 There are two ways to set it up:
 
@@ -19525,7 +19525,7 @@ There are two ways to set it up:
 ## Before you start
 
 - Install Claude Code.
-- Install the LangWatch command line tool: `npm install -g langwatch`
+- Install the LangWatch command-line tool: `npm install -g langwatch`
 - Create an account at [app.langwatch.ai](https://app.langwatch.ai), or run your own instance with `npx @langwatch/server`.
 
 ## Run Claude Code through the wrapper
@@ -19575,7 +19575,7 @@ The wrapper accepts the same flags: `langwatch claude --project acme-app` pins t
 langwatch logout
 ```
 
-This deletes every connection the command line tool wrote, for every tool.
+This deletes every connection the command-line tool wrote, for every tool.
 
 ## What you get in LangWatch
 
@@ -19585,7 +19585,7 @@ Open your personal page at `/me`, or open the project you pinned Claude Code to.
 - **Traces**: one trace per turn, with the tool call tree, the latency of each step, and each subagent on its own branch.
 - **[Cost](/coding-agents/usage-analytics)**: the amount per session and per turn, the model of each turn, and the split between tokens written to the prompt cache and tokens read back from it.
 - **[Pull requests](/coding-agents/pull-requests)**: what each pull request cost across every session that drove it.
-- **Content**: the prompt of each turn, the input and the output of each tool call, and the response of the model.
+- **Content**: the prompt of each turn, the input and the output of each tool call, and the response of the model. Content is what a [data privacy policy](/coding-agents/privacy) can drop or restrict, so the terminal replay and these fields are only as complete as that policy allows.
 
 Your agent can read all of this back. See [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
 
@@ -19658,7 +19658,7 @@ For more failure modes see [CLI debug](/ai-governance/cli-debug).
 
 ## Manual OpenTelemetry setup
 
-Use this when you cannot install the LangWatch command line tool. The block below mirrors the variables `langwatch instrument claude` writes for you, plus the optional `OTEL_LOG_ASSISTANT_RESPONSES` flag, which the wrapper does not set. Drop that line if you only want what the wrapper gives you.
+Use this when you cannot install the LangWatch command-line tool. The block below mirrors the variables `langwatch instrument claude` writes for you, plus the optional `OTEL_LOG_ASSISTANT_RESPONSES` flag, which the wrapper does not set. Drop that line if you only want what the wrapper gives you.
 
 ### Environment variables
 
@@ -19817,7 +19817,7 @@ Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `la
 
 # Price Your Real Usage Mix Against Other Providers
 
-Price-card comparisons lie by omission: a provider that halves the per-token price and lacks cache discounts can cost more on a cache-heavy coding workload. This skill prices the user's own month of usage, with its real input/output/cache mix, under each candidate. It is read-only on the platform: the only thing it writes is a report file.
+Price-card comparisons lie by omission: a provider that halves the per-token price and lacks cache discounts can cost more on a cache-heavy coding workload. This skill prices the user's own month of usage, with its real input/output/cache mix, under each candidate. It is read-only on the platform. Locally it writes a trace export while it works and deletes it again, and leaves one report file behind.
 
 ## Step 1: Set up the LangWatch CLI
 
@@ -19843,13 +19843,18 @@ If anything fails or confuses you while following this skill (broken commands, d
 
 ## Step 2: Export the Real Mix
 
-Get the aggregate mix first, then the cache split that the aggregates hide:
+Both `analytics query` and `trace export` default to the last 7 days, so a report about a month has to state the window itself. Compute one start date and one end date first, 30 days back to now unless the user names another window, then pass the same pair to every command:
 
 ```bash
-langwatch analytics query --metric total-tokens --group-by metadata.model --format json
-langwatch analytics query --metric total-cost --group-by metadata.model --format json
-langwatch trace export --format jsonl --limit 1000 -o traces.jsonl
+langwatch analytics query --metric total-tokens --group-by metadata.model --format json \
+  --start-date <start> --end-date <end>
+langwatch analytics query --metric total-cost --group-by metadata.model --format json \
+  --start-date <start> --end-date <end>
+langwatch trace export --format jsonl --limit 1000 \
+  --start-date <start> --end-date <end> -o traces.jsonl
 ```
+
+Delete `traces.jsonl` once the analysis is done.
 
 For coding-agent usage add `--origin coding_agent` to the export, collect the distinct `metadata.thread_id` values, and pull the per-call rows, because the cache split lives there:
 
@@ -19857,7 +19862,7 @@ For coding-agent usage add `--origin coding_agent` to the export, collect the di
 langwatch session events <sessionId> --format json
 ```
 
-Compute, per model: input tokens, output tokens, cache-read tokens, cache-creation tokens, and the observed monthly totals. The cache-read share is the single most important number of the whole analysis; on coding agents it is often the large majority of all input.
+Compute, per model: input tokens, output tokens, cache-read tokens, cache-creation tokens, and the totals over the window you exported. The cache-read share is the single most important number of the whole analysis; on coding agents it is often the large majority of all input.
 
 ## Step 3: Fetch Current Prices
 
@@ -19878,7 +19883,7 @@ For each candidate, reprice the same mix:
 
 Write a single self-contained `provider-cost-report.html` in the project root (inline CSS, no external assets) with:
 
-- **The answer first**: "your last 30 days cost $X; under the candidate the same usage prices at $Y" with the cache assumption named in the same sentence
+- **The answer first**: "your usage from `<start>` to `<end>` cost $X; under the candidate the same usage prices at $Y" with the exported window and the cache assumption named in the same sentence
 - The mix table: tokens per model per kind (input, output, cache read, cache write)
 - The comparison table: one row per candidate, direct and no-cache columns, with the price-page links and their fetch date
 - The sensitivity chart or table across cache-hit shares
@@ -20046,7 +20051,7 @@ Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `la
 
 # Find the Context Size Where Your Sessions Stop Paying
 
-This skill answers one question with the user's own data: at what context size do their coding-agent sessions become a bad deal? Long context is not free even when it fits the window: every cache rebuild re-bills the whole context at write rates, compactions burn turns, and models degrade before their window ends. The sweet spot is where those costs start outrunning the value of the carried context. It is read-only on the platform: the only thing it writes is a report file.
+This skill answers one question with the user's own data: at what context size do their coding-agent sessions become a bad deal? Long context is not free even when it fits the window: every cache rebuild re-bills the whole context at write rates, compactions burn turns, and models degrade before their window ends. The sweet spot is where those costs start outrunning the value of the carried context. It is read-only on the platform. Locally it writes a trace export while it works and deletes it again, and leaves one report file behind.
 
 ## Step 1: Set up the LangWatch CLI
 
@@ -20072,11 +20077,14 @@ If anything fails or confuses you while following this skill (broken commands, d
 
 ## Step 2: Collect the Sessions
 
-Get the session population from the coding-agent traces, then pull each interesting session's per-call rows:
+Pick one window and use it everywhere, because `trace export` defaults to the last 7 days. Compute a start and an end date once (30 days back to now is a good default) and pass both:
 
 ```bash
-langwatch trace export --origin coding_agent --format jsonl --limit 1000 -o coding-traces.jsonl
+langwatch trace export --origin coding_agent --format jsonl --limit 1000 \
+  --start-date <start> --end-date <end> -o coding-traces.jsonl
 ```
+
+Report the window you used in the report, and delete `coding-traces.jsonl` once the analysis is done.
 
 Each trace carries `metadata.thread_id` (the session id) and `metadata."langwatch.source"` (which agent). Collect the distinct session ids, then for each session with enough turns to mean anything (5 or more model calls):
 
@@ -20091,7 +20099,7 @@ The events are the raw material: every model call with its input, output, cache-
 Write a small local script (python3 or jq) over the events. Per session, compute:
 
 1. **Peak context**: the largest (input + cache-read) of any model call, and its share of the model's context window.
-2. **Cache rebuilds**: model calls whose cache-creation tokens are the bulk of their input. Each one re-paid for context that was already paid for, at the cache-write rate, which is higher than fresh input.
+2. **Cache rebuilds**: model calls whose cache-creation tokens are the bulk of their input. Each one re-paid for context that was already paid for, at the provider's cache-write rate. That rate is provider and model specific: some price a write above fresh input, some price it the same, and some charge for cache storage by time instead. Take it from the price card of the model in question, never from a rule of thumb.
 3. **Compaction count and where they landed**: a compaction late in a session marks the point where the carried context stopped fitting.
 4. **Cost per model call over session lifetime**: split each session into thirds by call order and compare the average cost per call between the first and last third.
 5. **Waiting time around rebuilds**: rebuilt context is also re-uploaded and re-processed, so rebuild-heavy sessions are slower per turn.
@@ -20160,10 +20168,10 @@ The [session detail](/coding-agents/sessions#session-detail) shows the same cach
 ---
 title: Gemini CLI Integration Guide
 sidebarTitle: Gemini CLI
-description: Send Gemini CLI sessions, cost and traces to LangWatch with the LangWatch command line tool.
+description: Send Gemini CLI sessions, cost and traces to LangWatch with the LangWatch command-line tool.
 ---
 
-Gemini CLI reports every session over OpenTelemetry. The LangWatch command line tool connects that report to your workspace, so you can read the cost of each session, the trace of each turn, and the prompts behind both.
+Gemini CLI reports every session over OpenTelemetry. The LangWatch command-line tool connects that report to your workspace, so you can read the cost of each session, the trace of each turn, and the prompts behind both.
 
 There are two ways to set it up:
 
@@ -20173,7 +20181,7 @@ There are two ways to set it up:
 ## Before you start
 
 - Install Gemini CLI.
-- Install the LangWatch command line tool: `npm install -g langwatch`
+- Install the LangWatch command-line tool: `npm install -g langwatch`
 - Create an account at [app.langwatch.ai](https://app.langwatch.ai), or run your own instance with `npx @langwatch/server`.
 
 ## Run Gemini CLI through the wrapper
@@ -20229,7 +20237,7 @@ The wrapper accepts the same flags: `langwatch gemini --project acme-app` pins t
 langwatch logout
 ```
 
-This deletes every connection the command line tool wrote, for every tool.
+This deletes every connection the command-line tool wrote, for every tool.
 
 ## What you get in LangWatch
 
@@ -20276,7 +20284,7 @@ For more failure modes see [CLI debug](/ai-governance/cli-debug).
 
 ## Manual OpenTelemetry setup
 
-Use this when you cannot install the LangWatch command line tool. The block below mirrors the variables the setup writes for you:
+Use this when you cannot install the LangWatch command-line tool. The block below mirrors the variables the setup writes for you:
 
 ```bash
 export GEMINI_TELEMETRY_ENABLED=true
@@ -20305,14 +20313,14 @@ For a self-hosted instance, replace the endpoint host with the address of your i
 ---
 title: GitHub Copilot Integration Guide
 sidebarTitle: GitHub Copilot
-description: Send GitHub Copilot CLI and Copilot Chat sessions, cost and traces to LangWatch with the LangWatch command line tool.
+description: Send GitHub Copilot CLI and Copilot Chat sessions, cost and traces to LangWatch with the LangWatch command-line tool.
 ---
 
-GitHub Copilot reports its work over OpenTelemetry, in the command line tool and in the Visual Studio Code chat extension. The LangWatch command line tool connects that report to your workspace, so you can read the cost of each session, the trace of each turn, and the prompt and the response behind both.
+GitHub Copilot reports its work over OpenTelemetry, in the command-line tool and in the Visual Studio Code chat extension. The LangWatch command-line tool connects that report to your workspace, so you can read the cost of each session, the trace of each turn, and the prompt and the response behind both.
 
 This page covers two surfaces:
 
-- `copilot`, the GitHub Copilot command line tool. Version 1.0.41 or later.
+- `copilot`, the GitHub Copilot command-line tool. Version 1.0.41 or later.
 - `code`, Visual Studio Code, for the GitHub Copilot Chat extension inside it.
 
 Each one has two ways to set it up:
@@ -20322,8 +20330,8 @@ Each one has two ways to set it up:
 
 ## Before you start
 
-- Install the GitHub Copilot command line tool, Visual Studio Code, or both.
-- Install the LangWatch command line tool: `npm install -g langwatch`
+- Install the GitHub Copilot command-line tool, Visual Studio Code, or both.
+- Install the LangWatch command-line tool: `npm install -g langwatch`
 - Create an account at [app.langwatch.ai](https://app.langwatch.ai), or run your own instance with `npx @langwatch/server`.
 
 ## Run Copilot through the wrapper
@@ -20343,7 +20351,7 @@ The first run asks one question:
 LangWatch remembers the answer, so later runs do not ask again. Everything else is unchanged: `langwatch copilot` accepts the same flags and the same subcommands as `copilot`, and it returns the same exit code.
 
 <Warning>
-  The gateway answer moves the model spend off your Copilot seat and onto your organization's gateway budget. Pick it only when that is what you want. The command line tool names the change every time it takes that route.
+  The gateway answer moves the model spend off your Copilot seat and onto your organization's gateway budget. Pick it only when that is what you want. The command-line tool names the change every time it takes that route.
 </Warning>
 
 For Copilot Chat inside Visual Studio Code, start the editor the same way:
@@ -20382,7 +20390,7 @@ Pass one scope flag, and one only:
 | `langwatch instrument copilot --key <ingest-key>` | The project that owns the key, with no login. See [Headless machines and CI](/coding-agents/headless-and-ci). |
 | `langwatch instrument copilot --personal` | Back to your personal workspace |
 
-Replace `copilot` with `code` for the Visual Studio Code extension. The two are separate, so you can send the command line tool to a team project and keep the editor on your personal workspace.
+Replace `copilot` with `code` for the Visual Studio Code extension. The two are separate, so you can send the command-line tool to a team project and keep the editor on your personal workspace.
 
 The wrapper accepts the same flags: `langwatch copilot --project acme-app` pins the project and then starts Copilot. `--project` and `--personal` are LangWatch flags; LangWatch removes them from the command line before Copilot reads it.
 
@@ -20392,7 +20400,7 @@ The wrapper accepts the same flags: `langwatch copilot --project acme-app` pins 
 langwatch logout
 ```
 
-This deletes every connection the command line tool wrote, for every tool.
+This deletes every connection the command-line tool wrote, for every tool.
 
 ## The GitHub Copilot app
 
@@ -20459,7 +20467,7 @@ For more failure modes see [CLI debug](/ai-governance/cli-debug).
 
 ## Manual OpenTelemetry setup
 
-Use this when you cannot install the LangWatch command line tool. The variables below are the ones `langwatch instrument copilot` writes for you.
+Use this when you cannot install the LangWatch command-line tool. The variables below are the ones `langwatch instrument copilot` writes for you.
 
 ### GitHub Copilot CLI
 
@@ -20607,10 +20615,10 @@ Every CLI sign-in, CI runners included, appears under **Devices** on [/me/config
 ---
 title: OpenAI Codex CLI Integration Guide
 sidebarTitle: OpenAI Codex
-description: Send OpenAI Codex CLI sessions, cost and traces to LangWatch with the LangWatch command line tool.
+description: Send OpenAI Codex CLI sessions, cost and traces to LangWatch with the LangWatch command-line tool.
 ---
 
-The OpenAI Codex command line tool reports every session over OpenTelemetry. The LangWatch command line tool connects that report to your workspace, so you can read the cost of each session, the trace of each turn, and the conversation behind both.
+The OpenAI Codex command-line tool reports every session over OpenTelemetry. The LangWatch command-line tool connects that report to your workspace, so you can read the cost of each session, the trace of each turn, and the conversation behind both.
 
 There are two ways to set it up:
 
@@ -20621,8 +20629,8 @@ After either one, a plain `codex` run also reports to LangWatch. The connection 
 
 ## Before you start
 
-- Install the Codex command line tool.
-- Install the LangWatch command line tool: `npm install -g langwatch`
+- Install the Codex command-line tool.
+- Install the LangWatch command-line tool: `npm install -g langwatch`
 - Create an account at [app.langwatch.ai](https://app.langwatch.ai), or run your own instance with `npx @langwatch/server`.
 
 ## Run Codex through the wrapper
@@ -20672,7 +20680,7 @@ The wrapper accepts the same flags: `langwatch codex --project acme-app` pins th
 langwatch logout
 ```
 
-This deletes every connection the command line tool wrote, for every tool.
+This deletes every connection the command-line tool wrote, for every tool.
 
 ## What you get in LangWatch
 
@@ -20764,7 +20772,7 @@ For more failure modes see [CLI debug](/ai-governance/cli-debug).
 
 ## Manual OpenTelemetry setup
 
-Use this when you cannot install the LangWatch command line tool. The block below is the one `langwatch instrument codex` writes for you.
+Use this when you cannot install the LangWatch command-line tool. The block below is the one `langwatch instrument codex` writes for you.
 
 Add it to `~/.codex/config.toml`:
 
@@ -20806,10 +20814,10 @@ A manual block reports the tokens, the model and the timing of each turn, and wi
 ---
 title: opencode Integration Guide
 sidebarTitle: opencode
-description: Send opencode sessions, cost and traces to LangWatch with the LangWatch command line tool.
+description: Send opencode sessions, cost and traces to LangWatch with the LangWatch command-line tool.
 ---
 
-[opencode](https://opencode.ai) is an open-source terminal coding agent. It reports every session over OpenTelemetry. The LangWatch command line tool connects that report to your workspace, so you can read the cost of each session, the model calls of each turn, and every tool call with its arguments and its result.
+[opencode](https://opencode.ai) is an open-source terminal coding agent. It reports every session over OpenTelemetry. The LangWatch command-line tool connects that report to your workspace, so you can read the cost of each session, the model calls of each turn, and every tool call with its arguments and its result.
 
 There are two ways to set it up:
 
@@ -20819,7 +20827,7 @@ There are two ways to set it up:
 ## Before you start
 
 - Install opencode.
-- Install the LangWatch command line tool: `npm install -g langwatch`
+- Install the LangWatch command-line tool: `npm install -g langwatch`
 - Create an account at [app.langwatch.ai](https://app.langwatch.ai), or run your own instance with `npx @langwatch/server`.
 
 ## Run opencode through the wrapper
@@ -20882,7 +20890,7 @@ The wrapper accepts the same flags: `langwatch opencode --project acme-app` pins
 langwatch logout
 ```
 
-This deletes every connection the command line tool wrote, for every tool.
+This deletes every connection the command-line tool wrote, for every tool.
 
 ## What you get in LangWatch
 
@@ -20937,7 +20945,7 @@ For more failure modes see [CLI debug](/ai-governance/cli-debug).
 
 ## Manual OpenTelemetry setup
 
-Use this when you cannot install the LangWatch command line tool.
+Use this when you cannot install the LangWatch command-line tool.
 
 First turn the reporting on in `~/.config/opencode/opencode.jsonc`:
 
@@ -20996,7 +21004,7 @@ sidebarTitle: Overview
 description: Track what Claude Code, Codex, Copilot, Gemini CLI and opencode really do and cost, per session, per pull request and per team, with privacy controls built for tracking people's tools.
 ---
 
-One command connects an agent. After that, LangWatch records every session with its cost, its context economics, its full conversation, and the pull requests it drove.
+One command connects an agent. After that, LangWatch records every session with its cost, its context economics, its conversation, and the pull requests it drove. An organization that drops or restricts content in its [data privacy policy](/coding-agents/privacy) keeps the numbers and loses the conversation.
 
 ```bash
 npx langwatch claude
@@ -21234,7 +21242,9 @@ Run your agent through the LangWatch wrapper. The first run opens a browser sign
 
 
 
-The billing question is "Using a subscription" against "Using an API key". Pick your subscription to keep your own plan and login, with LangWatch receiving telemetry only. Pick an API key to route the model calls through the LangWatch AI Gateway under your organization's budgets and policies. LangWatch remembers your answer.
+The billing question is "How should `langwatch claude` run?", and it offers two answers. The first names the tool's own plan, for example "Using a Claude subscription" or "Using a ChatGPT subscription": it keeps your own plan and login, and LangWatch receives telemetry only. The second is "Using an API key": the model calls route through the LangWatch AI Gateway under your organization's budgets and policies. LangWatch remembers your answer per tool.
+
+This is the wrapper's own question, and it is separate from `langwatch login`, which asks where to sign in and which credential to mint. See [the CLI reference](/integration/cli) for that flow.
 
 The wrapper changes nothing else: same flags, same subcommands, same exit code as the bare tool.
 
@@ -21242,7 +21252,7 @@ The wrapper changes nothing else: same flags, same subcommands, same exit code a
 
 Work with the agent for a minute, then open [/me](https://app.langwatch.ai/me):
 
-- Your session is on the [sessions list](/coding-agents/sessions), with its cost, the context it carried, and a terminal replay of the conversation.
+- Your session is on the [sessions list](/coding-agents/sessions), with its cost, the context it carried, and a terminal replay of the conversation. The replay shows what your organization's [data privacy policy](/coding-agents/privacy) lets it store: with content dropped, the session keeps its numbers and shows no conversation.
 - Your spend for the month is on the usage cards. See [Usage analytics](/coding-agents/usage-analytics).
 - Once the session works on a branch with a pull request, it shows under [Pull requests](/coding-agents/pull-requests).
 
@@ -21389,7 +21399,7 @@ One row per session, over the last 90 days. Every column sorts; a third click on
 | **Token cost** | What the session cost, cache-aware: tokens read from cache are priced as cache reads, not as fresh input. |
 | **Pull requests** | The pull requests the session's branches map to. |
 
-Search matches session titles. The period selector opens on **All time**; narrow it when you look for a specific day.
+Search matches session titles. The period selector starts unset and reads **All time**, which means the whole 90-day window above rather than every session you ever ran. Pick a range when you look for a specific day.
 
 ## Session detail
 
@@ -53207,7 +53217,7 @@ Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `la
 
 # Find the Context Size Where Your Sessions Stop Paying
 
-This skill answers one question with the user's own data: at what context size do their coding-agent sessions become a bad deal? Long context is not free even when it fits the window: every cache rebuild re-bills the whole context at write rates, compactions burn turns, and models degrade before their window ends. The sweet spot is where those costs start outrunning the value of the carried context. It is read-only on the platform: the only thing it writes is a report file.
+This skill answers one question with the user's own data: at what context size do their coding-agent sessions become a bad deal? Long context is not free even when it fits the window: every cache rebuild re-bills the whole context at write rates, compactions burn turns, and models degrade before their window ends. The sweet spot is where those costs start outrunning the value of the carried context. It is read-only on the platform. Locally it writes a trace export while it works and deletes it again, and leaves one report file behind.
 
 ## Step 1: Set up the LangWatch CLI
 
@@ -53233,11 +53243,14 @@ If anything fails or confuses you while following this skill (broken commands, d
 
 ## Step 2: Collect the Sessions
 
-Get the session population from the coding-agent traces, then pull each interesting session's per-call rows:
+Pick one window and use it everywhere, because `trace export` defaults to the last 7 days. Compute a start and an end date once (30 days back to now is a good default) and pass both:
 
 ```bash
-langwatch trace export --origin coding_agent --format jsonl --limit 1000 -o coding-traces.jsonl
+langwatch trace export --origin coding_agent --format jsonl --limit 1000 \
+  --start-date <start> --end-date <end> -o coding-traces.jsonl
 ```
+
+Report the window you used in the report, and delete `coding-traces.jsonl` once the analysis is done.
 
 Each trace carries `metadata.thread_id` (the session id) and `metadata."langwatch.source"` (which agent). Collect the distinct session ids, then for each session with enough turns to mean anything (5 or more model calls):
 
@@ -53252,7 +53265,7 @@ The events are the raw material: every model call with its input, output, cache-
 Write a small local script (python3 or jq) over the events. Per session, compute:
 
 1. **Peak context**: the largest (input + cache-read) of any model call, and its share of the model's context window.
-2. **Cache rebuilds**: model calls whose cache-creation tokens are the bulk of their input. Each one re-paid for context that was already paid for, at the cache-write rate, which is higher than fresh input.
+2. **Cache rebuilds**: model calls whose cache-creation tokens are the bulk of their input. Each one re-paid for context that was already paid for, at the provider's cache-write rate. That rate is provider and model specific: some price a write above fresh input, some price it the same, and some charge for cache storage by time instead. Take it from the price card of the model in question, never from a rule of thumb.
 3. **Compaction count and where they landed**: a compaction late in a session marks the point where the carried context stopped fitting.
 4. **Cost per model call over session lifetime**: split each session into thirds by call order and compare the average cost per call between the first and last third.
 5. **Waiting time around rebuilds**: rebuilt context is also re-uploaded and re-processed, so rebuild-heavy sessions are slower per turn.
@@ -53338,7 +53351,7 @@ Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `la
 
 # Price Your Real Usage Mix Against Other Providers
 
-Price-card comparisons lie by omission: a provider that halves the per-token price and lacks cache discounts can cost more on a cache-heavy coding workload. This skill prices the user's own month of usage, with its real input/output/cache mix, under each candidate. It is read-only on the platform: the only thing it writes is a report file.
+Price-card comparisons lie by omission: a provider that halves the per-token price and lacks cache discounts can cost more on a cache-heavy coding workload. This skill prices the user's own month of usage, with its real input/output/cache mix, under each candidate. It is read-only on the platform. Locally it writes a trace export while it works and deletes it again, and leaves one report file behind.
 
 ## Step 1: Set up the LangWatch CLI
 
@@ -53364,13 +53377,18 @@ If anything fails or confuses you while following this skill (broken commands, d
 
 ## Step 2: Export the Real Mix
 
-Get the aggregate mix first, then the cache split that the aggregates hide:
+Both `analytics query` and `trace export` default to the last 7 days, so a report about a month has to state the window itself. Compute one start date and one end date first, 30 days back to now unless the user names another window, then pass the same pair to every command:
 
 ```bash
-langwatch analytics query --metric total-tokens --group-by metadata.model --format json
-langwatch analytics query --metric total-cost --group-by metadata.model --format json
-langwatch trace export --format jsonl --limit 1000 -o traces.jsonl
+langwatch analytics query --metric total-tokens --group-by metadata.model --format json \
+  --start-date <start> --end-date <end>
+langwatch analytics query --metric total-cost --group-by metadata.model --format json \
+  --start-date <start> --end-date <end>
+langwatch trace export --format jsonl --limit 1000 \
+  --start-date <start> --end-date <end> -o traces.jsonl
 ```
+
+Delete `traces.jsonl` once the analysis is done.
 
 For coding-agent usage add `--origin coding_agent` to the export, collect the distinct `metadata.thread_id` values, and pull the per-call rows, because the cache split lives there:
 
@@ -53378,7 +53396,7 @@ For coding-agent usage add `--origin coding_agent` to the export, collect the di
 langwatch session events <sessionId> --format json
 ```
 
-Compute, per model: input tokens, output tokens, cache-read tokens, cache-creation tokens, and the observed monthly totals. The cache-read share is the single most important number of the whole analysis; on coding agents it is often the large majority of all input.
+Compute, per model: input tokens, output tokens, cache-read tokens, cache-creation tokens, and the totals over the window you exported. The cache-read share is the single most important number of the whole analysis; on coding agents it is often the large majority of all input.
 
 ## Step 3: Fetch Current Prices
 
@@ -53399,7 +53417,7 @@ For each candidate, reprice the same mix:
 
 Write a single self-contained `provider-cost-report.html` in the project root (inline CSS, no external assets) with:
 
-- **The answer first**: "your last 30 days cost $X; under the candidate the same usage prices at $Y" with the cache assumption named in the same sentence
+- **The answer first**: "your usage from `<start>` to `<end>` cost $X; under the candidate the same usage prices at $Y" with the exported window and the cache assumption named in the same sentence
 - The mix table: tokens per model per kind (input, output, cache read, cache write)
 - The comparison table: one row per candidate, direct and no-cache columns, with the price-page links and their fetch date
 - The sensitivity chart or table across cache-hit shares
