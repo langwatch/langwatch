@@ -14,13 +14,8 @@ import { TestCasesPanel } from "./TestCasesPanel";
 import { TestCasesRail } from "./TestCasesRail";
 import { useTestCasesTab } from "./useTestCasesTab";
 
-export type TestCasesTabProps = {
-  /** Opens the create-a-case flow, filed in the suite it is given. */
-  onNewTestCase: (folderId: string | null) => void;
-};
-
-export function TestCasesTab({ onNewTestCase }: TestCasesTabProps) {
-  const model = useTestCasesTab(onNewTestCase);
+export function TestCasesTab() {
+  const model = useTestCasesTab();
 
   return (
     <HStack

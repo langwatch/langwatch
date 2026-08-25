@@ -19,6 +19,7 @@ import type {
 import {
   displayOptionalValue,
   serializeOptionalScalarValue,
+  serializeScalarValue,
 } from "~/utils/jsonValueText";
 
 /**
@@ -85,4 +86,39 @@ export function toLineRunParameters({
   }
 
   return Object.keys(parameters).length > 0 ? parameters : undefined;
+}
+
+/**
+ * The declarations a line stands for, keeping every secret the case already
+ * declares.
+ *
+ * A secret carries no default and never rides on the line, so it would be
+ * dropped by a save that read the line alone. Every other declaration is
+ * rewritten from the line, so removing a pair removes the parameter.
+ */
+export function toParameterDefinitions({
+  line,
+  existing,
+}: {
+  line: string;
+  /** What the case declares today, for the secrets and the descriptions. */
+  existing: ScenarioParameterDefinition[];
+}): ScenarioParameterDefinition[] {
+  const secrets = existing.filter((definition) => definition.secret === true);
+  const described = new Map(
+    existing.map((definition) => [definition.name, definition.description]),
+  );
+
+  const declared: ScenarioParameterDefinition[] = [];
+  for (const [name, raw] of parseParameterLine(line)) {
+    if (secrets.some((definition) => definition.name === name)) continue;
+    const description = described.get(name);
+    declared.push({
+      name,
+      ...(description ? { description } : {}),
+      ...(raw === "" ? {} : { defaultValue: serializeScalarValue(raw) }),
+    });
+  }
+
+  return [...declared, ...secrets];
 }

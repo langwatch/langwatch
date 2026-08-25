@@ -1,55 +1,55 @@
 /**
  * Agent Testing: one page with the test cases and the results in tabs.
  *
- * The page is the only mount point of the live-run subscription, and every
- * move inside it is a shallow address push, so a run keeps streaming while a
- * person moves between suites, plans and tabs.
+ * The page is the only mount point of the live-run subscription and of the
+ * case editor, and every move inside it is a shallow address push, so a run
+ * keeps streaming while a person moves between suites, plans and tabs.
  *
  * @see specs/features/agent-testing/page-structure.feature
  */
 
 import { Box, VStack } from "@chakra-ui/react";
-import { useCallback, useState } from "react";
-import { DashboardLayout } from "~/components/DashboardLayout";
-import { ScenarioCreateModal } from "~/components/scenarios/ScenarioCreateModal";
 import { NowProvider } from "~/components/suites/NowProvider";
+import { DashboardLayout } from "~/components/DashboardLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePreloadDrawer } from "~/hooks/usePreloadDrawer";
+import { api } from "~/utils/api";
 import { AgentTestingHeader } from "./AgentTestingHeader";
+import { AgentTestingCaseEditor } from "./cases/AgentTestingCaseEditor";
 import { TestCasesTab } from "./cases/TestCasesTab";
 import { ResultsTab } from "./results/ResultsTab";
 import { useAgentTestingLiveUpdates } from "./useAgentTestingLiveUpdates";
 import {
   useHydrateViewFromUrl,
   useNewRunPlanFlow,
-  useScenarioEditorRunFlow,
-  useSelectedSuiteFolderId,
 } from "./useAgentTestingPageFlows";
 import { useAgentTestingRouting } from "./useAgentTestingRouting";
 
+/** How many test cases and how many run plans the tabs count. */
+function useTabCounts(projectId: string) {
+  const { data: scenarios } = api.scenarios.getAll.useQuery(
+    { projectId },
+    { enabled: !!projectId },
+  );
+  const { data: suites } = api.suites.getAll.useQuery(
+    { projectId, kinds: ["custom", "folder"] },
+    { enabled: !!projectId },
+  );
+
+  return { casesCount: scenarios?.length, plansCount: suites?.length };
+}
+
 export function AgentTestingPage() {
   const { project } = useOrganizationTeamProject();
-  // The rows open a run's detail, the rail opens the case editor and the
-  // header opens the run plan editor, three separate downloads. Fetch them
-  // while the person reads the page.
-  usePreloadDrawer("scenarioRunDetail", "scenarioEditor", "suiteEditor");
+  // The rows open a run's detail and the header opens the run plan editor,
+  // two separate downloads. Fetch them while the person reads the page.
+  usePreloadDrawer("scenarioRunDetail", "suiteEditor");
 
   const routing = useAgentTestingRouting();
-  const [createCase, setCreateCase] = useState<{
-    open: boolean;
-    folderId: string | null;
-  }>({ open: false, folderId: null });
-
-  const selectedFolderId = useSelectedSuiteFolderId(routing.selection);
   useHydrateViewFromUrl();
   const { isSseConnected } = useAgentTestingLiveUpdates(project?.id ?? "");
   const handleNewRunPlan = useNewRunPlanFlow(routing.selectPlan);
-  useScenarioEditorRunFlow(project?.id);
-
-  const handleNewTestCase = useCallback(
-    (folderId: string | null) => setCreateCase({ open: true, folderId }),
-    [],
-  );
+  const { casesCount, plansCount } = useTabCounts(project?.id ?? "");
 
   return (
     <NowProvider>
@@ -58,25 +58,21 @@ export function AgentTestingPage() {
           <AgentTestingHeader
             tab={routing.tab}
             onTabChange={routing.setTab}
-            onNewTestCase={() => handleNewTestCase(selectedFolderId)}
             onNewRunPlan={handleNewRunPlan}
+            casesCount={casesCount}
+            plansCount={plansCount}
           />
 
           <Box flex={1} width="full" minHeight={0} overflow="hidden">
             {routing.tab === "cases" ? (
-              <TestCasesTab onNewTestCase={handleNewTestCase} />
+              <TestCasesTab />
             ) : (
               <ResultsTab isSseConnected={isSseConnected} />
             )}
           </Box>
         </VStack>
 
-        <ScenarioCreateModal
-          open={createCase.open}
-          folderId={createCase.folderId}
-          variant="agent-testing"
-          onClose={() => setCreateCase({ open: false, folderId: null })}
-        />
+        <AgentTestingCaseEditor />
       </DashboardLayout>
     </NowProvider>
   );

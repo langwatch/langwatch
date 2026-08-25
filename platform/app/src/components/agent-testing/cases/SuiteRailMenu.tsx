@@ -35,13 +35,22 @@ export function SuiteRailMenu({
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
+        {/* The menu only appears under the pointer, so a rail of suites reads
+            as a list of names and not as a column of controls. */}
         <Button
           size="xs"
           variant="ghost"
+          minWidth="20px"
+          height="20px"
+          paddingX={0}
+          opacity={0}
+          _groupHover={{ opacity: 1 }}
+          _focusVisible={{ opacity: 1 }}
+          _open={{ opacity: 1 }}
           aria-label={`Actions for ${suite.name}`}
           onClick={stop}
         >
-          <MoreVertical size={14} />
+          <MoreVertical size={13} />
         </Button>
       </Menu.Trigger>
       <Menu.Content>

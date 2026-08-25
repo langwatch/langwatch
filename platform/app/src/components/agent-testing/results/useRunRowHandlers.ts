@@ -9,6 +9,7 @@ import { useCallback } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import { useAgentTestingStore } from "../useAgentTestingStore";
 
 export function useRunRowHandlers({
   scenarioSetId,
@@ -17,6 +18,7 @@ export function useRunRowHandlers({
 }) {
   const { openDrawer } = useDrawer();
   const targetNameMap = useTargetNameMap();
+  const openCaseEditor = useAgentTestingStore((state) => state.openCaseEditor);
 
   const resolveTargetName = useCallback(
     (scenarioRun: ScenarioRunData): string | null => {
@@ -42,15 +44,9 @@ export function useRunRowHandlers({
   );
 
   const handleEditCase = useCallback(
-    (scenarioRun: ScenarioRunData) => {
-      openDrawer("scenarioEditor", {
-        urlParams: {
-          variant: "agent-testing",
-          scenarioId: scenarioRun.scenarioId,
-        },
-      });
-    },
-    [openDrawer],
+    (scenarioRun: ScenarioRunData) =>
+      openCaseEditor({ scenarioId: scenarioRun.scenarioId }),
+    [openCaseEditor],
   );
 
   return { resolveTargetName, handleScenarioRunClick, handleEditCase };

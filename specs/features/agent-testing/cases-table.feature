@@ -5,8 +5,8 @@ Feature: The test cases table
 
   Background: what a row shows.
     A row shows the name of the test case, its labels as small pastel pills,
-    when it was added and by whom, and its last result. A Run button and a row
-    menu sit at the end of the row.
+    and its last result. A Run button and a row menu sit at the end of the row.
+    The row carries no author, no date and no version.
 
     In All test cases the rows are grouped under their test suite name, with
     the unfiled cases last. Under a single suite the rows are flat.
@@ -43,12 +43,6 @@ Feature: The test cases table
     When its row is read
     Then both labels are shown as pills beside the name
     And each label gets its own pill colour
-
-  @integration
-  Scenario: The added column reads as one line with the author and the date
-    Given a test case added by "Lena Fischer" on 6 July
-    When its row is read
-    Then the added cell reads "Lena Fischer · Jul 6" on one line
 
   @integration
   Scenario: The last result cell shows the verdict of the last run
@@ -129,19 +123,41 @@ Feature: The test cases table
   # --- The case editor ---
 
   @integration
-  Scenario: The case editor footer holds Cancel, Save and Run, with no dropdown
-    Given a test case that ran against an agent before
-    When its editor is opened
-    Then the footer holds "Cancel", "Save" and "Run"
-    And Run carries no dropdown
-    And it is titled "Edit test case"
+  Scenario: New test case opens the case dialog straight away
+    Given the Agent Testing page is open
+    When "New test case" is chosen
+    Then the case dialog opens titled "New test case"
+    And it asks for a title, a test suite, a situation and the rubrics
+    And no step asks to write the case with a model first
 
   @integration
-  Scenario: Run is off on a test case that never ran
-    Given a test case that never ran
+  Scenario: The case dialog footer holds the labels, Save and Save and Run
+    Given the case dialog is open
+    When its footer is read
+    Then the labels of the case sit on the left
+    And "Save" and "Save & Run" sit on the right
+
+  @integration
+  Scenario: Editing a case names its version and opens the history
+    Given a test case at version 4
     When its editor is opened
-    Then the Run button is off
-    And it says to run the case from the table first
+    Then the dialog is titled "Edit test case"
+    And the header offers "v4 · History"
+    And choosing it opens the version history
+
+  @integration
+  Scenario: Save and Run saves the case and then asks what to run it against
+    Given the case dialog holds a title and one rubric
+    When "Save & Run" is chosen
+    Then the case is saved
+    And the run dialog opens for the case that was saved
+
+  @integration
+  Scenario: The model and turn overrides sit under Advanced
+    Given the case dialog is open
+    When the body is read
+    Then the simulator model, the judge and the turn limits are not shown
+    And they are offered under "Advanced"
 
   @integration
   Scenario: Clicking the Run button does not open the row

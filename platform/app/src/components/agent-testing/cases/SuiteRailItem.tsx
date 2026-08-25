@@ -1,46 +1,48 @@
 /**
- * The two building blocks of the suites rail: one selectable row, and the
- * heading that names a section of rows.
+ * The three building blocks of the suites rail: one selectable row, the
+ * heading that names a section of rows, and the row-shaped button that ends a
+ * section.
  *
  * @see specs/features/agent-testing/suites-rail.feature
  */
 
-import { Box, HStack, Spacer, Text } from "@chakra-ui/react";
+import { Box, chakra, HStack, Text } from "@chakra-ui/react";
+import { FG_FAINT, FG_MUTED } from "../shared/design";
 
 export type RailSectionHeadingProps = {
   label: string;
   collapsed: boolean;
-  action?: React.ReactNode;
+  /** True for a heading that opens a section under another one. */
+  spaced?: boolean;
 };
 
 export function RailSectionHeading({
   label,
   collapsed,
-  action,
+  spaced,
 }: RailSectionHeadingProps) {
   if (collapsed) return <Box height="8px" />;
 
   return (
-    <HStack gap={1} paddingX={2} paddingTop={3} paddingBottom={1}>
-      <Text
-        fontSize="xs"
-        fontWeight="bold"
-        textTransform="uppercase"
-        color="fg.muted"
-        letterSpacing="0.04em"
-      >
-        {label}
-      </Text>
-      <Spacer />
-      {action}
-    </HStack>
+    <Text
+      paddingLeft="10px"
+      paddingTop={spaced ? 2 : 1.5}
+      paddingBottom={0.5}
+      fontSize="10px"
+      fontWeight="semibold"
+      textTransform="uppercase"
+      letterSpacing="0.025em"
+      color={FG_FAINT}
+    >
+      {label}
+    </Text>
   );
 }
 
 export type RailItemProps = {
   label: string;
-  caption?: string;
-  icon: React.ReactNode;
+  /** Absent on the row that stands for every test case. */
+  icon?: React.ReactNode;
   selected: boolean;
   collapsed: boolean;
   onClick: () => void;
@@ -54,7 +56,6 @@ export type RailItemProps = {
  */
 export function RailItem({
   label,
-  caption,
   icon,
   selected,
   collapsed,
@@ -63,6 +64,7 @@ export function RailItem({
 }: RailItemProps) {
   return (
     <HStack
+      className="group"
       role="button"
       tabIndex={0}
       aria-current={selected ? "true" : undefined}
@@ -75,29 +77,60 @@ export function RailItem({
       }}
       gap={2}
       width="full"
-      paddingX={2}
-      paddingY={1.5}
-      borderRadius="md"
+      paddingX="10px"
+      paddingY="6px"
+      borderRadius="lg"
       textAlign="left"
       cursor="pointer"
+      fontSize="12.5px"
+      fontWeight={selected ? "medium" : "normal"}
+      color={selected ? "fg" : FG_MUTED}
       background={selected ? "bg.muted" : "transparent"}
-      _hover={{ background: "bg.muted" }}
+      _hover={{ background: "bg.muted/60" }}
       data-testid={`suite-rail-item-${label}`}
     >
       {icon}
       {!collapsed && (
         <>
-          <Text fontSize="sm" truncate flex={1} minWidth={0}>
+          <Text truncate flex={1} minWidth={0}>
             {label}
           </Text>
-          {caption && (
-            <Text fontSize="xs" color="fg.muted" whiteSpace="nowrap">
-              {caption}
-            </Text>
-          )}
           {actions}
         </>
       )}
     </HStack>
+  );
+}
+
+/** The row-shaped button that adds one more entry to a section. */
+export function RailAddButton({
+  label,
+  icon,
+  onClick,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <chakra.button
+      type="button"
+      onClick={onClick}
+      display="flex"
+      alignItems="center"
+      gap={2}
+      width="full"
+      paddingX="10px"
+      paddingY="6px"
+      borderRadius="lg"
+      textAlign="left"
+      cursor="pointer"
+      fontSize="12px"
+      color={FG_FAINT}
+      _hover={{ background: "bg.muted/60", color: FG_MUTED }}
+    >
+      {icon}
+      <Text>{label}</Text>
+    </chakra.button>
   );
 }

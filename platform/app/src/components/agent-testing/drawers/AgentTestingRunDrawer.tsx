@@ -13,7 +13,6 @@
  */
 
 import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
-import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
 import { Drawer } from "~/components/ui/drawer";
 import { useDrawer } from "~/hooks/useDrawer";
 import { RunDrawerContent } from "./RunDrawerContent";
@@ -69,7 +68,7 @@ function RunDrawerBody({
 export function AgentTestingRunDrawer({ open }: { open?: boolean }) {
   const { closeDrawer } = useDrawer();
   const state = useRunDrawerState({ open: !!open });
-  const { detail, knownScenarioId } = state;
+  const { detail } = state;
   const stop = useRunDrawerStop({
     scenarioRunId: state.scenarioRunId,
     scenarioState: state.scenarioState,
@@ -101,13 +100,6 @@ export function AgentTestingRunDrawer({ open }: { open?: boolean }) {
         onRun={detail.handleRunAgain}
         initialTarget={detail.persistedTarget}
         isLoading={detail.isRunning}
-      />
-
-      <ScenarioFormDrawer
-        open={detail.scenarioEditorOpen}
-        onClose={() => detail.setScenarioEditorOpen(false)}
-        scenarioId={detail.scenarioId ?? knownScenarioId}
-        variant="agent-testing"
       />
     </>
   );

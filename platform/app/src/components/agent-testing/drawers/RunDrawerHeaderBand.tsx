@@ -18,6 +18,7 @@ import { Drawer } from "~/components/ui/drawer";
 import { Tooltip } from "~/components/ui/tooltip";
 import { Chip } from "~/features/traces-v2/components/TraceDrawer/Chip";
 import { CaseVersionChip } from "../shared/CaseVersionChip";
+import { useAgentTestingStore } from "../useAgentTestingStore";
 import type {
   RunDetail,
   RunDrawerState,
@@ -79,6 +80,7 @@ function HeaderActions({
   stop: ReturnType<typeof useRunDrawerStop>;
 }) {
   const { scenarioData } = detail;
+  const openCaseEditor = useAgentTestingStore((state) => state.openCaseEditor);
   // Without a trace there is no conversation to reach, and a run that ends
   // before it answers has none worth opening.
   const isTraceReachable =
@@ -112,7 +114,10 @@ function HeaderActions({
         scenario={scenarioData}
         isRunning={detail.isRunning}
         onRunAgain={detail.handleRunAgainClick}
-        onEditScenario={() => detail.setScenarioEditorOpen(true)}
+        onEditScenario={() =>
+          scenarioData &&
+          openCaseEditor({ scenarioId: scenarioData.id })
+        }
         onOpenThread={isTraceReachable ? openThread : null}
         onOpenInTraces={isTraceReachable ? detail.handleOpenInTraces : null}
         dejaViewHref={detail.dejaView.href ?? null}

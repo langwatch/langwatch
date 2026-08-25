@@ -1,13 +1,15 @@
 /**
  * The line above the cases table: what is selected, how many cases it holds,
- * the label filter and the two entry points that write.
+ * the label filter and the entry points that write.
  *
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import { Badge, Button, HStack, Spacer, Text } from "@chakra-ui/react";
-import { FolderCode, Play, Plus } from "lucide-react";
+import { Badge, HStack, Icon, Spacer, Text } from "@chakra-ui/react";
+import { ChevronRight, Folder, FolderCode, Pencil, Play, Plus } from "lucide-react";
 import { LabelFilterDropdown } from "~/components/scenarios/LabelFilterDropdown";
+import { FG_FAINT } from "../shared/design";
+import { SmallButton } from "../shared/SmallButton";
 import type { CasesPanelProps } from "./CasesPanel";
 
 export type CasesPanelHeaderProps = Pick<
@@ -21,6 +23,8 @@ export type CasesPanelHeaderProps = Pick<
   | "isRunningSet"
   | "onRunSet"
   | "onNewTestCase"
+  | "onEditSuite"
+  | "onOpenExternalResults"
 > & {
   /** True for a set that runs from code, which the platform cannot write. */
   isExternal: boolean;
@@ -28,21 +32,27 @@ export type CasesPanelHeaderProps = Pick<
 };
 
 export function CasesPanelHeader(props: CasesPanelHeaderProps) {
+  const isSuite = props.selection.kind === "suite";
+
   return (
-    <HStack gap={2}>
+    <HStack gap={2} minHeight="32px" flexWrap="wrap">
       {props.isExternal && (
-        <FolderCode size={16} color="var(--chakra-colors-fg-muted)" />
+        <Icon as={FolderCode} boxSize="15px" color={FG_FAINT} />
       )}
-      <Text fontSize="sm" fontWeight="semibold">
+      {isSuite && <Icon as={Folder} boxSize="15px" color={FG_FAINT} />}
+      <Text fontSize="14px" fontWeight="semibold" color="fg">
         {props.title}
       </Text>
-      <Text fontSize="xs" color="fg.muted">
-        {props.caseCount === 1
-          ? "1 test case"
-          : `${props.caseCount} test cases`}
+      <Text fontSize="11.5px" color={FG_FAINT}>
+        {props.caseCount} cases
       </Text>
       {props.isExternal && (
-        <Badge size="xs" variant="subtle" colorPalette="gray">
+        <Badge
+          size="xs"
+          variant="subtle"
+          colorPalette="gray"
+          title="Defined and run from your codebase; results land here"
+        >
           from code
         </Badge>
       )}
@@ -54,7 +64,14 @@ export function CasesPanelHeader(props: CasesPanelHeaderProps) {
           onToggle={props.onToggleLabel}
         />
       )}
-      {!props.isExternal && props.canManage && <CasesPanelActions {...props} />}
+      {props.isExternal ? (
+        <SmallButton onClick={props.onOpenExternalResults}>
+          <ChevronRight size={13} />
+          View results
+        </SmallButton>
+      ) : (
+        props.canManage && <CasesPanelActions {...props} />
+      )}
     </HStack>
   );
 }
@@ -65,25 +82,38 @@ function CasesPanelActions({
   isRunningSet,
   onRunSet,
   onNewTestCase,
+  onEditSuite,
 }: Pick<
   CasesPanelHeaderProps,
-  "selection" | "isRunningSet" | "onRunSet" | "onNewTestCase"
+  | "selection"
+  | "isRunningSet"
+  | "onRunSet"
+  | "onNewTestCase"
+  | "onEditSuite"
 >) {
+  const isSuite = selection.kind === "suite";
+
   return (
     <>
-      <Button size="sm" variant="outline" onClick={onNewTestCase}>
-        <Plus size={14} />
+      {isSuite && (
+        <SmallButton
+          variant="ghost"
+          background="transparent"
+          borderColor="transparent"
+          onClick={onEditSuite}
+        >
+          <Pencil size={13} />
+          Edit suite
+        </SmallButton>
+      )}
+      <SmallButton onClick={onNewTestCase}>
+        <Plus size={13} />
         New test case
-      </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        loading={isRunningSet}
-        onClick={onRunSet}
-      >
-        <Play size={14} />
-        {selection.kind === "all" ? "Run all" : "Run suite"}
-      </Button>
+      </SmallButton>
+      <SmallButton loading={isRunningSet} onClick={onRunSet}>
+        <Play size={13} />
+        {isSuite ? "Run suite" : "Run all"}
+      </SmallButton>
     </>
   );
 }

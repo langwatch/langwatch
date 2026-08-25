@@ -95,7 +95,6 @@ function panelProps(
     isLoading: false,
     lastResults: new Map(),
     isLastResultsLoading: false,
-    authorNameById: {},
     suites: [REFUNDS, CHECKOUT],
     canManage: true,
     projectHasNoCases: false,
@@ -114,6 +113,8 @@ function panelProps(
     onOpenLastRun: vi.fn(),
     onArchive: vi.fn(),
     onOpenExternalCase: vi.fn(),
+    onOpenExternalResults: vi.fn(),
+    onEditSuite: vi.fn(),
     ...overrides,
   };
 }
@@ -124,6 +125,13 @@ function renderPanel(
   const props = panelProps(overrides);
   const view = render(<CasesPanel {...props} />, { wrapper: Wrapper });
   return { props, view };
+}
+
+/** The group headings the table drew, in reading order. */
+function groupHeadings(): string[] {
+  return Array.from(
+    document.querySelectorAll('[data-testid^="folder-header-row-"]'),
+  ).map((row) => row.getAttribute("data-testid") ?? "");
 }
 
 async function openRowMenu(caseName: string) {
@@ -159,19 +167,16 @@ describe("the test cases table", () => {
       groups: groupCasesByFolder({ cases, suites: [REFUNDS, CHECKOUT] }),
     });
 
-    const headings = screen
-      .getAllByRole("row")
-      .map((row) => row.getAttribute("data-testid"))
-      .filter((id): id is string => !!id?.startsWith("folder-header-row-"));
-
-    expect(headings).toEqual([
+    expect(groupHeadings()).toEqual([
       "folder-header-row-Refunds",
       "folder-header-row-Checkout",
       `folder-header-row-${UNFILED_GROUP_NAME}`,
     ]);
     expect(
-      screen.getByTestId(`folder-header-row-${UNFILED_GROUP_NAME}`),
-    ).toHaveTextContent("3 test cases");
+      within(
+        screen.getByTestId(`folder-header-row-${UNFILED_GROUP_NAME}`),
+      ).getByLabelText("3 test cases"),
+    ).toBeInTheDocument();
   });
 
   /** @scenario "A group heading carries the last result of the whole suite" */
@@ -195,7 +200,7 @@ describe("the test cases table", () => {
 
     const heading = screen.getByTestId("folder-header-row-Refunds");
     expect(within(heading).getByText("100%")).toBeInTheDocument();
-    expect(heading).toHaveTextContent("3 test cases");
+    expect(within(heading).getByLabelText("3 test cases")).toBeInTheDocument();
   });
 
   /** @scenario "A single suite view lists its rows without group headings" */
@@ -215,7 +220,9 @@ describe("the test cases table", () => {
     expect(
       screen.queryByTestId("folder-header-row-Refunds"),
     ).not.toBeInTheDocument();
-    expect(screen.getAllByRole("row")).toHaveLength(4); // header + three rows
+    expect(
+      document.querySelectorAll('[data-testid^="case-row-"]'),
+    ).toHaveLength(3);
   });
 
   // --- Row content ---
@@ -241,23 +248,6 @@ describe("the test cases table", () => {
     // Quieter than the name: the pill palette is a subtle surface, not the
     // foreground the case name is drawn in.
     expect(critical.className).not.toEqual(billing.className);
-  });
-
-  /** @scenario "The added column reads as one line with the author and the date" */
-  it("reads the author and the date on one line", () => {
-    renderPanel({
-      selection: { kind: "suite", slug: "refunds" },
-      groups: [
-        {
-          id: REFUNDS.id,
-          name: REFUNDS.name,
-          cases: [makeCase({ lastUpdatedById: "user_1" })],
-        },
-      ],
-      authorNameById: { user_1: "Lena Fischer" },
-    });
-
-    expect(screen.getByText("Lena Fischer · Jul 6")).toBeInTheDocument();
   });
 
   /** @scenario "The last result cell shows the verdict of the last run" */
@@ -423,7 +413,7 @@ describe("the test cases table", () => {
     );
 
     const heading = screen.getByTestId("folder-header-row-Refunds");
-    expect(heading).toHaveTextContent("2 test cases");
+    expect(within(heading).getByLabelText("2 test cases")).toBeInTheDocument();
     const copyRow = screen.getByTestId("case-row-Double charge (copy)");
     expect(
       within(copyRow).getByTestId("tag-pill-critical"),
@@ -461,9 +451,11 @@ describe("the test cases table", () => {
     expect(
       screen.queryByTestId("folder-header-row-Refunds"),
     ).not.toBeInTheDocument();
-    expect(screen.getByTestId("folder-header-row-Checkout")).toHaveTextContent(
-      "1 test case",
-    );
+    expect(
+      within(screen.getByTestId("folder-header-row-Checkout")).getByLabelText(
+        "1 test case",
+      ),
+    ).toBeInTheDocument();
 
     const unfiled = { ...filed, folderId: null };
     view.rerender(

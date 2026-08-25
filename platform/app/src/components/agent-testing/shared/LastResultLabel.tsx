@@ -1,11 +1,13 @@
 /**
  * What the last run of a test case said, in one line: "Passed (3/3)".
  *
+ * The verdict carries its own dot rather than an icon, so a column of rows
+ * reads as one line of coloured text and the counts line up.
+ *
  * A case that never ran says so, and a case that is running right now shows a
  * spinner instead of a verdict it does not have yet.
  */
-import { Badge, HStack, Spinner, Text } from "@chakra-ui/react";
-import { ScenarioRunStatusIcon } from "~/components/simulations/ScenarioRunStatusIcon";
+import { Badge, Box, HStack, Spinner, Text } from "@chakra-ui/react";
 import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
 import { formatRunStatusLabel } from "~/components/suites/format-run-status-label";
 import type { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
@@ -44,7 +46,7 @@ export function LastResultLabel({
     return (
       <HStack gap={1.5}>
         <Spinner size="xs" color={config.fgColor} />
-        <Text fontSize="sm" color={config.fgColor}>
+        <Text fontSize="12px" fontWeight="medium" color={config.fgColor}>
           {label}
         </Text>
       </HStack>
@@ -52,9 +54,15 @@ export function LastResultLabel({
   }
 
   return (
-    <HStack gap={1.5}>
-      <ScenarioRunStatusIcon status={status} boxSize="14px" />
-      <Text fontSize="sm" color={config.fgColor}>
+    <HStack gap={1.5} whiteSpace="nowrap">
+      <Box
+        width="8px"
+        height="8px"
+        borderRadius="full"
+        background={config.fgColor}
+        flexShrink={0}
+      />
+      <Text fontSize="12px" fontWeight="semibold" color={config.fgColor}>
         {label}
       </Text>
     </HStack>

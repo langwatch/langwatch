@@ -2,17 +2,26 @@
  * The scrolling body of the suites rail: All test cases, the test suites of
  * the project, and the sets that run from code.
  *
+ * No row carries a count or a time. How many cases a set holds reads once,
+ * beside the title of the panel.
+ *
  * @see specs/features/agent-testing/suites-rail.feature
  */
 
-import { IconButton, Skeleton, VStack } from "@chakra-ui/react";
-import { Folder, FolderCode, LayoutList, Plus } from "lucide-react";
-import { useNow } from "~/hooks/useNow";
-import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
+import { Icon, Skeleton, VStack } from "@chakra-ui/react";
+import { Folder, FolderCode, FolderPlus, ListChecks } from "lucide-react";
+import { FG_FAINT } from "../shared/design";
 import type { SuiteRailProps } from "./SuiteRail";
-import { RailItem, RailSectionHeading } from "./SuiteRailItem";
+import {
+  RailAddButton,
+  RailItem,
+  RailSectionHeading,
+} from "./SuiteRailItem";
 import { SuiteRailMenu } from "./SuiteRailMenu";
 import type { TestSuiteEntry } from "./test-cases";
+
+/** What the section of the sets a code run writes into is called. */
+export const FROM_CODE_HEADING = "From Code";
 
 export type SuiteRailSectionsProps = Omit<
   SuiteRailProps,
@@ -28,33 +37,36 @@ export function SuiteRailSections(props: SuiteRailSectionsProps) {
   const { selection, collapsed, canManage, onSelect } = props;
 
   return (
-    <VStack align="stretch" gap={1} flex={1} overflowY="auto" padding={2}>
+    <VStack
+      align="stretch"
+      gap={0.5}
+      flex={1}
+      overflowY="auto"
+      paddingX={3}
+      paddingY={4}
+    >
       <RailItem
         label="All test cases"
-        icon={<LayoutList size={14} color="var(--chakra-colors-fg-muted)" />}
+        icon={
+          collapsed ? <Icon as={ListChecks} boxSize="13px" color={FG_FAINT} /> : undefined
+        }
         selected={selection.kind === "all"}
         collapsed={collapsed}
         onClick={() => onSelect({ kind: "all" })}
       />
 
-      <RailSectionHeading
-        collapsed={collapsed}
-        label="Test Suites"
-        action={
-          canManage ? (
-            <IconButton
-              aria-label="New test suite"
-              size="xs"
-              variant="ghost"
-              onClick={props.onNewSuite}
-            >
-              <Plus size={14} />
-            </IconButton>
-          ) : null
-        }
-      />
+      <RailSectionHeading collapsed={collapsed} label="Test Suites" />
 
       <SuiteRailSuiteList {...props} />
+
+      {canManage && !collapsed && (
+        <RailAddButton
+          label="New Test Suite"
+          icon={<Icon as={FolderPlus} boxSize="13px" />}
+          onClick={props.onNewSuite}
+        />
+      )}
+
       <SuiteRailExternalSets {...props} />
     </VStack>
   );
@@ -79,7 +91,7 @@ function SuiteRailSuiteList(props: SuiteRailSectionsProps) {
         <RailItem
           key={suite.id}
           label={suite.name}
-          icon={<Folder size={14} color="var(--chakra-colors-fg-muted)" />}
+          icon={<Icon as={Folder} boxSize="13px" color={FG_FAINT} flexShrink={0} />}
           selected={selection.kind === "suite" && selection.slug === suite.slug}
           collapsed={collapsed}
           onClick={() => onSelect({ kind: "suite", slug: suite.slug })}
@@ -106,28 +118,28 @@ function SuiteRailSuiteList(props: SuiteRailSectionsProps) {
 /** The sets a code run writes into, listed under their own heading. */
 function SuiteRailExternalSets(props: SuiteRailSectionsProps) {
   const { selection, externalSets, collapsed, onSelect } = props;
-  const now = useNow();
 
   if (externalSets.length === 0) return null;
 
   return (
     <>
-      <RailSectionHeading collapsed={collapsed} label="External Sets" />
+      <RailSectionHeading
+        collapsed={collapsed}
+        label={FROM_CODE_HEADING}
+        spaced
+      />
       {externalSets.map((set) => (
         <RailItem
           key={set.setId}
           label={set.setId}
           icon={
-            <FolderCode
-              size={14}
-              color="var(--chakra-colors-fg-muted)"
+            <Icon
+              as={FolderCode}
+              boxSize="13px"
+              color={FG_FAINT}
+              flexShrink={0}
               aria-label="Runs from code"
             />
-          }
-          caption={
-            set.lastRunTimestamp
-              ? formatTimeAgoCompact(set.lastRunTimestamp, now)
-              : undefined
           }
           selected={
             selection.kind === "external" && selection.setId === set.setId

@@ -10,8 +10,8 @@
  * @see specs/features/agent-testing/live-one-off-run.feature
  */
 
-import { Button } from "@chakra-ui/react";
 import { Play } from "lucide-react";
+import { SmallButton } from "../shared/SmallButton";
 
 export type RunCaseButtonProps = {
   caseName: string;
@@ -27,9 +27,7 @@ export function RunCaseButton({
   onOpen,
 }: RunCaseButtonProps) {
   return (
-    <Button
-      size="xs"
-      variant="outline"
+    <SmallButton
       loading={isRunning}
       disabled={disabled}
       aria-label={`Run ${caseName}`}
@@ -38,8 +36,8 @@ export function RunCaseButton({
         onOpen();
       }}
     >
-      <Play size={12} />
+      <Play size={13} />
       Run
-    </Button>
+    </SmallButton>
   );
 }

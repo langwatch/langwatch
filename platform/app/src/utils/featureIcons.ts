@@ -11,6 +11,7 @@ import {
   FlaskConical,
   FolderOpen,
   Home,
+  ListChecks,
   ListTree,
   type LucideIcon,
   Pencil,
@@ -84,7 +85,7 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
     label: "Simulations",
   },
   agent_testing: {
-    icon: FlaskConical,
+    icon: ListChecks,
     color: "pink.500",
     label: "Agent Testing",
   },

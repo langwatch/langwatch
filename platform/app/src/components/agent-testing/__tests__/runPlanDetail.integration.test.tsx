@@ -198,6 +198,7 @@ describe("<RunPlanDetail/>", () => {
       viewMode: "table",
       pendingBatchRunId: null,
       cancellingJobId: null,
+      caseEditor: { open: false, scenarioId: null, folderId: null },
     });
     mockGetBatchRunCount.mockReturnValue({ data: { count: 3 } });
     mockFreshnessQuery.mockReturnValue({ data: undefined });
@@ -426,8 +427,10 @@ describe("<RunPlanDetail/>", () => {
       await screen.findByRole("menuitem", { name: "Edit test case" }),
     );
 
-    expect(mockOpenDrawer).toHaveBeenCalledWith("scenarioEditor", {
-      urlParams: { variant: "agent-testing", scenarioId: "scen_7" },
+    expect(useAgentTestingStore.getState().caseEditor).toEqual({
+      open: true,
+      scenarioId: "scen_7",
+      folderId: null,
     });
   });
 

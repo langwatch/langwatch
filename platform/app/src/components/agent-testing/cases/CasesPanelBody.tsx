@@ -44,10 +44,7 @@ export function CasesPanelBody(props: CasesPanelBodyProps) {
         onNewTestCase={props.onNewTestCase}
       />
     ) : (
-      <NoCasesHereEmptyState
-        canManage={props.canManage}
-        onNewTestCase={props.onNewTestCase}
-      />
+      <NoCasesHereEmptyState />
     );
   }
 
@@ -58,7 +55,6 @@ export function CasesPanelBody(props: CasesPanelBodyProps) {
         showGroupHeadings={props.selection.kind === "all"}
         lastResults={props.lastResults}
         isLastResultsLoading={props.isLastResultsLoading}
-        authorNameById={props.authorNameById}
         suites={props.suites}
         canManage={props.canManage}
         runningCaseId={props.runningCaseId}

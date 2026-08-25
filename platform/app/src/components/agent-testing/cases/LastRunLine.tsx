@@ -8,6 +8,7 @@
 import { HStack, Text } from "@chakra-ui/react";
 import { format } from "date-fns";
 import { RunMetricsSummary } from "~/components/suites/RunMetricsSummary";
+import { FG_MUTED } from "../shared/design";
 import type { AgentTestingSelection } from "../useAgentTestingRouting";
 import type { CaseLastResult } from "./CasesTable";
 import {
@@ -46,11 +47,14 @@ export function LastRunLine({
   return (
     <HStack
       gap={3}
+      rowGap={2}
+      flexWrap="wrap"
       justify="flex-end"
       paddingX={1}
+      paddingTop={3}
       data-testid="cases-last-run-line"
     >
-      <Text fontSize="xs" color="fg.muted">
+      <Text fontSize="12px" color={FG_MUTED}>
         {label} {lastRunAt ? format(lastRunAt, "MMM d, HH:mm") : "-"}
       </Text>
       <RunMetricsSummary summary={summaryFromLastResults(results)} />

@@ -26,7 +26,7 @@ import { SuiteRailSections } from "./SuiteRailSections";
 import type { ExternalSetEntry, TestSuiteEntry } from "./test-cases";
 
 /** How wide the rail is when it is open. */
-export const SUITE_RAIL_WIDTH = 260;
+export const SUITE_RAIL_WIDTH = 218;
 
 /** What the archive dialog of a test suite says. */
 export const SUITE_ARCHIVE_TITLE = "Archive test suite?";
@@ -78,8 +78,6 @@ export function SuiteRail(props: SuiteRailProps) {
       height="full"
       width={collapsed ? "56px" : `${SUITE_RAIL_WIDTH}px`}
       minWidth={collapsed ? "56px" : `${SUITE_RAIL_WIDTH}px`}
-      borderRightWidth="1px"
-      borderColor="border"
       data-testid="agent-testing-suite-rail"
     >
       <SuiteRailSections

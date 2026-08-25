@@ -34,13 +34,17 @@ function runSubjectForSuite(
   };
 }
 
-/** What happens the moment a run is queued. */
-function useRunStartedHandler({
+/**
+ * What happens the moment a run is queued. Shared by the table and the case
+ * editor, so a run started from either one opens the same way.
+ */
+export function useRunStartedHandler({
   projectId,
   setRunningCaseId,
 }: {
   projectId: string;
-  setRunningCaseId: (scenarioId: string | null) => void;
+  /** Marks the row of a one-off run while it starts. */
+  setRunningCaseId?: (scenarioId: string | null) => void;
 }): (info: RunStartedInfo) => void {
   const { openLiveRun } = useOpenLiveRun();
   const setPendingBatchRunId = useAgentTestingStore(
@@ -55,7 +59,7 @@ function useRunStartedHandler({
         return;
       }
       // A one-off run opens in the drawer right away and streams into it.
-      setRunningCaseId(info.scenarioId);
+      setRunningCaseId?.(info.scenarioId);
       openLiveRun({
         batchRunId: info.batchRunId,
         scenarioSetId: info.scenarioSetId ?? getOnPlatformSetId(projectId),

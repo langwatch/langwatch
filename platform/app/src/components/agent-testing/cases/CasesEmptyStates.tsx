@@ -6,6 +6,7 @@
 
 import { Box, Button, EmptyState } from "@chakra-ui/react";
 import { FlaskConical, FolderCode, Plus } from "lucide-react";
+import { FG_FAINT } from "../shared/design";
 
 export type EmptyStateActionProps = {
   canManage: boolean;
@@ -45,31 +46,25 @@ export function FirstCaseEmptyState({
   );
 }
 
-/** What a test suite that holds nothing yet reads. */
-export function NoCasesHereEmptyState({
-  canManage,
-  onNewTestCase,
-}: EmptyStateActionProps) {
+/**
+ * What a test suite that holds nothing yet reads. The New test case button
+ * sits in the panel header above, so the line only says what to do.
+ */
+export function NoCasesHereEmptyState() {
   return (
-    <EmptyState.Root paddingY={12} data-testid="agent-testing-empty-suite">
-      <EmptyState.Content>
-        <EmptyState.Indicator>
-          <FlaskConical size={28} />
-        </EmptyState.Indicator>
-        <EmptyState.Title>No test cases here</EmptyState.Title>
-        <EmptyState.Description>
-          Add a test case to this suite, or move one into it from another suite.
-        </EmptyState.Description>
-        {canManage && (
-          <Box paddingTop={2}>
-            <Button size="sm" variant="outline" onClick={onNewTestCase}>
-              <Plus size={14} />
-              New test case
-            </Button>
-          </Box>
-        )}
-      </EmptyState.Content>
-    </EmptyState.Root>
+    <Box
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="xl"
+      background="bg.panel"
+      paddingX={4}
+      paddingY={4}
+      fontSize="12px"
+      color={FG_FAINT}
+      data-testid="agent-testing-empty-suite"
+    >
+      Empty suite. Add a test case, or move one here from another suite.
+    </Box>
   );
 }
 

@@ -1,9 +1,14 @@
 /**
- * The table of test cases: the name, the labels, the last result and who
- * added the case, with a Run button and a row menu at the end of every row.
+ * The table of test cases: the name, the labels and the last result, with a
+ * Run button and a row menu at the end of every row.
+ *
+ * The table is a grid inside one card, not a ruled table: the columns line up
+ * without a vertical rule between them, so a long list of cases reads as a
+ * list of names rather than as a spreadsheet.
  *
  * In All test cases the rows sit under their test suite, unfiled cases last.
- * Under one suite the rows are flat.
+ * Under one suite the rows are flat, and the time and the cost of the last run
+ * read beside the verdict.
  *
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/scenarios/scenario-folder-assignment.feature
@@ -14,19 +19,17 @@ import {
   Button,
   HStack,
   Skeleton,
-  Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { format } from "date-fns";
 import { MoreVertical } from "lucide-react";
 import { RunMetricsSummary } from "~/components/suites/RunMetricsSummary";
-import { ListTable } from "~/components/ui/ListTable";
 import { Menu } from "~/components/ui/menu";
 import { TagList } from "~/components/ui/TagList";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { ScenarioLastResultSummary } from "~/server/scenarios/scenario-event.types";
-import { CaseVersionChip } from "../shared/CaseVersionChip";
+import { FG_FAINT, ROW_HOVER_BG, TABLE_HEADER_BG } from "../shared/design";
 import { FolderHeaderRow } from "../shared/FolderHeaderRow";
 import { LastResultLabel } from "../shared/LastResultLabel";
 import { ResultMetricsInline } from "../shared/ResultMetricsInline";
@@ -43,7 +46,14 @@ import {
 /** The last result of a case, as the aggregate answers it. */
 export type CaseLastResult = ScenarioLastResultSummary;
 
-const COLUMN_COUNT = 4;
+/**
+ * The columns of the table. Under one suite the last result column carries the
+ * time and the cost as well, so it is wider there.
+ */
+const WIDE_COLUMNS = "minmax(0,1fr) 290px 112px";
+const NARROW_COLUMNS = "minmax(0,1fr) 170px 112px";
+/** A set that runs from code has no controls, and a last run column instead. */
+const EXTERNAL_COLUMNS = "minmax(0,1fr) 290px 110px";
 
 export type CasesTableProps = {
   groups: CaseGroup[];
@@ -52,8 +62,6 @@ export type CasesTableProps = {
   lastResults: Map<string, CaseLastResult>;
   /** True while the last-result cells are still on their way. */
   isLastResultsLoading: boolean;
-  /** The name of the person who last saved each case, when it is known. */
-  authorNameById: Record<string, string>;
   /** The test suites a case can be moved into. */
   suites: TestSuiteEntry[];
   canManage: boolean;
@@ -71,12 +79,58 @@ export type CasesTableProps = {
   onArchive: (testCase: TestCase) => void;
 };
 
+/** The card every Agent Testing table is drawn inside. */
+function TableCard({ children, ...rest }: React.ComponentProps<typeof Box>) {
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="xl"
+      background="bg.panel"
+      overflow="hidden"
+      boxShadow="0 1px 2px rgb(16 16 32 / 0.04)"
+      {...rest}
+    >
+      {children}
+    </Box>
+  );
+}
+
+/** The line of column names above the rows. */
+function TableHeaderRow({
+  templateColumns,
+  children,
+}: {
+  templateColumns: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Box
+      display="grid"
+      gridTemplateColumns={templateColumns}
+      columnGap={3}
+      alignItems="center"
+      paddingX={4}
+      paddingY={2}
+      background={TABLE_HEADER_BG}
+      borderBottomWidth="1px"
+      borderBottomColor="border"
+      fontSize="10.5px"
+      fontWeight="semibold"
+      textTransform="uppercase"
+      letterSpacing="0.025em"
+      color={FG_FAINT}
+    >
+      {children}
+    </Box>
+  );
+}
+
 export function CasesTable({
   groups,
   showGroupHeadings,
   lastResults,
   isLastResultsLoading,
-  authorNameById,
   suites,
   canManage,
   runningCaseId,
@@ -90,125 +144,93 @@ export function CasesTable({
   onOpenLastRun,
   onArchive,
 }: CasesTableProps) {
+  const templateColumns = showGroupHeadings ? NARROW_COLUMNS : WIDE_COLUMNS;
+
   return (
-    <ListTable size="sm" data-testid="agent-testing-cases-table">
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Test case</Table.ColumnHeader>
-          <Table.ColumnHeader width="220px">Last result</Table.ColumnHeader>
-          <Table.ColumnHeader width="180px">Added</Table.ColumnHeader>
-          <Table.ColumnHeader width="130px" />
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
-        {groups.map((group) => (
-          <CaseGroupRows
-            key={group.id}
-            group={group}
-            showGroupHeading={showGroupHeadings}
-            lastResults={lastResults}
-            isLastResultsLoading={isLastResultsLoading}
-            authorNameById={authorNameById}
-            suites={suites}
-            canManage={canManage}
-            runningCaseId={runningCaseId}
-            onSelectSuite={onSelectSuite}
-            onRowClick={onRowClick}
-            onRunCase={onRunCase}
-            onEdit={onEdit}
-            onHistory={onHistory}
-            onDuplicate={onDuplicate}
-            onMoveToSuite={onMoveToSuite}
-            onOpenLastRun={onOpenLastRun}
-            onArchive={onArchive}
-          />
-        ))}
-      </Table.Body>
-    </ListTable>
+    <TableCard data-testid="agent-testing-cases-table">
+      <TableHeaderRow templateColumns={templateColumns}>
+        <Text as="span">Test case</Text>
+        <Text as="span">Last result</Text>
+        <Text as="span" />
+      </TableHeaderRow>
+
+      {groups.map((group, index) => (
+        <Box key={group.id}>
+          {showGroupHeadings && (
+            <FolderHeaderRow
+              name={group.name}
+              caseCount={group.cases.length}
+              templateColumns={templateColumns}
+              aggregateSpan={2}
+              separated={index > 0}
+              onClick={
+                group.id === UNFILED_GROUP_ID
+                  ? undefined
+                  : () => onSelectSuite(group.id)
+              }
+            >
+              <GroupAggregate group={group} lastResults={lastResults} />
+            </FolderHeaderRow>
+          )}
+          <Box
+            css={{
+              "& > * + *": {
+                borderTopWidth: "1px",
+                borderTopColor: "var(--chakra-colors-border-muted)",
+              },
+            }}
+          >
+            {group.cases.map((testCase) => (
+              <CaseRow
+                key={testCase.id}
+                testCase={testCase}
+                templateColumns={templateColumns}
+                lastResult={lastResults.get(testCase.id)}
+                isLastResultsLoading={isLastResultsLoading}
+                showMetricsInline={!showGroupHeadings}
+                suites={suites}
+                canManage={canManage}
+                isRunning={runningCaseId === testCase.id}
+                onRowClick={onRowClick}
+                onRunCase={onRunCase}
+                onEdit={onEdit}
+                onHistory={onHistory}
+                onDuplicate={onDuplicate}
+                onMoveToSuite={onMoveToSuite}
+                onOpenLastRun={onOpenLastRun}
+                onArchive={onArchive}
+              />
+            ))}
+          </Box>
+        </Box>
+      ))}
+    </TableCard>
   );
 }
 
-type GroupRowsProps = Omit<CasesTableProps, "groups" | "showGroupHeadings"> & {
-  group: CaseGroup;
-  showGroupHeading: boolean;
-};
-
-function CaseGroupRows({
+/** How the last run of a whole group went, beside its name. */
+function GroupAggregate({
   group,
-  showGroupHeading,
   lastResults,
-  isLastResultsLoading,
-  authorNameById,
-  suites,
-  canManage,
-  runningCaseId,
-  onSelectSuite,
-  onRowClick,
-  onRunCase,
-  onEdit,
-  onHistory,
-  onDuplicate,
-  onMoveToSuite,
-  onOpenLastRun,
-  onArchive,
-}: GroupRowsProps) {
+}: {
+  group: CaseGroup;
+  lastResults: Map<string, CaseLastResult>;
+}) {
   const groupResults = group.cases
     .map((testCase) => lastResults.get(testCase.id))
     .filter((result): result is CaseLastResult => !!result);
 
-  return (
-    <>
-      {showGroupHeading && (
-        <FolderHeaderRow
-          name={group.name}
-          caseCount={group.cases.length}
-          colSpan={COLUMN_COUNT}
-          onClick={
-            group.id === UNFILED_GROUP_ID
-              ? undefined
-              : () => onSelectSuite(group.id)
-          }
-        >
-          {groupResults.length > 0 && (
-            <RunMetricsSummary summary={summaryFromLastResults(groupResults)} />
-          )}
-        </FolderHeaderRow>
-      )}
-      {group.cases.map((testCase) => (
-        <CaseRow
-          key={testCase.id}
-          testCase={testCase}
-          lastResult={lastResults.get(testCase.id)}
-          isLastResultsLoading={isLastResultsLoading}
-          showMetricsInline={!showGroupHeading}
-          authorName={
-            testCase.lastUpdatedById
-              ? authorNameById[testCase.lastUpdatedById]
-              : undefined
-          }
-          suites={suites}
-          canManage={canManage}
-          isRunning={runningCaseId === testCase.id}
-          onRowClick={onRowClick}
-          onRunCase={onRunCase}
-          onEdit={onEdit}
-          onHistory={onHistory}
-          onDuplicate={onDuplicate}
-          onMoveToSuite={onMoveToSuite}
-          onOpenLastRun={onOpenLastRun}
-          onArchive={onArchive}
-        />
-      ))}
-    </>
-  );
+  if (groupResults.length === 0) return null;
+
+  return <RunMetricsSummary summary={summaryFromLastResults(groupResults)} />;
 }
 
 function CaseRow({
   testCase,
+  templateColumns,
   lastResult,
   isLastResultsLoading,
   showMetricsInline,
-  authorName,
   suites,
   canManage,
   isRunning,
@@ -222,10 +244,10 @@ function CaseRow({
   onArchive,
 }: {
   testCase: TestCase;
+  templateColumns: string;
   lastResult?: CaseLastResult;
   isLastResultsLoading: boolean;
   showMetricsInline: boolean;
-  authorName?: string;
   suites: TestSuiteEntry[];
   canManage: boolean;
   isRunning: boolean;
@@ -239,58 +261,57 @@ function CaseRow({
   onArchive: (testCase: TestCase) => void;
 }) {
   return (
-    <Table.Row
+    <Box
+      display="grid"
+      gridTemplateColumns={templateColumns}
+      columnGap={3}
+      alignItems="center"
+      paddingX={4}
+      paddingY="10px"
       cursor="pointer"
-      _hover={{ background: "bg.muted" }}
+      _hover={{ background: ROW_HOVER_BG }}
       onClick={() => onRowClick(testCase)}
       data-testid={`case-row-${testCase.name}`}
     >
-      <Table.Cell>
-        <HStack gap={2} minWidth={0}>
-          <Text fontSize="sm" fontWeight="medium" truncate>
-            {testCase.name}
-          </Text>
-          <CaseVersionChip version={testCase.version} />
-          <TagList labels={testCase.labels} tone="pastel" />
-        </HStack>
-      </Table.Cell>
-      <Table.Cell>
-        <LastResultCell
-          lastResult={lastResult}
-          isLoading={isLastResultsLoading}
-          showMetricsInline={showMetricsInline}
-        />
-      </Table.Cell>
-      <Table.Cell>
-        <Text fontSize="xs" color="fg.muted" whiteSpace="nowrap" truncate>
-          {authorName ? `${authorName} · ` : ""}
-          {format(testCase.createdAt, "MMM d")}
+      <HStack gap={1.5} minWidth={0} flexWrap="wrap">
+        <Text fontSize="12.5px" fontWeight="medium" color="fg" truncate>
+          {testCase.name}
         </Text>
-      </Table.Cell>
-      <Table.Cell>
-        <HStack gap={1} justify="flex-end">
-          {canManage && (
-            <RunCaseButton
-              caseName={testCase.name}
-              isRunning={isRunning}
-              onOpen={() => onRunCase(testCase)}
-            />
-          )}
-          <CaseRowActionsMenu
-            testCase={testCase}
-            suites={suites}
-            canManage={canManage}
-            hasLastRun={!!lastResult}
-            onEdit={onEdit}
-            onHistory={onHistory}
-            onDuplicate={onDuplicate}
-            onMoveToSuite={onMoveToSuite}
-            onOpenLastRun={onOpenLastRun}
-            onArchive={onArchive}
+        <TagList labels={testCase.labels} tone="pastel" />
+      </HStack>
+
+      <LastResultCell
+        lastResult={lastResult}
+        isLoading={isLastResultsLoading}
+        showMetricsInline={showMetricsInline}
+      />
+
+      <HStack
+        gap={1}
+        justify="flex-end"
+        onClick={(event) => event.stopPropagation()}
+      >
+        {canManage && (
+          <RunCaseButton
+            caseName={testCase.name}
+            isRunning={isRunning}
+            onOpen={() => onRunCase(testCase)}
           />
-        </HStack>
-      </Table.Cell>
-    </Table.Row>
+        )}
+        <CaseRowActionsMenu
+          testCase={testCase}
+          suites={suites}
+          canManage={canManage}
+          hasLastRun={!!lastResult}
+          onEdit={onEdit}
+          onHistory={onHistory}
+          onDuplicate={onDuplicate}
+          onMoveToSuite={onMoveToSuite}
+          onOpenLastRun={onOpenLastRun}
+          onArchive={onArchive}
+        />
+      </HStack>
+    </Box>
   );
 }
 
@@ -333,7 +354,7 @@ function LastResultCell({
 
   if (showMetricsInline) {
     return (
-      <HStack gap={2} minWidth={0}>
+      <HStack gap={2.5} minWidth={0}>
         {label}
         {metrics}
       </HStack>
@@ -342,7 +363,7 @@ function LastResultCell({
 
   return (
     <Tooltip content={metrics} disabled={!hasMetrics}>
-      <HStack gap={2} minWidth={0}>
+      <HStack gap={2.5} minWidth={0}>
         {label}
       </HStack>
     </Tooltip>
@@ -380,6 +401,9 @@ function CaseRowActionsMenu({
         <Button
           size="xs"
           variant="ghost"
+          minWidth="24px"
+          height="24px"
+          paddingX={0}
           aria-label={`Actions for ${testCase.name}`}
           onClick={stop}
         >
@@ -485,36 +509,52 @@ export function ExternalCasesTable({
   onRowClick: (scenarioId: string) => void;
 }) {
   return (
-    <ListTable size="sm" data-testid="agent-testing-external-cases-table">
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Test case</Table.ColumnHeader>
-          <Table.ColumnHeader width="220px">Last run</Table.ColumnHeader>
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
+    <TableCard data-testid="agent-testing-external-cases-table">
+      <TableHeaderRow templateColumns={EXTERNAL_COLUMNS}>
+        <Text as="span">Test case</Text>
+        <Text as="span" />
+        <Text as="span" textAlign="right">
+          Last run
+        </Text>
+      </TableHeaderRow>
+      <Box
+        css={{
+          "& > * + *": {
+            borderTopWidth: "1px",
+            borderTopColor: "var(--chakra-colors-border-muted)",
+          },
+        }}
+      >
         {cases.map((externalCase) => (
-          <Table.Row
+          <Box
             key={externalCase.scenarioId}
+            display="grid"
+            gridTemplateColumns={EXTERNAL_COLUMNS}
+            columnGap={3}
+            alignItems="center"
+            paddingX={4}
+            paddingY="10px"
             cursor="pointer"
-            _hover={{ background: "bg.muted" }}
+            _hover={{ background: ROW_HOVER_BG }}
             onClick={() => onRowClick(externalCase.scenarioId)}
             data-testid={`external-case-row-${externalCase.name}`}
           >
-            <Table.Cell>
-              <Text fontSize="sm" fontWeight="medium" truncate>
-                {externalCase.name}
-              </Text>
-            </Table.Cell>
-            <Table.Cell>
-              <Text fontSize="xs" color="fg.muted" whiteSpace="nowrap">
-                {format(externalCase.lastRunAt, "MMM d, HH:mm")}
-              </Text>
-            </Table.Cell>
-          </Table.Row>
+            <Text fontSize="12.5px" fontWeight="medium" color="fg" truncate>
+              {externalCase.name}
+            </Text>
+            <Box />
+            <Text
+              fontSize="11px"
+              color={FG_FAINT}
+              whiteSpace="nowrap"
+              textAlign="right"
+            >
+              {format(externalCase.lastRunAt, "MMM d, HH:mm")}
+            </Text>
+          </Box>
         ))}
-      </Table.Body>
-    </ListTable>
+      </Box>
+    </TableCard>
   );
 }
 

@@ -123,7 +123,7 @@ describe("the test suites rail", () => {
     });
 
     expect(screen.getByText("Test Suites")).toBeInTheDocument();
-    expect(screen.getByText("External Sets")).toBeInTheDocument();
+    expect(screen.getByText("From Code")).toBeInTheDocument();
 
     const rail = screen.getByTestId("agent-testing-suite-rail");
     const entries = within(rail)
@@ -138,9 +138,9 @@ describe("the test suites rail", () => {
       "suite-rail-item-nightly-ci",
     ]);
 
-    // No row carries a count: the case count reads beside the panel title.
-    // The external row is the one that carries a number, its last run time.
-    for (const entry of entries.slice(0, 3)) {
+    // No row carries a count and no row carries a time: how many cases a set
+    // holds reads beside the panel title, once.
+    for (const entry of entries) {
       expect(screen.getByTestId(entry).textContent).not.toMatch(/\d/);
     }
   });
@@ -162,7 +162,7 @@ describe("the test suites rail", () => {
   });
 
   /** @scenario "An external set carries the code icon and no counts" */
-  it("carries the code icon and the last run time on an external set, and no Run", () => {
+  it("carries the code icon on an external set, and no Run", () => {
     renderRail({
       suites: [],
       externalSets: [{ setId: "nightly-ci", lastRunTimestamp: 1 }],
@@ -170,17 +170,16 @@ describe("the test suites rail", () => {
 
     const row = screen.getByTestId("suite-rail-item-nightly-ci");
     expect(within(row).getByLabelText("Runs from code")).toBeInTheDocument();
-    expect(within(row).getByText("2h ago")).toBeInTheDocument();
     expect(
       within(row).queryByRole("button", { name: /Actions for/ }),
     ).not.toBeInTheDocument();
   });
 
-  /** @scenario "A project with no external sets hides the External Sets heading" */
-  it("hides the External Sets heading when the project has none", () => {
+  /** @scenario "A project with no external sets hides the From Code heading" */
+  it("hides the From Code heading when the project has none", () => {
     renderRail({ externalSets: [] });
 
-    expect(screen.queryByText("External Sets")).not.toBeInTheDocument();
+    expect(screen.queryByText("From Code")).not.toBeInTheDocument();
   });
 
   /** @scenario "The rail offers to create a test suite" */
@@ -188,7 +187,7 @@ describe("the test suites rail", () => {
     const user = userEvent.setup();
     const { props, view } = renderRail({ suites: [] });
 
-    await user.click(screen.getByRole("button", { name: "New test suite" }));
+    await user.click(screen.getByRole("button", { name: "New Test Suite" }));
     await user.type(await screen.findByLabelText("Test suite name"), "Refunds");
     await user.click(screen.getByRole("button", { name: "Create" }));
 
@@ -295,7 +294,7 @@ describe("the test suites rail", () => {
     );
     expect(items).toEqual(["Open last run"]);
     expect(
-      screen.queryByRole("button", { name: "New test suite" }),
+      screen.queryByRole("button", { name: "New Test Suite" }),
     ).not.toBeInTheDocument();
   });
 

@@ -19,7 +19,7 @@ function panelTitle({ base, view }: TestCasesTabModel): string {
 }
 
 export function TestCasesPanel({ model }: { model: TestCasesTabModel }) {
-  const { base, data, view, caseMutations, run, open } = model;
+  const { base, data, view, caseMutations, suiteMutations, run, open } = model;
   const isExternal = base.selection.kind === "external";
 
   return (
@@ -31,7 +31,6 @@ export function TestCasesPanel({ model }: { model: TestCasesTabModel }) {
       isLoading={isExternal ? view.isExternalLoading : data.isLoading}
       lastResults={data.lastResults}
       isLastResultsLoading={data.isLastResultsLoading}
-      authorNameById={data.authorNameById}
       suites={data.suites}
       canManage={base.canManage}
       projectHasNoCases={data.cases.length === 0}
@@ -55,6 +54,12 @@ export function TestCasesPanel({ model }: { model: TestCasesTabModel }) {
       onArchive={caseMutations.setCaseToArchive}
       onOpenExternalCase={() =>
         base.selectPlan(toExternalPlanSlug(view.externalSetId))
+      }
+      onOpenExternalResults={() =>
+        base.selectPlan(toExternalPlanSlug(view.externalSetId))
+      }
+      onEditSuite={() =>
+        suiteMutations.setSuiteToRename(view.selectedSuite ?? null)
       }
     />
   );

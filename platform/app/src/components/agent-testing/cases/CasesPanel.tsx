@@ -9,7 +9,10 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 
-import { ContentColumn } from "../shared/ContentColumn";
+import {
+  CONTENT_COLUMN_GUTTER,
+  ContentColumn,
+} from "../shared/ContentColumn";
 import type { AgentTestingSelection } from "../useAgentTestingRouting";
 import { CasesPanelBody } from "./CasesPanelBody";
 import { CasesPanelHeader } from "./CasesPanelHeader";
@@ -38,7 +41,6 @@ export type CasesPanelProps = {
   isLoading: boolean;
   lastResults: Map<string, CaseLastResult>;
   isLastResultsLoading: boolean;
-  authorNameById: Record<string, string>;
   suites: TestSuiteEntry[];
   canManage: boolean;
   /** True when the whole project holds no test case at all. */
@@ -60,6 +62,10 @@ export type CasesPanelProps = {
   onOpenLastRun: (testCase: TestCase) => void;
   onArchive: (testCase: TestCase) => void;
   onOpenExternalCase: (scenarioId: string) => void;
+  /** Opens the editor of the selected test suite. */
+  onEditSuite: () => void;
+  /** Opens the results of the selected set that runs from code. */
+  onOpenExternalResults: () => void;
 };
 
 export function CasesPanel(props: CasesPanelProps) {
@@ -70,7 +76,7 @@ export function CasesPanel(props: CasesPanelProps) {
 
   return (
     <ContentColumn
-      railWidth={SUITE_RAIL_WIDTH}
+      railWidth={SUITE_RAIL_WIDTH + CONTENT_COLUMN_GUTTER}
       data-testid="agent-testing-cases-panel"
     >
       <CasesPanelHeader

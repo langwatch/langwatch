@@ -21,8 +21,6 @@ type ScenarioRows = RouterOutputs["scenarios"]["getAll"];
 type FolderRows = RouterOutputs["suites"]["folders"]["getAll"];
 type ExternalSetRows = RouterOutputs["scenarios"]["getExternalSetSummaries"];
 type SuiteSummaries = RouterOutputs["suites"]["getSummaries"];
-type OrganizationWithMembers =
-  RouterOutputs["organization"]["getOrganizationWithMembersAndTheirTeams"];
 
 export type TestCasesData = {
   suites: TestSuiteEntry[];
@@ -32,13 +30,12 @@ export type TestCasesData = {
   isLastResultsLoading: boolean;
   /** The suites that have a run inside the period, so Open last run is offered. */
   suiteIdsWithRuns: Set<string>;
-  authorNameById: Record<string, string>;
   isLoading: boolean;
 };
 
 /** Every read the tab makes, still in the shape the server returned it. */
 function useTestCasesQueries(period: Period) {
-  const { project, organization } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
   const startDate = period.startDate.getTime();
   const endDate = period.endDate.getTime();
@@ -64,21 +61,12 @@ function useTestCasesQueries(period: Period) {
     enabled: !!project,
   });
 
-  // Only to put a name on the "Added" cell. A project whose members cannot be
-  // read shows the date alone rather than failing the table.
-  const { data: organizationMembers } =
-    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-      { organizationId: organization?.id ?? "" },
-      { enabled: !!organization?.id },
-    );
-
   return {
     folders,
     scenarios,
     externalSetSummaries,
     lastResultRows,
     suiteSummaries,
-    organizationMembers,
     isLastResultsLoading,
     isLoading: isFoldersLoading || isScenariosLoading,
   };
@@ -158,18 +146,6 @@ function useSuiteIdsWithRuns(
   }, [summaries]);
 }
 
-function useAuthorNames(
-  organizationMembers: OrganizationWithMembers | undefined,
-): Record<string, string> {
-  return useMemo<Record<string, string>>(() => {
-    const names: Record<string, string> = {};
-    for (const member of organizationMembers?.members ?? []) {
-      if (member.user.name) names[member.user.id] = member.user.name;
-    }
-    return names;
-  }, [organizationMembers]);
-}
-
 export function useTestCasesData({
   period,
 }: {
@@ -181,7 +157,6 @@ export function useTestCasesData({
   const externalSets = useExternalSetEntries(queries.externalSetSummaries);
   const lastResults = useLastResultsByCase(queries.lastResultRows);
   const suiteIdsWithRuns = useSuiteIdsWithRuns(queries.suiteSummaries);
-  const authorNameById = useAuthorNames(queries.organizationMembers);
 
   return {
     cases,
@@ -190,7 +165,6 @@ export function useTestCasesData({
     lastResults,
     isLastResultsLoading: queries.isLastResultsLoading,
     suiteIdsWithRuns,
-    authorNameById,
     isLoading: queries.isLoading,
   };
 }

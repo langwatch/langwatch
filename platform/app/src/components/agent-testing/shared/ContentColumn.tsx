@@ -18,6 +18,12 @@ export const CONTENT_COLUMN_MAX_WIDTH = "1100px";
 /** The width from which the rail is paid back on the right. */
 export const CONTENT_COLUMN_CENTERING_WIDTH = 1600;
 
+/**
+ * The padding on the left of the column. A rail is paid back together with it,
+ * so the column centres on the page rather than on the rail's inner edge.
+ */
+export const CONTENT_COLUMN_GUTTER = 32;
+
 export type ContentColumnProps = BoxProps & {
   /**
    * The width of the rail on the left of this column, in pixels. The column
@@ -39,7 +45,8 @@ export function ContentColumn({
       width="full"
       height="full"
       overflow="auto"
-      padding={6}
+      paddingX={8}
+      paddingY={4}
       css={
         railWidth > 0
           ? {

@@ -298,7 +298,7 @@ describe("starting a one-off run from the case table", () => {
   /** @scenario "Confirming a run from a case row does not change the address" */
   it("keeps the address and the table when a run is confirmed", async () => {
     const user = userEvent.setup();
-    render(<TestCasesTab onNewTestCase={vi.fn()} />, { wrapper: Wrapper });
+    render(<TestCasesTab />, { wrapper: Wrapper });
 
     await confirmRowRun(user);
 
@@ -316,7 +316,7 @@ describe("starting a one-off run from the case table", () => {
   it("keeps the suite selected in the rail after a run from inside it", async () => {
     const user = userEvent.setup();
     mockRouterState.asPath = "/test-project/agent-testing/suites/refunds";
-    render(<TestCasesTab onNewTestCase={vi.fn()} />, { wrapper: Wrapper });
+    render(<TestCasesTab />, { wrapper: Wrapper });
 
     await confirmRowRun(user);
 
@@ -330,7 +330,7 @@ describe("starting a one-off run from the case table", () => {
   /** @scenario "The run detail drawer opens as soon as the run is queued" */
   it("opens the drawer at queue time, naming the case and the target", async () => {
     const user = userEvent.setup();
-    render(<TestCasesTab onNewTestCase={vi.fn()} />, { wrapper: Wrapper });
+    render(<TestCasesTab />, { wrapper: Wrapper });
 
     await confirmRowRun(user);
 
@@ -369,7 +369,7 @@ describe("starting a one-off run from the case table", () => {
   /** @scenario "Closing the drawer leaves the table where it was" */
   it("shows the same table with the fresh verdict once the drawer closes", async () => {
     const user = userEvent.setup();
-    const view = render(<TestCasesTab onNewTestCase={vi.fn()} />, {
+    const view = render(<TestCasesTab />, {
       wrapper: Wrapper,
     });
 
@@ -395,7 +395,7 @@ describe("starting a one-off run from the case table", () => {
     });
     view.rerender(
       <ChakraProvider value={defaultSystem}>
-        <TestCasesTab onNewTestCase={vi.fn()} />
+        <TestCasesTab />
       </ChakraProvider>,
     );
 

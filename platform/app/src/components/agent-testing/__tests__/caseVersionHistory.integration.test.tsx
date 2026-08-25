@@ -19,10 +19,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  NO_REMEMBERED_TARGET_HINT,
-  ScenarioFormDrawer,
-} from "~/components/scenarios/ScenarioFormDrawer";
+import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
 import { ScenarioVersionHistoryDrawer } from "../drawers/ScenarioVersionHistoryDrawer";
 
 const mocks = vi.hoisted(() => ({
@@ -348,62 +345,6 @@ describe("the version chip in the case editor", () => {
       "scenarioVersionHistory",
       { urlParams: { scenarioId: "case_1" } },
     );
-  });
-});
-
-/** @see specs/features/agent-testing/cases-table.feature */
-describe("the case editor footer", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.mockParams = {};
-    mocks.canManage = true;
-    mocks.persistedTarget = null;
-    mocks.mockGetById.mockReturnValue({
-      data: scenarioAt(4),
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mocks.mockGetByIdRefetch,
-    });
-  });
-
-  afterEach(cleanup);
-
-  const renderEditor = () =>
-    render(
-      <ScenarioFormDrawer
-        open
-        scenarioId="case_1"
-        variant="agent-testing"
-        onClose={vi.fn()}
-      />,
-      { wrapper: Wrapper },
-    );
-
-  /** @scenario "The case editor footer holds Cancel, Save and Run, with no dropdown" */
-  it("holds Cancel, Save and Run, and no Save-and-Run dropdown", async () => {
-    mocks.persistedTarget = { type: "http", id: "agent_1" };
-    renderEditor();
-    await screen.findByTestId("case-version-4");
-
-    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
-    const run = screen.getByTestId("editor-run");
-    expect(run).toBeEnabled();
-    expect(
-      screen.queryByRole("button", { name: /Save and Run/i }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByText("Edit test case")).toBeInTheDocument();
-  });
-
-  /** @scenario "Run is off on a test case that never ran" */
-  it("turns Run off, and says why, on a case with no remembered agent", async () => {
-    renderEditor();
-    await screen.findByTestId("case-version-4");
-
-    const run = screen.getByTestId("editor-run");
-    expect(run).toBeDisabled();
-    expect(run).toHaveAttribute("title", NO_REMEMBERED_TARGET_HINT);
   });
 });
 

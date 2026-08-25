@@ -8,6 +8,7 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
+import { useCallback } from "react";
 import type {
   Period,
   PeriodMode,
@@ -50,15 +51,18 @@ export type TestCasesTabBase = {
   onNewTestCase: (folderId: string | null) => void;
 };
 
-function useTestCasesTabBase(
-  onNewTestCase: (folderId: string | null) => void,
-): TestCasesTabBase {
+function useTestCasesTabBase(): TestCasesTabBase {
   const { project } = useOrganizationTeamProject();
   const { can } = useCan();
   const { selection, selectSuite, selectPlan } = useAgentTestingRouting();
   const { period, mode, setPeriod, setRelativePeriod } = usePeriodSelector(30);
   const isRailCollapsed = useAgentTestingStore((state) => state.railCollapsed);
   const toggleRail = useAgentTestingStore((state) => state.toggleRailCollapsed);
+  const openCaseEditor = useAgentTestingStore((state) => state.openCaseEditor);
+  const onNewTestCase = useCallback(
+    (folderId: string | null) => openCaseEditor({ folderId }),
+    [openCaseEditor],
+  );
 
   return {
     projectId: project?.id ?? "",
@@ -83,10 +87,8 @@ export type TestCasesTabModel = {
   open: CaseOpenActions;
 };
 
-export function useTestCasesTab(
-  onNewTestCase: (folderId: string | null) => void,
-): TestCasesTabModel {
-  const base = useTestCasesTabBase(onNewTestCase);
+export function useTestCasesTab(): TestCasesTabModel {
+  const base = useTestCasesTabBase();
   const { projectId, selection, selectSuite } = base;
 
   const data = useTestCasesData({ period: base.periodPicker.period });

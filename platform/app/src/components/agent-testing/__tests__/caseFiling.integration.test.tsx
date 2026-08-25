@@ -23,6 +23,7 @@ import {
   ScenarioPicker,
 } from "~/components/suites/ScenarioPicker";
 import { TestCasesTab } from "../cases/TestCasesTab";
+import { useAgentTestingStore } from "../useAgentTestingStore";
 
 const mockScenariosGetAll = vi.hoisted(() => vi.fn());
 const mockFoldersGetAll = vi.hoisted(() => vi.fn());
@@ -163,18 +164,19 @@ describe("the Test cases tab", () => {
   });
   afterEach(cleanup);
 
-  const renderTab = (onNewTestCase = vi.fn()) => {
-    render(<TestCasesTab onNewTestCase={onNewTestCase} />, {
-      wrapper: Wrapper,
-    });
-    return onNewTestCase;
+  const renderTab = () => {
+    useAgentTestingStore.getState().closeCaseEditor();
+    render(<TestCasesTab />, { wrapper: Wrapper });
   };
+
+  /** What the page-level case editor was last asked to open. */
+  const caseEditor = () => useAgentTestingStore.getState().caseEditor;
 
   /** @scenario "A project with no test cases shows what to do first" */
   it("says what a test case is and offers the first one", () => {
     mockScenariosGetAll.mockReturnValue({ data: [], isLoading: false });
     mockFoldersGetAll.mockReturnValue({ data: [], isLoading: false });
-    const onNewTestCase = renderTab();
+    renderTab();
 
     const empty = screen.getByTestId("agent-testing-first-case-empty");
     expect(
@@ -186,13 +188,13 @@ describe("the Test cases tab", () => {
     expect(
       within(empty).getByRole("button", { name: "New test case" }),
     ).toBeInTheDocument();
-    expect(onNewTestCase).not.toHaveBeenCalled();
+    expect(caseEditor().open).toBe(false);
   });
 
   /** @scenario "A case created from inside a suite is filed into that suite" */
   it("files a case made inside a suite into that suite", async () => {
     const user = userEvent.setup();
-    const onNewTestCase = renderTab();
+    renderTab();
 
     await user.click(screen.getByTestId("suite-rail-item-Refunds"));
     await user.click(
@@ -202,7 +204,11 @@ describe("the Test cases tab", () => {
       await screen.findByRole("menuitem", { name: "New test case" }),
     );
 
-    expect(onNewTestCase).toHaveBeenCalledWith(REFUNDS.id);
+    expect(caseEditor()).toEqual({
+      open: true,
+      scenarioId: null,
+      folderId: REFUNDS.id,
+    });
   });
 
   /** @scenario "Choosing a suite in the rail does not reload the page" */

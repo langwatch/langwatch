@@ -7,7 +7,7 @@
  *
  * @see specs/features/agent-testing/cases-table.feature
  */
-import { ChakraProvider, defaultSystem, Table } from "@chakra-ui/react";
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
@@ -113,16 +113,13 @@ describe("<FolderHeaderRow/>", () => {
     props: Partial<React.ComponentProps<typeof FolderHeaderRow>> = {},
   ) =>
     render(
-      <Table.Root>
-        <Table.Body>
-          <FolderHeaderRow
-            name="Checkout"
-            caseCount={4}
-            colSpan={4}
-            {...props}
-          />
-        </Table.Body>
-      </Table.Root>,
+      <FolderHeaderRow
+        name="Checkout"
+        caseCount={4}
+        templateColumns="minmax(0,1fr) 170px 112px"
+        aggregateSpan={2}
+        {...props}
+      />,
       { wrapper: Wrapper },
     );
 
@@ -130,13 +127,13 @@ describe("<FolderHeaderRow/>", () => {
     renderRow();
 
     expect(screen.getByText("Checkout")).toBeInTheDocument();
-    expect(screen.getByText("4 test cases")).toBeInTheDocument();
+    expect(screen.getByLabelText("4 test cases")).toBeInTheDocument();
   });
 
   it("counts one case as one", () => {
     renderRow({ caseCount: 1 });
 
-    expect(screen.getByText("1 test case")).toBeInTheDocument();
+    expect(screen.getByLabelText("1 test case")).toBeInTheDocument();
   });
 
   it("carries the aggregate it is given", () => {

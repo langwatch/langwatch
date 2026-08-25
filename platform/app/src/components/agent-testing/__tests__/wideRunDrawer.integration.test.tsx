@@ -28,6 +28,7 @@ import {
   Verdict,
 } from "~/server/scenarios/scenario-event.enums";
 import { AgentTestingRunDrawer } from "../drawers/AgentTestingRunDrawer";
+import { useAgentTestingStore } from "../useAgentTestingStore";
 
 const mockGetRunState = vi.hoisted(() => vi.fn());
 const mockGetScenario = vi.hoisted(() => vi.fn());
@@ -338,7 +339,11 @@ describe("the wide run detail drawer", () => {
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Edit scenario" }));
 
-    expect(await screen.findByText("Edit Scenario")).toBeInTheDocument();
+    expect(useAgentTestingStore.getState().caseEditor).toEqual({
+      open: true,
+      scenarioId: "case_1",
+      folderId: null,
+    });
   });
 
   /** @scenario "A run that is still going shows the conversation growing beside empty results" */

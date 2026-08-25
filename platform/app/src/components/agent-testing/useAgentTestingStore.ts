@@ -41,6 +41,21 @@ interface RouterLike {
 
 type QueryLike = Record<string, string | string[] | undefined>;
 
+/** The case the editor dialog is open on, if any. */
+export type CaseEditorTarget = {
+  open: boolean;
+  /** The case being edited, or nothing for a new one. */
+  scenarioId: string | null;
+  /** The suite a new case starts in. */
+  folderId: string | null;
+};
+
+const CLOSED_CASE_EDITOR: CaseEditorTarget = {
+  open: false,
+  scenarioId: null,
+  folderId: null,
+};
+
 export interface AgentTestingState {
   viewMode: AgentTestingViewMode;
   railCollapsed: boolean;
@@ -51,6 +66,7 @@ export interface AgentTestingState {
   pendingBatchRunId: string | null;
   /** The run whose cancel is in flight, so its button can say so. */
   cancellingJobId: string | null;
+  caseEditor: CaseEditorTarget;
 
   setViewMode: (value: AgentTestingViewMode) => void;
   setRailCollapsed: (isCollapsed: boolean) => void;
@@ -60,6 +76,8 @@ export interface AgentTestingState {
   setLastRunTarget: (target: TargetValue) => void;
   setPendingBatchRunId: (batchRunId: string | null) => void;
   setCancellingJobId: (jobId: string | null) => void;
+  openCaseEditor: (target: Partial<Omit<CaseEditorTarget, "open">>) => void;
+  closeCaseEditor: () => void;
 
   syncToUrl: (router: RouterLike) => void;
   hydrateFromUrl: (query: QueryLike) => void;
@@ -115,6 +133,7 @@ export function createAgentTestingStore() {
     lastRunTarget: null,
     pendingBatchRunId: null,
     cancellingJobId: null,
+    caseEditor: CLOSED_CASE_EDITOR,
 
     setViewMode: (value) => set({ viewMode: value }),
 
@@ -153,6 +172,11 @@ export function createAgentTestingStore() {
       set({ pendingBatchRunId: batchRunId }),
 
     setCancellingJobId: (jobId) => set({ cancellingJobId: jobId }),
+
+    openCaseEditor: ({ scenarioId = null, folderId = null }) =>
+      set({ caseEditor: { open: true, scenarioId, folderId } }),
+
+    closeCaseEditor: () => set({ caseEditor: CLOSED_CASE_EDITOR }),
 
     syncToUrl: (router) => {
       const { viewMode } = get();

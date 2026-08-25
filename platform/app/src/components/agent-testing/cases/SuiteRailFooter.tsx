@@ -29,13 +29,7 @@ export function SuiteRailFooter({
   setRelativePeriod,
 }: SuiteRailFooterProps) {
   return (
-    <HStack
-      gap={2}
-      paddingX={2}
-      paddingY={2}
-      borderTopWidth="1px"
-      borderColor="border"
-    >
+    <HStack gap={2} paddingX={3} paddingBottom={4} paddingTop={4}>
       {!collapsed && (
         <PeriodSelector
           period={period}

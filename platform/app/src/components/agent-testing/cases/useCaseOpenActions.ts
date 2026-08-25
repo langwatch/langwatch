@@ -7,6 +7,7 @@
 
 import { useCallback } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useAgentTestingStore } from "../useAgentTestingStore";
 import type { CaseLastResult } from "./CasesTable";
 import type { TestCase } from "./test-cases";
 import { useOpenLiveRun } from "./useOpenLiveRun";
@@ -24,15 +25,11 @@ export function useCaseOpenActions(
 ): CaseOpenActions {
   const { openDrawer } = useDrawer();
   const { openLiveRun } = useOpenLiveRun();
+  const openCaseEditor = useAgentTestingStore((state) => state.openCaseEditor);
 
   const openEditor = useCallback(
-    (testCase: TestCase) => {
-      openDrawer("scenarioEditor", {
-        variant: "agent-testing",
-        urlParams: { scenarioId: testCase.id },
-      });
-    },
-    [openDrawer],
+    (testCase: TestCase) => openCaseEditor({ scenarioId: testCase.id }),
+    [openCaseEditor],
   );
 
   const openHistory = useCallback(

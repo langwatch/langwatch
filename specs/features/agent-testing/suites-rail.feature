@@ -22,7 +22,7 @@ Feature: The test suites rail
     When the Agent Testing page is opened
     Then "All test cases" is the first entry
     And the two test suites follow it under a "Test Suites" heading
-    And the external set follows them under an "External Sets" heading
+    And the external set follows them under a "From Code" heading
     And no entry carries a count
 
   @integration
@@ -30,14 +30,14 @@ Feature: The test suites rail
     Given a project with an external set
     When the rail is read
     Then the external set carries the folder-with-code icon
-    And it shows when it last ran
+    And it shows no count and no run time
     And it shows no Run control
 
   @integration
-  Scenario: A project with no external sets hides the External Sets heading
+  Scenario: A project with no external sets hides the From Code heading
     Given a project with test suites and no external sets
     When the rail is read
-    Then no "External Sets" heading is shown
+    Then no "From Code" heading is shown
 
   @integration
   Scenario: The rail offers to create a test suite
