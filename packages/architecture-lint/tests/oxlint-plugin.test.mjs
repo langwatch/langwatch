@@ -74,6 +74,11 @@ tester.run("package-boundaries", plugin.rules["package-boundaries"], {
       errors: [{ messageId: "retiredPackageRuntime" }],
     },
     {
+      filename: "packages/features/agent/contract/src/example.ts",
+      code: 'import { z } from "zod/v4"; export const value = z.string();',
+      errors: [{ messageId: "retiredPackageRuntime" }],
+    },
+    {
       filename: "platform/app/src/server/example.ts",
       code: 'import { cadence } from "@langwatch/automations/cadences"; export { cadence };',
       errors: [{ messageId: "retiredPackageRuntime" }],
