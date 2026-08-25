@@ -233,10 +233,8 @@ describe("VersionHistoryButton", () => {
     });
 
     describe("when the caller confirms a restore", () => {
-      /**
-       * @scenario "Restoring a version reloads the workbench"
-       * @scenario "The history closes once a restore lands"
-       */
+      /** @scenario "Restoring a version reloads the workbench" */
+      /** @scenario "The history closes once a restore lands" */
       it("restores it and loads the fresh setup into the workbench", async () => {
         const user = await openHistory();
 
