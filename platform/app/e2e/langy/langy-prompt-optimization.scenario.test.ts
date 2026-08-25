@@ -59,7 +59,7 @@ describe("Langy prompt optimization: the improvement loop", () => {
         langy,
         name: "happy guided improvement loop",
         description:
-          "A non-technical webshop founder has a support-bot experiment fully set up (dataset, prompt column, answer-match evaluator) and wants the bot to answer better. Langy runs the improvement loop: read the state, duplicate the baseline, ground a hypothesis in failing rows, edit the copy's draft, run scoped, compare, narrate.",
+          "A non-technical webshop founder has a support-bot experiment fully set up (dataset, prompt column, answer-match evaluator) and wants the bot to answer better. Langy runs the improvement loop: read the state, score the baseline, duplicate the baseline, ground a hypothesis in failing rows, edit the copy's draft, run scoped, compare, narrate.",
         slug: seeded.experimentSlug,
         script: [
           scenario.user(
