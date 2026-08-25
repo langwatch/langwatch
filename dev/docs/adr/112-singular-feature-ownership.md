@@ -76,7 +76,7 @@ The initial core catalogue contains the following independently owned domains:
 | Feature | Representative ownership |
 | --- | --- |
 | `agent` | agent definitions and execution-facing product behaviour |
-| `analytics` | product analytics queries, workbench charts, and dashboards |
+| `analytics` | analytical query execution, query vocabulary, and reusable analytical read models |
 | `annotation` | annotation and score lifecycle |
 | `api-key` | API credential issuance, rotation, restriction, and revocation |
 | `auth` | authentication, login, identity-provider, and session behaviour |

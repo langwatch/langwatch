@@ -123,13 +123,9 @@ catalogue, and subordinate-behaviour examples are fixed by ADR-112.
 
 ### Canonical example: evaluation
 
-useful full example. The names below describe ownership, not mandatory
-boilerplate: a smaller feature contains only the files and packages it needs.
 Evaluation exercises all three surfaces and both API transports, so it is a
-useful full example. The names below describe ownership, not mandatory
-boilerplate: a smaller feature contains only the files and packages it needs.
-useful full example. The names below describe ownership, not mandatory
-boilerplate: a smaller feature contains only the files and packages it needs.
+useful full example. The names describe ownership, not mandatory boilerplate:
+a smaller feature contains only the files and packages it needs.
 
 ```text
 packages/
