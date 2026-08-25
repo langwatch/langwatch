@@ -213,6 +213,32 @@ regexes = [
   '''^tok-live-abc123$''',
 ]
 
+# The JWT-shaped fixture an earlier commit on the redaction-eats-product-ids
+# branch put in `applyContentRedaction.unit.test.ts`. The test proves the `jwt`
+# rule still fires under a reserved identifier attribute, so the fixture has to
+# be shaped exactly like the thing a real leak would be, the same argument as
+# the Azure block above. The tip assembles the three segments at run time, so no
+# literal is added there, but gitleaks scans the whole commit range on a pull
+# request and the earlier commit still needs naming here.
+#
+# Naming the value, as this file requires. The three segments decode to:
+#   header    {"alg":"HS256"}
+#   payload   {"sub":"1234567890"}
+#   signature 32 bytes over a key this repository does not hold
+# It is the sample token printed across public JWT documentation. It names no
+# tenant, no account and no issuer, it authenticates against nothing here, and
+# there is nothing to revoke.
+#
+# Scoped by VALUE and ANCHORED, for the reason given above the block before it:
+# a substring allowlist would also permit a real token that merely starts with
+# these segments.
+[[allowlists]]
+description = "Public sample JWT, the fixture proving the jwt rule still runs on a reserved attribute"
+targetRules = ["jwt"]
+regexes = [
+  '''^eyJhbGciOiJIUzI1NiJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIn0\.dBjftJeZ4CVPmB92K27uhbUJU1p1r_wW1gFWFOEjXk$''',
+]
+
 # `ik-lw-fresh1234567890_secret`, the stand-in ingestion token an earlier commit
 # on the ingest-key rotation branch handed the mocked `apiKeys.create`. The tip
 # spells it `ik-lw-fake-token`, which no rule fires on, but gitleaks scans the
