@@ -51,7 +51,7 @@ export function LastRunLine({
       flexWrap="wrap"
       justify="flex-end"
       paddingX={1}
-      paddingTop={3}
+      paddingTop={6}
       data-testid="cases-last-run-line"
     >
       <Text fontSize="12px" color={FG_MUTED}>

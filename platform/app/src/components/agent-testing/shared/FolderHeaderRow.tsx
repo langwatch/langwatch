@@ -76,13 +76,17 @@ export function FolderHeaderRow({
           rest of the row is its own. */}
       <HStack gap={1.5} gridColumn={`span ${aggregateSpan}`} minWidth={0}>
         {children}
-        <Icon
-          as={ChevronRight}
-          boxSize="13px"
-          color={FG_FAINT}
-          marginLeft="auto"
-          flexShrink={0}
-        />
+        {/* The chevron says the row opens the folder, so a row that opens
+            nothing does not carry one. */}
+        {onClick && (
+          <Icon
+            as={ChevronRight}
+            boxSize="13px"
+            color={FG_FAINT}
+            marginLeft="auto"
+            flexShrink={0}
+          />
+        )}
       </HStack>
     </chakra.button>
   );
