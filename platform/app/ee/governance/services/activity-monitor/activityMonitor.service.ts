@@ -45,25 +45,15 @@ import {
   UNASSIGNED_DEPARTMENT,
 } from "../department/departmentAttribution";
 import { PROJECT_KIND } from "../governanceProject.service";
-import {
-  ActivityMonitorClickHouseRepository,
-  type PulledEventChRow,
-  type PushedEventChRow,
-  type WindowCountChRow,
-} from "./activityMonitor.clickhouse.repository";
-
-// Re-export shared types so existing consumers (router, tests) don't break.
-export type {
-  SortDir,
-  SpendOverTimeGroupBy,
-  SpendSortField,
-} from "./activityMonitor.clickhouse.repository";
-
 import type {
+  PulledEventChRow,
+  PushedEventChRow,
   SortDir,
   SpendOverTimeGroupBy,
   SpendSortField,
-} from "./activityMonitor.clickhouse.repository";
+  WindowCountChRow,
+} from "./activityMonitor.clickhouse.schemas";
+import { ActivityMonitorClickHouseRepository } from "./activityMonitor.clickhouse.repository";
 
 // ---------------------------------------------------------------------------
 // Public interfaces — the service's API contract

@@ -34,23 +34,6 @@ import { ActivityMonitorEventsClickHouseRepository } from "./activityMonitor.eve
 import { ActivityMonitorHealthClickHouseRepository } from "./activityMonitor.health.clickhouse.repository";
 import { ActivityMonitorSpendClickHouseRepository } from "./activityMonitor.spend.clickhouse.repository";
 
-// Re-export shared types so existing consumers (service, router, tests)
-// don't need to know the schemas moved.
-export type {
-  PulledEventChRow,
-  PushedEventChRow,
-  SortDir,
-  SourceEventCountChRow,
-  SpendByDepartmentChRow,
-  SpendByTeamSourceChRow,
-  SpendByUserChRow,
-  SpendOverTimeChRow,
-  SpendOverTimeGroupBy,
-  SpendSortField,
-  SummarySpendChRow,
-  WindowCountChRow,
-};
-
 export class ActivityMonitorClickHouseRepository {
   private readonly spend = new ActivityMonitorSpendClickHouseRepository();
   private readonly events = new ActivityMonitorEventsClickHouseRepository();
