@@ -62,6 +62,10 @@ import {
   type LangyMessageRow,
   NullLangyMessageRepository,
 } from "./repositories/langy-message.repository";
+import type {
+  LangyTurnOrderReader,
+  LangyTurnSegment,
+} from "./streaming/langyTurnOrder";
 
 export type { LangyConversationRepository as LangyConversationReadRepository } from "./repositories/langy-conversation.repository";
 
@@ -277,6 +281,7 @@ export class LangyConversationService {
     private readonly commands: LangyConversationCommands,
     private readonly messages: LangyMessageRepository = new NullLangyMessageRepository(),
     private readonly events: LangyConversationEventsReader | null = null,
+    private readonly turnOrder: LangyTurnOrderReader | null = null,
   ) {}
 
   /**
@@ -1044,13 +1049,46 @@ export class LangyConversationService {
       });
       return;
     }
+    const order = await this.readTurnOrder({ conversationId, turnId });
     await this.finalizeTurn({
       projectId,
       conversationId,
       turnId,
-      parts: buildFinalAssistantParts({ text: text ?? "", toolCalls }),
+      parts: buildFinalAssistantParts({
+        text: text ?? "",
+        toolCalls,
+        ...(order.length > 0 ? { order } : {}),
+      }),
       outcome: "completed",
     });
+  }
+
+  /**
+   * The turn's own account of what happened when, folded off its live stream.
+   *
+   * Read here rather than by the caller because two paths finalize a turn — the
+   * relay's terminal frame and the agent's own HTTP post — and whichever lands
+   * first is the one the record keeps. Reading in one place is what makes the
+   * two produce the same parts.
+   *
+   * Best effort by design: a turn long enough to outlive its buffer, or one
+   * whose read fails, records the shape it always did rather than failing a
+   * finalize that is otherwise complete.
+   */
+  private async readTurnOrder(at: {
+    conversationId: string;
+    turnId: string;
+  }): Promise<LangyTurnSegment[]> {
+    if (!this.turnOrder) return [];
+    try {
+      return await this.turnOrder.readTurnOrder(at);
+    } catch (error) {
+      conversationServiceLogger.warn(
+        { ...at, error },
+        "could not read a turn's order; recording its calls before its reply",
+      );
+      return [];
+    }
   }
 
   /**
@@ -1248,7 +1286,14 @@ export class LangyConversationService {
     repository: LangyConversationRepository,
     messages?: LangyMessageRepository,
     events?: LangyConversationEventsReader | null,
+    turnOrder?: LangyTurnOrderReader | null,
   ): LangyConversationService {
-    return new LangyConversationService(repository, commands, messages, events);
+    return new LangyConversationService(
+      repository,
+      commands,
+      messages,
+      events,
+      turnOrder,
+    );
   }
 }

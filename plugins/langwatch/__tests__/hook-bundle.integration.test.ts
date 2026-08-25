@@ -33,6 +33,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 const pluginRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const hookScript = join(pluginRoot, "scripts", "session-context.mjs");
+const guidanceScript = join(pluginRoot, "scripts", "session-guidance.mjs");
 
 /** The ingest key the hook authorizes the post with, per agent. */
 const INGEST_KEY = "sk-lw-plugin-integration-test";
@@ -161,7 +162,7 @@ const settle = (): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, 250));
 
 beforeAll(async () => {
-  if (!existsSync(hookScript)) {
+  if (!existsSync(hookScript) || !existsSync(guidanceScript)) {
     execFileSync("node", [join(pluginRoot, "build.mjs")], {
       cwd: pluginRoot,
       stdio: "inherit",
@@ -303,6 +304,64 @@ describe("the bundled session context hook", () => {
       expect(run.stdout).toBe("");
       expect(run.stderr).toBe("");
       expect(received).toEqual([]);
+    });
+  });
+});
+
+/** Run the guidance script the way the plugin's hooks.json does. */
+const runGuidance = (env: Record<string, string>): Promise<HookRun> =>
+  new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [guidanceScript], {
+      cwd: scratch,
+      env: { PATH: process.env.PATH ?? "", HOME: home, ...env },
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString("utf8");
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString("utf8");
+    });
+
+    child.on("error", reject);
+    child.on("close", (exitCode) => {
+      resolve({ exitCode, stdout, stderr });
+    });
+
+    child.stdin.end();
+  });
+
+describe("the bundled session guidance hook", () => {
+  describe("given a Claude Code session starting", () => {
+    /** @scenario "The plugin's guidance hook emits the guidance as session context" */
+    it("emits one JSON object whose additionalContext names the declare command", async () => {
+      const run = await runGuidance({ CLAUDECODE: "1" });
+
+      expect(run.exitCode).toBe(0);
+      expect(run.stderr).toBe("");
+      const parsed = JSON.parse(run.stdout) as {
+        hookSpecificOutput: {
+          hookEventName: string;
+          additionalContext: string;
+        };
+      };
+      expect(parsed.hookSpecificOutput.hookEventName).toBe("SessionStart");
+      expect(parsed.hookSpecificOutput.additionalContext).toContain(
+        "langwatch ingest context",
+      );
+    });
+  });
+
+  describe("given another Agent Plugins client running the hook", () => {
+    it("emits nothing and exits zero", async () => {
+      const run = await runGuidance({});
+
+      expect(run.exitCode).toBe(0);
+      expect(run.stdout).toBe("");
+      expect(run.stderr).toBe("");
     });
   });
 });

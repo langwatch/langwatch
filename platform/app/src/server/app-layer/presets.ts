@@ -31,6 +31,7 @@ import { createLangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
 import { createLangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
+import { createLangyTurnOrderReader } from "~/server/app-layer/langy/streaming/langyTurnOrder";
 import { OpsExplainClickHouseRepository } from "~/server/app-layer/ops/repositories/ops-explain.clickhouse.repository";
 import { InstanceUsageStatsClickHouseRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
 import {
@@ -1356,6 +1357,10 @@ export function initializeDefaultApp(options?: {
     langyConversationRepository,
     langyMessageRepository,
     es.getEventStore<LangyConversationProcessingEvent>() ?? null,
+    // The turn's own account of what happened when, read off the live edge at
+    // finalize so the record keeps the paragraphs written between the calls.
+    // Null without Redis: the record then keeps the calls-then-reply shape.
+    redis ? createLangyTurnOrderReader(langyTokenBuffer) : null,
   );
   const langyMessages = new LangyMessageService(
     langyMessageRepository,

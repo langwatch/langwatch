@@ -99,6 +99,32 @@ const readPersistedSnapshot = (): string =>
 export type AutosaveOutcome = "saved" | "unchanged" | "refused" | "failed";
 
 /**
+ * What a refusal says about the version the tab has to reload to, and who
+ * wrote it.
+ *
+ * Someone else — another tab, Langy, the API — holds a newer version. Both
+ * facts ride in the refusal's meta, and the actor is what lets the banner name
+ * Langy instead of telling the reader the change came from "somewhere else"
+ * while Langy was driving their own tab. An older server sends neither, so the
+ * version falls back to "one past what this tab knows" and the actor to none.
+ */
+function refusedSaveStaleness({
+  meta,
+  knownVersion,
+}: {
+  meta?: Record<string, unknown>;
+  knownVersion?: number;
+}): { serverVersion: number; actorLabel?: string } {
+  const serverVersion =
+    typeof meta?.currentVersion === "number"
+      ? meta.currentVersion
+      : (knownVersion ?? 0) + 1;
+  const actorLabel =
+    typeof meta?.actorLabel === "string" ? meta.actorLabel : undefined;
+  return { serverVersion, actorLabel };
+}
+
+/**
  * Manages syncing the evaluations v3 state with the database.
  * Uses workbenchState field in the Experiment model for persistence.
  *
@@ -338,13 +364,12 @@ export const useAutosaveEvaluationsV3 = () => {
     const state = useEvaluationsV3Store.getState();
     const handled = readHandledError(error);
     if (handled?.code === "experiment_stale_workbench_state") {
-      // Someone else (another tab, Langy, the API) wrote a newer version. The
-      // current server version rides in the error's meta when available.
-      const serverVersion =
-        typeof handled.meta?.currentVersion === "number"
-          ? handled.meta.currentVersion
-          : (state.workbenchVersion ?? 0) + 1;
-      setStaleWorkbench({ serverVersion });
+      setStaleWorkbench(
+        refusedSaveStaleness({
+          meta: handled.meta,
+          knownVersion: state.workbenchVersion,
+        }),
+      );
       setAutosaveStatus("evaluation", "error", AUTOSAVE_OUT_OF_DATE_REASON);
       return "refused";
     }
