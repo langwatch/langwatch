@@ -2,7 +2,6 @@ import { createHash } from "crypto";
 import { z } from "zod";
 import { Prisma } from "~/generated/prisma/client";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
 import {
   probeOrganizationPermission,
   probeProjectPermission,
@@ -146,7 +145,7 @@ export const sharedTraceRouter = createTRPCRouter({
       // Throws typed share HandledErrors on any failure — handledErrorMiddleware
       // maps them to wire codes (not_found/kill-switch → 404, expired and
       // exhausted → 403, out-of-audience → 401).
-      const share = await getApp().share.resolveForViewer({
+      const share = await ctx.app.share.resolveForViewer({
         token: input.token,
         viewer,
         viewerKey,
@@ -188,7 +187,7 @@ export const sharedTraceRouter = createTRPCRouter({
         throw error;
       }
 
-      const app = getApp();
+      const app = ctx.app;
 
       // Cache lookup happens AFTER the token resolved and protections were
       // computed — never before. Authorization is re-run on every request, so
@@ -234,7 +233,7 @@ export const sharedTraceRouter = createTRPCRouter({
         eventRows,
         evaluationsByTrace,
       ] = await Promise.all([
-        app.projects.getById(projectId),
+        app.projects.tryGetById(projectId),
         app.traces.spans.getSpanSummaryByTraceId({
           tenantId: projectId,
           traceId,
