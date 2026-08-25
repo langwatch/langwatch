@@ -78,7 +78,11 @@ export const isStableAuthError = (error: string | null | undefined): boolean =>
  */
 export const FEDERATED_LOGOUT_PATH = "/api/auth/logout";
 
-/** Friendly heading for known error codes; falls back to the raw code. */
+/**
+ * Friendly heading for known error codes. An unknown code gets generic copy,
+ * never itself: `?error=` is caller-controlled, and echoing it made this
+ * heading a place to put attacker-chosen words under LangWatch branding.
+ */
 const errorTitle = (error: string): string => {
   switch (error) {
     case "OAuthAccountNotLinked":
@@ -88,7 +92,7 @@ const errorTitle = (error: string): string => {
     case "SSO_PROVIDER_NOT_ALLOWED":
       return "Use your organization's sign-in";
     default:
-      return error;
+      return "Something went wrong signing you in";
   }
 };
 

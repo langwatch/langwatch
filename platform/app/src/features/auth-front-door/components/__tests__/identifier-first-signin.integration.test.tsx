@@ -574,5 +574,25 @@ describe("given the identifier-first sign-in screen", () => {
       });
       expect(container.querySelector('input[type="password"]')).not.toBeNull();
     });
+
+    it("asks for the address in the form, so the emergency door can actually be used", async () => {
+      // No address step ran, so without a field of its own this form could
+      // only ever post an empty username — a dead emergency door, discovered
+      // unusable exactly when the IdP path is broken.
+      searchParamsRef.current = new URLSearchParams("local=1");
+      routeMock.mockResolvedValue({
+        outcome: "method_picker",
+        methodSet: [passwordMethod],
+        reasonCode: "break_glass",
+      } satisfies RoutingDecision);
+
+      renderScreen();
+      await screen.findByTestId("method-picker");
+
+      const email = screen.getByLabelText("Email");
+      expect(email.getAttribute("type")).toBe("email");
+      await userEvent.type(email, "op@selfhosted.example");
+      expect((email as HTMLInputElement).value).toBe("op@selfhosted.example");
+    });
   });
 });

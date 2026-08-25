@@ -71,13 +71,16 @@ Feature: The first-party sign-in and sign-up screens - the front door is ours
   # A pending conditional-mediation request is supposed to be invisible, but a
   # third-party passkey provider (1Password) answers it with its own unlock
   # sheet the moment it starts. Opening the page must therefore not start one:
-  # somebody who came to read the page owes it no ceremony.
+  # somebody who came to read the page owes it no ceremony. And the page
+  # focusing the field ITSELF is not the person reaching for it — the offer
+  # waits for a click or a keystroke.
   @integration
   Scenario: The passkey offer waits until I reach for the address field
     Given this deployment offers passkeys
     When the sign-in screen opens
+    And the entrance focuses the address field for me
     Then no passkey request has started
-    When I focus the address field
+    When I click into the field or start typing my address
     Then the passkey offer starts, once, and never again for this visit
 
   # ── Sign-up ────────────────────────────────────────────────────────────

@@ -199,22 +199,25 @@ export function VerificationFirstSignUp() {
     );
   }
 
-  if (verifyToken && completeVerification.error) {
-    return (
-      <LinkNoLongerWorks
-        error={completeVerification.error}
-        isSending={requestVerification.isPending}
-        onResend={sendTo}
-      />
-    );
-  }
-
+  // Before the dead-link branch, deliberately: the dead link's error never
+  // clears, so a successful resend FROM that screen must win this race or
+  // the person clicks "Send a new link" forever and the screen never moves.
   if (sentTo) {
     return (
       <CheckYourEmail
         email={sentTo}
         what="Open it to confirm the address."
         onUseDifferentEmail={() => setSentTo(null)}
+      />
+    );
+  }
+
+  if (verifyToken && completeVerification.error) {
+    return (
+      <LinkNoLongerWorks
+        error={completeVerification.error}
+        isSending={requestVerification.isPending}
+        onResend={sendTo}
       />
     );
   }

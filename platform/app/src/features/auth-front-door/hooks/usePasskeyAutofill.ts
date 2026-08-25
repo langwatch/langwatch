@@ -57,13 +57,17 @@ async function offerPasskeyFromAutofill({
  *     by something they did not do.
  *   - it resolves only if somebody PICKS the passkey. Until then the promise
  *     simply waits, which is why there is no loading state anywhere near it.
- *   - it waits for a gesture. The request starts on the address field's first
- *     focus, not on page load: a pending conditional request is supposed to be
- *     silent, but a third-party passkey provider (1Password, notably) answers
- *     it with its own unlock sheet the moment it starts — so starting it on
- *     load ambushes somebody who only came to read the page. The autofill list
- *     the credential rides in only shows under a focused field anyway, so
- *     arming on focus costs nothing.
+ *   - it waits for a gesture. The request starts when the person actually
+ *     reaches for the address field — a click or a keystroke — never on page
+ *     load: a pending conditional request is supposed to be silent, but a
+ *     third-party passkey provider (1Password, notably) answers it with its
+ *     own unlock sheet the moment it starts, so starting it uninvited
+ *     ambushes somebody who only came to read the page. Focus alone is NOT
+ *     the gesture: the entrance focuses the address field programmatically
+ *     (`useFocusWhenSettled`), and a focus the page gave itself is the page's
+ *     intent, not the person's. The autofill list the credential rides in
+ *     only shows under a focused field anyway, so arming this late costs
+ *     nothing.
  */
 export function usePasskeyAutofill({
   enabled,
@@ -82,6 +86,9 @@ export function usePasskeyAutofill({
     // somewhere they had already left.
     let live = true;
     let offered = false;
+    // A gesture is a pointer or a key, not a focus: the entrance focuses the
+    // field programmatically, and that must not start a ceremony.
+    let interacted = false;
 
     const isWebauthnField = (target: EventTarget | null): boolean =>
       target instanceof HTMLInputElement &&
@@ -90,7 +97,7 @@ export function usePasskeyAutofill({
     const offerOnce = () => {
       if (offered || !live) return;
       offered = true;
-      document.removeEventListener("focusin", onFocusIn);
+      remove();
       void offerPasskeyFromAutofill({
         isLive: () => live,
         callbackUrl,
@@ -98,20 +105,36 @@ export function usePasskeyAutofill({
     };
 
     const onFocusIn = (event: FocusEvent) => {
-      if (isWebauthnField(event.target)) offerOnce();
+      // Tab arriving in the field: the keydown that moved focus set
+      // `interacted`, and this focus is the person landing.
+      if (interacted && isWebauthnField(event.target)) offerOnce();
     };
 
-    // Somebody may already be in the field by the time the deployment's
-    // method set arrives and enables this — offer immediately then.
-    if (isWebauthnField(document.activeElement)) {
-      offerOnce();
-    } else {
-      document.addEventListener("focusin", onFocusIn);
-    }
+    const onGesture = (event: Event) => {
+      interacted = true;
+      // A click straight into the field, or a keystroke while already in it
+      // (the entrance autofocuses, so typing is often the FIRST gesture).
+      if (
+        isWebauthnField(event.target) ||
+        isWebauthnField(document.activeElement)
+      ) {
+        offerOnce();
+      }
+    };
+
+    const remove = () => {
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("pointerdown", onGesture);
+      document.removeEventListener("keydown", onGesture);
+    };
+
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("pointerdown", onGesture);
+    document.addEventListener("keydown", onGesture);
 
     return () => {
       live = false;
-      document.removeEventListener("focusin", onFocusIn);
+      remove();
     };
   }, [enabled, callbackUrl]);
 }

@@ -1,4 +1,4 @@
-import { Alert, Box, Button, VStack } from "@chakra-ui/react";
+import { Alert, Box, Button, Input, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -13,11 +13,24 @@ import { attemptCredentialSignIn } from "../logic/attemptCredentialSignIn";
 import { describeRemainingWait } from "../logic/credentialSignIn";
 import { rememberLastUsedMethod } from "../logic/lastUsedMethod";
 import { EmailPill } from "./EmailPill";
-import { FrontDoorField } from "./FrontDoorField";
+import { FIELD_FOCUS, FIELD_SURFACE, FrontDoorField } from "./FrontDoorField";
 import { PasswordInput } from "./PasswordInput";
 
 const credentialSchema = z.object({
+  // Blank when the address arrived settled from the address step; the field
+  // only renders (and only validates) on the break-glass door, where no
+  // address step ran.
+  email: z.string(),
   password: z.string().min(1, { message: "Enter your password" }),
+});
+
+/** The break-glass door has to ask for the address itself. */
+const breakGlassSchema = credentialSchema.extend({
+  email: z
+    .string()
+    .trim()
+    .min(1, { message: "Enter your email address" })
+    .email({ message: "Enter a valid email address" }),
 });
 
 type CredentialValues = z.infer<typeof credentialSchema>;
@@ -34,8 +47,15 @@ type CredentialValues = z.infer<typeof credentialSchema>;
  * The failure wording is the anchor `sign-in-failure-messages.feature` holds:
  * a wrong password, a rate limit and an installation set up for another
  * address each say their own thing, through the same mapper the legacy screen
- * uses, and never put an internal code on screen. It says nothing about
- * whether the address has an account, ever.
+ * uses, and never put an internal code on screen.
+ *
+ * On whether the address has an account: the SCREEN says nothing, but the
+ * unified funnel deliberately does not pretend — an address with no account
+ * converts to sign-up ("check your email") where a held account answers
+ * "invalid password". That asymmetry is ADR-117 §6 (Revision 2026-08-24),
+ * which retired the no-oracle invariant at the screen level and scoped it to
+ * the router and reset; the spec header in signin-signup-screens.feature
+ * carries the argument.
  */
 export function CredentialSignInForm({
   email,
@@ -55,8 +75,13 @@ export function CredentialSignInForm({
    */
   onSignUpStarted?: (email: string) => void;
 }) {
+  // No address means no address step ran — the break-glass door
+  // (`?local=1`) renders this form cold, and it has to be able to ask for
+  // the address itself or it is a password box that can only ever fail.
+  const asksForAddress = email === "";
   const form = useForm<CredentialValues>({
-    resolver: zodResolver(credentialSchema),
+    resolver: zodResolver(asksForAddress ? breakGlassSchema : credentialSchema),
+    defaultValues: { email, password: "" },
     // Nothing validates automatically; the handlers below decide when a
     // judgement is welcome — the same line the address step takes.
     mode: "onSubmit",
@@ -97,10 +122,11 @@ export function CredentialSignInForm({
   const { secondsToWait, startWait } = useRetryCountdown();
 
   const onSubmit = async (values: CredentialValues) => {
+    const address = asksForAddress ? values.email.trim() : email;
     setSubmitError(null);
     setIsSubmitting(true);
     const attempt = await attemptCredentialSignIn({
-      email,
+      email: address,
       password: values.password,
       callbackUrl,
       convertToSignUp: onSignUpStarted
@@ -114,7 +140,7 @@ export function CredentialSignInForm({
       return;
     }
     if (attempt.outcome === "signing_up") {
-      onSignUpStarted?.(email);
+      onSignUpStarted?.(address);
       return;
     }
 
@@ -141,16 +167,41 @@ export function CredentialSignInForm({
             onAction={onUseDifferentEmail}
             testId="routed-identifier"
           />
+        ) : (
+          // The break-glass door renders this form with no address step in
+          // front of it, so the address is asked for HERE — without this
+          // field the emergency door was a password box that could only post
+          // an empty username, unusable exactly when the IdP path is broken.
+          <FrontDoorField label="Email" error={form.formState.errors.email}>
+            {(id) => (
+              <Input
+                id={id}
+                type="email"
+                placeholder="you@company.com"
+                fontSize={{ base: "16px", md: "14px" }}
+                minHeight="44px"
+                borderRadius={SHAPE.field}
+                autoComplete="username"
+                {...FIELD_SURFACE}
+                _focusVisible={FIELD_FOCUS}
+                {...form.register("email")}
+              />
+            )}
+          </FrontDoorField>
+        )}
+        {email ? (
+          // The address the password belongs to, kept in the form so a
+          // password manager can save and fill the pair. Read-only above,
+          // carried here. (The break-glass field above IS the form field, so
+          // it needs no shadow copy.)
+          <input
+            type="hidden"
+            name="email"
+            value={email}
+            autoComplete="username"
+            readOnly
+          />
         ) : null}
-        {/* The address the password belongs to, kept in the form so a password
-            manager can save and fill the pair. Read-only above, carried here. */}
-        <input
-          type="hidden"
-          name="email"
-          value={email}
-          autoComplete="username"
-          readOnly
-        />
         <FrontDoorField
           label="Password"
           labelEnd={

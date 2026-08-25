@@ -46,8 +46,13 @@ export const frontDoorRouter = createTRPCRouter({
   route: publicProcedure
     .input(
       z.object({
-        /** Null before any address has been typed. */
-        identifier: z.string().nullable(),
+        /**
+         * Null before any address has been typed. Bounded because this is a
+         * public endpoint: 254 is the RFC 5321 ceiling for an address, and
+         * anything past it is not one — no need to carry it into
+         * normalization or the routing recorder.
+         */
+        identifier: z.string().max(254).nullable(),
         /** `?local=1`: the local method set, whatever else would route. */
         breakGlass: z.boolean().optional(),
       }),
