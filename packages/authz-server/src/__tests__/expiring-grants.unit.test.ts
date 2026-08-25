@@ -379,6 +379,41 @@ describe("narrowing a grant that has an end date", () => {
     );
   });
 
+  it("refuses a date already behind us, and revokes nothing", async () => {
+    const { service, repository } = makeGrantsService();
+
+    await expect(
+      service.replace({
+        actor,
+        who: dana,
+        from: orgScope,
+        to: teamScope,
+        role: memberRole,
+        expiresAtMs: NOW - 1,
+      }),
+    ).rejects.toMatchObject({ code: "grant_expiry_in_past" });
+
+    // The refusal has to land BEFORE the write, or the source binding is gone
+    // and the replacement never arrives.
+    expect(repository.replaceBinding).not.toHaveBeenCalled();
+  });
+
+  it("refuses a date of exactly now", async () => {
+    const { service, repository } = makeGrantsService();
+
+    await expect(
+      service.replace({
+        actor,
+        who: dana,
+        from: orgScope,
+        to: teamScope,
+        role: memberRole,
+        expiresAtMs: NOW,
+      }),
+    ).rejects.toMatchObject({ code: "grant_expiry_in_past" });
+    expect(repository.replaceBinding).not.toHaveBeenCalled();
+  });
+
   it("leaves the replacement open-ended when no date is given", async () => {
     const { service, repository } = makeGrantsService();
 
