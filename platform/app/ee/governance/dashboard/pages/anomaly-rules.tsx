@@ -195,24 +195,11 @@ const blankComposer = (): ComposerState => ({
 
 function AnomalyRulesHeader() {
   return (
-    <HStack alignItems="end">
-      <VStack align="start" gap={1}>
-        <HStack gap={2}>
-          <Heading size="md">Anomaly Rules</Heading>
-          <Badge colorPalette="purple" size="sm" variant="surface">
-            Preview
-          </Badge>
-        </HStack>
-        <Text color="fg.muted" fontSize="sm" maxW="3xl">
-          Define thresholds that page on-call when activity drifts. Rules
-          surface on the{" "}
-          <Link href="/governance" color="blue.600">
-            governance overview
-          </Link>{" "}
-          once they fire.
-        </Text>
-      </VStack>
-      <Spacer />
+    <HStack gap={2}>
+      <Heading size="md">Anomaly Rules</Heading>
+      <Badge colorPalette="purple" size="sm" variant="surface">
+        Preview
+      </Badge>
     </HStack>
   );
 }

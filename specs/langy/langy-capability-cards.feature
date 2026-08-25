@@ -100,6 +100,15 @@ Feature: Langy renders domain-capability cards for tool calls
     And each figure rolls up from zero as a rolling number
     And the figures stay still for people who prefer reduced motion
 
+  # The card used to word-match its badge anywhere in the payload, so reading
+  # the failing rows of a run painted a red "failed" badge on a call that
+  # succeeded, and the body under it was the first two lines of the JSON.
+  @integration
+  Scenario: A run card reads its state from the run, not from its rows
+    When Langy reads the failing rows of a run that succeeded
+    Then the card shows no failure
+    And it counts the rows it read instead of printing their JSON
+
   @integration
   Scenario: An unmapped tool falls through to the raw view
     When Langy runs a tool that is not a LangWatch action and has no capability card
@@ -289,6 +298,85 @@ Feature: Langy renders domain-capability cards for tool calls
     Scenario: A turn that failed immediately still leads with the failure
       Given the first thing Langy did in a turn failed
       Then the failure is the first thing in the transcript
+
+    # Ordering held inside the activity block and nowhere else. The block itself
+    # sat above the reply and the whole reply below it, so a turn that wrote a
+    # paragraph, ran a tool, wrote another paragraph and ran another tool showed
+    # both cards on top and both paragraphs underneath. Watching it was worse
+    # than reading it: the cards changed in one place while the text grew in
+    # another, and nothing said which paragraph followed which call.
+    @integration
+    Scenario: A tool card sits between the paragraphs it ran between
+      Given Langy wrote a paragraph, ran a tool, and then wrote another paragraph
+      Then the tool's card is shown after the first paragraph and before the second
+      And the reply is not collected into one block underneath the cards
+
+    @integration
+    Scenario: A turn is read in the order it was watched in
+      Given a turn that wrote text and ran tools in turn
+      When it settles
+      Then the settled turn keeps the order the reader watched it arrive in
+
+    # The record was built as every tool call first and the reply after them,
+    # from the text the agent wrote after its LAST call. Everything written
+    # between calls existed only on the live edge, so a reader who refreshed
+    # got a pile of cards and one closing paragraph, and the account of what
+    # happened was gone. The agent was even told to hoard its text to the end
+    # because of it, which is the wrong way round: the record follows the turn,
+    # the turn does not bend to fit the record.
+    @unit
+    Scenario: The record keeps the paragraphs written between the calls
+      Given a turn that wrote, ran a call, wrote again, and ran a second call
+      When the turn is recorded
+      Then the recorded parts are the paragraphs and the calls in the order they happened
+      And no paragraph written between two calls is dropped
+
+    @unit
+    Scenario: A card is recorded where the work began
+      Given a call whose result arrived after the agent had written more text
+      When the turn is recorded
+      Then the call is recorded at the point it started, not where it finished
+
+    @unit
+    Scenario: A reloaded turn reads the same as the turn that was watched
+      Given a turn that wrote text and ran tools in turn
+      When the reader reloads the page
+      Then the turn reads in the same order it did while it was happening
+
+    # A turn long enough to outlive its live buffer has no ordered account to
+    # rebuild from. It records what it always did rather than guessing an order.
+    @unit
+    Scenario: A turn with no ordered account on hand records what it always did
+      Given a finalized turn whose ordered account is not available
+      When the turn is recorded
+      Then the recorded parts are its calls followed by its reply
+
+    # A turn that goes quiet after its last call hands over its WHOLE narration
+    # as the reply, because there is no closing paragraph to hand over instead.
+    # Recording that reply after the account would print every paragraph a
+    # second time, below the cards it was written between.
+    @unit
+    Scenario: A turn that ends on a call does not repeat what it already wrote
+      Given a turn that wrote between its calls and said nothing after the last one
+      When the turn is recorded
+      Then each paragraph appears once, where it was written
+      And no closing paragraph is added after the last call
+
+    # Two paths finish a turn and race each other: the live relay's terminal
+    # frame, and the agent's own post over HTTP. The record keeps whichever
+    # lands first, so the order must not be read by one of them. It is read
+    # where the turn is recorded, once, for both.
+    @unit
+    Scenario: The order does not depend on which path finished the turn
+      Given a turn that wrote between its calls
+      When the turn is recorded by the path that posts the result directly
+      Then the recorded parts read in the same order as the relay would record them
+
+    @unit
+    Scenario: A turn whose order cannot be read is still recorded
+      Given a turn whose live account cannot be read back
+      When the turn is recorded
+      Then the reply and the calls are still recorded
 
   # The scenario library lives under Simulations, and a scenario's own page is
   # the library with that scenario open. Pointing at the Simulations index sent

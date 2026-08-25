@@ -8,7 +8,7 @@
 import {
   computeMetricStats,
   type MetricStats,
-} from "~/components/shared/MetricStatsTooltip";
+} from "~/components/shared/metricStats";
 import {
   isOnPlatformSet,
   ON_PLATFORM_DISPLAY_NAME,

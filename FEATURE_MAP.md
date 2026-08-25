@@ -19,7 +19,7 @@ prompt-management/   — Prompts, Prompt Playground
 library/             — Agents, Workflows, Evaluators, Datasets
 dashboards/          — Custom analytics dashboards
 triggers/            — Automations / alerts
-ai-gateway/          — Virtual Keys, Budgets, Governance, Catalog (ingestion)
+ai-gateway/          — Virtual Keys, Budgets, Governance, Inventory (ingestion)
 settings/            — Model Providers, Model Defaults, Project Secrets
 ```
 
@@ -87,7 +87,7 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 | Virtual Keys | — | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
 | Budgets | — | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
 | Governance | — | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
-| Catalog (ingestion) | — | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
+| Inventory (ingestion) | — | — | — | ✅ | — | ✅ | — | — | ✅ | ✅ |
 | **Settings** | | | | | | | | | | |
 | Projects | — | — | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | — |
 | Model Providers | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | ✅ |

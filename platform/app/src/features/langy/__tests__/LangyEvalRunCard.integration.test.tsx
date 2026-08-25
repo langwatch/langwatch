@@ -62,6 +62,50 @@ afterEach(() => {
   pushMock.mockClear();
 });
 
+describe("Feature: a run card reports the run, not the data the run returned", () => {
+  describe("given the failing rows of a run that succeeded", () => {
+    /** @scenario "A run card reads its state from the run, not from its rows" */
+    it("shows no failure, and counts the rows instead of printing their JSON", () => {
+      renderCard(
+        JSON.stringify({
+          runId: "silent-ideal-owl",
+          progress: 20,
+          total: 20,
+          meta: { filter: "failed" },
+          evaluations: [
+            {
+              targetId: "target-1",
+              passed: false,
+              details: "the reply failed to name the refund window",
+            },
+            { targetId: "target-1", passed: true, details: "matches" },
+          ],
+        }),
+      );
+
+      expect(screen.queryByText("failed")).toBeNull();
+      expect(screen.getByText("20 of 20 rows")).toBeDefined();
+      expect(screen.getByText("1 of 2 evaluations passed")).toBeDefined();
+      expect(screen.queryByText(/"evaluations"/)).toBeNull();
+    });
+  });
+
+  describe("given the run's own status document", () => {
+    it("shows the status the run reported for itself", () => {
+      renderCard(
+        JSON.stringify({
+          runId: "silent-ideal-owl",
+          status: "completed",
+          progress: 20,
+          total: 20,
+        }),
+      );
+
+      expect(screen.getByText("completed")).toBeDefined();
+    });
+  });
+});
+
 describe("Feature: the platform's link for a resource addresses that resource, not an index", () => {
   describe("Rule: a card's open link is the platform's link for the resource it shows", () => {
     describe("given Langy fetched one scenario run and shows its card", () => {

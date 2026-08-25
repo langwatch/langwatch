@@ -21,6 +21,12 @@ export type ExecutionScope =
   | { type: "full" }
   | { type: "rows"; rowIndices: number[] }
   | { type: "target"; targetId: string }
+  | {
+      type: "target-rows";
+      targetIds: string[];
+      /** Omitted means every row of the dataset. */
+      rowIndices?: number[];
+    }
   | { type: "cell"; targetId: string; rowIndex: number }
   | {
       type: "evaluator";
@@ -108,6 +114,15 @@ export const executionRequestSchema = z
       z.object({ type: z.literal("full") }),
       z.object({ type: z.literal("rows"), rowIndices: z.array(z.number()) }),
       z.object({ type: z.literal("target"), targetId: z.string() }),
+      // Neither filter may be empty. Omitting `rowIndices` is how a caller
+      // asks for every row, so an empty list can only mean no rows, and an
+      // empty `targetIds` says the same about the columns. Either one reaches
+      // the engine as a run that reports success over zero cells.
+      z.object({
+        type: z.literal("target-rows"),
+        targetIds: z.array(z.string()).min(1),
+        rowIndices: z.array(z.number()).min(1).optional(),
+      }),
       z.object({
         type: z.literal("cell"),
         targetId: z.string(),
@@ -177,6 +192,22 @@ export const runInputsBodySchema = z
     path: ["data"],
   });
 export type RunInputsBody = z.infer<typeof runInputsBodySchema>;
+
+/**
+ * True when a run evaluates the experiment's own saved dataset, untouched.
+ *
+ * Only such a run may write its cells back into the workbench state. Rows sent
+ * in the request, a different saved dataset, or constant parameters all make
+ * the outputs disagree with the rows the workbench shows, so those runs leave
+ * the saved cells alone. A row subset is not an override: it fills the rows it
+ * ran and leaves the rest as they were.
+ */
+export const runsSavedDataset = (runInputs?: RunInputsBody): boolean => {
+  if (!runInputs) return true;
+  if (runInputs.data !== undefined) return false;
+  if (runInputs.dataset_id !== undefined) return false;
+  return Object.keys(runInputs.parameters ?? {}).length === 0;
+};
 
 // ============================================================================
 // SSE Event Types

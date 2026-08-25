@@ -71,6 +71,104 @@ func TestProcessWatchKillsARunawayTsgo(t *testing.T) {
 	})
 }
 
+// TypeScript 7 renamed the native compiler from `tsgo` to `tsc` and
+// lib/tsc.js execve()s it, so this — argv[0] and all — is what ps reports for
+// an ordinary `pnpm typecheck` today. It went ungoverned and unobserved while
+// the governor selected on the old name.
+// @scenario "The compiler is governed under both of its names"
+func TestProcessWatchGovernsTheCompilerUnderBothNames(t *testing.T) {
+	now := time.Date(2026, 8, 25, 12, 0, 0, 0, time.UTC)
+
+	t.Run("given a runaway typescript@7 run", func(t *testing.T) {
+		sys := &fakeSystem{now: now, procSamples: []ProcessSample{
+			{PID: 10, RSSBytes: 13 << 30, CPUTime: time.Minute, Elapsed: 5 * time.Minute,
+				Command: "/Users/x/repo/node_modules/.pnpm/@typescript+typescript-darwin-arm64@7.0.2/node_modules/@typescript/typescript-darwin-arm64/lib/tsc --noEmit --project ./tsconfig.tsgo.json"},
+		}}
+		tel := &fakeProcTel{}
+		o := watchOrch(sys, tel)
+
+		t.Run("when the daemon takes its sample", func(t *testing.T) {
+			o.governProcesses()
+
+			t.Run("it is reclaimed at the per-run ceiling", func(t *testing.T) {
+				if len(sys.killed) != 1 || sys.killed[0] != 10 {
+					t.Fatalf("killed = %v, want the runaway tsc run", sys.killed)
+				}
+			})
+
+			t.Run("and it is observed under the compiler class", func(t *testing.T) {
+				if len(tel.samples) != 1 || len(tel.samples[0]) != 1 {
+					t.Fatalf("expected one sample of one watched process, got %+v", tel.samples)
+				}
+				got := tel.samples[0][0]
+				if got.Class != domain.TypeScriptCompilerClass || got.Role != domain.TsgoRun {
+					t.Fatalf("classed %q/%q, want %q/run", got.Class, got.Role, domain.TypeScriptCompilerClass)
+				}
+				want := [2]string{domain.TypeScriptCompilerClass, "run exceeds the per-run memory ceiling"}
+				if len(tel.kills) != 1 || tel.kills[0] != want {
+					t.Fatalf("expected the kill counted as %v, got %v", want, tel.kills)
+				}
+			})
+		})
+	})
+
+	t.Run("given a tsc run and a tsgo run that only exceed the budget together", func(t *testing.T) {
+		// 7 + 7 = 14 GiB against the 12 GiB budget of an 18 GiB machine, with
+		// neither over the per-run ceiling: one combined budget over both
+		// names, or each name is weighed against the whole machine alone.
+		sys := &fakeSystem{now: now, procSamples: []ProcessSample{
+			{PID: 20, RSSBytes: 7 << 30, CPUTime: time.Minute, Elapsed: 10 * time.Minute,
+				Command: "/x/lib/tsc --noEmit -p tsconfig.tsgo.json"},
+			{PID: 21, RSSBytes: 7 << 30, CPUTime: time.Minute, Elapsed: time.Minute,
+				Command: "/y/lib/tsgo --noEmit -p tsconfig.tsgo.tests.json"},
+		}}
+		tel := &fakeProcTel{}
+		o := watchOrch(sys, tel)
+
+		t.Run("when the daemon takes its sample", func(t *testing.T) {
+			o.governProcesses()
+
+			t.Run("the youngest of the two is reclaimed", func(t *testing.T) {
+				if len(sys.killed) != 1 || sys.killed[0] != 21 {
+					t.Fatalf("killed = %v, want the youngest compiler run", sys.killed)
+				}
+			})
+
+			t.Run("and both were recorded under one class", func(t *testing.T) {
+				if len(tel.samples) != 1 || len(tel.samples[0]) != 2 {
+					t.Fatalf("expected one sample of two watched processes, got %+v", tel.samples)
+				}
+				for _, p := range tel.samples[0] {
+					if p.Class != domain.TypeScriptCompilerClass {
+						t.Fatalf("pid %d classed %q, want %q", p.PID, p.Class, domain.TypeScriptCompilerClass)
+					}
+				}
+			})
+		})
+	})
+
+	t.Run("given an active typescript@7 language server", func(t *testing.T) {
+		sys := &fakeSystem{now: now, procSamples: []ProcessSample{
+			{PID: 30, RSSBytes: 2 << 30, CPUTime: time.Minute, Elapsed: time.Hour,
+				Command: "/x/lib/tsc --lsp --stdio"},
+		}}
+		o := watchOrch(sys, &fakeProcTel{})
+
+		t.Run("when the daemon takes its sample", func(t *testing.T) {
+			o.governProcesses()
+			sys.now = now.Add(50 * time.Minute)
+			sys.procSamples[0].CPUTime = 2 * time.Minute // the clock moved
+			o.governProcesses()
+
+			t.Run("it keeps the protection its role has always had", func(t *testing.T) {
+				if len(sys.killed) != 0 {
+					t.Fatalf("an active language server must never be evicted, got %v", sys.killed)
+				}
+			})
+		})
+	})
+}
+
 // @scenario "Coding agents, dev servers and test workers are observed, never touched"
 func TestProcessWatchNeverKillsObserveOnlyClasses(t *testing.T) {
 	now := time.Date(2026, 8, 13, 12, 0, 0, 0, time.UTC)

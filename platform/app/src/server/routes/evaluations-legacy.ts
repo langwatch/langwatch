@@ -736,7 +736,7 @@ secured.access(legacyEvaluationAuth).post(
       };
     }
 
-    const experiment = await ExperimentService.create(prisma).findBySlug({
+    const experiment = await ExperimentService.create({ prisma }).findBySlug({
       projectId: project.id,
       slug: experimentSlug,
     });

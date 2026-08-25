@@ -46,6 +46,7 @@ import {
   BindingMissingError,
   type BindingPrincipalWhere,
   DuplicateBindingError,
+  type GrantEventSource,
   type LedgerScopeType,
   type RoleBindingWrite,
 } from "@langwatch/authz-server";
@@ -71,6 +72,7 @@ import {
   AUTHZ_GRANT_PIPELINE_NAME,
   type AuthzAuditVerb,
 } from "~/server/event-sourcing/pipelines/authz-grants/schemas/constants";
+import { NON_AUDITABLE_SOURCES } from "~/server/event-sourcing/pipelines/authz-grants/subscribers/authzAuditTrail.subscriber";
 import { prisma as appPrisma } from "../../db";
 import { RoleDuplicateNameError } from "../../role/errors/role-duplicate-name.error";
 import { tryGetApp } from "../app";
@@ -80,19 +82,6 @@ import { PrismaAuthzRevocationRepository } from "./repositories/authz-revocation
 import { liveGrants } from "./repositories/live-rows";
 
 const logger = createLogger("langwatch:authz:ledger");
-
-/**
- * Which writer authored a runtime fact — the event's `source` field.
- *
- * `read-through-mint` is the compatibility path (decision 1: no legacy-key
- * sunset): a credential whose access predates the ledger states it the first
- * time it is used, rather than being asked to be re-issued.
- */
-export type LedgerWriteSource =
-  | "grants-service"
-  | "scim"
-  | "invite"
-  | "read-through-mint";
 
 type Sender<T> = { send: (data: T) => Promise<unknown> };
 
@@ -392,7 +381,15 @@ export class GrantsLedgerWriter {
     organizationId: string;
     bindings: LedgerBindingAttach[];
     actor: LedgerActor;
-    source?: LedgerWriteSource;
+    /**
+     * Which surface authored the fact — the provenance the actor cannot
+     * state. `read-through-mint` is the compatibility path (decision 1: no
+     * legacy-key sunset): a credential whose access predates the ledger
+     * states it the first time it is used, rather than being asked to be
+     * re-issued. Defaults to the grants service, which is what a hand-made
+     * grant is.
+     */
+    source?: GrantEventSource;
     onDuplicate: "reject" | "skip";
     /**
      * A caller-derived command id, for writes that are not a user action and
@@ -594,7 +591,7 @@ export class GrantsLedgerWriter {
     fresh: LedgerBindingAttach[];
     duplicates: string[];
     actor: LedgerActor;
-    source: LedgerWriteSource;
+    source: GrantEventSource;
     onDuplicate: "reject" | "skip";
     occurredAtMs: number;
   }): Promise<AttachOutcome> {
@@ -1593,7 +1590,7 @@ function attachAuditFacts({
   source,
 }: {
   fresh: LedgerBindingAttach[];
-  source: LedgerWriteSource;
+  source: GrantEventSource;
 }): Record<string, unknown>[] {
   if (!auditableSource(source)) return [];
   return fresh.map((binding) => ({
@@ -1642,13 +1639,15 @@ export function isRecordNotFound(error: unknown): boolean {
 
 /**
  * The subscriber's relevance guard, on the pre-ledger side (decision 17).
- * `genesis-import` and `backfill-b` never reach this writer at all, and the
- * read-through mint is gated off for an unmigrated organization, so in
- * practice nothing is filtered here — the rule is stated anyway so the two
- * audit paths cannot drift into disagreeing about what earns a row.
+ * The migration never reaches this writer at all, and the read-through mint
+ * is gated off for an unmigrated organization, so in practice nothing is
+ * filtered here — the rule is stated anyway so the two audit paths cannot
+ * drift into disagreeing about what earns a row. It reads the subscriber's
+ * OWN list rather than restating it, which is what makes that guarantee
+ * mechanical instead of a promise in a comment.
  */
-function auditableSource(source: LedgerWriteSource): boolean {
-  return source !== "read-through-mint";
+function auditableSource(source: GrantEventSource): boolean {
+  return !NON_AUDITABLE_SOURCES.includes(source);
 }
 
 function roleKeyFor({

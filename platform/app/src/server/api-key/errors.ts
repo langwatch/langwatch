@@ -91,8 +91,10 @@ export class ApiKeyPermissionDeniedError extends HandledError {
  * here that advice sends them to a door that does not open, and they wait for
  * a grant nobody can give. Langy hit this with `triggers:create`: it read the
  * generic refusal, offered to retry once the user "granted the permission",
- * and the permission is one `READ_ONLY_FAMILIES` withholds from every session
- * key that will ever exist.
+ * and the permission was one the policy of the day withheld from every
+ * session key that would ever exist. (`triggers:create` is delegable now —
+ * the incident, not the example, is the point; today's withheld grains live
+ * in `langyPermissionPolicy.ts`.)
  *
  * `subject` names the credential in the customer's own words ("Langy"), so the
  * class stays generic while the sentence stays specific. The policy's own

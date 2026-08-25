@@ -10,6 +10,10 @@ import {
   ENTERPRISE_EVENT_TYPE_IDENTIFIERS,
 } from "@ee/event-sourcing/typeIdentifiers";
 import {
+  IDENTITY_COMMAND_TYPES,
+  IDENTITY_EVENT_TYPES,
+} from "@langwatch/identity";
+import {
   LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES,
   LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
 } from "@langwatch/langy";
@@ -81,6 +85,7 @@ const TEST_EVENT_TYPES = ["test.integration.event"] as const;
  */
 export const EVENT_TYPE_IDENTIFIERS = [
   ...AUTHZ_GRANTS_EVENT_TYPES,
+  ...IDENTITY_EVENT_TYPES,
   ...AUTOMATIONS_EVENT_TYPES,
   ...TRACE_PROCESSING_EVENT_TYPES,
   ...METRIC_PROCESSING_EVENT_TYPES,
@@ -103,6 +108,7 @@ export const EVENT_TYPE_IDENTIFIERS = [
  */
 export const COMMAND_TYPE_IDENTIFIERS = [
   ...AUTHZ_GRANTS_COMMAND_TYPES,
+  ...IDENTITY_COMMAND_TYPES,
   ...AUTOMATIONS_COMMAND_TYPES,
   ...TRACE_PROCESSING_COMMAND_TYPES,
   ...METRIC_PROCESSING_COMMAND_TYPES,
@@ -136,6 +142,7 @@ export const AGGREGATE_TYPE_IDENTIFIERS = [
   // organization-keyed authorization aggregate.
   "authz_grant",
   "authz_role",
+  "user_identity",
   "trigger",
   "trace",
   "metric",

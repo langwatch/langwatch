@@ -12,13 +12,24 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Namespace alias for the partial mock's `importOriginal` type argument. A
+// top-level `import type` rather than an inline `import()` query, per the
+// repo's TypeScript guidelines; erased at compile time, so it does not
+// perturb the hoisted `vi.mock` below.
+import type * as RbacModule from "~/server/api/rbac";
+
 vi.mock("~/utils/encryption", () => ({
   encrypt: vi.fn((value: string) => `enc:${value}`),
   decrypt: vi.fn((value: string) => value.replace(/^enc:/, "")),
 }));
 
 const batchProjectPermissions = vi.fn();
-vi.mock("~/server/api/rbac", () => ({
+// Partial mock: only the permission resolver is stubbed. The REAL
+// `Resources`/`Actions`/`isOrgExclusivePermission` must come through, because
+// `langyPermissionPolicy.ts` derives the candidate list from them at import
+// time — a stub there would silently shrink the very list this file tests.
+vi.mock("~/server/api/rbac", async (importOriginal) => ({
+  ...(await importOriginal<typeof RbacModule>()),
   batchProjectPermissions: (...args: unknown[]) =>
     batchProjectPermissions(...args),
 }));
@@ -30,12 +41,15 @@ vi.mock("~/server/api-key/api-key.service", () => ({
   },
 }));
 
+import { hasPermissionWithHierarchy } from "~/server/api/rbac";
 import {
+  LANGY_CANDIDATE_PERMISSIONS,
   LangySessionKeyScopeError,
   mintLangySessionApiKey,
   reapExpiredLangySessionApiKeys,
   revokeLangySessionApiKey,
 } from "../langyApiKey";
+import { LANGY_AUTH_SCOPE_FAMILY_NAMES } from "../langyPermissionPolicy";
 
 const SESSION = { user: { id: "user-1" }, expires: "1" } as any;
 // The mint resolves the project's team once (a TEAM binding inherits to its
@@ -45,36 +59,14 @@ const prisma = {
 } as any;
 
 // The full candidate surface, in declaration order — used to assert the "all
-// permissions held" case grants exactly this set.
-const ALL_CANDIDATES = [
-  "project:view",
-  "traces:view",
-  "traces:create",
-  "traces:update",
-  "evaluations:view",
-  "evaluations:create",
-  "evaluations:update",
-  "datasets:view",
-  "datasets:create",
-  "datasets:update",
-  "scenarios:view",
-  "scenarios:create",
-  "scenarios:update",
-  "annotations:view",
-  "annotations:create",
-  "annotations:update",
-  "analytics:view",
-  "analytics:create",
-  "analytics:update",
-  "prompts:view",
-  "prompts:create",
-  "prompts:update",
-  "triggers:view",
-  "workflows:view",
-  "workflows:create",
-  "workflows:update",
-  "experiments:view",
-];
+// permissions held" case grants exactly this set. The REAL derived list, not a
+// hand-copy: the mint's job under test is the intersection and the key's
+// shape, and pinning a duplicate of the list here would make every deliberate
+// policy change fail twice for one decision. The list's own CONTENT is pinned
+// where it is decided — `langy-permission-coverage.unit.test.ts` asserts the
+// boundaries (secrets absent, auth-scope writes absent, data-family CRUD
+// present) against `langyPermissionPolicy.ts`.
+const ALL_CANDIDATES = [...LANGY_CANDIDATE_PERMISSIONS];
 
 beforeEach(() => {
   batchProjectPermissions.mockReset();
@@ -219,7 +211,7 @@ describe("mintLangySessionApiKey", () => {
         expect(arg.permissions).toContain("scenarios:create");
       });
 
-      it("never reaches past the write grain to management itself", async () => {
+      it("reaches the manage grain on data families, and never on the auth scope", async () => {
         batchProjectPermissions.mockImplementation(
           (_ctx: unknown, args: { permissions: string[] }) =>
             Promise.resolve(args.permissions),
@@ -233,12 +225,23 @@ describe("mintLangySessionApiKey", () => {
         });
 
         const arg = apiKeyCreate.mock.calls[0]![0] as Record<string, any>;
-        // `:manage` implies `:delete`. Langy must not be able to destroy a
-        // user's work, however much access that user has.
+        // Owner decision, 2026-08-21: full CRUD on tenant data. The old
+        // assertion here was the inverse — no `:manage`/`:delete` anywhere —
+        // which enforced a default that had hardened into doctrine. The
+        // ceiling that actually protects the user is the intersection with
+        // their own permissions, exercised by the subset tests above.
+        expect(arg.permissions).toContain("scenarios:manage");
+        expect(arg.permissions).toContain("datasets:delete");
+        // The line that remains: no write grain on a family whose writes
+        // change who-can-do-what or a credential.
         expect(
-          (arg.permissions as string[]).filter(
-            (p) => p.endsWith(":manage") || p.endsWith(":delete"),
-          ),
+          (arg.permissions as string[]).filter((p) => {
+            const family = p.split(":")[0]!;
+            return (
+              LANGY_AUTH_SCOPE_FAMILY_NAMES.includes(family) &&
+              !p.endsWith(":view")
+            );
+          }),
         ).toEqual([]);
       });
     });
@@ -266,11 +269,12 @@ describe("mintLangySessionApiKey", () => {
     });
   });
 
-  // The candidate list bounds what Langy can EVER touch. Widening it to reach
-  // the write tier must not have widened it into administration.
+  // The candidate list bounds what Langy can EVER touch. Widening it to full
+  // tenant-data CRUD must not have widened it across the owner's three
+  // carve-outs: secrets, auth-scope writes, ceiling-escaping actions.
   describe("given an admin who holds everything in the organization", () => {
     describe("when a session key is minted", () => {
-      it("never asks for administration, secrets, or public trace sharing", async () => {
+      it("never asks for secrets, auth-scope writes, or public trace sharing", async () => {
         // The user holds literally every permission asked about.
         batchProjectPermissions.mockImplementation(
           (_ctx: unknown, args: { permissions: string[] }) =>
@@ -285,22 +289,40 @@ describe("mintLangySessionApiKey", () => {
         });
 
         const arg = apiKeyCreate.mock.calls[0]![0] as Record<string, any>;
-        const families = new Set(
-          (arg.permissions as string[]).map((p) => p.split(":")[0]),
-        );
-        for (const forbidden of [
-          "organization",
-          "team",
-          "secrets",
-          "governance",
-          "virtualKeys",
-          "gatewayBudgets",
-          "apiKeys",
-        ]) {
-          expect(families.has(forbidden)).toBe(false);
+        const permissions = arg.permissions as string[];
+        // Secrets: not even the read.
+        expect(permissions.filter((p) => p.startsWith("secrets:"))).toEqual([]);
+        // Auth scope: reads only. (The reads themselves ARE expected — that
+        // half of the rule lives in the coverage test's boundary block.)
+        for (const family of LANGY_AUTH_SCOPE_FAMILY_NAMES) {
+          expect(
+            permissions.filter(
+              (p) => p.startsWith(`${family}:`) && !p.endsWith(":view"),
+            ),
+          ).toEqual([]);
         }
-        expect(arg.permissions).not.toContain("traces:share");
-        expect(arg.permissions).not.toContain("traces:manage");
+        // Ceiling-escaping actions, on any family — asserted on the
+        // EFFECTIVE grain, because `:manage` implies `:rotate` through the
+        // hierarchy; direct containment alone stayed green while
+        // `virtualKeys:manage` made rotation reachable.
+        expect(permissions).not.toContain("traces:share");
+        expect(permissions).not.toContain("virtualKeys:rotate");
+        expect(permissions).not.toContain("virtualKeys:manage");
+        expect(
+          hasPermissionWithHierarchy(permissions, "virtualKeys:rotate"),
+        ).toBe(false);
+        // The self-invocation and staff-ops walls.
+        expect(
+          permissions.filter(
+            (p) => p.startsWith("langy:") || p.startsWith("ops:"),
+          ),
+        ).toEqual([]);
+        // And the widening is real, not vacuous: full CRUD arrived.
+        expect(permissions).toContain("traces:manage");
+        expect(permissions).toContain("gatewayBudgets:manage");
+        // Including virtual keys: gateway-driving callers mint keys through
+        // Langy (owner decision, 2026-08-21), rotate alone stays withheld.
+        expect(permissions).toContain("virtualKeys:create");
       });
 
       // `project` is the one family Langy reaches outside its nine, and only to
@@ -329,11 +351,13 @@ describe("mintLangySessionApiKey", () => {
         expect(projectPermissions).toEqual(["project:view"]);
       });
 
-      // Every other family Langy can write creates DATA — a row, inert until
-      // something reads it. A trigger is a standing instruction that keeps
-      // acting on its own, and it is durable, so it outlives the session key
-      // that created it. Authoring one is a decision that stays with a person.
-      it("reads triggers but can never create one", async () => {
+      // Triggers and experiments were the two families the old policy held to
+      // read-only, each with a written rationale (durable standing
+      // instructions; a manage-only write surface). Both rationales were
+      // policy defaults, not product boundaries, and the owner's 2026-08-21
+      // rule supersedes them: tenant data is fully operable. This pin is what
+      // proves the supersession actually reached the key.
+      it("carries the full write surface on the formerly read-only families", async () => {
         batchProjectPermissions.mockImplementation(
           (_ctx: unknown, args: { permissions: string[] }) =>
             Promise.resolve(args.permissions),
@@ -347,59 +371,16 @@ describe("mintLangySessionApiKey", () => {
         });
 
         const arg = apiKeyCreate.mock.calls[0]![0] as Record<string, any>;
-        const triggerPermissions = (arg.permissions as string[]).filter((p) =>
-          p.startsWith("triggers:"),
-        );
-        expect(triggerPermissions).toEqual(["triggers:view"]);
-      });
-
-      // `experiments:view` is what `GET /api/experiments` asks for, and without
-      // it `langwatch experiment list` — and `langwatch status`, which calls it
-      // — were refused a read every role in the project already holds. The
-      // family stops at the view because no route asks for anything finer:
-      // starting a run is gated by the evaluations family, and `:manage` is the
-      // only other action the family defines, which is the delete Langy must
-      // never hold.
-      it("reads the project's experiments but can never manage them", async () => {
-        batchProjectPermissions.mockImplementation(
-          (_ctx: unknown, args: { permissions: string[] }) =>
-            Promise.resolve(args.permissions),
-        );
-
-        await mintLangySessionApiKey({
-          prisma,
-          session: SESSION,
-          projectId: "proj-1",
-          organizationId: "org-1",
-        });
-
-        const arg = apiKeyCreate.mock.calls[0]![0] as Record<string, any>;
-        const experimentPermissions = (arg.permissions as string[]).filter(
-          (p) => p.startsWith("experiments:"),
-        );
-        expect(experimentPermissions).toEqual(["experiments:view"]);
-      });
-
-      // Starting an experiment run creates a run row; it does not administer
-      // the evaluations family. The route asks for the create grain precisely
-      // so this key clears it — see the route note in experiments-v3.ts.
-      it("can start an experiment run without holding the evaluations manage grain", async () => {
-        batchProjectPermissions.mockImplementation(
-          (_ctx: unknown, args: { permissions: string[] }) =>
-            Promise.resolve(args.permissions),
-        );
-
-        await mintLangySessionApiKey({
-          prisma,
-          session: SESSION,
-          projectId: "proj-1",
-          organizationId: "org-1",
-        });
-
-        const arg = apiKeyCreate.mock.calls[0]![0] as Record<string, any>;
-        expect(arg.permissions).toContain("evaluations:create");
-        expect(arg.permissions).not.toContain("evaluations:manage");
-        expect(arg.permissions).not.toContain("evaluations:delete");
+        for (const permission of [
+          "triggers:create",
+          "triggers:update",
+          "triggers:manage",
+          "experiments:manage",
+          "evaluations:manage",
+          "evaluations:delete",
+        ]) {
+          expect(arg.permissions).toContain(permission);
+        }
       });
     });
   });

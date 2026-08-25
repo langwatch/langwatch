@@ -629,8 +629,7 @@ describe("LangyTurnRelay", () => {
       // fallback resolved only scenariorun_ ids, so the navigate silently
       // dropped for every other resource. The fallback table must answer.
       const resolveResourceUrl = vi.fn(
-        async () =>
-          "https://app.langwatch.ai/acme/prompts?drawer.open=promptEditor&drawer.promptId=prompt_x",
+        async () => "https://app.langwatch.ai/acme/prompts?promptId=prompt_x",
       );
       const { relay, buffer } = makeRelay({ resolveResourceUrl });
 
@@ -658,7 +657,7 @@ describe("LangyTurnRelay", () => {
       expect(buffer.appendNavigate).toHaveBeenCalledWith({
         conversationId: "conv-1",
         turnId: "turn-1",
-        href: "/acme/prompts?drawer.open=promptEditor&drawer.promptId=prompt_x",
+        href: "/acme/prompts?promptId=prompt_x",
       });
     });
 

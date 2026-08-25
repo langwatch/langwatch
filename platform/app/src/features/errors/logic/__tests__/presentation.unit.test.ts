@@ -89,6 +89,47 @@ describe("explainHandledError", () => {
       expect(description).toBe("");
     });
 
+    /** @scenario "The refusal names the reserved parameter the caller actually supplied" */
+    it("names the granularity step when that is the parameter supplied", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "lwql_reserved_parameter_supplied",
+          meta: { parameters: ["period_granularity_seconds"] },
+        }),
+      );
+
+      expect(description).toContain("period_granularity_seconds");
+      // The bug this pins: the copy named the window pair unconditionally, so
+      // a caller that sent only the step was told to remove two parameters it
+      // had never sent.
+      expect(description).not.toContain("period_start");
+      expect(description).not.toContain("period_end");
+    });
+
+    /** @scenario "The refusal names the reserved parameter the caller actually supplied" */
+    it("names every supplied reserved parameter, and agrees in number", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "lwql_reserved_parameter_supplied",
+          meta: { parameters: ["period_start", "period_end"] },
+        }),
+      );
+
+      expect(description).toContain("period_start and period_end");
+      expect(description).toContain("come from");
+      expect(description).toContain("Remove them");
+    });
+
+    /** @scenario "meta is read only where the client knows its shape" */
+    it("still says something useful when the supplied names are absent", () => {
+      const { title, description } = explainHandledError(
+        shape({ code: "lwql_reserved_parameter_supplied", meta: {} }),
+      );
+
+      expect(title.length).toBeGreaterThan(0);
+      expect(description).toContain("Remove them from your parameters");
+    });
+
     /** @scenario "meta is read only where the client knows its shape" */
     it("ignores meta of the wrong type rather than rendering it", () => {
       const { description } = explainHandledError(

@@ -266,9 +266,12 @@ func (a *Agent) Stream(ctx context.Context, _ app.Endpoint, _ string, sink app.C
 				if mErr != nil {
 					continue
 				}
-				if !emitFrame(hb) {
-					return
-				}
+				// A failed beat is never a reason to stop beating. The sink
+				// absorbs a broken push and reconnects on a later frame, so
+				// giving up here would leave the rest of the turn with no
+				// liveness at all, and the control plane ends a turn whose
+				// heartbeat goes stale. Only the turn ending stops the ticker.
+				emitFrame(hb)
 			}
 		}
 	}()
@@ -310,15 +313,18 @@ func (a *Agent) Stream(ctx context.Context, _ app.Endpoint, _ string, sink app.C
 }
 
 // consumeEvent maps one wire event onto frames. isDone reports that the turn is
-// over (terminal seen, or the relay push broke) and err is the turn's mapped
-// outcome.
+// over (terminal seen) and err is the turn's mapped outcome.
 func (a *Agent) consumeEvent(ctx context.Context, st *streamState, ev wireEvent) (isDone bool, err error) {
 	if isTerminal(ev.Type) {
 		return true, a.finishTurn(ctx, st, ev)
 	}
-	if !st.apply(ev) {
-		return true, nil // relay push broke; the liveness path owns the turn now.
-	}
+	// A failed emit must NOT end the turn: the worker is still executing, and
+	// concluding here made driveTurn post a completed durable final for a turn
+	// that was mid-tool, release the worker, and let the idle reaper kill it
+	// while it worked. The app's sink absorbs push failures and reconnects on
+	// its own, so an emit "failure" is only a dropped live frame — keep
+	// consuming to the real terminal; the durable fold stays complete.
+	_ = st.apply(ev)
 	return false, nil
 }
 

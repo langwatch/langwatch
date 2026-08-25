@@ -603,6 +603,9 @@ export class LangyTurnRelay {
           backstopSilentTurn: (frame.text ?? "").trim() === "",
         });
         const text = backstopped ? LANGY_EMPTY_TURN_FALLBACK : frame.text;
+        // markEnd first: it flushes the last tokens, so the turn's own account
+        // of what happened when is complete on the stream before the ingest
+        // reads it back to record the parts in that order.
         await this.deps.conversations.ingestAgentTurnResult({
           projectId,
           conversationId,

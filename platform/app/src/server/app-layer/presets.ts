@@ -31,6 +31,7 @@ import { createLangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import { createLangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import { createLangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
 import { createLangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
+import { createLangyTurnOrderReader } from "~/server/app-layer/langy/streaming/langyTurnOrder";
 import { OpsExplainClickHouseRepository } from "~/server/app-layer/ops/repositories/ops-explain.clickhouse.repository";
 import { InstanceUsageStatsClickHouseRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
 import {
@@ -222,6 +223,10 @@ import { PrismaGithubInstallationsRepository } from "./github/repositories/githu
 import { NullGithubInstallationsRepository } from "./github/repositories/github-installations.repository";
 import { PrismaGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.prisma.repository";
 import { NullGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
+import { PrismaIdentityHeadsRepository } from "./identity/repositories/identity-heads.prisma.repository";
+import { PrismaIdentityProjectionRepository } from "./identity/repositories/identity-projection.prisma.repository";
+import { PrismaIdentityReservationRepository } from "./identity/repositories/identity-reservations.prisma.repository";
+import { PrismaIdentityUsersRepository } from "./identity/repositories/identity-users.prisma.repository";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import {
   createLangyTrustedMessageReader,
@@ -541,7 +546,7 @@ export function initializeDefaultApp(options?: {
     "LogRecordStorageService",
   );
   const experiments = traced(
-    ExperimentService.create(prisma),
+    ExperimentService.create({ prisma, broadcaster: broadcast }),
     "ExperimentService",
   );
   const organizations = traced(
@@ -803,6 +808,10 @@ export function initializeDefaultApp(options?: {
     messages: createLangyTrustedMessageReader(langyMessageRepository),
   });
 
+  // The address lock is shared: the guards claim through it and the fold
+  // releases through it, so the two must be the same instance (ADR-116 §6).
+  const identityReservations = new PrismaIdentityReservationRepository(prisma);
+
   // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
   const repositories: PipelineRepositories = {
     suiteRunState: clickhouseEnabled
@@ -887,6 +896,13 @@ export function initializeDefaultApp(options?: {
     processStore: new PrismaProcessStore(prisma),
     authzGrantsWrite: new PrismaAuthzGrantsWriteRepository(prisma),
     authzAuditTrail: new PrismaAuthzAuditTrailRepository(prisma),
+    identityProjection: new PrismaIdentityProjectionRepository(
+      prisma,
+      identityReservations,
+    ),
+    identityHeads: new PrismaIdentityHeadsRepository(prisma),
+    identityUsers: new PrismaIdentityUsersRepository(prisma),
+    identityReservations,
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,
     ),
@@ -1042,8 +1058,9 @@ export function initializeDefaultApp(options?: {
   scheduler?.start();
 
   // ADR-092 stage B: the in-place system migrations. Worker-only and
-  // fire-and-forget - one pass per boot, level-triggered, so held and parked
-  // organizations retry on the restart cadence with nobody running anything.
+  // fire-and-forget - passes run until the fleet stops moving and then stop,
+  // so held and parked organizations converge here rather than on the
+  // restart cadence with nobody running anything.
   // Redis is handed in rather than read back off the App: this composes the
   // App, so `tryGetApp()` is still null here, and a null handle would make
   // the lease unacquirable and every pass a silent no-op.
@@ -1298,6 +1315,10 @@ export function initializeDefaultApp(options?: {
     langyConversationRepository,
     langyMessageRepository,
     es.getEventStore<LangyConversationProcessingEvent>() ?? null,
+    // The turn's own account of what happened when, read off the live edge at
+    // finalize so the record keeps the paragraphs written between the calls.
+    // Null without Redis: the record then keeps the calls-then-reply shape.
+    redis ? createLangyTurnOrderReader(langyTokenBuffer) : null,
   );
   const langyMessages = new LangyMessageService(
     langyMessageRepository,
@@ -2029,7 +2050,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         legacyBackend: new ClickHouseAnalyticsService(null),
       }),
     },
-    experiments: ExperimentService.create(testPrisma),
+    experiments: ExperimentService.create({
+      prisma: testPrisma,
+      broadcaster: testBroadcast,
+    }),
     triggers: new TriggerService(new NullTriggerRepository()),
     emailSuppressions: new EmailSuppressionService(
       new NullEmailSuppressionRepository(),

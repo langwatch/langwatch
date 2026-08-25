@@ -1,19 +1,20 @@
 /**
- * The plan checklist — the spine of a multi-step turn.
+ * The plan checklist — what a multi-step turn said it would do, and where it is.
  *
- * When a turn's message carries a `todowrite` plan (folded by `langyPlan`), this
- * card replaces the flat activity list: the steps render as a checklist, and the
- * tool/capability cards that ran under each step nest beneath it. The rules the
- * design plan sets:
+ * The checklist is the steps and nothing else. It used to nest each step's tool
+ * cards under it, which put the same card in two places once the transcript
+ * started carrying every call where it happened (logic/langyTranscript.ts). The
+ * rules the design plan sets, minus the nesting:
  *
- *   - completed → green check, one collapsed line (click to re-expand its work);
- *   - in-progress → pulsing dot + the brand shimmer, EXPANDED with its nested
- *     cards; the only step whose work is shown by default while the turn runs;
+ *   - completed → green check, one line;
+ *   - in-progress → pulsing dot + the brand shimmer;
  *   - pending → dimmed, no dot;
  *   - cancelled → struck through, dimmed, and NOT counted toward the total.
  *
- * The card is a compact live receipt by default: progress plus the current
- * step. Clicking it reveals the whole checklist and its historical work. A
+ * While the turn runs the card is open and LangyPanel holds it above the
+ * composer, so a plan does not scroll away on the long turns that have one. It
+ * folds to a compact receipt — progress plus the current step — once the turn
+ * settles; clicking it either way pins the reader's choice. A
  * settled-but-incomplete turn (a failure/handoff) freezes honestly: nothing
  * pulses and no step is invented.
  *
@@ -30,7 +31,6 @@ import type {
   LangyPlanItem,
   LangyPlanItemStatus,
 } from "../logic/langyPlan";
-import { LangyActivityParts } from "./LangyToolActivity";
 import { langyThinkingShimmerStyles } from "./langyShimmer";
 
 const dotPulse = keyframes`
@@ -63,9 +63,17 @@ export function LangyPlanCard({
   isStreaming?: boolean;
 }) {
   const reduce = useReducedMotion();
-  // A plan is a small status receipt first; the checklist is available on
-  // demand. This keeps a three-step task from becoming the whole conversation.
-  const [cardOpen, setCardOpen] = useState(false);
+  // While the turn runs, the card is OPEN: the reader is watching work happen,
+  // and every command the agent ran is nested in here. Closed, a turn that
+  // spent four minutes running twenty commands showed one line and a wall of
+  // narration with nothing between the paragraphs — and once the last step
+  // completed there was no current step left to show either. A settled turn in
+  // a scrolled-back transcript is a status receipt again, with the checklist
+  // one click away. Either way the reader's own click wins from then on.
+  const [cardOpenOverride, setCardOpenOverride] = useState<boolean | null>(
+    null,
+  );
+  const cardOpen = cardOpenOverride ?? isStreaming;
   const currentItem =
     plan.currentIndex >= 0 ? plan.items[plan.currentIndex] : undefined;
 
@@ -79,15 +87,12 @@ export function LangyPlanCard({
       <PlanOverline
         completed={plan.completedCount}
         total={plan.totalCount}
-        onToggle={() => setCardOpen((value) => !value)}
+        onToggle={() => setCardOpenOverride(!cardOpen)}
         expanded={cardOpen}
       />
 
       {cardOpen ? (
         <>
-          {plan.preamble.length > 0 ? (
-            <LangyActivityParts parts={plan.preamble} live={isStreaming} />
-          ) : null}
           <VStack align="stretch" gap={1.5} role="list">
             {plan.items.map((item, index) => (
               <PlanStep
@@ -95,7 +100,6 @@ export function LangyPlanCard({
                 item={item}
                 isCurrent={index === plan.currentIndex}
                 isStreaming={isStreaming}
-                nestedParts={plan.itemParts[index] ?? []}
                 reduce={reduce}
               />
             ))}
@@ -127,7 +131,6 @@ export function LangyPlanCard({
           item={currentItem}
           isCurrent
           isStreaming={isStreaming}
-          nestedParts={plan.itemParts[plan.currentIndex] ?? []}
           reduce={reduce}
         />
       ) : null}
@@ -213,22 +216,13 @@ function PlanStep({
   item,
   isCurrent,
   isStreaming,
-  nestedParts,
   reduce,
 }: {
   item: LangyPlanItem;
   isCurrent: boolean;
   isStreaming: boolean;
-  nestedParts: readonly unknown[];
   reduce: boolean;
 }) {
-  const hasNested = nestedParts.length > 0;
-  // The current step opens its work by default; a completed step is a line you
-  // can click open. A pending/cancelled step has nothing to open.
-  const canExpand = hasNested && !isCurrent;
-  const [open, setOpen] = useState(false);
-  const showNested = hasNested && (isCurrent || open);
-
   const pulsing = isCurrent && isStreaming;
   const shimmer = reduce
     ? { ...langyThinkingShimmerStyles, animation: "none" }
@@ -313,52 +307,12 @@ function PlanStep({
     </Text>
   );
 
-  const header = (
-    <HStack gap={2} align="center">
-      {marker}
-      {rowText}
-      {canExpand ? (
-        <Box
-          as="span"
-          color="fg.subtle"
-          transition="transform 0.18s ease"
-          transform={open ? "rotate(90deg)" : undefined}
-          flexShrink={0}
-          display="flex"
-        >
-          <ChevronRight size={12} />
-        </Box>
-      ) : null}
-    </HStack>
-  );
-
   return (
     <Box role="listitem">
-      {canExpand ? (
-        <chakra.button
-          type="button"
-          width="full"
-          textAlign="left"
-          cursor="pointer"
-          aria-expanded={open}
-          onClick={() => setOpen((v) => !v)}
-          _focusVisible={{
-            outline: "2px solid",
-            outlineColor: "orange.solid",
-            outlineOffset: "2px",
-            borderRadius: "4px",
-          }}
-        >
-          {header}
-        </chakra.button>
-      ) : (
-        header
-      )}
-      {showNested ? (
-        <Box paddingLeft="20px" paddingTop={2}>
-          <LangyActivityParts parts={nestedParts} live={isStreaming} />
-        </Box>
-      ) : null}
+      <HStack gap={2} align="center">
+        {marker}
+        {rowText}
+      </HStack>
     </Box>
   );
 }

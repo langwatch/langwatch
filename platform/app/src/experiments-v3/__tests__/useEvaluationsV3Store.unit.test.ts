@@ -6,6 +6,7 @@ import {
   type DatasetReference,
   DEFAULT_TEST_DATA_ID,
   type EvaluatorConfig,
+  type LocalPromptConfig,
   type TargetConfig,
 } from "../types";
 
@@ -251,6 +252,13 @@ describe("useEvaluationsV3Store", () => {
       mappings: {},
     });
 
+    const createTestPromptConfig = (): LocalPromptConfig => ({
+      llm: { model: "openai/gpt-5-mini" },
+      messages: [{ role: "user", content: "Answer {{input}}" }],
+      inputs: [{ identifier: "input", type: "str" }],
+      outputs: [{ identifier: "output", type: "str" }],
+    });
+
     it("adds a target", () => {
       const store = useEvaluationsV3Store.getState();
       store.addTarget(createTestTarget("target-1"));
@@ -319,6 +327,39 @@ describe("useEvaluationsV3Store", () => {
 
       const state = useEvaluationsV3Store.getState();
       expect(state.targets).toHaveLength(0);
+    });
+
+    it("writes a target's prompt draft", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.addTarget(createTestTarget("target-1"));
+      store.setTargetPrompt({
+        targetId: "target-1",
+        localPromptConfig: createTestPromptConfig(),
+      });
+
+      const state = useEvaluationsV3Store.getState();
+      const target = state.targets.find((t) => t.id === "target-1");
+      expect(target?.localPromptConfig?.messages[0]?.content).toBe(
+        "Answer {{input}}",
+      );
+    });
+
+    // The UI store answers an unknown id with a silent no-op. Only
+    // applyWorkbenchAction reports the refusal, because its caller is a machine
+    // that needs the reason.
+    it("keeps the targets untouched when the prompt names an unknown target", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.addTarget(createTestTarget("target-1"));
+      const before = useEvaluationsV3Store.getState().targets;
+
+      expect(() =>
+        store.setTargetPrompt({
+          targetId: "target-does-not-exist",
+          localPromptConfig: createTestPromptConfig(),
+        }),
+      ).not.toThrow();
+
+      expect(useEvaluationsV3Store.getState().targets).toEqual(before);
     });
 
     it("sets target mapping for specific dataset", () => {

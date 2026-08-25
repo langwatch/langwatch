@@ -16,7 +16,10 @@ import {
   isModelAllowedAsRoleDefault,
   isModelAllowedForFeature,
 } from "./codexRestrictions";
-import { ModelDefaultScopeForbiddenError } from "./errors";
+import {
+  ModelDefaultScopeForbiddenError,
+  ModelDefaultUserKeyRequiredError,
+} from "./errors";
 import {
   allFeatures,
   featureByKey,
@@ -53,7 +56,7 @@ export async function assertCanWriteScope(
   scopeId: string,
 ): Promise<void> {
   if (!ctx.session?.user?.id) {
-    throw new Error("Not authenticated");
+    throw new ModelDefaultUserKeyRequiredError();
   }
   if (scopeType === "ORGANIZATION") {
     if (
