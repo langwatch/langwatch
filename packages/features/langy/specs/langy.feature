@@ -26,3 +26,17 @@ Feature: Langy service capability
     When a transport lists conversations, starts a turn, or ingests a relay result
     Then it calls the corresponding LangyService method directly
     And it does not reach through a subordinate capability property
+
+  Scenario: feedback prompt keeps its existing cadence
+    Given a process-owned LangyService with Redis available
+    When feedback is checked after an assistant answer
+    Then it never asks before two assistant answers
+    And a shown card starts a three-day per-user quiet period
+    And a long conversation may ask once in another conversation
+    And the cadence record expires after thirty days
+
+  Scenario: feedback prompt is safe when Redis is unavailable
+    Given a process-owned LangyService without readable Redis
+    When feedback is checked or marked shown
+    Then the read returns false
+    And the write does not throw

@@ -112,7 +112,6 @@ import { LwqlKeyMapService } from "~/server/analytics/lwql/lwql-key-map.service"
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import { liveTriggerNotifier } from "~/server/app-layer/automations/delivery/triggerNotifier";
-import { LangyFeedbackPromptService } from "~/server/app-layer/langy/langy-feedback-prompt.service";
 import { resolveNavigateFallbackUrl } from "~/server/app-layer/langy/streaming/langyNavigateFallback";
 import { resolveLangyCapabilityProgress } from "~/server/app-layer/langy/langy-capability-progress";
 import { createAppLangyCredentialComposition } from "~/server/app-layer/langy/langy-credential-adapters";
@@ -1642,8 +1641,6 @@ export function initializeDefaultApp(options?: {
     });
   }
 
-  const langyFeedbackPrompt = new LangyFeedbackPromptService({ redis });
-
   // The organization's GitHub connection: the install/webhook lifecycle, and
   // the token mints Langy (write) and pull-request linkage (read) ask for. The
   // App is optional per instance; when the private key is unset the service
@@ -1721,7 +1718,7 @@ export function initializeDefaultApp(options?: {
         handoffStore: redis ? langyHandoffStore : null,
         messages: ports.messages,
       }),
-    feedbackPrompt: langyFeedbackPrompt,
+    feedbackPromptRedis: redis,
   });
 
   const suiteRunService = SuiteRunService.create({
@@ -2716,7 +2713,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
           env.LW_GATEWAY_BASE_URL,
         mirrorProjectId: env.LANGY_MIRROR_PROJECT_ID,
       }),
-      feedbackPrompt: new LangyFeedbackPromptService({ redis: null }),
+      feedbackPromptRedis: null,
     }),
     organizations: nullOrganizations,
       projects: testProjects,

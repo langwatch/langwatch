@@ -549,7 +549,6 @@
     {"feature":"langy","file":"platform/app/src/server/app-layer/langy/execution/githubCommand.ts","kind":"legacy-implementation"},
     {"feature":"langy","file":"platform/app/src/server/app-layer/langy/langy-credential-adapters.ts","kind":"legacy-implementation"},
     {"feature":"langy","file":"platform/app/src/server/app-layer/langy/langy-credential.test-adapter.ts","kind":"legacy-implementation"},
-    {"feature":"langy","file":"platform/app/src/server/app-layer/langy/langy-feedback-prompt.service.ts","kind":"legacy-implementation"},
     {"feature":"langy","file":"platform/app/src/server/app-layer/langy/langy-title-generation.service.ts","kind":"legacy-implementation"},
     {"feature":"langy","file":"platform/app/src/server/app-layer/langy/langy-turn-attempt.ts","kind":"legacy-implementation"},
     {"feature":"langy","file":"platform/app/src/server/app-layer/langy/langy-turn-base-dependencies.ts","kind":"legacy-implementation"},

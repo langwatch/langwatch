@@ -7,6 +7,7 @@ import {
   RelayRepository,
   TurnRepository,
 } from "../src/repositories/langy.repository";
+import { LangyFeedbackPromptPolicy } from "../src/ports/langy-feedback-prompt.port";
 
 const conversation = {
   id: "conversation_1",
@@ -58,7 +59,29 @@ function service() {
     credentials: new Credentials(),
     relay: new Relay(),
   };
-  return { service: LangyService.create(repositories), repositories };
+  return {
+    service: LangyService.create(
+      repositories,
+      LangyFeedbackPromptPolicy.create({ redis: null }),
+    ),
+    repositories,
+  };
+}
+
+function feedbackPrompt() {
+  const values = new Map<string, string>();
+  return {
+    service: LangyFeedbackPromptPolicy.create({
+      redis: {
+        get: async (key) => values.get(key) ?? null,
+        set: async (key, value) => {
+          values.set(key, value);
+          return "OK";
+        },
+      },
+    }),
+    values,
+  };
 }
 
 describe("LangyService", () => {
@@ -107,5 +130,30 @@ describe("LangyService", () => {
       }),
     ).rejects.toMatchObject({ code: "langy_conversation_not_found" });
     expect(repositories.messages.list).not.toHaveBeenCalled();
+  });
+
+  it("owns feedback cadence on the flat service boundary", async () => {
+    const repositories = {
+      conversations: new Conversations(),
+      turns: new Turns(),
+      messages: new Messages(),
+      credentials: new Credentials(),
+      relay: new Relay(),
+    };
+    const prompt = feedbackPrompt();
+    const langy = LangyService.create(repositories, prompt.service);
+
+    await expect(
+      langy.shouldAskFeedback({
+        userId: "user_1",
+        conversationId: "conversation_1",
+        assistantAnswerCount: 2,
+      }),
+    ).resolves.toBe(true);
+    await langy.markFeedbackShown({
+      userId: "user_1",
+      conversationId: "conversation_1",
+    });
+    expect(prompt.values.get("langy:feedback:last-asked:user_1")).toBeDefined();
   });
 });

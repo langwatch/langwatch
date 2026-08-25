@@ -60,6 +60,7 @@ import {
   LangyTurnRelay,
   type LangyRelayRedis,
 } from "../streaming/langy-turn-relay";
+import { LangyFeedbackPromptPolicy } from "../ports/langy-feedback-prompt.port";
 
 export type LangyRelayCompositionOptions = {
   redis: LangyRelayRedis;
@@ -209,14 +210,6 @@ type AppCapabilities = {
   credentials: {
     tryGetModelsAllowedForProject(projectId: string): Promise<string[] | null>;
   };
-  feedbackPrompt: {
-    shouldAsk(input: {
-      userId: string;
-      conversationId: string;
-      assistantAnswerCount: number;
-    }): Promise<boolean>;
-    markShown(input: { userId: string; conversationId: string }): Promise<void>;
-  };
 };
 
 export type LangyLegacyCapabilities = {
@@ -224,7 +217,6 @@ export type LangyLegacyCapabilities = {
   turns: object;
   messages: object;
   credentials: object;
-  feedbackPrompt: object;
 };
 
 type SelectedCapabilities<C> = C extends LangyLegacyCapabilities ? C : never;
@@ -234,10 +226,10 @@ export class LangyService<Capabilities = never> extends LangyServiceContract {
   declare readonly turns: SelectedCapabilities<Capabilities>["turns"];
   declare readonly messages: SelectedCapabilities<Capabilities>["messages"];
   declare readonly credentials: SelectedCapabilities<Capabilities>["credentials"];
-  declare readonly feedbackPrompt: SelectedCapabilities<Capabilities>["feedbackPrompt"];
 
   private constructor(
     private readonly repositories: Repositories | null,
+    private readonly feedbackPrompt: LangyFeedbackPromptPolicy,
     capabilities?: Capabilities,
     private readonly relayOptions: LangyRelayCompositionOptions | null = null,
   ) {
@@ -247,16 +239,21 @@ export class LangyService<Capabilities = never> extends LangyServiceContract {
     }
   }
 
-  static create(options: Repositories): LangyService {
-    return new LangyService(options);
+  static create(
+    options: Repositories,
+    feedbackPrompt: LangyFeedbackPromptPolicy,
+  ): LangyService {
+    return new LangyService(options, feedbackPrompt);
   }
 
   static compose<Capabilities extends LangyLegacyCapabilities>(
     capabilities: Capabilities,
+    feedbackPrompt: LangyFeedbackPromptPolicy,
     relayOptions?: LangyRelayCompositionOptions,
   ): LangyService<Capabilities> {
     return new LangyService<Capabilities>(
       null,
+      feedbackPrompt,
       capabilities,
       relayOptions ?? null,
     );
@@ -481,15 +478,19 @@ export class LangyService<Capabilities = never> extends LangyServiceContract {
   }
 
   shouldAskFeedback(
-    input: Parameters<AppCapabilities["feedbackPrompt"]["shouldAsk"]>[0],
+    input: {
+      userId: string;
+      conversationId: string;
+      assistantAnswerCount: number;
+    },
   ): Promise<boolean> {
-    return this.appCapabilities().feedbackPrompt.shouldAsk(input);
+    return this.feedbackPrompt.shouldAsk(input);
   }
 
   markFeedbackShown(
-    input: Parameters<AppCapabilities["feedbackPrompt"]["markShown"]>[0],
+    input: { userId: string; conversationId: string },
   ): Promise<void> {
-    return this.appCapabilities().feedbackPrompt.markShown(input);
+    return this.feedbackPrompt.markShown(input);
   }
 
   turnExists(

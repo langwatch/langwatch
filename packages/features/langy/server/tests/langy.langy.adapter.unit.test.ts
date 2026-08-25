@@ -45,7 +45,7 @@ function composition(turns: (ports: LangyTurnCompositionPorts) => object) {
       },
     }),
     turns,
-    feedbackPrompt: {},
+    feedbackPromptRedis: null,
   };
 }
 

@@ -19,6 +19,10 @@ import {
   type LangyConversationRuntime,
   type LangyRelayCompositionOptions,
 } from "../services/langy.service";
+import {
+  LangyFeedbackPromptPolicy,
+  type LangyFeedbackPromptRedis,
+} from "../ports/langy-feedback-prompt.port";
 import { LangyConversationService } from "../services/langy-conversation.service";
 import { LangyMessageService } from "../services/langy-message.service";
 import { LangyFinalPartsService } from "../services/langy-final-parts.service";
@@ -90,7 +94,6 @@ export type LangyTurnComposition = (
 export interface LangyCompositionCapabilities {
   turns: LangyTurnComposition;
   credentials: LangyCredentialComposition;
-  feedbackPrompt: object;
 }
 
 /** Generic capabilities needed before the Langy command pipeline is bound. */
@@ -108,6 +111,7 @@ export interface LangyServiceCompositionOptions
   events?: LangyConversationEventsReader | null;
   runtime?: LangyConversationRuntime;
   relay?: LangyRelayCompositionOptions;
+  feedbackPromptRedis?: LangyFeedbackPromptRedis | null;
 }
 
 export interface PostgresLangyAdapterOptions {
@@ -203,9 +207,14 @@ export class PostgresLangyAdapter {
       }),
       messages,
       credentials,
-      feedbackPrompt: options.feedbackPrompt,
     };
-    this.service = LangyService.compose(capabilities, options.relay);
+    this.service = LangyService.compose(
+      capabilities,
+      LangyFeedbackPromptPolicy.create({
+        redis: options.feedbackPromptRedis ?? null,
+      }),
+      options.relay,
+    );
     return this.service;
   }
 }
