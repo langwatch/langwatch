@@ -147,7 +147,7 @@ export interface StatusDocument {
 }
 
 export const statusCommand = async (options?: RawOutputFlags): Promise<void> => {
-  await resolveCredentials();
+  const credentials = await resolveCredentials();
 
   const apiClient = createLangWatchApiClient();
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
@@ -163,9 +163,21 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     advisories: {},
   };
 
-  async function fetchCount(url: string): Promise<{ data: unknown; error?: unknown; status?: number }> {
+  async function fetchCount(
+    url: string,
+    options?: { method?: "GET" | "POST"; body?: unknown },
+  ): Promise<{ data: unknown; error?: unknown; status?: number }> {
     const response = await fetch(`${endpoint}${url}`, {
-      headers: buildAuthHeaders({ apiKey }),
+      method: options?.method,
+      headers: {
+        ...buildAuthHeaders({ apiKey, projectId: credentials.projectId }),
+        ...(options?.body === undefined
+          ? {}
+          : { "Content-Type": "application/json" }),
+      },
+      ...(options?.body === undefined
+        ? {}
+        : { body: JSON.stringify(options.body) }),
     });
     if (!response.ok) {
       let body: unknown;
@@ -416,7 +428,14 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     { key: "dashboards", fn: () => apiClient.GET("/api/dashboards") },
     { key: "triggers", fn: () => fetchCount("/api/triggers") },
     { key: "monitors", fn: () => fetchCount("/api/monitors") },
-    { key: "secrets", fn: () => fetchCount("/api/secrets") },
+    {
+      key: "secrets",
+      fn: () =>
+        fetchCount("/api/secrets/latest/secrets.list", {
+          method: "POST",
+          body: { projectId: credentials.projectId },
+        }),
+    },
   ];
 
   // Same reason as `fetchers` above: the three return number |

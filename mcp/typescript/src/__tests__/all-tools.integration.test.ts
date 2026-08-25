@@ -593,22 +593,39 @@ function createMockServer(): Server {
         res.end(JSON.stringify({ id: monitorId, deleted: true }));
       }
       // --- Secret endpoints ---
-      else if (url === "/api/secrets" && method === "GET") {
+      else if (
+        url === "/api/secrets/latest/secrets.list" &&
+        method === "POST"
+      ) {
         res.writeHead(200);
         res.end(JSON.stringify([
           { id: "secret_abc", projectId: "proj_123", name: "MY_API_KEY", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" },
           { id: "secret_def", projectId: "proj_123", name: "DB_PASSWORD", createdAt: "2026-01-02T00:00:00Z", updatedAt: "2026-01-02T00:00:00Z" },
         ]));
-      } else if (url === "/api/secrets" && method === "POST") {
+      } else if (
+        url === "/api/secrets/latest/secrets.get" &&
+        method === "POST"
+      ) {
+        res.writeHead(200);
+        res.end(JSON.stringify({ id: "secret_abc", projectId: "proj_123", name: "MY_API_KEY", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }));
+      } else if (
+        url === "/api/secrets/latest/secrets.create" &&
+        method === "POST"
+      ) {
         res.writeHead(201);
         res.end(JSON.stringify({ id: "secret_new", projectId: "proj_123", name: "NEW_SECRET", createdAt: "2026-01-03T00:00:00Z", updatedAt: "2026-01-03T00:00:00Z" }));
-      } else if (url?.match(/^\/api\/secrets\/[^/]+$/) && method === "PUT") {
+      } else if (
+        url === "/api/secrets/latest/secrets.update" &&
+        method === "POST"
+      ) {
         res.writeHead(200);
         res.end(JSON.stringify({ id: "secret_abc", projectId: "proj_123", name: "MY_API_KEY", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-03T00:00:00Z" }));
-      } else if (url?.match(/^\/api\/secrets\/[^/]+$/) && method === "DELETE") {
-        const secretId = url?.split("/").pop();
+      } else if (
+        url === "/api/secrets/latest/secrets.delete" &&
+        method === "POST"
+      ) {
         res.writeHead(200);
-        res.end(JSON.stringify({ id: secretId, deleted: true }));
+        res.end(JSON.stringify({ id: "secret_abc", deleted: true }));
       }
       // --- Fallback ---
       else {
@@ -638,6 +655,7 @@ describe("All MCP tools integration", () => {
         initConfig({
           apiKey: "test-integration-key",
           endpoint: `http://localhost:${port}`,
+          projectId: "proj_123",
         });
         resolve();
       });
@@ -1400,6 +1418,7 @@ describe("All MCP tools integration", () => {
       initConfig({
         apiKey: "test-integration-key",
         endpoint: `http://localhost:${port}`,
+        projectId: "proj_123",
       });
     });
 
@@ -1407,6 +1426,7 @@ describe("All MCP tools integration", () => {
       initConfig({
         apiKey: "bad-key",
         endpoint: `http://localhost:${port}`,
+        projectId: "proj_123",
       });
 
       const { handleSearchTraces } = await import(
@@ -1421,6 +1441,7 @@ describe("All MCP tools integration", () => {
       initConfig({
         apiKey: "bad-key",
         endpoint: `http://localhost:${port}`,
+        projectId: "proj_123",
       });
 
       const { handleListEvaluators } = await import(
@@ -1433,6 +1454,7 @@ describe("All MCP tools integration", () => {
       initConfig({
         apiKey: "bad-key",
         endpoint: `http://localhost:${port}`,
+        projectId: "proj_123",
       });
 
       const { handleListModelProviders } = await import(

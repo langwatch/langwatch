@@ -4,7 +4,7 @@
  *
  * Feature: specs/typescript-sdk/cli-cross-project-access.feature
  */
-import { readCliErrorDocument } from "@langwatch/langy/cards/handled-error";
+import { readCliErrorDocument } from "@langwatch/langy-contract/cards/handled-error";
 import { describe, expect, it } from "vitest";
 import {
   installCrossProjectHarness,

@@ -64,7 +64,11 @@ function normalizeEndpoint(endpoint: string): string {
   return trimmed.slice(0, end);
 }
 
-export function initConfig(args: { apiKey?: string; endpoint?: string }): void {
+export function initConfig(args: {
+  apiKey?: string;
+  endpoint?: string;
+  projectId?: string;
+}): void {
   const state = getGlobalState();
   state.globalConfig = {
     apiKey: args.apiKey || process.env.LANGWATCH_API_KEY,
@@ -72,7 +76,7 @@ export function initConfig(args: { apiKey?: string; endpoint?: string }): void {
       normalizeEndpoint(args.endpoint ?? "") ||
       normalizeEndpoint(process.env.LANGWATCH_ENDPOINT ?? "") ||
       "https://app.langwatch.ai",
-    projectId: process.env.LANGWATCH_PROJECT_ID,
+    projectId: args.projectId ?? process.env.LANGWATCH_PROJECT_ID,
   };
 }
 

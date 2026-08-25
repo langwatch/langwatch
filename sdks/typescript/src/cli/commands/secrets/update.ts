@@ -20,7 +20,10 @@ export const updateSecretCommand = async (
   id: string,
   options: { value: string }
 ): Promise<CommandResult | void> => {
-  await resolveCredentials();
+  const credentials = await resolveCredentials();
+  if (!credentials.projectId) {
+    throw new Error("A project must be selected for secret operations");
+  }
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   const endpoint =
@@ -29,13 +32,17 @@ export const updateSecretCommand = async (
   const spinner = createSpinner(`Updating secret "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/secrets/${id}`, {
-      method: "PUT",
+    const response = await fetch(`${endpoint}/api/secrets/latest/secrets.update`, {
+      method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...buildAuthHeaders({ apiKey }),
       },
-      body: JSON.stringify({ value: options.value }),
+      body: JSON.stringify({
+        projectId: credentials.projectId,
+        id,
+        value: options.value,
+      }),
     });
 
     if (!response.ok) {

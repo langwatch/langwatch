@@ -35,13 +35,16 @@
     "typecheck:all": "pnpm --filter @langwatch/web typecheck:all",
     "lint": "pnpm --filter @langwatch/web lint && pnpm lint:architecture",
     "lint:architecture": "oxlint --quiet --config .oxlintrc.architecture.json packages/features packages/enterprise packages/config packages/design-system packages/prisma-client/src packages/runtime-composition/src platform/app/src && pnpm --filter @langwatch/architecture-lint lint",
+    "lint:architecture:declarations": "pnpm --filter @langwatch/architecture-lint lint:declarations",
+    "lint:architecture:migration": "pnpm --filter @langwatch/architecture-lint lint:migration",
     "lint:fix": "pnpm --filter @langwatch/web lint:fix",
     "format": "pnpm --filter @langwatch/web format",
     "prepare:files": "pnpm --filter @langwatch/web start:prepare:files",
     "prisma:migrate": "pnpm --filter @langwatch/web prisma:migrate",
     "prisma:seed": "pnpm --filter @langwatch/web prisma:seed",
     "pack:npm": "bash dev/scripts/pack-npm.sh",
-    "release:dry-run": "bash dev/scripts/pack-npm.sh && tar -tzf langwatch-server-*.tgz | head -50"
+    "release:dry-run": "bash dev/scripts/pack-npm.sh && tar -tzf langwatch-server-*.tgz | head -50",
+    "refactor:rename-package": "pnpm --filter @langwatch/architecture-lint rename-package --root ../.."
   },
   "devDependencies": {
     "@0xdeafcafe/tslsp-cli": "0.6.0",

@@ -15,7 +15,10 @@ import type { CommandResult } from "../../utils/output";
 export const deleteSecretCommand = async (
   id: string,
 ): Promise<CommandResult | void> => {
-  await resolveCredentials();
+  const credentials = await resolveCredentials();
+  if (!credentials.projectId) {
+    throw new Error("A project must be selected for secret operations");
+  }
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   const endpoint =
@@ -24,9 +27,13 @@ export const deleteSecretCommand = async (
   const spinner = createSpinner(`Deleting secret "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/secrets/${id}`, {
-      method: "DELETE",
-      headers: buildAuthHeaders({ apiKey }),
+    const response = await fetch(`${endpoint}/api/secrets/latest/secrets.delete`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...buildAuthHeaders({ apiKey }),
+      },
+      body: JSON.stringify({ projectId: credentials.projectId, id }),
     });
 
     if (!response.ok) {

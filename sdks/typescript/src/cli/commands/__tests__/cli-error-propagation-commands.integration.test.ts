@@ -224,7 +224,7 @@ describe("CLI error propagation across commands", () => {
 
   describe("secret create", () => {
     it("surfaces the raw body when the server omits error/message fields", async () => {
-      pushResponse("POST", "/api/secrets", {
+      pushResponse("POST", "/api/secrets/latest/secrets.create", {
         status: 500,
         body: { code: "DB_DOWN", traceId: "abc-123" },
       });

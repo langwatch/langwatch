@@ -3219,38 +3219,183 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/secrets": {
+    "/api/secrets/2026-08-24/secrets.list": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** @description List all secrets for the project (values are never returned) */
-        get: operations["getApiSecrets"];
+        get?: never;
         put?: never;
-        /** @description Create a new project secret. The value is encrypted at rest and never returned. */
-        post: operations["postApiSecrets"];
+        /**
+         * List project secrets
+         * @description Lists metadata only. Secret values are never returned.
+         */
+        post: operations["listSecrets_2026_08_24"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/secrets/{id}": {
+    "/api/secrets/2026-08-24/secrets.get": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** @description Get a secret by its ID (value is never returned) */
-        get: operations["getApiSecretsById"];
-        /** @description Update a secret's value */
-        put: operations["putApiSecretsById"];
-        post?: never;
-        /** @description Delete a secret */
-        delete: operations["deleteApiSecretsById"];
+        get?: never;
+        put?: never;
+        /** Get project-secret metadata */
+        post: operations["getSecret_2026_08_24"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/secrets/2026-08-24/secrets.create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a project secret
+         * @description Encrypts the value at rest and never returns it.
+         */
+        post: operations["createSecret_2026_08_24"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/secrets/2026-08-24/secrets.update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replace a project secret value */
+        post: operations["updateSecret_2026_08_24"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/secrets/2026-08-24/secrets.delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Delete a project secret */
+        post: operations["deleteSecret_2026_08_24"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/secrets/latest/secrets.list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * List project secrets
+         * @description Lists metadata only. Secret values are never returned.
+         */
+        post: operations["listSecrets"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/secrets/latest/secrets.get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Get project-secret metadata */
+        post: operations["getSecret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/secrets/latest/secrets.create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a project secret
+         * @description Encrypts the value at rest and never returns it.
+         */
+        post: operations["createSecret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/secrets/latest/secrets.update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replace a project secret value */
+        post: operations["updateSecret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/secrets/latest/secrets.delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Delete a project secret */
+        post: operations["deleteSecret"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -4752,6 +4897,7 @@ export interface operations {
                                 };
                             };
                         }) & {
+                            /** Format: uri */
                             platformUrl: string;
                         })[];
                         pagination: {
@@ -5475,6 +5621,7 @@ export interface operations {
                             };
                         };
                     }) & {
+                        /** Format: uri */
                         platformUrl: string;
                     };
                 };
@@ -5850,6 +5997,7 @@ export interface operations {
                             };
                         };
                     }) & {
+                        /** Format: uri */
                         platformUrl: string;
                     };
                 };
@@ -6266,6 +6414,7 @@ export interface operations {
                             };
                         };
                     }) & {
+                        /** Format: uri */
                         platformUrl: string;
                     };
                 };
@@ -6327,7 +6476,10 @@ export interface operations {
                     /** @description Human-readable name for this key */
                     name: string;
                     description?: string;
-                    /** @description ISO 8601 timestamp after which the key stops working */
+                    /**
+                     * Format: date-time
+                     * @description ISO 8601 timestamp after which the key stops working
+                     */
                     expiresAt?: string;
                     /** @description Organization admins only: the member who owns the key and whose access caps it. Defaults to the caller. */
                     assignedToUserId?: string;
@@ -6664,196 +6816,7 @@ export interface operations {
                     query?: string;
                     /** @default {} */
                     filters?: {
-                        "topics.topics"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "topics.subtopics"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.user_id"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.thread_id"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.customer_id"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.labels"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.key"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.value"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.prompt_ids"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "traces.origin"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "traces.error"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "traces.name"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "spans.type"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "spans.model"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.evaluator_id"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.evaluator_id.guardrails_only"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.evaluator_id.has_passed"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.evaluator_id.has_score"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.evaluator_id.has_label"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.passed"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.score"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.state"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.label"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "events.event_type"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "events.metrics.key"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "events.metrics.value"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "events.event_details.key"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "annotations.hasAnnotation"?: string[] | {
+                        [key: string]: string[] | {
                             [key: string]: string[];
                         } | {
                             [key: string]: {
@@ -6877,196 +6840,7 @@ export interface operations {
                             aggregation: "sum" | "avg" | "min" | "max";
                         };
                         filters?: {
-                            "topics.topics"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "topics.subtopics"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "metadata.user_id"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "metadata.thread_id"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "metadata.customer_id"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "metadata.labels"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "metadata.key"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "metadata.value"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "metadata.prompt_ids"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "traces.origin"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "traces.error"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "traces.name"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "spans.type"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "spans.model"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "evaluations.evaluator_id"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "evaluations.evaluator_id.guardrails_only"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "evaluations.evaluator_id.has_passed"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "evaluations.evaluator_id.has_score"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "evaluations.evaluator_id.has_label"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "evaluations.passed"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "evaluations.score"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "evaluations.state"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "evaluations.label"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "events.event_type"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "events.metrics.key"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "events.metrics.value"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "events.event_details.key"?: string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "annotations.hasAnnotation"?: string[] | {
+                            [key: string]: string[] | {
                                 [key: string]: string[];
                             } | {
                                 [key: string]: {
@@ -7340,8 +7114,7 @@ export interface operations {
                                 name: string;
                                 type: string;
                                 description: string;
-                                /** @enum {string|null} */
-                                unit: "ms" | "USD" | "tokens" | "tokens/s" | null;
+                                unit: ("ms" | "USD" | "tokens" | "tokens/s") | null;
                                 gates: ("input" | "output" | "costs")[];
                                 available: boolean;
                             }[];
@@ -7565,7 +7338,7 @@ export interface operations {
             content: {
                 "application/json": {
                     name: string;
-                    definition?: unknown;
+                    definition: unknown;
                 };
             };
         };
@@ -8596,7 +8369,19 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["DatasetPostEntries"];
+                "application/json": {
+                    /**
+                     * @example [
+                     *       {
+                     *         "input": "hi",
+                     *         "output": "Hello, how can I help you today?"
+                     *       }
+                     *     ]
+                     */
+                    entries: {
+                        [key: string]: unknown;
+                    }[];
+                };
             };
         };
         responses: never;
@@ -8626,7 +8411,9 @@ export interface operations {
                             entry: {
                                 [key: string]: unknown;
                             };
+                            /** Format: date-time */
                             createdAt: string;
+                            /** Format: date-time */
                             updatedAt: string;
                         }[];
                     };
@@ -8775,7 +8562,9 @@ export interface operations {
                         } | null;
                         workflowId: string | null;
                         copiedFromEvaluatorId: string | null;
+                        /** Format: date-time */
                         createdAt: string;
+                        /** Format: date-time */
                         updatedAt: string;
                         fields: {
                             identifier: string;
@@ -8879,7 +8668,9 @@ export interface operations {
                         } | null;
                         workflowId: string | null;
                         copiedFromEvaluatorId: string | null;
+                        /** Format: date-time */
                         createdAt: string;
+                        /** Format: date-time */
                         updatedAt: string;
                         fields: {
                             identifier: string;
@@ -8976,7 +8767,9 @@ export interface operations {
                         } | null;
                         workflowId: string | null;
                         copiedFromEvaluatorId: string | null;
+                        /** Format: date-time */
                         createdAt: string;
+                        /** Format: date-time */
                         updatedAt: string;
                         fields: {
                             identifier: string;
@@ -9094,7 +8887,9 @@ export interface operations {
                         } | null;
                         workflowId: string | null;
                         copiedFromEvaluatorId: string | null;
+                        /** Format: date-time */
                         createdAt: string;
+                        /** Format: date-time */
                         updatedAt: string;
                         fields: {
                             identifier: string;
@@ -10729,197 +10524,8 @@ export interface operations {
                     endDate: number;
                     query?: string;
                     /** @default {} */
-                    filters?: {
-                        "topics.topics": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "topics.subtopics": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.user_id": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.thread_id": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.customer_id": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.labels": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.key": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.value": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.prompt_ids": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "traces.origin": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "traces.error": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "traces.name": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "spans.type": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "spans.model": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.evaluator_id": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.evaluator_id.guardrails_only": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.evaluator_id.has_passed": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.evaluator_id.has_score": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.evaluator_id.has_label": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.passed": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.score": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.state": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.label": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "events.event_type": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "events.metrics.key": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "events.metrics.value": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "events.event_details.key": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "annotations.hasAnnotation": string[] | {
+                    filters: {
+                        [key: string]: string[] | {
                             [key: string]: string[];
                         } | {
                             [key: string]: {
@@ -10943,196 +10549,7 @@ export interface operations {
                             aggregation: "sum" | "avg" | "min" | "max";
                         };
                         filters?: {
-                            "topics.topics": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "topics.subtopics": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "metadata.user_id": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "metadata.thread_id": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "metadata.customer_id": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "metadata.labels": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "metadata.key": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "metadata.value": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "metadata.prompt_ids": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "traces.origin": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "traces.error": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "traces.name": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "spans.type": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "spans.model": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "evaluations.evaluator_id": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "evaluations.evaluator_id.guardrails_only": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "evaluations.evaluator_id.has_passed": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "evaluations.evaluator_id.has_score": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "evaluations.evaluator_id.has_label": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "evaluations.passed": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "evaluations.score": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "evaluations.state": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "evaluations.label": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "events.event_type": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "events.metrics.key": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "events.metrics.value": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "events.event_details.key": string[] | {
-                                [key: string]: string[];
-                            } | {
-                                [key: string]: {
-                                    [key: string]: string[];
-                                };
-                            };
-                            "annotations.hasAnnotation": string[] | {
+                            [key: string]: string[] | {
                                 [key: string]: string[];
                             } | {
                                 [key: string]: {
@@ -11662,197 +11079,8 @@ export interface operations {
                      * @description Which traces the trigger fires on. An empty object fires on all of them.
                      * @default {}
                      */
-                    filters?: {
-                        "topics.topics": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "topics.subtopics": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.user_id": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.thread_id": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.customer_id": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.labels": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.key": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.value": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.prompt_ids": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "traces.origin": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "traces.error": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "traces.name": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "spans.type": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "spans.model": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.evaluator_id": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.evaluator_id.guardrails_only": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.evaluator_id.has_passed": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.evaluator_id.has_score": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.evaluator_id.has_label": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.passed": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.score": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.state": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.label": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "events.event_type": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "events.metrics.key": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "events.metrics.value": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "events.event_details.key": string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "annotations.hasAnnotation": string[] | {
+                    filters: {
+                        [key: string]: string[] | {
                             [key: string]: string[];
                         } | {
                             [key: string]: {
@@ -12170,20 +11398,15 @@ export interface operations {
                             routing_policy_id: string | null;
                             /** @enum {string} */
                             routing_mode: "none" | "fallback_all" | "policy";
-                            config?: unknown;
+                            config: unknown;
                             revision: string;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
                             updated_at: string;
-                            /** Format: date-time */
                             last_used_at: string | null;
-                            /** Format: date-time */
                             revoked_at: string | null;
-                            /**
-                             * Format: date-time
-                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
-                             */
+                            /** @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended. */
                             expires_at: string | null;
                         }[];
                         /** @description Pass back as `cursor` for the next page. Null means the walk is exhausted; a full page does NOT mean there is more. */
@@ -12298,7 +11521,10 @@ export interface operations {
                     routing_policy_id?: string | null;
                     /** @enum {string} */
                     routing_mode?: "none" | "fallback_all" | "policy";
-                    /** @description When the key stops serving. Omit it and the key never expires. A date that has already passed is refused with `virtual_key_expiry_in_past`, rather than writing a key that is dead on arrival. */
+                    /**
+                     * Format: date-time
+                     * @description When the key stops serving. Omit it and the key never expires. A date that has already passed is refused with `virtual_key_expiry_in_past`, rather than writing a key that is dead on arrival.
+                     */
                     expires_at?: string;
                     budget?: {
                         limit_usd: number | string;
@@ -12368,11 +11594,6 @@ export interface operations {
                             /** @default null */
                             maxOpenSessions?: number | null;
                         };
-                        /**
-                         * @default {
-                         *       "tags": []
-                         *     }
-                         */
                         metadata?: {
                             label?: string;
                             /** @default [] */
@@ -12425,20 +11646,15 @@ export interface operations {
                             routing_policy_id: string | null;
                             /** @enum {string} */
                             routing_mode: "none" | "fallback_all" | "policy";
-                            config?: unknown;
+                            config: unknown;
                             revision: string;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
                             updated_at: string;
-                            /** Format: date-time */
                             last_used_at: string | null;
-                            /** Format: date-time */
                             revoked_at: string | null;
-                            /**
-                             * Format: date-time
-                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
-                             */
+                            /** @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended. */
                             expires_at: string | null;
                         };
                         secret: string;
@@ -12592,20 +11808,15 @@ export interface operations {
                             routing_policy_id: string | null;
                             /** @enum {string} */
                             routing_mode: "none" | "fallback_all" | "policy";
-                            config?: unknown;
+                            config: unknown;
                             revision: string;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
                             updated_at: string;
-                            /** Format: date-time */
                             last_used_at: string | null;
-                            /** Format: date-time */
                             revoked_at: string | null;
-                            /**
-                             * Format: date-time
-                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
-                             */
+                            /** @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended. */
                             expires_at: string | null;
                         };
                     };
@@ -12807,11 +12018,6 @@ export interface operations {
                             /** @default null */
                             maxOpenSessions?: number | null;
                         };
-                        /**
-                         * @default {
-                         *       "tags": []
-                         *     }
-                         */
                         metadata?: {
                             label?: string;
                             /** @default [] */
@@ -12860,20 +12066,15 @@ export interface operations {
                             routing_policy_id: string | null;
                             /** @enum {string} */
                             routing_mode: "none" | "fallback_all" | "policy";
-                            config?: unknown;
+                            config: unknown;
                             revision: string;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
                             updated_at: string;
-                            /** Format: date-time */
                             last_used_at: string | null;
-                            /** Format: date-time */
                             revoked_at: string | null;
-                            /**
-                             * Format: date-time
-                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
-                             */
+                            /** @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended. */
                             expires_at: string | null;
                         };
                     };
@@ -13160,20 +12361,15 @@ export interface operations {
                             routing_policy_id: string | null;
                             /** @enum {string} */
                             routing_mode: "none" | "fallback_all" | "policy";
-                            config?: unknown;
+                            config: unknown;
                             revision: string;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
                             updated_at: string;
-                            /** Format: date-time */
                             last_used_at: string | null;
-                            /** Format: date-time */
                             revoked_at: string | null;
-                            /**
-                             * Format: date-time
-                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
-                             */
+                            /** @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended. */
                             expires_at: string | null;
                         };
                         secret: string;
@@ -13314,20 +12510,15 @@ export interface operations {
                             routing_policy_id: string | null;
                             /** @enum {string} */
                             routing_mode: "none" | "fallback_all" | "policy";
-                            config?: unknown;
+                            config: unknown;
                             revision: string;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
                             updated_at: string;
-                            /** Format: date-time */
                             last_used_at: string | null;
-                            /** Format: date-time */
                             revoked_at: string | null;
-                            /**
-                             * Format: date-time
-                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
-                             */
+                            /** @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended. */
                             expires_at: string | null;
                         };
                     };
@@ -13460,20 +12651,15 @@ export interface operations {
                             routing_policy_id: string | null;
                             /** @enum {string} */
                             routing_mode: "none" | "fallback_all" | "policy";
-                            config?: unknown;
+                            config: unknown;
                             revision: string;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
                             updated_at: string;
-                            /** Format: date-time */
                             last_used_at: string | null;
-                            /** Format: date-time */
                             revoked_at: string | null;
-                            /**
-                             * Format: date-time
-                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
-                             */
+                            /** @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended. */
                             expires_at: string | null;
                         };
                     };
@@ -13606,20 +12792,15 @@ export interface operations {
                             routing_policy_id: string | null;
                             /** @enum {string} */
                             routing_mode: "none" | "fallback_all" | "policy";
-                            config?: unknown;
+                            config: unknown;
                             revision: string;
                             /** Format: date-time */
                             created_at: string;
                             /** Format: date-time */
                             updated_at: string;
-                            /** Format: date-time */
                             last_used_at: string | null;
-                            /** Format: date-time */
                             revoked_at: string | null;
-                            /**
-                             * Format: date-time
-                             * @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended.
-                             */
+                            /** @description When the key stops serving, or null for a key that never expires. Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the date on purpose: the three status values are what clients switch on, and the key stays editable so the date can be extended. */
                             expires_at: string | null;
                         };
                     };
@@ -17201,12 +16382,14 @@ export interface operations {
                         /** @enum {string} */
                         scope: "ORGANIZATION" | "PROJECT";
                         name: string;
+                        /** Format: date-time */
                         updatedAt: string;
                         projectId: string;
                         organizationId: string;
                         versionId: string;
                         authorId?: string | null;
                         version: number;
+                        /** Format: date-time */
                         createdAt: string;
                         commitMessage?: string | null;
                         prompt: string;
@@ -17404,12 +16587,14 @@ export interface operations {
                         /** @enum {string} */
                         scope: "ORGANIZATION" | "PROJECT";
                         name: string;
+                        /** Format: date-time */
                         updatedAt: string;
                         projectId: string;
                         organizationId: string;
                         versionId: string;
                         authorId?: string | null;
                         version: number;
+                        /** Format: date-time */
                         createdAt: string;
                         commitMessage?: string | null;
                         prompt: string;
@@ -17583,6 +16768,7 @@ export interface operations {
                         configId: string;
                         versionId: string;
                         tag: string;
+                        /** Format: date-time */
                         updatedAt: string;
                     };
                 };
@@ -17667,6 +16853,7 @@ export interface operations {
                     "application/json": {
                         id: string;
                         name: string;
+                        /** Format: date-time */
                         createdAt: string;
                     }[];
                 };
@@ -17745,6 +16932,7 @@ export interface operations {
                     "application/json": {
                         id: string;
                         name: string;
+                        /** Format: date-time */
                         createdAt: string;
                     };
                 };
@@ -17825,6 +17013,7 @@ export interface operations {
                     "application/json": {
                         id: string;
                         name: string;
+                        /** Format: date-time */
                         createdAt: string;
                     };
                 };
@@ -17970,12 +17159,14 @@ export interface operations {
                         /** @enum {string} */
                         scope: "ORGANIZATION" | "PROJECT";
                         name: string;
+                        /** Format: date-time */
                         updatedAt: string;
                         projectId: string;
                         organizationId: string;
                         versionId: string;
                         authorId?: string | null;
                         version: number;
+                        /** Format: date-time */
                         createdAt: string;
                         commitMessage?: string | null;
                         prompt: string;
@@ -18144,12 +17335,14 @@ export interface operations {
                         /** @enum {string} */
                         scope: "ORGANIZATION" | "PROJECT";
                         name: string;
+                        /** Format: date-time */
                         updatedAt: string;
                         projectId: string;
                         organizationId: string;
                         versionId: string;
                         authorId?: string | null;
                         version: number;
+                        /** Format: date-time */
                         createdAt: string;
                         commitMessage?: string | null;
                         prompt: string;
@@ -18323,12 +17516,14 @@ export interface operations {
                         /** @enum {string} */
                         scope: "ORGANIZATION" | "PROJECT";
                         name: string;
+                        /** Format: date-time */
                         updatedAt: string;
                         projectId: string;
                         organizationId: string;
                         versionId: string;
                         authorId?: string | null;
                         version: number;
+                        /** Format: date-time */
                         createdAt: string;
                         commitMessage?: string | null;
                         prompt: string;
@@ -18537,12 +17732,14 @@ export interface operations {
                         /** @enum {string} */
                         scope: "ORGANIZATION" | "PROJECT";
                         name: string;
+                        /** Format: date-time */
                         updatedAt: string;
                         projectId: string;
                         organizationId: string;
                         versionId: string;
                         authorId?: string | null;
                         version: number;
+                        /** Format: date-time */
                         createdAt: string;
                         commitMessage?: string | null;
                         prompt: string;
@@ -18901,12 +18098,14 @@ export interface operations {
                             /** @enum {string} */
                             scope: "ORGANIZATION" | "PROJECT";
                             name: string;
+                            /** Format: date-time */
                             updatedAt: string;
                             projectId: string;
                             organizationId: string;
                             versionId: string;
                             authorId?: string | null;
                             version: number;
+                            /** Format: date-time */
                             createdAt: string;
                             commitMessage?: string | null;
                             prompt: string;
@@ -19491,7 +18690,7 @@ export interface operations {
                             customKeys: {
                                 [key: string]: unknown;
                             } | null;
-                            deploymentMapping?: null;
+                            deploymentMapping: unknown | null;
                             models?: string[] | null;
                             embeddingsModels?: string[] | null;
                             customModels?: {
@@ -19628,7 +18827,7 @@ export interface operations {
                             customKeys: {
                                 [key: string]: unknown;
                             } | null;
-                            deploymentMapping?: null;
+                            deploymentMapping: unknown | null;
                             models?: string[] | null;
                             embeddingsModels?: string[] | null;
                             customModels?: {
@@ -19733,9 +18932,9 @@ export interface operations {
                         sample: number;
                         level: string;
                         evaluatorId: string | null;
-                        preconditions?: unknown;
-                        parameters?: unknown;
-                        mappings?: null;
+                        preconditions: unknown;
+                        parameters: unknown;
+                        mappings: unknown | null;
                         threadIdleTimeout: number | null;
                         createdAt: string;
                         updatedAt: string;
@@ -19867,9 +19066,9 @@ export interface operations {
                         sample: number;
                         level: string;
                         evaluatorId: string | null;
-                        preconditions?: unknown;
-                        parameters?: unknown;
-                        mappings?: null;
+                        preconditions: unknown;
+                        parameters: unknown;
+                        mappings: unknown | null;
                         threadIdleTimeout: number | null;
                         createdAt: string;
                         updatedAt: string;
@@ -19956,9 +19155,9 @@ export interface operations {
                         sample: number;
                         level: string;
                         evaluatorId: string | null;
-                        preconditions?: unknown;
-                        parameters?: unknown;
-                        mappings?: null;
+                        preconditions: unknown;
+                        parameters: unknown;
+                        mappings: unknown | null;
                         threadIdleTimeout: number | null;
                         createdAt: string;
                         updatedAt: string;
@@ -20181,9 +19380,9 @@ export interface operations {
                         sample: number;
                         level: string;
                         evaluatorId: string | null;
-                        preconditions?: unknown;
-                        parameters?: unknown;
-                        mappings?: null;
+                        preconditions: unknown;
+                        parameters: unknown;
+                        mappings: unknown | null;
                         threadIdleTimeout: number | null;
                         createdAt: string;
                         updatedAt: string;
@@ -20367,12 +19566,13 @@ export interface operations {
                         supportContact: string | null;
                         presenceEnabled: boolean;
                         traceSharingEnabled: boolean;
-                        /** @enum {string|null} */
-                        primaryIntent: "AGENT_GOVERNANCE" | "LLM_OPS" | null;
+                        primaryIntent: ("AGENT_GOVERNANCE" | "LLM_OPS") | null;
                         s3Endpoint: string | null;
                         s3AccessKeyId: string | null;
                         s3Bucket: string | null;
+                        /** Format: date-time */
                         createdAt: string;
+                        /** Format: date-time */
                         updatedAt: string;
                     };
                 };
@@ -20393,8 +19593,7 @@ export interface operations {
                     supportContact?: string | null;
                     presenceEnabled?: boolean;
                     traceSharingEnabled?: boolean;
-                    /** @enum {string|null} */
-                    primaryIntent?: "AGENT_GOVERNANCE" | "LLM_OPS" | null;
+                    primaryIntent?: ("AGENT_GOVERNANCE" | "LLM_OPS") | null;
                     s3Endpoint?: string | null;
                     s3AccessKeyId?: string | null;
                     s3SecretAccessKey?: string | null;
@@ -20416,12 +19615,13 @@ export interface operations {
                         supportContact: string | null;
                         presenceEnabled: boolean;
                         traceSharingEnabled: boolean;
-                        /** @enum {string|null} */
-                        primaryIntent: "AGENT_GOVERNANCE" | "LLM_OPS" | null;
+                        primaryIntent: ("AGENT_GOVERNANCE" | "LLM_OPS") | null;
                         s3Endpoint: string | null;
                         s3AccessKeyId: string | null;
                         s3Bucket: string | null;
+                        /** Format: date-time */
                         createdAt: string;
+                        /** Format: date-time */
                         updatedAt: string;
                     };
                 };
@@ -20454,7 +19654,9 @@ export interface operations {
                             role: "ADMIN" | "MEMBER" | "EXTERNAL";
                             disabled: boolean;
                             disabledAt: string | null;
+                            /** Format: date-time */
                             createdAt: string;
+                            /** Format: date-time */
                             updatedAt: string;
                             user: {
                                 id: string;
@@ -20491,7 +19693,9 @@ export interface operations {
                         role: "ADMIN" | "MEMBER" | "EXTERNAL";
                         disabled: boolean;
                         disabledAt: string | null;
+                        /** Format: date-time */
                         createdAt: string;
+                        /** Format: date-time */
                         updatedAt: string;
                         user: {
                             id: string;
@@ -20567,7 +19771,9 @@ export interface operations {
                         role: "ADMIN" | "MEMBER" | "EXTERNAL";
                         disabled: boolean;
                         disabledAt: string | null;
+                        /** Format: date-time */
                         createdAt: string;
+                        /** Format: date-time */
                         updatedAt: string;
                         user: {
                             id: string;
@@ -20669,6 +19875,7 @@ export interface operations {
                                 role: string;
                                 customRoleId: string | null;
                             }[];
+                            /** Format: date-time */
                             createdAt: string;
                         }[];
                     };
@@ -20723,6 +19930,7 @@ export interface operations {
                                 role: string;
                                 customRoleId: string | null;
                             }[];
+                            /** Format: date-time */
                             createdAt: string;
                             emailNotSent: boolean;
                         }[];
@@ -20778,12 +19986,13 @@ export interface operations {
                         supportContact: string | null;
                         presenceEnabled: boolean;
                         traceSharingEnabled: boolean;
-                        /** @enum {string|null} */
-                        primaryIntent: "AGENT_GOVERNANCE" | "LLM_OPS" | null;
+                        primaryIntent: ("AGENT_GOVERNANCE" | "LLM_OPS") | null;
                         s3Endpoint: string | null;
                         s3AccessKeyId: string | null;
                         s3Bucket: string | null;
+                        /** Format: date-time */
                         createdAt: string;
+                        /** Format: date-time */
                         updatedAt: string;
                     };
                 };
@@ -20804,8 +20013,7 @@ export interface operations {
                     supportContact?: string | null;
                     presenceEnabled?: boolean;
                     traceSharingEnabled?: boolean;
-                    /** @enum {string|null} */
-                    primaryIntent?: "AGENT_GOVERNANCE" | "LLM_OPS" | null;
+                    primaryIntent?: ("AGENT_GOVERNANCE" | "LLM_OPS") | null;
                     s3Endpoint?: string | null;
                     s3AccessKeyId?: string | null;
                     s3SecretAccessKey?: string | null;
@@ -20827,12 +20035,13 @@ export interface operations {
                         supportContact: string | null;
                         presenceEnabled: boolean;
                         traceSharingEnabled: boolean;
-                        /** @enum {string|null} */
-                        primaryIntent: "AGENT_GOVERNANCE" | "LLM_OPS" | null;
+                        primaryIntent: ("AGENT_GOVERNANCE" | "LLM_OPS") | null;
                         s3Endpoint: string | null;
                         s3AccessKeyId: string | null;
                         s3Bucket: string | null;
+                        /** Format: date-time */
                         createdAt: string;
+                        /** Format: date-time */
                         updatedAt: string;
                     };
                 };
@@ -20865,7 +20074,9 @@ export interface operations {
                             role: "ADMIN" | "MEMBER" | "EXTERNAL";
                             disabled: boolean;
                             disabledAt: string | null;
+                            /** Format: date-time */
                             createdAt: string;
+                            /** Format: date-time */
                             updatedAt: string;
                             user: {
                                 id: string;
@@ -20902,7 +20113,9 @@ export interface operations {
                         role: "ADMIN" | "MEMBER" | "EXTERNAL";
                         disabled: boolean;
                         disabledAt: string | null;
+                        /** Format: date-time */
                         createdAt: string;
+                        /** Format: date-time */
                         updatedAt: string;
                         user: {
                             id: string;
@@ -20978,7 +20191,9 @@ export interface operations {
                         role: "ADMIN" | "MEMBER" | "EXTERNAL";
                         disabled: boolean;
                         disabledAt: string | null;
+                        /** Format: date-time */
                         createdAt: string;
+                        /** Format: date-time */
                         updatedAt: string;
                         user: {
                             id: string;
@@ -21080,6 +20295,7 @@ export interface operations {
                                 role: string;
                                 customRoleId: string | null;
                             }[];
+                            /** Format: date-time */
                             createdAt: string;
                         }[];
                     };
@@ -21134,6 +20350,7 @@ export interface operations {
                                 role: string;
                                 customRoleId: string | null;
                             }[];
+                            /** Format: date-time */
                             createdAt: string;
                             emailNotSent: boolean;
                         }[];
@@ -21414,6 +20631,7 @@ export interface operations {
                             scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
                             scopeId: string;
                             scopeName: string | null;
+                            /** Format: date-time */
                             createdAt: string;
                         }[];
                         totalCount: number;
@@ -21467,6 +20685,7 @@ export interface operations {
                         scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
                         scopeId: string;
                         scopeName: string | null;
+                        /** Format: date-time */
                         createdAt: string;
                         hasLegacyAccessNotice?: boolean;
                     };
@@ -21540,6 +20759,7 @@ export interface operations {
                         scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
                         scopeId: string;
                         scopeName: string | null;
+                        /** Format: date-time */
                         createdAt: string;
                     };
                 };
@@ -21586,6 +20806,7 @@ export interface operations {
                             scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
                             scopeId: string;
                             scopeName: string | null;
+                            /** Format: date-time */
                             createdAt: string;
                         }[];
                         totalCount: number;
@@ -21639,6 +20860,7 @@ export interface operations {
                         scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
                         scopeId: string;
                         scopeName: string | null;
+                        /** Format: date-time */
                         createdAt: string;
                         hasLegacyAccessNotice?: boolean;
                     };
@@ -21712,6 +20934,7 @@ export interface operations {
                         scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
                         scopeId: string;
                         scopeName: string | null;
+                        /** Format: date-time */
                         createdAt: string;
                     };
                 };
@@ -21739,7 +20962,9 @@ export interface operations {
                             name: string;
                             description: string | null;
                             permissions: string[];
+                            /** Format: date-time */
                             createdAt: string;
+                            /** Format: date-time */
                             updatedAt: string;
                         }[];
                     };
@@ -21775,7 +21000,9 @@ export interface operations {
                         name: string;
                         description: string | null;
                         permissions: string[];
+                        /** Format: date-time */
                         createdAt: string;
+                        /** Format: date-time */
                         updatedAt: string;
                     };
                 };
@@ -21832,7 +21059,9 @@ export interface operations {
                         name: string;
                         description: string | null;
                         permissions: string[];
+                        /** Format: date-time */
                         createdAt: string;
+                        /** Format: date-time */
                         updatedAt: string;
                     };
                 };
@@ -21894,7 +21123,9 @@ export interface operations {
                         name: string;
                         description: string | null;
                         permissions: string[];
+                        /** Format: date-time */
                         createdAt: string;
+                        /** Format: date-time */
                         updatedAt: string;
                     };
                 };
@@ -21922,7 +21153,9 @@ export interface operations {
                             name: string;
                             description: string | null;
                             permissions: string[];
+                            /** Format: date-time */
                             createdAt: string;
+                            /** Format: date-time */
                             updatedAt: string;
                         }[];
                     };
@@ -21958,7 +21191,9 @@ export interface operations {
                         name: string;
                         description: string | null;
                         permissions: string[];
+                        /** Format: date-time */
                         createdAt: string;
+                        /** Format: date-time */
                         updatedAt: string;
                     };
                 };
@@ -22015,7 +21250,9 @@ export interface operations {
                         name: string;
                         description: string | null;
                         permissions: string[];
+                        /** Format: date-time */
                         createdAt: string;
+                        /** Format: date-time */
                         updatedAt: string;
                     };
                 };
@@ -22077,7 +21314,9 @@ export interface operations {
                         name: string;
                         description: string | null;
                         permissions: string[];
+                        /** Format: date-time */
                         createdAt: string;
+                        /** Format: date-time */
                         updatedAt: string;
                     };
                 };
@@ -22103,6 +21342,7 @@ export interface operations {
                         tokens: {
                             id: string;
                             description: string | null;
+                            /** Format: date-time */
                             createdAt: string;
                             lastUsedAt: string | null;
                         }[];
@@ -22185,6 +21425,7 @@ export interface operations {
                         tokens: {
                             id: string;
                             description: string | null;
+                            /** Format: date-time */
                             createdAt: string;
                             lastUsedAt: string | null;
                         }[];
@@ -23565,141 +22806,43 @@ export interface operations {
                     type: "SCENARIO_MESSAGE_SNAPSHOT";
                     timestamp: number;
                     rawEvent?: unknown;
+                    batchRunId: string;
+                    scenarioId: string;
+                    scenarioRunId: string;
+                    /** @default default */
+                    scenarioSetId?: string;
                     messages: ((({
                         id: string;
-                        /** @constant */
-                        role: "developer";
-                        content: string;
-                        name?: string;
-                        encryptedValue?: string;
-                    } | {
-                        id: string;
-                        /** @constant */
-                        role: "system";
-                        content: string;
-                        name?: string;
-                        encryptedValue?: string;
-                    } | {
-                        id: string;
-                        /** @constant */
-                        role: "assistant";
-                        content?: string;
-                        name?: string;
-                        encryptedValue?: string;
-                        toolCalls?: {
-                            id: string;
-                            /** @constant */
-                            type: "function";
-                            function: {
-                                name: string;
-                                arguments: string;
-                            };
-                            encryptedValue?: string;
-                        }[];
-                    } | {
-                        id: string;
-                        /** @constant */
-                        role: "user";
-                        content: string | ({
-                            /** @constant */
-                            type: "text";
-                            text: string;
-                        } | {
-                            /** @constant */
-                            type: "image";
-                            source: {
-                                /** @constant */
-                                type: "data";
-                                value: string;
-                                mimeType: string;
-                            } | {
-                                /** @constant */
-                                type: "url";
-                                value: string;
-                                mimeType?: string;
-                            };
-                            metadata?: unknown;
-                        } | {
-                            /** @constant */
-                            type: "audio";
-                            source: {
-                                /** @constant */
-                                type: "data";
-                                value: string;
-                                mimeType: string;
-                            } | {
-                                /** @constant */
-                                type: "url";
-                                value: string;
-                                mimeType?: string;
-                            };
-                            metadata?: unknown;
-                        } | {
-                            /** @constant */
-                            type: "video";
-                            source: {
-                                /** @constant */
-                                type: "data";
-                                value: string;
-                                mimeType: string;
-                            } | {
-                                /** @constant */
-                                type: "url";
-                                value: string;
-                                mimeType?: string;
-                            };
-                            metadata?: unknown;
-                        } | {
-                            /** @constant */
-                            type: "document";
-                            source: {
-                                /** @constant */
-                                type: "data";
-                                value: string;
-                                mimeType: string;
-                            } | {
-                                /** @constant */
-                                type: "url";
-                                value: string;
-                                mimeType?: string;
-                            };
-                            metadata?: unknown;
-                        } | {
-                            /** @constant */
-                            type: "binary";
-                            mimeType: string;
+                        /** @enum {string} */
+                        role: "developer" | "system" | "assistant" | "user" | "tool" | "activity" | "reasoning";
+                        content?: unknown;
+                        toolCalls?: ({
                             id?: string;
-                            url?: string;
-                            data?: string;
-                            filename?: string;
-                        })[];
-                        name?: string;
-                        encryptedValue?: string;
-                    } | {
-                        id: string;
-                        content: string;
-                        /** @constant */
-                        role: "tool";
-                        toolCallId: string;
-                        error?: string;
-                        encryptedValue?: string;
-                    } | {
-                        id: string;
-                        /** @constant */
-                        role: "activity";
-                        activityType: string;
-                        content: {
+                            function?: {
+                                name?: string;
+                                arguments?: string;
+                            } & {
+                                [key: string]: unknown;
+                            };
+                        } & {
                             [key: string]: unknown;
-                        };
-                    } | {
-                        id: string;
-                        /** @constant */
-                        role: "reasoning";
-                        content: string;
-                        encryptedValue?: string;
+                        })[];
+                        tool_calls?: ({
+                            id?: string;
+                            function?: {
+                                name?: string;
+                                arguments?: string;
+                            } & {
+                                [key: string]: unknown;
+                            };
+                        } & {
+                            [key: string]: unknown;
+                        })[];
+                    } & {
+                        [key: string]: unknown;
                     }) | {
                         role?: "system" | "developer" | "user" | "assistant" | "function" | "tool" | "unknown";
-                        content?: string | ({
+                        content?: (string | ({
                             /** @constant */
                             type: "text";
                             text?: string;
@@ -23771,7 +22914,7 @@ export interface operations {
                                 file_id?: string;
                                 filename?: string;
                             };
-                        })[] | null;
+                        })[]) | null;
                         parts?: ({
                             /** @constant */
                             type: "text";
@@ -23881,11 +23024,6 @@ export interface operations {
                         id?: string;
                         trace_id?: string;
                     })[];
-                    batchRunId: string;
-                    scenarioId: string;
-                    scenarioRunId: string;
-                    /** @default default */
-                    scenarioSetId?: string;
                 } | {
                     /** @constant */
                     type: "SCENARIO_TEXT_MESSAGE_START";
@@ -25026,14 +24164,20 @@ export interface operations {
             };
         };
     };
-    getApiSecrets: {
+    listSecrets_2026_08_24: {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    projectId: string;
+                };
+            };
+        };
         responses: {
             /** @description Success */
             200: {
@@ -25045,62 +24189,16 @@ export interface operations {
                         id: string;
                         projectId: string;
                         name: string;
+                        /** Format: date-time */
                         createdAt: string;
+                        /** Format: date-time */
                         updatedAt: string;
                     }[];
                 };
             };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
         };
     };
-    postApiSecrets: {
+    getSecret_2026_08_24: {
         parameters: {
             query?: never;
             header?: never;
@@ -25110,14 +24208,50 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
+                    projectId: string;
+                    id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        projectId: string;
+                        name: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
+                    };
+                };
+            };
+        };
+    };
+    createSecret_2026_08_24: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    projectId: string;
                     name: string;
                     value: string;
                 };
             };
         };
         responses: {
-            /** @description Secret created */
-            201: {
+            /** @description Success */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -25126,83 +24260,31 @@ export interface operations {
                         id: string;
                         projectId: string;
                         name: string;
+                        /** Format: date-time */
                         createdAt: string;
+                        /** Format: date-time */
                         updatedAt: string;
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Secret with this name already exists */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
                     };
                 };
             };
         };
     };
-    getApiSecretsById: {
+    updateSecret_2026_08_24: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                id: string;
-            };
+            path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    projectId: string;
+                    id: string;
+                    value: string;
+                };
+            };
+        };
         responses: {
             /** @description Success */
             200: {
@@ -25214,91 +24296,62 @@ export interface operations {
                         id: string;
                         projectId: string;
                         name: string;
+                        /** Format: date-time */
                         createdAt: string;
+                        /** Format: date-time */
                         updatedAt: string;
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Secret not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
                     };
                 };
             };
         };
     };
-    putApiSecretsById: {
+    deleteSecret_2026_08_24: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                id: string;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody: {
             content: {
                 "application/json": {
-                    value: string;
+                    projectId: string;
+                    id: string;
                 };
             };
         };
         responses: {
-            /** @description Secret updated */
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        /** @constant */
+                        deleted: true;
+                    };
+                };
+            };
+        };
+    };
+    listSecrets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    projectId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -25308,85 +24361,32 @@ export interface operations {
                         id: string;
                         projectId: string;
                         name: string;
+                        /** Format: date-time */
                         createdAt: string;
+                        /** Format: date-time */
                         updatedAt: string;
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Secret not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
+                    }[];
                 };
             };
         };
     };
-    deleteApiSecretsById: {
+    getSecret: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                id: string;
-            };
+            path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": {
+                    projectId: string;
+                    id: string;
+                };
+            };
+        };
         responses: {
-            /** @description Secret deleted */
+            /** @description Success */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -25394,67 +24394,115 @@ export interface operations {
                 content: {
                     "application/json": {
                         id: string;
-                        deleted: boolean;
+                        projectId: string;
+                        name: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
                     };
                 };
             };
-            /** @description Bad Request */
-            400: {
+        };
+    };
+    createSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    projectId: string;
+                    name: string;
+                    value: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        id: string;
+                        projectId: string;
+                        name: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
                     };
                 };
             };
-            /** @description Unauthorized */
-            401: {
+        };
+    };
+    updateSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    projectId: string;
+                    id: string;
+                    value: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
+                        id: string;
+                        projectId: string;
+                        name: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
                     };
                 };
             };
-            /** @description Secret not found */
-            404: {
+        };
+    };
+    deleteSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    projectId: string;
+                    id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: string;
-                        message?: string;
+                        id: string;
+                        /** @constant */
+                        deleted: true;
                     };
                 };
             };
@@ -26871,196 +25919,7 @@ export interface operations {
                     query?: string;
                     /** @default {} */
                     filters?: {
-                        "topics.topics"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "topics.subtopics"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.user_id"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.thread_id"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.customer_id"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.labels"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.key"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.value"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "metadata.prompt_ids"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "traces.origin"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "traces.error"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "traces.name"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "spans.type"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "spans.model"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.evaluator_id"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.evaluator_id.guardrails_only"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.evaluator_id.has_passed"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.evaluator_id.has_score"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.evaluator_id.has_label"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.passed"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.score"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.state"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "evaluations.label"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "events.event_type"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "events.metrics.key"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "events.metrics.value"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "events.event_details.key"?: string[] | {
-                            [key: string]: string[];
-                        } | {
-                            [key: string]: {
-                                [key: string]: string[];
-                            };
-                        };
-                        "annotations.hasAnnotation"?: string[] | {
+                        [key: string]: string[] | {
                             [key: string]: string[];
                         } | {
                             [key: string]: {
@@ -27504,8 +26363,7 @@ export interface operations {
                         };
                         active: boolean;
                         message: string | null;
-                        /** @enum {string|null} */
-                        alertType: "CRITICAL" | "WARNING" | "INFO" | null;
+                        alertType: ("CRITICAL" | "WARNING" | "INFO") | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -27609,8 +26467,7 @@ export interface operations {
                         };
                         active: boolean;
                         message: string | null;
-                        /** @enum {string|null} */
-                        alertType: "CRITICAL" | "WARNING" | "INFO" | null;
+                        alertType: ("CRITICAL" | "WARNING" | "INFO") | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -27698,8 +26555,7 @@ export interface operations {
                         };
                         active: boolean;
                         message: string | null;
-                        /** @enum {string|null} */
-                        alertType: "CRITICAL" | "WARNING" | "INFO" | null;
+                        alertType: ("CRITICAL" | "WARNING" | "INFO") | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */
@@ -27869,8 +26725,7 @@ export interface operations {
                     name?: string;
                     active?: boolean;
                     message?: string | null;
-                    /** @enum {string|null} */
-                    alertType?: "CRITICAL" | "WARNING" | "INFO" | null;
+                    alertType?: ("CRITICAL" | "WARNING" | "INFO") | null;
                     filters?: {
                         [key: string]: unknown;
                     };
@@ -27900,8 +26755,7 @@ export interface operations {
                         };
                         active: boolean;
                         message: string | null;
-                        /** @enum {string|null} */
-                        alertType: "CRITICAL" | "WARNING" | "INFO" | null;
+                        alertType: ("CRITICAL" | "WARNING" | "INFO") | null;
                         createdAt: string;
                         updatedAt: string;
                         /** Format: uri */

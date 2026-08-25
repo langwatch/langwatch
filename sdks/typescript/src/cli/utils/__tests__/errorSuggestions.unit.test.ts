@@ -5,7 +5,7 @@
  * @see specs/typescript-sdk/cli-management-apis.feature
  */
 import { describe, expect, it } from "vitest";
-import type { CliHandledError } from "@langwatch/langy/cards/handled-error";
+import type { CliHandledError } from "@langwatch/langy-contract/cards/handled-error";
 import {
   fallbackSuggestionsFor,
   withFallbackSuggestions,

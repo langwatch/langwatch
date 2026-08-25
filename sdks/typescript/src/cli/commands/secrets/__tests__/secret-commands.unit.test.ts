@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai", projectId: "proj_123" })),
 }));
 
 vi.mock("ora", () => ({
@@ -63,8 +63,8 @@ describe("listSecretsCommand()", () => {
 
     await listSecretsCommand();
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/secrets"),
-      expect.objectContaining({ headers: expect.any(Object) })
+      expect.stringContaining("/api/secrets/latest/secrets.list"),
+      expect.objectContaining({ method: "POST", headers: expect.any(Object) })
     );
   });
 
@@ -109,8 +109,11 @@ describe("getSecretCommand()", () => {
 
     await getSecretCommand("secret_abc");
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/secrets/secret_abc"),
-      expect.any(Object)
+      expect.stringContaining("/api/secrets/latest/secrets.get"),
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining("secret_abc"),
+      })
     );
   });
 
@@ -140,7 +143,7 @@ describe("createSecretCommand()", () => {
 
     await createSecretCommand("MY_API_KEY", { value: "sk-123" });
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/secrets"),
+      expect.stringContaining("/api/secrets/latest/secrets.create"),
       expect.objectContaining({
         method: "POST",
         body: expect.stringContaining("MY_API_KEY"),
@@ -186,10 +189,14 @@ describe("updateSecretCommand()", () => {
 
     await updateSecretCommand("secret_abc", { value: "new-value" });
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/secrets/secret_abc"),
+      expect.stringContaining("/api/secrets/latest/secrets.update"),
       expect.objectContaining({
-        method: "PUT",
-        body: expect.stringContaining("new-value"),
+        method: "POST",
+        body: JSON.stringify({
+          projectId: "proj_123",
+          id: "secret_abc",
+          value: "new-value",
+        }),
       })
     );
   });
@@ -222,8 +229,11 @@ describe("deleteSecretCommand()", () => {
 
     await deleteSecretCommand("secret_abc");
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/secrets/secret_abc"),
-      expect.objectContaining({ method: "DELETE" })
+      expect.stringContaining("/api/secrets/latest/secrets.delete"),
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining("secret_abc"),
+      })
     );
   });
 

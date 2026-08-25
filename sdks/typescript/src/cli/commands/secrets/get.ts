@@ -18,7 +18,10 @@ import type { CommandResult } from "../../utils/output";
 export const getSecretCommand = async (
   id: string,
 ): Promise<CommandResult | void> => {
-  await resolveCredentials();
+  const credentials = await resolveCredentials();
+  if (!credentials.projectId) {
+    throw new Error("A project must be selected for secret operations");
+  }
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   const endpoint =
@@ -27,8 +30,13 @@ export const getSecretCommand = async (
   const spinner = createSpinner(`Fetching secret "${id}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/secrets/${id}`, {
-      headers: buildAuthHeaders({ apiKey }),
+    const response = await fetch(`${endpoint}/api/secrets/latest/secrets.get`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...buildAuthHeaders({ apiKey }),
+      },
+      body: JSON.stringify({ projectId: credentials.projectId, id }),
     });
 
     if (!response.ok) {

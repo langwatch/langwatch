@@ -113,6 +113,7 @@ import { resolveEndpoint } from "@/internal/endpoint";
 export interface LangWatchConstructorOptions {
   apiKey?: string;
   endpoint?: string;
+  projectId?: string;
   options?: {
     logger?: Logger;
   };
@@ -232,7 +233,11 @@ export class LangWatch {
     this.graphs = new GraphsApiService(this.config);
     this.simulationRuns = new SimulationRunsApiService(this.config);
     this.monitors = new MonitorsApiService({ apiKey, endpoint });
-    this.secrets = new SecretsApiService({ apiKey, endpoint });
+    this.secrets = new SecretsApiService({
+      apiKey,
+      endpoint,
+      projectId: options.projectId,
+    });
     this.virtualKeys = new VirtualKeysApiService({ apiKey, endpoint });
     this.gatewayBudgets = new GatewayBudgetsApiService({ apiKey, endpoint });
     this.spendEvents = new SpendEventsApiService({ apiKey, endpoint });

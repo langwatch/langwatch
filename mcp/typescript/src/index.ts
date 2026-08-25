@@ -14,6 +14,10 @@ const argv = await yargs(hideBin(process.argv))
     type: "string",
     description: "LangWatch API endpoint",
   })
+  .option("projectId", {
+    type: "string",
+    description: "LangWatch project ID",
+  })
   .option("http", {
     type: "boolean",
     description: "Start HTTP/SSE server instead of stdio",
@@ -41,6 +45,7 @@ const argv = await yargs(hideBin(process.argv))
 initConfig({
   apiKey: argv.apiKey,
   endpoint: argv.endpoint,
+  projectId: argv.projectId,
 });
 
 // Discover the rpc.discover-driven tools once, before any transport starts

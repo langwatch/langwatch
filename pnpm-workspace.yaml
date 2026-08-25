@@ -79,10 +79,10 @@ minimumReleaseAgeExclude:
 # deliberately NOT carried up, because each is a DIRECT dependency of the
 # project that pinned it and its own declaration governs it just as well:
 #
-#   zod: ^4.0.14                   (sdks/typescript) — the app is on zod ^3.25.76
-#                                  and @langwatch/langy compiles against it via
-#                                  the `zod/v4` subpath. Global would force the
-#                                  app to zod 4 and break that arrangement.
+#   zod: ^4.0.14                   (sdks/typescript) — every first-party package
+#                                  now declares Zod 4 directly. A global pin is
+#                                  still unnecessary and would also rewrite
+#                                  private third-party dependency graphs.
 #
 #   ...and sdks/typescript's whole OpenTelemetry pin set, eleven entries in
 #   all: api, api-logs 0.205.0, sdk-logs 0.205.0, core, resources,

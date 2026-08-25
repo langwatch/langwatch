@@ -1,11 +1,13 @@
 export interface McpConfig {
   apiKey: string | undefined;
   endpoint: string;
+  projectId?: string;
 }
 
 export declare function initConfig(args: {
   apiKey?: string;
   endpoint?: string;
+  projectId?: string;
 }): void;
 
 export declare function getConfig(): McpConfig;

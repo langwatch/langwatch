@@ -16,7 +16,10 @@ import type { CommandResult } from "../../utils/output";
  * metadata only — never a secret VALUE — so the raw list is safe as a payload.
  */
 export const listSecretsCommand = async (): Promise<CommandResult | void> => {
-  await resolveCredentials();
+  const credentials = await resolveCredentials();
+  if (!credentials.projectId) {
+    throw new Error("A project must be selected for secret operations");
+  }
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   const endpoint =
@@ -25,8 +28,13 @@ export const listSecretsCommand = async (): Promise<CommandResult | void> => {
   const spinner = createSpinner("Fetching secrets...").start();
 
   try {
-    const response = await fetch(`${endpoint}/api/secrets`, {
-      headers: buildAuthHeaders({ apiKey }),
+    const response = await fetch(`${endpoint}/api/secrets/latest/secrets.list`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...buildAuthHeaders({ apiKey }),
+      },
+      body: JSON.stringify({ projectId: credentials.projectId }),
     });
 
     if (!response.ok) {

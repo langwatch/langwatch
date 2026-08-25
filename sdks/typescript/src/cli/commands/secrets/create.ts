@@ -24,7 +24,10 @@ export const createSecretCommand = async (
   name: string,
   options: { value: string }
 ): Promise<CommandResult | void> => {
-  await resolveCredentials();
+  const credentials = await resolveCredentials();
+  if (!credentials.projectId) {
+    throw new Error("A project must be selected for secret operations");
+  }
 
   if (!/^[A-Z][A-Z0-9_]*$/.test(name)) {
     reportCommandError({
@@ -42,13 +45,17 @@ export const createSecretCommand = async (
   const spinner = createSpinner(`Creating secret "${name}"...`).start();
 
   try {
-    const response = await fetch(`${endpoint}/api/secrets`, {
+    const response = await fetch(`${endpoint}/api/secrets/latest/secrets.create`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...buildAuthHeaders({ apiKey }),
       },
-      body: JSON.stringify({ name, value: options.value }),
+      body: JSON.stringify({
+        projectId: credentials.projectId,
+        name,
+        value: options.value,
+      }),
     });
 
     if (!response.ok) {

@@ -222,7 +222,7 @@ describe("the CLI boot module graph", () => {
         "js-yaml",
         "zod",
         "ora",
-        "@langwatch/langy/cards",
+        "@langwatch/langy-contract/cards",
         "cli/program.ts",
         "cli/utils/commandCatalog.ts",
       ];

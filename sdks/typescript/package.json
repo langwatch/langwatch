@@ -77,7 +77,7 @@
     "@langchain/core": ">=0.3.68 <0.4.0",
     "@langchain/langgraph": ">=0.4.0 <1.0.0",
     "@langchain/openai": ">=0.6.0 <1.0.0",
-    "@langwatch/langy": "workspace:*",
+    "@langwatch/langy-contract": "workspace:*",
     "@opentelemetry/sdk-node": "0.221.0",
     "@opentelemetry/sdk-trace-node": "^2.0.1",
     "@opentelemetry/sdk-trace-web": ">=2.0.1",

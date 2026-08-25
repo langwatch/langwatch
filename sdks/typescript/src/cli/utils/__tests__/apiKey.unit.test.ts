@@ -7,7 +7,7 @@
  * Feature: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { readCliErrorDocument } from "@langwatch/langy/cards/handled-error";
+import { readCliErrorDocument } from "@langwatch/langy-contract/cards/handled-error";
 import type * as ProjectScopeNs from "../projectScope";
 import type * as SessionApiNs from "../governance/session-api";
 
