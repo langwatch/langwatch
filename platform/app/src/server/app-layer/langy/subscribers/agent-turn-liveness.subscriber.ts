@@ -161,17 +161,17 @@ export function createAgentTurnLivenessSubscriber(
           ? candidateHandoff
           : null;
 
-      if (stalledMs > MAX_STALL_MS || !handoff) {
+      if (stalledMs > MAX_STALL_MS) {
         // This is the branch that kills a user's turn — it must never be
         // silent. `reason` says which guard tripped: too stale to revive, or
-        // nothing to revive with.
+        // stale AND nothing to revive with.
         logger.warn(
           {
             projectId,
             conversationId,
             turnId,
             stalledMs,
-            reason: stalledMs > MAX_STALL_MS ? "stall_expired" : "no_handoff",
+            reason: handoff ? "stall_expired" : "no_handoff",
           },
           "failing a stalled langy turn",
         );
@@ -186,6 +186,24 @@ export function createAgentTurnLivenessSubscriber(
           error,
         });
         return;
+      }
+
+      if (!handoff) {
+        // The heartbeat lapsed but the turn is still producing activity, so
+        // the worker is running: there is nothing on hand to re-drive it
+        // with, and a live turn needs no re-driving. A missing handoff is not
+        // evidence that anything stopped. Turns longer than
+        // LANGY_HANDOFF_TTL_SECONDS (5 min) outlive their handoff key, while
+        // the heartbeat key lives only 10s (2x HEARTBEAT_INTERVAL_MS) and is
+        // refreshed solely by a `heartbeat` frame the worker POSTs into the
+        // relay, so a single 10s gap in worker-to-app HTTP is routine on a
+        // loaded host. Absence of a handoff only decides what happens to a
+        // turn that HAS stalled; here, keep watching.
+        throw new DispatchError({
+          message: `langy turn ${turnId} has no handoff but is still active (${stalledMs}ms); re-checking liveness`,
+          retryable: true,
+          retryAfterMs: LANGY_LIVENESS.HEARTBEAT_GRACE_MS,
+        });
       }
 
       await deps.buffer
