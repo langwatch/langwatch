@@ -19544,6 +19544,8 @@ The first run asks one question:
 
 LangWatch remembers the answer, so later runs do not ask again. Everything else is unchanged: `langwatch claude` accepts the same flags, the same subcommands and the same keyboard shortcuts as `claude`, and it returns the same exit code.
 
+You do not always see the question. When your organization allows only one of the two paths, LangWatch takes that path without asking. A run with no terminal attached, in CI for example, keeps your own plan and sends telemetry only. `--tool-mode` settles it explicitly on any run, and overrides a remembered answer.
+
 <Note>
   A virtual key is created the first time you choose the gateway, not at login. If you always keep your own subscription, LangWatch never creates one for you.
 </Note>
@@ -19843,20 +19845,26 @@ If anything fails or confuses you while following this skill (broken commands, d
 
 ## Step 2: Export the Real Mix
 
-Both `analytics query` and `trace export` default to the last 7 days, so a report about a month has to state the window itself. Compute one start date and one end date first, 30 days back to now unless the user names another window, then pass the same pair to every command:
+Settle two things before running anything, and hold both for the whole analysis.
+
+**The window.** `analytics query` and `trace export` both default to the last 7 days, so a report about a month has to state the window itself. Compute one start date and one end date, 30 days back to now unless the user names another window, and pass the same pair to every command.
+
+**The scope.** `analytics query` covers the whole project and has no origin filter, while `trace export` takes `--origin`. Mixing them silently compares application traffic in the totals against coding-agent traffic in the breakdown. When the question is about coding-agent usage, scope the export with `--origin coding_agent` and build every priced number from that export. Use the analytics calls only as a project-wide cross-check, and label them that way in the report. When the question is about the whole project, drop `--origin` and the two agree by construction.
 
 ```bash
 langwatch analytics query --metric total-tokens --group-by metadata.model --format json \
   --start-date <start> --end-date <end>
 langwatch analytics query --metric total-cost --group-by metadata.model --format json \
   --start-date <start> --end-date <end>
-langwatch trace export --format jsonl --limit 1000 \
+langwatch trace export --format jsonl --origin coding_agent --limit 20000 \
   --start-date <start> --end-date <end> -o traces.jsonl
 ```
 
+`--limit` caps the whole export, not one page, so a window with more matches than the limit gives a partial file. The command reports both counts when it truncates, for example `Exported 20000 traces (48213 total)`. Raise `--limit` until the two agree, or say in the report that the numbers come from a sample of N of M traces. Never present a truncated export as the window's total.
+
 Delete `traces.jsonl` once the analysis is done.
 
-For coding-agent usage add `--origin coding_agent` to the export, collect the distinct `metadata.thread_id` values, and pull the per-call rows, because the cache split lives there:
+Collect the distinct `metadata.thread_id` values from the export and pull the per-call rows, because the cache split lives there:
 
 ```bash
 langwatch session events <sessionId> --format json
@@ -19897,7 +19905,7 @@ State the headline numbers directly in the conversation too.
 - Do NOT use remembered prices; fetch the price page and cite it with a date.
 - Do NOT present the repriced number as the migration outcome; it prices the same usage, and a different model changes the usage. Say so once, clearly.
 - Do NOT ignore cache-write pricing; providers that bill writes above fresh input make rebuild-heavy workloads more expensive, not less.
-- Do NOT mix application traffic and coding-agent traffic in one mix when the question is about one of them; scope with `--origin`.
+- Do NOT mix application traffic and coding-agent traffic in one mix when the question is about one of them. The export scopes with `--origin`; the analytics totals cannot, so never take a priced number from an analytics call while the export is scoped.
 - If the CLI returns an error, report the user-facing consequence, not the raw error text.
 ````
 
@@ -20080,9 +20088,11 @@ If anything fails or confuses you while following this skill (broken commands, d
 Pick one window and use it everywhere, because `trace export` defaults to the last 7 days. Compute a start and an end date once (30 days back to now is a good default) and pass both:
 
 ```bash
-langwatch trace export --origin coding_agent --format jsonl --limit 1000 \
+langwatch trace export --origin coding_agent --format jsonl --limit 20000 \
   --start-date <start> --end-date <end> -o coding-traces.jsonl
 ```
+
+`--limit` caps the whole export, not one page, so a window with more matches than the limit gives a partial file and the sessions it drops are the ones missing from the buckets. The command reports both counts when it truncates, for example `Exported 20000 traces (48213 total)`. Raise `--limit` until the two agree, or say in the report that the buckets come from a sample of N of M traces.
 
 Report the window you used in the report, and delete `coding-traces.jsonl` once the analysis is done.
 
@@ -20099,7 +20109,7 @@ The events are the raw material: every model call with its input, output, cache-
 Write a small local script (python3 or jq) over the events. Per session, compute:
 
 1. **Peak context**: the largest (input + cache-read) of any model call, and its share of the model's context window.
-2. **Cache rebuilds**: model calls whose cache-creation tokens are the bulk of their input. Each one re-paid for context that was already paid for, at the provider's cache-write rate. That rate is provider and model specific: some price a write above fresh input, some price it the same, and some charge for cache storage by time instead. Take it from the price card of the model in question, never from a rule of thumb.
+2. **Cache rebuilds**: model calls whose cache-creation tokens are the bulk of their input, counted only once the session already holds cached context. The first cache-creating call of a session builds the cache rather than rebuilding it, and it pays for the context once, so it is a setup cost and not a rebuild. Count a write from the first call that follows a call with cache-read tokens, or that follows an explicit cache miss. Each rebuild re-paid for context that was already paid for, at the provider's cache-write rate. That rate is specific to the provider and the model: some price a write above fresh input, some price it the same, and some charge for cache storage by time instead. Take it from the price card of the model in question, never from a rule of thumb.
 3. **Compaction count and where they landed**: a compaction late in a session marks the point where the carried context stopped fitting.
 4. **Cost per model call over session lifetime**: split each session into thirds by call order and compare the average cost per call between the first and last third.
 5. **Waiting time around rebuilds**: rebuilt context is also re-uploaded and re-processed, so rebuild-heavy sessions are slower per turn.
@@ -20123,6 +20133,7 @@ Also state the top finding directly in the conversation, leading with the number
 - Do NOT judge context by peak share alone; a fat context that never rebuilds is cheap, and a modest one that rebuilds every turn is expensive. The rebuild rate carries the finding.
 - Do NOT compare sessions across different models as one population; window sizes and cache pricing differ. Bucket per model, then compare.
 - Do NOT count cache-read tokens as cost the way input tokens are; they bill at a fraction. The split is in the event rows, use it.
+- Do NOT count the first cache-creating call of a session as a rebuild. It builds the cache, and counting it makes every short session look rebuild-heavy and drags the whole bucket with it.
 - Do NOT report a threshold without the sessions behind it; every bucket statistic needs 2 or 3 example session ids.
 - Do NOT include sessions with fewer than 5 model calls; they carry no lifetime signal and flatten the buckets.
 - If the CLI returns an error, report the user-facing consequence, not the raw error text.
@@ -20199,6 +20210,8 @@ The first run asks one question:
 | **Using an API key** | Gemini CLI calls travel through the LangWatch AI Gateway with a virtual key. LangWatch receives telemetry and applies your budget and your policies. |
 
 LangWatch remembers the answer, so later runs do not ask again. Everything else is unchanged: `langwatch gemini` accepts the same flags and the same subcommands as `gemini`, and it returns the same exit code.
+
+You do not always see the question. When your organization allows only one of the two paths, LangWatch takes that path without asking. A run with no terminal attached, in CI for example, keeps your own plan and sends telemetry only. `--tool-mode` settles it explicitly on any run, and overrides a remembered answer.
 
 <Note>
   For the gateway path, `~/.gemini/settings.json` must have `security.auth.selectedType` set to `"gemini-api-key"`. With `"gemini-oauth"` selected, Gemini CLI uses its cached login and ignores the key, so the calls bypass the gateway; the wrapper warns when it sees that. The telemetry path works with either.
@@ -20349,6 +20362,8 @@ The first run asks one question:
 | **Using an API key** | Copilot calls travel through the LangWatch gateway with your own provider keys. |
 
 LangWatch remembers the answer, so later runs do not ask again. Everything else is unchanged: `langwatch copilot` accepts the same flags and the same subcommands as `copilot`, and it returns the same exit code.
+
+You do not always see the question. When your organization allows only one of the two paths, LangWatch takes that path without asking. A run with no terminal attached, in CI for example, keeps your own plan and sends telemetry only. `--tool-mode` settles it explicitly on any run, and overrides a remembered answer.
 
 <Warning>
   The gateway answer moves the model spend off your Copilot seat and onto your organization's gateway budget. Pick it only when that is what you want. The command-line tool names the change every time it takes that route.
@@ -20649,6 +20664,8 @@ The first run asks one question:
 
 LangWatch remembers the answer, so later runs do not ask again. Everything else is unchanged: `langwatch codex` accepts the same flags and the same subcommands as `codex`, and it returns the same exit code.
 
+You do not always see the question. When your organization allows only one of the two paths, LangWatch takes that path without asking. A run with no terminal attached, in CI for example, keeps your own plan and sends telemetry only. `--tool-mode` settles it explicitly on any run, and overrides a remembered answer.
+
 <Note>
   A virtual key is created the first time you choose the gateway, not at login. If you always keep your own subscription, LangWatch never creates one for you.
 </Note>
@@ -20845,6 +20862,8 @@ The first run asks one question:
 | **Using an API key** | opencode calls travel through the LangWatch gateway with a virtual key. LangWatch receives telemetry and applies your budget and your policies. |
 
 LangWatch remembers the answer, so later runs do not ask again. Everything else is unchanged: `langwatch opencode` accepts the same flags as `opencode` and returns the same exit code.
+
+You do not always see the question. When your organization allows only one of the two paths, LangWatch takes that path without asking. A run with no terminal attached, in CI for example, keeps your own plan and sends telemetry only. `--tool-mode` settles it explicitly on any run, and overrides a remembered answer.
 
 <Note>
   A virtual key is created the first time you choose the gateway, not at login. If you always keep your own providers, LangWatch never creates one for you.
@@ -21243,6 +21262,8 @@ Run your agent through the LangWatch wrapper. The first run opens a browser sign
 
 
 The billing question is "How should `langwatch claude` run?", and it offers two answers. The first names the tool's own plan, for example "Using a Claude subscription" or "Using a ChatGPT subscription": it keeps your own plan and login, and LangWatch receives telemetry only. The second is "Using an API key": the model calls route through the LangWatch AI Gateway under your organization's budgets and policies. LangWatch remembers your answer per tool.
+
+You do not always see it. When your organization allows only one of the two paths, LangWatch takes that path without asking, and a run with no terminal attached keeps your own plan and sends telemetry only. `--tool-mode` settles it explicitly on any run.
 
 This is the wrapper's own question, and it is separate from `langwatch login`, which asks where to sign in and which credential to mint. See [the CLI reference](/integration/cli) for that flow.
 
@@ -53250,9 +53271,11 @@ If anything fails or confuses you while following this skill (broken commands, d
 Pick one window and use it everywhere, because `trace export` defaults to the last 7 days. Compute a start and an end date once (30 days back to now is a good default) and pass both:
 
 ```bash
-langwatch trace export --origin coding_agent --format jsonl --limit 1000 \
+langwatch trace export --origin coding_agent --format jsonl --limit 20000 \
   --start-date <start> --end-date <end> -o coding-traces.jsonl
 ```
+
+`--limit` caps the whole export, not one page, so a window with more matches than the limit gives a partial file and the sessions it drops are the ones missing from the buckets. The command reports both counts when it truncates, for example `Exported 20000 traces (48213 total)`. Raise `--limit` until the two agree, or say in the report that the buckets come from a sample of N of M traces.
 
 Report the window you used in the report, and delete `coding-traces.jsonl` once the analysis is done.
 
@@ -53269,7 +53292,7 @@ The events are the raw material: every model call with its input, output, cache-
 Write a small local script (python3 or jq) over the events. Per session, compute:
 
 1. **Peak context**: the largest (input + cache-read) of any model call, and its share of the model's context window.
-2. **Cache rebuilds**: model calls whose cache-creation tokens are the bulk of their input. Each one re-paid for context that was already paid for, at the provider's cache-write rate. That rate is provider and model specific: some price a write above fresh input, some price it the same, and some charge for cache storage by time instead. Take it from the price card of the model in question, never from a rule of thumb.
+2. **Cache rebuilds**: model calls whose cache-creation tokens are the bulk of their input, counted only once the session already holds cached context. The first cache-creating call of a session builds the cache rather than rebuilding it, and it pays for the context once, so it is a setup cost and not a rebuild. Count a write from the first call that follows a call with cache-read tokens, or that follows an explicit cache miss. Each rebuild re-paid for context that was already paid for, at the provider's cache-write rate. That rate is specific to the provider and the model: some price a write above fresh input, some price it the same, and some charge for cache storage by time instead. Take it from the price card of the model in question, never from a rule of thumb.
 3. **Compaction count and where they landed**: a compaction late in a session marks the point where the carried context stopped fitting.
 4. **Cost per model call over session lifetime**: split each session into thirds by call order and compare the average cost per call between the first and last third.
 5. **Waiting time around rebuilds**: rebuilt context is also re-uploaded and re-processed, so rebuild-heavy sessions are slower per turn.
@@ -53293,6 +53316,7 @@ Also state the top finding directly in the conversation, leading with the number
 - Do NOT judge context by peak share alone; a fat context that never rebuilds is cheap, and a modest one that rebuilds every turn is expensive. The rebuild rate carries the finding.
 - Do NOT compare sessions across different models as one population; window sizes and cache pricing differ. Bucket per model, then compare.
 - Do NOT count cache-read tokens as cost the way input tokens are; they bill at a fraction. The split is in the event rows, use it.
+- Do NOT count the first cache-creating call of a session as a rebuild. It builds the cache, and counting it makes every short session look rebuild-heavy and drags the whole bucket with it.
 - Do NOT report a threshold without the sessions behind it; every bucket statistic needs 2 or 3 example session ids.
 - Do NOT include sessions with fewer than 5 model calls; they carry no lifetime signal and flatten the buckets.
 - If the CLI returns an error, report the user-facing consequence, not the raw error text.
@@ -53381,20 +53405,26 @@ If anything fails or confuses you while following this skill (broken commands, d
 
 ## Step 2: Export the Real Mix
 
-Both `analytics query` and `trace export` default to the last 7 days, so a report about a month has to state the window itself. Compute one start date and one end date first, 30 days back to now unless the user names another window, then pass the same pair to every command:
+Settle two things before running anything, and hold both for the whole analysis.
+
+**The window.** `analytics query` and `trace export` both default to the last 7 days, so a report about a month has to state the window itself. Compute one start date and one end date, 30 days back to now unless the user names another window, and pass the same pair to every command.
+
+**The scope.** `analytics query` covers the whole project and has no origin filter, while `trace export` takes `--origin`. Mixing them silently compares application traffic in the totals against coding-agent traffic in the breakdown. When the question is about coding-agent usage, scope the export with `--origin coding_agent` and build every priced number from that export. Use the analytics calls only as a project-wide cross-check, and label them that way in the report. When the question is about the whole project, drop `--origin` and the two agree by construction.
 
 ```bash
 langwatch analytics query --metric total-tokens --group-by metadata.model --format json \
   --start-date <start> --end-date <end>
 langwatch analytics query --metric total-cost --group-by metadata.model --format json \
   --start-date <start> --end-date <end>
-langwatch trace export --format jsonl --limit 1000 \
+langwatch trace export --format jsonl --origin coding_agent --limit 20000 \
   --start-date <start> --end-date <end> -o traces.jsonl
 ```
 
+`--limit` caps the whole export, not one page, so a window with more matches than the limit gives a partial file. The command reports both counts when it truncates, for example `Exported 20000 traces (48213 total)`. Raise `--limit` until the two agree, or say in the report that the numbers come from a sample of N of M traces. Never present a truncated export as the window's total.
+
 Delete `traces.jsonl` once the analysis is done.
 
-For coding-agent usage add `--origin coding_agent` to the export, collect the distinct `metadata.thread_id` values, and pull the per-call rows, because the cache split lives there:
+Collect the distinct `metadata.thread_id` values from the export and pull the per-call rows, because the cache split lives there:
 
 ```bash
 langwatch session events <sessionId> --format json
@@ -53435,7 +53465,7 @@ State the headline numbers directly in the conversation too.
 - Do NOT use remembered prices; fetch the price page and cite it with a date.
 - Do NOT present the repriced number as the migration outcome; it prices the same usage, and a different model changes the usage. Say so once, clearly.
 - Do NOT ignore cache-write pricing; providers that bill writes above fresh input make rebuild-heavy workloads more expensive, not less.
-- Do NOT mix application traffic and coding-agent traffic in one mix when the question is about one of them; scope with `--origin`.
+- Do NOT mix application traffic and coding-agent traffic in one mix when the question is about one of them. The export scopes with `--origin`; the analytics totals cannot, so never take a priced number from an analytics call while the export is scoped.
 - If the CLI returns an error, report the user-facing consequence, not the raw error text.
 ````
 

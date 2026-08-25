@@ -39,6 +39,8 @@ Run your agent through the LangWatch wrapper. The first run opens a browser sign
 
 The billing question is "How should `langwatch claude` run?", and it offers two answers. The first names the tool's own plan, for example "Using a Claude subscription" or "Using a ChatGPT subscription": it keeps your own plan and login, and LangWatch receives telemetry only. The second is "Using an API key": the model calls route through the LangWatch AI Gateway under your organization's budgets and policies. LangWatch remembers your answer per tool.
 
+You do not always see it. When your organization allows only one of the two paths, LangWatch takes that path without asking, and a run with no terminal attached keeps your own plan and sends telemetry only. `--tool-mode` settles it explicitly on any run.
+
 This is the wrapper's own question, and it is separate from `langwatch login`, which asks where to sign in and which credential to mint. See [the CLI reference](/integration/cli) for that flow.
 
 The wrapper changes nothing else: same flags, same subcommands, same exit code as the bare tool.

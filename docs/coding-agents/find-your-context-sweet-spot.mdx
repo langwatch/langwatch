@@ -87,9 +87,11 @@ If anything fails or confuses you while following this skill (broken commands, d
 Pick one window and use it everywhere, because `trace export` defaults to the last 7 days. Compute a start and an end date once (30 days back to now is a good default) and pass both:
 
 ```bash
-langwatch trace export --origin coding_agent --format jsonl --limit 1000 \
+langwatch trace export --origin coding_agent --format jsonl --limit 20000 \
   --start-date <start> --end-date <end> -o coding-traces.jsonl
 ```
+
+`--limit` caps the whole export, not one page, so a window with more matches than the limit gives a partial file and the sessions it drops are the ones missing from the buckets. The command reports both counts when it truncates, for example `Exported 20000 traces (48213 total)`. Raise `--limit` until the two agree, or say in the report that the buckets come from a sample of N of M traces.
 
 Report the window you used in the report, and delete `coding-traces.jsonl` once the analysis is done.
 
@@ -106,7 +108,7 @@ The events are the raw material: every model call with its input, output, cache-
 Write a small local script (python3 or jq) over the events. Per session, compute:
 
 1. **Peak context**: the largest (input + cache-read) of any model call, and its share of the model's context window.
-2. **Cache rebuilds**: model calls whose cache-creation tokens are the bulk of their input. Each one re-paid for context that was already paid for, at the provider's cache-write rate. That rate is provider and model specific: some price a write above fresh input, some price it the same, and some charge for cache storage by time instead. Take it from the price card of the model in question, never from a rule of thumb.
+2. **Cache rebuilds**: model calls whose cache-creation tokens are the bulk of their input, counted only once the session already holds cached context. The first cache-creating call of a session builds the cache rather than rebuilding it, and it pays for the context once, so it is a setup cost and not a rebuild. Count a write from the first call that follows a call with cache-read tokens, or that follows an explicit cache miss. Each rebuild re-paid for context that was already paid for, at the provider's cache-write rate. That rate is specific to the provider and the model: some price a write above fresh input, some price it the same, and some charge for cache storage by time instead. Take it from the price card of the model in question, never from a rule of thumb.
 3. **Compaction count and where they landed**: a compaction late in a session marks the point where the carried context stopped fitting.
 4. **Cost per model call over session lifetime**: split each session into thirds by call order and compare the average cost per call between the first and last third.
 5. **Waiting time around rebuilds**: rebuilt context is also re-uploaded and re-processed, so rebuild-heavy sessions are slower per turn.
@@ -130,6 +132,7 @@ Also state the top finding directly in the conversation, leading with the number
 - Do NOT judge context by peak share alone; a fat context that never rebuilds is cheap, and a modest one that rebuilds every turn is expensive. The rebuild rate carries the finding.
 - Do NOT compare sessions across different models as one population; window sizes and cache pricing differ. Bucket per model, then compare.
 - Do NOT count cache-read tokens as cost the way input tokens are; they bill at a fraction. The split is in the event rows, use it.
+- Do NOT count the first cache-creating call of a session as a rebuild. It builds the cache, and counting it makes every short session look rebuild-heavy and drags the whole bucket with it.
 - Do NOT report a threshold without the sessions behind it; every bucket statistic needs 2 or 3 example session ids.
 - Do NOT include sessions with fewer than 5 model calls; they carry no lifetime signal and flatten the buckets.
 - If the CLI returns an error, report the user-facing consequence, not the raw error text.

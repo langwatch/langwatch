@@ -23,20 +23,26 @@ Personal coding-agent usage needs `langwatch login --device`; a team or applicat
 
 ## Step 2: Export the Real Mix
 
-Both `analytics query` and `trace export` default to the last 7 days, so a report about a month has to state the window itself. Compute one start date and one end date first, 30 days back to now unless the user names another window, then pass the same pair to every command:
+Settle two things before running anything, and hold both for the whole analysis.
+
+**The window.** `analytics query` and `trace export` both default to the last 7 days, so a report about a month has to state the window itself. Compute one start date and one end date, 30 days back to now unless the user names another window, and pass the same pair to every command.
+
+**The scope.** `analytics query` covers the whole project and has no origin filter, while `trace export` takes `--origin`. Mixing them silently compares application traffic in the totals against coding-agent traffic in the breakdown. When the question is about coding-agent usage, scope the export with `--origin coding_agent` and build every priced number from that export. Use the analytics calls only as a project-wide cross-check, and label them that way in the report. When the question is about the whole project, drop `--origin` and the two agree by construction.
 
 ```bash
 langwatch analytics query --metric total-tokens --group-by metadata.model --format json \
   --start-date <start> --end-date <end>
 langwatch analytics query --metric total-cost --group-by metadata.model --format json \
   --start-date <start> --end-date <end>
-langwatch trace export --format jsonl --limit 1000 \
+langwatch trace export --format jsonl --origin coding_agent --limit 20000 \
   --start-date <start> --end-date <end> -o traces.jsonl
 ```
 
+`--limit` caps the whole export, not one page, so a window with more matches than the limit gives a partial file. The command reports both counts when it truncates, for example `Exported 20000 traces (48213 total)`. Raise `--limit` until the two agree, or say in the report that the numbers come from a sample of N of M traces. Never present a truncated export as the window's total.
+
 Delete `traces.jsonl` once the analysis is done.
 
-For coding-agent usage add `--origin coding_agent` to the export, collect the distinct `metadata.thread_id` values, and pull the per-call rows, because the cache split lives there:
+Collect the distinct `metadata.thread_id` values from the export and pull the per-call rows, because the cache split lives there:
 
 ```bash
 langwatch session events <sessionId> --format json
@@ -77,5 +83,5 @@ State the headline numbers directly in the conversation too.
 - Do NOT use remembered prices; fetch the price page and cite it with a date.
 - Do NOT present the repriced number as the migration outcome; it prices the same usage, and a different model changes the usage. Say so once, clearly.
 - Do NOT ignore cache-write pricing; providers that bill writes above fresh input make rebuild-heavy workloads more expensive, not less.
-- Do NOT mix application traffic and coding-agent traffic in one mix when the question is about one of them; scope with `--origin`.
+- Do NOT mix application traffic and coding-agent traffic in one mix when the question is about one of them. The export scopes with `--origin`; the analytics totals cannot, so never take a priced number from an analytics call while the export is scoped.
 - If the CLI returns an error, report the user-facing consequence, not the raw error text.

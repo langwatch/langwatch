@@ -38,6 +38,8 @@ The first run asks one question:
 
 LangWatch remembers the answer, so later runs do not ask again. Everything else is unchanged: `langwatch copilot` accepts the same flags and the same subcommands as `copilot`, and it returns the same exit code.
 
+You do not always see the question. When your organization allows only one of the two paths, LangWatch takes that path without asking. A run with no terminal attached, in CI for example, keeps your own plan and sends telemetry only. `--tool-mode` settles it explicitly on any run, and overrides a remembered answer.
+
 <Warning>
   The gateway answer moves the model spend off your Copilot seat and onto your organization's gateway budget. Pick it only when that is what you want. The command-line tool names the change every time it takes that route.
 </Warning>
