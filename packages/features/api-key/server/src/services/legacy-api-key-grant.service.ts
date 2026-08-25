@@ -133,7 +133,7 @@ export class LegacyApiKeyGrantService {
 
   private guardHeld(apiKeyId: string): boolean {
     const expiresAt = this.emitted.get(apiKeyId);
-    if (expiresAt === undefined) {
+    if (expiresAt === void 0) {
       return false;
     }
     if (this.now() < expiresAt) {

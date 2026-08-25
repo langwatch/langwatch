@@ -113,7 +113,7 @@ export class ApiKeyService extends ApiKeyCapability {
   }
 
   markUsed({ id }: { id: string }): void {
-    void this.repository.updateLastUsedAt({ id }).catch(() => undefined);
+    void this.repository.updateLastUsedAt({ id }).catch(() => void 0);
   }
 
   async list(input: { userId: string; organizationId: string }): Promise<ApiKey[]> {

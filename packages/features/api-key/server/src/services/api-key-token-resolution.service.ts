@@ -51,7 +51,7 @@ export class ApiKeyTokenResolutionService {
     if (verification === "match_legacy") {
       void this.repository
         .upgradeHash({ id: row.id, hashedSecret: this.options.tokens.hash(split.secret) })
-        .catch(() => undefined);
+        .catch(() => void 0);
     }
     this.options.legacyGrants.mint(publicApiKey(row));
     return { ...publicApiKey(row), tokenType: "apiKey" };

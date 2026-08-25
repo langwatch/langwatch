@@ -54,7 +54,8 @@ export class ApiKeyGrantPolicyService {
   }
 
   async isOrgAdmin(input: { userId: string; organizationId: string }): Promise<boolean> {
-    return (await this.options.authz.listUserBindings(input)).some(
+    const bindings = await this.options.authz.listUserBindings(input);
+    return bindings.some(
       (binding) =>
         binding.scopeType === "ORGANIZATION" &&
         binding.scopeId === input.organizationId &&
@@ -66,13 +67,14 @@ export class ApiKeyGrantPolicyService {
     apiKeyId: string;
     organizationId: string;
   }): Promise<boolean> {
-    return (
-      await this.options.authz.listScopeBindings({
-        organizationId: input.organizationId,
-        scopeType: "ORGANIZATION",
-        scopeIds: [input.organizationId],
-      })
-    ).some((binding) => binding.apiKeyId === input.apiKeyId && binding.role === "ADMIN");
+    const bindings = await this.options.authz.listScopeBindings({
+      organizationId: input.organizationId,
+      scopeType: "ORGANIZATION",
+      scopeIds: [input.organizationId],
+    });
+    return bindings.some(
+      (binding) => binding.apiKeyId === input.apiKeyId && binding.role === "ADMIN",
+    );
   }
 
   validatePermissionSelection(input: {
@@ -110,7 +112,7 @@ export class ApiKeyGrantPolicyService {
       }
     }
 
-    return input.permissions?.length ? [...input.permissions].sort() : undefined;
+    return input.permissions?.length ? [...input.permissions].sort() : void 0;
   }
 
   async assertPersonalScopesOwnedBy(input: {

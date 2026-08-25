@@ -75,7 +75,8 @@ export class ApiKeyCatalogService {
     userId: string;
     organizationId: string;
   }): Promise<ApiKeyBinding[]> {
-    return (await this.options.authz.listUserBindings(input)).map((binding) => ({
+    const bindings = await this.options.authz.listUserBindings(input);
+    return bindings.map((binding) => ({
       id: binding.id,
       role: binding.role,
       customRoleId: binding.customRoleId,
@@ -89,13 +90,12 @@ export class ApiKeyCatalogService {
   }: {
     organizationId: string;
   }): Promise<ApiKeyProject[]> {
-    return (
-      await this.options.projects.listByOrganization({
-        organizationId,
-        page: 1,
-        limit: 1000,
-      })
-    ).data.map((project) => ({
+    const page = await this.options.projects.listByOrganization({
+      organizationId,
+      page: 1,
+      limit: 1000,
+    });
+    return page.data.map((project) => ({
       id: project.id,
       name: project.name,
       teamId: project.teamId,
@@ -107,9 +107,12 @@ export class ApiKeyCatalogService {
   }: {
     organizationId: string;
   }): Promise<ApiKeyTeam[]> {
-    return (
-      await this.options.organizations.listTeams({ organizationId, page: 1, limit: 1000 })
-    ).data.map((team) => ({ id: team.id, name: team.name }));
+    const page = await this.options.organizations.listTeams({
+      organizationId,
+      page: 1,
+      limit: 1000,
+    });
+    return page.data.map((team) => ({ id: team.id, name: team.name }));
   }
 
   async getOrgMembers({
@@ -133,13 +136,13 @@ export class ApiKeyCatalogService {
   }
 
   async list(input: { userId: string; organizationId: string }): Promise<ApiKey[]> {
-    return (await this.repository.listForUser(input)).map(publicApiKey);
+    const rows = await this.repository.listForUser(input);
+    return rows.map(publicApiKey);
   }
 
   async listAll({ organizationId }: { organizationId: string }): Promise<ApiKey[]> {
-    return (await this.repository.listForOrganization({ organizationId })).map(
-      publicApiKey,
-    );
+    const rows = await this.repository.listForOrganization({ organizationId });
+    return rows.map(publicApiKey);
   }
 
   async tryGetIngestionKey(input: {
@@ -155,14 +158,16 @@ export class ApiKeyCatalogService {
     organizationId: string;
     projectId: string;
   }): Promise<ApiKey[]> {
-    return (await this.repository.findIngestKeysForProject(input)).map(publicApiKey);
+    const rows = await this.repository.findIngestKeysForProject(input);
+    return rows.map(publicApiKey);
   }
 
   async customRoles(ids: string[], organizationId: string): Promise<ApiKeyRoleSummary[]> {
     if (ids.length === 0) {
       return [];
     }
-    return (await this.options.authz.listUserCreatedRoles({ organizationId }))
+    const roles = await this.options.authz.listUserCreatedRoles({ organizationId });
+    return roles
       .filter((role) => ids.includes(role.id))
       .map((role) => ({
         id: role.id,

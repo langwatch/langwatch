@@ -179,7 +179,7 @@ export class ApiKeyCliService {
           callerIsAdmin: false,
           organizationId: input.organizationId,
         })
-        .catch(() => undefined);
+        .catch(() => void 0);
       throw error;
     }
     return { token: created.token, apiKeyId: created.apiKey.id, scope };

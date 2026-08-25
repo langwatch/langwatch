@@ -117,7 +117,7 @@ export class ApiKeyLifecycleService {
     const existing = await this.getInOrganization(input.id, input.organizationId);
     if (
       SYSTEM_NAMES.has(existing.name) ||
-      (input.name !== undefined && SYSTEM_NAMES.has(input.name))
+      (input.name !== void 0 && SYSTEM_NAMES.has(input.name))
     ) {
       throw new ApiKeyNotFoundError(input.id);
     }
@@ -131,16 +131,16 @@ export class ApiKeyLifecycleService {
       throw new ApiKeyAlreadyRevokedError(input.id);
     }
     const hasPermissionUpdate =
-      input.bindings !== undefined ||
-      input.permissionMode !== undefined ||
-      input.permissions !== undefined;
+      input.bindings !== void 0 ||
+      input.permissionMode !== void 0 ||
+      input.permissions !== void 0;
     const permissions = hasPermissionUpdate
       ? this.grants.validatePermissionSelection({
           bindings: input.bindings ?? [],
           permissionMode: input.permissionMode ?? existing.permissionMode,
           permissions: input.permissions,
         })
-      : undefined;
+      : void 0;
     if (input.bindings) {
       for (const binding of input.bindings) {
         await this.grants.validateScope(binding, input.organizationId);
@@ -160,8 +160,8 @@ export class ApiKeyLifecycleService {
       }
     }
     const effectiveBindings =
-      input.bindings === undefined
-        ? undefined
+      input.bindings === void 0
+        ? void 0
         : await this.grants.writeBindings({
             apiKeyId: input.id,
             organizationId: input.organizationId,
