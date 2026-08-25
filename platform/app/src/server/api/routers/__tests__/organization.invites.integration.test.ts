@@ -122,7 +122,6 @@ describe("Organization Invites Integration", () => {
   let adminUserId: string;
   let memberUserId: string;
   let adminCaller: ReturnType<typeof appRouter.createCaller>;
-  let memberCaller: ReturnType<typeof appRouter.createCaller>;
   // Invitee users each test mints; accumulated so teardown deletes exactly
   // these and never sweeps wider (cleanupTestRows' accumulator pattern).
   const inviteeUserIds: string[] = [];
@@ -241,15 +240,6 @@ describe("Organization Invites Integration", () => {
       },
     });
     adminCaller = appRouter.createCaller(adminCtx);
-
-    // Create member caller
-    const memberCtx = createInnerTRPCContext({
-      session: {
-        user: { id: memberUserId },
-        expires: "1",
-      },
-    });
-    memberCaller = appRouter.createCaller(memberCtx);
   });
 
   afterEach(async () => {

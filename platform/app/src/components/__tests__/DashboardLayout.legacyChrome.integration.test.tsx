@@ -196,6 +196,7 @@ vi.mock("../CurrentDrawer", () => ({ CurrentDrawer: () => null }));
 vi.mock("../AnnouncementBanner", () => ({ AnnouncementBanner: () => null }));
 vi.mock("../UpgradeModal", () => ({ GlobalUpgradeModal: () => null }));
 vi.mock("../SavedViewsBar", () => ({ SavedViewsBar: () => null }));
+vi.mock("../me/PasskeyNudge", () => ({ PasskeyNudge: () => null }));
 vi.mock("../governance/AdminViewingAsBanner", () => ({
   AdminViewingAsBanner: () => null,
 }));

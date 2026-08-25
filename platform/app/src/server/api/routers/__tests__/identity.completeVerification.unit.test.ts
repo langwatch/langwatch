@@ -85,6 +85,10 @@ vi.mock(
     connectionGrandfatherMigration: () => ({}),
     joinRequests: () => ({}),
     joinRequestsService: () => ({}),
+    // These two are re-exported from ./signin-method-policy rather than built
+    // here, so they are the functions themselves, not factories returning one.
+    deploymentIsFederationCapable: () => false,
+    resolveSignInMethodPolicy: async () => ({}),
     signInDomainRoutingPort: () => ({}),
     signInRouter: () => ({}),
     signUpVerification: () => ({}),
