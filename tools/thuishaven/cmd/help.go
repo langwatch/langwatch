@@ -115,7 +115,8 @@ var envHelpText = `Environment variables.
                                  one per ~4 GiB RAM, capped at CPU count).
     HAVEN_TYPECHECK_MAX_RSS_MB   Kill a typecheck run over this RSS (default 6144
                                  = 6 GiB) or over 10 minutes wall-clock — a
-                                 runaway tsgo shouldn't sit on a slot forever.
+                                 runaway typecheck shouldn't sit on a slot
+                                 forever.
     CHECK_SLOTS=N                Caps concurrent whole-repo checks ("pnpm
                                  typecheck", "pnpm lint") machine wide (0
                                  disables). With haven installed those runs are
