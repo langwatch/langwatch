@@ -4,7 +4,7 @@ Feature: Machine-wide slots for whole-repo checks
   So that N parallel checks never take the machine down, and a slow one
   explains itself instead of looking hung
 
-  # Both checks saturate the machine on purpose. A tsgo run peaks around 3 to 4
+  # Both checks saturate the machine on purpose. A typecheck peaks around 3 to 4
   # GiB and uses every core; a biome run over 6,800 files spends 38 CPU-seconds
   # in 4 seconds of wall clock. That is the right trade for one run, and capping
   # either tool's threads only stretches the same CPU cost over 5x the wall
@@ -256,11 +256,15 @@ Feature: Machine-wide slots for whole-repo checks
   # --- The bin shims: the package scripts are not the only way in ---
 
   # Wrapping the scripts left every other route to the binary uncounted, and
-  # they get used: `pnpm exec tsgo --noEmit -p tsconfig.tsgo.json`,
-  # `./node_modules/.bin/tsgo`, and the standing advice to iterate with
+  # they get used: `pnpm exec tsc --noEmit -p tsconfig.tsgo.json`,
+  # `./node_modules/.bin/tsc`, and the standing advice to iterate with
   # targeted checks, widened to the whole project. Observed in the wild as
-  # three tsgo processes on an 18 GB laptop with the limit set to 2, one of
+  # three compiler processes on an 18 GB laptop with the limit set to 2, one of
   # them started from the same worktree as a properly queued run.
+  #
+  # The compiler answers to two names — typescript@7 installs it as `tsc`,
+  # @typescript/native-preview as `tsgo` — so the shims cover both and so does
+  # haven's gate (ADR-095).
   #
   # dev/scripts/install-check-shims.mjs makes platform/app's bin entries
   # themselves the boundary, so the route into the tool stops mattering. Only
@@ -270,7 +274,7 @@ Feature: Machine-wide slots for whole-repo checks
 
   @unit
   Scenario: A whole-project run counts however it was started
-    When I run "pnpm exec tsgo --noEmit -p tsconfig.tsgo.json" instead of "pnpm typecheck"
+    When I run "pnpm exec tsc --noEmit -p tsconfig.tsgo.json" instead of "pnpm typecheck"
     Then the run counts against the limit, exactly as the script would have
 
   @unit
@@ -287,12 +291,12 @@ Feature: Machine-wide slots for whole-repo checks
   # file to check is what turns a whole-project run into one nothing waits for.
   @unit
   Scenario: A subcommand or a flag's value is not a target
-    When I run "biome check" with no paths, or "tsgo --pretty false"
+    When I run "biome check" with no paths, or "tsc --pretty false"
     Then the run counts against the limit, because neither names a file and both walk the project
 
   @unit
   Scenario: A run that names files starts immediately
-    When I run "tsgo --noEmit src/foo.ts"
+    When I run "tsc --noEmit src/foo.ts"
     Then it starts without waiting, so the iterate-fast loop never sits behind a full run
 
   @unit
@@ -303,7 +307,7 @@ Feature: Machine-wide slots for whole-repo checks
   @unit
   Scenario: A check does not queue behind itself
     Given "pnpm typecheck" holds the only slot
-    When the tsgo it runs would otherwise ask for a slot of its own
+    When the compiler it runs would otherwise ask for a slot of its own
     Then it starts without waiting
     And the check does not sit out the maximum wait before starting
 
