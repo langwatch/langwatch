@@ -14,10 +14,12 @@ export function IconGlyph({
   icon,
   monochrome = false,
   size = "16px",
+  testId,
 }: {
   icon: React.ReactNode;
   monochrome?: boolean;
   size?: string | number;
+  testId?: string;
 }) {
   return (
     <Box
@@ -34,6 +36,7 @@ export function IconGlyph({
       // hard-burn against the dark surface.
       _dark={monochrome ? { filter: "invert(1) brightness(0.92)" } : undefined}
       aria-hidden="true"
+      data-testid={testId}
     >
       {icon}
     </Box>
