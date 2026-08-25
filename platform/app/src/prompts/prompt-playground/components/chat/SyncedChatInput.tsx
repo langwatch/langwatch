@@ -145,7 +145,19 @@ export function SyncedChatInput({
       {/* One integrated surface, the way Langy's composer reads: the field and
           its action live inside a single rounded card that lights up on focus,
           rather than a bordered box with a control floating over one corner. */}
+      {/* Focus is tracked on the CARD, not on the field. React's onFocus and
+          onBlur are focusin/focusout, so they fire for any descendant -- which
+          is what keeps the sync checkbox on screen while it holds keyboard
+          focus. Tracking the textarea alone hid the control the moment a
+          keyboard user tabbed onto it. `relatedTarget` is where focus is
+          going; still inside the card means the card is still focused. */}
       <Box
+        onFocus={() => setIsFocused(true)}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            setIsFocused(false);
+          }
+        }}
         position="relative"
         borderRadius={COMPOSER_RADIUS}
         borderWidth="1px"
@@ -176,8 +188,6 @@ export function SyncedChatInput({
             value={currentInput}
             onChange={(e) => setCurrentInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
             ref={textareaRef}
             data-tab-id={tabId}
           />

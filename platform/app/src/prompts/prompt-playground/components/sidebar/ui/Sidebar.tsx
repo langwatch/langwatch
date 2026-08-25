@@ -215,7 +215,14 @@ function SidebarItem({
     // looking at?". Neutral rather than branded: a coloured fill on a list this
     // dense shouts, and the fill alone already reads as selected. Hover is the
     // fainter fill, so the two never look alike.
+    // A row that does something is a button, not a div that happens to take
+    // clicks: as a `Box` it had no focus target, no role and no Enter/Space,
+    // so the rail was reachable with a mouse and with nothing else. Rows
+    // without an `onClick` stay plain -- there is nothing to activate.
     <Box
+      as={onClick ? "button" : undefined}
+      type={onClick ? "button" : undefined}
+      textAlign="left"
       fontSize="sm"
       color="fg"
       fontWeight={active ? "medium" : "normal"}

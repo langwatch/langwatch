@@ -152,7 +152,15 @@ export function ImagePart({
   const align = alignForRole(part.role, roleMode);
   return (
     <VStack align={align} data-align={align}>
-      <Image src={part.src} maxH="200px" borderRadius="md" />
+      {/* Chakra's Image emits a bare <img>, and one with no alt is announced
+          as its URL. The conversation does not carry a caption for these, so
+          the role it arrived under is the most a screen reader can be told. */}
+      <Image
+        src={part.src}
+        alt={part.role ? `Image from ${part.role}` : "Image in conversation"}
+        maxH="200px"
+        borderRadius="md"
+      />
     </VStack>
   );
 }

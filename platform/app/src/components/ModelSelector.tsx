@@ -465,6 +465,10 @@ export const ModelSelector = React.memo(function ModelSelector({
         borderColor="border.muted"
         borderRadius="lg"
         background="bg.panel"
+        // `role` as well as the label: an HStack is a div, and a div carrying
+        // only aria-label is not announced at all. `status` is what this is --
+        // a transient progress message -- and it makes the label reachable.
+        role="status"
         aria-label="Loading models"
       >
         <SkeletonCircle size={size === "sm" ? "14px" : "18px"} />

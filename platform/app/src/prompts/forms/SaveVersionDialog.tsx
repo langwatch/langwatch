@@ -78,7 +78,10 @@ export function SaveVersionDialog({
               void handleSubmit(submitCallback)();
             }}
           >
-            <Field.Root>
+            {/* Chakra v3 renders `Field.ErrorText` only when the Root is
+                invalid. Without this the branch below picks the error, and
+                nothing appears -- a rejected save looked like a no-op. */}
+            <Field.Root invalid={!!errors.commitMessage}>
               <Field.Label>Description</Field.Label>
               <Input
                 placeholder="Enter a description for this version"
