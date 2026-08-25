@@ -52,10 +52,12 @@ const ink = {
 export const EMAIL_COLOR = {
   /** `auth.ground` (light). The paper everything stands on. */
   ground: "#ffffff",
-  /** A half-step under the card, so the card reads as a pane on a page. */
-  page: "#faf9f8",
-  /** `auth.action` (light). The primary action, and nothing else. */
-  action: brand[600],
+  /** The site's cream paper, under the card: the page the mail stands on
+   *  reads as the website's own ground, and the white card as a pane on it. */
+  page: "#f6f2ea",
+  /** `auth.action` (light): the site's ink pill. The orange stays in the
+   *  details — links, tints, accents — never on the button. */
+  action: ink[900],
   /** `auth.onAction`. */
   onAction: "#ffffff",
   /** `auth.detail` (light): the brand without being the button. */

@@ -44,16 +44,18 @@ describe("emailTheme", () => {
       expect(EMAIL_COLOR.ground).toBe(light);
     });
 
-    it("takes the action colour from the brand stop the auth screens names", () => {
-      // The token is `action: mode(brand[600], ...)`, so the stop is read from
-      // the token rather than assumed: a auth screens that moved its action to
-      // another stop fails here rather than shipping a second orange.
-      const stop = /action:\s*mode\(\s*brand\[(\d+)\]/.exec(
-        authThemeSource,
-      )?.[1];
+    it("takes the action colour from the ink stop the auth screens names", () => {
+      // The token is `action: mode(ink[900], ...)` — the site's ink pill —
+      // so the stop is read from the token rather than assumed: an auth
+      // screen that moved its action fails here rather than shipping a
+      // second button colour in the mail.
+      const stop = /action:\s*mode\(\s*ink\[(\d+)\]/.exec(authThemeSource)?.[1];
 
       expect(stop).toBeDefined();
-      expect(EMAIL_COLOR.action).toBe(brandStop(Number(stop)));
+      const inkStop = new RegExp(`\\b${stop}:\\s*"(#[0-9a-fA-F]{6})"`).exec(
+        authThemeSource,
+      )?.[1];
+      expect(EMAIL_COLOR.action).toBe(inkStop);
     });
 
     it("takes the tinted-surface text colour from the same ramp", () => {
