@@ -25,16 +25,16 @@ import {
 } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight, History, Play } from "lucide-react";
 import { useState } from "react";
-import { SimulationModelSelect } from "~/components/scenarios/SimulationModelSelect";
 import { UNFILED_OPTION_LABEL } from "~/components/scenarios/ScenarioForm";
+import { SimulationModelSelect } from "~/components/scenarios/SimulationModelSelect";
 import { Dialog } from "~/components/ui/dialog";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { TagList } from "~/components/ui/TagList";
-import { FG_FAINT, FG_MUTED } from "../shared/design";
 import { DIALOG_FIELD_STYLE, FieldLabel } from "../shared/DialogFields";
+import { FG_FAINT, FG_MUTED } from "../shared/design";
 import { SmallButton } from "../shared/SmallButton";
-import type { CaseDraft, CaseEditorState } from "./useCaseEditor";
 import type { TestSuiteEntry } from "./test-cases";
+import type { CaseDraft, CaseEditorState } from "./useCaseEditor";
 
 /** What the dialog says a test case is for. */
 export const CASE_MODAL_SUBTITLE =

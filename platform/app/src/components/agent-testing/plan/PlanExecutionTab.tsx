@@ -13,8 +13,12 @@ import { Box, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { PromptTargetMappingSection } from "~/components/suites/PromptTargetMappingSection";
 import { TargetPicker } from "~/components/suites/TargetPicker";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
+import {
+  DIALOG_FIELD_STYLE,
+  FieldError,
+  FieldLabel,
+} from "../shared/DialogFields";
 import { FG_MUTED } from "../shared/design";
-import { FieldError, FieldLabel, DIALOG_FIELD_STYLE } from "../shared/DialogFields";
 import type { PlanEditorState } from "./usePlanEditor";
 
 export function PlanExecutionTab({

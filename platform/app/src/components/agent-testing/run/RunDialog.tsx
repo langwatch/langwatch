@@ -104,7 +104,12 @@ export function RunDialog({
           </Dialog.Title>
           <Dialog.CloseTrigger />
         </Dialog.Header>
-        <Dialog.Body paddingX={5} paddingY={4} maxHeight="58vh" overflowY="auto">
+        <Dialog.Body
+          paddingX={5}
+          paddingY={4}
+          maxHeight="58vh"
+          overflowY="auto"
+        >
           <RunDialogFields form={form} isBusy={controller.isBusy} />
         </Dialog.Body>
         <RunDialogFooter

@@ -6,7 +6,13 @@
  */
 
 import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
-import { MessageSquare, MoreVertical, Pencil, Play, Square } from "lucide-react";
+import {
+  MessageSquare,
+  MoreVertical,
+  Pencil,
+  Play,
+  Square,
+} from "lucide-react";
 import { buildDisplayTitle } from "~/components/suites/run-history-transforms";
 import { isCancellableStatus } from "~/components/suites/useCancelScenarioRun";
 import { Menu } from "~/components/ui/menu";
@@ -215,9 +221,7 @@ export function RunResultRow({
         <ResultRowActionsMenu
           displayName={displayName}
           onOpenConversation={() => onScenarioRunClick(scenarioRun)}
-          onRerunCase={
-            onRerunCase ? () => onRerunCase(scenarioRun) : undefined
-          }
+          onRerunCase={onRerunCase ? () => onRerunCase(scenarioRun) : undefined}
           onEditCase={onEditCase ? () => onEditCase(scenarioRun) : undefined}
         />
       </HStack>

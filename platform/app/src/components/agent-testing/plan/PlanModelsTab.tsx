@@ -7,8 +7,8 @@
 
 import { Box, Grid, Text, VStack } from "@chakra-ui/react";
 import { SimulationModelSelect } from "~/components/scenarios/SimulationModelSelect";
-import { FG_MUTED } from "../shared/design";
 import { FieldError, FieldLabel } from "../shared/DialogFields";
+import { FG_MUTED } from "../shared/design";
 import type { PlanEditorState } from "./usePlanEditor";
 
 export function PlanModelsTab({ editor }: { editor: PlanEditorState }) {

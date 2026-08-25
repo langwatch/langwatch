@@ -77,9 +77,7 @@ function PromptRow({
           v{prompt.version}
         </Text>
       </Box>
-      {isActive && (
-        <Check size={14} color="var(--chakra-colors-blue-500)" />
-      )}
+      {isActive && <Check size={14} color="var(--chakra-colors-blue-500)" />}
     </HStack>
   );
 }

@@ -27,8 +27,7 @@ const WINDOWS: { key: RelativePresetKey; days: number; label: string }[] = [
 ];
 
 /** What the picker says about the runs it cannot reach. */
-export const COLD_STORAGE_NOTE =
-  "Runs older than 30 days are in cold storage.";
+export const COLD_STORAGE_NOTE = "Runs older than 30 days are in cold storage.";
 
 /**
  * How many days the window spans, counted the way the shared period control

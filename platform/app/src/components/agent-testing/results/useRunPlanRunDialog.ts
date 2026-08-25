@@ -13,11 +13,11 @@
 import { useCallback, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { readScenarioTarget } from "~/hooks/useScenarioTarget";
-import { parseSuiteTargets } from "~/server/suites/types";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import { parseSuiteTargets } from "~/server/suites/types";
 import { api } from "~/utils/api";
-import type { RunDialogSubject } from "../run/RunDialog";
 import { useRunStartedHandler } from "../cases/useCaseRunActions";
+import type { RunDialogSubject } from "../run/RunDialog";
 import type { RunPlan } from "./run-plans";
 
 export type RunPlanRunDialog = {

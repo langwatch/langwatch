@@ -12,8 +12,12 @@
 import { Box, HStack, Input, Text, Textarea, VStack } from "@chakra-ui/react";
 import { Folder } from "lucide-react";
 import { ScenarioPicker } from "~/components/suites/ScenarioPicker";
+import {
+  DIALOG_FIELD_STYLE,
+  FieldError,
+  FieldLabel,
+} from "../shared/DialogFields";
 import { FG_FAINT } from "../shared/design";
-import { FieldError, FieldLabel, DIALOG_FIELD_STYLE } from "../shared/DialogFields";
 import type { PlanEditorState } from "./usePlanEditor";
 
 export function PlanGeneralTab({
@@ -117,9 +121,7 @@ function FixedScopeRow({
       data-testid="plan-fixed-scope"
     >
       <Folder size={13} color="var(--chakra-colors-fg-muted)" />
-      <Text color="fg.muted">
-        Test cases from the {suiteName} test suite
-      </Text>
+      <Text color="fg.muted">Test cases from the {suiteName} test suite</Text>
       <Box flex={1} />
       <Text fontSize="11.5px" color={FG_FAINT} whiteSpace="nowrap">
         {caseCount === 1 ? "1 case" : `${caseCount} cases`}

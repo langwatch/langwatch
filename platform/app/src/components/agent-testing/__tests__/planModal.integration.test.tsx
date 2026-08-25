@@ -17,7 +17,9 @@ const mockCreate = vi.hoisted(() => vi.fn());
 const mockUpdate = vi.hoisted(() => vi.fn());
 const mockSuiteGetById = vi.hoisted(() => vi.fn());
 const mockCloseDrawer = vi.hoisted(() => vi.fn());
-const mockDrawerParams = vi.hoisted(() => ({ current: {} as { suiteId?: string } }));
+const mockDrawerParams = vi.hoisted(() => ({
+  current: {} as { suiteId?: string },
+}));
 
 const emptyQuery = vi.hoisted(() => () => ({
   data: undefined,
@@ -235,7 +237,10 @@ describe("the run plan dialog", () => {
     beforeEach(() => {
       mockDrawerParams.current = { suiteId: "suite_1" };
       mockSuiteGetById.mockReturnValue({
-        data: storedSuite({ kind: "folder", scenarioIds: ["scen_1", "scen_2"] }),
+        data: storedSuite({
+          kind: "folder",
+          scenarioIds: ["scen_1", "scen_2"],
+        }),
         isLoading: false,
       });
     });
@@ -250,7 +255,9 @@ describe("the run plan dialog", () => {
         "Test cases from the Checkout test suite",
       );
       expect(scope).toHaveTextContent("2 cases");
-      expect(screen.queryByText("Angry refund request")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Angry refund request"),
+      ).not.toBeInTheDocument();
     });
   });
 });

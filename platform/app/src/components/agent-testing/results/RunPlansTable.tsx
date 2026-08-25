@@ -38,7 +38,12 @@ import { Menu } from "~/components/ui/menu";
 import { useNow } from "~/hooks/useNow";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { ContentColumn } from "../shared/ContentColumn";
-import { FG_FAINT, FG_MUTED, ROW_HOVER_BG, TABLE_HEADER_BG } from "../shared/design";
+import {
+  FG_FAINT,
+  FG_MUTED,
+  ROW_HOVER_BG,
+  TABLE_HEADER_BG,
+} from "../shared/design";
 import { AgentTestingPeriodPicker, periodDays } from "../shared/PeriodPicker";
 import { planScopeNote, type RunPlan, toRunGroupSummary } from "./run-plans";
 
@@ -47,8 +52,7 @@ import { planScopeNote, type RunPlan, toRunGroupSummary } from "./run-plans";
  * window between the result and the chevron; the plan queries only read the
  * last run, so that place holds the row menu instead.
  */
-const PLAN_COLUMNS =
-  "minmax(0,1fr) 60px 58px minmax(0,560px) 32px 20px";
+const PLAN_COLUMNS = "minmax(0,1fr) 60px 58px minmax(0,560px) 32px 20px";
 
 export type RunPlansTableProps = {
   plans: RunPlan[];
@@ -215,10 +219,7 @@ function PlanRow({
         <LastResultCell plan={plan} days={days} />
       </HStack>
 
-      <HStack
-        justify="flex-end"
-        onClick={(event) => event.stopPropagation()}
-      >
+      <HStack justify="flex-end" onClick={(event) => event.stopPropagation()}>
         <PlanRowMenu
           plan={plan}
           onOpenLastRun={() => onSelectPlan(plan.slug)}

@@ -9,8 +9,8 @@
 import { Box, Button, Text, VStack } from "@chakra-ui/react";
 import { ArrowLeft } from "lucide-react";
 import { FG_FAINT, FG_MUTED } from "../shared/design";
-import type { PeriodControls } from "./period-controls";
 import { AgentTestingPeriodPicker } from "../shared/PeriodPicker";
+import type { PeriodControls } from "./period-controls";
 import { RunsSidebarBatchEntry } from "./RunsSidebarBatchEntry";
 import { RunsSidebarEntry } from "./RunsSidebarEntry";
 import type { RunPlan } from "./run-plans";
