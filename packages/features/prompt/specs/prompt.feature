@@ -19,3 +19,9 @@ Feature: Prompt service
     When a caller creates or renames a prompt tag
     Then the Prompt service applies the organization scope
     And no separate tag feature or repository is created
+
+  Scenario: trace metadata uses the Prompt contract
+    Given SDK span attributes describe a Prompt handle, version, tag, or variables
+    When Trace reads the Prompt metadata
+    Then the Prompt contract interprets the attributes consistently
+    And Trace retains ownership of locating the reference in a trace

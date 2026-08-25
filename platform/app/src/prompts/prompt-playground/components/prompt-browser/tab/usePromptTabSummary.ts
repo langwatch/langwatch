@@ -1,9 +1,8 @@
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
-import { NEW_PROMPT_TITLE } from "@langwatch/prompt-web";
+import { NEW_PROMPT_TITLE, shouldShowVersionBadge } from "@langwatch/prompt-web";
 import { useHasUnsavedChanges } from "../../../hooks/useHasUnsavedChanges";
 import { useDraggableTabsBrowserStore } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
 import { useTabById } from "../../../prompt-playground-store/useTabById";
-import { shouldShowVersionBadge } from "./shouldShowVersionBadge";
 
 /** What a prompt tab displays about itself, wherever it is displayed. */
 export interface PromptTabSummary {

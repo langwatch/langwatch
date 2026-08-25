@@ -1,4 +1,5 @@
 import { Box, Button, HStack, Tabs, Text } from "@chakra-ui/react";
+import { useTabId } from "@langwatch/prompt-web";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { LuEraser } from "react-icons/lu";
@@ -14,7 +15,6 @@ import {
   PromptPlaygroundChat,
   type PromptPlaygroundChatRef,
 } from "../../chat/PromptPlaygroundChat";
-import { useTabId } from "../ui/TabContext";
 import { DemonstrationsTabContent } from "./DemonstrationsTabContent";
 import type { LayoutMode } from "./PromptBrowserWindowContent";
 import { ResizableDivider } from "./ResizableDivider";

@@ -1,4 +1,5 @@
 import { HStack } from "@chakra-ui/react";
+import { TabIdProvider } from "@langwatch/prompt-web";
 import { LuColumns2 } from "react-icons/lu";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -8,7 +9,6 @@ import { ExperimentFromPlaygroundButton } from "./ExperimentFromPlaygroundButton
 import { PromptTabStrip } from "./PromptTabStrip";
 import { PromptBrowserWindowContent } from "./prompt-browser-window/PromptBrowserWindowContent";
 import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";
-import { TabIdProvider } from "./ui/TabContext";
 
 /**
  * Tabbed browser for the prompt playground with draggable tabs and split-pane support.

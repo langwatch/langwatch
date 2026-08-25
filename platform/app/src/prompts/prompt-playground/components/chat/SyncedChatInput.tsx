@@ -1,9 +1,9 @@
 import { Box, HStack } from "@chakra-ui/react";
+import { useTabId } from "@langwatch/prompt-web";
 import type { InputProps } from "@copilotkit/react-ui";
 import { useEffect, useRef, useState } from "react";
 import { useIsTabActive } from "../../hooks/useIsTabActive";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
-import { useTabId } from "../prompt-browser/ui/TabContext";
 import { usePromptPlaygroundChatSync } from "./PromptPlaygroundChatContext";
 import { ChatSendButton } from "./ui/ChatSendButton";
 import { ChatSyncCheckbox } from "./ui/ChatSyncCheckbox";

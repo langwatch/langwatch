@@ -1,4 +1,5 @@
 import { Box } from "@chakra-ui/react";
+import { useTabId } from "@langwatch/prompt-web";
 import { useFormContext } from "react-hook-form";
 import type { PromptConfigFormValues } from "~/prompts";
 import { PromptEditorHeader } from "~/prompts/components/PromptEditorHeader";
@@ -7,7 +8,6 @@ import { useHasUnsavedChanges } from "~/prompts/prompt-playground/hooks/useHasUn
 import { useDraggableTabsBrowserStore } from "~/prompts/prompt-playground/prompt-playground-store/DraggableTabsBrowserStore";
 import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompts/utils/llmPromptConfigUtils";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import { useTabId } from "../ui/TabContext";
 
 /**
  * Header bar for the prompt browser with handle, model selector, and action buttons.

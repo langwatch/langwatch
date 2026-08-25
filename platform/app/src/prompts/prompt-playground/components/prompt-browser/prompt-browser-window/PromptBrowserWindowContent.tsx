@@ -1,4 +1,5 @@
 import { Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
+import { useTabId } from "@langwatch/prompt-web";
 import { cloneDeep, debounce } from "lodash-es";
 import {
   createContext,
@@ -16,7 +17,6 @@ import {
   useDraggableTabsBrowserStore,
 } from "~/prompts/prompt-playground/prompt-playground-store/DraggableTabsBrowserStore";
 import type { PromptConfigFormValues } from "~/prompts/types";
-import { useTabId } from "../ui/TabContext";
 import { PromptBrowserHeader } from "./PromptBrowserHeader";
 import { PromptMessagesEditor } from "./PromptMessagesEditor";
 import { PromptTabbedSection } from "./PromptTabbedSection";
@@ -25,7 +25,7 @@ import { PromptTabbedSection } from "./PromptTabbedSection";
 const TABS_AND_DIVIDER_HEIGHT = 48;
 const MIN_CHAT_AREA = 200;
 
-export { useTabId } from "../ui/TabContext";
+export { useTabId } from "@langwatch/prompt-web";
 
 export type LayoutMode = "vertical" | "horizontal";
 

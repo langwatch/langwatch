@@ -3,6 +3,7 @@ export * from "./prompt.commands";
 export * from "./prompt.errors";
 export * from "./prompt.service";
 export * from "./prompt.shorthand";
+export * from "./prompt.trace-reference";
 export * from "./prompt.enums";
 export {
   nodeDatasetSchema,

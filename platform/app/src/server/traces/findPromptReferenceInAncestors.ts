@@ -1,4 +1,7 @@
-import { type PromptReference, parsePromptReference } from "./parsePromptReference";
+import {
+  type ParsedPromptTraceReference as PromptReference,
+  parsePromptTraceReference,
+} from "@langwatch/prompt-contract";
 
 /**
  * Span shape used for prompt reference lookup.
@@ -12,7 +15,7 @@ export interface PromptLookupSpan {
 }
 
 /**
- * Prompt-relevant attribute keys that parsePromptReference reads.
+ * Prompt-relevant attribute keys that parsePromptTraceReference reads.
  * Used to selectively extract only these from nested params objects.
  */
 const PROMPT_ATTRIBUTE_KEYS = [
@@ -24,7 +27,7 @@ const PROMPT_ATTRIBUTE_KEYS = [
 
 /**
  * Converts nested span params (e.g. `{ langwatch: { prompt: { id: "..." } } }`)
- * to the flat dot-notation attributes expected by parsePromptReference
+ * to the flat dot-notation attributes expected by parsePromptTraceReference
  * (e.g. `{ "langwatch.prompt.id": "..." }`).
  *
  * Only extracts prompt-relevant keys to keep the mapping minimal and safe.
@@ -137,7 +140,7 @@ export function findPromptReferenceInAncestors({
     }
 
     // Fall back to checking the ancestor itself (old behavior).
-    const ancestorRef = parsePromptReference(ancestor.attributes);
+    const ancestorRef = parsePromptTraceReference(ancestor.attributes);
     if (ancestorRef.promptHandle) {
       return ancestorRef;
     }
@@ -190,7 +193,7 @@ function findClosestPrecedingSibling({
     if (excludeSpanIds.has(child.spanId)) continue;
     if (child.startTime > targetStartTime) continue;
 
-    const ref = parsePromptReference(child.attributes);
+    const ref = parsePromptTraceReference(child.attributes);
     if (ref.promptHandle) {
       preceding.push({ ref, startTime: child.startTime });
     }
