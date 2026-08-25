@@ -47,6 +47,28 @@ export const resolveStatUnit = (
   return { display: trimmed, isSpaced: !isSymbol(trimmed) };
 };
 
+/**
+ * Below this magnitude the default three decimal places round a reading the
+ * model measured down to nothing: a per-row cost of 0.0001543 was drawn as
+ * "0 usd" beside prose that named the figure exactly.
+ */
+const SMALL_MAGNITUDE = 0.01;
+
+/** How many significant digits a reading below that magnitude keeps. */
+const SMALL_MAGNITUDE_SIGNIFICANT_DIGITS = 6;
+
+/**
+ * A reading as a reader should see it. Small magnitudes keep significant
+ * digits rather than decimal places, so they never read as zero; everything
+ * else keeps the grouped, three-decimal drawing that suits a whole number.
+ */
+const formatNumber = (value: number): string =>
+  value !== 0 && Math.abs(value) < SMALL_MAGNITUDE
+    ? value.toLocaleString(undefined, {
+        maximumSignificantDigits: SMALL_MAGNITUDE_SIGNIFICANT_DIGITS,
+      })
+    : value.toLocaleString();
+
 /** The full figure a reader sees, number and unit together. */
 export const formatStatFigure = ({
   value,
@@ -55,7 +77,7 @@ export const formatStatFigure = ({
   value: string | number;
   unit?: string;
 }): string => {
-  const number = typeof value === "number" ? value.toLocaleString() : value;
+  const number = typeof value === "number" ? formatNumber(value) : value;
   const resolved = resolveStatUnit(unit);
   if (!resolved) return number;
   return `${number}${resolved.isSpaced ? " " : ""}${resolved.display}`;
