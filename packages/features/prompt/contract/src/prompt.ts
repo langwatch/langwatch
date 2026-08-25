@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 
 export const PROMPT_FEATURE_ID = "prompt" as const;
 export const promptScopeSchema = z.enum(["PROJECT", "ORGANIZATION"]);

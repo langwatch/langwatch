@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 import { promptHandleSchema, promptScopeSchema, promptMessageSchema, promptInputSchema, promptOutputSchema, promptingTechniqueSchema, type PromptConfigData } from "./prompt";
 
 export const promptConfigFieldsSchema = z.object({

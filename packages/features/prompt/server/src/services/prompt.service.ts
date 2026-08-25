@@ -6,7 +6,7 @@ import {
   type PromptTag,
   type PromptTagAssignment,
 } from "@langwatch/prompt-contract";
-import type { z } from "zod/v4";
+import type { z } from "zod";
 import type { LlmPromptConfigVersion, Prisma, PrismaClient, PromptScope } from "../repositories/prisma/prisma.prompt.repository";
 import {
   deriveResponseFormatFromOutputs,

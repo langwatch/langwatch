@@ -1,4 +1,4 @@
-import type { z } from "zod/v4";
+import type { z } from "zod";
 import type { LlmPromptConfigVersion, Prisma, PrismaClient } from "../repositories/prisma/prisma.prompt.repository";
 import type { messageSchema } from "@langwatch/prompt-contract";
 import type { SchemaVersion } from "@langwatch/prompt-contract";

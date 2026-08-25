@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 import { SchemaVersion } from "./prompt.enums";
 
 const LlmConfigInputTypes = ["str", "float", "bool", "image", "list", "list[str]", "list[float]", "list[int]", "list[bool]", "dict", "chat_messages"] as const;

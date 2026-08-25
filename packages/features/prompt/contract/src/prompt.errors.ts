@@ -1,5 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
-import { z } from "zod/v4";
+import { z } from "zod";
 
 export const promptProblemSchema = z.object({ code: z.string(), message: z.string(), details: z.unknown().optional() }).strict();
 export type PromptProblem = z.infer<typeof promptProblemSchema>;
@@ -25,7 +25,7 @@ export class PromptSystemPromptConflictError extends HandledError {
 export class PromptSystemPromptRequiredError extends HandledError {
   declare readonly code: "prompt_system_prompt_required";
 
-  constructor(message = "System prompt is required.") {
+  constructor(message = "Prompt or system message is required.") {
     super("prompt_system_prompt_required", message, {
       httpStatus: 400,
       fault: "customer",
