@@ -181,7 +181,6 @@ type DatasetTabProps = {
   dataset: DatasetReference;
   isActive: boolean;
   onSelect: () => void;
-  /** Opens the dataset picker; the active tab offers it as "Switch Dataset". */
   onSwitch: () => void;
   onRemove: () => void;
   onSaveAs: () => void;
