@@ -90,7 +90,23 @@ func (s *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "redirect_uri is required", http.StatusBadRequest)
 		return
 	}
+	clientID := q.Get("client_id")
+	// A registered client may only be sent back to an address it registered.
+	// The refusal is rendered here rather than redirected: bouncing an error to
+	// an address the client did not register is the exact move a real IdP must
+	// refuse, and a developer who mistyped the redirect address learns far more
+	// from a page that names both addresses than from a silent bounce.
+	if app, registered := t.ApplicationByClientID(clientID); registered && !app.redirectAllowed(redirectURI) {
+		s.record(t, "oidc.authorize", OutcomeRefused, clientID, "",
+			"redirect address "+redirectURI+" is not registered for "+app.Name)
+		s.refusalPage(w, t, http.StatusBadRequest, "That redirect address is not registered",
+			"The application "+app.Name+" asked to be sent back to "+redirectURI+", which is not one of the addresses it registered.",
+			"Register that address on the tenant page, or fix the redirect address in the application's own configuration. A {placeholder} segment matches any single segment, so the address LangWatch shows before a connection exists can be registered exactly as written.")
+		return
+	}
 	if rt := q.Get("response_type"); rt != "code" {
+		s.record(t, "oidc.authorize", OutcomeRefused, clientID, "",
+			"unsupported response_type "+rt+" — this provider issues authorization codes")
 		oauthRedirectError(w, r, redirectURI, q.Get("state"), "unsupported_response_type")
 		return
 	}
@@ -104,18 +120,22 @@ func (s *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	}
 	user, ok := t.FindUser(hint)
 	if !ok || !user.Active {
+		s.record(t, "oidc.authorize", OutcomeRefused, clientID, hint,
+			"no active user matches the login hint "+hint)
 		oauthRedirectError(w, r, redirectURI, q.Get("state"), "access_denied")
 		return
 	}
 	code := t.MintCode(&authCode{
 		UserID:        user.ID,
-		ClientID:      q.Get("client_id"),
+		ClientID:      clientID,
 		RedirectURI:   redirectURI,
 		Nonce:         q.Get("nonce"),
 		Scope:         q.Get("scope"),
 		CodeChallenge: q.Get("code_challenge"),
 		ChallengeMeth: q.Get("code_challenge_method"),
 	}, s.now())
+	s.record(t, "oidc.authorize", OutcomeOK, clientID, user.Email,
+		"signed in as "+user.Email+", sending an authorization code back to "+redirectURI)
 	dest, err := url.Parse(redirectURI)
 	if err != nil {
 		http.Error(w, "redirect_uri is not a valid URL", http.StatusBadRequest)
@@ -165,11 +185,15 @@ func oauthRedirectError(w http.ResponseWriter, r *http.Request, redirectURI, sta
 }
 
 // handleToken implements the token endpoint: authorization_code exchange with
-// single-use codes and PKCE enforcement. Client authentication is deliberately
-// lax — any client_id/secret pair is accepted, because the simulator's job is
-// to hand out predictable identities, not to defend them — but the client_id
-// must match the one the code was minted for, so a mis-wired configuration
-// still fails visibly.
+// single-use codes and PKCE enforcement.
+//
+// Client authentication depends on whether the client is registered. A
+// registered application must present its secret — that is the whole point of
+// registering, and a wrong secret is one of the two or three things that
+// actually go wrong when wiring an IdP up, so it has to fail loudly. An
+// unregistered client id is accepted with any secret, which keeps the
+// zero-configuration path (point the app at a tenant, log in) working; the
+// activity feed says which of the two happened, so it is never a mystery.
 func (s *Server) handleToken(w http.ResponseWriter, r *http.Request) {
 	t, ok := s.tenantFor(r)
 	if !ok {
@@ -185,29 +209,47 @@ func (s *Server) handleToken(w http.ResponseWriter, r *http.Request) {
 		oauthError(w, "unsupported_grant_type", "only authorization_code is supported")
 		return
 	}
+	// Authenticate the client BEFORE redeeming: a code is single-use, so
+	// burning one on a request that fails client authentication would turn a
+	// wrong secret into a second, confusing "already used" failure on retry.
+	clientID, clientSecret := clientCredentials(r)
+	if app, registered := t.ApplicationByClientID(clientID); registered {
+		if subtle.ConstantTimeCompare([]byte(clientSecret), []byte(app.Secret)) != 1 {
+			s.record(t, "oidc.token", OutcomeRefused, clientID, "",
+				"wrong client secret for "+app.Name)
+			oauthError(w, "invalid_client", "the client secret does not match the one registered for "+app.Name)
+			return
+		}
+	}
 	code, ok := t.RedeemCode(r.PostForm.Get("code"), s.now())
 	if !ok {
+		s.record(t, "oidc.token", OutcomeRefused, clientID, "",
+			"the authorization code was unknown, expired, or already exchanged")
 		oauthError(w, "invalid_grant", "unknown, expired or already-used code")
 		return
 	}
-	clientID := r.PostForm.Get("client_id")
-	if basicID, _, ok := r.BasicAuth(); ok && clientID == "" {
-		clientID = basicID
-	}
 	if code.ClientID != "" && clientID != code.ClientID {
+		s.record(t, "oidc.token", OutcomeRefused, clientID, "",
+			"the code was issued to "+code.ClientID+", not "+clientID)
 		oauthError(w, "invalid_grant", "code was issued to a different client")
 		return
 	}
 	if uri := r.PostForm.Get("redirect_uri"); uri != "" && uri != code.RedirectURI {
+		s.record(t, "oidc.token", OutcomeRefused, clientID, "",
+			"redirect address "+uri+" does not match the one the code was issued for")
 		oauthError(w, "invalid_grant", "redirect_uri does not match the authorization request")
 		return
 	}
 	if !pkceSatisfied(code, r.PostForm.Get("code_verifier")) {
+		s.record(t, "oidc.token", OutcomeRefused, clientID, "",
+			"PKCE verification failed — the code verifier does not match the challenge")
 		oauthError(w, "invalid_grant", "PKCE verification failed")
 		return
 	}
 	user, ok := t.UserByID(code.UserID)
 	if !ok {
+		s.record(t, "oidc.token", OutcomeRefused, clientID, "",
+			"the user the code was issued for no longer exists")
 		oauthError(w, "invalid_grant", "the code's user no longer exists")
 		return
 	}
@@ -216,6 +258,8 @@ func (s *Server) handleToken(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "signing the ID token failed", http.StatusInternalServerError)
 		return
 	}
+	s.record(t, "oidc.token", OutcomeOK, clientID, user.Email,
+		"exchanged the code for an ID token and an access token")
 	writeJSON(w, http.StatusOK, map[string]any{
 		"access_token": t.MintAccessToken(user.ID, code.Scope, s.now()),
 		"token_type":   "Bearer",
@@ -295,6 +339,7 @@ func (s *Server) handleUserinfo(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "the token's user no longer exists", http.StatusUnauthorized)
 		return
 	}
+	s.record(t, "oidc.userinfo", OutcomeOK, "", user.Email, "returned the profile claims for "+user.Email)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"sub":                t.Subject(user),
 		"email":              user.Email,
@@ -315,6 +360,25 @@ func oauthError(w http.ResponseWriter, code, description string) {
 		"error":             code,
 		"error_description": description,
 	})
+}
+
+// clientCredentials reads the client id and secret from wherever the client
+// put them: HTTP basic (client_secret_basic) or the form body
+// (client_secret_post). Both are advertised in discovery, and different
+// libraries pick different ones.
+func clientCredentials(r *http.Request) (id, secret string) {
+	id, secret = r.PostForm.Get("client_id"), r.PostForm.Get("client_secret")
+	basicID, basicSecret, ok := r.BasicAuth()
+	if !ok {
+		return id, secret
+	}
+	if id == "" {
+		id = basicID
+	}
+	if secret == "" {
+		secret = basicSecret
+	}
+	return id, secret
 }
 
 func bearerToken(r *http.Request) (string, bool) {

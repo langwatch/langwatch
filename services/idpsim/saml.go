@@ -106,6 +106,7 @@ func (s *Server) handleSAMLSSO(w http.ResponseWriter, r *http.Request) {
 	}
 	user, ok := s.samlUser(t, r)
 	if !ok {
+		s.record(t, "saml.sso", OutcomeRefused, sp.entityID, "", "the tenant has no active user to assert")
 		http.Error(w, "the tenant has no active user to assert", http.StatusBadRequest)
 		return
 	}
@@ -125,6 +126,8 @@ func (s *Server) handleSAMLSSO(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("building the assertion failed: %v", err), http.StatusInternalServerError)
 		return
 	}
+	s.record(t, "saml.sso", OutcomeOK, sp.entityID, user.Email,
+		"signed an assertion for "+user.Email+", posting it to "+sp.acsURL)
 	if err := req.WriteResponse(w); err != nil {
 		http.Error(w, fmt.Sprintf("writing the response failed: %v", err), http.StatusInternalServerError)
 		return

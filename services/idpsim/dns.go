@@ -17,11 +17,14 @@ import (
 type dnsServer struct {
 	store *verificationStore
 	conn  net.PacketConn
+	// observe, when set, is told about every TXT question, so the tenant that
+	// owns the domain can show that a verifier really did come and ask.
+	observe func(domain string, found bool)
 }
 
 // startDNS binds the UDP listener and serves until ctx ends. addr="" disables
 // the server. The returned address is the bound one, so tests can bind :0.
-func startDNS(ctx context.Context, addr string, store *verificationStore) (*dnsServer, error) {
+func startDNS(ctx context.Context, addr string, store *verificationStore, observe func(domain string, found bool)) (*dnsServer, error) {
 	if addr == "" {
 		return nil, nil
 	}
@@ -30,7 +33,7 @@ func startDNS(ctx context.Context, addr string, store *verificationStore) (*dnsS
 	if err != nil {
 		return nil, fmt.Errorf("binding verification DNS listener on %s: %w", addr, err)
 	}
-	s := &dnsServer{store: store, conn: conn}
+	s := &dnsServer{store: store, conn: conn, observe: observe}
 	go func() {
 		<-ctx.Done()
 		_ = conn.Close()
@@ -80,6 +83,9 @@ func (s *dnsServer) answer(packet []byte) ([]byte, bool) {
 	switch question.Type {
 	case dnsmessage.TypeTXT:
 		values, ok := s.store.TXT(domain)
+		if s.observe != nil {
+			s.observe(domain, ok)
+		}
 		if !ok {
 			reply.RCode = dnsmessage.RCodeNameError
 			break

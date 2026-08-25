@@ -437,7 +437,7 @@ func queryDNS(t *testing.T, addr, domain string, qtype uint16) (rcode int, txt [
 // @scenario "A configured TXT record is served over DNS for verification"
 func TestDNSTXTAnswer(t *testing.T) {
 	s := newTestServer(t, 1)
-	dns, err := startDNS(t.Context(), "127.0.0.1:0", s.verification)
+	dns, err := startDNS(t.Context(), "127.0.0.1:0", s.verification, s.recordDNSLookup)
 	require.NoError(t, err)
 
 	s.verification.SetTXT("custom.example.com", []string{"langwatch-verification=abc123"})
@@ -455,7 +455,7 @@ func TestDNSTXTAnswer(t *testing.T) {
 // @scenario "An unconfigured domain gets a name error over DNS"
 func TestDNSNameError(t *testing.T) {
 	s := newTestServer(t, 1)
-	dns, err := startDNS(t.Context(), "127.0.0.1:0", s.verification)
+	dns, err := startDNS(t.Context(), "127.0.0.1:0", s.verification, s.recordDNSLookup)
 	require.NoError(t, err)
 	rcode, _ := queryDNS(t, dns.Addr(), "nobody-configured.example.", 16)
 	assert.Equal(t, 3, rcode) // NXDOMAIN

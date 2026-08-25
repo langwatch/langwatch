@@ -12,6 +12,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/hex"
+	"encoding/pem"
 	"fmt"
 	"math/big"
 	"strings"
@@ -76,6 +77,13 @@ type Tenant struct {
 	groups []*Group
 	codes  map[string]*authCode
 	grants map[string]*accessGrant
+	// apps are the relying parties registered with this tenant (apps.go), and
+	// events its recent request history (activity.go). Neither is directory
+	// state, so Reset — which restores the seeded users — leaves both alone: a
+	// developer resetting users has not un-registered their application, and
+	// the log of what just happened is the reason they are looking.
+	apps   []*Application
+	events []Event
 	// samlpSubjects makes the tenant mint Auth0-broker-style subjects
 	// (samlp|idpsim-t<n>|<user id>) so the app's SAML-brokered-login handling
 	// can be exercised over plain OIDC, the way Auth0 delivers it.
@@ -125,6 +133,12 @@ type accessGrant struct {
 
 // KeyID is the identifier the tenant's JWKS and JWT headers share.
 func (t *Tenant) KeyID() string { return fmt.Sprintf("t%d-k1", t.ID) }
+
+// CertificatePEM is the tenant's SAML signing certificate, PEM-armored —
+// the shape a "signing certificate" field expects to be pasted into.
+func (t *Tenant) CertificatePEM() string {
+	return string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: t.Cert.Raw}))
+}
 
 // seedUsers resets the tenant to its two deterministic users: an admin and a
 // member on the tenant's own domain.

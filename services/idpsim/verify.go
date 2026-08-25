@@ -91,6 +91,42 @@ func (v *verificationStore) Snapshot() (txt map[string][]string, tokens map[stri
 	return txt, tokens
 }
 
+// recordVerification files a domain-verification lookup against the tenant
+// that owns the domain, so "has the verifier actually come and looked?" is
+// something you can see rather than guess at. A domain no tenant owns is not
+// recorded: there is no page it would show up on.
+func (s *Server) recordVerification(domain, kind string, found bool, detail string) {
+	t, ok := s.tenantByDomain(domain)
+	if !ok {
+		return
+	}
+	outcome := OutcomeOK
+	if !found {
+		outcome = OutcomeRefused
+	}
+	s.record(t, kind, outcome, "", "", detail)
+}
+
+// recordDNSLookup is what the DNS server calls on every TXT question.
+func (s *Server) recordDNSLookup(domain string, found bool) {
+	detail := "answered a DNS TXT lookup for " + domain + " with the verification record"
+	if !found {
+		detail = "a DNS TXT lookup arrived for " + domain + ", which is not configured here"
+	}
+	s.recordVerification(domain, "verification.dns", found, detail)
+}
+
+// tenantByDomain finds the tenant that owns a domain.
+func (s *Server) tenantByDomain(domain string) (*Tenant, bool) {
+	domain = normalizeDomain(domain)
+	for _, t := range s.tenants {
+		if normalizeDomain(t.Domain) == domain {
+			return t, true
+		}
+	}
+	return nil, false
+}
+
 // handleWellKnownVerification serves the HTTP (non-DNS) verification token.
 // The domain being verified is the request's Host by default — the shape a
 // real verifier fetches — with a ?domain= override so a test (or a verifier
@@ -106,9 +142,13 @@ func (s *Server) handleWellKnownVerification(w http.ResponseWriter, r *http.Requ
 	}
 	token, ok := s.verification.Token(domain)
 	if !ok {
+		s.recordVerification(domain, "verification.http", false,
+			"someone asked for a verification token for "+domain+", which is not configured")
 		http.NotFound(w, r)
 		return
 	}
+	s.recordVerification(domain, "verification.http", true,
+		"served the verification token for "+domain+" over HTTP")
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	_, _ = w.Write([]byte(token))
 }

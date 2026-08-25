@@ -55,6 +55,13 @@ func (s *Server) tenantFor(r *http.Request) (*Tenant, bool) {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
+	// The tenant's own page: how to wire an application up, what is
+	// registered, and what it has been doing.
+	mux.HandleFunc("GET /t/{tenant}", s.handleTenantPage)
+	mux.HandleFunc("GET /t/{tenant}/{$}", s.handleTenantPage)
+	mux.HandleFunc("POST /t/{tenant}/apps", s.handleRegisterApplication)
+	mux.HandleFunc("POST /t/{tenant}/apps/{client}/delete", s.handleRemoveApplication)
+
 	// OIDC, per tenant.
 	mux.HandleFunc("GET /t/{tenant}/.well-known/openid-configuration", s.handleDiscovery)
 	mux.HandleFunc("GET /t/{tenant}/oauth/jwks", s.handleJWKS)
@@ -82,6 +89,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /control/state", s.handleControlState)
 	mux.HandleFunc("POST /control/t/{tenant}/reset", s.handleControlReset)
 	mux.HandleFunc("POST /control/t/{tenant}/users", s.handleControlAddUser)
+	mux.HandleFunc("GET /control/t/{tenant}/activity", s.handleControlActivity)
+	mux.HandleFunc("POST /control/t/{tenant}/apps", s.handleControlRegisterApp)
 	mux.HandleFunc("POST /control/t/{tenant}/config", s.handleControlConfig)
 	mux.HandleFunc("POST /control/t/{tenant}/scim-push", s.handleControlSCIMPush)
 	mux.HandleFunc("PUT /control/dns/txt", s.handleControlDNS)
@@ -99,7 +108,7 @@ func (s *Server) Handler() http.Handler {
 // Serve runs the HTTP listener (and the verification DNS server when
 // configured) until ctx ends, then shuts down gracefully.
 func (s *Server) Serve(ctx context.Context) error {
-	dns, err := startDNS(ctx, s.cfg.DNSAddr, s.verification)
+	dns, err := startDNS(ctx, s.cfg.DNSAddr, s.verification, s.recordDNSLookup)
 	if err != nil {
 		return err
 	}

@@ -21,6 +21,8 @@ const (
 func (s *Server) scimAuthorized(t *Tenant, w http.ResponseWriter, r *http.Request) bool {
 	token, ok := bearerToken(r)
 	if !ok || subtle.ConstantTimeCompare([]byte(token), []byte(t.SCIMToken)) != 1 {
+		s.record(t, "scim.auth", OutcomeRefused, "", "",
+			"a SCIM request arrived with a missing or wrong bearer token")
 		scimError(w, http.StatusUnauthorized, "invalid or missing bearer token")
 		return false
 	}
@@ -144,6 +146,7 @@ func (s *Server) handleSCIMUsers(w http.ResponseWriter, r *http.Request) {
 		}
 		u := body.toUser(fmt.Sprintf("t%d-scim-%s", t.ID, randomToken()[:8]))
 		t.AddUser(u)
+		s.record(t, "scim.user.create", OutcomeOK, "", u.Email, "provisioned "+u.UserName+" over SCIM")
 		writeJSON(w, http.StatusCreated, scimUserResource(u))
 	default:
 		scimError(w, http.StatusMethodNotAllowed, "unsupported method")
@@ -177,14 +180,24 @@ func (s *Server) handleSCIMUser(w http.ResponseWriter, r *http.Request) {
 		body.applyTo(u)
 		writeJSON(w, http.StatusOK, scimUserResource(u))
 	case http.MethodPatch:
+		wasActive := u.Active
 		if !applySCIMPatch(w, r, func(path string, value any) {
 			applyUserPatch(u, path, value)
 		}) {
 			return
 		}
+		detail := "updated " + u.UserName + " over SCIM"
+		if wasActive != u.Active {
+			detail = "deactivated " + u.UserName + " over SCIM"
+			if u.Active {
+				detail = "reactivated " + u.UserName + " over SCIM"
+			}
+		}
+		s.record(t, "scim.user.update", OutcomeOK, "", u.Email, detail)
 		writeJSON(w, http.StatusOK, scimUserResource(u))
 	case http.MethodDelete:
 		t.RemoveUser(u.ID)
+		s.record(t, "scim.user.delete", OutcomeOK, "", u.Email, "deprovisioned "+u.UserName+" over SCIM")
 		w.WriteHeader(http.StatusNoContent)
 	default:
 		scimError(w, http.StatusMethodNotAllowed, "unsupported method")
@@ -331,6 +344,8 @@ func (s *Server) handleSCIMGroups(w http.ResponseWriter, r *http.Request) {
 			MemberIDs: body.memberIDs(),
 		}
 		t.AddGroup(g)
+		s.record(t, "scim.group.create", OutcomeOK, "", "",
+			fmt.Sprintf("created the group %s with %d member(s) over SCIM", g.Name, len(g.MemberIDs)))
 		writeJSON(w, http.StatusCreated, scimGroupResource(t, g))
 	default:
 		scimError(w, http.StatusMethodNotAllowed, "unsupported method")

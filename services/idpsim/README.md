@@ -32,8 +32,54 @@ IDPSIM_TENANTS=20 make service svc=idpsim   # a wider range
 Under haven the lane is **on by default** in every stack (`haven up -idp`
 turns it off for a worktree), routed at `idp.<slug>.langwatch.localhost`.
 
-Open `/` for the index page: every tenant with its issuer, SAML metadata, SCIM
-base + token, and seeded users. `GET /control/state` is the same as JSON.
+Open `/` for the tenant list, and `/t/<n>/` for a tenant's own page: register
+an application, copy the values the setup wizard asks for, see its users, and
+watch a live feed of everything it serves or refuses. `GET /control/state` is
+the same as JSON.
+
+## Registering an application
+
+LangWatch's single sign-on setup shows you a redirect address ending in
+`{connection}` — the real id only exists *after* you register the connection,
+which you cannot do until the identity provider is set up. Paste the address
+into the tenant page exactly as shown: a `{placeholder}` segment here matches
+whichever id turns up, so the circle breaks and you never have to come back.
+
+Registering hands back the three values the wizard's *Then tell us about it*
+step asks for, under the same names:
+
+| Wizard field   | Where it comes from                     |
+| -------------- | --------------------------------------- |
+| Name           | whatever you called the application      |
+| Issuer address | the tenant's base address, `…/t/<n>`     |
+| Client id      | minted at registration                   |
+| Client secret  | minted at registration                   |
+
+For the SAML half the tenant page carries the sign-in address, entity id and a
+copyable signing certificate, plus a link to the metadata document if you would
+rather paste that.
+
+Registration also switches enforcement on **for that client**: it must present
+its secret and one of its redirect addresses, so a mistyped secret or address
+fails loudly instead of mysteriously. A client id the tenant does not know is
+still accepted with anything — that keeps the zero-setup path working — and the
+activity feed says which of the two happened.
+
+`POST /control/t/<n>/apps` does the same thing from a script:
+
+```bash
+curl -X POST localhost:5565/control/t/1/apps \
+  -d '{"name":"LangWatch","redirectUris":["https://app.example/api/auth/sso/callback/{connection}"]}'
+```
+
+## Watching a tenant
+
+The tenant page's activity feed is live, and `GET /control/t/<n>/activity` is
+the same feed as JSON. Every authorization, token exchange, userinfo call, SAML
+assertion, SCIM operation and domain-verification lookup lands there with an
+outcome and a plain-language reason — which is usually the fastest way to find
+out whether a login even reached the identity provider, and what it objected to
+if it did.
 
 | Variable          | Default                  | Meaning                                    |
 | ----------------- | ------------------------ | ------------------------------------------ |

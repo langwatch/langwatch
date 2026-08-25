@@ -56,6 +56,54 @@ Feature: Local IdP simulator (idpsim)
     When a client completes the authorization code flow
     Then the ID token's subject carries the samlp| prefix Auth0 uses for brokered SAML connections
 
+  # --- Registering an application ---------------------------------------
+
+  @unit
+  Scenario: Registering an application hands back what the setup wizard asks for
+    When an application is registered with a tenant under a name
+    Then the tenant hands back an issuer address, a client id and a client secret
+    And the client id and secret differ from every other application's
+
+  @unit
+  Scenario: A redirect address can be registered before the connection exists
+    Given an application registered with a redirect address whose last segment is a placeholder
+    When a client is sent through authorize with a real id in that segment
+    Then the authorization succeeds
+    And an address that differs anywhere else is still refused
+
+  @unit
+  Scenario: A registered application must present its client secret
+    Given an application registered with a tenant
+    When it completes authorize and exchanges the code with the wrong secret
+    Then the token endpoint refuses the exchange as an invalid client
+    And the authorization code is left unspent, so a retry with the right secret works
+
+  @unit
+  Scenario: A registered application may only be sent back to a registered address
+    Given an application registered with one redirect address
+    When it is sent through authorize naming a different address
+    Then the request is refused on the page rather than bounced to that address
+    And the refusal names both the application and the address it asked for
+
+  @unit
+  Scenario: A client the tenant does not know still works
+    Given a tenant with a registered application
+    When a client that registered nothing completes the authorization code flow
+    Then it succeeds, because an unregistered client id is the zero-setup path
+
+  # --- Watching a tenant -------------------------------------------------
+
+  @unit
+  Scenario: A tenant records what it has been asked to do
+    Given a tenant that has served a login and refused a bad client secret
+    When its activity is read
+    Then both are listed newest-first, each with an outcome and a plain-language reason
+
+  @unit
+  Scenario: Directory and domain-verification traffic is recorded too
+    When a user is provisioned over SCIM and a verifier fetches the domain token
+    Then both appear in the owning tenant's activity
+
   # --- SAML -------------------------------------------------------------
 
   @unit
