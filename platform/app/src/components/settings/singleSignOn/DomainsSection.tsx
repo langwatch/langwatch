@@ -16,7 +16,7 @@ import { useState } from "react";
 import { domainProofChipFor } from "~/features/sso/logic/domainProofChip";
 import { api } from "../../../utils/api";
 import { IdentityChip } from "../../access/IdentityRow";
-import { CopyInput } from "../../CopyInput";
+import { CopyValueRows } from "./CopyValueRow";
 import { reportRefusal } from "./refusals";
 
 /**
@@ -68,7 +68,9 @@ export function DomainsSection({
   return (
     <VStack align="stretch" gap={3}>
       {domains.length === 0 ? (
-        <Text color="fg.muted">No domain has been claimed yet.</Text>
+        <Text color="fg.muted" fontSize="sm">
+          No domain has been claimed yet.
+        </Text>
       ) : (
         <Table.Root size="sm">
           <Table.Header>
@@ -214,27 +216,45 @@ function PublishedRecord({
 
   return (
     <VStack align="stretch" gap={3} paddingTop={2}>
-      <Heading size="xs">Publish this record on {record.domain}</Heading>
-      <Text color="fg.muted">
-        Add it wherever you manage DNS for {record.domain}. Some providers ask
-        for the whole name and some ask for the part before your domain, so both
-        are here.
-      </Text>
-      <CopyInput value={record.type} label="Record type" />
-      <CopyInput value={record.name} label="Record name" />
-      <CopyInput
-        value={record.label}
-        label="Record name, without your domain"
+      <VStack align="stretch" gap={1}>
+        <Heading size="xs">Publish this record on {record.domain}</Heading>
+        <Text color="fg.muted" fontSize="sm">
+          Add it wherever you manage DNS for {record.domain}. Some providers ask
+          for the whole name and some ask for the part before your domain, so
+          both are here.
+        </Text>
+      </VStack>
+      <CopyValueRows
+        rows={[
+          { label: "Record type", value: record.type },
+          {
+            label: "Record name",
+            hint: "The whole name, for providers that want one",
+            value: record.name,
+          },
+          {
+            label: "Record name, without your domain",
+            hint: "For providers that ask for the label alone",
+            value: record.label,
+          },
+          ...(record.value === null
+            ? []
+            : [
+                {
+                  label: "Record value",
+                  hint: "Shown once — this is the secret",
+                  value: record.value,
+                },
+              ]),
+        ]}
       />
       {/* The value is shown once, when it is issued. What is kept is its
           hash, so a reload shows the record rather than the secret. */}
-      {record.value === null ? (
-        <Text color="fg.muted">
+      {record.value === null && (
+        <Text color="fg.muted" fontSize="sm">
           The value was shown once, when the record was issued. If you no longer
           have it, ask for a fresh record below.
         </Text>
-      ) : (
-        <CopyInput value={record.value} label="Record value" />
       )}
       {record.expired && (
         <Alert.Root status="warning">

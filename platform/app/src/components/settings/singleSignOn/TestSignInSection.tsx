@@ -24,7 +24,7 @@ export function TestSignInSection({
 
   return (
     <VStack align="stretch" gap={3}>
-      <Text color="fg.muted">
+      <Text color="fg.muted" fontSize="sm">
         This sends you to {providerName} to sign in, then brings you back here.
         Going live rests on a sign-in that actually worked, so this is the step
         that proves the connection carries a real person — not a setting we can

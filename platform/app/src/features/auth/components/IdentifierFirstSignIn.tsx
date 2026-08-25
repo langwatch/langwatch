@@ -32,17 +32,17 @@ import { shouldStartPasskeyOnArrival } from "../logic/methodRanking";
 import { usePasskeyCeremony } from "../logic/passkeyCeremony";
 import { signInRoutingReasonCopy } from "../logic/routingReasonCopy";
 import { useTwoStepChallenge } from "../logic/twoStepChallenge";
+import { AuthFinePrint } from "./AuthFinePrint";
+import { AuthPrimaryButton } from "./AuthPrimaryButton";
 import { CheckYourEmail } from "./CheckYourEmail";
 import { CredentialSignInForm } from "./CredentialSignInForm";
 import { EmailPill } from "./EmailPill";
-import { AuthFinePrint } from "./AuthFinePrint";
-import { AuthPrimaryButton } from "./AuthPrimaryButton";
 import { IdentifierStepForm } from "./IdentifierStepForm";
-import { SecondaryActionLink } from "./SecondaryActionLink";
 import {
   PasskeyCeremonyPanel,
   passkeyCeremonyTitle,
 } from "./PasskeyCeremonyPanel";
+import { SecondaryActionLink } from "./SecondaryActionLink";
 import {
   AlternativeMethods,
   hasAlternativeMethods,
@@ -320,7 +320,7 @@ export function IdentifierFirstSignIn() {
         <SignUpLink
           callbackUrl={callbackUrl}
           email={submittedIdentifier}
-          label="Create an account"
+          label="Or create an account instead"
         />
       </AuthCard>
     );
@@ -348,7 +348,10 @@ export function IdentifierFirstSignIn() {
         isSubmitting={routing.isDeciding}
         onSubmit={({ email }) => decide({ identifier: email, breakGlass })}
         footer={
-          <SignUpLink callbackUrl={callbackUrl} label="Create an account" />
+          <SignUpLink
+            callbackUrl={callbackUrl}
+            label="Or create an account instead"
+          />
         }
         alternatives={
           hasAlternativeMethods(instanceMethods) ? (
@@ -531,7 +534,10 @@ export function RoutedToConnection({
           they do not have an account here yet, and the browser's back button
           lands on a step this screen keeps in memory rather than in the URL. */}
       {footer ?? (
-        <SignUpLink callbackUrl={callbackUrl} label="Create an account" />
+        <SignUpLink
+          callbackUrl={callbackUrl}
+          label="Or create an account instead"
+        />
       )}
     </AuthCard>
   );

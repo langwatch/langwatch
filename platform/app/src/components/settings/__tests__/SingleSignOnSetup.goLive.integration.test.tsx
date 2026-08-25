@@ -290,14 +290,12 @@ describe("given the ways back in an organization holds", () => {
     expect(container.textContent).toContain(
       "Name one person who can still sign in with a password if it ever stops working",
     );
-    // None of our vocabulary, and no protocol or component of ours.
-    for (const jargon of [
-      "break glass",
-      "break-glass",
-      "binding",
-      "SAML",
-      "OpenID",
-    ]) {
+    // None of OUR vocabulary. The protocol's own name is not in this list:
+    // the summary card names the connection by its protocol, exactly as the
+    // overview does, because "OpenID Connect" is the word on the
+    // administrator's own console — the ban is on terms of ours a customer
+    // would have to look up.
+    for (const jargon of ["break glass", "break-glass", "binding"]) {
       expect(container.textContent?.toLowerCase()).not.toContain(
         jargon.toLowerCase(),
       );

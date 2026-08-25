@@ -2,9 +2,9 @@ import { Box, Flex } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import "../auth.css";
-import { CastleSnake } from "./CastleSnake";
 import { AuthGround } from "./AuthGround";
 import { AuthValuePanel } from "./AuthValuePanel";
+import { CastleSnake } from "./CastleSnake";
 import { LogoHandoff } from "./LogoHandoff";
 
 /**

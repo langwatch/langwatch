@@ -6,7 +6,7 @@ import { z } from "zod";
 import "../auth.css";
 import { SHAPE } from "../authTheme";
 import { useFocusWhenSettled } from "../hooks/useFocusWhenSettled";
-import { FIELD_FOCUS, FIELD_SURFACE, AuthField } from "./AuthField";
+import { AuthField, FIELD_FOCUS, FIELD_SURFACE } from "./AuthField";
 import { AuthPrimaryButton } from "./AuthPrimaryButton";
 import { MethodDivider } from "./SignInMethodPicker";
 

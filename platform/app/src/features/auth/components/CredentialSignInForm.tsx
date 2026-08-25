@@ -13,9 +13,9 @@ import { attemptCredentialSignIn } from "../logic/attemptCredentialSignIn";
 import { describeRemainingWait } from "../logic/credentialSignIn";
 import { rememberLastUsedMethod } from "../logic/lastUsedMethod";
 import { startTwoStepChallenge } from "../logic/twoStepChallenge";
-import { EmailPill } from "./EmailPill";
-import { FIELD_FOCUS, FIELD_SURFACE, AuthField } from "./AuthField";
+import { AuthField, FIELD_FOCUS, FIELD_SURFACE } from "./AuthField";
 import { AuthPrimaryButton } from "./AuthPrimaryButton";
+import { EmailPill } from "./EmailPill";
 import { PasswordInput } from "./PasswordInput";
 
 const credentialSchema = z.object({
