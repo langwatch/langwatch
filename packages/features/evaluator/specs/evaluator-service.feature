@@ -27,6 +27,6 @@ Feature: Evaluator service boundary
 
   Scenario: Reusable evaluator UI remains browser-safe
     Given a browser host supplies evaluator availability and navigation callbacks
-    When it renders an evaluator category, type picker, or card
+    When it renders an evaluator picker, card, or editor chrome
     Then the reusable UI uses only the evaluator contract for domain values
-    And router, tRPC, API-usage, copy, and cascade composition remain in the host
+    And router, tRPC, Monaco, field-mapping, API-usage, copy, and cascade composition remain in the host

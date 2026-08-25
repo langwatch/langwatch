@@ -1398,11 +1398,6 @@
     },
     {
       "feature": "evaluator",
-      "file": "platform/app/src/components/evaluators/codeEvaluatorValidation.ts",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "evaluator",
       "file": "platform/app/src/components/evaluators/CopyEvaluatorDialog.tsx",
       "kind": "page-shell"
     },

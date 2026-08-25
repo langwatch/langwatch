@@ -1,17 +1,6 @@
-import {
-  Box,
-  Button,
-  Field,
-  HStack,
-  IconButton,
-  Input,
-  NativeSelect,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
-import { LuArrowLeft, LuPlus, LuX } from "react-icons/lu";
+import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
@@ -37,12 +26,15 @@ import {
 } from "@langwatch/evaluator-contract";
 import { api } from "~/utils/api";
 
-import { codeEvaluatorDisabledReason } from "@langwatch/evaluator-web";
+import {
+  CodeEvaluatorEditor,
+  codeEvaluatorDisabledReason,
+  type CodeEvaluatorField,
+  validCodeEvaluatorFields,
+} from "@langwatch/evaluator-web";
 import type { EvaluatorMappingsConfig } from "./EvaluatorEditorShared";
 
-const FIELD_TYPES = ["str", "float", "bool", "list[str]", "dict"] as const;
-
-type EditableField = { identifier: string; type: string };
+type EditableField = CodeEvaluatorField;
 
 export type CodeEvaluatorEditorDrawerProps = {
   open?: boolean;
@@ -59,9 +51,6 @@ export type CodeEvaluatorEditorDrawerProps = {
   /** Called with the saved evaluator; flow callbacks take precedence. */
   onSave?: (evaluator: { id: string; name: string }) => void;
 };
-
-const validFields = (fields: EditableField[]) =>
-  fields.filter((f) => f.identifier.trim() !== "");
 
 /** Form state and the create/update mutation behind the drawer; no JSX in here. */
 function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
@@ -90,8 +79,6 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
   const [inputs, setInputs] = useState<EditableField[]>(
     defaultCodeEvaluatorConfig.inputs.map((f) => ({ ...f })),
   );
-  // Outputs are the fixed evaluator contract, not user-editable.
-  const outputs: EditableField[] = [...codeEvaluatorOutputFields];
   const [mappings, setMappings] = useState<Record<string, UIFieldMapping>>(
     mappingsConfig?.initialMappings ?? {},
   );
@@ -121,7 +108,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
   // unexpected keyword. Only the signature line changes; the body is kept.
   const setInputsAndSyncCode = (next: EditableField[]) => {
     setInputs(next);
-    const valid = validFields(next);
+    const valid = validCodeEvaluatorFields(next);
     if (valid.length > 0) {
       setCode((current) => rewriteCodeSignature(current, valid));
     }
@@ -188,7 +175,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
     if (!project?.id || !name.trim()) return;
     const config: CodeEvaluatorConfig = {
       code,
-      inputs: validFields(inputs),
+      inputs: validCodeEvaluatorFields(inputs),
       outputs: codeEvaluatorOutputFields.map((field) => ({ ...field })),
     };
     if (isEditing) {
@@ -214,7 +201,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
   const canSave =
     !!name.trim() &&
     code.trim() !== "" &&
-    validFields(inputs).length > 0 &&
+    validCodeEvaluatorFields(inputs).length > 0 &&
     !isPending &&
     !isLoadingEvaluator;
 
@@ -227,7 +214,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
       : codeEvaluatorDisabledReason({
           hasName: !!name.trim(),
           hasCode: code.trim() !== "",
-          hasInput: validFields(inputs).length > 0,
+          hasInput: validCodeEvaluatorFields(inputs).length > 0,
           isEditing,
         });
 
@@ -238,7 +225,6 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
     setCode,
     inputs,
     setInputs: setInputsAndSyncCode,
-    outputs,
     mappings,
     handleMappingChange,
     mappingsConfig,
@@ -353,198 +339,49 @@ function EditorHeader({
 
 function CodeEvaluatorFormFields({ form }: { form: CodeEvaluatorFormState }) {
   return (
-    <>
-      <Field.Root required>
-        <Field.Label>Name</Field.Label>
-        <Input
-          value={form.name}
-          onChange={(e) => form.setName(e.target.value)}
-          placeholder="My code evaluator"
-          data-testid="code-evaluator-name"
-        />
-      </Field.Root>
-
-      <Field.Root>
-        <Field.Label>Python Code</Field.Label>
-        <Field.HelperText margin={0}>
-          Define a Python class with a `__call__` method that takes the inputs and returns
-          the outputs (passed, score, label or details).
-        </Field.HelperText>
-        <Box
-          width="full"
-          height="320px"
-          borderWidth="1px"
-          borderColor="border"
-          borderRadius="md"
-          overflow="hidden"
-        >
-          <CodeEditor
-            code={form.code}
-            setCode={form.setCode}
-            onClose={() => undefined}
-            language="python"
-            technologies={["python"]}
-            inputs={validFields(form.inputs)}
-            outputs={validFields(form.outputs)}
-          />
-        </Box>
-      </Field.Root>
-
-      {form.showMappings && form.mappingsConfig ? (
-        <VariablesSection
-          title="Inputs"
-          variables={form.inputs.map((f) => ({
-            identifier: f.identifier,
-            type: f.type as Variable["type"],
-          }))}
-          onChange={(vars) =>
-            form.setInputs(vars.map((v) => ({ identifier: v.identifier, type: v.type })))
-          }
-          showMappings
-          mappings={form.mappings}
-          onMappingChange={form.handleMappingChange}
-          availableSources={form.mappingsConfig.availableSources}
-          canAddRemove
-        />
-      ) : (
-        <FieldListEditor
-          label="Inputs"
-          fields={form.inputs}
-          setFields={form.setInputs}
-          testIdPrefix="code-evaluator-input"
+    <CodeEvaluatorEditor
+      name={form.name}
+      code={form.code}
+      inputs={form.inputs}
+      onNameChange={form.setName}
+      onInputsChange={form.setInputs}
+      renderCodeEditor={({ code, inputs, outputs }) => (
+        <CodeEditor
+          code={code}
+          setCode={form.setCode}
+          onClose={() => void 0}
+          language="python"
+          technologies={["python"]}
+          inputs={inputs}
+          outputs={outputs}
         />
       )}
-      <OutputContractInfo />
-    </>
-  );
-}
-
-/** Short, human-readable purpose of each fixed evaluator output field. */
-const OUTPUT_FIELD_DESCRIPTIONS: Record<string, string> = {
-  passed: "Whether the check passed (true or false).",
-  score: "A numeric score for the result.",
-  label: "A classification label for the result.",
-  details: "A human-readable explanation of the result.",
-};
-
-/**
- * The evaluator output contract is fixed (passed, score, label, details), just
- * like an evaluator end node. Rather than a dynamic field editor that could
- * declare an output the code never returns, the drawer explains the fields the
- * function may return; whichever the code returns become the result.
- */
-function OutputContractInfo() {
-  return (
-    <VStack align="stretch" gap={2}>
-      <Text fontSize="sm" fontWeight="semibold">
-        Outputs
-      </Text>
-      <Text fontSize="xs" color="fg.muted">
-        Return a dictionary from your function with any of these fields. Whichever you
-        return become the evaluation result.
-      </Text>
-      <VStack
-        align="stretch"
-        gap={1.5}
-        borderWidth="1px"
-        borderColor="border"
-        borderRadius="md"
-        padding={3}
-      >
-        {codeEvaluatorOutputFields.map((field) => (
-          <HStack key={field.identifier} gap={2} align="baseline">
-            <Text
-              fontSize="sm"
-              fontFamily="mono"
-              fontWeight="medium"
-              data-testid={`code-evaluator-output-field-${field.identifier}`}
-            >
-              {field.identifier}
-            </Text>
-            <Text fontSize="xs" color="fg.muted" fontFamily="mono">
-              {field.type}
-            </Text>
-            <Text fontSize="xs" color="fg.muted">
-              {OUTPUT_FIELD_DESCRIPTIONS[field.identifier]}
-            </Text>
-          </HStack>
-        ))}
-      </VStack>
-    </VStack>
-  );
-}
-
-function FieldListEditor({
-  label,
-  fields,
-  setFields,
-  testIdPrefix,
-}: {
-  label: string;
-  fields: EditableField[];
-  setFields: (fields: EditableField[]) => void;
-  testIdPrefix: string;
-}) {
-  return (
-    <VStack align="stretch" gap={2}>
-      <HStack justify="space-between">
-        <Text fontSize="sm" fontWeight="semibold">
-          {label}
-        </Text>
-        <Button
-          size="xs"
-          variant="ghost"
-          onClick={() => setFields([...fields, { identifier: "", type: "str" }])}
-          data-testid={`${testIdPrefix}-add`}
-        >
-          <LuPlus size={14} /> Add
-        </Button>
-      </HStack>
-      {fields.map((field, index) => (
-        <HStack key={index} gap={2}>
-          <Input
-            size="sm"
-            value={field.identifier}
-            placeholder="identifier"
-            onChange={(e) =>
-              setFields(
-                fields.map((f, i) =>
-                  i === index ? { ...f, identifier: e.target.value } : f,
-                ),
-              )
-            }
-            data-testid={`${testIdPrefix}-identifier-${index}`}
-          />
-          <NativeSelect.Root size="sm" width="140px">
-            <NativeSelect.Field
-              value={field.type}
-              onChange={(e) =>
-                setFields(
-                  fields.map((f, i) =>
-                    i === index ? { ...f, type: e.target.value } : f,
-                  ),
-                )
-              }
-            >
-              {FIELD_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </NativeSelect.Field>
-            <NativeSelect.Indicator />
-          </NativeSelect.Root>
-          <IconButton
-            size="sm"
-            variant="ghost"
-            aria-label={`Remove ${label.toLowerCase()} ${field.identifier}`}
-            onClick={() => setFields(fields.filter((_, i) => i !== index))}
-            disabled={fields.length <= 1}
-          >
-            <LuX size={14} />
-          </IconButton>
-        </HStack>
-      ))}
-    </VStack>
+      renderInputMappings={
+        form.showMappings && form.mappingsConfig
+          ? ({ inputs, onInputsChange }) => (
+              <VariablesSection
+                title="Inputs"
+                variables={inputs.map((field) => ({
+                  identifier: field.identifier,
+                  type: field.type as Variable["type"],
+                }))}
+                onChange={(variables) =>
+                  onInputsChange(
+                    variables.map((variable) => ({
+                      identifier: variable.identifier,
+                      type: variable.type,
+                    })),
+                  )
+                }
+                showMappings
+                mappings={form.mappings}
+                onMappingChange={form.handleMappingChange}
+                availableSources={form.mappingsConfig.availableSources}
+                canAddRemove
+              />
+            )
+          : void 0
+      }
+    />
   );
 }

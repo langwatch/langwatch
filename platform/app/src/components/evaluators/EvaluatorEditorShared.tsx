@@ -1,16 +1,4 @@
-import {
-  Box,
-  Button,
-  Circle,
-  Field,
-  Heading,
-  HStack,
-  Input,
-  Spacer,
-  Spinner,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Field, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
 import debounce from "lodash-es/debounce";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -19,7 +7,6 @@ import { z } from "zod";
 
 import DynamicZodForm from "~/components/checks/DynamicZodForm";
 import { Link } from "~/components/ui/link";
-import { Tooltip } from "~/components/ui/tooltip";
 import type {
   AvailableSource,
   FieldMapping as UIFieldMapping,
@@ -57,7 +44,11 @@ import {
 import { getEvaluatorDefaultSettings } from "@langwatch/evaluator-contract";
 import { api } from "~/utils/api";
 
-import type { EvaluatorCategoryId } from "@langwatch/evaluator-web";
+import {
+  type EvaluatorCategoryId,
+  EvaluatorEditorActions,
+  EvaluatorEditorHeading as EvaluatorEditorHeadingPresentation,
+} from "@langwatch/evaluator-web";
 import { EvaluatorMappingsSection } from "./EvaluatorMappingsSection";
 
 // Stable reference for the "no comparison config yet" default (new comparison
@@ -910,72 +901,20 @@ export function EvaluatorEditorFooter({
     handleClose,
   } = controller;
 
-  // Only a comparison editor mirrors its config into the store live (via
-  // onComparisonChange), so only there does an unrunnable (sub-2-variant)
-  // config need Apply gated. For every other local-config evaluator — an
-  // unnamed LLM-judge whose name isValid deliberately rejects — Apply must
-  // keep its original always-enabled behavior, so gating on isValid here
-  // doesn't newly trap them behind the name requirement.
-  const isComparisonEditor = !!onComparisonChange;
-
-  if (onLocalConfigChange) {
-    return (
-      <HStack width="full">
-        {hasUnsavedChanges && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDiscard}
-            data-testid="evaluator-discard-button"
-          >
-            Discard
-          </Button>
-        )}
-        <Spacer />
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleSave}
-          disabled={!isValid || isSaving}
-          loading={isSaving}
-          data-testid="evaluator-save-button"
-        >
-          Save
-        </Button>
-        <Button
-          colorPalette="blue"
-          size="sm"
-          onClick={handleApply}
-          // A comparison below its 2-variant minimum must not be applyable —
-          // onComparisonChange has already mirrored an unrunnable config into
-          // the store live and Apply just closes over it. The ENTIRE guard is
-          // scoped to the comparison editor: base had no `disabled` on Apply
-          // at all, so a non-comparison editor (e.g. a still-unnamed LLM
-          // judge) keeps Apply always-enabled, pixel-identical to before.
-          disabled={isComparisonEditor && (!isValid || isSaving)}
-          data-testid="evaluator-apply-button"
-        >
-          Apply
-        </Button>
-      </HStack>
-    );
-  }
-
   return (
-    <HStack gap={3}>
-      <Button variant="outline" onClick={onCancel ?? handleClose}>
-        Cancel
-      </Button>
-      <Button
-        colorPalette="green"
-        onClick={handleSave}
-        disabled={!isValid || isSaving}
-        loading={isSaving}
-        data-testid="save-evaluator-button"
-      >
-        {saveButtonText ?? (evaluatorId ? "Save Changes" : "Create Evaluator")}
-      </Button>
-    </HStack>
+    <EvaluatorEditorActions
+      mode={onLocalConfigChange ? "local" : "persisted"}
+      isEditing={!!evaluatorId}
+      hasUnsavedChanges={hasUnsavedChanges}
+      isSaving={isSaving}
+      isValid={isValid}
+      isComparisonEditor={!!onComparisonChange}
+      saveButtonText={saveButtonText}
+      onSave={handleSave}
+      onDiscard={handleDiscard}
+      onApply={handleApply}
+      onCancel={onCancel ?? handleClose}
+    />
   );
 }
 
@@ -990,18 +929,9 @@ export function EvaluatorEditorHeading({
 }) {
   const { title, hasUnsavedChanges, onLocalConfigChange } = controller;
   return (
-    <>
-      <Heading>{title}</Heading>
-      {hasUnsavedChanges && onLocalConfigChange && (
-        <Tooltip
-          content="Unpublished modifications"
-          positioning={{ placement: "top" }}
-          openDelay={0}
-          showArrow
-        >
-          <Circle size="10px" bg="orange.400" />
-        </Tooltip>
-      )}
-    </>
+    <EvaluatorEditorHeadingPresentation
+      title={title}
+      showUnpublishedBadge={hasUnsavedChanges && !!onLocalConfigChange}
+    />
   );
 }
