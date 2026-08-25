@@ -35,6 +35,25 @@ func TestAgentsTemplate_NamesNoWorkerSideAddress(t *testing.T) {
 	}
 }
 
+// Counting is a normal thing to want, and the prompt told the agent to "get the
+// total first with the cheapest count query" without ever saying what that was.
+// So the agent guessed, twice: a filter the output did not answer and a flag
+// the command did not take, then a Python one-liner whose traceback reached the
+// user. The rule now names the flags.
+//
+// @scenario "The prompt says how to count"
+func TestAgentsTemplate_SaysHowToCount(t *testing.T) {
+	tmpl, err := AgentsTemplate()
+	if err != nil {
+		t.Fatalf("AgentsTemplate: %v", err)
+	}
+	for _, named := range []string{"--jq length", ".pagination.total"} {
+		if !strings.Contains(tmpl, named) {
+			t.Errorf("AGENTS.md tells the agent to get a total but never names %q, which is what leaves it guessing at a count", named)
+		}
+	}
+}
+
 // The prompt has a byte budget so it cannot silently grow back into a rule
 // pile. It once reached 52,795 bytes by accreting one rule per observed
 // failure. A fix that needs the ceiling raised is a fix at the wrong layer:

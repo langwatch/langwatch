@@ -40,6 +40,16 @@ Feature: Langy minimal harness
     When the prompt asset is checked
     Then its size is under the enforced byte ceiling
 
+  # Asked how many of something there are, the agent had no documented way to
+  # ask. The prompt told it to count first and never said with what, so it
+  # guessed: a filter the output did not answer, a flag the command did not
+  # take, then a Python one-liner whose traceback reached the user. The prompt
+  # names the two flags instead.
+  @unit
+  Scenario: The prompt says how to count
+    When the prompt asset is checked
+    Then the rule about counting a whole population names the flags that count
+
   # The prompt used to name the worker's own endpoint as an EXAMPLE of an
   # address never to give the user, and the manager filled that placeholder in
   # per worker at spawn. So the one paragraph forbidding internal addresses
