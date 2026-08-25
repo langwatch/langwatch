@@ -422,20 +422,45 @@ Feature: Redacting secrets from traces
     When each id is redacted
     Then every id is left exactly as written
 
-  # Second line for the same failure. A value rule reads a shape, and a minted
-  # id and a minted key have the same shape, so a rule tuned for keys will take
-  # ids again. For the small set of attribute names the ingestion pipeline
-  # READS - the run id it attaches a trace by, the prompt id, the conversation,
-  # user and customer it groups by, the gateway and ingestion provenance - the
-  # value is an address rather than content, so the secrets pass is skipped for
-  # them by name. The personal-data pass still runs on them, and every other
-  # attribute keeps both passes.
+  # Second line for the same failure. Two rules decide on shape alone: they ask
+  # only whether a token looks random, and a minted id looks as random as a
+  # minted key, so a rule tuned for keys will take ids again. For the small set
+  # of attribute names the ingestion pipeline READS - the run id it attaches a
+  # trace by, the prompt id, the conversation, user and customer it groups by,
+  # the gateway and ingestion provenance - the value is an address rather than
+  # content, so those two rules are left out by name.
+  #
+  # Only those two. An exemption that turned the secrets pass off would trade
+  # one hole for a worse one, because a real key parked under a run id would
+  # then be stored in the clear. Every rule that reads a vendor prefix, armour,
+  # a URL password, an authorization scheme or a credential keyword still runs,
+  # so does the sensitive-name rule, so do the customer's own patterns, and so
+  # does the personal-data pass. None of them can match a minted record id,
+  # which carries no vendor prefix and no keyword in front of it.
 
   @unit
   Scenario: A reserved identifier attribute keeps its value
     Given a span attribute the pipeline reads to link a trace, holding an id
     When the attribute is redacted with secrets redaction on
     Then the stored attribute still holds the id
+
+  @unit
+  Scenario: A credential under a reserved identifier attribute is still redacted
+    Given a reserved attribute holding a real vendor credential
+    When the attribute is redacted
+    Then the credential is replaced
+
+  @unit
+  Scenario: A custom secret pattern still runs on a reserved identifier attribute
+    Given a rule that adds a custom secret pattern
+    When a reserved attribute holds a value that pattern matches
+    Then the value is replaced
+
+  @unit
+  Scenario: The sensitive name rule still runs on a reserved identifier attribute
+    Given a reserved attribute whose name the deny-list matches
+    When the attribute is redacted
+    Then the value is replaced by name
 
   @unit
   Scenario: A name that only resembles a reserved one is still redacted

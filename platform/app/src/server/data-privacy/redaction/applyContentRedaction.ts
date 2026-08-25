@@ -4,6 +4,7 @@ import {
   isSensitiveAttributeKey,
   redactSecretsInText,
   SECRETS_REDACTION_MARKER,
+  SHAPE_ONLY_SECRET_RULE_IDS,
 } from "@langwatch/redaction";
 import type { ResolvedDataPrivacy } from "../dataPrivacy.types";
 import {
@@ -55,9 +56,10 @@ export function nativePiiEntitiesForPolicy(
  * pass hold identifier-shaped values back from the recognizers that have only a
  * shape to go on. Free text (bodies, status messages) leaves it off.
  *
- * `skipSecrets` turns the secrets pass off for this one string while the policy
- * stays on, for the reserved attributes in
- * {@link SECRETS_EXEMPT_RESERVED_ATTRIBUTES}. It never touches the PII pass.
+ * `skipSecretRuleIds` names built-in secret rules to leave out of this one
+ * string while the policy stays on, for the reserved attributes in
+ * {@link SHAPE_RULE_EXEMPT_ATTRIBUTES}. Custom patterns and the PII pass are
+ * out of its reach.
  */
 export function redactStringNative({
   text,
@@ -65,22 +67,23 @@ export function redactStringNative({
   compiledSecretPatterns,
   compiledPiiExceptions,
   isAttributeValue = false,
-  skipSecrets = false,
+  skipSecretRuleIds,
 }: {
   text: string;
   policy: ResolvedDataPrivacy;
   compiledSecretPatterns?: readonly RegExp[];
   compiledPiiExceptions?: readonly RegExp[];
   isAttributeValue?: boolean;
-  skipSecrets?: boolean;
+  skipSecretRuleIds?: readonly string[];
 }): { text: string; redactedCount: number } {
   let result = text;
   let redactedCount = 0;
 
-  if (policy.secrets.enabled && !skipSecrets) {
+  if (policy.secrets.enabled) {
     const secrets = redactSecretsInText({
       text: result,
       customPatterns: compiledSecretPatterns,
+      skipRuleIds: skipSecretRuleIds,
     });
     result = secrets.text;
     redactedCount += secrets.redactedCount;
@@ -134,8 +137,7 @@ const NAME_RULE_EXEMPT_ATTRIBUTES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Attribute names the SECRETS pass does not run on at all, name rule and value
- * rules both.
+ * Attribute names the SHAPE-ONLY secret rules do not run on.
  *
  * These are the names the ingestion pipeline itself reads. It uses them to
  * attach a span to its simulation run, its evaluation run, its prompt, its
@@ -147,19 +149,27 @@ const NAME_RULE_EXEMPT_ATTRIBUTES: ReadonlySet<string> = new Set([
  * stored. Every value in this set is also shown back to the customer as an id,
  * so there is no reader for whom it is content.
  *
- * The set exists because a value-shape rule cannot tell a minted id from a
- * minted key, and one that guessed wrong took `scenario.run_id` with it. The
+ * The set exists because a rule that reads a shape cannot tell a minted id from
+ * a minted key, and one that guessed wrong took `scenario.run_id` with it. The
  * shape rules are listed record prefixes now, which is the first line; this is
  * the second, and it holds whatever the shape rules decide next.
  *
- * Three limits keep it narrow. It is an exact-name match, so a nested or
- * suffixed variant carries none of it. It covers the secrets pass ONLY, so a
- * personal identifier under one of these names is still replaced by the PII
- * pass at every level that runs it. And a name goes in only when the pipeline
- * reads it: an attribute the product merely stores is content and keeps both
- * passes.
+ * What it does NOT turn off matters as much, because an exemption that turned
+ * the secrets pass off would trade one hole for a worse one: a real key parked
+ * under `scenario.run_id` would be stored in the clear. So only
+ * {@link SHAPE_ONLY_SECRET_RULE_IDS} is skipped. The sensitive-NAME rule, every
+ * rule that reads a vendor namespace, armour, a URL password, an authorization
+ * scheme or a credential keyword, the customer's own custom patterns, and the
+ * whole PII pass all stay active on these attributes. None of those can match a
+ * minted record id, which is a single-underscore `prefix_<base62 body>` with no
+ * vendor namespace and no credential word in front of it.
+ *
+ * Two more limits keep it narrow. It is an exact-name match, so a nested or
+ * suffixed variant carries none of it. And a name goes in only when the
+ * pipeline reads it: an attribute the product merely stores is content and
+ * keeps every rule.
  */
-export const SECRETS_EXEMPT_RESERVED_ATTRIBUTES: ReadonlySet<string> = new Set([
+export const SHAPE_RULE_EXEMPT_ATTRIBUTES: ReadonlySet<string> = new Set([
   // Simulation runs. The trace pipeline reads this to send the trace's cost to
   // the run that spent it.
   "scenario.run_id",
@@ -204,8 +214,9 @@ export const SECRETS_EXEMPT_RESERVED_ATTRIBUTES: ReadonlySet<string> = new Set([
  * essential PII), marked as an attribute value so the PII pass can hold an
  * identifier-shaped value back from the recognizers that go on shape alone.
  *
- * {@link SECRETS_EXEMPT_RESERVED_ATTRIBUTES} skips the secrets pass entirely
- * and keeps the PII pass.
+ * For {@link SHAPE_RULE_EXEMPT_ATTRIBUTES} the shape-only value rules are left
+ * out. Every other rule, the name rule included, runs as it does on any other
+ * attribute.
  */
 export function redactAttributeNative({
   key,
@@ -220,10 +231,8 @@ export function redactAttributeNative({
   compiledSecretPatterns?: readonly RegExp[];
   compiledPiiExceptions?: readonly RegExp[];
 }): { text: string; redactedCount: number } {
-  const secretsExempt = SECRETS_EXEMPT_RESERVED_ATTRIBUTES.has(key);
   if (
     policy.secrets.enabled &&
-    !secretsExempt &&
     value.length > 0 &&
     !NAME_RULE_EXEMPT_ATTRIBUTES.has(key) &&
     isSensitiveAttributeKey(key)
@@ -233,7 +242,9 @@ export function redactAttributeNative({
   return redactStringNative({
     text: value,
     policy,
-    skipSecrets: secretsExempt,
+    skipSecretRuleIds: SHAPE_RULE_EXEMPT_ATTRIBUTES.has(key)
+      ? SHAPE_ONLY_SECRET_RULE_IDS
+      : undefined,
     compiledSecretPatterns,
     compiledPiiExceptions,
     isAttributeValue: true,

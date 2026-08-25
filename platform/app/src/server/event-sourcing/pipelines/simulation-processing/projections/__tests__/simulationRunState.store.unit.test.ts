@@ -10,6 +10,7 @@ import {
 import type {
   SimulationRunMetricsComputedEvent,
   SimulationRunQueuedEvent,
+  SimulationRunStartedEvent,
 } from "../../schemas/events";
 import {
   type SimulationRunStateData,
@@ -90,13 +91,36 @@ function queuedEvent(): SimulationRunQueuedEvent {
   };
 }
 
+function startedEvent(): SimulationRunStartedEvent {
+  return {
+    id: "event-started",
+    aggregateId: RUN_ID,
+    aggregateType: "simulation_run",
+    tenantId: TENANT_ID,
+    createdAt: 1500,
+    occurredAt: 1500,
+    type: SIMULATION_RUN_EVENT_TYPES.STARTED,
+    version: SIMULATION_EVENT_VERSIONS.STARTED,
+    data: {
+      scenarioRunId: RUN_ID,
+      scenarioId: "scenario-1",
+      batchRunId: "scenariobatch_0005FFcHZ7IBvPE1OSWymml0ikKqB",
+      scenarioSetId: "set-1",
+      name: "checkout flow",
+    },
+  };
+}
+
 const projection = new SimulationRunStateFoldProjection({
   store: { store: async () => {}, get: async () => null },
 });
 
-function fold(
-  events: Array<SimulationRunMetricsComputedEvent | SimulationRunQueuedEvent>,
-): SimulationRunStateData {
+type FoldedEvent =
+  | SimulationRunMetricsComputedEvent
+  | SimulationRunQueuedEvent
+  | SimulationRunStartedEvent;
+
+function fold(events: FoldedEvent[]): SimulationRunStateData {
   return events.reduce(
     (state, event) => projection.apply(state, event),
     projection.init(),
@@ -129,13 +153,13 @@ describe("SimulationRunStateFoldStore", () => {
 
   describe("when cost metrics arrive before the run", () => {
     /** @scenario "Cost that arrives before the run starts reaches the row" */
-    it("carries the cost into the row the lifecycle event writes", async () => {
+    it("carries the cost into the row the started event writes", async () => {
       const { store, written } = makeStore();
       const withMetrics = fold([metricsComputedEvent(1.25)]);
       await store.store(withMetrics, context);
       expect(written).toEqual([]);
 
-      await store.store(projection.apply(withMetrics, queuedEvent()), context);
+      await store.store(projection.apply(withMetrics, startedEvent()), context);
       expect(written).toHaveLength(1);
       const stored = written[0]!.data as SimulationRunStateData;
       expect(stored.ScenarioRunId).toBe(RUN_ID);
