@@ -290,6 +290,9 @@ describe("ImpersonationService", () => {
           email: "target@example.com",
           image: null,
           deactivatedAt: null,
+          // The service's own select always asks for these, so a stub
+          // without them is a target shape the database cannot return.
+          orgMemberships: [],
         });
         const auditLog = makeAuditLog();
         const service = ImpersonationService.create(
@@ -323,6 +326,7 @@ describe("ImpersonationService", () => {
           email: "target@example.com",
           image: null,
           deactivatedAt: null,
+          orgMemberships: [],
         });
         const service = ImpersonationService.create(
           prisma as unknown as PrismaClient,
