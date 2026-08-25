@@ -3,7 +3,6 @@ import { ValidationError } from "@langwatch/handled-error";
 import { describeRoute, resolver } from "hono-openapi";
 import { z } from "zod";
 import { createProjectApp, requires } from "~/server/api/security";
-import { getApp } from "~/server/app-layer/app";
 import { MAX_SESSION_EVENTS_PAGE_SIZE } from "~/server/app-layer/coding-agent/coding-agent-session.service";
 import type { SessionEventsCursor } from "~/server/app-layer/coding-agent/repositories/coding-agent-session-events.repository";
 import { GithubPullRequestNotMappedError } from "~/server/app-layer/github/errors";
@@ -184,7 +183,7 @@ secured.access(requires("traces:view")).get(
     }
 
     const { events, nextCursor } =
-      await getApp().codingAgents.sessions.getSessionEvents({
+      await c.app.codingAgents.sessions.getSessionEvents({
         projectId: project.id,
         sessionId,
         kinds,
@@ -435,7 +434,7 @@ secured.access(requires("traces:view")).get(
     });
 
     const usage =
-      await getApp().codingAgents.pullRequestUsage.getPullRequestUsage({
+      await c.app.codingAgents.pullRequestUsage.getPullRequestUsage({
         organizationId,
         repositoryHost: query.data.host,
         repositoryFullName: query.data.repository,
