@@ -221,12 +221,16 @@ export class AnomalyAlertDispatcherService {
         (email) => email.toLowerCase(),
       ),
     );
-    if (destination.to.some((address) => !memberEmails.has(address))) {
+    const deliverable = destination.to.filter((address) =>
+      memberEmails.has(address),
+    );
+    const skippedCount = destination.to.length - deliverable.length;
+    if (deliverable.length === 0) {
       return {
         destinationIndex,
         type: "email",
         status: "failed",
-        reason: "recipient is not an active organization member",
+        reason: "no recipient is an active organization member",
         acceptedCount: 0,
         failedCount: destination.to.length,
         totalCount: destination.to.length,
@@ -235,7 +239,7 @@ export class AnomalyAlertDispatcherService {
 
     const dashboardUrl = `${(env.BASE_HOST ?? "https://app.langwatch.ai").replace(/\/$/, "")}/governance`;
     const results = await Promise.allSettled(
-      destination.to.map((to) =>
+      deliverable.map((to) =>
         this.sendEmailImpl({
           to,
           monitorName: "Activity Monitor",
@@ -252,10 +256,10 @@ export class AnomalyAlertDispatcherService {
       return {
         destinationIndex,
         type: "email",
-        status: "succeeded",
+        status: skippedCount === 0 ? "succeeded" : "partial_failure",
         acceptedCount: results.length,
-        failedCount: 0,
-        totalCount: results.length,
+        failedCount: skippedCount,
+        totalCount: destination.to.length,
       };
     }
 
@@ -269,8 +273,8 @@ export class AnomalyAlertDispatcherService {
       status: failed.length === results.length ? "failed" : "partial_failure",
       reason: `${failed.length} of ${results.length} email deliveries failed`,
       acceptedCount: results.length - failed.length,
-      failedCount: failed.length,
-      totalCount: results.length,
+      failedCount: skippedCount + failed.length,
+      totalCount: destination.to.length,
     };
   }
 

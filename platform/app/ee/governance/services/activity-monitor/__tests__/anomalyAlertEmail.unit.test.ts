@@ -69,6 +69,35 @@ describe("AnomalyAlertDispatcherService email destination", () => {
     expect(result.dispatchTag).toBe("dispatched_email_1");
   });
 
+  /** @scenario Email dispatch skips recipients who are no longer active organization members */
+  it("continues sending to active members when a configured member departs", async () => {
+    const sendEmail = vi.fn<SendGovernanceAlertEmailLike>(
+      async (_input) => undefined,
+    );
+    const dispatcher = AnomalyAlertDispatcherService.create(
+      fetchImpl,
+      sendEmail,
+      async () => ["alice@example.com"],
+    );
+
+    const result = await dispatcher.dispatchAlert({ rule, alert });
+
+    expect({
+      recipients: sendEmail.mock.calls.map(([input]) => input.to),
+      outcome: result.outcomes[0],
+    }).toEqual({
+      recipients: ["alice@example.com"],
+      outcome: {
+        destinationIndex: 0,
+        type: "email",
+        status: "partial_failure",
+        acceptedCount: 1,
+        failedCount: 1,
+        totalCount: 2,
+      },
+    });
+  });
+
   /** @scenario Email delivery failure is recorded on the alert */
   it("returns a recipient-safe failed outcome when delivery fails", async () => {
     const dispatcher = AnomalyAlertDispatcherService.create(
