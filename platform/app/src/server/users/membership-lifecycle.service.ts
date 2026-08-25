@@ -149,10 +149,52 @@ export class MembershipLifecycleService {
       return { closedLinks, globallyDeactivated };
     });
 
-    if (outcome.globallyDeactivated) {
+    const globallyDeactivated =
+      outcome.globallyDeactivated ||
+      (await this.settleAccountDeactivation({ userId, now }));
+
+    if (globallyDeactivated) {
       await this.userService.revokeAllAccess({ userId });
     }
-    return outcome;
+    return { ...outcome, globallyDeactivated };
+  }
+
+  /**
+   * Re-ask the last-membership question after the transaction has committed,
+   * and turn the account off if the answer is now zero.
+   *
+   * Why it cannot be left to the in-transaction check alone: two directories
+   * removing a person's last two memberships at the same moment run two
+   * transactions under READ COMMITTED, and each counts memberships before the
+   * other commits. Both see one membership left, both decline to escalate, and
+   * the person keeps a live account with no memberships at all — the exact
+   * state #6976's rule exists to prevent, reached by neither party doing
+   * anything wrong.
+   *
+   * Asking again after our own commit closes it without a lock: whichever
+   * caller commits LAST sees both rows already gone and escalates. That is not
+   * a race narrowed, it is one removed — the last committer's re-check happens
+   * strictly after every competing commit, so at least one caller always sees
+   * zero. `markAccountDeactivated` is conditional on the flag being unset, so
+   * the other callers write nothing and the timestamp never slides.
+   *
+   * A read-modify-write, not a lock, on purpose: an advisory lock held across
+   * the membership transaction would serialise every offboarding in the fleet
+   * behind one person's row for the duration of a SCIM call, and buy an
+   * invariant this already guarantees.
+   */
+  private async settleAccountDeactivation({
+    userId,
+    now,
+  }: {
+    userId: string;
+    now: Date;
+  }): Promise<boolean> {
+    const activeMembershipsLeft = (
+      await activeMembershipsOf({ tx: this.prisma, userId })
+    ).length;
+    if (activeMembershipsLeft > 0) return false;
+    return await this.markAccountDeactivated({ tx: this.prisma, userId, now });
   }
 
   /**

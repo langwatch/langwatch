@@ -171,7 +171,11 @@ describe("PrismaIdentityLinkStorage — erasure blanks who, never which rows (AD
           userId: "someone-else",
           actorUserId: null,
           externalId: "99999",
-          erasedAt,
+          // NO stamp. This row's subject is someone-else, who was not erased;
+          // the erased person only typed it. `resolveOwnerAt` reads a stamp
+          // beside a null userId as "erased-person" and the report shows that
+          // inside the ATTRIBUTED bucket, so stamping here would eventually
+          // move a third party's spend to somebody who never owned the login.
         },
       },
       {
