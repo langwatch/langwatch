@@ -114,12 +114,23 @@ export function SingleSignOnCard({
       {failure && <TestSignInFailureNotice failure={failure} />}
 
       <OverviewDetail label="Identity provider">
-        <Text fontSize="sm">{connection.providerId}</Text>
+        <Text fontSize="13px">{connection.providerId}</Text>
       </OverviewDetail>
 
       {connection.issuer && (
         <OverviewDetail label="Issuer">
-          <Text fontSize="sm" color="fg.muted" wordBreak="break-all">
+          {/* AN IDENTIFIER, SET LIKE ONE. It is a URL an administrator
+              compares character by character against their provider's
+              console, so it is monospaced and it wraps inside its own column
+              rather than running off the card — which is what it did while
+              the value column refused to shrink. */}
+          <Text
+            fontSize="12px"
+            fontFamily="mono"
+            color="fg.muted"
+            wordBreak="break-all"
+            lineHeight="1.5"
+          >
             {connection.issuer}
           </Text>
         </OverviewDetail>

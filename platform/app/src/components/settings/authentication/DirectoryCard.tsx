@@ -69,19 +69,34 @@ export function DirectoryCard({
 
   const shownGroups = facts.directoryGroups.slice(0, GROUPS_SHOWN);
   const restGroups = facts.directoryGroups.length - shownGroups.length;
+  /** No provider has ever pushed, so every fact here would be an absence. */
+  const nothingHasArrived = facts.lastPushedAtMs === null;
 
   return (
     <OverviewCard
       title="Directory"
       chip={directorySyncChipFor(facts.connections)}
       data-testid="directory-card"
+      // THE ACTION IS WHATEVER WOULD MOVE THIS ON. Before a first push that
+      // is issuing a token; after one it is going to see who arrived.
+      // Offering "see provisioned members" to somebody with no provisioned
+      // members is an invitation to an empty table.
       actions={
-        <Link href="/settings/directory">
-          <Button size="sm" variant="outline">
-            See provisioned members
-            <ArrowRight size={14} />
-          </Button>
-        </Link>
+        nothingHasArrived ? (
+          <Link href="/settings/directory?tab=tokens">
+            <Button size="sm" variant="solid" colorPalette="orange">
+              Issue a token
+              <ArrowRight size={14} />
+            </Button>
+          </Link>
+        ) : (
+          <Link href="/settings/directory">
+            <Button size="sm" variant="outline">
+              See provisioned members
+              <ArrowRight size={14} />
+            </Button>
+          </Link>
+        )
       }
     >
       {/* "Sources" alone left a reader guessing what kind of source, on a
@@ -92,77 +107,94 @@ export function DirectoryCard({
         <DirectorySourceChips connections={facts.connections} />
       </OverviewDetail>
 
-      <OverviewDetail label="Members it manages">
-        <DirectoryFactUnavailable canRead={canReadMembership} read={provenance}>
-          <VStack align="start" gap={0}>
-            <Text fontSize="sm" data-testid="directory-card-members">
-              {facts.insideDirectory} of {facts.members.length}
-            </Text>
-            {facts.outsideDirectory > 0 && (
-              <Text fontSize="xs" color="fg.muted">
-                {facts.outsideDirectory} arrived another way, so removing them
-                from your identity provider will not remove them here.
-              </Text>
-            )}
-          </VStack>
-        </DirectoryFactUnavailable>
-      </OverviewDetail>
-
-      <OverviewDetail label="Last sync">
-        <Text fontSize="sm">
-          {facts.lastPushedAtMs === null
-            ? "No push yet"
-            : new Date(facts.lastPushedAtMs).toLocaleString()}
-        </Text>
-      </OverviewDetail>
-
-      {/* SAID HERE, NOT ONLY WHERE THEY ARE MANAGED. "Provisioning token" is
-          the phrase this page hands somebody, and sending them to another
-          screen to find out what one is makes the trip the explanation. The
-          short version lives here; the full one is beside the table. */}
-      {/* SAID HERE, NOT ONLY WHERE THEY ARE MANAGED. "Provisioning token" is
-          the phrase this page hands somebody, and sending them to another
-          screen to find out what one is makes the trip the explanation. The
-          short version is the row's hint — which is where an explanation
-          belongs now that a row is a name on the left and its state on the
-          right; as a value it pushed the only pressable thing in the row off
-          the line every other value sits on. */}
-      <OverviewDetail
-        label="Provisioning token"
-        hint="The password your identity provider uses to create and remove people here on its own, without anybody signing in. One per connection, shown once when it is issued."
-      >
-        <Link href="/settings/directory?tab=tokens">
-          <Text fontSize="12.5px" color="colorPalette.fg" whiteSpace="nowrap">
-            Issue or revoke
+      {/* FOUR ROWS OF NOTHING IS NOT A STATUS. Until a provider has pushed
+          once, every fact this card holds is an absence — "0 of 1", "No push
+          yet", "No group has arrived yet" — and drawing them as a table makes
+          a connection that is merely NEW look like one that is broken. Worse,
+          it buries the single thing that would change any of it.
+          So before the first push the card says what is missing and what
+          fixes it, in one sentence, and the token becomes the action. The
+          facts come back the moment there are any. */}
+      {nothingHasArrived ? (
+        <VStack align="start" gap={1} paddingY={1}>
+          <Text fontSize="13px" fontWeight="500">
+            Nothing has arrived yet
           </Text>
-        </Link>
-      </OverviewDetail>
+          <Text
+            fontSize="11.5px"
+            lineHeight="1.6"
+            color="fg.muted"
+            maxWidth="46ch"
+          >
+            Your identity provider creates and removes people here using a
+            provisioning token — no one has to sign in for it to work. Issue a
+            token, paste it into your provider, and the members, groups and sync
+            time fill themselves in.
+          </Text>
+        </VStack>
+      ) : (
+        <>
+          {/* A FRACTION, and the caveat under its own name rather than beside
+              the number: a whole sentence in the value column squeezed the
+              name into one word per line and then overlapped it. */}
+          <OverviewDetail
+            label="Members it manages"
+            hint={
+              facts.outsideDirectory > 0
+                ? `${facts.outsideDirectory} arrived another way, so removing them from your identity provider will not remove them here.`
+                : undefined
+            }
+          >
+            <DirectoryFactUnavailable
+              canRead={canReadMembership}
+              read={provenance}
+            >
+              <Text
+                fontSize="13px"
+                fontVariantNumeric="tabular-nums"
+                whiteSpace="nowrap"
+                data-testid="directory-card-members"
+              >
+                {facts.insideDirectory} of {facts.members.length}
+              </Text>
+            </DirectoryFactUnavailable>
+          </OverviewDetail>
 
-      <OverviewDetail label="Groups it sent">
-        <DirectoryFactUnavailable canRead={canReadMembership} read={groups}>
-          {facts.directoryGroups.length === 0 ? (
-            <Text fontSize="sm" color="fg.muted">
-              No group has arrived yet.
+          <OverviewDetail label="Last sync">
+            <Text fontSize="13px" whiteSpace="nowrap">
+              {facts.lastPushedAtMs === null
+                ? "No push yet"
+                : new Date(facts.lastPushedAtMs).toLocaleString()}
             </Text>
-          ) : (
-            <HStack gap={1} flexWrap="wrap">
-              {shownGroups.map((group) => (
-                <IdentityChip
-                  key={group.id}
-                  label={group.name}
-                  data-testid="directory-card-group-chip"
-                />
-              ))}
-              {restGroups > 0 && (
-                <Text
-                  fontSize="xs"
-                  color="fg.muted"
-                >{`+${restGroups} more`}</Text>
+          </OverviewDetail>
+
+          <OverviewDetail label="Groups it sent">
+            <DirectoryFactUnavailable canRead={canReadMembership} read={groups}>
+              {facts.directoryGroups.length === 0 ? (
+                <Text fontSize="13px" color="fg.muted">
+                  None yet
+                </Text>
+              ) : (
+                <HStack gap={1} flexWrap="wrap" justify="end">
+                  {shownGroups.map((group) => (
+                    <IdentityChip
+                      key={group.id}
+                      label={group.name}
+                      data-testid="directory-card-group-chip"
+                    />
+                  ))}
+                  {restGroups > 0 && (
+                    <Text
+                      fontSize="xs"
+                      color="fg.muted"
+                    >{`+${restGroups} more`}</Text>
+                  )}
+                </HStack>
               )}
-            </HStack>
-          )}
-        </DirectoryFactUnavailable>
-      </OverviewDetail>
+            </DirectoryFactUnavailable>
+          </OverviewDetail>
+        </>
+      )}
     </OverviewCard>
   );
 }

@@ -47,13 +47,27 @@ export function SettingRow({
       width="full"
       gap={4}
       paddingY={2.5}
-      // CENTRED, so a one-line name sits level with the control beside it.
-      // Top-aligned rows left a label floating above a taller neighbour and
-      // made a tidy list look accidental.
+      // CENTRED for the ordinary row, where a name sits level with the badge
+      // beside it. Tall rows are handled by the value's own alignment below —
+      // centring a three-line value against a one-line name is what made this
+      // list look accidental.
       align="center"
       data-testid={testId}
     >
-      <VStack align="start" gap={0.5} minWidth={0} flex={1}>
+      {/*
+       * THE NAME COLUMN NEVER COLLAPSES. It used to take flex={1} against a
+       * value that refused to shrink, so a long value squeezed the name until
+       * it wrapped one word per line — "Members / it / manages" beside a
+       * sentence that then overlapped it. The name is the thing being scanned
+       * down, so it gets a floor and the value gets whatever is left.
+       */}
+      <VStack
+        align="start"
+        gap={0.5}
+        flex="1 1 auto"
+        minWidth="10rem"
+        maxWidth={children ? "60%" : "full"}
+      >
         <Text fontSize="13px" fontWeight="500" lineHeight="1.4">
           {label}
         </Text>
@@ -64,7 +78,16 @@ export function SettingRow({
         )}
       </VStack>
       {children && (
-        <HStack gap={2} flexShrink={0} justify="end" align="center">
+        <HStack
+          gap={2}
+          // Shrinkable and right-aligned: a long value wraps inside its own
+          // column instead of pushing the name out of the row.
+          flex="0 1 auto"
+          minWidth={0}
+          justify="end"
+          align="center"
+          textAlign="end"
+        >
           {children}
         </HStack>
       )}

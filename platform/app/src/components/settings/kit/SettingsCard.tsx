@@ -77,13 +77,16 @@ export function SettingsCard({
 
           {children}
 
+          {/* Directly under the settings, not pinned to the floor. Two cards
+              side by side are rarely the same length, and a Spacer here left
+              the shorter one with a button stranded at the bottom of a void
+              the reader had to cross. The card still stretches to match its
+              neighbour; the empty space now falls below the action, where it
+              reads as a card that is simply shorter. */}
           {actions && (
-            <>
-              <Spacer />
-              <HStack gap={2} flexWrap="wrap" paddingTop={2}>
-                {actions}
-              </HStack>
-            </>
+            <HStack gap={2} flexWrap="wrap" paddingTop={2}>
+              {actions}
+            </HStack>
           )}
         </VStack>
       </Card.Body>
