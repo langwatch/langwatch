@@ -356,6 +356,23 @@ func (r nodeRun) storeOutput(stdout, stderr string) {
 	r.ns.Stderr = redactSecrets(stderr, r.scrubbedValues())
 }
 
+// storeError scrubs a node error the same way stored output is scrubbed.
+//
+// A NodeError travels the same execution events, traces and logs stdout and
+// stderr travel, and the runner fills it from `str(exc)` and
+// `traceback.format_exc()`. An exception raised inside a call that carries a
+// credential quotes that credential, so the message and the traceback are
+// scrubbed before the error leaves the node.
+func (r nodeRun) storeError(err *NodeError) *NodeError {
+	if err == nil {
+		return nil
+	}
+	values := r.scrubbedValues()
+	err.Message = redactSecrets(err.Message, values)
+	err.Traceback = redactSecrets(err.Traceback, values)
+	return err
+}
+
 // scrubbedValues is every value that must never appear in a stored output:
 // the project's resolved secrets, plus the run's sandbox key.
 func (r nodeRun) scrubbedValues() map[string]string {
@@ -516,11 +533,11 @@ func (e *Engine) runIfElsePython(ctx context.Context, node *dsl.Node, run nodeRu
 		Params:          run.params,
 	})
 	if err != nil {
-		return nil, &NodeError{Type: "code_runner_error", Message: err.Error()}
+		return nil, run.storeError(&NodeError{Type: "code_runner_error", Message: err.Error()})
 	}
 	run.storeOutput(res.Stdout, res.Stderr)
 	if res.Error != nil {
-		return nil, nodeErrorFromCodeBlock(res.Error)
+		return nil, run.storeError(nodeErrorFromCodeBlock(res.Error))
 	}
 	result, ok := res.Outputs["result"].(bool)
 	if !ok {
@@ -581,11 +598,11 @@ func (e *Engine) runCode(ctx context.Context, node *dsl.Node, run nodeRun) (map[
 		SandboxAPIKey:   run.sandboxAPIKey,
 	})
 	if err != nil {
-		return nil, &NodeError{Type: "code_runner_error", Message: err.Error()}
+		return nil, run.storeError(&NodeError{Type: "code_runner_error", Message: err.Error()})
 	}
 	run.storeOutput(res.Stdout, res.Stderr)
 	if res.Error != nil {
-		return nil, nodeErrorFromCodeBlock(res.Error)
+		return nil, run.storeError(nodeErrorFromCodeBlock(res.Error))
 	}
 	return res.Outputs, nil
 }

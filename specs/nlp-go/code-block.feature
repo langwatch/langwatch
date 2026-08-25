@@ -215,6 +215,18 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       Then the stored stdout shows the sandbox key as "[redacted]"
       And the stored stderr shows the sandbox key as "[redacted]"
 
+    # A node error carries the exception text and the traceback the runner
+    # captured, and it travels the same execution events, traces and logs the
+    # stored output travels. An exception raised inside a call that carries the
+    # credential quotes it, so the error is scrubbed the same way.
+    @unit
+    Scenario: The sandbox key is scrubbed from a code node error
+      Given the run carries a sandbox key
+      And a code node whose body raises an exception that quotes the sandbox key
+      When the engine invokes the node
+      Then the node error message shows the sandbox key as "[redacted]"
+      And the node error traceback shows the sandbox key as "[redacted]"
+
   # The former "identical outputs on Go and Python" parity scenario was removed:
   # the Python langwatch_nlp engine has been removed (see _shared/contract.md —
   # nlpgo is the sole NLP engine), so /studio/execute_sync no longer exists and

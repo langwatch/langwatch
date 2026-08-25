@@ -120,6 +120,39 @@ func TestRunCode_ScrubsTheSandboxKeyFromStoredOutput(t *testing.T) {
 	assert.Contains(t, ns.Stderr, "[redacted]")
 }
 
+// TestRunCode_ScrubsTheSandboxKeyFromANodeError pins that a raised exception
+// cannot carry the run's credential out of the node either. The runner fills the
+// error from `str(exc)` and `traceback.format_exc()`, and a NodeError travels
+// the same execution events, traces and logs stored output travels, so an
+// exception raised inside a call that quotes the credential would otherwise
+// write it into all of them.
+// @scenario "The sandbox key is scrubbed from a code node error"
+func TestRunCode_ScrubsTheSandboxKeyFromANodeError(t *testing.T) {
+	requirePythonForRedaction(t)
+	codeExec, err := codeblock.New(codeblock.Options{
+		SandboxEndpoint: "https://app.langwatch.test",
+	})
+	require.NoError(t, err)
+	eng := New(Options{Code: codeExec})
+
+	code := "import os\n" +
+		"\n" +
+		"def execute():\n" +
+		"    raise ValueError('login refused for ' + os.environ['LANGWATCH_API_KEY'])\n"
+
+	ns := &NodeState{ID: "code-1"}
+	_, nodeErr := eng.runCode(context.Background(), codeNode("code-1", code, "ok"), nodeRun{
+		ns:            ns,
+		sandboxAPIKey: "sk-lw-run-scoped-value",
+	})
+	require.NotNil(t, nodeErr, "expected the node to fail")
+
+	assert.NotContains(t, nodeErr.Message, "sk-lw-run-scoped-value")
+	assert.Contains(t, nodeErr.Message, "[redacted]")
+	assert.NotContains(t, nodeErr.Traceback, "sk-lw-run-scoped-value")
+	assert.Contains(t, nodeErr.Traceback, "[redacted]")
+}
+
 // TestRunIfElsePython_ScrubsSecretsFromStoredOutput pins the same rule on the
 // other sandbox-backed node: a python condition prints through the identical
 // runner, so its stored output is exposed identically.
