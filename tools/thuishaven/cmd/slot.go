@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -95,14 +96,14 @@ func resolveSlotLimit(pressure domain.Pressure, env domain.CheckEnv) (int, strin
 }
 
 // slotCheckEnv reads the environment the slot limit is resolved from. The
-// ancestry walk behind HeldByQueue runs only when the marker is present, which
+// process walk behind HeldByQueue runs only when the marker is present, which
 // is only on runs the queue itself spawned.
 func slotCheckEnv() domain.CheckEnv {
 	return domain.CheckEnv{
 		CheckSlots:  os.Getenv("CHECK_SLOTS"),
 		CI:          os.Getenv("CI"),
 		Claudecode:  os.Getenv("CLAUDECODE"),
-		HeldByQueue: heldByLiveAncestor(os.Getenv("CHECK_QUEUE_HELD")),
+		HeldByQueue: heldByQueueAncestor(os.Getenv("CHECK_QUEUE_HELD")),
 	}
 }
 
@@ -117,16 +118,31 @@ func reportGateOffIgnored(env domain.CheckEnv) {
 		strings.TrimSpace(env.CheckSlots))
 }
 
-// heldByLiveAncestor verifies a CHECK_QUEUE_HELD marker: the pid it names must
-// sit above this process in the live parent chain, so only a wrapper that
-// spawned this run — an ancestor by construction — can convince it. A chain
-// that cannot be read answers no: a marker that cannot be verified must gate
-// nothing off.
-func heldByLiveAncestor(raw string) bool {
+// heldByQueueAncestor verifies a CHECK_QUEUE_HELD marker: the pid it names must
+// sit above this process in the live parent chain AND be one of the queue's own
+// wrappers. Ancestry alone proves nothing, because a shell is an ancestor of
+// everything it runs, so CHECK_QUEUE_HELD=$$ would otherwise hand any agent the
+// gate-off. A chain that cannot be read answers no: a marker that cannot be
+// verified must gate nothing off.
+//
+// This is a lock on an honest door, not a vault. Anyone who may spawn processes
+// on the machine may also spawn one named haven. It stops the one-token
+// bypasses, which is what the queue needs: the runs it serializes are all
+// started by the wrappers themselves.
+func heldByQueueAncestor(raw string) bool {
 	candidate, err := strconv.Atoi(strings.TrimSpace(raw))
 	if err != nil || candidate <= 1 {
 		return false
 	}
+	if !isQueueCommand(psField(candidate, "args")) {
+		return false
+	}
+	return isLiveAncestor(candidate)
+}
+
+// isLiveAncestor reports that candidate sits above this process in the live
+// parent chain.
+func isLiveAncestor(candidate int) bool {
 	current := os.Getpid()
 	for hop := 0; hop < 64; hop++ {
 		parent := parentPid(current)
@@ -141,19 +157,41 @@ func heldByLiveAncestor(raw string) bool {
 	return false
 }
 
+// isQueueCommand reports that a command line is one of the two programs that
+// hand a slot down: the JavaScript wrapper dev/scripts/check-queue.mjs, and the
+// haven binary whose slot run does the same job in Go.
+func isQueueCommand(command string) bool {
+	command = strings.TrimSpace(command)
+	if command == "" {
+		return false
+	}
+	if strings.Contains(command, "check-queue.mjs") {
+		return true
+	}
+	executable := filepath.Base(strings.Fields(command)[0])
+	return executable == "haven" || strings.HasPrefix(executable, "haven.")
+}
+
 // parentPid reads a process's parent through ps, which is what works for a pid
 // that is not our own. Zero means it could not be read.
 func parentPid(pid int) int {
-	cmd := exec.CommandContext(context.Background(), "ps", "-o", "ppid=", "-p", strconv.Itoa(pid)) //nolint:gosec // G204: fixed argv, the only variable is an integer
-	out, err := cmd.Output()
-	if err != nil {
-		return 0
-	}
-	parent, err := strconv.Atoi(strings.TrimSpace(string(out)))
+	parent, err := strconv.Atoi(psField(pid, "ppid"))
 	if err != nil || parent < 0 {
 		return 0
 	}
 	return parent
+}
+
+// psField reads one ps field of a pid. An empty string means it could not be
+// read. -ww because ps otherwise cuts a command line at the terminal width, and
+// the script path this reads for sits at the end of one.
+func psField(pid int, field string) string {
+	cmd := exec.CommandContext(context.Background(), "ps", "-ww", "-o", field+"=", "-p", strconv.Itoa(pid)) //nolint:gosec // G204: fixed argv, the only variables are an integer and a caller-supplied literal
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }
 
 // resolveSlotPressure measures once per invocation: the level shapes the

@@ -29,8 +29,10 @@
  *                            and is off under CI, where one job runs one check.
  *   CHECK_QUEUE_HELD=<pid>   Set by the queue itself on everything below a
  *                            wrapper that already counted the run. Honored
- *                            only when the pid is a live ancestor, so a copied
- *                            value gates nothing off.
+ *                            only when the pid is a live ancestor AND that
+ *                            process is one of the queue's own wrappers, so
+ *                            neither a copied pid nor a shell's own $$ gates
+ *                            anything off.
  *   CHECK_PRESSURE=<level>   Forces the memory-pressure level (green, amber or
  *                            red) instead of measuring it. Unset measures; a
  *                            misspelling measures too. Under amber or red the
@@ -160,29 +162,59 @@ function resolvePressure(env) {
 }
 
 /**
- * The parent of `pid`, read through ps because Node only knows its own parent,
- * or null when it cannot be read.
+ * One field of `pid` read through ps, because Node knows only its own process.
+ * Null when it cannot be read. `-ww` because ps otherwise cuts a command line
+ * at the terminal width, and the script path this reads for sits at the end of
+ * one.
  */
-function parentOfPid(pid) {
+function psField(pid, field) {
   try {
-    const result = spawnSync("ps", ["-o", "ppid=", "-p", String(pid)], {
+    const args = ["-ww", "-o", `${field}=`, "-p", String(pid)];
+    const result = spawnSync("ps", args, {
       encoding: "utf8",
       timeout: 2000,
     });
     if (result.status !== 0) return null;
-    const parent = Number.parseInt((result.stdout ?? "").trim(), 10);
-    return Number.isInteger(parent) && parent > 0 ? parent : null;
+    const value = (result.stdout ?? "").trim();
+    return value === "" ? null : value;
   } catch {
     return null;
   }
 }
 
+/** The parent of `pid`, or null when it cannot be read. */
+function parentOfPid(pid) {
+  const parent = Number.parseInt(psField(pid, "ppid") ?? "", 10);
+  return Number.isInteger(parent) && parent > 0 ? parent : null;
+}
+
 /**
- * Whether `candidate` sits above this process in the live parent chain. A
- * chain that cannot be read answers no: a marker that cannot be verified must
- * gate nothing off.
+ * Whether a command line is one of the two programs that hand a slot down: this
+ * script, and the haven binary whose `slot run` does the same job in Go.
  */
-function isLiveAncestor(candidate) {
+function isQueueCommand(command) {
+  if (!command) return false;
+  if (command.includes("check-queue.mjs")) return true;
+  const executable = path.basename(command.trim().split(/\s+/)[0] ?? "");
+  return executable === "haven" || executable.startsWith("haven.");
+}
+
+/**
+ * Whether `candidate` is a slot-holding wrapper above this process: it must sit
+ * in the live parent chain AND be one of the queue's own programs. Ancestry
+ * alone proves nothing, because a shell is an ancestor of everything it runs,
+ * so `CHECK_QUEUE_HELD=$$` would otherwise hand any agent the gate-off. A chain
+ * that cannot be read answers no: a marker that cannot be verified must gate
+ * nothing off.
+ *
+ * This is a lock on an honest door, not a vault. Anyone who may spawn processes
+ * on the machine may also spawn one named `haven`. It stops the one-token
+ * bypasses, which is what the queue needs: the runs it serializes are all
+ * started by the wrappers themselves.
+ */
+function heldByQueueAncestor(candidate) {
+  if (!Number.isInteger(candidate) || candidate <= 1) return false;
+  if (!isQueueCommand(psField(candidate, "args"))) return false;
   let current = process.pid;
   for (let hop = 0; hop < 64; hop++) {
     const parent = parentOfPid(current);
@@ -220,15 +252,16 @@ function resolveSlots(env, pressure = "green") {
       // exists to serialize, so from an agent shell (Claude Code sets
       // CLAUDECODE in every shell it spawns) it is honored only when the queue
       // itself asked for it: a wrapper that already counted the run puts its
-      // own pid in CHECK_QUEUE_HELD, and only a live ancestor counts, so a
-      // copied pid gates nothing off. Observed in the wild: an agent prefixed
-      // CHECK_SLOTS=0 onto a whole-tree typecheck to jump the queue, and the
-      // machine ran three checks at once, 14 GB into swap.
+      // own pid in CHECK_QUEUE_HELD, and only a live ancestor that is itself
+      // one of the queue's wrappers counts, so neither a copied pid nor a
+      // shell's own `$$` gates anything off. Observed in the wild: an agent
+      // prefixed CHECK_SLOTS=0 onto a whole-tree typecheck to jump the queue,
+      // and the machine ran three checks at once, 14 GB into swap.
       if (!isTruthyEnv(env.CLAUDECODE)) {
         return { slots: 0, source: "CHECK_SLOTS" };
       }
       const held = Number.parseInt((env.CHECK_QUEUE_HELD ?? "").trim(), 10);
-      if (Number.isInteger(held) && held > 1 && isLiveAncestor(held)) {
+      if (heldByQueueAncestor(held)) {
         return { slots: 0, source: "held" };
       }
       stderr(

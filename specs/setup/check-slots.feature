@@ -165,9 +165,16 @@ Feature: Machine-wide slots for whole-repo checks
 
   # The queue itself turns the gate off for everything below a run it already
   # counted, or a slot-holding run would queue behind itself at the first bin
-  # shim. That gate-off carries the wrapper's pid in CHECK_QUEUE_HELD, and it
-  # is honored only when that pid is a live ancestor of the run asking, so an
-  # agent cannot borrow the marker: a copied pid is not its ancestor.
+  # shim. That gate-off carries the wrapper's pid in CHECK_QUEUE_HELD, and the
+  # pid must pass two tests: it is a live ancestor of the run asking, and that
+  # process is one of the queue's own wrappers. Ancestry alone would prove
+  # nothing, because a shell is an ancestor of every command it runs, so
+  # CHECK_QUEUE_HELD=$$ would hand the gate-off to any agent that types it.
+  #
+  # This is a lock on an honest door, not a vault. Anyone who may start
+  # processes on the machine may start one named haven. It closes the one-token
+  # bypasses, which is what the queue needs: the runs it serializes are all
+  # started by the wrappers themselves.
 
   @unit
   Scenario: A run the queue spawned itself stays unqueued in an agent shell
@@ -183,6 +190,13 @@ Feature: Machine-wide slots for whole-repo checks
     And CLAUDECODE is set and CHECK_SLOTS asks for the gate to be off
     When the limit is resolved
     Then the derived limit applies
+
+  @unit
+  Scenario: An agent's own shell is not a queue wrapper
+    Given CHECK_QUEUE_HELD names a live ancestor of the run that is not a queue wrapper
+    And CLAUDECODE is set and CHECK_SLOTS asks for the gate to be off
+    When the limit is resolved
+    Then the derived limit applies, because the marker names no wrapper that counted the run
 
   @unit
   Scenario: haven ignores an agent's gate-off the same way

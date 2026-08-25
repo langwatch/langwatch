@@ -571,9 +571,13 @@ describe("check queue", () => {
       expect(startOrder(readEvents())).toEqual(["inner"]);
     });
 
-    it("honors a held-marker naming a live ancestor", async () => {
+    /** @scenario "An agent's own shell is not a queue wrapper" */
+    it("rejects a held-marker naming an ancestor that is not a queue wrapper", async () => {
+      // The test runner is a real live ancestor of the run below, and it is
+      // not the queue. `CHECK_QUEUE_HELD=$$` from an agent shell has exactly
+      // this shape, and it is the cheapest bypass there is, so it must fail.
       const explained = await startRun({
-        tag: "held",
+        tag: "not-the-queue",
         argv: ["--explain"],
         env: {
           CLAUDECODE: "1",
@@ -583,8 +587,8 @@ describe("check queue", () => {
         },
       }).done;
 
-      expect(explained.stderr).toContain("slots=0 source=held");
-      expect(explained.stderr).not.toContain("ignored in an agent shell");
+      expect(explained.stderr).toContain("ignored in an agent shell");
+      expect(explained.stderr).not.toContain("source=held");
     });
 
     /** @scenario "A borrowed held-marker does not turn the queue off" */

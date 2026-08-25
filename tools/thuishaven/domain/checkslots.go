@@ -28,8 +28,9 @@ type CheckEnv struct {
 	CI         string // CI
 	Claudecode string // CLAUDECODE, set in every shell an agent runs
 	// HeldByQueue reports that CHECK_QUEUE_HELD names a live ancestor of this
-	// process: the queue itself spawned the run and already counted it. The
-	// caller resolves it, because the domain does not inspect processes.
+	// process that is itself one of the queue's wrappers: the queue spawned the
+	// run and already counted it. The caller resolves it, because the domain
+	// does not inspect processes.
 	HeldByQueue bool
 }
 

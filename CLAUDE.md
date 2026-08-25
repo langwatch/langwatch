@@ -226,7 +226,8 @@ no path argument at all. Naming files (`tsc --noEmit src/foo.ts`) stays instant
 and unqueued, and `--watch` / `--lsp` never queue, since they would hold a slot
 for the session. A run that already holds a slot exports `CHECK_SLOTS=0` with
 its pid in `CHECK_QUEUE_HELD` to everything it spawns, so it can't queue behind
-itself; the marker only convinces a descendant of that run. The installer stands
+itself; the marker only convinces a descendant of that run, and only when the
+pid names one of the queue's own wrappers. The installer stands
 down entirely when `NODE_ENV=production` or `CI` is set to anything but `0` or
 `false`, so an image build or a server install keeps pnpm's own bin entries.
 

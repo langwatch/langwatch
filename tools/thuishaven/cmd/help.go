@@ -128,7 +128,8 @@ var envHelpText = `Environment variables.
                                  with their pid in CHECK_QUEUE_HELD for the run
                                  they spawn, so a run is never counted twice
                                  and cannot queue behind itself; the marker
-                                 only convinces a descendant.
+                                 only convinces a descendant, and only when it
+                                 names one of those two wrappers.
                                  CHECK_QUEUE_IMPL=js forces the JavaScript
                                  queue in dev/scripts/check-queue.mjs.
     HAVEN_SLOT_HELD=1            Set by "haven run" inside the command it spawns:
