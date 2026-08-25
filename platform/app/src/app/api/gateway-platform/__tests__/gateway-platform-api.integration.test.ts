@@ -510,6 +510,11 @@ describe("gateway platform REST API (real PG + real CH)", () => {
         where: { organizationId: orgId },
       });
     }
+    // Memberships first: `GroupMembership.group` is `onDelete: Restrict`, so
+    // a group cannot be deleted out from under rows that record who was in it.
+    await prisma.groupMembership.deleteMany({
+      where: { group: { organizationId: { in: ALL_ORG_IDS } } },
+    });
     await prisma.group.deleteMany({
       where: { organizationId: { in: ALL_ORG_IDS } },
     });
