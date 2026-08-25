@@ -2991,7 +2991,9 @@ Compute, per model: input tokens, output tokens, cache-read tokens, cache-creati
 
 ## Step 3: Fetch Current Prices
 
-Fetch the candidates' price pages at analysis time and cite them; never price from memory, the numbers churn monthly. For each candidate record: input price, output price, cache-read price, cache-write price (some providers price a write above fresh input, some do not offer caching at all), and the context window.
+Fetch the candidates' price pages at analysis time and cite them; never price from memory, the numbers churn monthly. For each candidate record: input price, output price, cache-read price, cache-write price (some providers price a write above fresh input, some price it the same, some offer no caching at all), the cache-storage price and its unit if the candidate bills cache residency by time, the default cache lifetime, and the context window.
+
+Cache pricing has three shapes and they do not reprice the same way: a write premium and no storage charge, a storage charge by token-hour with a cheap or free write, or no cache at all. Record which shape each candidate uses, because Step 4 needs it.
 
 Candidates come from the user; when they name none, take the current obvious ones for the workload's model class and say why those.
 
@@ -2999,7 +3001,7 @@ Candidates come from the user; when they name none, take the current obvious one
 
 For each candidate, reprice the same mix:
 
-1. **Direct repricing**: the same tokens at the candidate's rates, cache split preserved where the candidate has caching.
+1. **Direct repricing**: the same tokens at the candidate's rates, cache split preserved where the candidate has caching. A candidate that bills cache residency by time needs a storage line as well, because tokens alone do not price it: estimate the residency of each session from its own call timestamps, from the first call that writes the cache to the last call that reads it, cap each stretch at the candidate's cache lifetime, and multiply the cached token count by the elapsed time and the storage rate. State the residency assumption next to the number. When the exported rows carry no usable timestamps, do not publish a direct row that silently omits a real charge: fall back to the no-cache row for that candidate and label it as an upper bound.
 2. **No-cache degradation**: for a candidate without caching, cache reads and cache writes both rebill as fresh input, because the candidate is sent the same context in full on every call. Add the two together, do not price the writes at a write rate the candidate does not have, and state this row separately; it is where most "80% cheaper" claims die.
 3. **Sensitivity**: recompute at the observed cache-hit share, at half of it, and at zero, so the conclusion survives a workload change.
 4. **The non-price caveats, named not judged**: a different model is a different model. State window differences and any capability constraint the user's workload obviously depends on (tool calling, long context), and leave the quality judgment to the user; this is a cost analysis.
@@ -3022,6 +3024,7 @@ State the headline numbers directly in the conversation too.
 - Do NOT use remembered prices; fetch the price page and cite it with a date.
 - Do NOT present the repriced number as the migration outcome; it prices the same usage, and a different model changes the usage. Say so once, clearly.
 - Do NOT ignore cache-write pricing; providers that bill writes above fresh input make rebuild-heavy workloads more expensive, not less.
+- Do NOT price a cache on token rates alone when the candidate charges for residency by time. A storage charge does not appear in the token mix, so leaving it out makes that candidate look cheaper than it is.
 - Do NOT mix application traffic and coding-agent traffic in one mix when the question is about one of them. The export scopes with `--origin`; the analytics totals cannot, so never take a priced number from an analytics call while the export is scoped.
 - If the CLI returns an error, report the user-facing consequence, not the raw error text.
 ````
