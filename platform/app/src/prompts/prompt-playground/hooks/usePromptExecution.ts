@@ -252,6 +252,12 @@ function useRunPrompt({
           },
         });
       } catch (error) {
+        // Stopping is not failing. `stop()` aborts the controller, `fetchSSE`
+        // rejects with an AbortError, and it arrives here like any other
+        // rejection -- so without this the user pressed Stop and was told the
+        // run had failed for an unknown reason. `finally` still settles the
+        // turn, so whatever streamed before the stop is kept.
+        if (signal.aborted) return;
         // The stream never opened, or died mid-flight. `parseLLMError` never
         // ran on this path, so it is unknown and the error registry writes the
         // sentence. A run that failed before `start` has no turn to attach to,

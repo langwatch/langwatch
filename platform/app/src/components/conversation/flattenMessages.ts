@@ -136,9 +136,14 @@ function toolResultMessagePart(msg: FlattenableMessage): DisplayPart {
 
 /** The calls a message requested, in the order it requested them. */
 function toolCallParts(msg: FlattenableMessage): DisplayPart[] {
-  return readToolCalls(msg).map((call) => ({
+  return readToolCalls(msg).map((call, index) => ({
     kind: "tool",
-    id: `${msg.id ?? ""}-tool-${call.function?.name ?? "unknown"}`,
+    // `call.id` and not the function name: parallel calls to the SAME tool are
+    // an ordinary response shape, and two `search` calls in one message built
+    // the same id. `ConversationThread` keys on it, so React reused the node
+    // and the second call's arguments rendered under the first card. The index
+    // is the fallback for a provider that sends no id.
+    id: `${msg.id ?? ""}-tool-${call.id ?? `${call.function?.name ?? "unknown"}-${index}`}`,
     name: call.function?.name ?? "unknown",
     arguments: safeJsonParseOrStringFallback(call.function?.arguments ?? "{}"),
     toolCallId: call.id,

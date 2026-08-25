@@ -55,6 +55,62 @@ describe("flattenMessages", () => {
     });
   });
 
+  describe("given one message calling the same tool twice", () => {
+    it("gives each call its own id, so the thread cannot key them together", () => {
+      const parts = flatten([
+        {
+          id: "m1",
+          role: "assistant",
+          content: "",
+          tool_calls: [
+            { id: "call_1", function: { name: "search", arguments: '{"q":"a"}' } },
+            { id: "call_2", function: { name: "search", arguments: '{"q":"b"}' } },
+          ],
+        },
+      ]);
+
+      expect(parts).toHaveLength(2);
+      // ConversationThread renders with `key={part.id}`. Two identical keys
+      // make React reuse the node, so the second call's arguments appear under
+      // the first card -- wrong output, no error.
+      expect(parts[0]?.id).not.toBe(parts[1]?.id);
+      expect(new Set(parts.map((part) => part.id)).size).toBe(2);
+    });
+  });
+
+  describe("given a media part beside a text part", () => {
+    const mediaMessage = (type: "audio" | "image") => [
+      {
+        id: "m1",
+        role: "assistant",
+        content: [
+          { type, source: { type: "url", value: "https://example.test/x" } },
+          { type: "text", text: "here is what was said" },
+        ],
+      },
+    ];
+
+    it("folds the text into an audio part as its transcript", () => {
+      const parts = flatten(mediaMessage("audio"));
+
+      expect(parts).toHaveLength(1);
+      expect(parts[0]).toMatchObject({
+        kind: "media",
+        transcript: "here is what was said",
+      });
+    });
+
+    it("leaves the text alone beside an image", () => {
+      const parts = flatten(mediaMessage("image"));
+
+      // An image message from Anthropic or Gemini has the same shape as the
+      // Realtime audio convention. Folding it would demote a real reply to an
+      // italic caption under the picture.
+      expect(parts).toHaveLength(2);
+      expect(parts.map((part) => part.kind)).toContain("text");
+    });
+  });
+
   describe("given a tool result in a later message", () => {
     it("pairs it onto the call it answers", () => {
       const parts = flatten([

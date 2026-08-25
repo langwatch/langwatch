@@ -191,6 +191,11 @@ export function collapseAudioTranscript(parts: DisplayPart[]): DisplayPart[] {
 
   const only = media[0];
   if (only?.kind !== "media") return parts;
+  // AUDIO only, which is what the convention above is about. An image message
+  // from Anthropic or Gemini is also one media part beside one text part, and
+  // folding that one turns the reply into an italic caption under the picture
+  // -- it loses its bubble, its role alignment and its markdown.
+  if (only.part.type !== "audio") return parts;
 
   only.transcript = texts
     .map((part) => (part.kind === "text" ? part.content : ""))

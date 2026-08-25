@@ -186,6 +186,47 @@ describe("usePromptExecution", () => {
         content: "partial",
       });
     });
+
+    /** @scenario "Stopping a running execution cancels it" */
+    it("records no failure when the abort rejects the stream", async () => {
+      // The sibling test's mock RESOLVES before `stop()` runs, so the abort
+      // path it is named for never executes. This one hangs until the signal
+      // fires and then rejects the way `fetchSSE` really does.
+      fetchSSEMock.mockImplementation(
+        async ({
+          onEvent,
+          signal,
+        }: {
+          onEvent: (event: unknown) => void;
+          signal?: AbortSignal;
+        }) => {
+          onEvent({ type: "start", messageId: "trace-1", traceId: "trace-1" });
+          onEvent({ type: "delta", content: "partial" });
+          await new Promise((_resolve, reject) => {
+            signal?.addEventListener("abort", () => {
+              const error = new Error("The operation was aborted.");
+              error.name = "AbortError";
+              reject(error);
+            });
+          });
+        },
+      );
+
+      const { result } = setup();
+      const running = act(async () => {
+        await result.current.send("hi");
+      });
+      act(() => result.current.stop());
+      await running;
+
+      // Stopping is a thing the user asked for, not a thing that went wrong.
+      expect(Object.values(result.current.errors)).toHaveLength(0);
+      expect(result.current.isRunning).toBe(false);
+      // And what already streamed is still there.
+      expect(result.current.messages.at(-1)).toMatchObject({
+        content: "partial",
+      });
+    });
   });
 
   describe("when a message is deleted", () => {
