@@ -171,4 +171,28 @@ describe("POST /api/experiments/execute", () => {
       expect(failure.code).not.toContain("db-1.internal");
     });
   });
+
+  describe("when the orchestrator throws after the run has reported it finished", () => {
+    /** @scenario "A run started from the open page is readable by the run API" */
+    it("leaves the finished run finished, rather than rewriting it as failed", async () => {
+      orchestratorEvents.events = [
+        { type: "execution_started", runId: "keen-plain-ram", total: 1 },
+        { type: "done", summary: { total: 1, completed: 1 } },
+        {
+          get type(): string {
+            throw new Error("the stream tore down after the last frame");
+          },
+        },
+      ];
+
+      await execute();
+
+      expect(completeRun).toHaveBeenCalledWith("keen-plain-ram", {
+        total: 1,
+        completed: 1,
+      });
+      // A poller that already read "done" must not read "failed" next.
+      expect(failRun).not.toHaveBeenCalled();
+    });
+  });
 });

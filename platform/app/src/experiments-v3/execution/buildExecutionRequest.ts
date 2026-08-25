@@ -220,6 +220,57 @@ export const datasetRowsOf = (
  * cells as running and to size its progress bar. The engine plans its own cells
  * from `scope` and `seedTargetOutputs`, and reaches the same set.
  */
+/**
+ * One target as the server reads it.
+ *
+ * `comparison` is normalized rather than passed through: a state loaded from a
+ * pre-merge experiment still carries the legacy `pairwise` shape, and the
+ * server only understands `comparison`. Column-targets need it on the wire so
+ * the orchestrator can skip the column in Phase 1 and emit Phase 2 synthetic
+ * cells with every variant's output baked in; without it the server falls
+ * through to a normal evaluator-target dispatch whose mappings have no per-row
+ * candidate outputs, and the judge endpoint rejects the empty payload.
+ */
+const targetOnTheWire = (
+  target: TargetConfig,
+): ExecutionRequest["targets"][number] => ({
+  id: target.id,
+  type: target.type,
+  promptId: target.promptId,
+  promptVersionId: target.promptVersionId,
+  promptVersionNumber: target.promptVersionNumber,
+  dbAgentId: target.dbAgentId,
+  agentType: target.agentType,
+  httpConfig: target.httpConfig,
+  targetEvaluatorId: target.targetEvaluatorId,
+  inputs: target.inputs,
+  outputs: target.outputs,
+  mappings: target.mappings,
+  localPromptConfig: target.localPromptConfig,
+  localEvaluatorConfig: target.localEvaluatorConfig,
+  comparison: toComparisonConfig(target),
+});
+
+/**
+ * One evaluator as the server reads it.
+ *
+ * The comparison config must survive the wire. The orchestrator keys its whole
+ * Phase-1/Phase-2 split off this field: without it every comparison evaluator
+ * looks like a plain per-row evaluator, gets attached to each target cell in
+ * Phase 1, and dispatches an empty input payload (nlpgo: "Data required").
+ */
+const evaluatorOnTheWire = (
+  evaluator: EvaluatorConfig,
+): ExecutionRequest["evaluators"][number] => ({
+  id: evaluator.id,
+  evaluatorType: evaluator.evaluatorType,
+  inputs: evaluator.inputs,
+  mappings: evaluator.mappings,
+  dbEvaluatorId: evaluator.dbEvaluatorId,
+  localEvaluatorConfig: evaluator.localEvaluatorConfig,
+  comparison: toComparisonConfig(evaluator),
+});
+
 export const buildExecutionRequest = ({
   state,
   projectId,
@@ -264,46 +315,8 @@ export const buildExecutionRequest = ({
       columns: dataset.columns ?? [],
       savedRecords: dataset.savedRecords,
     },
-    targets: state.targets.map((target) => ({
-      id: target.id,
-      type: target.type,
-      promptId: target.promptId,
-      promptVersionId: target.promptVersionId,
-      promptVersionNumber: target.promptVersionNumber,
-      dbAgentId: target.dbAgentId,
-      agentType: target.agentType,
-      httpConfig: target.httpConfig,
-      targetEvaluatorId: target.targetEvaluatorId,
-      inputs: target.inputs,
-      outputs: target.outputs,
-      mappings: target.mappings,
-      localPromptConfig: target.localPromptConfig,
-      localEvaluatorConfig: target.localEvaluatorConfig,
-      // Comparison column-targets need this on the wire so the orchestrator can
-      // skip the column in Phase 1 and emit Phase 2 synthetic cells with every
-      // variant's output baked in. Without it, the server falls through to a
-      // normal evaluator-target dispatch whose mappings have no per-row
-      // candidate outputs, and the judge endpoint rejects the empty payload.
-      //
-      // Normalized rather than passed through: a state loaded from a pre-merge
-      // experiment still carries the legacy `pairwise` shape here, and the
-      // server only understands `comparison`.
-      comparison: toComparisonConfig(target),
-    })),
-    evaluators: state.evaluators.map((evaluator) => ({
-      id: evaluator.id,
-      evaluatorType: evaluator.evaluatorType,
-      inputs: evaluator.inputs,
-      mappings: evaluator.mappings,
-      dbEvaluatorId: evaluator.dbEvaluatorId,
-      localEvaluatorConfig: evaluator.localEvaluatorConfig,
-      // The comparison config must survive the wire. The orchestrator keys its
-      // whole Phase-1/Phase-2 split off this field: without it every comparison
-      // evaluator looks like a plain per-row evaluator, gets attached to each
-      // target cell in Phase 1, and dispatches an empty input payload (nlpgo:
-      // "Data required").
-      comparison: toComparisonConfig(evaluator),
-    })),
+    targets: state.targets.map(targetOnTheWire),
+    evaluators: state.evaluators.map(evaluatorOnTheWire),
     scope,
     ...(concurrency !== undefined ? { concurrency } : {}),
     seedTargetOutputs:

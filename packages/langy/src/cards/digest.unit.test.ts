@@ -143,11 +143,15 @@ describe("extractDigest, given a collection read", () => {
         output: JSON.stringify([
           { id: "prompt_1" },
           { id: "prompt_2" },
-          "… 42 more items truncated, 44 total",
+          // The stated total disagrees with rows-plus-removed on purpose: the
+          // producer states what the query matched, and that is the number the
+          // card has to draw. Making them agree would pass either way and pin
+          // nothing.
+          "… 42 more items truncated, 50 total",
         ]),
       });
 
-      expect(digest.counts).toEqual({ returned: 2, total: 44 });
+      expect(digest.counts).toEqual({ returned: 2, total: 50 });
     });
 
     it("counts a plain list of its rows when nothing was removed", () => {

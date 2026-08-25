@@ -79,6 +79,7 @@ vi.mock("../abortManager", () => ({
   },
 }));
 
+import type { OrchestratorInput } from "../orchestrator";
 import { runOrchestrator } from "../orchestrator";
 import type { EvaluationV3Event } from "../types";
 
@@ -154,7 +155,7 @@ const runCandidateOnly = async (
   >,
 ): Promise<EvaluationV3Event[]> => {
   const events: EvaluationV3Event[] = [];
-  for await (const event of runOrchestrator({
+  const input: OrchestratorInput = {
     projectId: "project-1",
     runId: "run-1",
     scope: { type: "target", targetId: "candidate" },
@@ -177,7 +178,8 @@ const runCandidateOnly = async (
       ],
     ]),
     ...(seedTargetOutputs ? { seedTargetOutputs } : {}),
-  } as never)) {
+  };
+  for await (const event of runOrchestrator(input)) {
     events.push(event as EvaluationV3Event);
     if (event.type === "done" || event.type === "stopped") break;
   }

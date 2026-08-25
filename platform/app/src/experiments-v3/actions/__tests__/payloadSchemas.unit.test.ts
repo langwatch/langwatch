@@ -181,7 +181,9 @@ describe("payload schemas", () => {
           : result.error.issues.map((issue) => issue.path.join(".")),
       ).toContain("evaluatorType");
     });
+  });
 
+  describe("given an addEvaluator payload naming a type defined outside the built-in catalog", () => {
     it("accepts the whole-workflow evaluator, which has no id in its type", () => {
       expect(
         addEvaluatorPayloadSchema.safeParse({

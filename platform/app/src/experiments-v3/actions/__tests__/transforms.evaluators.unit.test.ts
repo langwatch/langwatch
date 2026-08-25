@@ -215,7 +215,9 @@ describe("addEvaluator", () => {
       );
       expect(message).toContain('Run "langwatch evaluator types"');
     });
+  });
 
+  describe("when the payload names a type defined outside the built-in catalog", () => {
     it("accepts a project's own evaluator, whose type carries a row id", () => {
       const { state } = addEvaluator({
         state: baseState(),

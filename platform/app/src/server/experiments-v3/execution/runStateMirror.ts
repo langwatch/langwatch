@@ -10,8 +10,13 @@
  * request handling and stream output and the run's lifecycle stays with the
  * execution layer that owns it.
  */
+
 import type { SerializedHandledError } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
 import { runStateManager } from "./runStateManager";
+
+const logger = createLogger("langwatch:experiments-v3:run-state-mirror");
+
 import type { EvaluationV3Event } from "./types";
 
 /** What a caller feeds one run's stream into. */
@@ -44,16 +49,40 @@ export const createRunStateMirror = ({
   let runId: string | undefined;
   let ended = false;
 
+  /**
+   * The mirror never fails the run it is watching.
+   *
+   * The store is Redis and it is a side channel for pollers, so a timeout on it
+   * must not reach the `for await` loop the run is streaming through: that
+   * would write an error frame to the customer and abandon a healthy run.
+   */
+  const mirrored = async (
+    what: string,
+    write: () => Promise<unknown>,
+  ): Promise<void> => {
+    try {
+      await write();
+    } catch (error) {
+      logger.warn(
+        { error, projectId, runId, what },
+        "run-state mirror write failed; the run itself is unaffected",
+      );
+    }
+  };
+
   const recordEnd = async (event: EvaluationV3Event): Promise<void> => {
-    if (!runId) return;
+    const id = runId;
+    if (!id) return;
     if (event.type === "done") {
       ended = true;
-      await runStateManager.completeRun(runId, event.summary);
+      await mirrored("completeRun", () =>
+        runStateManager.completeRun(id, event.summary),
+      );
       return;
     }
     if (event.type === "stopped") {
       ended = true;
-      await runStateManager.stopRun(runId);
+      await mirrored("stopRun", () => runStateManager.stopRun(id));
     }
   };
 
@@ -61,17 +90,20 @@ export const createRunStateMirror = ({
     async record(event: EvaluationV3Event): Promise<void> {
       if (event.type === "execution_started") {
         runId = event.runId;
-        await runStateManager.createRun({
-          runId: event.runId,
-          projectId,
-          experimentId,
-          experimentSlug,
-          total: event.total,
-        });
+        await mirrored("createRun", () =>
+          runStateManager.createRun({
+            runId: event.runId,
+            projectId,
+            experimentId,
+            experimentSlug,
+            total: event.total,
+          }),
+        );
         return;
       }
-      if (!runId) return;
-      await runStateManager.addEvent(runId, event);
+      const id = runId;
+      if (!id) return;
+      await mirrored("addEvent", () => runStateManager.addEvent(id, event));
       await recordEnd(event);
     },
     async fail(failure: {
@@ -79,8 +111,9 @@ export const createRunStateMirror = ({
       domainError?: SerializedHandledError;
       traceId?: string;
     }): Promise<void> {
-      if (!runId || ended) return;
-      await runStateManager.failRun(runId, failure);
+      const id = runId;
+      if (!id || ended) return;
+      await mirrored("failRun", () => runStateManager.failRun(id, failure));
     },
   };
 };

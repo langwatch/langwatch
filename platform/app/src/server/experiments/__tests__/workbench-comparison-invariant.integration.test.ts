@@ -106,6 +106,9 @@ describe("workbench comparison invariant", () => {
   });
 
   afterAll(async () => {
+    // A setup that failed leaves no project to scope the deletes to, and a
+    // teardown that throws on `project.id` hides the failure that caused it.
+    if (!project) return;
     await prisma.experimentVersion.deleteMany({
       where: { experimentId: { in: createdIds }, projectId: project.id },
     });

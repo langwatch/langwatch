@@ -38,7 +38,11 @@ const store = vi.hoisted(() => ({
 
 const applyWorkbenchAction = vi.hoisted(() => vi.fn(() => ({ ok: true })));
 const saveNow = vi.hoisted(() => vi.fn(async () => store.saveOutcome));
-const executeEvaluation = vi.hoisted(() => vi.fn());
+// `async`, like the real hook: `useExecuteEvaluation().execute` is an async
+// function, so it always answers with a promise, and the run handler settles on
+// that promise when the stream names no run. A mock returning undefined would
+// leave the handler waiting out its whole id budget.
+const executeEvaluation = vi.hoisted(() => vi.fn(async () => undefined));
 
 vi.mock("~/components/DashboardLayout", () => ({
   DashboardLayout: () => null,

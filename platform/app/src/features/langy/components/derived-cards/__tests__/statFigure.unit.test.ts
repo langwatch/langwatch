@@ -65,8 +65,10 @@ describe("formatStatFigure", () => {
     it("draws negative zero as zero, with no sign", () => {
       expect(formatStatFigure({ value: -0, unit: "usd" })).toBe("0 usd");
     });
+  });
 
-    it("leaves readings a hundredth and larger as they were", () => {
+  describe("given a value a hundredth or larger", () => {
+    it("leaves the reading as it was", () => {
       expect(formatStatFigure({ value: 0.01, unit: "usd" })).toBe("0.01 usd");
       expect(formatStatFigure({ value: 0.5, unit: "usd" })).toBe("0.5 usd");
       expect(formatStatFigure({ value: 1204 })).toBe("1,204");

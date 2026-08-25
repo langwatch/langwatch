@@ -843,7 +843,10 @@ export const generateComparisonCells = ({
     evaluatorId: string;
   }): void => {
     for (const rowIndex of rowsInScope) {
-      if (!datasetRows[rowIndex]) continue;
+      const datasetEntry = datasetRows[rowIndex];
+      // The same gate `generateCells` applies: a blank trailing row never ran,
+      // so an unfinished comparison must not paint a red cell onto it.
+      if (!datasetEntry || isRowEmpty(datasetEntry)) continue;
       skipReasons.push({
         rowIndex,
         targetId,

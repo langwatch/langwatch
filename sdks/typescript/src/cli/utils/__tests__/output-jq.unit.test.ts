@@ -94,6 +94,9 @@ describe("applyJq", () => {
       [".traces,.other"],
       [".traces + 1"],
       [".traces(x)"],
+      // A minus with no digits: this parsed as an index of NaN and traversed
+      // to null, which is exactly the fabricated answer this list exists for.
+      [".traces[-]"],
     ])("throws rather than answering null for %s", (expression) => {
       expect(() => applyJq(expression, DATA)).toThrow(/unsupported syntax|must start with/);
     });

@@ -53,7 +53,7 @@ Feature: Langy runs the prompt improvement loop on the workbench
   Scenario: Langy runs the loop without asking permission to continue
     Given a dataset the experiment already holds
     When the loop starts
-    Then Langy scores the baseline, duplicates, edits, runs and compares without asking the user anything
+    Then Langy scores the baseline, duplicates, edits, runs and compares without asking permission to continue
     And it never asks whether it may run the next attempt
 
   @e2e

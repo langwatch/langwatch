@@ -53,7 +53,9 @@ func TestTruncateToolOutput_ReducesJSONStructurally(t *testing.T) {
 		t.Errorf("scalar fields must survive the reduction, totalHits = %d", parsed.Pagination.TotalHits)
 	}
 	if len(parsed.Traces) < 2 {
-		t.Errorf("a sample of the array must survive, got %d items", len(parsed.Traces))
+		// Fatal, not an error: the tail read below would panic on an empty array
+		// and a panic diagnoses nothing.
+		t.Fatalf("a sample of the array must survive, got %d items", len(parsed.Traces))
 	}
 	// The clip marker rides IN the array, shape intact, and states the true
 	// total so a reader with no count field of its own still has one.

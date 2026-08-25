@@ -323,6 +323,59 @@ describe("normalizeTargets", () => {
       expect(normalized?.pairwise).toBeUndefined();
     });
   });
+
+  describe("given a prompt target saved with a comparison config", () => {
+    it("drops the config the target cannot own", () => {
+      const targets = [
+        {
+          id: "prompt-target",
+          type: "prompt",
+          promptId: "prompt_1",
+          mappings: {},
+          comparison: {
+            variants: ["target-a", "target-b"],
+            hasGoldenAnswer: false,
+            includeMetrics: [] as ("cost" | "duration")[],
+            randomizeOrder: true,
+          },
+        },
+      ] as unknown as TargetConfig[];
+
+      const [normalized] = normalizeTargets(targets);
+
+      // Every comparison edit skips a non-evaluator target, so leaving the
+      // field on would give the column an editor that saves nothing.
+      expect(normalized?.comparison).toBeUndefined();
+      expect(normalized?.type).toBe("prompt");
+      expect(normalized?.promptId).toBe("prompt_1");
+    });
+  });
+
+  describe("given an evaluator target with a comparison config", () => {
+    it("keeps it, because that is the target kind a comparison column has", () => {
+      const targets = [
+        {
+          id: "comparison-target",
+          type: "evaluator",
+          targetEvaluatorId: "db_evaluator_1",
+          mappings: {},
+          comparison: {
+            variants: ["target-a", "target-b"],
+            hasGoldenAnswer: false,
+            includeMetrics: [] as ("cost" | "duration")[],
+            randomizeOrder: true,
+          },
+        },
+      ] as unknown as TargetConfig[];
+
+      const [normalized] = normalizeTargets(targets);
+
+      expect(normalized?.comparison?.variants).toEqual([
+        "target-a",
+        "target-b",
+      ]);
+    });
+  });
 });
 
 describe("resolveVerdictLabel", () => {

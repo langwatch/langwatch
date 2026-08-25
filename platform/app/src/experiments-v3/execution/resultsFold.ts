@@ -80,6 +80,15 @@ export const applyTargetOutput = ({
       rowIndex,
       value: output,
     }),
+    // The cell draws its failure before its output, so a retry that succeeds
+    // has to take the previous failure off the row or the customer keeps
+    // reading an error the run has already corrected.
+    errors: withRow({
+      record: results.errors,
+      key: targetId,
+      rowIndex,
+      value: null,
+    }),
     targetMetadata: metadata
       ? withRow({
           record: results.targetMetadata,

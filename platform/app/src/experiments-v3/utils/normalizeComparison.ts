@@ -149,8 +149,28 @@ export const normalizeEvaluators = <T extends EvaluatorCarrier>(
     stripInvalidComparison(normalizeCarrier(evaluator)),
   );
 
+/**
+ * Drop a `comparison` config from a target that cannot own a comparison column.
+ *
+ * A comparison column is always an evaluator target: the target names a DB
+ * evaluator row rather than carrying an evaluator type, so its kind is the only
+ * check this seam can make. A persisted prompt or agent target holding a stale
+ * comparison reached the store, where every comparison edit silently skipped it
+ * and its editor saved nothing. The repair matches the evaluator one: remove
+ * the field the target cannot own and leave the rest alone.
+ */
+const stripNonEvaluatorComparison = (target: TargetConfig): TargetConfig => {
+  if (!target.comparison) return target;
+  if (target.type === "evaluator") return target;
+
+  const { comparison: _invalid, ...rest } = target;
+  return rest as TargetConfig;
+};
+
 export const normalizeTargets = (targets: TargetConfig[]): TargetConfig[] =>
-  targets.map(normalizeCarrier);
+  targets.map((target) =>
+    stripNonEvaluatorComparison(normalizeCarrier(target)),
+  );
 
 /**
  * Resolve a stored verdict label to the winning variant's target id.

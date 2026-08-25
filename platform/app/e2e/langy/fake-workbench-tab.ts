@@ -63,8 +63,15 @@ export interface FakeWorkbenchTab {
   close(): Promise<void>;
 }
 
-/** The store is a module singleton, so there is one tab per process. */
+/**
+ * The store is a module singleton, so there is one tab per process.
+ *
+ * `isOpening` is claimed before the first `await` of `openFakeWorkbenchTab`:
+ * `openTab` itself is only set at the end, so two overlapping opens would both
+ * pass a check made on it alone and both attach to the same board.
+ */
 let openTab: FakeWorkbenchTab | null = null;
+let isOpening = false;
 
 export async function openFakeWorkbenchTab({
   adapter,
@@ -78,12 +85,27 @@ export async function openFakeWorkbenchTab({
   adapter?: LangyAdapter;
   experimentSlug: string;
 }): Promise<FakeWorkbenchTab> {
-  if (openTab) {
+  if (openTab || isOpening) {
     throw new Error(
       "A fake workbench tab is already open in this process. The workbench store is a module singleton, so two tabs would drive the same board: close the first one before opening another.",
     );
   }
+  isOpening = true;
 
+  try {
+    return await open({ adapter, experimentSlug });
+  } finally {
+    isOpening = false;
+  }
+}
+
+async function open({
+  adapter,
+  experimentSlug,
+}: {
+  adapter?: LangyAdapter;
+  experimentSlug: string;
+}): Promise<FakeWorkbenchTab> {
   const cookie = await getSessionCookie();
   const seenActions: { actionId: string; kind: string }[] = [];
   const claimedActions: ObservedAction[] = [];

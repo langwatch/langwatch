@@ -45,7 +45,7 @@ const datasetColumns = [
 ];
 
 /** An exact-match chip whose fields are mapped, or not mapped at all. */
-const gradingEvaluator = (mapped: boolean): EvaluatorConfig => ({
+const gradingEvaluator = (isMapped: boolean): EvaluatorConfig => ({
   id: "eval-1",
   evaluatorType: "langevals/exact_match",
   dbEvaluatorId: "db-eval-1",
@@ -53,7 +53,7 @@ const gradingEvaluator = (mapped: boolean): EvaluatorConfig => ({
     { identifier: "output", type: "str" },
     { identifier: "expected_output", type: "str" },
   ],
-  mappings: mapped
+  mappings: isMapped
     ? {
         "dataset-1": {
           "target-1": {
@@ -197,7 +197,7 @@ describe("given an evaluator run as its own column", () => {
     ],
   ]);
 
-  const evaluatorColumn = (mapped: boolean): ExecutionCell => ({
+  const evaluatorColumn = (isMapped: boolean): ExecutionCell => ({
     rowIndex: 0,
     targetId: "target-eval",
     targetConfig: {
@@ -209,7 +209,7 @@ describe("given an evaluator run as its own column", () => {
         { identifier: "expected_output", type: "str" },
       ],
       outputs: [{ identifier: "passed", type: "bool" }],
-      mappings: mapped
+      mappings: isMapped
         ? {
             "dataset-1": {
               output: {

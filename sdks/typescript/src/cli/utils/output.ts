@@ -277,7 +277,10 @@ const descend = (value: unknown, key: string): unknown => {
  * end), repeatable: `.traces[0]`, `.traces[].spans[0]`, `.matrix[0][1]`. The key
  * is optional so root accessors parse too (`.[]`, `.[0]`).
  */
-const SUPPORTED_SEGMENT_RE = /^([A-Za-z_][A-Za-z0-9_-]*)?((?:\[-?\d*\])*)$/;
+// An accessor is `[]` or `[<n>]`, and a minus needs digits after it: `[-]`
+// would otherwise parse as an index of NaN and traverse to null instead of
+// failing the way an unsupported expression has to.
+const SUPPORTED_SEGMENT_RE = /^([A-Za-z_][A-Za-z0-9_-]*)?((?:\[(?:-?\d+)?\])*)$/;
 
 /** One move along the path: into a key, over an array, or at one index. */
 type PathStep =
@@ -317,7 +320,7 @@ const parsePathSteps = (expression: string): PathStep[] => {
     }
     if (key !== undefined) steps.push({ kind: "key", key });
 
-    for (const accessor of accessors.match(/\[-?\d*\]/g) ?? []) {
+    for (const accessor of accessors.match(/\[(?:-?\d+)?\]/g) ?? []) {
       const inner = accessor.slice(1, -1);
       steps.push(
         inner === "" ? { kind: "iterate" } : { kind: "index", index: Number(inner) },

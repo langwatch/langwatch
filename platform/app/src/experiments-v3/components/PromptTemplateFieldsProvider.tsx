@@ -39,7 +39,17 @@ export const PromptTemplateFieldsProvider = ({
   const promptQueries = api.useQueries((t) =>
     promptTargets.map((target) =>
       t.prompts.getByIdOrHandle(
-        { idOrHandle: target.promptId ?? "", projectId },
+        {
+          idOrHandle: target.promptId ?? "",
+          projectId,
+          // A pinned column runs the version it names, and the template that
+          // decides which variables are required is that version's. Asking for
+          // the latest and dropping it when it disagrees left the column with
+          // no required fields at all, which reads as "nothing to map".
+          ...(target.promptVersionNumber !== undefined
+            ? { version: target.promptVersionNumber }
+            : {}),
+        },
         {
           enabled: !!target.promptId && !!projectId,
           staleTime: 60_000,
@@ -66,7 +76,9 @@ export const PromptTemplateFieldsProvider = ({
     promptTargets.forEach((target, index) => {
       const prompt = promptQueries[index]?.data;
       if (!prompt) return;
-      // Only the version the target actually runs describes its template.
+      // The query asks for the pinned version, so a mismatch here means the
+      // answer is not the template this column runs. Leaving the column out
+      // rather than describing it from the wrong template.
       if (
         target.promptVersionNumber !== undefined &&
         target.promptVersionNumber !== prompt.version
