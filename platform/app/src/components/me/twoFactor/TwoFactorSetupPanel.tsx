@@ -4,12 +4,12 @@ import {
   Field,
   HStack,
   Input,
-  QrCode,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { useState } from "react";
 import { CopyInput } from "~/components/CopyInput";
+import { StyledQrCode } from "./StyledQrCode";
 import { groupedSecret, sharedSecretFrom } from "./totpUri";
 
 /**
@@ -54,16 +54,13 @@ export function TwoFactorSetupPanel({
       <HStack justify="center">
         <Box
           borderWidth="1px"
-          borderRadius="md"
+          borderColor="border.muted"
+          borderRadius="xl"
           padding={4}
           background="white"
           data-testid="two-factor-scannable-code"
         >
-          <QrCode.Root value={setupUri} size="lg">
-            <QrCode.Frame>
-              <QrCode.Pattern />
-            </QrCode.Frame>
-          </QrCode.Root>
+          <StyledQrCode value={setupUri} size={200} />
         </Box>
       </HStack>
 
