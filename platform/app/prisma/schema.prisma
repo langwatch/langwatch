@@ -3113,8 +3113,6 @@ model GroupMembership {
   removedAt     DateTime?
   removedReason String?
 
-  @@index([userId])
-  @@index([groupId])
   @@index([userId, removedAt])
   @@index([groupId, removedAt])
 }

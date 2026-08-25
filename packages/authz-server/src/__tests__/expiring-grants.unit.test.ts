@@ -358,6 +358,45 @@ describe("GrantsService.attach with an end date", () => {
   });
 });
 
+describe("narrowing a grant that has an end date", () => {
+  /** @scenario "Reducing an expiring grant keeps its end date" */
+  it("carries the end date onto the replacement binding", async () => {
+    const { service, repository } = makeGrantsService();
+
+    await service.replace({
+      actor,
+      who: dana,
+      from: orgScope,
+      to: teamScope,
+      role: memberRole,
+      expiresAtMs: NOW + 7 * DAY,
+    });
+
+    expect(repository.replaceBinding).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ expiresAtMs: NOW + 7 * DAY }),
+      }),
+    );
+  });
+
+  it("leaves the replacement open-ended when no date is given", async () => {
+    const { service, repository } = makeGrantsService();
+
+    await service.replace({
+      actor,
+      who: dana,
+      from: orgScope,
+      to: teamScope,
+      role: memberRole,
+    });
+
+    // Absent, not `undefined`: the row is compared by value elsewhere, so a
+    // key holding undefined is not the same thing as no key at all.
+    const [args] = repository.replaceBinding.mock.calls.at(-1)!;
+    expect("expiresAtMs" in (args as { create: object }).create).toBe(false);
+  });
+});
+
 describe("revoking a grant that has an end date", () => {
   /** @scenario "Revoking an expiring grant early still works" */
   it("deletes the binding before its date and bumps the epoch", async () => {

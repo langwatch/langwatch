@@ -39,6 +39,8 @@
 -- DROP INDEX IF EXISTS "GroupMembership_userId_groupId_live_key";
 -- DROP INDEX IF EXISTS "GroupMembership_userId_removedAt_idx";
 -- DROP INDEX IF EXISTS "GroupMembership_groupId_removedAt_idx";
+-- CREATE INDEX "GroupMembership_userId_idx" ON "GroupMembership"("userId");
+-- CREATE INDEX "GroupMembership_groupId_idx" ON "GroupMembership"("groupId");
 -- ALTER TABLE "GroupMembership" DROP COLUMN "removedReason";
 -- ALTER TABLE "GroupMembership" DROP COLUMN "removedAt";
 -- ALTER TABLE "GroupMembership" DROP COLUMN "occurredAt";
@@ -70,6 +72,16 @@ CREATE INDEX "GroupMembership_userId_removedAt_idx" ON "GroupMembership"("userId
 
 -- CreateIndex
 CREATE INDEX "GroupMembership_groupId_removedAt_idx" ON "GroupMembership"("groupId", "removedAt");
+
+-- DropIndex
+-- The two single-column indexes are now leading-column prefixes of the pair
+-- above, and Postgres answers a `userId`-only lookup from
+-- ("userId","removedAt") just as well. Keeping them would buy nothing and cost
+-- two more index writes on every membership insert and every removal mark --
+-- and removals are now writes rather than deletes, so that cost doubled the
+-- moment this migration ran.
+DROP INDEX IF EXISTS "GroupMembership_userId_idx";
+DROP INDEX IF EXISTS "GroupMembership_groupId_idx";
 
 -- CreateIndex
 -- The pair's uniqueness, over live rows only. NOT declared in schema.prisma:
