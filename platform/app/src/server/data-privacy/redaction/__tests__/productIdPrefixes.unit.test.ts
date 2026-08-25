@@ -68,6 +68,30 @@ describe("secrets redaction, given the ids the app mints", () => {
     expect(eaten).toEqual([]);
   });
 
+  describe("when a service caller id nests a project id", () => {
+    // The gateway and governance routes name a service caller `svc_<project
+    // id>`, so the body of that id is another id rather than a KSUID. It is
+    // long enough to reach the shape rule, unlike a bare project id.
+    it("leaves the nested id exactly as written", () => {
+      expect(survives("svc_project_xAcuLT9UuPMl2k-qmu-9f")).toBe(true);
+    });
+  });
+
+  describe("when a token borrows a product prefix but not the format", () => {
+    // The prefix alone is too weak a signal to exempt on: `agent`, `prompt`,
+    // `record` and `dataset` are the words an unlisted vendor mints a token
+    // under too. The body has to carry the format the product writes, and a
+    // vendor token does not, so it is replaced even in text that names no
+    // credential.
+    /** @scenario "A credential that borrows a product id prefix is still redacted" */
+    it("still redacts it in text that names no credential", () => {
+      const kept = ["agent", "prompt", "record", "dataset", "event", "svc"]
+        .map((prefix) => `${prefix}_aB3dEf7gHi2jKlMnOpQrStUvWx0123456789xYz`)
+        .filter((token) => survives(`the caller sent ${token} onward`));
+      expect(kept).toEqual([]);
+    });
+  });
+
   describe("when a prefix names key material rather than a record", () => {
     // The exemption is per prefix, and the app mints its credentials with a
     // dash. A prefix added for its underscore form would exempt the dash form

@@ -415,12 +415,27 @@ Feature: Redacting secrets from traces
   # The prefixes the app mints are listed one by one now, and the test walks
   # the app's own resource registry, so a resource added later cannot be
   # forgotten here.
+  #
+  # A prefix on its own is too weak a signal to exempt a token on, because the
+  # words the product mints ids under - `agent`, `prompt`, `record`, `dataset`,
+  # `event` - are the words an unlisted vendor mints a token under too. So the
+  # whole token has to look like an id the product minted: the prefix names the
+  # record and the body carries the format the product writes, a fixed-length
+  # base62 string. A vendor token that borrows the prefix has a body of the
+  # wrong length and is still replaced.
 
   @unit
   Scenario: Every id prefix the product mints survives redaction
     Given an id for every resource the application mints ids for
     When each id is redacted
     Then every id is left exactly as written
+
+  @unit
+  Scenario: A credential that borrows a product id prefix is still redacted
+    Given a credential-shaped token whose prefix names a product record
+    And the token body is not the format the product mints
+    When the token is redacted in text that names no credential
+    Then the token is replaced
 
   # Second line for the same failure. Two rules decide on shape alone: they ask
   # only whether a token looks random, and a minted id looks as random as a

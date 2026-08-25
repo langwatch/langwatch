@@ -155,112 +155,123 @@ describe("redactAttributeNative", () => {
   });
 
   describe("given a reserved attribute the ingestion pipeline reads", () => {
-    // The shape-only rules go on randomness, and a minted id is as random as a
-    // minted key. One of them took `scenario.run_id` and the platform lost the
-    // link between a trace and its run, so the names the pipeline itself reads
-    // leave those two rules out.
-    /** @scenario "A reserved identifier attribute keeps its value" */
-    it("keeps every reserved identifier exactly as sent", () => {
-      const eaten = [...SHAPE_RULE_EXEMPT_ATTRIBUTES]
-        .map((key) => ({
+    describe("when the value is an id the product minted", () => {
+      /** @scenario "A reserved identifier attribute keeps its value" */
+      it("keeps every reserved identifier exactly as sent", () => {
+        const eaten = [...SHAPE_RULE_EXEMPT_ATTRIBUTES]
+          .map((key) => ({
+            key,
+            text: redactAttributeNative({
+              key,
+              value: RUN_ID,
+              policy: policy({}),
+            }).text,
+          }))
+          .filter(({ text }) => text !== RUN_ID);
+        expect(eaten).toEqual([]);
+      });
+    });
+
+    describe("when the value is a credential a vendor minted", () => {
+      // Turning the whole secrets pass off for these names would trade one
+      // hole for a worse one, so only the shape rules are skipped and a real
+      // credential parked under a reserved name is still replaced by the rule
+      // that names its vendor.
+      //
+      // The tokens are assembled at run time. A complete credential-shaped
+      // literal in the source reads as a committed secret to every scanner
+      // that walks the repository, the CI gitleaks step included.
+      /** @scenario "A credential under a reserved identifier attribute is still redacted" */
+      it.each([
+        ["a provider key", `sk-ant-${"A".repeat(40)}`],
+        ["a GitHub token", `ghp_${"b".repeat(38)}`],
+        ["an AWS access key id", `AKIA${"C".repeat(16)}`],
+        [
+          "a JWT",
+          ["eyJhbGciOiJIUzI1NiJ9", "eyJzdWIiOiJhY21lIn0", "c2lnbmF0dXJl"].join(
+            ".",
+          ),
+        ],
+        [
+          "a connection URL password",
+          "postgres://user:hunter2abc@db.internal/x",
+        ],
+      ])("still redacts %s under every reserved name", (_label, value) => {
+        const kept = [...SHAPE_RULE_EXEMPT_ATTRIBUTES].filter(
+          (key) =>
+            !redactAttributeNative({
+              key,
+              value,
+              policy: policy({}),
+            }).text.includes("[SECRET]"),
+        );
+        expect(kept).toEqual([]);
+      });
+    });
+
+    describe("when the customer added a pattern of their own", () => {
+      /** @scenario "A custom secret pattern still runs on a reserved identifier attribute" */
+      it("still applies that pattern to a reserved name", () => {
+        const p = policy({ customPatterns: ["acme_live_[A-Za-z0-9]+"] });
+        const { text } = redactAttributeNative({
+          key: "scenario.run_id",
+          value: "acme_live_9f8e7d6c5b4a39281706",
+          policy: p,
+          compiledSecretPatterns: compilePolicySecretPatterns(p),
+        });
+        expect(text).toBe("[SECRET]");
+      });
+    });
+
+    describe("when the name only resembles a reserved one", () => {
+      // The exemption is an exact-name match. A suffixed or nested variant is
+      // a name any client can invent, so it keeps the shape rules too.
+      /** @scenario "A name that only resembles a reserved one is still redacted" */
+      it.each([
+        "scenario.run_id.extra",
+        "custom.scenario.run_id",
+        "scenario.run_idx",
+      ])("treats %s as ordinary content", (key) => {
+        const { text } = redactAttributeNative({
           key,
-          text: redactAttributeNative({
-            key,
-            value: RUN_ID,
-            policy: policy({}),
-          }).text,
-        }))
-        .filter(({ text }) => text !== RUN_ID);
-      expect(eaten).toEqual([]);
-    });
-
-    // The other half of the same rule. Turning the whole secrets pass off for
-    // these names would trade one hole for a worse one, so only the shape-only
-    // rules are skipped and a real credential parked under a reserved name is
-    // still replaced by the rule that names its vendor.
-    //
-    // The tokens are assembled at run time. A complete credential-shaped
-    // literal in the source reads as a committed secret to every scanner that
-    // walks the repository, the CI gitleaks step included.
-    /** @scenario "A credential under a reserved identifier attribute is still redacted" */
-    it.each([
-      ["a provider key", `sk-ant-${"A".repeat(40)}`],
-      ["a GitHub token", `ghp_${"b".repeat(38)}`],
-      ["an AWS access key id", `AKIA${"C".repeat(16)}`],
-      [
-        "a JWT",
-        ["eyJhbGciOiJIUzI1NiJ9", "eyJzdWIiOiJhY21lIn0", "c2lnbmF0dXJl"].join(
-          ".",
-        ),
-      ],
-      ["a connection URL password", "postgres://user:hunter2abc@db.internal/x"],
-    ])("still redacts %s under every reserved name", (_label, value) => {
-      const kept = [...SHAPE_RULE_EXEMPT_ATTRIBUTES].filter(
-        (key) =>
-          !redactAttributeNative({
-            key,
-            value,
-            policy: policy({}),
-          }).text.includes("[SECRET]"),
-      );
-      expect(kept).toEqual([]);
-    });
-
-    /** @scenario "A custom secret pattern still runs on a reserved identifier attribute" */
-    it("still applies the customer's own pattern to a reserved name", () => {
-      const p = policy({ customPatterns: ["acme_live_[A-Za-z0-9]+"] });
-      const { text } = redactAttributeNative({
-        key: "scenario.run_id",
-        value: "acme_live_9f8e7d6c5b4a39281706",
-        policy: p,
-        compiledSecretPatterns: compilePolicySecretPatterns(p),
+          value: "sk-ant-" + "A".repeat(40),
+          policy: policy({}),
+        });
+        expect(text).toBe("[SECRET]");
       });
-      expect(text).toBe("[SECRET]");
     });
 
-    // The exemption is an exact-name match. A suffixed or nested variant is a
-    // name any client can invent, so it keeps the shape-only rules too.
-    /** @scenario "A name that only resembles a reserved one is still redacted" */
-    it.each([
-      "scenario.run_id.extra",
-      "custom.scenario.run_id",
-      "scenario.run_idx",
-    ])("treats %s as ordinary content", (key) => {
-      const { text } = redactAttributeNative({
-        key,
-        value: "sk-ant-" + "A".repeat(40),
-        policy: policy({}),
+    describe("when the reserved name is one the deny-list matches", () => {
+      // No reserved name trips the name rule today, so this asserts the wiring
+      // rather than a live case: a reserved name that ever gains a credential
+      // word keeps the deny-list.
+      /** @scenario "The sensitive name rule still runs on a reserved identifier attribute" */
+      it("leaves the sensitive-name deny-list in force", () => {
+        const nameRuled = [...SHAPE_RULE_EXEMPT_ATTRIBUTES].filter((key) =>
+          isSensitiveAttributeKey(key),
+        );
+        for (const key of nameRuled) {
+          expect(
+            redactAttributeNative({
+              key,
+              value: "ordinary text",
+              policy: policy({}),
+            }).text,
+          ).toBe("[SECRET]");
+        }
       });
-      expect(text).toBe("[SECRET]");
     });
 
-    // The name rule is unchanged by the exemption. No reserved name trips it
-    // today, so this asserts the wiring rather than a live case: a reserved
-    // name that ever gains a credential word keeps the deny-list.
-    /** @scenario "The sensitive name rule still runs on a reserved identifier attribute" */
-    it("leaves the sensitive-name deny-list in force", () => {
-      const nameRuled = [...SHAPE_RULE_EXEMPT_ATTRIBUTES].filter((key) =>
-        isSensitiveAttributeKey(key),
-      );
-      for (const key of nameRuled) {
-        expect(
-          redactAttributeNative({
-            key,
-            value: "ordinary text",
-            policy: policy({}),
-          }).text,
-        ).toBe("[SECRET]");
-      }
-    });
-
-    /** @scenario "A reserved identifier attribute still runs the personal data pass" */
-    it("still replaces an email address under a reserved name", () => {
-      const { text } = redactAttributeNative({
-        key: "langwatch.user_id",
-        value: "test@example.com",
-        policy: policy({}),
+    describe("when the value is personal data", () => {
+      /** @scenario "A reserved identifier attribute still runs the personal data pass" */
+      it("still replaces an email address under a reserved name", () => {
+        const { text } = redactAttributeNative({
+          key: "langwatch.user_id",
+          value: "test@example.com",
+          policy: policy({}),
+        });
+        expect(text).toBe("[EMAIL_ADDRESS]");
       });
-      expect(text).toBe("[EMAIL_ADDRESS]");
     });
   });
 
