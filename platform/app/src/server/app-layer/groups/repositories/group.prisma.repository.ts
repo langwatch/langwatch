@@ -7,15 +7,22 @@ import {
   RoleBindingScopeType,
 } from "~/generated/prisma/client";
 import {
+  AuthzLedgerUnavailableError,
   type GrantsLedgerWriter,
   grantsLedgerWriter,
+  newGroupMembershipId,
 } from "~/server/app-layer/authz/ledger";
 import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
 import type {
   AccessListingBindingRow,
   AccessListingRepository,
 } from "~/server/app-layer/authz/repositories/access-listing.repository";
+import {
+  LIVE_MEMBERSHIP,
+  liveGroupMemberships,
+} from "~/server/app-layer/authz/repositories/live-rows";
 import { scopesTouchPersonalTeam } from "~/server/role-bindings/personal-team-scope";
+import { MemberNotInGroupError } from "../errors";
 import type {
   CreateBindingInput,
   CreatedBinding,
@@ -66,8 +73,11 @@ export class PrismaGroupRepository implements GroupRepository {
           },
           _count: {
             select: {
+              // LIVE members only: a group somebody left must not read as one
+              // seat larger than the access it confers.
               members: {
                 where: {
+                  ...LIVE_MEMBERSHIP,
                   user: {
                     orgMemberships: { some: { organizationId } },
                   },
@@ -100,6 +110,7 @@ export class PrismaGroupRepository implements GroupRepository {
         },
         members: {
           where: {
+            ...LIVE_MEMBERSHIP,
             user: {
               orgMemberships: { some: { organizationId } },
             },
@@ -139,23 +150,26 @@ export class PrismaGroupRepository implements GroupRepository {
     memberIds: string[];
     actor: LedgerActor;
   }): Promise<Group> {
-    // The group row and its memberships are not grant facts, so they keep the
-    // transaction; the grants the group carries are one command after it
-    // commits, because the ledger is their only writer.
-    const created = await this.prisma.$transaction(async (tx) => {
-      const row = await tx.group.create({ data: group });
+    // The group ROW is not a grant fact, so it keeps its own write. Its
+    // memberships are — a membership is what makes every grant the group
+    // carries reach a person — so they leave the transaction and become one
+    // command each, exactly as the bindings below do. The comment this
+    // replaces said memberships were "not grant facts"; that was the
+    // assumption ADR-125 named as the blocking one.
+    const created = await this.prisma.group.create({ data: group });
 
-      if (memberIds.length > 0) {
-        await tx.groupMembership.createMany({
-          data: memberIds.map((userId) => ({
-            groupId: row.id,
-            userId,
-          })),
-        });
-      }
-
-      return row;
-    });
+    if (memberIds.length > 0) {
+      await this.writer.addGroupMembers({
+        organizationId: group.organizationId,
+        memberships: memberIds.map((userId) => ({
+          membershipId: newGroupMembershipId(),
+          groupId: created.id,
+          userId,
+        })),
+        actor,
+        onDuplicate: "skip",
+      });
+    }
 
     if (bindings.length > 0) {
       await this.writer.attachBindings({
@@ -199,7 +213,7 @@ export class PrismaGroupRepository implements GroupRepository {
   }
 
   async findMembers({ groupId }: { groupId: string }) {
-    return this.prisma.groupMembership.findMany({
+    return liveGroupMemberships(this.prisma).findMany({
       where: { groupId },
       select: {
         userId: true,
@@ -208,27 +222,65 @@ export class PrismaGroupRepository implements GroupRepository {
     });
   }
 
+  /**
+   * One membership, through the ledger. `onDuplicate: "reject"` is what turns
+   * "they are already in this group" into the 409 the REST contract froze,
+   * and the writer's own liveness pre-check is what makes a re-add after a
+   * removal succeed rather than collide with the marked row.
+   */
   async addMember({
     groupId,
+    organizationId,
     userId,
+    actor,
   }: {
     groupId: string;
+    organizationId: string;
     userId: string;
+    actor: LedgerActor;
   }): Promise<GroupMembership> {
-    return this.prisma.groupMembership.create({
-      data: { groupId, userId },
+    const membershipId = newGroupMembershipId();
+    await this.writer.addGroupMembers({
+      organizationId,
+      memberships: [{ membershipId, groupId, userId }],
+      actor,
+      onDuplicate: "reject",
     });
+    // The row the fold wrote, read back through the fence. The writer waited
+    // for the projection, so it is there; if the wait timed out the append is
+    // still durable and the caller is told so rather than handed a row that
+    // does not exist yet.
+    const row = await liveGroupMemberships(this.prisma).findFirst({
+      where: { id: membershipId },
+    });
+    if (!row) throw new AuthzLedgerUnavailableError();
+    return row;
   }
 
   async removeMember({
     groupId,
+    organizationId,
     userId,
+    actor,
   }: {
     groupId: string;
+    organizationId: string;
     userId: string;
+    actor: LedgerActor;
   }): Promise<void> {
-    await this.prisma.groupMembership.delete({
-      where: { userId_groupId: { userId, groupId } },
+    // The LIVE membership, because that is the only one there is anything to
+    // end. A pair whose membership already ended has a row, and answering
+    // "removed" for it would report a change that did not happen.
+    const live = await liveGroupMemberships(this.prisma).findFirst({
+      where: { groupId, userId, group: { organizationId } },
+      select: { id: true },
+    });
+    if (!live) throw new MemberNotInGroupError(userId);
+    await this.writer.removeGroupMembers({
+      organizationId,
+      memberships: [{ membershipId: live.id, groupId, userId }],
+      actor,
+      reason: "removed from group",
     });
   }
 
@@ -300,8 +352,30 @@ export class PrismaGroupRepository implements GroupRepository {
     });
   }
 
-  async deleteAllMemberships({ groupId }: { groupId: string }): Promise<void> {
-    await this.prisma.groupMembership.deleteMany({ where: { groupId } });
+  /**
+   * End every live membership of the group, as facts.
+   *
+   * A `deleteMany` here erased who had been in the group and when they left,
+   * which is precisely the answer the ledger exists to keep. The rows are
+   * marked instead, and the events behind them name the pair — so the record
+   * survives even the group row's own deletion, which still cascades the
+   * projection rows away (see the `GroupMembership` model comment).
+   */
+  async deleteAllMemberships({
+    groupId,
+    organizationId,
+    actor,
+  }: {
+    groupId: string;
+    organizationId: string;
+    actor: LedgerActor;
+  }): Promise<void> {
+    await this.writer.removeGroupMembersWhere({
+      organizationId,
+      where: { groupId },
+      actor,
+      reason: "group deleted",
+    });
   }
 
   async deleteAllBindings({

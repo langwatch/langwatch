@@ -130,6 +130,74 @@ export interface GrantFact {
   occurredAtMs: number;
 }
 
+/**
+ * One person's membership of one group, as a fact with a beginning and an
+ * end (ADR-125's named prerequisite).
+ *
+ * A membership is its OWN aggregate, keyed on `membershipId` — the same rule
+ * ADR-110 applies to a grant and to a role: the aggregate is the entity the
+ * events are about, and the organization is the tenant of all of them. The
+ * membership is org-scoped because the group is: a `Group` row carries an
+ * `organizationId`, so `tenantId === organizationId` holds for these commands
+ * exactly as it does for the grant ones.
+ *
+ * The pair is NOT the identity. Somebody removed from a group can be added
+ * back, and that is a new membership with its own beginning and its own end,
+ * not an edit of the old one — so `membershipId` is minted per fact and the
+ * pair's uniqueness lives in a partial unique index over the LIVE rows.
+ *
+ * No role, no scope, no permissions: a membership grants nothing by itself.
+ * What it does is make every grant held by the group reach the user, which is
+ * why COLLECT has to fence on it and why the epoch has to move when it
+ * changes.
+ */
+export interface GroupMembershipFact {
+  membershipId: string;
+  groupId: string;
+  userId: string;
+  source: GrantEventSource;
+  /** Business time (an imported membership carries the legacy row's
+   *  createdAt). */
+  occurredAtMs: number;
+}
+
+/**
+ * The AGGREGATE one person's membership of one group belongs to.
+ *
+ * Not the membership id, and the difference is a security property rather
+ * than a naming preference. `queueManager.buildGroupKey` composes
+ * `${tenantId}/${jobPath}/${aggregateType}:${key}`, and `serializeByAggregate`
+ * makes every command about one aggregate share one FIFO lane by dropping the
+ * command name from `jobPath` and forcing the key to this value. So the
+ * aggregate id is exactly "which changes must not overtake each other".
+ *
+ * Keying on the membership id would serialize `added` against the `removed`
+ * for the SAME row and stop there — and a re-add is a DIFFERENT row, by
+ * design. `remove(M1)` and `add(M2)` for one pair would then sit in two lanes
+ * and drain in either order, and the `added` guard (which refuses a second
+ * live row for a pair) would silently drop the re-add. The person stays out
+ * of the group they were just put back into, with no error anywhere.
+ *
+ * The PAIR is the entity the events are about — joined, left, joined again is
+ * one relationship with a history, not three unrelated things — so the pair is
+ * the aggregate and the ordering is total across every change to it.
+ *
+ * `${groupId}:${userId}` and not a hash: group ids are nanoids and user ids
+ * are cuids, neither contains a colon, so the pair round-trips unambiguously
+ * (the same reasoning `groupBucketScopeId` states for the gateway's budget
+ * keys). The organization is absent because a group belongs to exactly one,
+ * and it is already the event's tenant — the first segment of the group key.
+ */
+export function groupMembershipAggregateId({
+  groupId,
+  userId,
+}: {
+  groupId: string;
+  userId: string;
+}): string {
+  return `${groupId}:${userId}`;
+}
+
 export interface RoleFact {
   roleId: string;
   name: string;

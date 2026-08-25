@@ -83,6 +83,8 @@ export {
   grantFactToCompatShareLink,
   grantFactToRow,
   grantRowToFact,
+  groupMembershipFactToRow,
+  groupMembershipRowToFact,
   PRINCIPAL_TO_DB,
   RESOURCE_KIND_TO_DB,
   roleFactToRow,
@@ -99,6 +101,7 @@ export type {
   GrantResourceKindDb,
   GrantRowShape,
   GrantScopeTypeDb,
+  GroupMembershipRowShape,
   RoleRowShape,
   ShareLinkAudience,
 } from "./ledger/projection-mapping";
@@ -112,11 +115,15 @@ export type {
 } from "./ledger/grant-identity";
 export {
 } from "./ledger/facts";
-export { GRANT_EVENT_SOURCES } from "./ledger/facts";
+export {
+  GRANT_EVENT_SOURCES,
+  groupMembershipAggregateId,
+} from "./ledger/facts";
 export type {
   GrantEventSource,
   GrantFact,
   GrantsLedgerActor,
+  GroupMembershipFact,
   LedgerPrincipal,
   MigrationTenantStatus,
   LedgerPrincipalType,

@@ -15,6 +15,7 @@
  * tool handles one vocabulary across the whole surface.
  */
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { remediation } from "../error-remediation";
 
 export class GroupNotFoundError extends NotFoundError {
   declare readonly code: "group_not_found";
@@ -81,6 +82,30 @@ export class DuplicateMemberError extends HandledError {
       { httpStatus: 409, ...(userId ? { meta: { userId } } : {}) },
     );
     this.name = "DuplicateMemberError";
+  }
+}
+
+/**
+ * The user holds no LIVE membership of this group, so there is nothing to end.
+ *
+ * Not a `NotFoundError`: a membership that already ended is still a row, kept
+ * on purpose, and telling the caller it does not exist would contradict the
+ * record they can read. What is absent is a membership that still grants.
+ *
+ * This used to be a raw Prisma `P2025` escaping the repository as an unknown
+ * error - the caller was told "unknown error" for a refusal we could name and
+ * they could act on.
+ */
+export class MemberNotInGroupError extends HandledError {
+  declare readonly code: "group_member_not_in_group";
+
+  constructor(userId?: string) {
+    super("group_member_not_in_group", "That member is not in this group", {
+      httpStatus: 409,
+      ...remediation("group_member_not_in_group"),
+      ...(userId ? { meta: { userId } } : {}),
+    });
+    this.name = "MemberNotInGroupError";
   }
 }
 

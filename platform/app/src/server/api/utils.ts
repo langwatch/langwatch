@@ -6,6 +6,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
+import { liveGroupMemberships } from "~/server/app-layer/authz/repositories/live-rows";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { VisibilityWindowService } from "~/server/app-layer/traces/visibility-window.service";
 import type { Session } from "~/server/auth";
@@ -371,7 +372,7 @@ export async function getUserProtectionsForProject(
     });
     organizationId = team?.organizationId ?? null;
     if (organizationId) {
-      const memberships = await ctx.prisma.groupMembership.findMany({
+      const memberships = await liveGroupMemberships(ctx.prisma).findMany({
         where: { userId, group: { organizationId } },
         select: { groupId: true },
       });

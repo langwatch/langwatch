@@ -16,14 +16,13 @@ import {
   grantsLedgerWriter,
   type LedgerBindingAttach,
   ledgerPrincipal,
+  newGroupMembershipId,
 } from "~/server/app-layer/authz/ledger";
 import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
 import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
+import { liveGroupMemberships } from "~/server/app-layer/authz/repositories/live-rows";
 // The SCIM-managed guard's typed refusal, shared with `group.service.ts` so
 // both paths answer the customer with the same `scim_managed_group` code.
-// These three used to throw a raw TRPCError whose `code` published as
-// "BAD_REQUEST" and whose message was the whole contract, which meant the
-// anchor in specs/groups/groups-rest-api.feature held on one path only.
 import { ScimManagedGroupError } from "~/server/app-layer/groups/errors";
 import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 import { LiteMemberViewerOnlyError } from "~/server/app-layer/teams/team.service";
@@ -60,6 +59,38 @@ function isDuplicateBinding(error: unknown): boolean {
     "code" in error &&
     (error as { code: unknown }).code === "role_binding_already_exists"
   );
+}
+
+/**
+ * What a directory-owned group refuses, stated once for all three edits.
+ *
+ * All three, not just the one that happens to come first: a SCIM group's name,
+ * its membership and its existence are the identity provider's to change, and
+ * an edit that renamed it and then failed on the membership would leave the
+ * group half-changed until the next sync undid the half that landed.
+ */
+function assertNotDirectoryManaged({
+  scimSource,
+  groupId,
+  isRenaming,
+  isRemoving,
+  isAdding,
+}: {
+  scimSource: string | null;
+  groupId: string;
+  isRenaming: boolean;
+  isRemoving: boolean;
+  isAdding: boolean;
+}): void {
+  if (!scimSource) return;
+  if (!isRenaming && !isRemoving && !isAdding) return;
+  // One code for all three edits, not three messages: what the customer reads
+  // comes from the presentation registry keyed by `code`, and the three
+  // refusals have the same cause and the same remedy -- make the change in the
+  // directory. A `TRPCError` here would carry no stable code at all, so the
+  // REST surface at app/api/role-bindings would answer with nothing a caller
+  // could act on.
+  throw new ScimManagedGroupError(groupId);
 }
 
 type ScopeRows = {
@@ -457,7 +488,7 @@ export class RoleBindingService {
       .map((b) => b.groupId!);
     const groupMemberships =
       groupIds.length > 0
-        ? await this.prisma.groupMembership.findMany({
+        ? await liveGroupMemberships(this.prisma).findMany({
             where: {
               groupId: { in: groupIds },
               group: { organizationId },
@@ -516,7 +547,7 @@ export class RoleBindingService {
         where: { userId, organizationId },
         select: { role: true },
       }),
-      this.prisma.groupMembership.findMany({
+      liveGroupMemberships(this.prisma).findMany({
         where: { userId, group: { organizationId } },
         include: {
           group: {
@@ -1058,6 +1089,7 @@ export class RoleBindingService {
       rename,
       memberUserIdsToAdd,
       memberUserIdsToRemove,
+      actor,
     });
 
     if (bindingsToCreate.length > 0) {
@@ -1116,75 +1148,131 @@ export class RoleBindingService {
   }
 
   /**
-   * The half of a group edit that is not a grant fact — the rename and the
-   * membership rows — in one transaction. Nothing here writes a binding: the
-   * binding revoke this edit implies runs before this is called, so a crash
-   * mid-edit never leaves an orphaned binding live.
+   * The rename and the membership edits.
+   *
+   * The membership rows USED to be in this transaction, on the reasoning that
+   * they were "not a grant fact". They are one — a membership is what makes
+   * every grant the group holds reach a person — so they go through the ledger
+   * now, which means they leave the transaction: a command cannot be enrolled
+   * in a Prisma transaction, and holding one open across an append would tie a
+   * database connection to the queue's availability.
+   *
+   * WHAT THAT COSTS, precisely. The set-swap is no longer one atomic
+   * statement: it is N independent commands, each serialized against the other
+   * changes to its OWN (user, group) pair and independent of every other pair.
+   * A crash partway through can leave some of the edit applied.
+   *
+   * WHY THAT IS ACCEPTABLE HERE, and it is not a shrug:
+   *
+   *   - The atomicity was already partial. The binding revoke this edit
+   *     implies runs BEFORE this method (see `applyGroupEdits`) and the
+   *     binding attach runs after, both outside this transaction. A group edit
+   *     has never been one atomic act end to end; this transaction only ever
+   *     covered the rename and the membership rows.
+   *   - The ordering is still fail-safe, which is the property that matters.
+   *     Removals go first and their deny is enforced synchronously against the
+   *     projection before this method returns, so a crash mid-edit leaves
+   *     strictly LESS access than was asked for, never more — the same
+   *     direction `applyGroupEdits` chose for the bindings.
+   *   - Every guard still runs before any write. The group lookup, the three
+   *     SCIM refusals and the organization-membership check are read-only and
+   *     stay ahead of the first command, so a rejected edit still writes
+   *     nothing at all.
+   *
+   * A retry converges: the adds are idempotent per pair (the writer's own
+   * liveness check skips a pair that is already live) and the removals mark a
+   * row that is already marked, which is a no-op.
    */
+  /** Every named user must be in the organization before any of them joins a
+   *  group: one query for the batch, and the first one missing is the one the
+   *  caller is told about. */
+  private async assertAllInOrganization({
+    organizationId,
+    uniqueMemberIds,
+  }: {
+    organizationId: string;
+    uniqueMemberIds: string[];
+  }): Promise<void> {
+    if (uniqueMemberIds.length === 0) return;
+    const orgMembers = await this.prisma.organizationUser.findMany({
+      where: { organizationId, userId: { in: uniqueMemberIds } },
+      select: { userId: true },
+    });
+    if (orgMembers.length === uniqueMemberIds.length) return;
+    const found = new Set(orgMembers.map((member) => member.userId));
+    throw new UserNotInOrganizationError(
+      uniqueMemberIds.find((id) => !found.has(id)) ?? "unknown",
+    );
+  }
+
   private async applyGroupMembershipEdits({
     organizationId,
     groupId,
     rename,
     memberUserIdsToAdd,
     memberUserIdsToRemove,
+    actor,
   }: {
     organizationId: string;
     groupId: string;
     rename?: { name: string; slug: string } | null;
     memberUserIdsToAdd: string[];
     memberUserIdsToRemove: string[];
+    actor: LedgerActor;
   }): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      const group = await tx.group.findFirst({
-        where: { id: groupId, organizationId },
-        select: { id: true, scimSource: true },
-      });
-      if (!group) {
-        throw new GroupNotInOrganizationError(groupId);
-      }
-
-      if (rename) {
-        if (group.scimSource) {
-          throw new ScimManagedGroupError(groupId);
-        }
-        await tx.group.update({
-          where: { id: groupId },
-          data: { name: rename.name, slug: rename.slug },
-        });
-      }
-
-      if (memberUserIdsToRemove.length > 0) {
-        if (group.scimSource) {
-          throw new ScimManagedGroupError(groupId);
-        }
-        await tx.groupMembership.deleteMany({
-          where: { groupId, userId: { in: memberUserIdsToRemove } },
-        });
-      }
-
-      if (memberUserIdsToAdd.length > 0) {
-        if (group.scimSource) {
-          throw new ScimManagedGroupError(groupId);
-        }
-        const uniqueMemberIds = [...new Set(memberUserIdsToAdd)];
-        const orgMembers = await tx.organizationUser.findMany({
-          where: {
-            organizationId,
-            userId: { in: uniqueMemberIds },
-          },
-          select: { userId: true },
-        });
-        if (orgMembers.length !== uniqueMemberIds.length) {
-          const found = new Set(orgMembers.map((member) => member.userId));
-          const missing =
-            uniqueMemberIds.find((id) => !found.has(id)) ?? "unknown";
-          throw new UserNotInOrganizationError(missing);
-        }
-        await tx.groupMembership.createMany({
-          data: uniqueMemberIds.map((userId) => ({ groupId, userId })),
-          skipDuplicates: true,
-        });
-      }
+    const group = await this.prisma.group.findFirst({
+      where: { id: groupId, organizationId },
+      select: { id: true, scimSource: true },
     });
+    if (!group) {
+      throw new GroupNotInOrganizationError(groupId);
+    }
+
+    // Every refusal, before any write. A SCIM-managed group rejects the whole
+    // edit rather than the half of it that happens to come second.
+    assertNotDirectoryManaged({
+      scimSource: group.scimSource,
+      groupId,
+      isRenaming: !!rename,
+      isRemoving: memberUserIdsToRemove.length > 0,
+      isAdding: memberUserIdsToAdd.length > 0,
+    });
+
+    const uniqueMemberIds = [...new Set(memberUserIdsToAdd)];
+    await this.assertAllInOrganization({ organizationId, uniqueMemberIds });
+
+    if (rename) {
+      await this.prisma.group.update({
+        where: { id: groupId },
+        data: { name: rename.name, slug: rename.slug },
+      });
+    }
+
+    // Removals first: the fail-safe direction. Their deny is enforced against
+    // the projection before this returns, so an interrupted edit under-grants.
+    for (const userId of memberUserIdsToRemove) {
+      await this.writer.removeGroupMembersWhere({
+        organizationId,
+        where: { groupId, userId },
+        actor,
+        reason: "removed from group",
+      });
+    }
+
+    if (uniqueMemberIds.length > 0) {
+      await this.writer.addGroupMembers({
+        organizationId,
+        memberships: uniqueMemberIds.map((userId) => ({
+          membershipId: newGroupMembershipId(),
+          groupId,
+          userId,
+        })),
+        actor,
+        // "skip", not "reject": re-asserting a membership the user already
+        // holds leaves exactly the state the caller asked for, which is what
+        // the `createMany … skipDuplicates` this replaces meant.
+        onDuplicate: "skip",
+      });
+    }
   }
 }

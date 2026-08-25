@@ -1369,6 +1369,13 @@ const presentations = {
     title: "They're already in this group",
     describe: () => "Nothing to do: the group already grants them its access.",
   },
+  group_member_not_in_group: {
+    // A membership that ended is still in the record, so "not found" would be
+    // wrong twice over: the row is there, and it is there on purpose.
+    title: "They're not in this group",
+    describe: () =>
+      "Their membership already ended, or they were never added. The group's history still shows when they left.",
+  },
   schedule_not_found: {
     title: "That schedule no longer exists",
     describe: () =>

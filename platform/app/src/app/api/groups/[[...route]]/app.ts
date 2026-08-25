@@ -296,6 +296,7 @@ secured
         groupId: id,
         organizationId: organization.id,
         userId: body.userId,
+        actor: orgRequestLedgerActor(c),
       });
 
       return c.json({ success: true }, 201);
@@ -318,6 +319,7 @@ secured
         groupId: id,
         organizationId: organization.id,
         userId,
+        actor: orgRequestLedgerActor(c),
       });
 
       return c.json({ success: true });

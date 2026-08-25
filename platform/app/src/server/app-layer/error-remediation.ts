@@ -282,6 +282,13 @@ const registry = {
     ],
     docsPath: "/platform/rbac",
   },
+  group_member_not_in_group: {
+    tips: [
+      "The user holds no LIVE membership of this group; a membership that ended is kept as a record and cannot be ended twice",
+      "List the group's members to see who is in it now, and treat this as already done if you meant to remove them",
+    ],
+    docsPath: "/platform/rbac",
+  },
   role_binding_already_exists: {
     tips: [
       "An identical binding (same principal, role, and scope) already exists; treat this as already done",

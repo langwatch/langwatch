@@ -42,6 +42,7 @@ import {
 } from "~/generated/prisma/client";
 import { authzChecksFor } from "~/server/app-layer/authz/checks";
 import { organizationOnAuthzEngine } from "~/server/app-layer/authz/engine-gate";
+import { liveGroupMemberships } from "~/server/app-layer/authz/repositories/live-rows";
 import {
   LiteMemberRestrictedError,
   MembershipDisabledError,
@@ -857,7 +858,7 @@ async function checkPermissionFromBindings({
   const scopeIds = scopes.map((s) => s.scopeId);
 
   // Fetch groups the user belongs to in this org
-  const groupMemberships = await prisma.groupMembership.findMany({
+  const groupMemberships = await liveGroupMemberships(prisma).findMany({
     where: { userId, group: { organizationId } },
     select: { groupId: true },
   });
@@ -1706,7 +1707,7 @@ async function loadScopeResolution(
   // stale cross-org binding names them at one of these scopes.
   if (organizationRole === null) return null;
 
-  const groupMemberships = await ctx.prisma.groupMembership.findMany({
+  const groupMemberships = await liveGroupMemberships(ctx.prisma).findMany({
     where: { userId, group: { organizationId: args.organizationId } },
     select: { groupId: true },
   });

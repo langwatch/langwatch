@@ -1,10 +1,12 @@
 import { definePipeline } from "../..";
 import {
+  AddGroupMemberCommand,
   AttachGrantCommand,
   ChangeGrantRoleCommand,
   ChangeRolePermissionsCommand,
   DefineRoleCommand,
   DeleteRoleCommand,
+  RemoveGroupMemberCommand,
   RevokeGrantCommand,
 } from "./commands/grantsLedgerCommands";
 import {
@@ -88,6 +90,20 @@ export function createAuthzGrantsPipeline(deps: AuthzGrantsPipelineDeps) {
         coalesceMaxBatch: GRANT_COALESCE_MAX_BATCH,
       })
       .withCommand("revokeGrant", RevokeGrantCommand, {
+        serializeByAggregate: true,
+        coalesceMaxBatch: GRANT_COALESCE_MAX_BATCH,
+      })
+      // A membership rides the same lane rule as a grant, and needs it for
+      // the same reason: `add` and the `remove` that follows it must queue
+      // behind each other. `remove` is a conditional UPDATE, so a remove that
+      // arrives before the row exists matches nothing, and the late `add`
+      // would then insert a LIVE membership no removal contradicts — access
+      // the admin was told they had taken away.
+      .withCommand("addGroupMember", AddGroupMemberCommand, {
+        serializeByAggregate: true,
+        coalesceMaxBatch: GRANT_COALESCE_MAX_BATCH,
+      })
+      .withCommand("removeGroupMember", RemoveGroupMemberCommand, {
         serializeByAggregate: true,
         coalesceMaxBatch: GRANT_COALESCE_MAX_BATCH,
       })

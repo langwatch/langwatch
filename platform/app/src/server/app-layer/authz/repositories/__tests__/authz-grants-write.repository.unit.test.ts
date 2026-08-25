@@ -66,6 +66,9 @@ function build() {
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
+    groupMembership: {
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
     $executeRaw: executeRaw,
     $transaction: vi.fn(async (ops: unknown[]) =>
       ops.map(() => ({ count: 1 })),
@@ -76,6 +79,7 @@ function build() {
     roleBinding: { upsert: Mock; updateMany: Mock; deleteMany: Mock };
     customRole: { upsert: Mock; updateMany: Mock; deleteMany: Mock };
     shareLink: { upsert: Mock; updateMany: Mock; deleteMany: Mock };
+    groupMembership: { updateMany: Mock };
   };
   return {
     prisma: mocks,
@@ -176,6 +180,66 @@ describe("PrismaAuthzGrantsWriteRepository", () => {
           data: expect.objectContaining({ legacyRole: null }),
         }),
       );
+    });
+  });
+
+  describe("given a group membership write", () => {
+    /** @scenario "The first removal is the one that counts" */
+    it("refuses to move an earlier removal's timestamp", async () => {
+      const { prisma, repository } = build();
+
+      await repository.append({
+        kind: "groupMembership.remove",
+        membershipId: "groupmember_1",
+        reason: "removed again",
+        occurredAt: new Date(1_800_000_000_000),
+      });
+
+      // `removedAt: null` in the WHERE is the whole guarantee: when access
+      // ended is a fact, and a second removal must not restate it. Without
+      // it, an admin repeating themselves on Friday would rewrite an audit
+      // answer that says Tuesday.
+      expect(prisma.groupMembership.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: "groupmember_1",
+          removedAt: null,
+          occurredAt: { lte: new Date(1_800_000_000_000) },
+        },
+        data: {
+          removedAt: new Date(1_800_000_000_000),
+          removedReason: "removed again",
+          occurredAt: new Date(1_800_000_000_000),
+        },
+      });
+    });
+
+    /** @scenario "Restating a membership cannot un-end it" */
+    it("never states an ending on the insert, so a redelivery cannot revive one", async () => {
+      const { executeRaw, repository } = build();
+
+      await repository.append({
+        kind: "groupMembership.upsert",
+        row: {
+          id: "groupmember_1",
+          groupId: "group_1",
+          userId: "user_1",
+          occurredAt: new Date(1_700_000_000_000),
+        },
+      });
+
+      const sql = sqlFrom(executeRaw);
+      // Neither the inserted columns nor the update list may name the
+      // ending. `removedAt` appears in this statement exactly once — inside
+      // the live-pair GUARD, which reads it and never writes it.
+      const setClause = sql.slice(sql.indexOf("DO UPDATE SET"));
+      expect(setClause).not.toContain("removedAt");
+      expect(setClause).not.toContain("removedReason");
+      expect(sql.match(/"removedAt"/g)).toHaveLength(1);
+      expect(sql).toContain('live."removedAt" IS NULL');
+      // And it guards on the rows it points at still existing, so a replay
+      // after a group deletion converges instead of failing the foreign key.
+      expect(sql).toContain('EXISTS (SELECT 1 FROM "Group"');
+      expect(sql).toContain('EXISTS (SELECT 1 FROM "User"');
     });
   });
 

@@ -35,7 +35,7 @@ import {
 } from "@langwatch/authz-server";
 import type { Prisma } from "~/generated/prisma/client";
 import { CUSTOM_ROLE_KIND } from "../../../role/role-kind";
-import { liveGrants, liveRoles } from "./live-rows";
+import { liveGrants, liveGroupMemberships, liveRoles } from "./live-rows";
 
 /** The three scope tiers a `CollectedBinding` can carry. RESOURCE rows are
  *  the share tier (findShareLinks) and PLATFORM rows are dormant facts that
@@ -104,11 +104,15 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
     userId: string;
     organizationId: string;
   }): Promise<CollectedBinding[]> {
-    // Same two-part gate the legacy group query carries: a GroupMembership row
-    // outlives removal from the organization, so the group member must be a
-    // CURRENT member, and the group itself must belong to this organization.
+    // Same three-part gate the legacy group query carries. A GroupMembership
+    // row outlives removal from the organization, so the group member must be
+    // a CURRENT member, and the group itself must belong to this organization.
+    // It also outlives the MEMBERSHIP now: a removal marks the row rather than
+    // deleting it, so the read has to be through `liveGroupMemberships` — a
+    // bare `findMany` here would hand the user every grant a group they left
+    // still holds.
     if (!(await this.isCurrentMember({ userId, organizationId }))) return [];
-    const memberships = await this.prisma.groupMembership.findMany({
+    const memberships = await liveGroupMemberships(this.prisma).findMany({
       where: { userId, group: { organizationId } },
       select: { groupId: true },
     });

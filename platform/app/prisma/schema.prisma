@@ -2974,16 +2974,73 @@ model Group {
   @@index([scimConnectionId])
 }
 
+// Group membership is a grant fact (ADR-125's named prerequisite). It used
+// to be `@@id([userId, groupId])` with a `createdAt` and nothing else, and a
+// removal was a hard DELETE - so a user who was in `sec-eng` in June and left
+// in July left no trace in any table. Since COLLECT unions {user} u groups,
+// a past-tense access answer computed after that removal was WRONG, and wrong
+// in the direction that UNDERSTATES past access. That is the worst direction
+// an audit answer can be wrong in.
+//
+// So this row now has the Grant row's posture, for the Grant row's reasons.
+// A removal MARKS it (`removedAt` + `removedReason`) and every read of live
+// membership fences on `removedAt IS NULL` - `liveGroupMemberships` in
+// `app-layer/authz/repositories/live-rows.ts` is the only way the authz
+// repositories reach the table, exactly as `liveGrants` is for grants.
+//
+// IDENTITY: a surrogate `id`, not the pair. The pair repeats - somebody
+// removed from a group can be added back, and that is a NEW membership with
+// its own beginning and its own end, not an edit of the old one. The pair's
+// uniqueness survives as a PARTIAL unique index over the live rows only,
+// declared in raw SQL (`GroupMembership_userId_groupId_live_key`, migration
+// 20260825130000_group_membership_is_event_truth) and deliberately NOT as an
+// `@@unique` here: Prisma has no partial indexes, so declaring one would make
+// the next `prisma migrate dev` drop the WHERE clause and rebuild it over
+// every removed row - the same reason RoleBinding's six partial uniques and
+// the Grant principal index are absent from this file.
+//
+// The id is the ledger's aggregate id: a membership is its own aggregate
+// (ADR-110's rule that the aggregate is the entity its events are about), so
+// this column is what `lw.authz.group_member.added` and `.removed` are keyed
+// on. `occurredAt` is business time and the projection's write guard, the
+// same pair `Grant` and `Role` carry.
+//
+// CASCADES, and what was chosen:
+//   * `user` keeps `onDelete: Cascade`. No application code deletes a `User`
+//     row - the cascade fires only under a direct erasure at the database,
+//     where erasing the person's memberships along with the person is the
+//     intent. Restricting it would block an erasure we want and protect
+//     nothing the application can reach.
+//   * `group` keeps `onDelete: Cascade` too, and that is a KNOWN limit rather
+//     than an endorsement: deleting a group still erases its membership rows
+//     from this projection. What it cannot erase is the FACT - the group's
+//     memberships are ended through the ledger before the group row goes, so
+//     `authz.grants.group_member_removed` rows and the events behind them
+//     name the user, the group and the moment. Making the row itself survive
+//     needs either a soft-deleted `Group` or `groupId`/`userId` as plain fact
+//     columns the way `Grant.principalId` is; both are a wider change than
+//     this one and neither is done here. The projection's insert is guarded
+//     on the group and user rows existing, so a replay after a group deletion
+//     converges instead of failing on the foreign key.
 model GroupMembership {
-  userId    String
-  groupId   String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
+  id            String    @id @default(nanoid())
+  userId        String
+  groupId       String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group         Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  /// Business time of the membership fact, and the projection's write guard:
+  /// a redelivered older event loses to the newer state already in the row.
+  occurredAt    DateTime  @default(now())
+  /// When the membership ended. Null is live; every read of live access
+  /// fences on it, and leaving that clause out fails OPEN.
+  removedAt     DateTime?
+  removedReason String?
 
-  @@id([userId, groupId])
   @@index([userId])
   @@index([groupId])
+  @@index([userId, removedAt])
+  @@index([groupId, removedAt])
 }
 
 model RoleBinding {

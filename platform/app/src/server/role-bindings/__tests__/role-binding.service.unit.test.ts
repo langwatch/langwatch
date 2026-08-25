@@ -24,8 +24,8 @@ const organizationUserFindFirst = vi.fn();
 const organizationUserFindMany = vi.fn();
 const groupFindFirst = vi.fn();
 const groupUpdate = vi.fn();
-const groupMembershipDeleteMany = vi.fn();
-const groupMembershipCreateMany = vi.fn();
+const addGroupMembers = vi.fn();
+const removeGroupMembersWhere = vi.fn();
 const apiKeyFindFirst = vi.fn();
 const attachBindings = vi.fn();
 const changeBindingRole = vi.fn();
@@ -44,10 +44,9 @@ const prisma = {
     findMany: organizationUserFindMany,
   },
   group: { findFirst: groupFindFirst, update: groupUpdate },
-  groupMembership: {
-    deleteMany: groupMembershipDeleteMany,
-    createMany: groupMembershipCreateMany,
-  },
+  // No `groupMembership` delegate at all: a membership is a grant fact now,
+  // so the service reaches it only through the writer. A regression that
+  // writes the table directly reads as a missing mock rather than passing.
   apiKey: { findFirst: apiKeyFindFirst },
   // The personal-team guard runs on every binding write; a shared team here.
   team: { findFirst: vi.fn().mockResolvedValue(null) },
@@ -76,6 +75,8 @@ const writer = {
   attachBindings,
   changeBindingRole,
   revokeBindings,
+  addGroupMembers,
+  removeGroupMembersWhere,
 } as unknown as GrantsLedgerWriter;
 
 const repository = {
@@ -101,8 +102,8 @@ beforeEach(() => {
   customRoleFindMany.mockResolvedValue([]);
   organizationUserFindMany.mockResolvedValue([]);
   groupUpdate.mockResolvedValue(undefined);
-  groupMembershipDeleteMany.mockResolvedValue(undefined);
-  groupMembershipCreateMany.mockResolvedValue(undefined);
+  addGroupMembers.mockResolvedValue({ added: [], duplicates: [] });
+  removeGroupMembersWhere.mockResolvedValue(["groupmember_1"]);
   transaction.mockImplementation(async (cb: (tx: PrismaClient) => unknown) =>
     cb(prisma),
   );
@@ -423,16 +424,17 @@ describe("RoleBindingService applyGroupEdits", () => {
           actor,
         }),
       );
-      expect(groupMembershipDeleteMany).toHaveBeenCalledWith(
+      expect(removeGroupMembersWhere).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { groupId: "group_1", userId: { in: ["user_removed"] } },
+          organizationId: "org_1",
+          where: { groupId: "group_1", userId: "user_removed" },
         }),
       );
       // The mock call orders are process-wide monotonic counters, so a lower
-      // number on the revoke than on the membership delete is proof the
+      // number on the revoke than on the membership removal is proof the
       // ledger command really ran first, not just that both ran.
       expect(revokeBindings.mock.invocationCallOrder[0]!).toBeLessThan(
-        groupMembershipDeleteMany.mock.invocationCallOrder[0]!,
+        removeGroupMembersWhere.mock.invocationCallOrder[0]!,
       );
     });
 
@@ -454,9 +456,9 @@ describe("RoleBindingService applyGroupEdits", () => {
       ).rejects.toThrow("ledger unavailable");
 
       // A crash between the two commands must leave less access, never more:
-      // the member removal (and any rename) must not have committed.
-      expect(transaction).not.toHaveBeenCalled();
-      expect(groupMembershipDeleteMany).not.toHaveBeenCalled();
+      // the member removal (and any rename) must not have happened.
+      expect(removeGroupMembersWhere).not.toHaveBeenCalled();
+      expect(groupUpdate).not.toHaveBeenCalled();
     });
   });
 
@@ -470,7 +472,7 @@ describe("RoleBindingService applyGroupEdits", () => {
       });
 
       expect(revokeBindings).not.toHaveBeenCalled();
-      expect(groupMembershipDeleteMany).toHaveBeenCalled();
+      expect(removeGroupMembersWhere).toHaveBeenCalled();
     });
   });
 

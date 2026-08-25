@@ -271,7 +271,16 @@ export class GroupRestService {
     // The grants go first, so the deny is enforced before the group row
     // that carries them disappears.
     await this.repo.deleteAllBindings({ groupId: id, organizationId, actor });
-    await this.repo.deleteAllMemberships({ groupId: id });
+    // The memberships END before the group row goes, so the ledger and the
+    // audit trail both carry who was in it and when they left. The group row's
+    // own deletion still cascades the marked rows away — see the
+    // `GroupMembership` model comment for why that limit stands and what
+    // closing it would cost.
+    await this.repo.deleteAllMemberships({
+      groupId: id,
+      organizationId,
+      actor,
+    });
     await this.repo.delete({ id, organizationId });
   }
 
@@ -283,10 +292,12 @@ export class GroupRestService {
     groupId,
     organizationId,
     userId,
+    actor,
   }: {
     groupId: string;
     organizationId: string;
     userId: string;
+    actor: LedgerActor;
   }): Promise<GroupMembership> {
     const group = await this.repo.findGroupOnly({
       id: groupId,
@@ -306,8 +317,18 @@ export class GroupRestService {
     }
 
     try {
-      return await this.repo.addMember({ groupId, userId });
+      return await this.repo.addMember({
+        groupId,
+        organizationId,
+        userId,
+        actor,
+      });
     } catch (error) {
+      // The ledger raises `DuplicateMemberError` from its own liveness
+      // pre-check, so it arrives already named. A raw P2002 can still reach
+      // here from the partial unique index when two adds race past that
+      // check, and it means the same thing.
+      if (error instanceof DuplicateMemberError) throw error;
       if (
         error instanceof Error &&
         "code" in error &&
@@ -323,10 +344,12 @@ export class GroupRestService {
     groupId,
     organizationId,
     userId,
+    actor,
   }: {
     groupId: string;
     organizationId: string;
     userId: string;
+    actor: LedgerActor;
   }): Promise<void> {
     const group = await this.repo.findGroupOnly({
       id: groupId,
@@ -339,7 +362,7 @@ export class GroupRestService {
       );
     }
 
-    await this.repo.removeMember({ groupId, userId });
+    await this.repo.removeMember({ groupId, organizationId, userId, actor });
   }
 
   async getBindings({

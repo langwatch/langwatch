@@ -152,7 +152,9 @@ describe("PrismaAuthzReadRepository", () => {
 
       // The membership gate sits on the GROUP MEMBER, not on the binding: a
       // GroupMembership row outlives removal from the organization, so
-      // without it an offboarded user keeps what their groups granted.
+      // without it an offboarded user keeps what their groups granted. It
+      // outlives the MEMBERSHIP too now — a removal marks the row — so
+      // `removedAt: null` is the second half of the same gate.
       expect(findMany).toHaveBeenCalledWith({
         where: {
           organizationId: "org-1",
@@ -160,6 +162,7 @@ describe("PrismaAuthzReadRepository", () => {
             members: {
               some: {
                 userId: "alice",
+                removedAt: null,
                 user: {
                   orgMemberships: {
                     some: { organizationId: "org-1", disabledAt: null },
