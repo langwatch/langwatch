@@ -257,6 +257,14 @@ describe("groupIntoTurns", () => {
     traceId,
   });
 
+  // `turn.parts` is the whole `DisplayPart` union and only its `text` arm
+  // carries `content`, so the narrowing has to happen here rather than on the
+  // helper. A non-text part reports its kind instead of being cast away, so a
+  // regression that changed the shape fails on the value rather than passing
+  // quietly with `undefined`.
+  const contentsOf = (parts: DisplayPart[] | undefined) =>
+    (parts ?? []).map((p) => (p.kind === "text" ? p.content : `<${p.kind}>`));
+
   /** @scenario "Consecutive parts sharing a trace are grouped into one turn" */
   it("numbers each run of parts that share a trace", () => {
     const turns = groupIntoTurns([
@@ -279,7 +287,7 @@ describe("groupIntoTurns", () => {
 
     expect(turns).toHaveLength(1);
     expect(turns[0]?.turnNumber).toBe(1);
-    expect(turns[0]?.parts.map((p) => p.content)).toEqual(["a", "b"]);
+    expect(contentsOf(turns[0]?.parts)).toEqual(["a", "b"]);
   });
 
   /** @scenario "An untraced part with nothing after it is left unnumbered" */
@@ -289,6 +297,6 @@ describe("groupIntoTurns", () => {
     expect(turns).toHaveLength(2);
     expect(turns[0]?.turnNumber).toBe(1);
     expect(turns[1]?.turnNumber).toBeUndefined();
-    expect(turns[1]?.parts.map((p) => p.content)).toEqual(["b"]);
+    expect(contentsOf(turns[1]?.parts)).toEqual(["b"]);
   });
 });
