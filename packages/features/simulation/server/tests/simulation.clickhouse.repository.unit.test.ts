@@ -1,10 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { SimulationReadClient } from "../src/adapters/clickhouse.simulation.adapter";
 import {
-  buildStartedAtWindowClause,
   RUN_ID_CAP,
   SimulationClickHouseRepository,
-  startedAtBoundsForPage,
 } from "../src/repositories/clickhouse/simulation.clickhouse.repository";
 import {
   type SimulationWindowFragment,
@@ -65,7 +63,7 @@ function makeRepository(
   return {
     fixture,
     windowedRead,
-    repository: new SimulationClickHouseRepository(
+    repository: SimulationClickHouseRepository.create(
       async () => fixture.client,
       windowedRead,
     ),
@@ -278,14 +276,22 @@ describe("SimulationClickHouseRepository", () => {
 
   it("calculates valid page bounds and renders the stable window clause", () => {
     expect(
-      startedAtBoundsForPage([
+      SimulationClickHouseRepository.startedAtBoundsForPage([
         { MinStartedAt: "3000", MaxStartedAt: "5000" },
         { MinStartedAt: "1000", MaxStartedAt: "9000" },
       ]),
     ).toEqual({ minMs: 1000, maxMs: 9000 });
-    expect(startedAtBoundsForPage([])).toBeNull();
-    expect(startedAtBoundsForPage([{ MinStartedAt: "0", MaxStartedAt: "NaN" }])).toBeNull();
-    expect(buildStartedAtWindowClause(makeWindow(1000, 9000))).toEqual({
+    expect(SimulationClickHouseRepository.startedAtBoundsForPage([])).toBeNull();
+    expect(
+      SimulationClickHouseRepository.startedAtBoundsForPage([
+        { MinStartedAt: "0", MaxStartedAt: "NaN" },
+      ]),
+    ).toBeNull();
+    expect(
+      SimulationClickHouseRepository.buildStartedAtWindowClause(
+        makeWindow(1000, 9000),
+      ),
+    ).toEqual({
       whereClause:
         "AND StartedAt >= fromUnixTimestamp64Milli(toUInt64({minStartedAtMs:String})) AND StartedAt <= fromUnixTimestamp64Milli(toUInt64({maxStartedAtMs:String}))",
       params: { minStartedAtMs: "1000", maxStartedAtMs: "9000" },

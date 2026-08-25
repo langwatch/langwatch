@@ -24,7 +24,10 @@ export class SimulationClickHouseAdapter {
     execution: SimulationExecutionPort;
   }): SimulationService {
     return new SimulationService(
-      new SimulationClickHouseRepository(input.resolveClient, input.windowedRead),
+      SimulationClickHouseRepository.create(
+        input.resolveClient,
+        input.windowedRead,
+      ),
       input.execution,
     );
   }

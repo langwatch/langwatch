@@ -254,23 +254,6 @@ function buildDateFilter({
  * behaviour as before — but the widening is now counted rather than silent
  * (ADR-067).
  */
-export function startedAtBoundsForPage(
-  rows: { MinStartedAt: string; MaxStartedAt: string }[],
-): { minMs: number; maxMs: number } | null {
-  let minMs = Number.POSITIVE_INFINITY;
-  let maxMs = 0;
-  for (const row of rows) {
-    const lo = Number(row.MinStartedAt);
-    const hi = Number(row.MaxStartedAt);
-    if (Number.isFinite(lo) && lo > 0) minMs = Math.min(minMs, lo);
-    if (Number.isFinite(hi) && hi > 0) maxMs = Math.max(maxMs, hi);
-  }
-  if (!Number.isFinite(minMs) || maxMs <= 0 || minMs > maxMs) {
-    return null;
-  }
-  return { minMs, maxMs };
-}
-
 /**
  * Renders the StartedAt predicate the step-2 read has always emitted, from a
  * {@link queryWindowed} fragment (or the empty clause for an unbounded `null`
@@ -281,26 +264,6 @@ export function startedAtBoundsForPage(
  * (a midpoint hint ± a half-range window), so `String(fromMs)`/`String(toMs)`
  * equal the bounds' own decimal strings.
  */
-export function buildStartedAtWindowClause(
-  window: SimulationWindowFragment | null,
-): {
-  whereClause: string;
-  params: Record<string, string>;
-} {
-  if (!window) {
-    return { whereClause: "", params: {} };
-  }
-  return {
-    whereClause:
-      "AND StartedAt >= fromUnixTimestamp64Milli(toUInt64({minStartedAtMs:String})) " +
-      "AND StartedAt <= fromUnixTimestamp64Milli(toUInt64({maxStartedAtMs:String}))",
-    params: {
-      minStartedAtMs: String(window.fromMs),
-      maxStartedAtMs: String(window.toMs),
-    },
-  };
-}
-
 const RUN_COLUMNS = `
   ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
   Status, Name, Description, Metadata,
@@ -386,7 +349,46 @@ type SimulationClickHouseClientResolver = (
 ) => Promise<SimulationClickHouseClient>;
 
 export class SimulationClickHouseRepository extends SimulationRepository {
-  constructor(
+  static create(
+    resolveClient: SimulationClickHouseClientResolver,
+    windowedRead: SimulationWindowedRead,
+  ): SimulationClickHouseRepository {
+    return new SimulationClickHouseRepository(resolveClient, windowedRead);
+  }
+
+  static startedAtBoundsForPage(
+    rows: { MinStartedAt: string; MaxStartedAt: string }[],
+  ): { minMs: number; maxMs: number } | null {
+    let minMs = Number.POSITIVE_INFINITY;
+    let maxMs = 0;
+    for (const row of rows) {
+      const lo = Number(row.MinStartedAt);
+      const hi = Number(row.MaxStartedAt);
+      if (Number.isFinite(lo) && lo > 0) minMs = Math.min(minMs, lo);
+      if (Number.isFinite(hi) && hi > 0) maxMs = Math.max(maxMs, hi);
+    }
+    if (!Number.isFinite(minMs) || maxMs <= 0 || minMs > maxMs) {
+      return null;
+    }
+    return { minMs, maxMs };
+  }
+
+  static buildStartedAtWindowClause(
+    window: SimulationWindowFragment | null,
+  ): { whereClause: string; params: Record<string, string> } {
+    if (!window) return { whereClause: "", params: {} };
+    return {
+      whereClause:
+        "AND StartedAt >= fromUnixTimestamp64Milli(toUInt64({minStartedAtMs:String})) " +
+        "AND StartedAt <= fromUnixTimestamp64Milli(toUInt64({maxStartedAtMs:String}))",
+      params: {
+        minStartedAtMs: String(window.fromMs),
+        maxStartedAtMs: String(window.toMs),
+      },
+    };
+  }
+
+  private constructor(
     private readonly resolveClient: SimulationClickHouseClientResolver,
     private readonly windowedRead: SimulationWindowedRead,
   ) {
@@ -607,7 +609,8 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     // empty windowed read is a genuine empty page and is never widened (widening
     // here would issue a second unbounded scan the old code never did, changing
     // the SQL that runs — precisely what byte-identical adoption forbids).
-    const startedAtBounds = startedAtBoundsForPage(pageRows);
+    const startedAtBounds =
+      SimulationClickHouseRepository.startedAtBoundsForPage(pageRows);
 
     // Step 2: fetch slim item rows (preview columns only)
     const itemRows = await this.windowedRead.query<PreviewItemRow[]>({
@@ -621,7 +624,8 @@ export class SimulationClickHouseRepository extends SimulationRepository {
       fallback: "none",
       isEmpty: (rows) => rows.length === 0,
       run: (window) => {
-        const startedAtWindow = buildStartedAtWindowClause(window);
+        const startedAtWindow =
+          SimulationClickHouseRepository.buildStartedAtWindowClause(window);
         return this.queryRows<PreviewItemRow>(
           `SELECT ${PREVIEW_COLUMNS}
        FROM ${TABLE_NAME}

@@ -16,6 +16,7 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
+import type { SimulationService } from "@langwatch/simulation-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createResilientClickHouseClient } from "~/server/clickhouse/managedClient";
@@ -31,7 +32,7 @@ import {
 import { SimulationRunStateRepositoryClickHouse } from "~/server/event-sourcing/pipelines/simulation-processing/repositories/simulationRunState.clickhouse.repository";
 import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
 import { encryptRunSecretValues } from "~/server/scenarios/run-secret-values";
-import { SimulationClickHouseRepository } from "../../simulations/repositories/simulation.clickhouse.repository";
+import { AppSimulationRuntime } from "~/runtime/app/features/simulation";
 import { NullSuiteRunReadRepository } from "../repositories/suite-run.repository";
 import { SuiteRunService } from "../suite-run.service";
 
@@ -43,7 +44,7 @@ const noopStore: FoldProjectionStore<SimulationRunStateData> = {
 };
 
 let ch: ClickHouseClient;
-let readRepository: SimulationClickHouseRepository;
+let simulations: SimulationService;
 let stateRepository: SimulationRunStateRepositoryClickHouse<{
   id: string;
   aggregateId: string;
@@ -56,7 +57,21 @@ beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
   const resilient = createResilientClickHouseClient({ client: ch });
-  readRepository = new SimulationClickHouseRepository(async () => resilient);
+  const noOp = async (): Promise<void> => {};
+  simulations = AppSimulationRuntime.create({
+    clickhouseEnabled: true,
+    resolveClient: async () => resilient,
+    commands: {
+      queueRun: noOp,
+      startRun: noOp,
+      messageSnapshot: noOp,
+      textMessageStart: noOp,
+      textMessageEnd: noOp,
+      finishRun: noOp,
+      cancelRun: noOp,
+      deleteRun: noOp,
+    },
+  }).build();
   stateRepository = new SimulationRunStateRepositoryClickHouse(
     async () => resilient,
   );
@@ -159,7 +174,7 @@ describe("Feature: recording a run's resolved parameters", () => {
 
       await recordQueuedRun(command);
 
-      const run = await readRepository.getScenarioRunData({
+      const run = await simulations.tryGetScenarioRunData({
         projectId: tenantId,
         scenarioRunId: command.scenarioRunId,
       });
@@ -180,7 +195,7 @@ describe("Feature: recording a run's resolved parameters", () => {
 
       await recordQueuedRun(command);
 
-      const run = await readRepository.getScenarioRunData({
+      const run = await simulations.tryGetScenarioRunData({
         projectId: tenantId,
         scenarioRunId: command.scenarioRunId,
       });
@@ -247,7 +262,7 @@ describe("Feature: recording a run's resolved parameters", () => {
 
       await recordQueuedRun(command);
 
-      const run = await readRepository.getScenarioRunData({
+      const run = await simulations.tryGetScenarioRunData({
         projectId: tenantId,
         scenarioRunId: command.scenarioRunId,
       });
@@ -269,7 +284,7 @@ describe("Feature: recording a run's resolved parameters", () => {
 
       await recordQueuedRun(command);
 
-      const run = await readRepository.getScenarioRunData({
+      const run = await simulations.tryGetScenarioRunData({
         projectId: tenantId,
         scenarioRunId: command.scenarioRunId,
       });
