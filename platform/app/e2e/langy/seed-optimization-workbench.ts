@@ -13,12 +13,14 @@
  * prompt of its own (same reasoning as the dogfood trace fixtures).
  */
 
+import { PROJECT_ID } from "./config";
 import {
   CLASSIFIER_PROMPT,
   FREE_TEXT_ROWS,
   LABEL_ROWS,
   SUPPORT_PROMPT,
 } from "./seed-optimization-rows";
+import { getSessionCookie, trpcMutate } from "./trpc";
 import { api, ensurePromptId } from "./workbench-rest";
 
 const RUN_STAMP = String(Math.floor(Date.now() / 60_000));
@@ -224,6 +226,173 @@ export async function seedOptimizationWorkbench({
     datasetId: DATASET_ID,
     baselineTargetId: BASELINE_TARGET_ID,
     promptId,
+    version: created.version,
+  };
+}
+
+// ============================================================================
+// Comparison workbenches
+// ============================================================================
+
+/** The judge that compares candidate columns against each other. */
+const COMPARISON_EVALUATOR_TYPE = "langevals/select_best_compare";
+
+const CANDIDATE_TARGET_ID = "target-candidate";
+const COMPARISON_TARGET_ID = "target-comparison";
+const COMPARISON_EVALUATOR_ID = "evaluator-comparison";
+
+/**
+ * The comparison judge's own fields, as the product derives them from the
+ * evaluator catalog when a column is added. All four are optional and typed
+ * `str`; the orchestrator fills them per row with baked value mappings.
+ */
+const COMPARISON_INPUTS = [
+  { identifier: "input", type: "str", optional: true },
+  { identifier: "golden", type: "str", optional: true },
+  { identifier: "candidates", type: "str", optional: true },
+  { identifier: "row_index", type: "str", optional: true },
+];
+
+const COMPARISON_OUTPUTS = [
+  { identifier: "passed", type: "bool" },
+  { identifier: "score", type: "float" },
+  { identifier: "label", type: "str" },
+];
+
+/** A second prompt, so the two columns have something to disagree about. */
+const TERSE_SUPPORT_PROMPT =
+  "You answer Brightcart support questions in one short sentence. State the policy and nothing else.";
+
+/** Which shape carries the comparison. Both leave the same hole in a scoped run. */
+export type ComparisonCarrier = "column-target" | "chip-evaluator";
+
+export interface SeededComparison extends SeededWorkbench {
+  candidateTargetId: string;
+  /** The column-target's id, or the chip evaluator's id, per carrier. */
+  comparisonId: string;
+  candidatePromptId: string;
+}
+
+const comparisonConfig = () => ({
+  variants: [BASELINE_TARGET_ID, CANDIDATE_TARGET_ID],
+  hasGoldenAnswer: true,
+  goldenField: "expected_output",
+  includeMetrics: [],
+  randomizeOrder: true,
+});
+
+/**
+ * A workbench holding two prompt columns and one comparison over them.
+ *
+ * The carrier decides which shape holds the comparison: a column-target of its
+ * own, or a chip attached to the board. A scoped run has the same hole either
+ * way: the judge needs every variant's output for the row, and a run that
+ * covers only one of them has nothing to compare unless the others are seeded.
+ */
+export async function seedComparisonWorkbench({
+  name,
+  rows,
+  carrier,
+}: {
+  name: string;
+  rows: number;
+  carrier: ComparisonCarrier;
+}): Promise<SeededComparison> {
+  const stampedName = `${name}-${RUN_STAMP}`;
+  const promptId = await ensurePromptId({
+    handle: stampedName,
+    prompt: SUPPORT_PROMPT,
+  });
+  const candidatePromptId = await ensurePromptId({
+    handle: `${stampedName}-candidate`,
+    prompt: TERSE_SUPPORT_PROMPT,
+  });
+
+  const candidateTarget = {
+    ...buildBaselineTarget({ promptId: candidatePromptId }),
+    id: CANDIDATE_TARGET_ID,
+  };
+
+  // A column-style comparison needs a saved evaluator behind it: the
+  // orchestrator skips any column-target with no `targetEvaluatorId`.
+  //
+  // Created the way the workbench's own "New Comparison" flow creates it: the
+  // `evaluators.create` mutation, as the signed-in user. The REST create is a
+  // different door: it resolves the project's embeddings model on the way in,
+  // for a topic-clustering feature this judge never touches, and refuses on a
+  // project that has no embeddings model configured.
+  const savedJudge = await trpcMutate<{ id: string }>({
+    cookie: await getSessionCookie(),
+    path: "evaluators.create",
+    input: {
+      projectId: PROJECT_ID,
+      name: `${stampedName} comparison`,
+      type: "evaluator",
+      config: {
+        evaluatorType: COMPARISON_EVALUATOR_TYPE,
+        settings: { has_golden_answer: true },
+      },
+    },
+  });
+
+  const comparisonTarget = {
+    id: COMPARISON_TARGET_ID,
+    type: "evaluator",
+    targetEvaluatorId: savedJudge.id,
+    inputs: COMPARISON_INPUTS,
+    outputs: COMPARISON_OUTPUTS,
+    comparison: comparisonConfig(),
+    mappings: {
+      [DATASET_ID]: {
+        input: datasetField("input"),
+        golden: datasetField("expected_output"),
+      },
+    },
+  };
+
+  const comparisonEvaluator = {
+    id: COMPARISON_EVALUATOR_ID,
+    evaluatorType: COMPARISON_EVALUATOR_TYPE,
+    dbEvaluatorId: savedJudge.id,
+    inputs: COMPARISON_INPUTS,
+    mappings: {},
+    comparison: comparisonConfig(),
+  };
+
+  const isColumn = carrier === "column-target";
+  const state = {
+    name,
+    datasets: [
+      buildDataset({
+        name,
+        rows,
+        goldenStyle: "free-text",
+        withContexts: false,
+      }),
+    ],
+    activeDatasetId: DATASET_ID,
+    evaluators: isColumn ? [] : [comparisonEvaluator],
+    targets: [
+      buildBaselineTarget({ promptId }),
+      candidateTarget,
+      ...(isColumn ? [comparisonTarget] : []),
+    ],
+  };
+
+  const created = await api({
+    method: "POST",
+    path: "/api/experiments",
+    body: { name: stampedName, state },
+  });
+  return {
+    experimentSlug: created.slug,
+    experimentId: created.id,
+    datasetId: DATASET_ID,
+    baselineTargetId: BASELINE_TARGET_ID,
+    candidateTargetId: CANDIDATE_TARGET_ID,
+    comparisonId: isColumn ? COMPARISON_TARGET_ID : COMPARISON_EVALUATOR_ID,
+    promptId,
+    candidatePromptId,
     version: created.version,
   };
 }

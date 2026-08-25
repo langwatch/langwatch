@@ -101,7 +101,17 @@ Feature: Workbench actions
     Given a saved evaluation whose plain evaluator carries a comparison config
     When the assistant edits that evaluation
     Then the evaluator reads back as a score attached to every target column
-    And the edit is saved rather than refused for a field nobody typed
+    And the edit is saved rather than refused for a field no one typed
+
+  # Two boundaries refuse the same shape, and an agent that reads two wordings for
+  # one rule reads them as two rules. Pinned against a live stack, because the
+  # wording is a shared constant and a copy of it is what drifts.
+  @e2e
+  Scenario: The save boundary refuses a comparison config in the dispatch's own words
+    Given a saved evaluation whose plain evaluator is given a comparison config
+    When the setup is written back over the API
+    Then the write is refused as an invalid setup
+    And the refusal says the same thing the action dispatch says
 
   # ============================================================================
   # What the assistant is allowed to do, and what it can see

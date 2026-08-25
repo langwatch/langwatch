@@ -2,12 +2,12 @@ import { Alert, Box, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { nanoid } from "nanoid";
 import { useEffect, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
+import { readLiveWorkbench } from "~/experiments-v3/actions/liveWorkbenchRead";
 import {
   WORKBENCH_ACTION_KINDS,
   WORKBENCH_ACTIONS,
 } from "~/experiments-v3/actions/manifest";
 import { narrateWorkbenchAction } from "~/experiments-v3/actions/narration";
-import { projectWorkbenchState } from "~/experiments-v3/actions/projection";
 import { scopeFromRunPayload } from "~/experiments-v3/actions/runScope";
 import { AutosaveStatus } from "~/experiments-v3/components/AutosaveStatus";
 import { EditableHeading } from "~/experiments-v3/components/EditableHeading";
@@ -49,50 +49,6 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { assertCrispChatHidden } from "~/utils/crispBubblePolicy";
-
-/**
- * The workbench as the agent should read it: the LIVE store, so unsaved prompt
- * drafts, pending cells and in-memory results are included, which the saved
- * copy cannot show. `source` mirrors the backend fallback's marker, so the
- * agent always knows whether it read the live page or the saved document.
- */
-function readLiveWorkbench({
-  includeResults,
-  targetNames,
-}: {
-  includeResults?: boolean;
-  /** Column names as the page resolved them, keyed by target id. */
-  targetNames?: Record<string, string>;
-}) {
-  const state = useEvaluationsV3Store.getState();
-
-  const identity: { experimentId?: string; experimentSlug?: string } = {};
-  if (state.experimentId) identity.experimentId = state.experimentId;
-  if (state.experimentSlug) identity.experimentSlug = state.experimentSlug;
-
-  const withResults: { results?: typeof state.results } = {};
-  if (includeResults !== false) withResults.results = state.results;
-
-  const projection = projectWorkbenchState({
-    state: {
-      name: state.name,
-      datasets: state.datasets,
-      activeDatasetId: state.activeDatasetId,
-      evaluators: state.evaluators,
-      targets: state.targets,
-      ...identity,
-    },
-    ...(targetNames ? { targetNames } : {}),
-    ...withResults,
-  });
-
-  const version: { version?: number } = {};
-  if (state.workbenchVersion !== undefined) {
-    version.version = state.workbenchVersion;
-  }
-
-  return { source: "live", ...version, ...projection };
-}
 
 /**
  * How long the run action waits for the stream to name its run.
@@ -519,7 +475,11 @@ export default function ExperimentsWorkbenchPage() {
     handlers["workbench.getState"] = {
       payloadSchema: WORKBENCH_ACTIONS["workbench.getState"].payloadSchema,
       run: (payload: { includeResults?: boolean }) =>
-        readLiveWorkbench({ ...payload, targetNames }),
+        readLiveWorkbench({
+          state: useEvaluationsV3Store.getState(),
+          ...payload,
+          targetNames,
+        }),
     };
     handlers["workbench.run"] = {
       payloadSchema: WORKBENCH_ACTIONS["workbench.run"].payloadSchema,
