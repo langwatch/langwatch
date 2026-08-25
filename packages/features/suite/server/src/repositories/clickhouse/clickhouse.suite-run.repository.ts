@@ -19,24 +19,7 @@ import {
 import {
   SuiteRunRepository,
 } from "../suite-run.repository";
-
-type QueryResult = { json<T>(): Promise<T[]> };
-export type SuiteClickHouseClient = {
-  query(input: {
-    query: string;
-    query_params: Record<string, unknown>;
-    format: "JSONEachRow";
-  }): Promise<QueryResult>;
-  insert(input: {
-    table: string;
-    values: unknown[];
-    format: "JSONEachRow";
-    clickhouse_settings?: {
-      async_insert?: 0 | 1;
-      wait_for_async_insert?: 0 | 1;
-    };
-  }): Promise<unknown>;
-};
+import type { SuiteClickHouseClient } from "../../ports/suite-clickhouse.port";
 
 export type SuiteRunClickHouseRepositoryOptions = {
   resolveClient: (projectId: string) => Promise<SuiteClickHouseClient>;

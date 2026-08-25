@@ -4,8 +4,8 @@ import type { SuiteRunStateData } from "@langwatch/suite-contract";
 import { PrismaSuiteRepository, type SuiteDatabase } from "../repositories/prisma/prisma.suite.repository";
 import {
   ClickHouseSuiteRunRepository,
-  type SuiteClickHouseClient,
 } from "../repositories/clickhouse/clickhouse.suite-run.repository";
+import type { SuiteClickHouseClient } from "../ports/suite-clickhouse.port";
 import type { SuiteRunRepository } from "../repositories/suite-run.repository";
 import { MemorySuiteRunRepository } from "../repositories/memory/memory.suite-run.repository";
 import { SuiteService, type SuiteServiceOptions } from "../services/suite.service";

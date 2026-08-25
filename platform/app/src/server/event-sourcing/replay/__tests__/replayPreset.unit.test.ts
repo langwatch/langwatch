@@ -43,10 +43,11 @@ vi.mock("../../pipelines/simulation-processing/schemas/constants", () => ({
   SIMULATION_PROJECTION_VERSIONS: { RUN_STATE: "v1" },
 }));
 
-vi.mock(
-  "../../pipelines/suite-run-processing/repositories/suiteRunState.clickhouse.repository",
-  () => ({ SuiteRunStateRepositoryClickHouse: class {} }),
-);
+vi.mock("~/runtime/app/features/suite", () => ({
+  AppSuiteRuntime: {
+    eventingForReplay: vi.fn(() => ({ suiteRunState: {} })),
+  },
+}));
 
 vi.mock("../../pipelines/suite-run-processing/schemas/constants", () => ({
   SUITE_RUN_PROJECTION_VERSIONS: { RUN_STATE: "v1" },

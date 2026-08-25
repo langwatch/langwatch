@@ -4,15 +4,13 @@ import {
   definePipeline,
   type FoldProjectionStore,
 } from "@langwatch/eventing";
+import type { SuiteRunStateData } from "@langwatch/suite-contract";
 import {
   CompleteSuiteRunItemCommand,
   RecordSuiteRunItemStartedCommand,
   StartSuiteRunCommand,
 } from "./commands";
-import {
-  type SuiteRunStateData,
-  SuiteRunStateFoldProjection,
-} from "./projections/suiteRunState.foldProjection";
+import { SuiteRunStateFoldProjection } from "./projections/suiteRunState.foldProjection";
 import { SUITE_RUN_PROCESSING_EVENT_TYPES } from "./schemas/constants";
 import type { SuiteRunProcessingEvent } from "./schemas/events";
 

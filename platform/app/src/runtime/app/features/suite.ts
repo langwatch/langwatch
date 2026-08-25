@@ -1,7 +1,9 @@
 import type { SuiteService } from "@langwatch/suite-contract";
 import {
+  ClickHouseSuiteEventingAdapter,
   PostgresSuiteAdapter,
   type PostgresSuiteAdapterOptions,
+  type SuiteEventingCapabilities,
 } from "@langwatch/suite-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
@@ -14,11 +16,26 @@ export class AppSuiteRuntime {
     return new AppSuiteRuntime(options);
   }
 
-  private constructor(
-    private readonly options: AppSuiteRuntimeOptions,
-  ) {}
+  static eventingForReplay(options: {
+    resolveClient: NonNullable<
+      PostgresSuiteAdapterOptions["resolveClickHouseClient"]
+    >;
+    defaultRetentionDays: number;
+  }): SuiteEventingCapabilities {
+    return ClickHouseSuiteEventingAdapter.create(options).build();
+  }
+
+  private readonly adapter: PostgresSuiteAdapter;
+
+  private constructor(options: AppSuiteRuntimeOptions) {
+    this.adapter = PostgresSuiteAdapter.create(options);
+  }
 
   build(): SuiteService {
-    return PostgresSuiteAdapter.create(this.options);
+    return this.adapter.build();
+  }
+
+  eventing(): SuiteEventingCapabilities {
+    return this.adapter.eventing();
   }
 }

@@ -21,6 +21,8 @@ import type {
   AppendStore,
   EventSourcing,
   FoldProjectionStore,
+  Projection,
+  ProjectionStore,
   ProcessStore,
   StateProjectionStore,
   StaticPipelineDefinition,
@@ -54,6 +56,7 @@ import { createStoredObjectsService } from "~/server/stored-objects/stored-objec
 import type { UsageReportingService } from "~/runtime/app/features/billing";
 import type { AutomationService } from "@langwatch/automation-contract";
 import type { EvaluationService } from "@langwatch/evaluation-contract";
+import type { SuiteRunStateData } from "@langwatch/suite-contract";
 import type { BillingCheckpointService } from "../../app-layer/billing/billingCheckpoint.service";
 import type { BroadcastService } from "../../app-layer/broadcast/broadcast.service";
 import type { CodingAgentSessionRepository } from "../../app-layer/coding-agent/repositories/coding-agent-session.repository";
@@ -175,8 +178,6 @@ import type { ComputeRunMetricsCommandData } from "../pipelines/simulation-proce
 import { SIMULATION_PROJECTION_VERSIONS } from "../pipelines/simulation-processing/schemas/constants";
 import type { SimulationProcessingEvent } from "../pipelines/simulation-processing/schemas/events";
 import { createSuiteRunProcessingPipeline } from "../pipelines/suite-run-processing/pipeline";
-import type { SuiteRunStateData } from "../pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
-import type { SuiteRunStateRepository } from "../pipelines/suite-run-processing/repositories/suiteRunState.repository";
 import { SUITE_RUN_PROJECTION_VERSIONS } from "../pipelines/suite-run-processing/schemas/constants";
 import { createTopicClusteringProcessingPipeline } from "../pipelines/topic-clustering-processing/pipeline";
 import type {
@@ -288,7 +289,6 @@ function createScenarioExecutionPoolHolder(): ScenarioExecutionPoolHolder {
  * The registry consumes these directly — no ClickHouse client resolution here.
  */
 export interface PipelineRepositories {
-  suiteRunState: SuiteRunStateRepository;
   /** Primary replica for read-after-write consistency. */
   simulationRunState: SimulationRunStateRepository;
   /** Write side of the simulationRunMetrics map projection (migration 00078). */
@@ -349,6 +349,8 @@ export interface PipelineRegistryDeps {
     connect(commands: unknown): void;
   };
   repositories: PipelineRepositories;
+  /** The Suite package's single run-state store, shared by Eventing and reads. */
+  suiteRunState: ProjectionStore<Projection<SuiteRunStateData>>;
   redis: Redis | Cluster;
   broadcast: BroadcastService;
   langy: {
@@ -1416,7 +1418,7 @@ export class PipelineRegistry {
       createSuiteRunProcessingPipeline({
         suiteRunStateFoldStore: this.cached<SuiteRunStateData>(
           new RepositoryFoldStore<SuiteRunStateData>(
-            this.deps.repositories.suiteRunState,
+            this.deps.suiteRunState,
             SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
           ),
           "suite_runs",

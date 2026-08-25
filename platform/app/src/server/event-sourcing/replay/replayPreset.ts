@@ -13,7 +13,8 @@ import { createExperimentRunStateFoldStore } from "../pipelines/experiment-run-p
 import { ExperimentRunStateRepositoryClickHouse } from "../pipelines/experiment-run-processing/repositories/experimentRunState.clickhouse.repository";
 import { SimulationRunStateRepositoryClickHouse } from "../pipelines/simulation-processing/repositories/simulationRunState.clickhouse.repository";
 import { SIMULATION_PROJECTION_VERSIONS } from "../pipelines/simulation-processing/schemas/constants";
-import { SuiteRunStateRepositoryClickHouse } from "../pipelines/suite-run-processing/repositories/suiteRunState.clickhouse.repository";
+import { AppSuiteRuntime } from "~/runtime/app/features/suite";
+import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import { SUITE_RUN_PROJECTION_VERSIONS } from "../pipelines/suite-run-processing/schemas/constants";
 import { TraceSummaryStore } from "../pipelines/trace-processing/projections/traceSummary.store";
 import { ClickHouseReplayEventSource } from "./replayEventLoader";
@@ -104,7 +105,10 @@ export function createReplayRuntime(config: {
     [
       "suite_run_processing",
       new RepositoryFoldStore(
-        new SuiteRunStateRepositoryClickHouse(clientResolver),
+        AppSuiteRuntime.eventingForReplay({
+          resolveClient: clientResolver,
+          defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+        }).suiteRunState,
         SUITE_RUN_PROJECTION_VERSIONS.RUN_STATE,
       ),
     ],

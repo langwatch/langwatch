@@ -17,7 +17,6 @@ import {
   type PlanProvider,
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
-import { SuiteRunService } from "~/server/app-layer/suites/suite-run.service";
 import { prisma } from "~/server/db";
 import type { QueueRunCommandData } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/commands";
 import type { StartSuiteRunCommandData } from "~/server/event-sourcing/pipelines/suite-run-processing/schemas/commands";
@@ -60,16 +59,7 @@ describe("Feature: Suites REST API", () => {
         notifyPlanLimitReached: vi.fn().mockResolvedValue(undefined),
         checkAndSendWarning: vi.fn().mockResolvedValue(undefined),
       } as any,
-      // The run route reaches the event stream through this service, so
-      // standing it up on spies is what lets a test read the commands a run
-      // actually dispatched.
-      suiteRuns: {
-        runs: SuiteRunService.create({
-          resolveClickHouseClient: null,
-          startSuiteRun,
-          queueSimulationRun,
-        }),
-      },
+      suiteCommands: { startSuiteRun, queueRun: queueSimulationRun },
     });
 
     testOrganization = await prisma.organization.create({

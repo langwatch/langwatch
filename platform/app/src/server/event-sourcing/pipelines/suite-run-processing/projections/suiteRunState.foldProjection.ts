@@ -1,4 +1,5 @@
 import type { FoldProjectionStore, Projection } from "@langwatch/eventing";
+import type { SuiteRunStateData } from "@langwatch/suite-contract";
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,
@@ -15,36 +16,7 @@ import {
   SuiteRunStartedEventSchema,
 } from "../schemas/events";
 
-/**
- * State data for a suite run.
- * Matches the suite_runs ClickHouse table schema.
- *
- * This is both the fold state and the stored data — one type, not two.
- * Handlers do all computation using simple counters (no Sets/arrays).
- * Store is a dumb read/write layer.
- */
-export interface SuiteRunStateData {
-  SuiteRunId: string;
-  BatchRunId: string;
-  ScenarioSetId: string;
-  SuiteId: string;
-  Status: string;
-  Total: number;
-  StartedCount: number;
-  CompletedCount: number;
-  FailedCount: number;
-  Progress: number;
-  PassRateBps: number | null;
-  CreatedAt: number;
-  UpdatedAt: number;
-  LastEventOccurredAt: number;
-  StartedAt: number | null;
-  FinishedAt: number | null;
-
-  // Raw counters for incremental aggregation
-  PassedCount: number;
-  GradedCount: number;
-}
+export type { SuiteRunStateData } from "@langwatch/suite-contract";
 
 export interface SuiteRunState extends Projection<SuiteRunStateData> {
   data: SuiteRunStateData;

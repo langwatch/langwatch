@@ -100,7 +100,6 @@ import type { ShareService } from "./share/share.service";
 import type { SharedTracePayloadCache } from "./share/shared-trace-cache.service";
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
-import type { SuiteRunService } from "./suites/suite-run.service";
 import type { LogRecordStorageService } from "./traces/log-record-storage.service";
 import type { LogRequestCollectionService } from "./traces/log-request-collection.service";
 import type { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
@@ -196,9 +195,6 @@ export interface AppDependencies {
   simulations: SimulationService;
   /** API-specific CSV composition over the canonical Simulation service. */
   simulationExports: ScenarioRunExportService;
-  suiteRuns: {
-    runs: SuiteRunService;
-  };
   /** One process-owned Topic capability shared by reads and transports. */
   topics: TopicService;
   /**

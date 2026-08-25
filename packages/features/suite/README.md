@@ -21,9 +21,10 @@ durable read model exists.
 
 ## Remaining migration seams
 
-- `platform/app/src/server/app-layer/suites/` still owns the command adapters
-  and compatibility callers. Its run read repository is now duplicated only
-  until central composition points at the Suite service.
+- `platform/app/src/runtime/app/features/suite-execution.adapter.ts` is the application
+  execution port: it resolves run-only parameters and dispatches the existing
+  simulation and Suite-run commands. The Suite service and its run repository
+  remain package-owned.
 - `platform/app/src/components/suites/`, `components/simulations/`, pages and
   hooks remain application composition because they depend on tRPC stores,
   routing and page layout. Portable UI can move later to `suite/web`.

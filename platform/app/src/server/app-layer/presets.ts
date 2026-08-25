@@ -220,10 +220,6 @@ import {
   SimulationRunStateRepositoryClickHouse,
   SimulationRunStateRepositoryMemory,
 } from "../event-sourcing/pipelines/simulation-processing/repositories";
-import {
-  SuiteRunStateRepositoryClickHouse,
-  SuiteRunStateRepositoryMemory,
-} from "../event-sourcing/pipelines/suite-run-processing/repositories";
 import { ScenarioRunExportService } from "../export/scenario-runs/scenario-run-export.service";
 import { InviteService } from "../invites/invite.service";
 import { resolveOrganizationId } from "../organizations/resolveOrganizationId";
@@ -354,8 +350,7 @@ import { createCompositePlanProvider } from "./subscription/composite-plan-provi
 import { PlanProviderService } from "./subscription/plan-provider";
 import { createSelfHostedPlanProvider } from "./subscription/self-hosted-plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
-import { SuiteRunService } from "./suites/suite-run.service";
-import { AppSuiteExecutionPort } from "../suites/suite-run.executor";
+import { AppSuiteExecutionPort } from "~/runtime/app/features/suite-execution.adapter";
 import { startSystemMigrations } from "./system-migrations/boot";
 import { startTopicClusteringBootSeeds } from "./topic-clustering/bootSeeds";
 import { clusterTopicsForProject } from "./topic-clustering/clustering";
@@ -726,6 +721,11 @@ export function initializeDefaultApp(options?: {
     }).build(),
     "WorkflowService",
   );
+  const agents = AgentsFeature.create({
+    prisma,
+    session: null,
+    workflows,
+  });
   const evaluators = traced(
     EvaluatorFeature.create({ prisma, workflows }),
     "EvaluatorService",
@@ -820,7 +820,32 @@ export function initializeDefaultApp(options?: {
       },
     },
   }).build();
-  // SuiteRunService is created after pipeline registration (needs startSuiteRun command)
+  // Suite execution commands are registered after the Suite adapter is built.
+  // Deferred dispatchers let the adapter's one run-state repository be shared
+  // with Eventing during pipeline registration without a second service.
+  const suiteStartRun = new Deferred<AppCommands["suiteRuns"]["startSuiteRun"]>(
+    "suiteStartRun",
+  );
+  const suiteQueueRun = new Deferred<AppCommands["simulations"]["queueRun"]>(
+    "suiteQueueRun",
+  );
+  const suiteRuntime = AppSuiteRuntime.create({
+    database: prisma,
+    agents,
+    prompts,
+    scenarios,
+    resolveClickHouseClient: clickhouseEnabled
+      ? resolveClickHouseClient
+      : null,
+    defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+    execution: AppSuiteExecutionPort.create({
+      startSuiteRun: suiteStartRun.fn,
+      queueSimulationRun: suiteQueueRun.fn,
+    }),
+    generateId: () => `suite_${nanoid()}`,
+  });
+  const suiteEventing = suiteRuntime.eventing();
+  const suites = traced(suiteRuntime.build(), "SuiteService");
 
   const planResolver = (organizationId: string) =>
     getApp().planProvider.getActivePlan({ organizationId });
@@ -1041,9 +1066,6 @@ export function initializeDefaultApp(options?: {
 
   // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
   const repositories: PipelineRepositories = {
-    suiteRunState: clickhouseEnabled
-      ? new SuiteRunStateRepositoryClickHouse(resolveClickHouseClient)
-      : new SuiteRunStateRepositoryMemory(),
     simulationRunState: clickhouseEnabled
       ? new SimulationRunStateRepositoryClickHouse(resolveClickHouseClient)
       : new SimulationRunStateRepositoryMemory(),
@@ -1534,6 +1556,7 @@ export function initializeDefaultApp(options?: {
       connect: (authzCommands) => authzFeature.connect(authzCommands as never),
     },
     repositories,
+    suiteRunState: suiteEventing.suiteRunState,
     redis: redis!,
     broadcast,
     codingAgent: {
@@ -1605,6 +1628,8 @@ export function initializeDefaultApp(options?: {
     governanceOcsfEventsSync,
   });
   const commands = registry.registerAll();
+  suiteStartRun.resolve(commands.suiteRuns.startSuiteRun);
+  suiteQueueRun.resolve(commands.simulations.queueRun);
   const ingestionSources = AppIngestionSourceAdapter.create({
     database: prisma,
     projects: governanceRuntime.projects,
@@ -1721,11 +1746,6 @@ export function initializeDefaultApp(options?: {
     feedbackPromptRedis: redis,
   });
 
-  const suiteRunService = SuiteRunService.create({
-    resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
-    startSuiteRun: commands.suiteRuns.startSuiteRun,
-    queueSimulationRun: commands.simulations.queueRun,
-  });
   const simulations = traced(
     AppSimulationRuntime.create({
       clickhouseEnabled,
@@ -2045,25 +2065,6 @@ export function initializeDefaultApp(options?: {
       redis && snapshotRepo ? getOpsSnapshotReader(snapshotRepo) : null,
   };
 
-  const agents = AgentsFeature.create({
-    prisma,
-    session: null,
-    workflows,
-  });
-  const suites = traced(
-    AppSuiteRuntime.create({
-      database: prisma,
-      agents,
-      prompts,
-      scenarios,
-      execution: AppSuiteExecutionPort.create({
-        suiteRuns: suiteRunService,
-      }),
-      generateId: () => `suite_${nanoid()}`,
-    }).build(),
-    "SuiteService",
-  );
-
   const app = initializeApp({
     config,
     agents,
@@ -2085,7 +2086,6 @@ export function initializeDefaultApp(options?: {
     dashboard: dashboardService,
     simulations,
     simulationExports,
-    suiteRuns: { runs: suiteRunService },
     topics,
     gateway: {
       budgetOverview: governanceRuntime.budgetOverview,
@@ -2205,7 +2205,14 @@ export function initializeDefaultApp(options?: {
 }
 
 /** Tests — noop commands, null-backed services. */
-export function createTestApp(overrides?: Partial<AppDependencies>): App {
+export function createTestApp(
+  overrides?: Partial<AppDependencies> & {
+    suiteCommands?: {
+      startSuiteRun: AppCommands["suiteRuns"]["startSuiteRun"];
+      queueRun: AppCommands["simulations"]["queueRun"];
+    };
+  },
+): App {
   const testPrisma = globalPrisma;
   AppAuditLogRuntime.install({ prisma: testPrisma });
   const testRetentionPolicyRepo = new DataRetentionPolicyRepository(testPrisma);
@@ -2416,17 +2423,17 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     database: testPrisma,
     generateId: () => generate(KSUID_RESOURCES.SCENARIO).toString(),
   }).build();
-  const testSuiteRuns = SuiteRunService.create({
-    resolveClickHouseClient: null,
-    startSuiteRun: noop,
-    queueSimulationRun: noop,
-  });
   const testSuites = AppSuiteRuntime.create({
     database: testPrisma,
     agents,
     prompts,
     scenarios: testScenarios,
-    execution: AppSuiteExecutionPort.create({ suiteRuns: testSuiteRuns }),
+    resolveClickHouseClient: null,
+    defaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
+    execution: AppSuiteExecutionPort.create({
+      startSuiteRun: overrides?.suiteCommands?.startSuiteRun ?? noop,
+      queueSimulationRun: overrides?.suiteCommands?.queueRun ?? noop,
+    }),
     generateId: () => `suite_${nanoid()}`,
   }).build();
   const testSimulations = AppSimulationRuntime.create({
@@ -2579,9 +2586,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     })(),
     simulations: testSimulations,
     simulationExports: ScenarioRunExportService.create(testSimulations),
-    suiteRuns: {
-      runs: testSuiteRuns,
-    },
     topics: testTopics,
     gateway: {
       budgetOverview: testGovernanceRuntime.budgetOverview,
