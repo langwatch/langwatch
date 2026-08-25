@@ -139,5 +139,37 @@ describe("Feature: MCP request logging", () => {
         expect(line.fields.status).toBe(401);
       });
     });
+
+    describe("when an authenticated request completes", () => {
+      /** @scenario MCP request logs carry the tenant and the client */
+      it("records the project the credential resolved to and the client attribution", async () => {
+        await fetch(`${baseUrl}/mcp`, {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${VALID_API_KEY}`,
+            "content-type": "application/json",
+            accept: "application/json, text/event-stream",
+            "user-agent": "langwatch-mcp/1.4.0",
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "initialize",
+            params: {
+              protocolVersion: "2025-03-26",
+              capabilities: {},
+              clientInfo: { name: "attribution-test", version: "1.0.0" },
+            },
+          }),
+        });
+
+        const line = await accessLogFor("/mcp");
+
+        expect(line.fields.projectId).toBe("logging-project");
+        expect(line.fields.endpointClass).toBe("mcp");
+        expect(line.fields.clientSource).toBe("mcp");
+        expect(line.fields.userAgent).toBe("langwatch-mcp/1.4.0");
+      });
+    });
   });
 });

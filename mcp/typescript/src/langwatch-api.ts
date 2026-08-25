@@ -2,8 +2,21 @@ import type {
   HandledErrorFault,
   SerializedReason,
 } from "@langwatch/handled-error";
+import packageJson from "../package.json" with { type: "json" };
 import { getConfig, requireApiKey } from "./config.js";
 import type { EvaluationSummary } from "./utils/format-evaluations.js";
+
+/**
+ * The platform attributes traffic by these headers (see
+ * specs/observability/traffic-attribution.feature): every request this MCP
+ * server makes names itself, so its calls never count as an anonymous
+ * HTTP client.
+ */
+export const MCP_IDENTITY_HEADERS: Record<string, string> = {
+  "User-Agent": `langwatch-mcp/${packageJson.version}`,
+  "X-LangWatch-SDK-Name": "langwatch-mcp",
+  "X-LangWatch-SDK-Version": packageJson.version,
+};
 
 // --- Response types ---
 
@@ -240,6 +253,7 @@ export async function makeRequest(
   const config = getConfig();
   const url = config.endpoint + path;
   const headers: Record<string, string> = {
+    ...MCP_IDENTITY_HEADERS,
     "X-Auth-Token": requireApiKey(),
   };
   if (config.projectId) {

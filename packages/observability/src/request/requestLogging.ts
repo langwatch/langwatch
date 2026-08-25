@@ -1,5 +1,6 @@
 import { REQUEST_CAUSE_FIELD } from "../constants";
 import type { Logger } from "../logger";
+import type { RequestAttribution } from "./trafficAttribution";
 
 /**
  * Common request logging data structure.
@@ -11,6 +12,12 @@ export interface RequestLogData {
   duration: number;
   userAgent: string | null;
   error?: unknown;
+  /**
+   * Traffic attribution (endpoint class + client source), flattened onto the
+   * log line. These fields plus the tenant the logging context stamps are
+   * what the usage dashboards slice by.
+   */
+  attribution?: RequestAttribution;
   /** Additional context to include in log */
   extra?: Record<string, unknown>;
 }
@@ -167,6 +174,7 @@ function requestLogMessage({
 export function logHttpRequest(logger: Logger, data: RequestLogData): void {
   const logData: Record<string, unknown> = {
     ...data.extra,
+    ...data.attribution,
     method: data.method,
     url: data.url,
     statusCode: data.statusCode,

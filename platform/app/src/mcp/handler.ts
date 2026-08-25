@@ -28,7 +28,11 @@ import {
   runWithConfig,
 } from "@langwatch/mcp-server/config";
 import { createMcpServer } from "@langwatch/mcp-server/create-mcp-server";
-import { createLogger } from "@langwatch/observability";
+import {
+  classifyClient,
+  createLogger,
+  endpointClassOf,
+} from "@langwatch/observability";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
@@ -622,6 +626,11 @@ export function createMcpHandler(): McpHandler {
       send401(res, "Invalid API key");
       return null;
     }
+
+    // MCP runs outside the app's request context, so the tenant never reaches
+    // its log lines through the logging mixin — the access log carries it
+    // instead, under the same key the mixin uses everywhere else.
+    noteLogFields(res, { projectId: project.id });
 
     return apiKey;
   }
@@ -1873,6 +1882,14 @@ export function createMcpHandler(): McpHandler {
   }): void {
     try {
       const startedAt = Date.now();
+      const userAgent = req.headers["user-agent"] ?? null;
+      const attribution = {
+        endpointClass: endpointClassOf(pathname),
+        ...classifyClient((name) => {
+          const value = req.headers[name];
+          return Array.isArray(value) ? value[0] : value;
+        }),
+      };
       res.once("close", () => {
         try {
           logger.info(
@@ -1881,6 +1898,8 @@ export function createMcpHandler(): McpHandler {
               path: pathname,
               status: res.statusCode,
               durationMs: Date.now() - startedAt,
+              userAgent,
+              ...attribution,
               ...requestLogFields.get(res),
             },
             "MCP request",

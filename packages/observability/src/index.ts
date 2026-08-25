@@ -32,6 +32,14 @@ export {
   type RequestLogData,
 } from "./request/requestLogging";
 export {
+  type ClientAttribution,
+  type ClientSource,
+  classifyClient,
+  type EndpointClass,
+  endpointClassOf,
+  type RequestAttribution,
+} from "./request/trafficAttribution";
+export {
   MAX_VALIDATION_ISSUES,
   validationMeta,
   type ValidationIssueMeta,
