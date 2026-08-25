@@ -315,6 +315,87 @@ describe("dev stack supervisor", () => {
     });
   });
 
+  describe("given a stack whose supervisor is killed outright", () => {
+    /**
+     * The supervisor's pid, found by its command line: it carries this test's
+     * marker (the stack path is its argument) and is not the sentinel. The
+     * launcher does not match, because ps shows its argv (`bash .../launcher.sh`),
+     * not the script body that mentions the supervisor.
+     */
+    function supervisorPid(): number | null {
+      const out = spawnSync("ps", ["-Ao", "pid=", "-o", "command="], {
+        encoding: "utf8",
+      }).stdout;
+      const line = out
+        .split("\n")
+        .find(
+          (l) =>
+            l.includes("dev-supervisor.mjs") &&
+            l.includes(marker) &&
+            !l.includes("--sentinel"),
+        );
+      if (!line) return null;
+      const pid = Number.parseInt(line.trim(), 10);
+      return Number.isInteger(pid) ? pid : null;
+    }
+
+    describe("when the supervisor and the shell are both killed by pid", () => {
+      /** @scenario "The stack goes down even when the supervisor is killed outright" */
+      it("still takes the whole stack down, sentinel included", async () => {
+        const stack = writeStack(DEEP_STACK);
+        const launcher = launchFrom(
+          `node ${asBashWord(SUPERVISOR)} ${asBashWord(stack)}`,
+        );
+        expect(await stackIsUp()).toBe(true);
+        await waitUntil(() => supervisorPid() !== null);
+        const supervisor = supervisorPid();
+        expect(supervisor).not.toBeNull();
+
+        // The shape of a hard session teardown: the launching group dies to
+        // SIGKILL, so no signal ever reaches the detached stack group.
+        process.kill(supervisor as number, "SIGKILL");
+        process.kill(launcher, "SIGKILL");
+
+        // stackPids counts the sentinel too (the guarded command is in its
+        // argv), so reaching zero also means the sentinel did not linger.
+        expect(await waitUntil(() => stackPids().length === 0)).toBe(true);
+      });
+    });
+
+    describe("when only the supervisor is killed", () => {
+      /** @scenario "A killed supervisor alone does not take a living launcher's stack" */
+      it("keeps the stack for the launcher, and takes it down when the launcher dies", async () => {
+        const stack = writeStack(DEEP_STACK);
+        const launcher = launchFrom(
+          `node ${asBashWord(SUPERVISOR)} ${asBashWord(stack)}`,
+        );
+        expect(await stackIsUp()).toBe(true);
+        await waitUntil(() => supervisorPid() !== null);
+        const supervisor = supervisorPid();
+        expect(supervisor).not.toBeNull();
+
+        process.kill(supervisor as number, "SIGKILL");
+        await sleep(1500);
+        // Launcher, lanes and sentinel are all still here: a crashed
+        // supervisor is not a reason to pull work out from under a live shell.
+        expect(stackPids().length).toBeGreaterThanOrEqual(3);
+
+        process.kill(launcher, "SIGKILL");
+        expect(await waitUntil(() => stackPids().length === 0)).toBe(true);
+      });
+    });
+
+    describe("when the stack exits on its own", () => {
+      /** @scenario "Supervision leaves nothing behind when the stack exits on its own" */
+      it("leaves no sentinel running", async () => {
+        const result = runSupervised(["sh", "-c", `: ${marker}`]);
+
+        expect(result.status).toBe(0);
+        expect(await waitUntil(() => stackPids().length === 0)).toBe(true);
+      });
+    });
+  });
+
   describe("given supervision cannot or should not apply", () => {
     describe("when the command is run anyway", () => {
       /** @scenario "Supervision can be turned off" */

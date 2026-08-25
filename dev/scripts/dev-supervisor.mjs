@@ -21,7 +21,7 @@
  * stack still owns the port, the next `pnpm dev` takes the next slot and the
  * worktree ends up running twice.
  *
- * So this sits at the top of the chain and does two things:
+ * So this sits at the top of the chain and does three things:
  *
  *   1. Runs the command in a process group of ITS OWN (`detached`). One signal
  *      to that group reaches vite, tsx and `go run` at once, without walking a
@@ -29,6 +29,13 @@
  *      never take down anything we did not start.
  *   2. Watches the group it was launched FROM. When that group's leader dies,
  *      the stack goes down: SIGTERM, then SIGKILL for whatever ignored it.
+ *   3. Posts a SENTINEL outside both groups. A hard session teardown SIGKILLs
+ *      the launching group as a whole — the shell, the pnpm chain, and this
+ *      supervisor in it — and the stack is detached exactly so that teardown
+ *      cannot reach it, which also means its watcher dies watching. The
+ *      sentinel is a process group of its own that answers to neither kill:
+ *      it idles while the supervisor or the launcher is alive, takes the
+ *      stack down when both are gone, and exits the moment the stack does.
  *
  * Watching the launching group rather than our own parent is what makes this
  * work at any depth: `pnpm dev` at the repo root delegates through several
@@ -53,6 +60,7 @@
 
 import { spawn, spawnSync } from "node:child_process";
 import os from "node:os";
+import { fileURLToPath } from "node:url";
 
 /** How long the stack gets between SIGTERM and SIGKILL. */
 const DEFAULT_GRACE_MS = 5_000;
@@ -60,6 +68,8 @@ const DEFAULT_GRACE_MS = 5_000;
 const WATCH_INTERVAL_MS = 1_000;
 /** Set for everything below us, so a nested dev script does not supervise again. */
 const NESTED = "LANGWATCH_DEV_SUPERVISED";
+/** Re-entry flag for the sentinel process; never typed by hand. */
+const SENTINEL_FLAG = "--sentinel";
 const PREFIX = "dev-supervisor:";
 
 const stderr = (msg) => process.stderr.write(msg);
@@ -111,6 +121,7 @@ function disabled(env) {
 }
 
 async function main(argv, env) {
+  if (argv[0] === SENTINEL_FLAG) return await runSentinel(argv.slice(1), env);
   if (argv.length === 0) {
     stderr(`${PREFIX} usage: dev-supervisor.mjs <command> [args...]\n`);
     return 64;
@@ -187,7 +198,65 @@ function stackControls({ target, graceMs }) {
     return !anyAlive();
   };
 
-  return { takeDown };
+  return { takeDown, anyAlive };
+}
+
+/**
+ * The sentinel: a group of its own, so no teardown aimed at the launcher or
+ * the stack can take it before it has done its job. It idles while either the
+ * supervisor or the launcher is alive (whichever of them is up owns the
+ * stack's lifetime), takes the stack down when both are gone, and exits as
+ * soon as the stack itself is gone — including when the stack was taken down
+ * properly and the sentinel was simply never needed.
+ *
+ * Anything after the three pids in its argv is the guarded command, carried
+ * only so `ps` shows what a sentinel is standing for.
+ */
+async function runSentinel(args, env) {
+  const stackPid = Number.parseInt(args[0] ?? "", 10);
+  const supervisorPid = Number.parseInt(args[1] ?? "", 10);
+  const leaderPid = Number.parseInt(args[2] ?? "", 10);
+  if (!Number.isInteger(stackPid) || stackPid <= 1) return 64;
+
+  const everyMs = positiveInt(env.LANGWATCH_DEV_WATCH_MS, WATCH_INTERVAL_MS);
+  const stack = stackControls({
+    target: -stackPid,
+    graceMs: positiveInt(env.LANGWATCH_DEV_GRACE_MS, DEFAULT_GRACE_MS),
+  });
+  const watched = (pid) => Number.isInteger(pid) && pid > 1 && alive(pid);
+
+  for (;;) {
+    if (!stack.anyAlive()) return 0;
+    if (!watched(supervisorPid) && !watched(leaderPid)) {
+      await stack.takeDown();
+      return 0;
+    }
+    await sleep(everyMs);
+  }
+}
+
+/**
+ * Posts the sentinel for a detached stack. Failing to post one is not a gate:
+ * the supervisor's own watch still covers every case except its own SIGKILL.
+ */
+function startSentinel({ stackPid, leader, argv, env }) {
+  try {
+    const child = spawn(
+      process.execPath,
+      [
+        fileURLToPath(import.meta.url),
+        SENTINEL_FLAG,
+        String(stackPid),
+        String(process.pid),
+        String(leader),
+        ...argv,
+      ],
+      { detached: true, stdio: "ignore", env },
+    );
+    child.unref();
+  } catch (err) {
+    stderr(`${PREFIX} could not post the sentinel (${err.message})\n`);
+  }
 }
 
 /** Polls for the launcher's death, or null when there is nothing to watch. */
@@ -210,6 +279,7 @@ function watchLauncher({ leader, env, onGone }) {
 function passThrough(argv, env, { detached, leader = null }) {
   const child = startChild(argv, env, detached);
   if (child === null) return Promise.resolve(127);
+  if (detached) startSentinel({ stackPid: child.pid, leader, argv, env });
 
   return new Promise((resolve) => {
     const stack = stackControls({

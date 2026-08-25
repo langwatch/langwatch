@@ -87,6 +87,36 @@ Feature: A dev stack does not outlive whoever started it
     When it does
     Then the supervisor exits with the same code rather than waiting for its launcher
 
+  # --- Surviving the supervisor's own death ---
+
+  # A hard session teardown SIGKILLs the whole launching group at once: the
+  # shell, the pnpm chain, and the supervisor sitting in it. The stack is
+  # detached exactly so that teardown cannot reach it — which also means its
+  # watcher dies watching. Observed: a bare `concurrently` at PPID 1,
+  # respawning lanes for two days in a worktree nobody was in. So the watch
+  # itself has to sit outside the doomed group: a sentinel in a group of its
+  # own, whose only job is to notice that both the supervisor and the
+  # launcher are gone and take the stack down in their place.
+
+  @unit
+  Scenario: The stack goes down even when the supervisor is killed outright
+    Given a dev stack started from a shell
+    When the supervisor and the shell are both killed without any signal reaching the stack
+    Then the whole stack is taken down anyway
+
+  @unit
+  Scenario: A killed supervisor alone does not take a living launcher's stack
+    Given a dev stack started from a shell
+    When only the supervisor is killed outright
+    Then the stack keeps running for as long as the shell lives
+    And it is taken down once the shell dies too
+
+  @unit
+  Scenario: Supervision leaves nothing behind when the stack exits on its own
+    Given a dev command that exits by itself
+    When it does
+    Then no part of the supervision is still running afterwards
+
   # --- Not taking down more than its own ---
 
   @unit
