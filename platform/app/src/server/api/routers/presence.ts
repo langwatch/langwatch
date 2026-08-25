@@ -1,22 +1,22 @@
 import { on } from "node:events";
 import { createLogger } from "@langwatch/observability";
-import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
-import type {
-  PresenceCursorEvent,
-  PresenceEvent,
-} from "~/server/app-layer/presence/types";
 import {
   presenceCursorAnchorSchema,
-  presenceCursorPayloadSchema,
-  presenceLocationSchema,
-} from "~/server/app-layer/presence/types";
+  presenceCursorEventSchema,
+  presenceCursorInputSchema,
+  presenceEventSchema,
+  presenceLeaveInputSchema,
+  presenceProjectInputSchema,
+  presenceUpdateInputSchema,
+  type PresenceEvent,
+} from "@langwatch/presence-contract";
+import { z } from "zod";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 const logger = createLogger("langwatch:api:presence");
 
-const projectInput = z.object({ projectId: z.string() });
-const sessionInput = projectInput.extend({ sessionId: z.string().min(1) });
+const projectInput = presenceProjectInputSchema;
+const sessionInput = presenceLeaveInputSchema;
 
 export const presenceRouter = createTRPCRouter({
   /**
@@ -27,17 +27,15 @@ export const presenceRouter = createTRPCRouter({
    */
   update: protectedProcedure
     .input(
-      sessionInput.extend({
-        location: presenceLocationSchema,
-      }),
+      presenceUpdateInputSchema.omit({ user: true }),
     )
     .permission("traces:view")
     .mutation(async ({ input, ctx }) => {
-      if (!(await getApp().presence.isEnabledForProject(input.projectId))) {
+      if (!(await ctx.app.presence.isEnabledForProject(input))) {
         return { ok: true as const };
       }
       const user = ctx.session.user;
-      await getApp().presence.update({
+      await ctx.app.presence.update({
         projectId: input.projectId,
         sessionId: input.sessionId,
         user: {
@@ -55,10 +53,10 @@ export const presenceRouter = createTRPCRouter({
     .input(sessionInput)
     .permission("traces:view")
     .mutation(async ({ input, ctx }) => {
-      if (!(await getApp().presence.isEnabledForProject(input.projectId))) {
+      if (!(await ctx.app.presence.isEnabledForProject(input))) {
         return { ok: true as const };
       }
-      await getApp().presence.leave({
+      await ctx.app.presence.leave({
         projectId: input.projectId,
         sessionId: input.sessionId,
       });
@@ -75,11 +73,11 @@ export const presenceRouter = createTRPCRouter({
     .permission("traces:view")
     .subscription(async function* (opts) {
       const { projectId } = opts.input;
-      const app = getApp();
+      const app = opts.ctx.app;
 
       // Yield an empty snapshot and exit immediately when presence is off —
       // the client unsubscribes on its own once it sees no further frames.
-      if (!(await app.presence.isEnabledForProject(projectId))) {
+      if (!(await app.presence.isEnabledForProject({ projectId }))) {
         yield { kind: "snapshot", sessions: [] } satisfies PresenceEvent;
         return;
       }
@@ -88,7 +86,7 @@ export const presenceRouter = createTRPCRouter({
 
       logger.debug({ projectId }, "Presence subscription started");
 
-      const snapshot = await app.presence.getByProject(projectId);
+      const snapshot = await app.presence.list({ projectId });
       yield { kind: "snapshot", sessions: snapshot } satisfies PresenceEvent;
 
       try {
@@ -96,9 +94,9 @@ export const presenceRouter = createTRPCRouter({
           signal: opts.signal,
         })) {
           const payload = eventArgs[0] as { event: string; timestamp: number };
-          let parsed: PresenceEvent;
+          let decoded: unknown;
           try {
-            parsed = JSON.parse(payload.event) as PresenceEvent;
+            decoded = JSON.parse(payload.event);
           } catch {
             logger.warn(
               { projectId },
@@ -106,6 +104,15 @@ export const presenceRouter = createTRPCRouter({
             );
             continue;
           }
+          const result = presenceEventSchema.safeParse(decoded);
+          if (!result.success) {
+            logger.warn(
+              { projectId },
+              "Ignoring invalid presence broadcast payload",
+            );
+            continue;
+          }
+          const parsed = result.data;
           // Defense-in-depth: the per-tenant emitter should already isolate
           // events, but if a future refactor ever leaks a payload across
           // tenants, this drops it before it reaches the wire instead of
@@ -137,17 +144,15 @@ export const presenceRouter = createTRPCRouter({
    */
   cursor: protectedProcedure
     .input(
-      sessionInput.extend({
-        payload: presenceCursorPayloadSchema,
-      }),
+      presenceCursorInputSchema.omit({ user: true }),
     )
     .permission("traces:view")
     .mutation(async ({ input, ctx }) => {
-      if (!(await getApp().presence.isEnabledForProject(input.projectId))) {
+      if (!(await ctx.app.presence.isEnabledForProject(input))) {
         return { ok: true as const };
       }
       const user = ctx.session.user;
-      await getApp().presence.broadcastCursor({
+      await ctx.app.presence.broadcastCursor({
         projectId: input.projectId,
         sessionId: input.sessionId,
         user: {
@@ -177,23 +182,27 @@ export const presenceRouter = createTRPCRouter({
     .subscription(async function* (opts) {
       const { projectId, anchor, sessionId } = opts.input;
 
-      if (!(await getApp().presence.isEnabledForProject(projectId))) {
+      const app = opts.ctx.app;
+      if (!(await app.presence.isEnabledForProject({ projectId }))) {
         return;
       }
 
-      const emitter = getApp().broadcast.getTenantEmitter(projectId);
+      const emitter = app.broadcast.getTenantEmitter(projectId);
 
       try {
         for await (const eventArgs of on(emitter, "presence_cursor", {
           signal: opts.signal,
         })) {
           const payload = eventArgs[0] as { event: string; timestamp: number };
-          let parsed: PresenceCursorEvent;
+          let decoded: unknown;
           try {
-            parsed = JSON.parse(payload.event) as PresenceCursorEvent;
+            decoded = JSON.parse(payload.event);
           } catch {
             continue;
           }
+          const result = presenceCursorEventSchema.safeParse(decoded);
+          if (!result.success) continue;
+          const parsed = result.data;
           // Defense-in-depth: per-tenant emitter already isolates this, but
           // a malformed payload or future shared-emitter regression must not
           // leak cursors across projects.
@@ -204,7 +213,7 @@ export const presenceRouter = createTRPCRouter({
           yield parsed;
         }
       } finally {
-        getApp().broadcast.cleanupTenantEmitter(projectId);
+        app.broadcast.cleanupTenantEmitter(projectId);
       }
     }),
 });
