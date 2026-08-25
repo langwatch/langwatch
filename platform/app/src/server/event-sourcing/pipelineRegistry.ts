@@ -170,10 +170,10 @@ import { getOpenAdmissionFindersByInstance } from "./pipelines/gateway-spend-pro
 import { GATEWAY_SPEND_PIPELINE_NAME } from "./pipelines/gateway-spend-processing/schemas/constants";
 import { createGithubMaintenancePipeline } from "./pipelines/github-maintenance/pipeline";
 import { createGovernanceEventsPipeline } from "./pipelines/governance-events/pipeline";
-import { createIdentityLinksMaintenancePipeline } from "./pipelines/identity-links-maintenance/pipeline";
 import { createIdentityPipeline } from "./pipelines/identity/pipeline";
 import type { IdentityFoldState } from "./pipelines/identity/projections/identityState.foldProjection";
 import type { MfaFoldState } from "./pipelines/identity/projections/mfaEnrollmentState.foldProjection";
+import { createIdentityLinksMaintenancePipeline } from "./pipelines/identity-links-maintenance/pipeline";
 import { createJoinRequestPipeline } from "./pipelines/join-requests/pipeline";
 import type { JoinRequestLifecyclePort } from "./pipelines/join-requests/process-manager/joinRequestLifecycle.process";
 import type { JoinRequestFoldState } from "./pipelines/join-requests/projections/joinRequestState.foldProjection";

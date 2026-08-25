@@ -30,7 +30,6 @@ import {
 } from "@langwatch/identity-links";
 import { z } from "zod";
 
-import { checkOrganizationPermission } from "~/server/api/rbac";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 import { AttributionLinkAdminService } from "../services/attributionLinkAdmin.service";
@@ -87,7 +86,7 @@ export const usageAttributionRouter = createTRPCRouter({
    */
   report: protectedProcedure
     .input(windowInput)
-    .use(checkOrganizationPermission("governance:view"))
+    .permission("governance:view")
     .query(async ({ ctx, input }) => {
       const { from, to } = asWindow(input);
       const wired = await createUsageAttributionReportService({
@@ -113,7 +112,7 @@ export const usageAttributionRouter = createTRPCRouter({
    */
   exportReport: protectedProcedure
     .input(windowInput)
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .mutation(async ({ ctx, input }) => {
       const { from, to } = asWindow(input);
       const wired = await createUsageAttributionReportService({
@@ -134,7 +133,7 @@ export const usageAttributionRouter = createTRPCRouter({
   /** One login's whole history, newest first by the ADR's ordering constant. */
   listTimeline: protectedProcedure
     .input(z.object({ organizationId: z.string(), login: loginRefInput }))
-    .use(checkOrganizationPermission("governance:view"))
+    .permission("governance:view")
     .query(async ({ ctx, input }) => {
       const service = AttributionLinkAdminService.create(ctx.prisma);
       return {
@@ -158,7 +157,7 @@ export const usageAttributionRouter = createTRPCRouter({
    */
   suggestions: protectedProcedure
     .input(windowInput)
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .query(async ({ ctx, input }) => {
       const { from, to } = asWindow(input);
       const wired = await createUsageAttributionReportService({
@@ -196,7 +195,7 @@ export const usageAttributionRouter = createTRPCRouter({
         source: adminLinkSource,
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .mutation(async ({ ctx, input }) => {
       const service = AttributionLinkAdminService.create(ctx.prisma);
       return await service.createLink({
@@ -222,7 +221,7 @@ export const usageAttributionRouter = createTRPCRouter({
         effectiveFromMs: z.number().int().nonnegative(),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .permission("organization:manage")
     .mutation(async ({ ctx, input }) => {
       const service = AttributionLinkAdminService.create(ctx.prisma);
       return await service.closeLink({
@@ -236,7 +235,7 @@ export const usageAttributionRouter = createTRPCRouter({
   /** The id namespaces each provider declares, for the manual-link form. */
   externalKinds: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("governance:view"))
+    .permission("governance:view")
     .query(() =>
       Object.entries(EXTERNAL_KINDS_BY_PROVIDER).map(([provider, kinds]) => ({
         provider,

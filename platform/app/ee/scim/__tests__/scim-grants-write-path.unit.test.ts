@@ -70,11 +70,15 @@ function buildUser(overrides: Partial<User> = {}): User {
 }
 
 function createMockPrisma() {
-  return {
+  const prisma = {
     user: {
       findUnique: vi.fn().mockResolvedValue(buildUser()),
       create: vi.fn().mockResolvedValue(buildUser()),
       update: vi.fn().mockResolvedValue(buildUser()),
+      // The account flag is already whatever it is: nothing here is the call
+      // that sets it, so the membership lifecycle reports no global
+      // deactivation and this file stays about the grants write path.
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
     organizationUser: {
       findUnique: vi.fn().mockResolvedValue({ userId: USER }),
@@ -82,6 +86,14 @@ function createMockPrisma() {
       count: vi.fn().mockResolvedValue(0),
       create: vi.fn().mockResolvedValue({}),
       delete: vi.fn().mockResolvedValue({}),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    // Ending a membership closes the person's open usage-attribution links in
+    // the same transaction (ADR-094 Decision 4); this person holds none.
+    providerIdentityLink: {
+      findMany: vi.fn().mockResolvedValue([]),
+      createMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
     roleBinding: { findMany: vi.fn().mockResolvedValue([]) },
     scimExternalId: {
@@ -94,10 +106,21 @@ function createMockPrisma() {
       findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
-    $transaction: vi
-      .fn()
-      .mockImplementation((ops: unknown[]) => Promise.all(ops)),
+    $transaction: vi.fn(),
   } as unknown as PrismaClient;
+
+  // Prisma's `$transaction` has two shapes: an array of promises, and an
+  // interactive callback handed a transaction client. The membership
+  // lifecycle uses the callback one, so the fake has to answer both.
+  (
+    prisma.$transaction as unknown as ReturnType<typeof vi.fn>
+  ).mockImplementation((arg: unknown) =>
+    typeof arg === "function"
+      ? (arg as (tx: unknown) => unknown)(prisma)
+      : Promise.all(arg as unknown[]),
+  );
+
+  return prisma;
 }
 
 function createGrants() {
@@ -264,8 +287,16 @@ describe("ScimService, on the grants write path", () => {
         },
       });
 
-      expect(prisma.user.update).toHaveBeenCalledWith({
-        where: { id: USER },
+      expect(prisma.organizationUser.updateMany).toHaveBeenCalledWith({
+        where: {
+          userId: USER,
+          organizationId: ORGANIZATION,
+          disabledAt: { not: null },
+        },
+        data: { disabledAt: null },
+      });
+      expect(prisma.user.updateMany).toHaveBeenCalledWith({
+        where: { id: USER, deactivatedAt: { not: null } },
         data: { deactivatedAt: null },
       });
       expect(ledger.attachBindings).not.toHaveBeenCalled();
@@ -304,8 +335,16 @@ describe("ScimService, on the grants write path", () => {
         });
 
         expect(result).toMatchObject({ id: USER });
-        expect(prisma.user.update).toHaveBeenCalledWith({
-          where: { id: USER },
+        expect(prisma.organizationUser.updateMany).toHaveBeenCalledWith({
+          where: {
+            userId: USER,
+            organizationId: ORGANIZATION,
+            disabledAt: { not: null },
+          },
+          data: { disabledAt: null },
+        });
+        expect(prisma.user.updateMany).toHaveBeenCalledWith({
+          where: { id: USER, deactivatedAt: { not: null } },
           data: { deactivatedAt: null },
         });
         // Nothing is put back: no membership, no grant, no role.
@@ -531,7 +570,9 @@ describe("ScimService, with the grants flag off", () => {
       revokedGrantIds: [],
       actor: { type: "system", id: "system:scim" },
     });
-    expect(prisma.organizationUser.delete).toHaveBeenCalled();
+    expect(prisma.organizationUser.deleteMany).toHaveBeenCalledWith({
+      where: { userId: USER, organizationId: ORGANIZATION },
+    });
     expect(grants.offboard).not.toHaveBeenCalled();
   });
 
@@ -547,9 +588,13 @@ describe("ScimService, with the grants flag off", () => {
     });
 
     expect(grants.offboard).not.toHaveBeenCalled();
-    expect(prisma.user.update).toHaveBeenCalledWith({
-      where: { id: USER },
-      data: { deactivatedAt: expect.any(Date) },
+    expect(prisma.organizationUser.updateMany).toHaveBeenCalledWith({
+      where: {
+        userId: USER,
+        organizationId: ORGANIZATION,
+        disabledAt: null,
+      },
+      data: { disabledAt: expect.any(Date) },
     });
   });
 

@@ -397,7 +397,10 @@ export class ScimService {
             externalId,
             op: "create",
           });
-          return this.toScimUser(existingUser);
+          return await this.toScimUserInOrg({
+            user: existingUser,
+            organizationId,
+          });
         }
         throw e;
       }
@@ -479,7 +482,7 @@ export class ScimService {
       op: "create",
     });
 
-    return this.toScimUser(newUser);
+    return await this.toScimUserInOrg({ user: newUser, organizationId });
   }
 
   /**
@@ -1129,7 +1132,15 @@ export class ScimService {
     });
   }
 
-  toScimUser(user: User): ScimUser {
+  /**
+   * The SCIM view of a person. The membership is what makes `active` mean
+   * active HERE (ADR-094 Decision 4): the account stays alive for the person's
+   * other organizations after this directory suspends them, and reporting them
+   * as still active would tell the IdP its own instruction did not take. It
+   * also carries the directory anchor back, so the IdP can confirm what it
+   * wrote. Absent for callers that hold no membership row.
+   */
+  toScimUser(user: User, membership?: ScimMembership | null): ScimUser {
     const { givenName, familyName } = this.splitName(user.name ?? "");
 
     return {
