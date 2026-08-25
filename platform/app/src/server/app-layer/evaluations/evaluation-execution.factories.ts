@@ -3,8 +3,8 @@ import {
   prepareEnvKeys,
   prepareLitellmParams,
 } from "~/server/api/routers/modelProviders.utils";
-import { prisma } from "~/server/db";
-import { ModelProviderService } from "~/server/modelProviders/modelProvider.service";
+import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { resolveMaxTokensCeiling } from "~/server/modelProviders/resolveMaxTokensCeiling";
 import { clampMaxTokens } from "~/utils/clampMaxTokens";
 import { isAzureEvaluatorType } from "./azure-safety-env";
@@ -12,7 +12,10 @@ import { getAzureSafetyEnvFromProject } from "./azure-safety-env.server";
 import { EvaluatorConfigError } from "./errors";
 import type { ModelEnvResolver } from "./evaluation-execution.service";
 
-export function createDefaultModelEnvResolver(): ModelEnvResolver {
+export function createDefaultModelEnvResolver(
+  modelProviders: ModelProviderService,
+  managedProviders: ManagedProviderService,
+): ModelEnvResolver {
   return {
     async resolveForEvaluator({ evaluatorType, evaluator, projectId, settings }) {
       // Hard cutover: Azure Content Safety evaluators never read from process.env.
@@ -21,7 +24,7 @@ export function createDefaultModelEnvResolver(): ModelEnvResolver {
       // clear skipped status before reaching this resolver.
       let evaluatorEnv: Record<string, string>;
       if (isAzureEvaluatorType(evaluatorType)) {
-        const azureEnv = await getAzureSafetyEnvFromProject(projectId);
+        const azureEnv = await getAzureSafetyEnvFromProject(modelProviders, projectId);
         evaluatorEnv = azureEnv ?? {};
       } else {
         evaluatorEnv = Object.fromEntries(
@@ -35,7 +38,14 @@ export function createDefaultModelEnvResolver(): ModelEnvResolver {
         typeof settings.model === "string" &&
         evaluatorType !== "openai/moderation"
       ) {
-        const modelEnv = await setupModelEnv(settings.model, false, projectId, settings);
+        const modelEnv = await setupModelEnv(
+          modelProviders,
+          managedProviders,
+          settings.model,
+          false,
+          projectId,
+          settings,
+        );
         evaluatorEnv = { ...evaluatorEnv, ...modelEnv };
       }
 
@@ -45,6 +55,8 @@ export function createDefaultModelEnvResolver(): ModelEnvResolver {
         typeof settings.embeddings_model === "string"
       ) {
         const embeddingsEnv = await setupModelEnv(
+          modelProviders,
+          managedProviders,
           settings.embeddings_model,
           true,
           projectId,
@@ -68,12 +80,14 @@ export function createDefaultModelEnvResolver(): ModelEnvResolver {
  * need a per-worker error class should catch and rewrap.
  */
 export async function setupModelEnv(
+  modelProvidersService: ModelProviderService,
+  managedProviders: ManagedProviderService,
   model: string,
   embeddings: boolean,
   projectId: string,
   settings?: Record<string, unknown>,
 ): Promise<Record<string, string>> {
-  const modelProviders = await getProjectModelProviders(projectId);
+  const modelProviders = await getProjectModelProviders(modelProvidersService, projectId);
   const provider = model.split("/")[0]!;
   const modelProvider = modelProviders[provider];
 
@@ -107,10 +121,10 @@ export async function setupModelEnv(
     // than masking it behind an infrastructure error.
     let servingRow = null;
     try {
-      servingRow = await ModelProviderService.create(prisma).findRowServingModel({
+      servingRow = await modelProvidersService.tryFindRowServingModel({
         projectId,
         provider,
-        bareModel: modelName,
+        model: modelName,
       });
     } catch {
       // fall through to the config error below
@@ -124,11 +138,15 @@ export async function setupModelEnv(
     }
   }
 
-  const litellmParams = await prepareLitellmParams({
-    model,
-    modelProvider,
-    projectId,
-  });
+  const litellmParams = await prepareLitellmParams(
+    modelProvidersService,
+    managedProviders,
+    {
+      model,
+      modelProvider,
+      projectId,
+    },
+  );
 
   let envResult = Object.fromEntries(
     Object.entries(litellmParams).map(([key, value]) => [

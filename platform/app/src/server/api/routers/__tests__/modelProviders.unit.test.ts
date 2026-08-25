@@ -6,10 +6,15 @@ import { customModelUpdateInputSchema } from "../../../modelProviders/customMode
 import type { MaybeStoredModelProvider } from "../../../modelProviders/registry";
 import {
   getModelMetadataForFrontend,
+  type LegacyModelProviderExecution,
   type ModelMetadataForFrontend,
   mergeCustomModelMetadata,
-  prepareLitellmParams,
+  prepareLitellmParams as prepareLitellmParamsWithServices,
 } from "../modelProviders";
+import {
+  testManagedProviders,
+  testModelProviders,
+} from "../../../modelProviders/__tests__/model-provider-services.test-support";
 
 /**
  * Unit tests for modelProviders router helper functions
@@ -221,10 +226,20 @@ describe("prepareLitellmParams", () => {
     vi.unstubAllEnvs();
   });
 
+  type TestLitellmProvider = {
+    provider: string;
+    enabled: boolean;
+    customKeys: Record<string, unknown> | null;
+    models: string[] | null;
+    embeddingsModels: string[] | null;
+    deploymentMapping: Record<string, string> | null;
+    extraHeaders: Array<{ key: string; value: string }> | null;
+  };
+
   const createMockProvider = (
     provider: string,
     customKeys: Record<string, string> | null = null,
-  ): MaybeStoredModelProvider => ({
+  ): TestLitellmProvider => ({
     provider,
     enabled: true,
     customKeys,
@@ -233,6 +248,46 @@ describe("prepareLitellmParams", () => {
     deploymentMapping: null,
     extraHeaders: null,
   });
+
+  const toExecutionProvider = (
+    provider: TestLitellmProvider,
+  ): LegacyModelProviderExecution => ({
+    id: "mp_test",
+    organizationId: "org_test",
+    provider: provider.provider,
+    name: provider.provider,
+    enabled: provider.enabled,
+    routingHandle: null,
+    scopes: [{ scopeType: "PROJECT", scopeId: "test-project" }],
+    scopeType: "PROJECT",
+    scopeId: "test-project",
+    customKeys: provider.customKeys,
+    customModels: [],
+    customEmbeddingsModels: [],
+    extraHeaders: provider.extraHeaders ?? [],
+    rateLimitRpm: null,
+    rateLimitTpm: null,
+    rateLimitRpd: null,
+    fallbackPriorityGlobal: null,
+    providerConfig: null,
+    deploymentMapping: provider.deploymentMapping,
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    models: provider.models,
+    embeddingsModels: provider.embeddingsModels,
+    isSystem: false,
+    embeddingsUnsupported: false,
+  });
+
+  const prepareLitellmParams = (input: {
+    model: string;
+    modelProvider: TestLitellmProvider;
+    projectId: string;
+  }) =>
+    prepareLitellmParamsWithServices(testModelProviders, testManagedProviders, {
+      ...input,
+      modelProvider: toExecutionProvider(input.modelProvider),
+    });
 
   describe("Anthropic URL normalization", () => {
     it("strips /v1 suffix from Anthropic api_base", async () => {

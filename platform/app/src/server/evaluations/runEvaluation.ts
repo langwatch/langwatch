@@ -3,6 +3,8 @@ import {
   EvaluatorNotFoundError,
 } from "~/server/app-layer/evaluations/errors";
 import type { EvaluationService } from "@langwatch/evaluation-contract";
+import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { setupModelEnv } from "~/server/app-layer/evaluations/evaluation-execution.factories";
 import { codeEvaluatorIdFromCheckType } from "~/server/evaluators/codeEvaluator";
 import { runCodeEvaluator } from "~/server/evaluators/runCodeEvaluator";
@@ -254,6 +256,8 @@ export const runEvaluationForTrace = async ({
   protections,
   workflowId,
   evaluations,
+  modelProviders,
+  managedProviders,
 }: {
   projectId: string;
   traceId: string;
@@ -264,6 +268,8 @@ export const runEvaluationForTrace = async ({
   protections: Protections;
   workflowId?: string | null;
   evaluations: EvaluationService;
+  modelProviders: ModelProviderService;
+  managedProviders: ManagedProviderService;
 }): Promise<EvaluationResultWithThreadId> => {
   // #4991: the trace being evaluated is read content-first — resolve the
   // FULL offloaded IO (ADR-022) so the evaluator never scores a preview.
@@ -323,6 +329,8 @@ export const runEvaluationForTrace = async ({
     settings: settings && typeof settings === "object" ? settings : undefined,
     trace,
     workflowId,
+    modelProviders,
+    managedProviders,
     parentCausalityDepth: maxCausalityDepthOfSpans(
       trace.spans as unknown as Array<{
         attributes?: Record<string, unknown> | null;
@@ -346,6 +354,8 @@ export const runEvaluation = async ({
   workflowId,
   retries = 1,
   parentCausalityDepth,
+  modelProviders,
+  managedProviders,
 }: {
   projectId: string;
   evaluatorType: EvaluatorTypes | "workflow";
@@ -355,6 +365,8 @@ export const runEvaluation = async ({
   workflowId?: string | null;
   retries?: number;
   parentCausalityDepth?: number;
+  modelProviders: ModelProviderService;
+  managedProviders: ManagedProviderService;
 }): Promise<SingleEvaluationResult> => {
   if (data.type === "custom") {
     // Code evaluators arrive as `{type:"custom"}` with an evaluatorType of
@@ -370,6 +382,8 @@ export const runEvaluation = async ({
         traceId: trace?.trace_id,
         parentCausalityDepth,
         parentTrace: extractParentTraceForNlpgo(trace),
+        modelProviders,
+        managedProviders,
       });
     }
     return customEvaluation(
@@ -413,7 +427,7 @@ export const runEvaluation = async ({
 
   let evaluatorEnv: Record<string, string>;
   if (isAzureEvaluatorType(builtInEvaluatorType)) {
-    const azureEnv = await getAzureSafetyEnvFromProject(projectId);
+    const azureEnv = await getAzureSafetyEnvFromProject(modelProviders, projectId);
     if (!azureEnv) {
       return {
         status: "skipped",
@@ -437,7 +451,14 @@ export const runEvaluation = async ({
     builtInEvaluatorType !== "openai/moderation"
   ) {
     try {
-      const modelEnv = await setupModelEnv(settings.model, false, projectId, settings);
+      const modelEnv = await setupModelEnv(
+        modelProviders,
+        managedProviders,
+        settings.model,
+        false,
+        projectId,
+        settings,
+      );
       evaluatorEnv = { ...evaluatorEnv, ...modelEnv };
     } catch (error) {
       if (error instanceof EvaluatorConfigError) {
@@ -461,6 +482,8 @@ export const runEvaluation = async ({
   ) {
     try {
       const embeddingsEnv = await setupModelEnv(
+        modelProviders,
+        managedProviders,
         settings.embeddings_model,
         true,
         projectId,
@@ -555,6 +578,8 @@ export const runEvaluation = async ({
         trace,
         workflowId,
         parentCausalityDepth,
+        modelProviders,
+        managedProviders,
         retries: retries - 1,
       });
     }

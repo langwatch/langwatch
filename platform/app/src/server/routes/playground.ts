@@ -67,13 +67,11 @@ secured
     // legacy `{provider}/{model}`. For mp-id values we look up the MP by
     // id; for legacy values we resolve to the single accessible MP for
     // that provider (today always narrowest-wins) exactly as before.
-    const modelProviders = await getProjectModelProviders(projectId);
-    const providerKey = model.split("/")[0] as string;
+    const modelProviders = await getProjectModelProviders(c.app.modelProviders, projectId);
+    const providerKey = model.split("/")[0] ?? "";
     const modelProvider = providerKey.startsWith("mp_")
-      ? (Object.values(modelProviders as Record<string, any>).find(
-          (mp) => (mp as any).id === providerKey,
-        ) as any)
-      : (modelProviders as Record<string, any>)[providerKey];
+      ? Object.values(modelProviders).find((provider) => provider.id === providerKey)
+      : modelProviders[providerKey];
     if (!modelProvider) {
       return c.json(
         { error: `Provider not configured: ${providerKey}` },
@@ -96,11 +94,15 @@ secured
       return c.json(previousError, { status: 401 });
     }
 
-    const litellmParams = await prepareLitellmParams({
-      model,
-      modelProvider,
-      projectId,
-    });
+    const litellmParams = await prepareLitellmParams(
+      c.app.modelProviders,
+      c.app.managedProviders,
+      {
+        model,
+        modelProvider,
+        projectId,
+      },
+    );
     const headers = Object.fromEntries(
       Object.entries(litellmParams).map(([key, value]) => [`x-litellm-${key}`, value]),
     );

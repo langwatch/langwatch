@@ -1,4 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import { CostReferenceType, CostType, type Project } from "~/generated/prisma/client";
@@ -115,11 +117,15 @@ export const clusterTopicsForProject = async ({
   searchAfter,
   runContext,
   resolveClickHouseClient,
+  modelProviders,
+  managedProviders,
 }: {
   projectId: string;
   searchAfter?: [number, string];
   runContext?: ClusteringRunContext;
   resolveClickHouseClient: ClickHouseClientResolver;
+  modelProviders: ModelProviderService;
+  managedProviders: ManagedProviderService;
 }): Promise<ClusteringPageOutcome> => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -250,8 +256,8 @@ export const clusterTopicsForProject = async ({
   }
 
   const summary = isIncrementalProcessing
-    ? await incrementalClustering(project, traces, runContext)
-    : await batchClusterTraces(project, traces, runContext);
+    ? await incrementalClustering(project, traces, modelProviders, managedProviders, runContext)
+    : await batchClusterTraces(project, traces, modelProviders, managedProviders, runContext);
 
   logger.info({ projectId }, "done! project");
 
@@ -559,7 +565,10 @@ function extractInputFromComputed(computedInput: string | null): string {
   }
 }
 
-const getProjectTopicClusteringModelProvider = async (project: Project) => {
+const getProjectTopicClusteringModelProvider = async (
+  project: Project,
+  modelProvidersService: ModelProviderService,
+) => {
   // Resolve the analytics.topic_clustering_llm feature at the project's
   // cascade. Throws ModelNotConfiguredError when nothing is set at any
   // scope; nothing here catches it — it propagates to the intent handler,
@@ -578,7 +587,9 @@ const getProjectTopicClusteringModelProvider = async (project: Project) => {
       `Topic clustering model "${topicClusteringModel}" has no provider prefix`,
     );
   }
-  const modelProvider = (await getProjectModelProviders(project.id))[provider];
+  const modelProvider = (
+    await getProjectModelProviders(modelProvidersService, project.id)
+  )[provider];
   if (!modelProvider) {
     throw new ClusteringError(
       CLUSTERING_ERROR_CODES.MODEL_NOT_CONFIGURED,
@@ -604,6 +615,8 @@ export interface ClusteringStoreSummary {
 export const batchClusterTraces = async (
   project: Project,
   traces: TopicClusteringTrace[],
+  modelProviders: ModelProviderService,
+  managedProviders: ManagedProviderService,
   runContext?: ClusteringRunContext,
 ): Promise<ClusteringStoreSummary | null> => {
   logger.info(
@@ -611,20 +624,20 @@ export const batchClusterTraces = async (
     "batch clustering topics",
   );
 
-  const topicModel = await getProjectTopicClusteringModelProvider(project);
+  const topicModel = await getProjectTopicClusteringModelProvider(project, modelProviders);
   if (!topicModel) {
     return null;
   }
-  const embeddingsModel = await getProjectEmbeddingsModel(project.id);
+  const embeddingsModel = await getProjectEmbeddingsModel(modelProviders, project.id);
   const clusteringResult = await fetchTopicsBatchClustering(project.id, {
     project_id: project.id,
-    litellm_params: await prepareLitellmParams({
+    litellm_params: await prepareLitellmParams(modelProviders, managedProviders, {
       model: topicModel.model,
       modelProvider: topicModel.modelProvider,
       projectId: project.id,
     }),
     embeddings_litellm_params: {
-      ...(await prepareLitellmParams({
+      ...(await prepareLitellmParams(modelProviders, managedProviders, {
         model: embeddingsModel.model,
         modelProvider: embeddingsModel.modelProvider,
         projectId: project.id,
@@ -634,12 +647,14 @@ export const batchClusterTraces = async (
     traces,
   });
 
-  return await storeResults(project.id, clusteringResult, false, runContext);
+  return await storeResults(project.id, clusteringResult, false, modelProviders, runContext);
 };
 
 export const incrementalClustering = async (
   project: Project,
   traces: TopicClusteringTrace[],
+  modelProviders: ModelProviderService,
+  managedProviders: ManagedProviderService,
   runContext?: ClusteringRunContext,
 ): Promise<ClusteringStoreSummary | null> => {
   logger.info(
@@ -678,20 +693,20 @@ export const incrementalClustering = async (
     parent_id: topic.parentId!,
   }));
 
-  const topicModel = await getProjectTopicClusteringModelProvider(project);
+  const topicModel = await getProjectTopicClusteringModelProvider(project, modelProviders);
   if (!topicModel) {
     return null;
   }
-  const embeddingsModel = await getProjectEmbeddingsModel(project.id);
+  const embeddingsModel = await getProjectEmbeddingsModel(modelProviders, project.id);
   const clusteringResult = await fetchTopicsIncrementalClustering(project.id, {
     project_id: project.id,
-    litellm_params: await prepareLitellmParams({
+    litellm_params: await prepareLitellmParams(modelProviders, managedProviders, {
       model: topicModel.model,
       modelProvider: topicModel.modelProvider,
       projectId: project.id,
     }),
     embeddings_litellm_params: {
-      ...(await prepareLitellmParams({
+      ...(await prepareLitellmParams(modelProviders, managedProviders, {
         model: embeddingsModel.model,
         modelProvider: embeddingsModel.modelProvider,
         projectId: project.id,
@@ -703,13 +718,14 @@ export const incrementalClustering = async (
     subtopics,
   });
 
-  return await storeResults(project.id, clusteringResult, true, runContext);
+  return await storeResults(project.id, clusteringResult, true, modelProviders, runContext);
 };
 
 export const storeResults = async (
   projectId: string,
   clusteringResult: TopicClusteringResponse | undefined,
   isIncremental: boolean,
+  modelProviders: ModelProviderService,
   runContext?: ClusteringRunContext,
 ): Promise<ClusteringStoreSummary | null> => {
   // NO RESULT IS A SKIP, NOT AN EMPTY CLUSTERING.
@@ -757,7 +773,7 @@ export const storeResults = async (
   // read a model that is one event behind. The merge event converges either
   // way, and pages are minutes apart while projections settle in seconds.
   if (topics.length > 0 || subtopics.length > 0) {
-    const embeddingsModel = await getProjectEmbeddingsModel(projectId);
+    const embeddingsModel = await getProjectEmbeddingsModel(modelProviders, projectId);
     // No clustering topics_recorded may be appended before the project's
     // pre-ownership history is on the stream: per-aggregate log order then
     // guarantees the seed folds first, so this event can never reconcile

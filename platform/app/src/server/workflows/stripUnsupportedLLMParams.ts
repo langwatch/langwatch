@@ -1,15 +1,16 @@
-import type { PrismaClient } from "~/generated/prisma/client";
-import type { CustomModelEntry } from "../modelProviders/customModel.schema";
-import { ModelProviderService } from "../modelProviders/modelProvider.service";
+import {
+  customModelEntrySchema,
+  type CustomModelEntry,
+  type ModelProviderService,
+} from "@langwatch/model-provider-contract";
+import { z } from "zod";
 import {
   filterUnsupportedSamplingParams,
   resolveSupportedParameters,
 } from "../modelProviders/resolveSupportedParameters";
 
-type LLMLike = {
-  model?: string;
-  [key: string]: unknown;
-};
+const llmLikeSchema = z.object({ model: z.string().optional() }).catchall(z.unknown());
+type LLMLike = z.infer<typeof llmLikeSchema>;
 
 type CustomModelsByProvider = Record<string, CustomModelEntry[] | null>;
 
@@ -19,14 +20,26 @@ type CustomModelsByProvider = Record<string, CustomModelEntry[] | null>;
  * without an extra DB hop per model occurrence.
  */
 async function loadProjectCustomModels(
-  prisma: PrismaClient,
+  modelProviders: ModelProviderService,
   projectId: string,
 ): Promise<CustomModelsByProvider> {
-  const service = ModelProviderService.create(prisma);
-  const providers = await service.getProjectModelProviders(projectId);
+  const providers = await modelProviders.getExecutionProviders({ projectId });
   const map: CustomModelsByProvider = {};
   for (const [providerKey, provider] of Object.entries(providers)) {
-    map[providerKey] = (provider.customModels ?? null) as CustomModelEntry[] | null;
+    map[providerKey] = provider.customModels.map((model) =>
+      customModelEntrySchema.parse({
+        modelId: model.id,
+        displayName: model.label,
+        mode: "chat",
+        ...(model.maxTokens === undefined ? {} : { maxTokens: model.maxTokens }),
+        ...(model.supportedParameters === undefined
+          ? {}
+          : { supportedParameters: model.supportedParameters }),
+        ...(model.multimodalInputs === undefined
+          ? {}
+          : { multimodalInputs: model.multimodalInputs }),
+      }),
+    );
   }
   return map;
 }
@@ -68,48 +81,45 @@ function filterLLMNode(
  * before the workflow hits nlpgo / langwatch_nlp. Mutates `workflow`
  * in place — the caller passes the message it is about to forward.
  */
-export async function stripUnsupportedLLMParamsFromWorkflow(opts: {
-  prisma: PrismaClient;
-  projectId: string;
-  workflow: {
-    nodes?: Array<{
-      data?: {
-        llm?: LLMLike;
-        parameters?: Array<{
-          identifier?: string;
-          value?: unknown;
-        }>;
-      };
-    }>;
-  };
-}): Promise<void> {
+export async function stripUnsupportedLLMParamsFromWorkflow(
+  modelProviders: ModelProviderService,
+  opts: {
+    projectId: string;
+    workflow: {
+      nodes?: Array<{
+        data?: {
+          llm?: LLMLike;
+          parameters?: Array<{
+            identifier?: string;
+            value?: unknown;
+          }>;
+        };
+      }>;
+    };
+  },
+): Promise<void> {
   const customModelsByProvider = await loadProjectCustomModels(
-    opts.prisma,
+    modelProviders,
     opts.projectId,
   );
   const { workflow } = opts;
   for (const node of workflow.nodes ?? []) {
     const data = node.data;
     if (!data) continue;
-    if (data.llm && typeof data.llm === "object") {
-      const filtered = filterLLMNode(data.llm, customModelsByProvider);
-      replaceObjectContents(data.llm, filtered);
+    if (data.llm && typeof data.llm === "object" && !Array.isArray(data.llm)) {
+      const llm = llmLikeSchema.parse(data.llm);
+      data.llm = filterLLMNode(llm, customModelsByProvider);
     }
     for (const param of data.parameters ?? []) {
-      if (param.identifier === "llm" && param.value && typeof param.value === "object") {
-        const value = param.value as LLMLike;
-        const filtered = filterLLMNode(value, customModelsByProvider);
-        replaceObjectContents(value, filtered);
+      if (
+        param.identifier === "llm" &&
+        param.value &&
+        typeof param.value === "object" &&
+        !Array.isArray(param.value)
+      ) {
+        const value = llmLikeSchema.parse(param.value);
+        param.value = filterLLMNode(value, customModelsByProvider);
       }
     }
   }
-}
-
-function replaceObjectContents(target: LLMLike, source: LLMLike): void {
-  for (const key of Object.keys(target)) {
-    if (!(key in source)) {
-      delete target[key];
-    }
-  }
-  Object.assign(target, source);
 }

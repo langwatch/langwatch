@@ -1,6 +1,13 @@
-import { getApp } from "../../app-layer/app";
 import { getSchemaShape } from "../../../utils/modelProviderHelpers";
-import { prisma } from "../../db";
+import type {
+  CustomModelEntry,
+  Model,
+  ModelProviderExecution,
+  ModelProviderService,
+  ModelProviderSummary,
+} from "@langwatch/model-provider-contract";
+import { customModelEntrySchema } from "@langwatch/model-provider-contract";
+import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
 import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "../../modelProviders/codexRefusalMessage";
 import { isCodexModel } from "../../modelProviders/codexRestrictions";
 import { geminiAgentPlatformPair } from "../../modelProviders/geminiDoor";
@@ -10,13 +17,8 @@ import type {
 } from "../../modelProviders/llmModels.types";
 import { translateModelIdForLitellm } from "../../modelProviders/modelIdBoundary";
 import {
-  ModelProviderService,
-  providerRowServesModel,
-} from "../../modelProviders/modelProvider.service";
-import {
   getAllModels,
   getParameterConstraints,
-  type MaybeStoredModelProvider,
   modelProviders,
   type ParameterConstraints,
 } from "../../modelProviders/registry";
@@ -59,9 +61,126 @@ export type ModelMetadataForFrontend = {
   parameterConstraints?: ParameterConstraints;
 };
 
-export const getProjectModelProviders = async (projectId: string, includeKeys = true) => {
-  const service = ModelProviderService.create(prisma);
-  return await service.getProjectModelProviders(projectId, includeKeys);
+/**
+ * The legacy execution shape used by LiteLLM and the workflow DSL.  It is
+ * deliberately assembled from the canonical server-only execution DTO at the
+ * app boundary: contract callers never receive the app's registry type or
+ * Prisma row shape.
+ */
+export type LegacyModelProviderExecution = Omit<
+  ModelProviderExecution,
+  "customModels" | "customEmbeddingsModels"
+> & {
+  scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+  scopeId?: string;
+  customModels: CustomModelEntry[];
+  customEmbeddingsModels: CustomModelEntry[];
+};
+
+function scopeRank(scopeType: LegacyModelProviderExecution["scopeType"]): number {
+  if (scopeType === "PROJECT") return 3;
+  if (scopeType === "TEAM") return 2;
+  return 1;
+}
+
+function narrowestScope(scopes: LegacyModelProviderExecution["scopes"]): {
+  scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+  scopeId?: string;
+} {
+  const scope = [...scopes].sort(
+    (left, right) => scopeRank(right.scopeType) - scopeRank(left.scopeType),
+  )[0];
+  return scope ? { scopeType: scope.scopeType, scopeId: scope.scopeId } : {};
+}
+
+function toLegacyCustomModel(
+  model: Model,
+  mode: "chat" | "embedding",
+): LegacyModelProviderExecution["customModels"][number] {
+  return customModelEntrySchema.parse({
+    modelId: model.id,
+    displayName: model.label,
+    mode,
+    ...(model.maxTokens === undefined ? {} : { maxTokens: model.maxTokens }),
+    ...(model.supportedParameters === undefined
+      ? {}
+      : { supportedParameters: model.supportedParameters }),
+    ...(model.multimodalInputs === undefined
+      ? {}
+      : { multimodalInputs: model.multimodalInputs }),
+  });
+}
+
+function toLegacyExecutionShape(
+  provider: ModelProviderExecution | ModelProviderSummary,
+): LegacyModelProviderExecution {
+  const scopes = provider.scopes.map((scope) => ({
+    scopeType: scope.scopeType,
+    scopeId: scope.scopeId,
+  }));
+  return {
+    id: provider.id,
+    organizationId: provider.organizationId,
+    provider: provider.provider,
+    name: provider.name,
+    enabled: provider.enabled,
+    ...(provider.defaultModel === undefined
+      ? {}
+      : { defaultModel: provider.defaultModel }),
+    routingHandle: provider.routingHandle,
+    scopes,
+    ...narrowestScope(scopes),
+    customKeys: provider.customKeys,
+    customModels: provider.customModels.map((model) =>
+      toLegacyCustomModel(model, "chat"),
+    ),
+    customEmbeddingsModels: provider.customEmbeddingsModels.map((model) =>
+      toLegacyCustomModel(model, "embedding"),
+    ),
+    extraHeaders: provider.extraHeaders,
+    rateLimitRpm: provider.rateLimitRpm,
+    rateLimitTpm: provider.rateLimitTpm,
+    rateLimitRpd: provider.rateLimitRpd,
+    fallbackPriorityGlobal: provider.fallbackPriorityGlobal,
+    providerConfig: provider.providerConfig,
+    deploymentMapping: provider.deploymentMapping ?? null,
+    createdAt: provider.createdAt,
+    updatedAt: provider.updatedAt,
+    models: provider.models ?? null,
+    embeddingsModels: provider.embeddingsModels ?? null,
+    ...(provider.disabledByDefault === undefined
+      ? {}
+      : { disabledByDefault: provider.disabledByDefault }),
+    isSystem: provider.isSystem,
+    embeddingsUnsupported: provider.embeddingsUnsupported,
+  };
+}
+
+/** Adapts a canonical execution DTO without masking its server-only credentials. */
+export function toLegacyExecutionProvider(
+  provider: ModelProviderExecution,
+): LegacyModelProviderExecution {
+  return toLegacyExecutionShape(provider);
+}
+
+/** Adapts a canonical summary DTO, whose credentials have already been masked. */
+export function toLegacyProviderSummary(
+  provider: ModelProviderSummary,
+): LegacyModelProviderExecution {
+  return toLegacyExecutionShape(provider);
+}
+
+export const getProjectModelProviders = async (
+  service: ModelProviderService,
+  projectId: string,
+): Promise<Record<string, LegacyModelProviderExecution>> => {
+  const providers = await service.getExecutionProviders({ projectId });
+  return Object.fromEntries(
+    Object.entries(providers).map(([provider, value]) => [
+      provider,
+      toLegacyExecutionProvider(value),
+    ]),
+  );
 };
 
 /**
@@ -101,7 +220,7 @@ export const getModelMetadataForFrontend = (): Record<
  */
 export const mergeCustomModelMetadata = (
   existingMetadata: Record<string, ModelMetadataForFrontend>,
-  providers: Record<string, MaybeStoredModelProvider>,
+  providers: Record<string, LegacyModelProviderExecution>,
 ): Record<string, ModelMetadataForFrontend> => {
   const merged = { ...existingMetadata };
 
@@ -134,13 +253,15 @@ export const mergeCustomModelMetadata = (
 
 // Frontend-only function that masks API keys for security and includes model metadata
 export const getProjectModelProvidersForFrontend = async (
+  service: ModelProviderService,
   projectId: string,
-  includeKeys = true,
 ) => {
-  const service = ModelProviderService.create(prisma);
-  const maskedProviders = await service.getProjectModelProvidersForFrontend(
-    projectId,
-    includeKeys,
+  const providers = await service.getForProject({ projectId });
+  const maskedProviders = Object.fromEntries(
+    Object.entries(providers).map(([provider, value]) => [
+      provider,
+      toLegacyProviderSummary(value),
+    ]),
   );
 
   // Include model metadata for all models, merged with custom model entries
@@ -159,9 +280,13 @@ export const getProjectModelProvidersForFrontend = async (
 // "OpenAI — Project override" side by side. The Record-by-provider-key
 // `getProjectModelProvidersForFrontend` collapses those duplicates and
 // is not safe to use here.
-export const listOrgModelProvidersForFrontend = async (organizationId: string) => {
-  const service = ModelProviderService.create(prisma);
-  const providers = await service.listOrgModelProvidersForFrontend(organizationId);
+export const listOrgModelProvidersForFrontend = async (
+  service: ModelProviderService,
+  organizationId: string,
+) => {
+  const providers = (await service.listForOrganization({ organizationId })).map(
+    toLegacyProviderSummary,
+  );
 
   const registryMetadata = getModelMetadataForFrontend();
   const providersAsRecord = Object.fromEntries(
@@ -175,9 +300,13 @@ export const listOrgModelProvidersForFrontend = async (organizationId: string) =
   };
 };
 
-export const listProjectModelProvidersForFrontend = async (projectId: string) => {
-  const service = ModelProviderService.create(prisma);
-  const providers = await service.listProjectModelProvidersForFrontend(projectId);
+export const listProjectModelProvidersForFrontend = async (
+  service: ModelProviderService,
+  projectId: string,
+) => {
+  const providers = (await service.listForProject({ projectId })).map(
+    toLegacyProviderSummary,
+  );
 
   const registryMetadata = getModelMetadataForFrontend();
   const providersAsRecord = Object.fromEntries(
@@ -192,28 +321,30 @@ export const listProjectModelProvidersForFrontend = async (projectId: string) =>
 };
 
 const getModelOrDefaultEnvKey = (
-  modelProvider: MaybeStoredModelProvider,
+  modelProvider: LegacyModelProviderExecution,
   envKey: string,
 ) => {
+  const storedValue = modelProvider.customKeys?.[envKey];
   return (
     // Allow env var to be set to empty string '' on purpose to fallback to process.env defined one
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-    (modelProvider.customKeys as Record<string, string>)?.[envKey] || process.env[envKey]
+    (typeof storedValue === "string" ? storedValue : "") || process.env[envKey]
   );
 };
 
-const getModelOrDefaultApiKey = (modelProvider: MaybeStoredModelProvider) => {
-  const providerDefinition =
-    modelProviders[modelProvider.provider as keyof typeof modelProviders];
+const getProviderDefinition = (provider: string) =>
+  Object.entries(modelProviders).find(([providerKey]) => providerKey === provider)?.[1];
+
+const getModelOrDefaultApiKey = (modelProvider: LegacyModelProviderExecution) => {
+  const providerDefinition = getProviderDefinition(modelProvider.provider);
   if (!providerDefinition) {
     return undefined;
   }
   return getModelOrDefaultEnvKey(modelProvider, providerDefinition.apiKey);
 };
 
-const getModelOrDefaultEndpointKey = (modelProvider: MaybeStoredModelProvider) => {
-  const providerDefinition =
-    modelProviders[modelProvider.provider as keyof typeof modelProviders];
+const getModelOrDefaultEndpointKey = (modelProvider: LegacyModelProviderExecution) => {
+  const providerDefinition = getProviderDefinition(modelProvider.provider);
   if (!providerDefinition) {
     return undefined;
   }
@@ -223,9 +354,8 @@ const getModelOrDefaultEndpointKey = (modelProvider: MaybeStoredModelProvider) =
   );
 };
 
-export const prepareEnvKeys = (modelProvider: MaybeStoredModelProvider) => {
-  const providerDefinition =
-    modelProviders[modelProvider.provider as keyof typeof modelProviders];
+export const prepareEnvKeys = (modelProvider: LegacyModelProviderExecution) => {
+  const providerDefinition = getProviderDefinition(modelProvider.provider);
   if (!providerDefinition) {
     return {};
   }
@@ -264,40 +394,58 @@ export const DEFAULT_AZURE_API_VERSION = "2025-04-01-preview";
  * through here — the swap would silently re-inject credentials.
  */
 async function resolveServingRow({
+  service,
   model,
   modelProvider,
   projectId,
 }: {
+  service: ModelProviderService;
   model: string;
-  modelProvider: MaybeStoredModelProvider;
+  modelProvider: LegacyModelProviderExecution;
   projectId: string;
-}): Promise<MaybeStoredModelProvider> {
+}): Promise<LegacyModelProviderExecution> {
   const parsedWire = parseWireValue(model);
   if (
     parsedWire.kind !== "legacy" ||
-    !modelProvider.id ||
-    providerRowServesModel({ row: modelProvider, bareModel: parsedWire.model })
+    modelProvider.models?.includes(parsedWire.model) ||
+    modelProvider.embeddingsModels?.includes(parsedWire.model) ||
+    modelProvider.customModels.some((entry) => entry.modelId === parsedWire.model) ||
+    modelProvider.customEmbeddingsModels.some(
+      (entry) => entry.modelId === parsedWire.model,
+    )
   ) {
     return modelProvider;
   }
-  const service = ModelProviderService.create(prisma);
-  const servingRow = await service.findRowServingModel({
+  const servingRow = await service.tryFindRowServingModel({
     projectId,
     provider: modelProvider.provider,
-    bareModel: parsedWire.model,
+    model: parsedWire.model,
   });
-  return servingRow ?? modelProvider;
+  return servingRow
+    ? toLegacyExecutionProvider({
+        ...servingRow,
+        models: modelProvider.models,
+        embeddingsModels: modelProvider.embeddingsModels,
+        disabledByDefault: modelProvider.disabledByDefault,
+        isSystem: false,
+        embeddingsUnsupported: modelProvider.embeddingsUnsupported,
+      })
+    : modelProvider;
 }
 
-export const prepareLitellmParams = async ({
-  model,
-  modelProvider: givenModelProvider,
-  projectId,
-}: {
-  model: string;
-  modelProvider: MaybeStoredModelProvider;
-  projectId: string;
-}) => {
+export const prepareLitellmParams = async (
+  service: ModelProviderService,
+  managedProviders: ManagedProviderService,
+  {
+    model,
+    modelProvider: givenModelProvider,
+    projectId,
+  }: {
+    model: string;
+    modelProvider: LegacyModelProviderExecution;
+    projectId: string;
+  },
+) => {
   // Execution backstop for the terms-restricted provider: every general
   // inference path (workflows, evaluations, playground, optimization
   // studio) funnels through here on its way to litellm/nlpgo, and codex
@@ -324,6 +472,7 @@ export const prepareLitellmParams = async ({
   // explicit row pick — and only for stored rows (env-fed pseudo-rows
   // have no id and no custom catalog).
   const modelProvider = await resolveServingRow({
+    service,
     model,
     modelProvider: givenModelProvider,
     projectId,
@@ -428,10 +577,7 @@ export const prepareLitellmParams = async ({
     // model id). The gateway/control-plane path already honors this field
     // (config.materialiser); mirror it here so the in-process Studio /
     // playground path agrees instead of assuming model id == deployment name.
-    const deploymentMap = modelProvider.deploymentMapping as Record<
-      string,
-      string
-    > | null;
+    const deploymentMap = modelProvider.deploymentMapping;
     if (deploymentMap) {
       // params.model is already normalized to `provider/model` (the incoming
       // `model` may still be the canonical `mp_.../...` wire format), so key
@@ -444,18 +590,15 @@ export const prepareLitellmParams = async ({
     }
 
     // Pass through all extra headers
-    if (modelProvider.extraHeaders) {
-      const extraHeaders = modelProvider.extraHeaders as {
-        key: string;
-        value: string;
-      }[];
+    if (modelProvider.extraHeaders.length > 0) {
+      const extraHeaders = modelProvider.extraHeaders;
       params.extra_headers = JSON.stringify(
         Object.fromEntries(extraHeaders.map(({ key, value }) => [key, value])),
       );
     }
   }
 
-  return await getApp().managedProviders.buildLitellmParameters({
+  return await managedProviders.buildLitellmParameters({
     params,
     projectId,
     model,

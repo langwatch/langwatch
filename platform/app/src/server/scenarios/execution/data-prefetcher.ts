@@ -21,7 +21,7 @@ import {
   withoutParameterNames,
 } from "@langwatch/scenario-contract";
 import type { Edge, Node } from "@xyflow/react";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { env } from "~/env.mjs";
 import { normalizeToSnakeCase } from "~/optimization_studio/components/properties/llm-configs/normalizeToSnakeCase";
 import type { App } from "~/server/app-layer/app";
@@ -1182,7 +1182,7 @@ export function createDataPrefetcherDependencies({
   app,
   prisma,
 }: {
-  app: Pick<App, "agents" | "prompts" | "scenarios">;
+  app: App;
   prisma: import("~/generated/prisma/client").PrismaClient;
 }): DataPrefetcherDependencies {
   return {
@@ -1298,7 +1298,7 @@ export function createDataPrefetcherDependencies({
             };
           }
 
-          const providers = await getProjectModelProviders(projectId);
+          const providers = await getProjectModelProviders(app.modelProviders, projectId);
           const provider = providers[providerKey];
 
           if (!provider) {
@@ -1317,11 +1317,15 @@ export function createDataPrefetcherDependencies({
             };
           }
 
-          const params = await prepareLitellmParams({
-            model,
-            modelProvider: provider,
-            projectId,
-          });
+          const params = await prepareLitellmParams(
+            app.modelProviders,
+            app.managedProviders,
+            {
+              model,
+              modelProvider: provider,
+              projectId,
+            },
+          );
 
           const hasCredentials = !!(
             params.api_key ||

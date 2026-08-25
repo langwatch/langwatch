@@ -1,13 +1,12 @@
 import { HandledError, type SerializedHandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import {
   providerApiRoots,
   providerDefaultBaseUrls,
 } from "../../features/onboarding/regions/model-providers/registry";
 import { MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 import { RedirectRefusedError, ssrfSafeFetch } from "../../utils/ssrfProtection";
-import { ModelProviderRepository } from "./modelProvider.repository";
 import { modelProviders } from "./registry";
 
 /**
@@ -998,19 +997,19 @@ async function runProbeChain({
  * @param projectId - The project ID to look up stored keys
  * @param provider - The provider key (e.g., "openai", "anthropic")
  * @param customBaseUrl - Optional custom base URL to validate against. If not provided, uses default URL.
- * @param prisma - Prisma client instance
+ * @param modelProviders - composed Model Provider service
  * @returns Promise resolving to validation result
  */
 export async function validateKeyWithCustomUrl({
   projectId,
   provider,
   customBaseUrl,
-  prisma,
+  modelProviders: service,
 }: {
   projectId: string;
   provider: string;
   customBaseUrl: string | undefined;
-  prisma: PrismaClient;
+  modelProviders: ModelProviderService;
 }): Promise<ValidationResult> {
   const providerDef = modelProviders[provider as keyof typeof modelProviders];
   if (!providerDef) {
@@ -1025,11 +1024,17 @@ export async function validateKeyWithCustomUrl({
   const endpointField = providerDef.endpointKey;
 
   // Try to get stored API key from DB (decrypted by repository)
-  const repository = new ModelProviderRepository(prisma);
-  const storedProvider = await repository.findByProvider(provider, projectId);
+  const storedProvider = await service.tryGetProviderForProject({
+    projectId,
+    provider,
+  });
 
-  const storedKeys = storedProvider?.customKeys as Record<string, string> | null;
-  let apiKey = storedKeys?.[apiKeyField]?.trim() ?? "";
+  const storedKeys = Object.fromEntries(
+    Object.entries(storedProvider?.customKeys ?? {}).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    ),
+  );
+  let apiKey = storedKeys[apiKeyField]?.trim() ?? "";
 
   // Fallback to env var if no stored key
   if (!apiKey) {
@@ -1050,7 +1055,7 @@ export async function validateKeyWithCustomUrl({
   // and an explicit custom URL are layered on top, in that order, so they
   // still win over whatever was stored.
   const customKeys: Record<string, string> = {
-    ...(storedKeys ?? {}),
+    ...storedKeys,
     [apiKeyField]: apiKey,
   };
   if (endpointField && customBaseUrl) {

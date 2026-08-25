@@ -13,7 +13,66 @@ vi.mock("~/server/modelProviders/modelProvider.service", () => ({
   },
 }));
 
-import { DEFAULT_AZURE_API_VERSION, prepareLitellmParams } from "../modelProviders.utils";
+import {
+  DEFAULT_AZURE_API_VERSION,
+  type LegacyModelProviderExecution,
+  prepareLitellmParams as prepareLitellmParamsWithServices,
+} from "../modelProviders.utils";
+import {
+  testManagedProviders,
+  testModelProviders,
+} from "../../../modelProviders/__tests__/model-provider-services.test-support";
+
+type LitellmProviderFixture = {
+  provider: string;
+  enabled: boolean;
+  customKeys: Record<string, unknown> | null;
+  extraHeaders?: Array<{ key: string; value: string }> | null;
+  deploymentMapping?: Record<string, string> | null;
+};
+
+function toExecutionProvider(
+  provider: LitellmProviderFixture,
+): LegacyModelProviderExecution {
+  return {
+    id: "mp_test",
+    organizationId: "org_test",
+    provider: provider.provider,
+    name: provider.provider,
+    enabled: provider.enabled,
+    routingHandle: null,
+    scopes: [{ scopeType: "PROJECT", scopeId: "project-123" }],
+    scopeType: "PROJECT",
+    scopeId: "project-123",
+    customKeys: provider.customKeys,
+    customModels: [],
+    customEmbeddingsModels: [],
+    extraHeaders: provider.extraHeaders ?? [],
+    rateLimitRpm: null,
+    rateLimitTpm: null,
+    rateLimitRpd: null,
+    fallbackPriorityGlobal: null,
+    providerConfig: null,
+    deploymentMapping: provider.deploymentMapping ?? null,
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    models: null,
+    embeddingsModels: null,
+    isSystem: false,
+    embeddingsUnsupported: false,
+  };
+}
+
+function prepareLitellmParams(input: {
+  model: string;
+  modelProvider: LitellmProviderFixture;
+  projectId: string;
+}) {
+  return prepareLitellmParamsWithServices(testModelProviders, testManagedProviders, {
+    ...input,
+    modelProvider: toExecutionProvider(input.modelProvider),
+  });
+}
 
 const baseAzureProvider = {
   provider: "azure" as const,

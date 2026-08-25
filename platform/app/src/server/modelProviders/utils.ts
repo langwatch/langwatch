@@ -1,7 +1,10 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { env } from "../../env.mjs";
 import {
   getProjectModelProviders,
+  type LegacyModelProviderExecution,
   prepareLitellmParams,
 } from "../api/routers/modelProviders.utils";
 import { prisma } from "../db";
@@ -11,7 +14,6 @@ import { isCodexModel } from "./codexRestrictions";
 import { featureByKey } from "./featureRegistry";
 import { ModelNotConfiguredError } from "./modelNotConfiguredError";
 import { ModelProviderDisabledError } from "./modelProviderDisabledError";
-import type { MaybeStoredModelProvider } from "./registry";
 import {
   findAlternateBelowScope,
   resolveModelForFeature,
@@ -28,15 +30,16 @@ import {
  * `ModelNotConfiguredError` and the surrounding tRPC interceptor maps
  * it to a sticky toast prompting the user to configure a default.
  */
-export const getVercelAIModel = async ({
-  projectId,
-  model,
-  featureKey = "prompt.create_default",
-}: {
+type VercelModelInput = {
   projectId: string;
   model?: string;
   featureKey?: string;
-}) => {
+  modelProviders: ModelProviderService;
+  managedProviders: ManagedProviderService;
+};
+
+export const getVercelAIModel = async (input: VercelModelInput) => {
+  const { projectId, model, featureKey = "prompt.create_default", managedProviders } = input;
   const project = await prisma.project.findUnique({
     where: { id: projectId },
   });
@@ -45,7 +48,7 @@ export const getVercelAIModel = async ({
     throw new Error("Project not found");
   }
 
-  const modelProviders = await getProjectModelProviders(projectId);
+  const modelProviders = await getProjectModelProviders(input.modelProviders, projectId);
 
   const model_ = await resolveModel({
     explicit: model,
@@ -54,7 +57,7 @@ export const getVercelAIModel = async ({
     modelProviders,
   });
 
-  const providerKey = model_.split("/")[0] as keyof typeof modelProviders;
+  const providerKey = model_.split("/")[0] ?? "";
   const modelProvider = modelProviders[providerKey];
 
   if (!modelProvider) {
@@ -77,11 +80,15 @@ export const getVercelAIModel = async ({
     return getCodexVercelAIModel({ projectId, model: model_, featureKey });
   }
 
-  const litellmParams = await prepareLitellmParams({
-    model: model_,
-    modelProvider,
-    projectId,
-  });
+  const litellmParams = await prepareLitellmParams(
+    input.modelProviders,
+    managedProviders,
+    {
+      model: model_,
+      modelProvider,
+      projectId,
+    },
+  );
   const headers = Object.fromEntries(
     Object.entries(litellmParams).map(([key, value]) => [`x-litellm-${key}`, value]),
   );
@@ -112,7 +119,7 @@ async function resolveModel({
   explicit: string | undefined;
   projectId: string;
   featureKey: string;
-  modelProviders: Record<string, MaybeStoredModelProvider>;
+  modelProviders: Record<string, LegacyModelProviderExecution>;
 }): Promise<string> {
   // 1. Explicit model always wins.
   if (explicit) return explicit;

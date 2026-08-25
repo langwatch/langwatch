@@ -14,6 +14,10 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
+import {
+  testManagedProviders,
+  testModelProviders,
+} from "~/server/modelProviders/__tests__/model-provider-services.test-support";
 import type { Trace } from "~/server/tracer/types";
 import type { TraceService } from "~/server/traces/trace.service";
 import type { LangEvalsClient } from "../../clients/langevals/langevals.client";
@@ -84,7 +88,10 @@ function createService(
 
   const deps: EvaluationExecutionDeps = {
     traceService: mockTraceService,
-    modelEnvResolver: createDefaultModelEnvResolver(),
+    modelEnvResolver: createDefaultModelEnvResolver(
+      testModelProviders,
+      testManagedProviders,
+    ),
     workflowExecutor: mockWorkflowExecutor,
     langevalsClient: mockClient,
   };

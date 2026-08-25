@@ -27,12 +27,15 @@ export const evaluationsRouter = createTRPCRouter({
   availableEvaluators: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .permission("evaluations:view")
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       // Azure Safety evaluators resolve their credentials solely from the
       // project's azure_safety Model Provider. There is no process.env
       // fallback, so an unconfigured provider reports them as missing.
       // Computed once and reused for all three Azure evaluator types.
-      const azureSafetyEnv = await getAzureSafetyEnvFromProject(input.projectId);
+      const azureSafetyEnv = await getAzureSafetyEnvFromProject(
+        ctx.app.modelProviders,
+        input.projectId,
+      );
       const azureMissingEnvVars = azureSafetyEnv ? [] : [...AZURE_SAFETY_ENV_VARS];
 
       return Object.fromEntries(
@@ -87,6 +90,8 @@ export const evaluationsRouter = createTRPCRouter({
         mappings: input.mappings ?? null,
         protections,
         evaluations: ctx.app.evaluations,
+        modelProviders: ctx.app.modelProviders,
+        managedProviders: ctx.app.managedProviders,
       });
 
       // Dispatch to evaluation processing pipeline when flag is ON
@@ -152,7 +157,7 @@ export const evaluationsRouter = createTRPCRouter({
       }),
     )
     .permission("evaluations:view")
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { projectId, count } = input;
 
       logger.debug({ projectId, count }, "Warming up Lambda instances");
@@ -161,6 +166,7 @@ export const evaluationsRouter = createTRPCRouter({
       const warmupPromises = Array.from({ length: count }, () =>
         studioBackendPostEvent({
           projectId,
+          modelProviders: ctx.app.modelProviders,
           message: { type: "is_alive", payload: {} },
           onEvent: () => {
             // Response received - lambda is warm

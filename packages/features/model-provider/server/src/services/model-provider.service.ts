@@ -22,6 +22,7 @@ import {
   modelProviderTestConnectionInputSchema,
   modelProviderWriteInputSchema,
   modelProviderSchema,
+  modelProviderExecutionSchema,
   modelProviderSummarySchema,
   translateInputSchema,
   type ModelCost,
@@ -32,6 +33,7 @@ import {
   type ModelDefaultSnapshot,
   type ModelDefaultSnapshotInput,
   type ModelProvider,
+  type ModelProviderExecution,
   ModelProviderService as ModelProviderServiceContract,
   type ModelCostEstimateInput,
   type ModelProviderApiKeyValidation,
@@ -39,6 +41,7 @@ import {
   type ModelProviderSummary,
   type TranslateOutput,
 } from "@langwatch/model-provider-contract";
+import type { ProjectService } from "@langwatch/project-contract";
 import type {
   ManagedProviderService,
   ModelCostRepository,
@@ -49,10 +52,12 @@ import type {
   ModelProviderRepository,
   ModelTranslationPort,
   ModelProviderCredentialPolicy,
+  ModelProviderOnboardingDefaults,
 } from "../ports/model-provider.port";
 
 export interface ModelProviderServiceOptions {
   repository: ModelProviderRepository;
+  projects: ProjectService;
   credentialPolicy: ModelProviderCredentialPolicy;
   defaults: ModelDefaultRepository;
   costs: ModelCostRepository;
@@ -60,6 +65,7 @@ export interface ModelProviderServiceOptions {
   managedProviders?: ManagedProviderService;
   authorization?: ModelProviderAuthorization;
   translation?: ModelTranslationPort;
+  onboardingDefaults?: ModelProviderOnboardingDefaults;
   generateId?: ModelProviderIdGenerator;
 }
 
@@ -109,20 +115,84 @@ export class ModelProviderService extends ModelProviderServiceContract {
     provider?: string;
   }): Promise<Record<string, ModelProviderSummary>> {
     const providers = await this.listForProject(input);
-    const selected = input.provider
-      ? providers.filter((provider) => provider.provider === input.provider)
-      : providers;
+    const chain = await this.getProjectScopeChain(input.projectId);
+    const selected = this.selectProjectProviders(providers, chain, input.provider);
     return Object.fromEntries(selected.map((provider) => [provider.provider, provider]));
+  }
+
+  async tryGetProviderForProject(input: {
+    projectId: string;
+    provider: string;
+  }): Promise<ModelProvider | null> {
+    const parsed = modelProviderListProjectInputSchema.parse({
+      projectId: input.projectId,
+    });
+    return this.options.repository.tryFindByProviderForProject({
+      projectId: parsed.projectId,
+      provider: input.provider,
+    });
+  }
+
+  async tryFindRowServingModel(input: {
+    projectId: string;
+    provider: string;
+    model: string;
+  }): Promise<ModelProvider | null> {
+    const parsed = modelProviderListProjectInputSchema.parse({
+      projectId: input.projectId,
+    });
+    const chain = await this.getProjectScopeChain(parsed.projectId);
+    const rows = await this.options.repository.listForProject(parsed.projectId);
+    const candidates = rows.filter(
+      (row) =>
+        row.provider === input.provider &&
+        row.enabled &&
+        [...row.customModels, ...row.customEmbeddingsModels].some(
+          (model) => model.id === input.model,
+        ),
+    );
+    candidates.sort((left, right) => this.compareProjectProviders(left, right, chain));
+    return candidates[0] ?? null;
+  }
+
+  async getExecutionProviders(input: {
+    projectId: string;
+  }): Promise<Record<string, ModelProviderExecution>> {
+    const parsed = modelProviderListProjectInputSchema.parse(input);
+    const [saved, system, chain] = await Promise.all([
+      this.options.repository.listForProject(parsed.projectId),
+      this.options.catalog.systemProviders(parsed),
+      this.getProjectScopeChain(parsed.projectId),
+    ]);
+    const candidates: ModelProviderExecution[] = [
+      ...saved.map((provider) => this.toExecutionProvider(provider)),
+      ...system
+        .filter(
+          (provider) =>
+            !saved.some((savedProvider) => savedProvider.provider === provider.provider),
+        )
+        .map((provider) => modelProviderExecutionSchema.parse(provider)),
+    ];
+    const selected = new Map<string, ModelProviderExecution>();
+    for (const candidate of candidates) {
+      const current = selected.get(candidate.provider);
+      if (!current || this.compareProjectProviders(candidate, current, chain) < 0) {
+        selected.set(candidate.provider, candidate);
+      }
+    }
+    return Object.fromEntries(selected.entries());
   }
 
   async upsert(
     input: Parameters<ModelProviderServiceContract["upsert"]>[0],
   ): Promise<ModelProvider> {
     const parsed = modelProviderWriteInputSchema.parse(input);
-    if (!this.options.catalog.exists(parsed.provider))
+    if (!this.options.catalog.exists(parsed.provider)) {
       throw new ModelProviderInvalidError(`Unknown provider: ${parsed.provider}`);
-    if (!parsed.id && !parsed.scopes && !parsed.projectId)
+    }
+    if (!parsed.id && !parsed.scopes && !parsed.projectId) {
       throw new ModelProviderScopesRequiredError();
+    }
     const existing = parsed.id
       ? await this.options.repository.tryFindById({
           id: parsed.id,
@@ -133,7 +203,9 @@ export class ModelProviderService extends ModelProviderServiceContract {
           provider: parsed.provider,
           projectId: parsed.projectId ?? "",
         });
-    if (parsed.id && !existing) throw new ModelProviderNotFoundError();
+    if (parsed.id && !existing) {
+      throw new ModelProviderNotFoundError();
+    }
     const scopes =
       parsed.scopes ??
       (parsed.projectId
@@ -145,17 +217,19 @@ export class ModelProviderService extends ModelProviderServiceContract {
         projectId: parsed.projectId,
         organizationId: parsed.organizationId,
       }));
-    if (!organizationId)
+    if (!organizationId) {
       throw new ModelProviderInvalidError(
         "Provider scope does not resolve to an organization",
       );
+    }
     if (
       organizationId !==
       (await this.options.repository.resolveOrganizationIdForScopes(scopes))
-    )
+    ) {
       throw new ModelProviderInvalidError(
         "Provider scopes must belong to one organization",
       );
+    }
     const now = new Date();
     const normalizedCredentials =
       parsed.customKeys === undefined
@@ -235,13 +309,20 @@ export class ModelProviderService extends ModelProviderServiceContract {
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     });
-    if (value.organizationId.length === 0)
+    if (value.organizationId.length === 0) {
       throw new ModelProviderInvalidError(
         "organizationId is required by the persistence boundary",
       );
+    }
     const saved = existing
       ? await this.options.repository.update(value)
       : await this.options.repository.create(value);
+    if (!existing && this.options.onboardingDefaults) {
+      await this.options.onboardingDefaults.seed({
+        provider: saved.provider,
+        scopes: saved.scopes,
+      });
+    }
     if (parsed.defaultModel !== undefined && parsed.projectId) {
       await this.options.defaults.set({
         scope: { scopeType: "PROJECT", scopeId: parsed.projectId },
@@ -267,7 +348,9 @@ export class ModelProviderService extends ModelProviderServiceContract {
           provider: parsed.provider,
           projectId: parsed.projectId ?? "",
         });
-    if (!existing) throw new ModelProviderNotFoundError();
+    if (!existing) {
+      throw new ModelProviderNotFoundError();
+    }
     await this.options.repository.delete({
       id: existing.id,
       organizationId: existing.organizationId,
@@ -279,8 +362,9 @@ export class ModelProviderService extends ModelProviderServiceContract {
     input: Parameters<ModelProviderServiceContract["validateApiKey"]>[0],
   ): Promise<ModelProviderApiKeyValidation> {
     const parsed = modelProviderApiKeyValidationInputSchema.parse(input);
-    if (!this.options.catalog.exists(parsed.provider))
+    if (!this.options.catalog.exists(parsed.provider)) {
       throw new ModelProviderInvalidError(`Unknown provider: ${parsed.provider}`);
+    }
     return this.options.catalog.validateApiKey(parsed.provider, parsed.customKeys);
   }
 
@@ -293,7 +377,9 @@ export class ModelProviderService extends ModelProviderServiceContract {
       organizationId: parsed.organizationId,
       projectId: parsed.projectId,
     });
-    if (!provider) throw new ModelProviderNotFoundError();
+    if (!provider) {
+      throw new ModelProviderNotFoundError();
+    }
     return this.options.catalog.testConnection(
       provider.provider,
       provider.customKeys ?? {},
@@ -344,7 +430,9 @@ export class ModelProviderService extends ModelProviderServiceContract {
           .filter((scope) => scope.scopeType === tier.type)
           .map((scope) => scope.scopeId),
       );
-      if (scopeIds.size === 0) return null;
+      if (scopeIds.size === 0) {
+        return null;
+      }
       const candidates = configs
         .filter((config) =>
           config.scopes.some(
@@ -354,9 +442,13 @@ export class ModelProviderService extends ModelProviderServiceContract {
         .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
       for (const config of candidates) {
         const raw = config.config[candidateKey];
-        if (!raw) continue;
+        if (!raw) {
+          continue;
+        }
         const model = expandModel ? this.normalizedDefaultModel(candidateKey, raw) : raw;
-        if (!model) continue;
+        if (!model) {
+          continue;
+        }
         return {
           model,
           source: candidateKey.includes(".") ? "feature_override" : "role_default",
@@ -367,10 +459,14 @@ export class ModelProviderService extends ModelProviderServiceContract {
     };
     for (const tier of tiers) {
       const feature = valueAt(key, tier);
-      if (feature) return feature;
+      if (feature) {
+        return feature;
+      }
       if (role !== key) {
         const fallback = valueAt(role, tier);
-        if (fallback) return fallback;
+        if (fallback) {
+          return fallback;
+        }
       }
     }
     return null;
@@ -560,7 +656,9 @@ export class ModelProviderService extends ModelProviderServiceContract {
         ({ PROJECT: 0, TEAM: 1, ORGANIZATION: 2 })[a.scopeType] -
         { PROJECT: 0, TEAM: 1, ORGANIZATION: 2 }[b.scopeType],
     )[0];
-    if (!reference) throw new ModelProviderInvalidError("At least one scope is required");
+    if (!reference) {
+      throw new ModelProviderInvalidError("At least one scope is required");
+    }
     const available = context.organizationId
       ? await this.options.defaults.listOrganizationScopes(context.organizationId)
       : {
@@ -571,16 +669,19 @@ export class ModelProviderService extends ModelProviderServiceContract {
           ],
         };
     const validScope = (scope: ModelDefaultScope): boolean => {
-      if (scope.scopeType === "ORGANIZATION")
+      if (scope.scopeType === "ORGANIZATION") {
         return scope.scopeId === context.organizationId;
-      if (scope.scopeType === "TEAM")
+      }
+      if (scope.scopeType === "TEAM") {
         return available.teams.some((team) => team.id === scope.scopeId);
+      }
       return available.projects.some((project) => project.id === scope.scopeId);
     };
-    if (input.scopes.some((scope) => !validScope(scope)))
+    if (input.scopes.some((scope) => !validScope(scope))) {
       throw new ModelProviderInvalidError(
         "Default scope does not belong to the project organization",
       );
+    }
     const excluded = new Set(
       input.scopes.map((scope) => `${scope.scopeType}:${scope.scopeId}`),
     );
@@ -591,14 +692,17 @@ export class ModelProviderService extends ModelProviderServiceContract {
     const chain: ModelDefaultScope[] = [];
     if (reference.scopeType === "PROJECT") {
       chain.push({ scopeType: "PROJECT", scopeId: reference.scopeId });
-      if (referenceProject?.teamId)
+      if (referenceProject?.teamId) {
         chain.push({ scopeType: "TEAM", scopeId: referenceProject.teamId });
-      if (context.organizationId)
+      }
+      if (context.organizationId) {
         chain.push({ scopeType: "ORGANIZATION", scopeId: context.organizationId });
+      }
     } else if (reference.scopeType === "TEAM") {
       chain.push({ scopeType: "TEAM", scopeId: reference.scopeId });
-      if (context.organizationId)
+      if (context.organizationId) {
         chain.push({ scopeType: "ORGANIZATION", scopeId: context.organizationId });
+      }
     } else {
       chain.push({ scopeType: "ORGANIZATION", scopeId: reference.scopeId });
     }
@@ -630,18 +734,20 @@ export class ModelProviderService extends ModelProviderServiceContract {
         const inferred = provider
           ? this.options.catalog.inferredDefaultsForProvider(provider.provider)[key]
           : undefined;
-        if (inferred)
+        if (inferred) {
           hit = {
             model: this.normalizedDefaultModel(key, inferred) ?? inferred,
             source: "inferred",
             scope: null,
             inferredFromProvider: provider?.provider,
           };
+        }
       }
       inherited[key] = hit;
     }
-    for (const feature of features)
+    for (const feature of features) {
       inherited[feature.key] = inherited[feature.key] ?? inherited[feature.role] ?? null;
+    }
     return { inherited, referenceScope: reference };
   }
 
@@ -651,13 +757,17 @@ export class ModelProviderService extends ModelProviderServiceContract {
     const parsed = modelDefaultResolveInputSchema.parse(input);
     const snapshot = await this.getDefaultSnapshot({ projectId: parsed.projectId });
     const direct = snapshot.effective[parsed.featureKey];
-    if (direct) return direct;
+    if (direct) {
+      return direct;
+    }
     const descriptor = this.options.catalog
       .defaultFeatures()
       .find((feature) => feature.key === parsed.featureKey);
     if (descriptor) {
       const role = snapshot.effective[descriptor.role];
-      if (role) return role;
+      if (role) {
+        return role;
+      }
     }
     return parsed.featureKey === "langy.chat"
       ? (snapshot.effective["prompt.create_default"] ?? null)
@@ -671,12 +781,15 @@ export class ModelProviderService extends ModelProviderServiceContract {
     const clean = this.options.catalog.sanitizeDefaultConfig({
       [parsed.key]: parsed.model ?? "",
     });
-    if (parsed.model !== null && !clean[parsed.key])
+    if (parsed.model !== null && !clean[parsed.key]) {
       throw new ModelProviderInvalidError(
         `Model is not allowed for default key: ${parsed.key}`,
       );
+    }
     const actorId = parsed.actorId ?? parsed.authorId;
-    if (actorId) await this.authorizeWrite(actorId, [parsed.scope]);
+    if (actorId) {
+      await this.authorizeWrite(actorId, [parsed.scope]);
+    }
     await this.options.defaults.set({ ...parsed, authorId: parsed.authorId ?? null });
   }
 
@@ -685,24 +798,35 @@ export class ModelProviderService extends ModelProviderServiceContract {
   ): Promise<ModelDefaultConfig> {
     const parsed = modelDefaultConfigWriteInputSchema.parse(input);
     const existing = parsed.id ? await this.options.defaults.tryGetById(parsed.id) : null;
-    if (parsed.id && !existing) throw new ModelDefaultNotFoundError();
-    if (existing && existing.scopes.length === 0) throw new ModelDefaultNotFoundError();
+    if (parsed.id && !existing) {
+      throw new ModelDefaultNotFoundError();
+    }
+    if (existing && existing.scopes.length === 0) {
+      throw new ModelDefaultNotFoundError();
+    }
     if (parsed.scopes?.length === 0) {
-      if (!existing) throw new ModelDefaultNotFoundError();
-      if (parsed.actorId) await this.authorizeWrite(parsed.actorId, existing.scopes);
+      if (!existing) {
+        throw new ModelDefaultNotFoundError();
+      }
+      if (parsed.actorId) {
+        await this.authorizeWrite(parsed.actorId, existing.scopes);
+      }
       await this.options.defaults.delete(existing.id);
       return existing;
     }
     const config = this.options.catalog.sanitizeDefaultConfig(
       parsed.config ?? existing?.config ?? {},
     );
-    if (Object.keys(config).length === 0)
+    if (Object.keys(config).length === 0) {
       throw new ModelProviderInvalidError("Pick at least one model");
+    }
     const scopes = parsed.scopes ?? existing?.scopes ?? [];
-    if (scopes.length === 0)
+    if (scopes.length === 0) {
       throw new ModelProviderInvalidError("Pick at least one scope");
-    if (parsed.actorId)
+    }
+    if (parsed.actorId) {
       await this.authorizeWrite(parsed.actorId, [...(existing?.scopes ?? []), ...scopes]);
+    }
     const saved = await this.options.defaults.save({
       id: parsed.id ?? this.options.generateId?.() ?? generateId("model_default"),
       config,
@@ -720,8 +844,12 @@ export class ModelProviderService extends ModelProviderServiceContract {
     input: Parameters<ModelProviderServiceContract["deleteDefaultConfig"]>[0],
   ): Promise<void> {
     const existing = await this.options.defaults.tryGetById(input.id);
-    if (!existing || existing.scopes.length === 0) throw new ModelDefaultNotFoundError();
-    if (input.actorId) await this.authorizeWrite(input.actorId, existing.scopes);
+    if (!existing || existing.scopes.length === 0) {
+      throw new ModelDefaultNotFoundError();
+    }
+    if (input.actorId) {
+      await this.authorizeWrite(input.actorId, existing.scopes);
+    }
     await this.options.defaults.delete(input.id);
   }
 
@@ -729,18 +857,20 @@ export class ModelProviderService extends ModelProviderServiceContract {
     actorId: string,
     scopes: Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }>,
   ): Promise<void> {
-    if (!this.options.authorization)
+    if (!this.options.authorization) {
       throw new ModelProviderInvalidError(
         "Model Provider authorization is not configured",
       );
+    }
     const unique = new Map(
       scopes.map((scope) => [`${scope.scopeType}:${scope.scopeId}`, scope]),
     );
     for (const scope of unique.values()) {
-      if (!(await this.options.authorization.canWrite({ actorId, ...scope })))
+      if (!(await this.options.authorization.canWrite({ actorId, ...scope }))) {
         throw new ModelProviderInvalidError(
           `Cannot manage ${scope.scopeType.toLowerCase()} scope`,
         );
+      }
     }
   }
 
@@ -749,28 +879,33 @@ export class ModelProviderService extends ModelProviderServiceContract {
       modelCostListInputSchema.parse(input).projectId,
     );
   }
+
   async upsertCost(
     input: Parameters<ModelProviderServiceContract["upsertCost"]>[0],
   ): Promise<ModelCost> {
     const parsed = modelCostWriteInputSchema.parse(input);
     const existing = parsed.id ? await this.options.costs.tryFindById(parsed.id) : null;
-    if (parsed.id && !existing) throw new ModelCostNotFoundError();
+    if (parsed.id && !existing) {
+      throw new ModelCostNotFoundError();
+    }
     const organizationId = await this.options.costs.tryResolveOrganizationId({
       projectId: parsed.projectId,
       scopeType: parsed.scopeType,
       scopeId: parsed.scopeId,
     });
-    if (!organizationId)
+    if (!organizationId) {
       throw new ModelProviderInvalidError(
         "Cost scope does not resolve to an organization",
       );
+    }
     if (existing && existing.organizationId !== organizationId) {
       throw new ModelProviderInvalidError("Cost cannot move between organizations");
     }
-    if (parsed.actorId && !this.options.authorization)
+    if (parsed.actorId && !this.options.authorization) {
       throw new ModelProviderInvalidError(
         "Model Provider authorization is not configured",
       );
+    }
     if (parsed.actorId && this.options.authorization) {
       const scopeType = parsed.scopeType ?? "PROJECT";
       const scopeId = parsed.scopeId ?? parsed.projectId;
@@ -790,8 +925,9 @@ export class ModelProviderService extends ModelProviderServiceContract {
           scopeType,
           scopeId,
         }))
-      )
+      ) {
         throw new ModelProviderInvalidError("Cannot manage cost scope");
+      }
     }
     const now = new Date();
     return this.options.costs.save({
@@ -813,22 +949,26 @@ export class ModelProviderService extends ModelProviderServiceContract {
       createdAt: existing?.createdAt ?? now,
     });
   }
+
   async deleteCost(
     input: Parameters<ModelProviderServiceContract["deleteCost"]>[0],
   ): Promise<void> {
     const parsed = modelCostDeleteInputSchema.parse(input);
     const existing = await this.options.costs.tryFindById(parsed.id);
-    if (!existing) throw new ModelCostNotFoundError();
+    if (!existing) {
+      throw new ModelCostNotFoundError();
+    }
     const organizationId = await this.options.costs.tryResolveOrganizationId({
       projectId: parsed.projectId,
     });
     if (!organizationId || organizationId !== existing.organizationId) {
       throw new ModelCostNotFoundError();
     }
-    if (parsed.actorId && !this.options.authorization)
+    if (parsed.actorId && !this.options.authorization) {
       throw new ModelProviderInvalidError(
         "Model Provider authorization is not configured",
       );
+    }
     if (
       parsed.actorId &&
       this.options.authorization &&
@@ -837,24 +977,32 @@ export class ModelProviderService extends ModelProviderServiceContract {
         scopeType: existing.scopeType,
         scopeId: existing.scopeId,
       }))
-    )
+    ) {
       throw new ModelProviderInvalidError("Cannot manage cost scope");
+    }
     await this.options.costs.delete(parsed.id);
   }
 
   async translate(
     input: Parameters<ModelProviderServiceContract["translate"]>[0],
   ): Promise<TranslateOutput> {
-    if (!this.options.translation)
+    if (!this.options.translation) {
       throw new ModelProviderInvalidError("Translation is not configured");
+    }
     const parsed = translateInputSchema.parse(input);
     const model = await this.options.defaults.tryResolve({
       projectId: parsed.projectId,
       featureKey: "translate.text",
     });
-    if (!model) throw new ModelProviderInvalidError("No translation model is configured");
+    if (!model) {
+      throw new ModelProviderInvalidError("No translation model is configured");
+    }
     return {
-      translation: await this.options.translation.translate({ ...parsed, model }),
+      translation: await this.options.translation.translate({
+        ...parsed,
+        model,
+        modelProviders: this,
+      }),
     };
   }
 
@@ -870,6 +1018,109 @@ export class ModelProviderService extends ModelProviderServiceContract {
         provider.customEmbeddingsModels.length === 0 &&
         metadata.embeddingsModels.length === 0,
     };
+  }
+
+  private toExecutionProvider(provider: ModelProvider): ModelProviderExecution {
+    const metadata = this.options.catalog.metadata(provider.provider);
+    return modelProviderExecutionSchema.parse({
+      ...provider,
+      ...metadata,
+      models: metadata.models,
+      embeddingsModels: metadata.embeddingsModels,
+      isSystem: false,
+      embeddingsUnsupported:
+        provider.customEmbeddingsModels.length === 0 &&
+        metadata.embeddingsModels.length === 0,
+    });
+  }
+
+  private selectProjectProviders(
+    providers: ModelProviderSummary[],
+    chain: ModelDefaultScope[],
+    requestedProvider?: string,
+  ): ModelProviderSummary[] {
+    const selected = new Map<string, ModelProviderSummary>();
+    for (const provider of providers) {
+      if (requestedProvider && provider.provider !== requestedProvider) {
+        continue;
+      }
+
+      const current = selected.get(provider.provider);
+      if (!current || this.isPreferredForProject(provider, current, chain)) {
+        selected.set(provider.provider, provider);
+      }
+    }
+
+    return [...selected.values()];
+  }
+
+  private isPreferredForProject(
+    candidate: ModelProviderSummary,
+    current: ModelProviderSummary,
+    chain: ModelDefaultScope[],
+  ): boolean {
+    return this.compareProjectProviders(candidate, current, chain) < 0;
+  }
+
+  private compareProjectProviders(
+    candidate: ModelProvider,
+    current: ModelProvider,
+    chain: ModelDefaultScope[],
+  ): number {
+    if (candidate.enabled !== current.enabled) {
+      return candidate.enabled ? -1 : 1;
+    }
+
+    const candidateScope = this.scopeSpecificity(candidate.scopes, chain);
+    const currentScope = this.scopeSpecificity(current.scopes, chain);
+    if (candidateScope !== currentScope) {
+      return currentScope - candidateScope;
+    }
+
+    const candidatePriority = candidate.fallbackPriorityGlobal ?? Number.MAX_SAFE_INTEGER;
+    const currentPriority = current.fallbackPriorityGlobal ?? Number.MAX_SAFE_INTEGER;
+    if (candidatePriority !== currentPriority) {
+      return candidatePriority - currentPriority;
+    }
+
+    return candidate.createdAt.getTime() - current.createdAt.getTime();
+  }
+
+  private scopeSpecificity(
+    scopes: ModelDefaultScope[],
+    chain: ModelDefaultScope[],
+  ): number {
+    let specificity = 0;
+    for (const scope of scopes) {
+      const isVisible = chain.some(
+        (item) => item.scopeType === scope.scopeType && item.scopeId === scope.scopeId,
+      );
+      if (!isVisible) {
+        continue;
+      }
+
+      if (scope.scopeType === "PROJECT") {
+        specificity = Math.max(specificity, 3);
+      }
+      if (scope.scopeType === "TEAM") {
+        specificity = Math.max(specificity, 2);
+      }
+      if (scope.scopeType === "ORGANIZATION") {
+        specificity = Math.max(specificity, 1);
+      }
+    }
+
+    return specificity;
+  }
+
+  private async getProjectScopeChain(projectId: string): Promise<ModelDefaultScope[]> {
+    const project = await this.options.projects.getWithTeam(projectId);
+
+    return [
+      { scopeType: "PROJECT", scopeId: project.id },
+      { scopeType: "TEAM", scopeId: project.teamId },
+      { scopeType: "ORGANIZATION", scopeId: project.team.organizationId },
+    ];
   }
 }
 

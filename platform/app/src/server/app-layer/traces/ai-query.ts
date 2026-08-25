@@ -1,5 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
+import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { generateObject, generateText, type ModelMessage } from "ai";
 import { z } from "zod";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
@@ -15,6 +17,8 @@ export interface AiQueryInput {
   projectId: string;
   prompt: string;
   timeRange: { from: number; to: number };
+  modelProviders: ModelProviderService;
+  managedProviders: ManagedProviderService;
 }
 
 export type AiQueryResult =
@@ -161,6 +165,8 @@ export async function generateTraceQueryFromPrompt(
   const model = await getVercelAIModel({
     projectId: input.projectId,
     featureKey: "traces.ai_search",
+    modelProviders: input.modelProviders,
+    managedProviders: input.managedProviders,
   });
 
   let lastQuery = "";
@@ -246,6 +252,8 @@ export async function generateTraceAction(input: AiQueryInput): Promise<AiAction
   const model = await getVercelAIModel({
     projectId: input.projectId,
     featureKey: "traces.ai_search",
+    modelProviders: input.modelProviders,
+    managedProviders: input.managedProviders,
   });
 
   let lastError = "Unknown error";

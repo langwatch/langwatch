@@ -896,7 +896,7 @@ export const workflowRouter = createTRPCRouter({
       }),
     )
     .permission("workflows:update")
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const prevDsl_ = JSON.stringify(
         recursiveAlphabeticallySortedKeys(clearDsl(input.prevDsl)),
         null,
@@ -935,6 +935,8 @@ export const workflowRouter = createTRPCRouter({
           model: await getVercelAIModel({
             projectId: input.projectId,
             featureKey: "workflows.commit_message",
+            modelProviders: ctx.app.modelProviders,
+            managedProviders: ctx.app.managedProviders,
           }),
           providerOptions: {
             openai: {

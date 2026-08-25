@@ -18,6 +18,9 @@ export const modelSchema = z
     id: z.string().min(1),
     label: z.string().min(1),
     type: z.enum(["chat", "embedding", "other"]),
+    maxTokens: z.number().positive().nullable().optional(),
+    supportedParameters: z.array(z.string()).optional(),
+    multimodalInputs: z.array(z.enum(["image", "file", "audio"])).optional(),
   })
   .strict();
 export type Model = z.infer<typeof modelSchema>;
@@ -42,6 +45,7 @@ export const modelProviderSchema = z
     rateLimitRpd: z.number().int().nonnegative().nullable(),
     fallbackPriorityGlobal: z.number().int().nullable(),
     providerConfig: z.record(z.string(), z.unknown()).nullable(),
+    deploymentMapping: z.record(z.string(), z.string()).nullable().optional(),
     createdAt: z.date(),
     updatedAt: z.date(),
   })
@@ -52,7 +56,7 @@ export const modelProviderSummarySchema = modelProviderSchema
   .extend({
     models: z.array(z.string()).nullable().optional(),
     embeddingsModels: z.array(z.string()).nullable().optional(),
-    deploymentMapping: z.unknown().nullable().optional(),
+    deploymentMapping: z.record(z.string(), z.string()).nullable().optional(),
     disabledByDefault: z.boolean().optional(),
     customKeys: providerCredentialSchema.nullable(),
     isSystem: z.boolean().default(false),
@@ -60,6 +64,18 @@ export const modelProviderSummarySchema = modelProviderSchema
   })
   .strict();
 export type ModelProviderSummary = z.infer<typeof modelProviderSummarySchema>;
+
+/** Server-only provider value used to build model execution parameters. */
+export const modelProviderExecutionSchema = modelProviderSchema
+  .extend({
+    models: z.array(z.string()).nullable(),
+    embeddingsModels: z.array(z.string()).nullable(),
+    disabledByDefault: z.boolean().optional(),
+    isSystem: z.boolean(),
+    embeddingsUnsupported: z.boolean(),
+  })
+  .strict();
+export type ModelProviderExecution = z.infer<typeof modelProviderExecutionSchema>;
 
 export const modelProviderTenantInputSchema = z
   .object({

@@ -8,6 +8,7 @@ export {
   ModelProviderCatalog,
   ModelProviderCredentialCodec,
   ModelProviderCredentialPolicy,
+  ModelProviderOnboardingDefaults,
   ModelTranslationPort,
   type ModelProviderIdGenerator,
 } from "./ports/model-provider.port";

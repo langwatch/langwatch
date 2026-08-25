@@ -1,8 +1,12 @@
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { getProjectModelProviders } from "./api/routers/modelProviders.utils";
 import { prisma } from "./db";
 import { resolveModelForFeature } from "./modelProviders/resolveModelForFeature";
 
-export const getProjectEmbeddingsModel = async (projectId: string) => {
+export const getProjectEmbeddingsModel = async (
+  modelProvidersService: ModelProviderService,
+  projectId: string,
+) => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
   });
@@ -22,7 +26,9 @@ export const getProjectEmbeddingsModel = async (projectId: string) => {
   if (!provider) {
     throw new Error("Embeddings provider not set");
   }
-  const modelProvider = (await getProjectModelProviders(project.id))[provider];
+  const modelProvider = (
+    await getProjectModelProviders(modelProvidersService, project.id)
+  )[provider];
   if (!modelProvider) {
     throw new Error(`Embeddings model provider ${provider} not found`);
   }

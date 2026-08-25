@@ -1,11 +1,11 @@
 import { createLogger } from "@langwatch/observability";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { getS3CacheKey } from "../../../../optimization_studio/server/addEnvs";
 import { invokeLambda } from "../../../../optimization_studio/server/lambda";
 import type {
   StudioClientEvent,
   StudioServerEvent,
 } from "@langwatch/workflow-contract";
-import { prisma } from "../../../../server/db";
 import { stripUnsupportedLLMParamsFromWorkflow } from "../../../../server/workflows/stripUnsupportedLLMParams";
 
 const logger = createLogger("langwatch:post_event");
@@ -16,6 +16,19 @@ const logger = createLogger("langwatch:post_event");
 // One second keeps the Stop button responsive without adding meaningful Redis
 // load during normal streaming, where reads resolve well before this fires.
 const ABORT_POLL_INTERVAL_MS = 1000;
+
+type WorkflowParameterInput = { identifier?: string; value?: unknown };
+type WorkflowNodeInput = {
+  data?: {
+    llm?: { model?: string; [key: string]: unknown };
+    parameters?: WorkflowParameterInput[];
+  };
+};
+type WorkflowInput = { nodes?: WorkflowNodeInput[] };
+
+function isWorkflowInput(value: unknown): value is WorkflowInput {
+  return value !== null && typeof value === "object";
+}
 
 /**
  * Reads the next stream chunk, resolving to "aborted" if an abort is requested
@@ -57,12 +70,14 @@ export const studioBackendPostEvent = async ({
   message: message,
   onEvent,
   isAborted,
+  modelProviders,
 }: {
   projectId: string;
   message: StudioClientEvent;
   onEvent: (event: StudioServerEvent) => void;
   /** Optional function to check if execution should be aborted */
   isAborted?: () => Promise<boolean>;
+  modelProviders: ModelProviderService;
 }) => {
   let reader: ReadableStreamDefaultReader<Uint8Array>;
   try {
@@ -79,15 +94,12 @@ export const studioBackendPostEvent = async ({
       message.payload &&
       typeof message.payload === "object" &&
       "workflow" in message.payload &&
-      message.payload.workflow
+      isWorkflowInput(message.payload.workflow)
     ) {
       try {
-        await stripUnsupportedLLMParamsFromWorkflow({
-          prisma,
+        await stripUnsupportedLLMParamsFromWorkflow(modelProviders, {
           projectId,
-          workflow: message.payload.workflow as Parameters<
-            typeof stripUnsupportedLLMParamsFromWorkflow
-          >[0]["workflow"],
+          workflow: message.payload.workflow,
         });
       } catch (filterError) {
         logger.warn(

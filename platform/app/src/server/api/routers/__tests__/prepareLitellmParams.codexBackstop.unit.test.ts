@@ -15,25 +15,49 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("~/server/db", () => ({ prisma: {} }));
 vi.mock("~/env.mjs", () => ({ env: {} }));
 
-import type { MaybeStoredModelProvider } from "../../../modelProviders/registry";
-import { prepareLitellmParams } from "../modelProviders.utils";
+import {
+  type LegacyModelProviderExecution,
+  prepareLitellmParams,
+} from "../modelProviders.utils";
+import {
+  testManagedProviders,
+  testModelProviders,
+} from "../../../modelProviders/__tests__/model-provider-services.test-support";
 
 const codexRow = {
   id: "mp_codexrow123",
+  organizationId: "org_1",
   provider: "openai_codex",
+  name: "Codex",
   enabled: true,
+  routingHandle: null,
+  scopes: [{ scopeType: "PROJECT", scopeId: "project-1" }],
+  scopeType: "PROJECT",
+  scopeId: "project-1",
   customKeys: { CODEX_ACCESS_TOKEN: "oauth-access-token" },
-  customModels: null,
-  customEmbeddingsModels: null,
+  customModels: [],
+  customEmbeddingsModels: [],
+  extraHeaders: [],
+  rateLimitRpm: null,
+  rateLimitTpm: null,
+  rateLimitRpd: null,
+  fallbackPriorityGlobal: null,
+  providerConfig: null,
+  deploymentMapping: null,
+  createdAt: new Date("2026-01-01T00:00:00.000Z"),
+  updatedAt: new Date("2026-01-01T00:00:00.000Z"),
   models: ["gpt-5.6-terra"],
+  embeddingsModels: null,
   disabledByDefault: false,
-} as unknown as MaybeStoredModelProvider;
+  isSystem: false,
+  embeddingsUnsupported: false,
+} satisfies LegacyModelProviderExecution;
 
 describe("prepareLitellmParams codex backstop", () => {
   describe("when the wire value carries the legacy codex prefix", () => {
     it("refuses to build litellm params", async () => {
       await expect(
-        prepareLitellmParams({
+        prepareLitellmParams(testModelProviders, testManagedProviders, {
           model: "openai_codex/gpt-5.6-terra",
           modelProvider: codexRow,
           projectId: "project-1",
@@ -45,7 +69,7 @@ describe("prepareLitellmParams codex backstop", () => {
   describe("when the wire value is the canonical row format", () => {
     it("refuses on the resolved codex row, closing the mp_ bypass", async () => {
       await expect(
-        prepareLitellmParams({
+        prepareLitellmParams(testModelProviders, testManagedProviders, {
           model: "mp_codexrow123/gpt-5.6-terra",
           modelProvider: codexRow,
           projectId: "project-1",

@@ -526,7 +526,7 @@ export const modelProviderRouter = createTRPCRouter({
         projectId,
         provider,
         customBaseUrl,
-        prisma: ctx.prisma,
+        modelProviders: ctx.app.modelProviders,
       });
     }),
 

@@ -12,6 +12,7 @@
  * It must NOT fall back to process.env.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { testModelProviders } from "~/server/modelProviders/__tests__/model-provider-services.test-support";
 
 const { getProjectModelProvidersMock } = vi.hoisted(() => ({
   getProjectModelProvidersMock: vi.fn(),
@@ -94,14 +95,14 @@ describe("getAzureSafetyEnvFromProject", () => {
           },
         });
 
-        const result = await getAzureSafetyEnvFromProject(projectId);
+        const result = await getAzureSafetyEnvFromProject(testModelProviders, projectId);
         expect(result).toBeNull();
       });
 
       it("does not fall back to process.env", async () => {
         getProjectModelProvidersMock.mockResolvedValue({});
 
-        const result = await getAzureSafetyEnvFromProject(projectId);
+        const result = await getAzureSafetyEnvFromProject(testModelProviders, projectId);
         expect(result).toBeNull();
       });
     });
@@ -121,7 +122,7 @@ describe("getAzureSafetyEnvFromProject", () => {
           },
         });
 
-        const result = await getAzureSafetyEnvFromProject(projectId);
+        const result = await getAzureSafetyEnvFromProject(testModelProviders, projectId);
         expect(result).toBeNull();
       });
     });
@@ -140,7 +141,7 @@ describe("getAzureSafetyEnvFromProject", () => {
           },
         });
 
-        const result = await getAzureSafetyEnvFromProject(projectId);
+        const result = await getAzureSafetyEnvFromProject(testModelProviders, projectId);
         expect(result).toBeNull();
       });
     });
@@ -157,7 +158,7 @@ describe("getAzureSafetyEnvFromProject", () => {
           },
         });
 
-        const result = await getAzureSafetyEnvFromProject(projectId);
+        const result = await getAzureSafetyEnvFromProject(testModelProviders, projectId);
         expect(result).toBeNull();
       });
     });
@@ -175,7 +176,7 @@ describe("getAzureSafetyEnvFromProject", () => {
           },
         });
 
-        const result = await getAzureSafetyEnvFromProject(projectId);
+        const result = await getAzureSafetyEnvFromProject(testModelProviders, projectId);
         expect(result).toBeNull();
       });
 
@@ -191,7 +192,7 @@ describe("getAzureSafetyEnvFromProject", () => {
           },
         });
 
-        const result = await getAzureSafetyEnvFromProject(projectId);
+        const result = await getAzureSafetyEnvFromProject(testModelProviders, projectId);
         expect(result).toBeNull();
       });
     });
@@ -212,7 +213,7 @@ describe("getAzureSafetyEnvFromProject", () => {
           },
         });
 
-        const result = await getAzureSafetyEnvFromProject(projectId);
+        const result = await getAzureSafetyEnvFromProject(testModelProviders, projectId);
         expect(result).toEqual({
           AZURE_CONTENT_SAFETY_ENDPOINT:
             "https://my-account.cognitiveservices.azure.com/",
@@ -235,7 +236,7 @@ describe("getAzureSafetyEnvFromProject", () => {
           },
         });
 
-        const result = await getAzureSafetyEnvFromProject(projectId);
+        const result = await getAzureSafetyEnvFromProject(testModelProviders, projectId);
         expect(result?.AZURE_CONTENT_SAFETY_ENDPOINT).toBe("https://project.azure.com/");
         expect(result?.AZURE_CONTENT_SAFETY_KEY).toBe("project-key");
       });

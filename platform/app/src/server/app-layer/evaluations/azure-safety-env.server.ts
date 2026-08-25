@@ -1,3 +1,4 @@
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { getProjectModelProviders } from "../../api/routers/modelProviders.utils";
 import { AZURE_SAFETY_PROVIDER_KEY } from "./azure-safety-env";
 
@@ -8,18 +9,18 @@ import { AZURE_SAFETY_PROVIDER_KEY } from "./azure-safety-env";
  * provider yields a deterministic null.
  */
 export async function getAzureSafetyEnvFromProject(
+  modelProvidersService: ModelProviderService,
   projectId: string,
 ): Promise<Record<string, string> | null> {
-  const modelProviders = await getProjectModelProviders(projectId);
+  const modelProviders = await getProjectModelProviders(modelProvidersService, projectId);
   const provider = modelProviders[AZURE_SAFETY_PROVIDER_KEY];
 
   if (!provider?.enabled) {
     return null;
   }
 
-  const customKeys = provider.customKeys as Record<string, unknown> | null;
-  const endpoint = customKeys?.AZURE_CONTENT_SAFETY_ENDPOINT;
-  const key = customKeys?.AZURE_CONTENT_SAFETY_KEY;
+  const endpoint = provider.customKeys?.AZURE_CONTENT_SAFETY_ENDPOINT;
+  const key = provider.customKeys?.AZURE_CONTENT_SAFETY_KEY;
 
   if (typeof endpoint !== "string" || endpoint.trim() === "") {
     return null;

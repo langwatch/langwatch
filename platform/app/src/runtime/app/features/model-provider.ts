@@ -4,6 +4,7 @@ import {
   ModelProviderCatalog,
   ModelProviderCredentialCodec,
   ModelProviderCredentialPolicy,
+  ModelProviderOnboardingDefaults,
   ModelTranslationPort,
   PostgresModelProviderAdapter,
 } from "@langwatch/model-provider-server";
@@ -15,6 +16,7 @@ import type {
   ModelProviderSummary,
 } from "@langwatch/model-provider-contract";
 import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
+import type { ProjectService } from "@langwatch/project-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import { ModelProviderAuthorization } from "@langwatch/model-provider-server";
 import { validateProviderApiKey } from "~/server/modelProviders/providerValidation";
@@ -37,6 +39,8 @@ import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { MASKED_KEY_PLACEHOLDER } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import { readCustomKeys } from "~/server/modelProviders/customKeys";
+import { seedOnboardingDefaultsForProvider } from "~/server/modelProviders/seedOnboardingDefaults";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 import {
   isSecretCredential,
@@ -111,7 +115,12 @@ class AppModelProviderCatalog extends ModelProviderCatalog {
   }
 
   inferredDefaultsForProvider(provider: string): Record<string, string> {
-    return buildSeedPlanForProvider(provider);
+    const plan = buildSeedPlanForProvider(provider);
+    return Object.fromEntries(
+      Object.entries(plan).filter(
+        (entry): entry is [string, string] => typeof entry[1] === "string",
+      ),
+    );
   }
 
   staticCostRates(): readonly ModelCostRate[] {
@@ -276,6 +285,26 @@ class AppModelProviderCredentialPolicy extends ModelProviderCredentialPolicy {
   }
 }
 
+class AppModelProviderOnboardingDefaults extends ModelProviderOnboardingDefaults {
+  constructor(private readonly database: PrismaClient) {
+    super();
+  }
+
+  async seed(input: {
+    provider: string;
+    scopes: Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }>;
+  }): Promise<void> {
+    for (const scope of input.scopes) {
+      await seedOnboardingDefaultsForProvider({
+        prisma: this.database,
+        provider: input.provider,
+        scopeType: scope.scopeType,
+        scopeId: scope.scopeId,
+      });
+    }
+  }
+}
+
 class AppModelProviderAuthorization extends ModelProviderAuthorization {
   constructor(private readonly permissions: AuthzService) {
     super();
@@ -338,14 +367,22 @@ class AppModelProviderAuthorization extends ModelProviderAuthorization {
 }
 
 class AppModelTranslation extends ModelTranslationPort {
+  constructor(private readonly managedProviders: ManagedProviderService) {
+    super();
+  }
+
   async translate(input: {
     projectId: string;
     text: string;
     model: string;
+    modelProviders: ModelProviderService;
   }): Promise<string> {
     const model = await getVercelAIModel({
       projectId: input.projectId,
+      model: input.model,
       featureKey: "translate.text",
+      modelProviders: input.modelProviders,
+      managedProviders: this.managedProviders,
     });
     const result = await generateText({
       model,
@@ -356,8 +393,9 @@ class AppModelTranslation extends ModelTranslationPort {
 }
 
 export interface AppModelProviderRuntimeOptions {
-  database: object;
+  database: PrismaClient;
   managedProviders: ManagedProviderService;
+  projects: ProjectService;
   systemProviderEnvironment?: Readonly<Record<string, string | undefined>>;
   isSaas?: boolean;
   permissions?: AuthzService;
@@ -373,6 +411,7 @@ export class AppModelProviderRuntime {
   build(): ModelProviderService {
     return PostgresModelProviderAdapter.create({
       database: this.options.database,
+      projects: this.options.projects,
       catalog: new AppModelProviderCatalog(
         this.options.managedProviders,
         this.options.systemProviderEnvironment,
@@ -381,10 +420,11 @@ export class AppModelProviderRuntime {
       managedProviders: this.options.managedProviders,
       credentials: new AppModelProviderCredentialCodec(),
       credentialPolicy: new AppModelProviderCredentialPolicy(),
+      onboardingDefaults: new AppModelProviderOnboardingDefaults(this.options.database),
       authorization: this.options.permissions
         ? new AppModelProviderAuthorization(this.options.permissions)
         : undefined,
-      translation: new AppModelTranslation(),
+      translation: new AppModelTranslation(this.options.managedProviders),
     }).build();
   }
 }

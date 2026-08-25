@@ -7,6 +7,7 @@ import type {
   ModelProviderApiKeyValidation,
   ModelProviderSummary,
   ModelDefaultFeature,
+  ModelProviderService,
 } from "@langwatch/model-provider-contract";
 
 export abstract class ModelProviderAuthorization {
@@ -52,6 +53,11 @@ export abstract class ModelProviderRepository {
   }): Promise<string | null>;
   abstract resolveOrganizationIdForScopes(scopes: ModelDefaultScope[]): Promise<string>;
   abstract hasStoredCredentials(id: string): Promise<boolean>;
+}
+
+/** Application-owned policy for the defaults created with a new provider. */
+export abstract class ModelProviderOnboardingDefaults {
+  abstract seed(input: { provider: string; scopes: ModelDefaultScope[] }): Promise<void>;
 }
 
 /** Credential encoding is supplied by the application boundary. */
@@ -195,6 +201,7 @@ export abstract class ModelTranslationPort {
     projectId: string;
     text: string;
     model: string;
+    modelProviders: ModelProviderService;
   }): Promise<string>;
 }
 

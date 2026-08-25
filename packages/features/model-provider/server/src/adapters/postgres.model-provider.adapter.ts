@@ -1,8 +1,10 @@
 import type { ModelProviderService as ModelProviderServiceContract } from "@langwatch/model-provider-contract";
+import type { ProjectService } from "@langwatch/project-contract";
 import {
   ModelProviderCatalog,
   ModelProviderCredentialCodec,
   ModelProviderCredentialPolicy,
+  ModelProviderOnboardingDefaults,
   ModelTranslationPort,
   type ManagedProviderService,
   type ModelProviderIdGenerator,
@@ -15,6 +17,7 @@ import { ModelProviderService } from "../services/model-provider.service";
 
 export interface PostgresModelProviderAdapterOptions {
   database: object;
+  projects: ProjectService;
   catalog: ModelProviderCatalog;
   managedProviders?: ManagedProviderService;
   translation?: ModelTranslationPort;
@@ -22,6 +25,7 @@ export interface PostgresModelProviderAdapterOptions {
   authorization?: ModelProviderAuthorization;
   credentials: ModelProviderCredentialCodec;
   credentialPolicy: ModelProviderCredentialPolicy;
+  onboardingDefaults?: ModelProviderOnboardingDefaults;
 }
 
 /** Composes the public Model Provider service with its private Postgres adapters. */
@@ -40,7 +44,9 @@ export class PostgresModelProviderAdapter {
         this.options.database,
         this.options.credentials,
       ),
+      projects: this.options.projects,
       credentialPolicy: this.options.credentialPolicy,
+      onboardingDefaults: this.options.onboardingDefaults,
       defaults: PrismaModelDefaultRepository.create(this.options.database),
       costs: PrismaModelCostRepository.create(this.options.database),
       catalog: this.options.catalog,

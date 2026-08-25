@@ -33,10 +33,26 @@ vi.mock("../codexGatewayModel", () => ({
 
 import { getProjectModelProviders } from "~/server/api/routers/modelProviders.utils";
 import { prisma } from "~/server/db";
-import { getVercelAIModel } from "../utils";
+import {
+  testManagedProviders,
+  testModelProviders,
+} from "./model-provider-services.test-support";
+import { getVercelAIModel as getVercelAIModelWithServices } from "../utils";
 
 const mockPrismaFindUnique = prisma.project.findUnique as ReturnType<typeof vi.fn>;
 const mockGetProjectModelProviders = getProjectModelProviders as ReturnType<typeof vi.fn>;
+
+function getVercelAIModel(input: {
+  projectId: string;
+  model?: string;
+  featureKey?: string;
+}) {
+  return getVercelAIModelWithServices({
+    ...input,
+    modelProviders: testModelProviders,
+    managedProviders: testManagedProviders,
+  });
+}
 
 describe("getVercelAIModel", () => {
   beforeEach(() => {

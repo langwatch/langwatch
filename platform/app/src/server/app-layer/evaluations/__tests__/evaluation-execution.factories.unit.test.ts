@@ -8,7 +8,11 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import type { MaybeStoredModelProvider } from "~/server/modelProviders/registry";
+import type { LegacyModelProviderExecution } from "~/server/api/routers/modelProviders.utils";
+import {
+  testManagedProviders,
+  testModelProviders,
+} from "~/server/modelProviders/__tests__/model-provider-services.test-support";
 
 vi.mock("~/server/api/routers/modelProviders.utils", () => ({
   getProjectModelProviders: vi.fn(),
@@ -27,18 +31,34 @@ import { EvaluatorConfigError } from "../errors";
 import { setupModelEnv } from "../evaluation-execution.factories";
 
 function buildProvider(
-  overrides: Partial<MaybeStoredModelProvider> = {},
-): MaybeStoredModelProvider {
+  overrides: Partial<LegacyModelProviderExecution> = {},
+): LegacyModelProviderExecution {
   return {
+    id: "mp_gemini",
+    organizationId: "org_1",
     provider: "gemini",
+    name: "Gemini",
     enabled: true,
+    routingHandle: null,
+    scopes: [{ scopeType: "PROJECT", scopeId: "proj-1" }],
+    scopeType: "PROJECT",
+    scopeId: "proj-1",
     customKeys: null,
     models: ["gemini-2.5-pro", "gemini-2.5-flash"],
     embeddingsModels: ["gemini-embedding-001"],
-    customModels: null,
-    customEmbeddingsModels: null,
+    customModels: [],
+    customEmbeddingsModels: [],
     deploymentMapping: null,
-    extraHeaders: null,
+    extraHeaders: [],
+    rateLimitRpm: null,
+    rateLimitTpm: null,
+    rateLimitRpd: null,
+    fallbackPriorityGlobal: null,
+    providerConfig: null,
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    isSystem: false,
+    embeddingsUnsupported: false,
     ...overrides,
   };
 }
@@ -51,7 +71,13 @@ describe("setupModelEnv", () => {
       });
 
       await expect(
-        setupModelEnv("gemini/gemini-2.5-pro", false, "proj-1"),
+        setupModelEnv(
+          testModelProviders,
+          testManagedProviders,
+          "gemini/gemini-2.5-pro",
+          false,
+          "proj-1",
+        ),
       ).resolves.toBeDefined();
     });
   });
@@ -71,7 +97,13 @@ describe("setupModelEnv", () => {
       });
 
       await expect(
-        setupModelEnv("gemini/gemini-1.5-pro", false, "proj-1"),
+        setupModelEnv(
+          testModelProviders,
+          testManagedProviders,
+          "gemini/gemini-1.5-pro",
+          false,
+          "proj-1",
+        ),
       ).resolves.toBeDefined();
     });
 
@@ -89,7 +121,13 @@ describe("setupModelEnv", () => {
       });
 
       await expect(
-        setupModelEnv("gemini/custom-embed", true, "proj-1"),
+        setupModelEnv(
+          testModelProviders,
+          testManagedProviders,
+          "gemini/custom-embed",
+          true,
+          "proj-1",
+        ),
       ).resolves.toBeDefined();
     });
   });
@@ -101,7 +139,13 @@ describe("setupModelEnv", () => {
       });
 
       await expect(
-        setupModelEnv("gemini/nonexistent-model", false, "proj-1"),
+        setupModelEnv(
+          testModelProviders,
+          testManagedProviders,
+          "gemini/nonexistent-model",
+          false,
+          "proj-1",
+        ),
       ).rejects.toThrow(EvaluatorConfigError);
     });
   });
@@ -113,7 +157,13 @@ describe("setupModelEnv", () => {
       });
 
       await expect(
-        setupModelEnv("gemini/any-model", false, "proj-1"),
+        setupModelEnv(
+          testModelProviders,
+          testManagedProviders,
+          "gemini/any-model",
+          false,
+          "proj-1",
+        ),
       ).resolves.toBeDefined();
     });
   });
@@ -123,7 +173,13 @@ describe("setupModelEnv", () => {
       vi.mocked(getProjectModelProviders).mockResolvedValue({});
 
       await expect(
-        setupModelEnv("gemini/gemini-2.5-pro", false, "proj-1"),
+        setupModelEnv(
+          testModelProviders,
+          testManagedProviders,
+          "gemini/gemini-2.5-pro",
+          false,
+          "proj-1",
+        ),
       ).rejects.toThrow("Provider gemini is not configured");
     });
   });
@@ -135,7 +191,13 @@ describe("setupModelEnv", () => {
       });
 
       await expect(
-        setupModelEnv("gemini/gemini-2.5-pro", false, "proj-1"),
+        setupModelEnv(
+          testModelProviders,
+          testManagedProviders,
+          "gemini/gemini-2.5-pro",
+          false,
+          "proj-1",
+        ),
       ).rejects.toThrow("Provider gemini is not enabled");
     });
   });

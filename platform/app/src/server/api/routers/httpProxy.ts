@@ -114,6 +114,8 @@ export const httpProxyRouter = createTRPCRouter({
           workflow,
           traceId,
           inputs: templateVariables,
+          modelProviders: ctx.app.modelProviders,
+          managedProviders: ctx.app.managedProviders,
         });
         result = toProxyResult({
           state,
@@ -203,12 +205,16 @@ const runNode = async ({
   workflow,
   traceId,
   inputs,
+  modelProviders,
+  managedProviders,
 }: {
   projectId: string;
   nodeId: string;
   workflow: StudioWorkflow;
   traceId: string;
   inputs: Record<string, unknown>;
+  modelProviders: import("@langwatch/model-provider-contract").ModelProviderService;
+  managedProviders: import("@langwatch/enterprise-managed-provider-contract").ManagedProviderService;
 }): Promise<NonNullable<BaseComponent["execution_state"]>> => {
   const event = {
     type: "execute_component" as const,
@@ -227,7 +233,8 @@ const runNode = async ({
   let state: BaseComponent["execution_state"];
   await studioBackendPostEvent({
     projectId,
-    message: await addEnvs(event, projectId),
+    modelProviders,
+    message: await addEnvs(event, projectId, modelProviders, managedProviders),
     onEvent: (serverEvent: StudioServerEvent) => {
       // Keep the last state the node reported; the engine streams it as the
       // node moves from running to its terminal status.

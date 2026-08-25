@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { z } from "zod";
 import {
   modelProviderSchema,
   type Model,
@@ -18,6 +19,22 @@ type Database = Pick<
   | "gatewayChangeEvent"
   | "$transaction"
 >;
+
+const recordSchema = z.record(z.string(), z.unknown());
+const stringRecordSchema = z.record(z.string(), z.string());
+const headerSchema = z.object({ key: z.string(), value: z.string() });
+const storedModelSchema = z.union([
+  z.string(),
+  z.object({
+    id: z.string().optional(),
+    modelId: z.string().optional(),
+    label: z.string().optional(),
+    displayName: z.string().optional(),
+    maxTokens: z.number().nullable().optional(),
+    supportedParameters: z.array(z.string()).optional(),
+    multimodalInputs: z.array(z.enum(["image", "file", "audio"])).optional(),
+  }),
+]);
 
 export class PrismaModelProviderRepository extends ModelProviderRepository {
   private constructor(
@@ -322,45 +339,62 @@ function toModelProvider(
     rateLimitRpd: value.rateLimitRpd ?? null,
     fallbackPriorityGlobal: value.fallbackPriorityGlobal ?? null,
     providerConfig: asRecord(value.providerConfig),
+    deploymentMapping: asStringRecord(value.deploymentMapping),
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
   });
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
+  const parsed = recordSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
 }
+
+function asStringRecord(value: unknown): Record<string, string> | null {
+  const parsed = stringRecordSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
 function asHeaders(value: unknown): Array<{ key: string; value: string }> {
-  return Array.isArray(value)
-    ? value
-        .filter((item): item is { key: string; value: string } =>
-          Boolean(
-            item &&
-            typeof item === "object" &&
-            typeof (item as Record<string, unknown>).key === "string" &&
-            typeof (item as Record<string, unknown>).value === "string",
-          ),
-        )
-        .map((item) => ({ key: item.key, value: item.value }))
-    : [];
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    const parsed = headerSchema.safeParse(item);
+    return parsed.success ? [parsed.data] : [];
+  });
 }
+
 function asModels(value: unknown, type: Model["type"]): Model[] {
-  return Array.isArray(value)
-    ? value.flatMap((item) => {
-        if (typeof item === "string") return [{ id: item, label: item, type }];
-        if (!item || typeof item !== "object") return [];
-        const row = item as Record<string, unknown>;
-        const id =
-          typeof row.id === "string"
-            ? row.id
-            : typeof row.modelId === "string"
-              ? row.modelId
-              : null;
-        return id
-          ? [{ id, label: typeof row.label === "string" ? row.label : id, type }]
-          : [];
-      })
-    : [];
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    const parsed = storedModelSchema.safeParse(item);
+    if (!parsed.success) {
+      return [];
+    }
+
+    if (typeof parsed.data === "string") {
+      return [{ id: parsed.data, label: parsed.data, type }];
+    }
+
+    const id = parsed.data.id ?? parsed.data.modelId;
+    if (!id) {
+      return [];
+    }
+
+    return [
+      {
+        id,
+        label: parsed.data.label ?? parsed.data.displayName ?? id,
+        type,
+        maxTokens: parsed.data.maxTokens ?? null,
+        supportedParameters: parsed.data.supportedParameters ?? [],
+        multimodalInputs: parsed.data.multimodalInputs ?? [],
+      },
+    ];
+  });
 }

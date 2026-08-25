@@ -6,6 +6,8 @@ import type {
 import { randomUUID } from "@copilotkit/shared";
 import { createLogger } from "@langwatch/observability";
 import type { DatasetService } from "@langwatch/dataset-contract";
+import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type z from "zod";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/load-datasets.adapter";
@@ -36,6 +38,8 @@ const TEMPLATE_INPUT_PLACEHOLDER_RE = /\{\{\s*input\s*\}\}/;
 type PromptStudioAdapterParams = {
   projectId: string;
   datasets: DatasetService;
+  modelProviders: ModelProviderService;
+  managedProviders: ManagedProviderService;
 };
 
 /**
@@ -46,6 +50,8 @@ type PromptStudioAdapterParams = {
 export class PromptStudioAdapter implements CopilotServiceAdapter {
   private projectId: string;
   private datasets: DatasetService;
+  private modelProviders: ModelProviderService;
+  private managedProviders: ManagedProviderService;
 
   /**
    * Creates a new PromptStudioAdapter instance.
@@ -54,6 +60,8 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
   constructor(params: PromptStudioAdapterParams) {
     this.projectId = params.projectId;
     this.datasets = params.datasets;
+    this.modelProviders = params.modelProviders;
+    this.managedProviders = params.managedProviders;
   }
 
   /**
@@ -228,7 +236,12 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
 
       // Enrich with envs and datasets to match server route behavior
       preparedEvent = await loadDatasets(
-        await addEnvs(rawEvent, this.projectId),
+        await addEnvs(
+          rawEvent,
+          this.projectId,
+          this.modelProviders,
+          this.managedProviders,
+        ),
         this.projectId,
         this.datasets,
       );
@@ -288,6 +301,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       try {
         await studioBackendPostEvent({
           projectId: this.projectId,
+          modelProviders: this.modelProviders,
           message: preparedEvent,
           onEvent: (serverEvent: StudioServerEvent) => {
             // Handle component state updates

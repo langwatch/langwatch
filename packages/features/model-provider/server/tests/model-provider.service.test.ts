@@ -5,6 +5,7 @@ import {
   type ModelProvider,
   type ModelProviderApiKeyValidation,
 } from "@langwatch/model-provider-contract";
+import { ProjectService, projectWithTeamSchema } from "@langwatch/project-contract";
 import { ModelProviderService } from "../src/services/model-provider.service";
 import {
   ManagedProviderService,
@@ -12,6 +13,7 @@ import {
   ModelDefaultRepository,
   ModelProviderCatalog,
   ModelProviderCredentialPolicy,
+  ModelProviderOnboardingDefaults,
   ModelProviderRepository,
   ModelTranslationPort,
 } from "../src/ports/model-provider.port";
@@ -84,6 +86,147 @@ class Providers extends ModelProviderRepository {
     return Promise.resolve(
       this.rows.some((row) => row.id === id && row.customKeys !== null),
     );
+  }
+}
+
+const project = projectWithTeamSchema.parse({
+  id: "project_1",
+  name: "Project",
+  slug: "project",
+  apiKey: "api-key",
+  lwqlKey: "lwql-key",
+  teamId: "team_1",
+  language: "typescript",
+  framework: "langchain",
+  kind: "application",
+  firstMessage: false,
+  integrated: true,
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+  userLinkTemplate: null,
+  traceSharingEnabled: false,
+  presenceEnabled: false,
+  s3Endpoint: null,
+  s3AccessKeyId: null,
+  s3SecretAccessKey: null,
+  s3Bucket: null,
+  archivedAt: null,
+  isPersonal: false,
+  ownerUserId: null,
+  personalFeatures: {},
+  departmentId: null,
+  langyEgressAllowlist: null,
+  lastCodingAgentSessionAt: null,
+  lastCodingAgentPullRequestAt: null,
+  team: {
+    id: "team_1",
+    name: "Team",
+    slug: "team",
+    organizationId: "org_1",
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    archivedAt: null,
+    isPersonal: false,
+    ownerUserId: null,
+    departmentId: null,
+  },
+});
+
+class Projects extends ProjectService {
+  private notUsed(): never {
+    throw new Error("Project method is not used by this test");
+  }
+
+  tryFindInternal() {
+    return this.notUsed();
+  }
+
+  ensureInternal() {
+    return this.notUsed();
+  }
+
+  isPresenceEnabled() {
+    return this.notUsed();
+  }
+
+  getById() {
+    return this.notUsed();
+  }
+
+  getOrganizationId() {
+    return this.notUsed();
+  }
+
+  tryGetById() {
+    return this.notUsed();
+  }
+
+  tryGetSummaryById() {
+    return this.notUsed();
+  }
+
+  getWithTeam() {
+    return Promise.resolve(project);
+  }
+
+  tryGetWithTeam() {
+    return this.notUsed();
+  }
+
+  create() {
+    return this.notUsed();
+  }
+
+  update() {
+    return this.notUsed();
+  }
+
+  archive() {
+    return this.notUsed();
+  }
+
+  listByOrganization() {
+    return this.notUsed();
+  }
+
+  listByTeam() {
+    return this.notUsed();
+  }
+
+  listNamesByIds() {
+    return this.notUsed();
+  }
+
+  listActiveByScopes() {
+    return this.notUsed();
+  }
+
+  updateMetadata() {
+    return this.notUsed();
+  }
+
+  touchCodingAgentSessionSeen() {
+    return this.notUsed();
+  }
+
+  touchCodingAgentPullRequestSeen() {
+    return this.notUsed();
+  }
+
+  searchByQuery() {
+    return this.notUsed();
+  }
+
+  isFeatureEnabled() {
+    return this.notUsed();
+  }
+
+  tryGetTraceSharingConfig() {
+    return this.notUsed();
+  }
+
+  resolveOrgAdmin() {
+    return this.notUsed();
   }
 }
 class Defaults extends ModelDefaultRepository {
@@ -201,6 +344,13 @@ class CredentialPolicy extends ModelProviderCredentialPolicy {
     return value.map(({ key }) => ({ key, value: "••••" }));
   }
 }
+class OnboardingDefaults extends ModelProviderOnboardingDefaults {
+  seeded: Array<{ provider: string; scopes: ModelProvider["scopes"] }> = [];
+  seed(input: { provider: string; scopes: ModelProvider["scopes"] }) {
+    this.seeded.push(input);
+    return Promise.resolve();
+  }
+}
 
 function service(
   providers = new Providers(),
@@ -208,6 +358,7 @@ function service(
 ) {
   return ModelProviderService.create({
     repository: providers,
+    projects: new Projects(),
     credentialPolicy: new CredentialPolicy(),
     defaults: new Defaults(),
     costs: new Costs(),
@@ -274,5 +425,79 @@ describe("ModelProviderService", () => {
       providerId: "mp_1",
       plan: "plus",
     });
+  });
+  it("selects the narrowest enabled custom-model provider row", async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({
+        id: "organization-row",
+        scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_1" }],
+        customModels: [{ id: "deployment", label: "Deployment", type: "chat" }],
+      }),
+      provider({
+        id: "project-row",
+        scopes: [{ scopeType: "PROJECT", scopeId: "project_1" }],
+        customModels: [{ id: "deployment", label: "Deployment", type: "chat" }],
+      }),
+    ];
+
+    await expect(
+      service(providers).tryFindRowServingModel({
+        projectId: "project_1",
+        provider: "openai",
+        model: "deployment",
+      }),
+    ).resolves.toMatchObject({ id: "project-row" });
+  });
+  it("returns raw execution providers with registry model metadata", async () => {
+    class ExecutionCatalog extends Catalog {
+      metadata() {
+        return {
+          models: ["gpt-4o"],
+          embeddingsModels: ["text-embedding-3-small"],
+        };
+      }
+    }
+
+    await expect(
+      service(new Providers(), new ExecutionCatalog()).getExecutionProviders({
+        projectId: "project_1",
+      }),
+    ).resolves.toMatchObject({
+      openai: {
+        customKeys: { apiKey: "secret" },
+        models: ["gpt-4o"],
+        embeddingsModels: ["text-embedding-3-small"],
+        isSystem: false,
+      },
+    });
+  });
+  it("seeds onboarding defaults after creating a provider", async () => {
+    const providers = new Providers();
+    providers.rows = [];
+    const onboardingDefaults = new OnboardingDefaults();
+    const modelProviders = ModelProviderService.create({
+      repository: providers,
+      projects: new Projects(),
+      credentialPolicy: new CredentialPolicy(),
+      defaults: new Defaults(),
+      costs: new Costs(),
+      catalog: new Catalog(),
+      onboardingDefaults,
+      generateId: () => "generated",
+    });
+
+    await modelProviders.upsert({
+      projectId: "project_1",
+      provider: "openai",
+      enabled: true,
+    });
+
+    expect(onboardingDefaults.seeded).toEqual([
+      {
+        provider: "openai",
+        scopes: [{ scopeType: "PROJECT", scopeId: "project_1" }],
+      },
+    ]);
   });
 });

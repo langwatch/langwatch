@@ -1,10 +1,12 @@
 import crypto from "crypto";
+import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import {
   getProjectModelProviders,
+  type LegacyModelProviderExecution,
   prepareLitellmParams,
 } from "../../server/api/routers/modelProviders.utils";
 import { prisma } from "../../server/db";
-import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
 import { decrypt } from "../../utils/encryption";
 import { normalizeToSnakeCase } from "../components/properties/llm-configs/normalizeToSnakeCase";
 import {
@@ -37,13 +39,15 @@ export class LlmModelNotSetError extends Error {
 export const addEnvs = async (
   event: StudioClientEvent,
   projectId: string,
+  modelProvidersService: ModelProviderService,
+  managedProviders: ManagedProviderService,
 ): Promise<StudioClientEvent> => {
   if (!("workflow" in event.payload)) {
     return event;
   }
 
   const [modelProviders, { apiKey }, projectSecrets] = await Promise.all([
-    getProjectModelProviders(projectId),
+    getProjectModelProviders(modelProvidersService, projectId),
     prisma.project.findUniqueOrThrow({
       where: {
         id: projectId,
@@ -93,6 +97,8 @@ export const addEnvs = async (
                 value: await addLiteLLMParams({
                   llm: p.value as LLMConfig,
                   modelProviders,
+                  modelProvidersService,
+                  managedProviders,
                   customKeysOnly: onlyCustomKeys,
                   projectId,
                 }),
@@ -115,6 +121,8 @@ export const addEnvs = async (
     event.payload.params.llm = await addLiteLLMParams({
       llm: event.payload.params.llm,
       modelProviders,
+      modelProvidersService,
+      managedProviders,
       customKeysOnly: onlyCustomKeys,
       projectId,
     });
@@ -132,11 +140,15 @@ export const addEnvs = async (
 const addLiteLLMParams = async ({
   llm,
   modelProviders,
+  modelProvidersService,
+  managedProviders,
   customKeysOnly,
   projectId,
 }: {
   llm: LLMConfig;
-  modelProviders: Record<string, MaybeStoredModelProvider>;
+  modelProviders: Record<string, LegacyModelProviderExecution>;
+  modelProvidersService: ModelProviderService;
+  managedProviders: ManagedProviderService;
   customKeysOnly: boolean;
   projectId: string;
 }) => {
@@ -159,7 +171,7 @@ const addLiteLLMParams = async ({
 
   return {
     ...normalizedLLM,
-    litellm_params: await prepareLitellmParams({
+    litellm_params: await prepareLitellmParams(modelProvidersService, managedProviders, {
       model: llm.model,
       modelProvider,
       projectId,

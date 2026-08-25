@@ -24,6 +24,10 @@ import {
 } from "../../../server/api/routers/modelProviders.utils";
 import { prisma } from "../../../server/db";
 import { decrypt } from "../../../utils/encryption";
+import {
+  testManagedProviders,
+  testModelProviders,
+} from "../../../server/modelProviders/__tests__/model-provider-services.test-support";
 import { addEnvs, LlmModelNotSetError } from "../addEnvs";
 
 const PROJECT_ID = "project-123";
@@ -49,6 +53,7 @@ const makeExecuteComponentEvent = ({
         version: "1.0",
         nodes,
         edges: [],
+        state: {},
       },
       node_id: "node-1",
       inputs: {},
@@ -84,7 +89,12 @@ describe("addEnvs", () => {
     it("includes decrypted secrets in the workflow", async () => {
       const event = makeExecuteComponentEvent();
 
-      const result = await addEnvs(event, PROJECT_ID);
+      const result = await addEnvs(
+        event,
+        PROJECT_ID,
+        testModelProviders,
+        testManagedProviders,
+      );
 
       const workflow = (result.payload as any).workflow;
       expect(workflow.secrets).toEqual({
@@ -96,7 +106,7 @@ describe("addEnvs", () => {
     it("decrypts each secret individually", async () => {
       const event = makeExecuteComponentEvent();
 
-      await addEnvs(event, PROJECT_ID);
+      await addEnvs(event, PROJECT_ID, testModelProviders, testManagedProviders);
 
       expect(decrypt).toHaveBeenCalledWith("encrypted:sk-abc123");
       expect(decrypt).toHaveBeenCalledWith("encrypted:postgres://localhost");
@@ -112,7 +122,12 @@ describe("addEnvs", () => {
     it("includes an empty secrets object in the workflow", async () => {
       const event = makeExecuteComponentEvent();
 
-      const result = await addEnvs(event, PROJECT_ID);
+      const result = await addEnvs(
+        event,
+        PROJECT_ID,
+        testModelProviders,
+        testManagedProviders,
+      );
 
       const workflow = (result.payload as any).workflow;
       expect(workflow.secrets).toEqual({});
@@ -126,7 +141,12 @@ describe("addEnvs", () => {
         payload: {},
       } as unknown as StudioClientEvent;
 
-      const result = await addEnvs(event, PROJECT_ID);
+      const result = await addEnvs(
+        event,
+        PROJECT_ID,
+        testModelProviders,
+        testManagedProviders,
+      );
 
       expect(result).toBe(event);
       expect(prisma.projectSecret.findMany).not.toHaveBeenCalled();
@@ -141,7 +161,7 @@ describe("addEnvs", () => {
     it("queries secrets for the correct project", async () => {
       const event = makeExecuteComponentEvent();
 
-      await addEnvs(event, PROJECT_ID);
+      await addEnvs(event, PROJECT_ID, testModelProviders, testManagedProviders);
 
       expect(prisma.projectSecret.findMany).toHaveBeenCalledWith({
         where: { projectId: PROJECT_ID },
@@ -161,6 +181,7 @@ describe("addEnvs", () => {
     const llmNode = (llmValue: unknown) => ({
       id: "llm_call",
       type: "signature",
+      position: { x: 0, y: 0 },
       data: {
         name: "LLM Call",
         parameters: [{ identifier: "llm", type: "llm", value: llmValue }],
@@ -172,7 +193,12 @@ describe("addEnvs", () => {
         nodes: [llmNode({ model: "openai/gpt-4o" })],
       });
 
-      const result = await addEnvs(event, PROJECT_ID);
+      const result = await addEnvs(
+        event,
+        PROJECT_ID,
+        testModelProviders,
+        testManagedProviders,
+      );
 
       const workflow = (result.payload as any).workflow;
       expect(workflow.nodes[0].data.parameters[0].value).toMatchObject({
@@ -186,10 +212,12 @@ describe("addEnvs", () => {
         nodes: [llmNode(undefined)],
       });
 
-      await expect(addEnvs(event, PROJECT_ID)).rejects.toThrow(LlmModelNotSetError);
-      await expect(addEnvs(event, PROJECT_ID)).rejects.toThrow(
-        'LLM node "LLM Call" has no model selected',
-      );
+      await expect(
+        addEnvs(event, PROJECT_ID, testModelProviders, testManagedProviders),
+      ).rejects.toThrow(LlmModelNotSetError);
+      await expect(
+        addEnvs(event, PROJECT_ID, testModelProviders, testManagedProviders),
+      ).rejects.toThrow('LLM node "LLM Call" has no model selected');
     });
 
     it("rejects an llm parameter with an empty model, naming the node", async () => {
@@ -197,7 +225,9 @@ describe("addEnvs", () => {
         nodes: [llmNode({ model: "" })],
       });
 
-      await expect(addEnvs(event, PROJECT_ID)).rejects.toThrow(LlmModelNotSetError);
+      await expect(
+        addEnvs(event, PROJECT_ID, testModelProviders, testManagedProviders),
+      ).rejects.toThrow(LlmModelNotSetError);
     });
   });
 });

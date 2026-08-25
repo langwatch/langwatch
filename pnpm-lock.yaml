@@ -2054,6 +2054,12 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../prisma-client
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       typescript:
         specifier: ^7.0.2

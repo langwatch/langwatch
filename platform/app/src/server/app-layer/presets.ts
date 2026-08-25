@@ -438,7 +438,12 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     searchAfter?: [number, string];
     runContext?: ClusteringRunContext;
   }): Promise<ClusteringPageOutcome> =>
-    clusterTopicsForProject({ ...params, resolveClickHouseClient });
+    clusterTopicsForProject({
+      ...params,
+      resolveClickHouseClient,
+      modelProviders,
+      managedProviders,
+    });
 
   // ADR-093: the composition root owns the App's Redis connection, and nothing
   // holds one at module scope. Two entry points outside a serving process build
@@ -470,18 +475,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     prisma,
     environment: process.env,
   }).service;
-  const modelProviders = AppModelProviderRuntime.create({
-    database: prisma,
-    managedProviders,
-    systemProviderEnvironment: process.env,
-    isSaas: env.IS_SAAS === "true",
-    permissions: authzFeature.permissions,
-  }).build();
-  const prompts = AppPromptRuntime.create({
-    database: prisma,
-    modelProvider: modelProviders,
-  }).build();
-
   const roles = AppRoleRuntime.create({
     database: prisma,
     grants: authzFeature.grants,
@@ -515,6 +508,18 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     }).build(),
     "ProjectService",
   );
+  const modelProviders = AppModelProviderRuntime.create({
+    database: prisma,
+    projects,
+    managedProviders,
+    systemProviderEnvironment: process.env,
+    isSaas: env.IS_SAAS === "true",
+    permissions: authzFeature.permissions,
+  }).build();
+  const prompts = AppPromptRuntime.create({
+    database: prisma,
+    modelProvider: modelProviders,
+  }).build();
   const apiKeyPepper = env.CREDENTIALS_SECRET ?? env.NEXTAUTH_SECRET;
   if (!apiKeyPepper) {
     throw new Error(
@@ -688,12 +693,12 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     migrateDsl: migrateWorkflowDslForExecution,
     getProjectModelProviders: (projectId) => modelProviders.getForProject({ projectId }),
     stripUnsupportedParams: ({ projectId, workflow }) =>
-      stripUnsupportedLLMParamsFromWorkflow({
-        prisma,
+      stripUnsupportedLLMParamsFromWorkflow(modelProviders, {
         projectId,
         workflow,
       }),
-    addEnvs,
+    addEnvs: (event, projectId) =>
+      addEnvs(event, projectId, modelProviders, managedProviders),
     dispatchNlp: (input) =>
       nlpgoFetch({
         projectId: input.projectId,
@@ -736,7 +741,9 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const evaluationExecution = traced(
     new EvaluationExecutionService({
       traceService,
-      modelEnvResolver: createDefaultModelEnvResolver(),
+      modelProviders,
+      managedProviders,
+      modelEnvResolver: createDefaultModelEnvResolver(modelProviders, managedProviders),
       langevalsClient: config.langevalsEndpoint
         ? new LangEvalsHttpClient(config.langevalsEndpoint)
         : new NullLangevalsClient(),
@@ -1660,7 +1667,12 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       promptProjectId: env.LANGY_PROMPT_PROJECT_ID?.trim(),
       models: {
         resolve: ({ projectId }) =>
-          getVercelAIModel({ projectId, featureKey: LANGY_CHAT_FEATURE_KEY }),
+          getVercelAIModel({
+            projectId,
+            featureKey: LANGY_CHAT_FEATURE_KEY,
+            modelProviders,
+            managedProviders,
+          }),
       },
       worker: langyAgentUrl && langyInternalSecret ? langyWorker : null,
       tokenBuffer: redis ? langyTokenBuffer : null,
@@ -2144,17 +2156,6 @@ export function createTestApp(
     prisma: testPrisma,
     environment: {},
   }).service;
-  const modelProviders = AppModelProviderRuntime.create({
-    database: testPrisma,
-    managedProviders,
-    systemProviderEnvironment: {},
-    isSaas: false,
-    permissions: testAuthz.permissions,
-  }).build();
-  const prompts = AppPromptRuntime.create({
-    database: testPrisma,
-    modelProvider: modelProviders,
-  }).build();
   const testRoles = AppRoleRuntime.create({
     database: testPrisma,
     grants: testAuthz.grants,
@@ -2198,6 +2199,18 @@ export function createTestApp(
     }).build(),
     "ProjectService",
   );
+  const modelProviders = AppModelProviderRuntime.create({
+    database: testPrisma,
+    projects: testProjects,
+    managedProviders,
+    systemProviderEnvironment: {},
+    isSaas: false,
+    permissions: testAuthz.permissions,
+  }).build();
+  const prompts = AppPromptRuntime.create({
+    database: testPrisma,
+    modelProvider: modelProviders,
+  }).build();
   const testDataRetentionService = PrismaDataRetentionAdapter.create({
     database: testPrisma,
     projects: testProjects,
