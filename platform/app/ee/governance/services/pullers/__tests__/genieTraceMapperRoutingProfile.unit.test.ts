@@ -16,6 +16,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { spanSchema } from "~/server/event-sourcing/pipelines/trace-processing/schemas/otlp";
 import {
   type ConversationRoutingProfile,
   GENIE_ROUTING_PROFILE,
@@ -82,6 +83,21 @@ describe("given a source mapping its own conversations", () => {
     expect((request as any).resourceSpans[0].scopeSpans[0].scope.name).toBe(
       "langwatch.ingestion.copilot_studio",
     );
+  });
+
+  it("emits spans a second source's batch can actually be ingested from", () => {
+    const request = mapGenieEventsToTraceRequest(
+      [conversationEvent("copilot_conversation")],
+      { ...ORIGIN, sourceType: "copilot_studio", profile: OTHER_PROFILE },
+    );
+
+    // The same gate Genie's own mapping is held to. Without it the assertions
+    // below could pass on a span the trace pipeline would reject on arrival.
+    const spans = (request as any).resourceSpans[0].scopeSpans[0].spans;
+    expect(spans.length).toBeGreaterThan(0);
+    for (const span of spans) {
+      expect(spanSchema.safeParse(span).success).toBe(true);
+    }
   });
 
   /** @scenario "A second kind of source routes its own conversations" */
