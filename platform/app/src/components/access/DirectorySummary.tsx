@@ -98,12 +98,16 @@ export function DirectorySummary({
       >
         <Fact
           label="Authentication source"
-          hint="Configured on the Authentication page. A source is the single sign-on connection your identity provider pushes people through."
+          hint="Configured on the Authentication page."
         >
           {/* The names ARE the value here: an administrator with two sources
               is not asking how many they have, they are asking which one is
-              the one that stopped. */}
-          <DirectorySourceChips connections={facts.connections} />
+              the one that stopped. The hint says where sources are
+              configured, and `addHref` makes that sentence pressable. */}
+          <DirectorySourceChips
+            connections={facts.connections}
+            addHref="/settings/authentication"
+          />
         </Fact>
         <Fact label="Last sync">
           {/* A date the directory has never written is not a date, so it

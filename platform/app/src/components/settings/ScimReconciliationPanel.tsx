@@ -14,8 +14,10 @@ import {
 import { Plug } from "lucide-react";
 import type { ReactNode } from "react";
 import { IdentityChip } from "~/components/access/IdentityRow";
+import { isRunningConnection } from "~/features/directory/logic/connectionLifecycle";
 import { api } from "../../utils/api";
 import RouterLink from "../../utils/compat/next-link";
+import { SettingsDisclosure } from "./SettingsDisclosure";
 import { SettingsEmptyState } from "./SettingsEmptyState";
 
 /**
@@ -145,20 +147,20 @@ type Reconciliation = NonNullable<
 >;
 type ConnectionPanel = Reconciliation["connections"][number];
 
-/** The lifecycle states in which a connection has left for good. */
-const RETIRED_STATES = new Set(["DISCARDED", "TORN_DOWN"]);
-
-function isRunningConnection(connection: ConnectionPanel): boolean {
-  return !RETIRED_STATES.has(connection.connectionState);
-}
-
 /**
  * The connections that are history, said as history.
  *
- * KEPT, NOT HIDDEN. The accounts a withdrawn connection provisioned are
- * still members of this organization, so a reader who removes a connection
- * and then asks "where did those forty people come from" needs to find it.
- * What they do not need is for it to look like it is still syncing.
+ * KEPT, NOT HIDDEN — but FOLDED. The accounts a withdrawn connection
+ * provisioned are still members of this organization, so a reader who removes
+ * a connection and then asks "where did those forty people come from" needs to
+ * find it. What they do not need is four dead connections and a paragraph
+ * about them standing open under the one connection that works: an
+ * organization that has been set up a few times reads as an organization with
+ * five directories, and the live one is the last thing on the page.
+ *
+ * So it opens closed, with the count in the summary. The count is the whole
+ * question somebody scanning has — "is there anything down there" — and it is
+ * answered without opening it.
  */
 function RetiredConnections({
   connections,
@@ -167,14 +169,23 @@ function RetiredConnections({
 }) {
   if (connections.length === 0) return null;
   return (
-    <VStack gap={2} width="full" align="stretch" paddingTop={2}>
-      <Text fontSize="xs" color="fg.muted" fontWeight={500}>
-        No longer connected
-      </Text>
+    <SettingsDisclosure summary={`No longer connected (${connections.length})`}>
+      <RetiredConnectionList connections={connections} />
+    </SettingsDisclosure>
+  );
+}
+
+function RetiredConnectionList({
+  connections,
+}: {
+  connections: ConnectionPanel[];
+}) {
+  return (
+    <VStack gap={2} width="full" align="stretch">
       <Text fontSize="xs" color="fg.muted" maxWidth="72ch">
         These connections have been removed. They provision nobody and their
-        tokens do nothing. Anyone they created is still a member here — taking
-        a connection away never takes people away with it.
+        tokens do nothing. Anyone they created is still a member here — taking a
+        connection away never takes people away with it.
       </Text>
       {connections.map((connection) => (
         <HStack

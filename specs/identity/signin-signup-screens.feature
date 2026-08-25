@@ -222,6 +222,62 @@ Feature: The first-party sign-in and sign-up screens - the auth screens is ours
     Then nothing is reported as having gone wrong
     And I can still finish by choosing a password
 
+  # ── A new account is asked for a credential before anything is mailed ──
+  #
+  # The order above — address, then credential, then the link — was built on
+  # the sign-up door and only there. The LOG-IN door kept the older order on
+  # both of its conversion paths: an address the router did not recognize, and
+  # a password typed for an address that turns out to hold no account. Both
+  # mailed a confirmation link straight from the address and asked for a
+  # credential afterwards, on the screen the link lands on.
+  #
+  # That is the wrong way round for two reasons. The mail goes out before
+  # anybody has committed to anything, so a mistyped address costs a stranger
+  # a message and costs us a send; and it puts somebody on a "check your email"
+  # screen as their first experience of the product, with the thing that would
+  # have finished the job — choosing a password — still one round trip away.
+  #
+  # `requestSignUpVerification` says as much in its own contract: it is the
+  # RESEND, for a link that expired or never arrived, and sign-up "no longer
+  # calls this". The two log-in paths were still calling it as a start.
+  @integration
+  Scenario: No confirmation link is sent until a credential has been chosen
+    Given I enter an address nobody holds an account for
+    When the screen offers to create an account with it
+    Then it asks for a password or a passkey before anything is sent
+    And no confirmation link has gone out while I am still choosing
+    And the account and the link are made by the same call, as on the sign-up door
+
+  # The one thing the log-in door must NOT do on the way is bank the password
+  # that was typed at it. That field is spelled `current-password`, is asked
+  # for once, and is held to no length — an account created from it could be
+  # made two ways, and the log-in way took a single character.
+  @integration
+  Scenario: Converting at the log-in door still asks for the password properly
+    Given I submitted a password for an address that holds no account
+    When the screen becomes the credential step
+    Then the password I typed at the log-in door is not carried into it
+    And I choose one there, typed twice and held to a length
+
+  # A passkey ceremony started from a SIGN-UP screen is a discoverable-
+  # credential request: the browser offers every passkey it holds for this
+  # site, and picking one signs that account in. On a screen whose whole
+  # purpose is to make a NEW account that is not an alternative way to finish
+  # the journey — it is a way to silently end up somewhere else, signed in as
+  # somebody the person was not trying to be. Worse, it looks like it worked.
+  #
+  # So the sign-up door offers passkeys the only way that means what it says:
+  # creating one, on the credential step, against the address being registered.
+  # Somebody who already has an account and a passkey is not stranded — the
+  # log-in door is one link away and carries the address they typed.
+  @integration
+  Scenario: The sign-up door never offers to use a passkey that already exists
+    Given this deployment offers passkeys
+    When I am on any step of creating a new account
+    Then no way in offers to use a passkey I already hold
+    And the passkey it does offer creates a new one for the address I am registering
+    And the way to the log-in door is on the card, so nobody with one is stranded
+
   # The address is the only personal data on these screens, and a query string
   # is written down by every hop it passes: access logs, proxies, error
   # reports, and the `Referer` of whatever is loaded next. The fragment is the
@@ -274,7 +330,7 @@ Feature: The first-party sign-in and sign-up screens - the auth screens is ours
   Scenario: Signing in without an account creates it through verification
     Given I enter an address nobody holds an account for
     When I submit a password on the log-in screen
-    Then I am told a link is on its way to finish setting up my account
+    Then the screen becomes the credential step for a new account with that address
     And a wrong password for an address that does have one still says so
 
   # The password is chosen ONCE, on the screen the confirmed link lands on,
@@ -286,8 +342,8 @@ Feature: The first-party sign-in and sign-up screens - the auth screens is ours
   Scenario: A password typed at the log-in door never becomes an account's password
     Given I enter an address nobody holds an account for
     When I submit a password on the log-in screen
-    Then only my address is sent to start the sign-up
-    And I choose my password after the address is confirmed, like every sign-up
+    Then only my address is carried into the sign-up
+    And I choose my password again on the credential step, like every sign-up
 
   # The commonest reason to be staring at "check your email" is that the
   # address on it is wrong. The step lives in memory rather than in the URL,
@@ -326,10 +382,10 @@ Feature: The first-party sign-in and sign-up screens - the auth screens is ours
   @integration
   Scenario: An address with no account carries on as a sign-up
     When I enter an email address no account holds
-    Then the screen says so and offers to create one with that address
-    And no password field is shown, because there is none to type
+    Then the screen says so and offers to create an account with that address
     And the address is carried, so I type it once
-    And confirming lands me on the same "check your email" the sign-up door shows
+    And it asks for a password or a passkey, the way the sign-up door does
+    And finishing lands me on the same "check your email" the sign-up door shows
     And I can go back to the address step for a mistyped address
 
   @integration

@@ -1,8 +1,9 @@
-import { Heading, SimpleGrid, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { SimpleGrid, Skeleton, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { DomainVerificationSection } from "~/components/access/DomainVerificationSection";
 import { JoinPolicyCard } from "~/components/access/JoinPolicyCard";
 import SettingsLayout from "~/components/SettingsLayout";
+import { SettingsPageHeader } from "~/components/settings/SettingsPageHeader";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -74,12 +75,10 @@ function AccessContent({
 
   return (
     <VStack gap={6} width="full" align="start">
-      <VStack align="start" gap={1} width="full">
-        <Heading>Access</Heading>
-        <Text color="fg.muted" fontSize="sm">
-          The rules this organization applies to everybody in it.
-        </Text>
-      </VStack>
+      <SettingsPageHeader
+        title="Access"
+        description="The rules this organization applies to everybody in it."
+      />
 
       {/* Where things stand, before any control: the four answers an
           administrator opens this page to check, each settled in detail by

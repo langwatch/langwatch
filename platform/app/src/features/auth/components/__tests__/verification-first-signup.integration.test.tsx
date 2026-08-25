@@ -544,6 +544,44 @@ describe("given the sign-up screen", () => {
       expect(await screen.findByTestId("method-picker")).toBeTruthy();
       expect(screen.queryByTestId("passkey-sign-up")).toBeNull();
     });
+
+    /**
+     * A ceremony started from a sign-up screen is a discoverable-credential
+     * request: the browser offers every passkey it holds for this site and
+     * picking one signs THAT account in. Somebody mid-sign-up who pressed it
+     * landed silently in a different account, having been shown nothing that
+     * said so — and it looked like the sign-up had worked.
+     *
+     * @scenario The sign-up door never offers to use a passkey that already exists
+     */
+    it("never offers an existing passkey, on the address step or after it", async () => {
+      routeMock.mockResolvedValue({
+        outcome: "method_picker",
+        methodSet: [
+          { id: "password", kind: "password", connectionId: null },
+          { id: "passkey", kind: "passkey", connectionId: null },
+        ],
+        reasonCode: "no_domain_match",
+      } satisfies RoutingDecision);
+
+      renderScreen();
+      // The address step, where the instance's other ways in are offered.
+      await screen.findByLabelText(/email/i);
+      await waitFor(() => expect(routeMock).toHaveBeenCalled());
+      expect(screen.queryByTestId("passkey-sign-in")).toBeNull();
+
+      await userEvent.type(screen.getByLabelText(/email/i), "sam@acme.com");
+      await userEvent.click(screen.getByRole("button", { name: "Continue" }));
+      await screen.findByTestId("signup-identifier");
+
+      // And on the credential step the passkey CREATES one for the address
+      // being registered, which is the only thing it can honestly do here.
+      expect(screen.queryByTestId("passkey-sign-in")).toBeNull();
+      expect(screen.getByTestId("passkey-sign-up")).toBeTruthy();
+      // Nobody is stranded: the other door is on the card, carrying the
+      // address they typed.
+      expect(screen.getByTestId("go-to-sign-in")).toBeTruthy();
+    });
   });
 
   describe("when this deployment never mounted passkeys", () => {

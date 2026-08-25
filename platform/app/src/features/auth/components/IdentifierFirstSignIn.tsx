@@ -1,13 +1,11 @@
-import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AuthCard } from "~/components/auth/AuthCard";
 import { HandledErrorAlert } from "~/features/errors";
 import { normalizeErrorCode, SignInError } from "~/pages/auth/error";
-import { api } from "~/utils/api";
 import { safeRedirectTarget, signIn, useSession } from "~/utils/auth-client";
 import { replaceLocation } from "~/utils/browserNavigation";
-import Link from "~/utils/compat/next-link";
 import { useSearchParams } from "~/utils/compat/next-navigation";
 import {
   useAuthAnalytics,
@@ -31,12 +29,12 @@ import {
 import { shouldStartPasskeyOnArrival } from "../logic/methodRanking";
 import { usePasskeyCeremony } from "../logic/passkeyCeremony";
 import { signInRoutingReasonCopy } from "../logic/routingReasonCopy";
+import { JOIN_BEFORE_CREATE_PATH } from "../logic/signUpDestination";
 import { useTwoStepChallenge } from "../logic/twoStepChallenge";
 import { AuthFinePrint } from "./AuthFinePrint";
 import { AuthPrimaryButton } from "./AuthPrimaryButton";
 import { CheckYourEmail } from "./CheckYourEmail";
 import { CredentialSignInForm } from "./CredentialSignInForm";
-import { EmailPill } from "./EmailPill";
 import { IdentifierStepForm } from "./IdentifierStepForm";
 import {
   PasskeyCeremonyPanel,
@@ -48,6 +46,7 @@ import {
   hasAlternativeMethods,
   SignInMethodPicker,
 } from "./SignInMethodPicker";
+import { SignUpCredentialForm } from "./SignUpCredentialForm";
 import {
   TwoStepChallengePanel,
   twoStepChallengeTitle,
@@ -97,7 +96,12 @@ export function IdentifierFirstSignIn() {
     readonly SignInMethod[]
   >([]);
   const [lastUsedMethodId] = useState(() => readLastUsedMethodId());
-  const [signingUp, setSigningUp] = useState<string | null>(null);
+  // The address is being made into an account and the credential step is up.
+  // Nothing has been created and nothing has been sent yet — see the note on
+  // `NoAccountYet`.
+  const [signingUpEmail, setSigningUpEmail] = useState<string | null>(null);
+  // The account exists, its link is on its way, and nobody is signed in.
+  const [sentTo, setSentTo] = useState<string | null>(null);
   // Every failure this card can have shows in one place, at the top. A
   // passkey is refused from a button part-way down the rail of methods, and
   // an alert opening there pushes the rest of the rail down the page.
@@ -168,13 +172,22 @@ export function IdentifierFirstSignIn() {
   // answer to a question that just failed to be answered.
   const showPicker =
     !routing.error && decision && (breakGlass || submittedIdentifier !== null);
+  // The address on its way to becoming an account, from whichever of the two
+  // conversions found it. Read before the picker below, so a password refused
+  // for an address nobody holds does not leave the picker standing.
+  const creatingAccountFor =
+    signingUpEmail ??
+    (decision?.outcome === "route_to_signup" && submittedIdentifier
+      ? submittedIdentifier
+      : null);
 
   // Told once, from the same state the returns below branch on, so the ground
   // can never be showing a step other than the one drawn over it.
   usePublishAuthStage({
     door: "signin",
     depth: signInDepth({
-      signingUp,
+      sentTo,
+      creatingAccountFor,
       challenged: twoStep !== null,
       showPicker: Boolean(showPicker),
     }),
@@ -187,7 +200,8 @@ export function IdentifierFirstSignIn() {
     surface: AUTH_SURFACE.signIn,
     step: signInStep({
       challenged: twoStep !== null,
-      signingUp: signingUp !== null,
+      sentTo: sentTo !== null,
+      creatingAccount: creatingAccountFor !== null,
       errored: Boolean(error),
       ceremony: passkeyCeremony !== null,
       outcome: decision?.outcome ?? null,
@@ -214,16 +228,17 @@ export function IdentifierFirstSignIn() {
     );
   }
 
-  if (signingUp) {
+  if (sentTo) {
     return (
       <CheckYourEmail
-        email={signingUp}
-        what="Open it to confirm the address, then choose a password."
+        email={sentTo}
+        what="Open it to confirm the address and finish signing in."
         onUseDifferentEmail={() => {
-          // Both, and in this order: the address step reads the router's
+          // All three, and in this order: the address step reads the router's
           // identifier, so clearing only the sent-to state would land back on
           // the password step for the address they came here to change.
-          setSigningUp(null);
+          setSentTo(null);
+          setSigningUpEmail(null);
           routing.clear();
         }}
       />
@@ -262,14 +277,36 @@ export function IdentifierFirstSignIn() {
   // Nobody holds this address, so the journey is a sign-up and the screen says
   // so rather than drawing a password box that can only fail (ADR-117,
   // revision 2026-08-25). The address is carried, so nothing is retyped.
-  if (decision?.outcome === "route_to_signup" && submittedIdentifier) {
+  //
+  // Reached two ways — the router said so, or a password was refused for an
+  // address the router then confirmed nobody holds — and both land on the same
+  // step, because to the person they are one situation.
+  if (creatingAccountFor) {
     return (
       <NoAccountYet
-        email={submittedIdentifier}
-        reasonCode={decision.reasonCode}
-        callbackUrl={callbackUrl}
-        onVerificationSent={setSigningUp}
-        onUseDifferentEmail={routing.clear}
+        email={creatingAccountFor}
+        reasonCode={
+          decision?.outcome === "route_to_signup" ? decision.reasonCode : null
+        }
+        callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH}
+        onAwaitingConfirmation={(email) => {
+          setSigningUpEmail(null);
+          setSentTo(email);
+        }}
+        onAddressAlreadyRegistered={() => {
+          // The address turned out to hold an account after all: the router
+          // reads the identity projection and `user.register` reads the
+          // account itself, and an account the projection has not caught up
+          // with is invisible to one and plain to the other. Not a refusal to
+          // show anybody — the way in is the picker, with the address already
+          // in it, which is what asking the router again renders.
+          setSigningUpEmail(null);
+          void decide({ identifier: creatingAccountFor, breakGlass });
+        }}
+        onUseDifferentEmail={() => {
+          setSigningUpEmail(null);
+          routing.clear();
+        }}
       />
     );
   }
@@ -308,7 +345,7 @@ export function IdentifierFirstSignIn() {
                 email={submittedIdentifier ?? ""}
                 callbackUrl={callbackUrl}
                 onUseDifferentEmail={routing.clear}
-                onSignUpStarted={setSigningUp}
+                onSignUpStarted={setSigningUpEmail}
               />
             );
           }}
@@ -375,16 +412,21 @@ export function IdentifierFirstSignIn() {
  * only ever agree.
  */
 function signInDepth({
-  signingUp,
+  sentTo,
+  creatingAccountFor,
   challenged,
   showPicker,
 }: {
-  signingUp: string | null;
+  sentTo: string | null;
+  creatingAccountFor: string | null;
   challenged: boolean;
   showPicker: boolean;
 }): AuthDepth {
   if (challenged) return "challenge";
-  if (signingUp) return "sent";
+  if (sentTo) return "sent";
+  // As far in as the password step it stands beside: the address has been
+  // answered for, and what is on screen is the way through.
+  if (creatingAccountFor) return "credential";
   if (showPicker) return "credential";
   return "entry";
 }
@@ -402,59 +444,64 @@ function signInDepth({
  * almost certainly came for, and keeps the other real possibility — a mistyped
  * address — one click away rather than behind the browser's back button.
  *
- * No password is asked for here and none is kept. The account is created the
- * way the sign-up door creates one: a confirmation link, then a password
- * chosen once on the screen built to ask for it.
+ * It asks for the CREDENTIAL, and nothing has been sent when it appears.
+ *
+ * This card used to be a single "Create an account" button that mailed a
+ * confirmation link, and asked for a password afterwards, on the screen the
+ * link lands on. That was the older order, kept here after the sign-up door
+ * moved off it, and it is wrong twice over: the mail goes out before anybody
+ * has committed to anything — so a mistyped address costs a stranger a message
+ * — and it puts a "check your email" screen between somebody and the one
+ * action that would have finished the job.
+ *
+ * So it is the sign-up door's own credential step, rendered here with the
+ * words that say how this address got to it. A password or a passkey, then
+ * `user.register` creates the account and mails the link on the same call, and
+ * only then does the screen become "check your email". The passkey it offers
+ * CREATES one for this address — an existing passkey signs somebody else's
+ * account in, which is not a way to finish making this one.
  */
 function NoAccountYet({
   email,
   reasonCode,
   callbackUrl,
-  onVerificationSent,
+  onAwaitingConfirmation,
+  onAddressAlreadyRegistered,
   onUseDifferentEmail,
 }: {
   email: string;
-  reasonCode: string;
-  callbackUrl?: string;
-  onVerificationSent: (email: string) => void;
+  /** Absent where a refused password found this address rather than the
+   *  router, which has no reason code to give for it. */
+  reasonCode: string | null;
+  callbackUrl: string;
+  onAwaitingConfirmation: (email: string) => void;
+  onAddressAlreadyRegistered: () => void;
   onUseDifferentEmail: () => void;
 }) {
-  const requestVerification = api.auth.requestSignUpVerification.useMutation();
-  const guidance = signInRoutingReasonCopy(reasonCode);
-
-  const send = () => {
-    requestVerification.mutate(
-      { email },
-      { onSuccess: () => onVerificationSent(email) },
-    );
-  };
+  const guidance = reasonCode ? signInRoutingReasonCopy(reasonCode) : null;
 
   return (
     <AuthCard
-      title={guidance?.title ?? "There is no account for that email yet"}
-      intro={guidance?.describe}
+      title={guidance?.title ?? "Let's create your account"}
+      intro={
+        guidance?.describe ??
+        "There is no account for that email address yet, so this is a sign-up."
+      }
+      finePrint={<AuthFinePrint />}
     >
       <VStack width="full" align="stretch" gap="14px">
-        {/* Never `error.message`: for a handled refusal that message IS the
-            code slug (#5984). The registry owns the words. */}
-        <HandledErrorAlert
-          error={requestVerification.error}
-          fallbackTitle="Couldn't start creating your account"
-          className="lw-auth-alert"
-        />
-        <EmailPill
+        <div data-testid="unknown-identifier" hidden>
+          {email}
+        </div>
+        <SignUpCredentialForm
           email={email}
-          actionLabel="Use a different email"
-          onAction={onUseDifferentEmail}
-          testId="unknown-identifier"
+          callbackUrl={callbackUrl}
+          onUseDifferentEmail={onUseDifferentEmail}
+          onAwaitingConfirmation={(confirmed) =>
+            onAwaitingConfirmation(confirmed)
+          }
+          onAddressAlreadyRegistered={onAddressAlreadyRegistered}
         />
-        <AuthPrimaryButton
-          isBusy={requestVerification.isPending}
-          onClick={send}
-          testId="create-account-here"
-        >
-          Create an account
-        </AuthPrimaryButton>
         <SignUpLink
           callbackUrl={callbackUrl}
           email={email}
@@ -576,31 +623,29 @@ function SignUpLink({
  */
 function signInStep({
   challenged,
-  signingUp,
+  sentTo,
+  creatingAccount,
   errored,
   ceremony,
   outcome,
-  hasIdentifier,
   showPicker,
 }: {
   challenged: boolean;
-  signingUp: boolean;
+  sentTo: boolean;
+  creatingAccount: boolean;
   errored: boolean;
   ceremony: boolean;
   outcome: string | null;
-  hasIdentifier: boolean;
   showPicker: boolean;
 }): string {
   if (challenged) return SIGN_IN_STEP.challenge;
-  if (signingUp) return SIGN_IN_STEP.checkEmail;
+  if (sentTo) return SIGN_IN_STEP.checkEmail;
   if (errored) return SIGN_IN_STEP.error;
   if (ceremony) return SIGN_IN_STEP.passkeyCeremony;
   if (outcome === "redirect_to_connection") {
     return SIGN_IN_STEP.routedToConnection;
   }
-  if (outcome === "route_to_signup" && hasIdentifier) {
-    return SIGN_IN_STEP.signUpHandoff;
-  }
+  if (creatingAccount) return SIGN_IN_STEP.signUpHandoff;
   if (showPicker) return SIGN_IN_STEP.methodPicker;
   return SIGN_IN_STEP.address;
 }

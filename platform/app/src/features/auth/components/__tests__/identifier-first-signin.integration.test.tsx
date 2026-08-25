@@ -18,18 +18,24 @@ const {
   routeMock,
   routeErrorRef,
   requestSignUpVerificationMock,
+  registerMock,
+  addPasskeyMock,
   signInMock,
   replaceMock,
   sessionRef,
   searchParamsRef,
+  publicEnvRef,
 } = vi.hoisted(() => ({
   routeMock: vi.fn(),
   routeErrorRef: { current: null as unknown },
   requestSignUpVerificationMock: vi.fn(),
+  registerMock: vi.fn(),
+  addPasskeyMock: vi.fn(),
   signInMock: vi.fn(),
   replaceMock: vi.fn(),
   sessionRef: { current: { data: null as unknown } },
   searchParamsRef: { current: new URLSearchParams("") },
+  publicEnvRef: { current: { IS_SAAS: true } as Record<string, unknown> },
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -42,13 +48,12 @@ vi.mock("~/utils/api", () => ({
           error: routeErrorRef.current,
         }),
       },
+      // Kept in the mock precisely so tests can assert it is NEVER reached.
+      // No confirmation link goes out until a credential has been chosen, and
+      // this is the call that would send one.
       requestSignUpVerification: {
         useMutation: () => ({
           mutateAsync: requestSignUpVerificationMock,
-          // The unknown-address card calls `mutate` with an `onSuccess`; the
-          // password form calls `mutateAsync`. Both are the same request, so
-          // both are the same spy, and the callback is honoured here so the
-          // card can move on the way it does in the browser.
           mutate: (
             input: { email: string },
             options?: { onSuccess?: () => void },
@@ -62,11 +67,22 @@ vi.mock("~/utils/api", () => ({
         }),
       },
     },
+    // The call that creates the account AND sends its link, on the credential
+    // step both doors now end at.
+    user: {
+      register: {
+        useMutation: () => ({
+          mutateAsync: registerMock,
+          isPending: false,
+          error: null,
+        }),
+      },
+    },
   },
 }));
 
 vi.mock("~/hooks/usePublicEnv", () => ({
-  usePublicEnv: () => ({ data: { IS_SAAS: true } }),
+  usePublicEnv: () => ({ data: publicEnvRef.current }),
 }));
 
 vi.mock("~/utils/auth-client", async (importOriginal) => {
@@ -75,6 +91,10 @@ vi.mock("~/utils/auth-client", async (importOriginal) => {
     ...actual,
     signIn: signInMock,
     useSession: () => sessionRef.current,
+    authClient: {
+      ...actual.authClient,
+      passkey: { addPasskey: addPasskeyMock },
+    },
   };
 });
 
@@ -124,6 +144,14 @@ const localPicker: RoutingDecision = {
   reasonCode: "no_domain_match",
 };
 
+/** Nobody holds the address. The router's answer, asked either by the address
+ *  step or by the password form after a refusal. */
+const unknownIdentifier: RoutingDecision = {
+  outcome: "route_to_signup",
+  methodSet: [],
+  reasonCode: "identifier_unknown",
+};
+
 const renderScreen = () =>
   render(
     <ChakraProvider value={defaultSystem}>
@@ -154,15 +182,17 @@ describe("given the identifier-first sign-in screen", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // The address has an account unless a test says otherwise, which is what
-    // makes a rejected password a WRONG password by default. Set explicitly,
-    // because an unset mock resolves — and a resolved sign-up request means
-    // "no account here, a link is on its way", which is the opposite.
+    // makes a rejected password a WRONG password by default. The router is
+    // what answers that now: a picker means somebody holds the address, and
+    // only `route_to_signup` says nobody does.
     requestSignUpVerificationMock.mockRejectedValue(
       new Error("email_already_registered"),
     );
+    registerMock.mockResolvedValue({ ok: true });
     routeErrorRef.current = null;
     sessionRef.current = { data: null };
     searchParamsRef.current = new URLSearchParams("");
+    publicEnvRef.current = { IS_SAAS: true };
     window.localStorage.clear();
   });
 
@@ -348,15 +378,27 @@ describe("given the identifier-first sign-in screen", () => {
   });
 
   describe("when the address typed in has no account at all", () => {
-    /** @scenario A password typed at the log-in door never becomes an account's password */
-    it("asks for a link and never banks the password that was typed", async () => {
-      routeMock.mockResolvedValue(localPicker);
+    /**
+     * The router is asked three times on this journey: once on mount with no
+     * address, once for the address that was typed, and once more by the
+     * password form — to tell a wrong password from somebody signing up. Only
+     * the last says nobody holds the address.
+     */
+    const refusedForAnUnheldAddress = () => {
+      routeMock
+        .mockResolvedValueOnce(localPicker)
+        .mockResolvedValueOnce(localPicker)
+        .mockResolvedValue(unknownIdentifier);
       signInMock.mockResolvedValue({
         error: "INVALID_EMAIL_OR_PASSWORD",
         code: "INVALID_EMAIL_OR_PASSWORD",
         status: 401,
       });
-      requestSignUpVerificationMock.mockResolvedValue({ sent: true });
+    };
+
+    /** @scenario A password typed at the log-in door never becomes an account's password */
+    it("asks for a credential and never banks the password that was typed", async () => {
+      refusedForAnUnheldAddress();
 
       const { container } = renderScreen();
       await enterEmail("nobody@example.com");
@@ -368,28 +410,89 @@ describe("given the identifier-first sign-in screen", () => {
       );
       await userEvent.click(screen.getByRole("button", { name: /^log in$/i }));
 
-      expect(await screen.findByTestId("verification-sent")).toHaveTextContent(
-        /nobody@example\.com/,
+      // The credential step, not a link. A password typed into a field spelled
+      // `current-password` must never become an account's password: it was
+      // asked for once and held to no length.
+      expect(await screen.findByTestId("unknown-identifier")).toHaveTextContent(
+        "nobody@example.com",
       );
-      // The address, and ONLY the address. A password typed into a field
-      // spelled `current-password` must never become an account's password:
-      // it was never confirmed and never held to a length.
-      expect(requestSignUpVerificationMock).toHaveBeenCalledWith({
-        email: "nobody@example.com",
-      });
+      expect(
+        container.querySelector('input[autocomplete="new-password"]'),
+      ).toBeTruthy();
+      expect(
+        (
+          container.querySelector(
+            'input[autocomplete="new-password"]',
+          ) as HTMLInputElement
+        ).value,
+      ).toBe("");
       // No refusal is shown on the way: nothing dead-ends here.
       expect(container.textContent).not.toMatch(/invalid email or password/i);
     });
 
+    /** @scenario Converting at the log-in door still asks for the password properly */
+    it("asks for the new password twice, and holds it to a length", async () => {
+      refusedForAnUnheldAddress();
+
+      const { container } = renderScreen();
+      await enterEmail("nobody@example.com");
+      await screen.findByTestId("method-picker");
+      await userEvent.type(
+        container.querySelector('input[type="password"]')!,
+        "typed-at-the-log-in-door",
+      );
+      await userEvent.click(screen.getByRole("button", { name: /^log in$/i }));
+      await screen.findByTestId("unknown-identifier");
+
+      // Empty: what was typed into a field spelled `current-password` did not
+      // travel into the field that becomes an account's password.
+      const first = container.querySelector(
+        'input[autocomplete="new-password"]',
+      ) as HTMLInputElement;
+      expect(first.value).toBe("");
+
+      // The confirmation arrives with the first keystroke — chosen once, typed
+      // twice, which the log-in door's single field never was.
+      await userEvent.type(first, "x");
+      await waitFor(() =>
+        expect(
+          container.querySelectorAll('input[autocomplete="new-password"]'),
+        ).toHaveLength(2),
+      );
+
+      // And held to a length. A single character never reaches the server,
+      // where the other test in this block proves a real password does.
+      await userEvent.click(
+        screen.getByRole("button", { name: /create account/i }),
+      );
+      expect(registerMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario No confirmation link is sent until a credential has been chosen */
+    it("has sent nothing at all while the credential is still being chosen", async () => {
+      refusedForAnUnheldAddress();
+
+      const { container } = renderScreen();
+      await enterEmail("nobody@example.com");
+      await screen.findByTestId("method-picker");
+      await userEvent.type(
+        container.querySelector('input[type="password"]')!,
+        "a-new-password",
+      );
+      await userEvent.click(screen.getByRole("button", { name: /^log in$/i }));
+      await screen.findByTestId("unknown-identifier");
+
+      // The whole point. Learning that an address is free used to cost the
+      // person who owns it a message, because asking for the link WAS how the
+      // screen found out.
+      expect(requestSignUpVerificationMock).not.toHaveBeenCalled();
+      expect(registerMock).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("verification-sent")).toBeNull();
+    });
+
     /** @scenario Going back from a sent link returns to the address step */
     it("goes back to the address step when the address was wrong", async () => {
-      routeMock.mockResolvedValue(localPicker);
-      signInMock.mockResolvedValue({
-        error: "INVALID_EMAIL_OR_PASSWORD",
-        code: "INVALID_EMAIL_OR_PASSWORD",
-        status: 401,
-      });
-      requestSignUpVerificationMock.mockResolvedValue({ sent: true });
+      refusedForAnUnheldAddress();
 
       const { container } = renderScreen();
       await enterEmail("typo@example.com");
@@ -399,28 +502,29 @@ describe("given the identifier-first sign-in screen", () => {
         "a-new-password",
       );
       await userEvent.click(screen.getByRole("button", { name: /^log in$/i }));
-      await screen.findByTestId("verification-sent");
+      await screen.findByTestId("unknown-identifier");
 
-      await userEvent.click(screen.getByTestId("check-email-back"));
+      await userEvent.click(
+        screen.getByRole("button", { name: /wrong email\?/i }),
+      );
 
       // All the way back to the address, not back to the password step for
       // the address they came here to change.
       expect(await screen.findByLabelText(/email/i)).toBeTruthy();
-      expect(screen.queryByTestId("verification-sent")).toBeNull();
+      expect(screen.queryByTestId("unknown-identifier")).toBeNull();
       expect(screen.queryByTestId("method-picker")).toBeNull();
     });
 
     /** @scenario Signing in without an account creates it through verification */
     it("keeps the honest failure when the address does have an account", async () => {
+      // The router says somebody holds it, both times it is asked, so the
+      // refusal really was a wrong password.
       routeMock.mockResolvedValue(localPicker);
       signInMock.mockResolvedValue({
         error: "INVALID_EMAIL_OR_PASSWORD",
         code: "INVALID_EMAIL_OR_PASSWORD",
         status: 401,
       });
-      requestSignUpVerificationMock.mockRejectedValue(
-        new Error("email_already_registered"),
-      );
 
       const { container } = renderScreen();
       await enterEmail("sam@example.com");
@@ -435,7 +539,8 @@ describe("given the identifier-first sign-in screen", () => {
       expect(
         await screen.findByText(/invalid email or password/i),
       ).toBeTruthy();
-      expect(screen.queryByTestId("verification-sent")).toBeNull();
+      expect(screen.queryByTestId("unknown-identifier")).toBeNull();
+      expect(requestSignUpVerificationMock).not.toHaveBeenCalled();
     });
   });
 
@@ -640,27 +745,37 @@ describe("given the identifier-first sign-in screen", () => {
   });
 
   describe("when the router says no account holds the address", () => {
-    const unknownIdentifier: RoutingDecision = {
-      outcome: "route_to_signup",
-      methodSet: [],
-      reasonCode: "identifier_unknown",
+    /**
+     * Types the same password into both boxes of the credential step. The
+     * second one is not on screen until the first is used, so it is queried
+     * after — see the sign-up screen's copy of this helper.
+     */
+    const fillPasswordPair = async (
+      container: HTMLElement,
+      password: string,
+    ) => {
+      const first = container.querySelector('input[type="password"]');
+      await userEvent.type(first as HTMLInputElement, password);
+      const both = container.querySelectorAll('input[type="password"]');
+      await userEvent.type(both[1] as HTMLInputElement, password);
     };
 
     /** @scenario An address with no account carries on as a sign-up */
-    it("says so, offers to create one, and shows no credential box", async () => {
+    it("says so and asks for a password, the way the sign-up door does", async () => {
       routeMock.mockResolvedValue(unknownIdentifier);
 
-      renderScreen();
+      const { container } = renderScreen();
       await enterEmail("nobody@example.com");
 
       expect(
         await screen.findByText(/no account for that email address yet/i),
       ).toBeTruthy();
-      // The dead end this outcome exists to remove: a password field somebody
-      // with no account can only fail at.
-      expect(document.querySelector('input[type="password"]')).toBeNull();
       expect(screen.queryByTestId("method-picker")).toBeNull();
-      expect(screen.getByTestId("create-account-here")).toBeTruthy();
+      // A NEW password — chosen here, typed twice and held to a length. The
+      // dead end this outcome removed was a `current-password` box somebody
+      // with no account could only fail at, and this is not one.
+      const field = container.querySelector('input[type="password"]');
+      expect(field?.getAttribute("autocomplete")).toBe("new-password");
     });
 
     /** @scenario An address with no account carries on as a sign-up */
@@ -673,27 +788,96 @@ describe("given the identifier-first sign-in screen", () => {
       expect(await screen.findByTestId("unknown-identifier")).toHaveTextContent(
         "nobody@example.com",
       );
+      expect(await screen.findByTestId("signup-identifier")).toHaveTextContent(
+        "nobody@example.com",
+      );
     });
 
-    /** @scenario An address with no account carries on as a sign-up */
-    it("sends the confirmation link and lands on the same check-your-email card", async () => {
+    /** @scenario No confirmation link is sent until a credential has been chosen */
+    it("mails nothing until the password is submitted", async () => {
       routeMock.mockResolvedValue(unknownIdentifier);
-      requestSignUpVerificationMock.mockResolvedValue({});
 
-      renderScreen();
+      const { container } = renderScreen();
       await enterEmail("nobody@example.com");
-      await userEvent.click(await screen.findByTestId("create-account-here"));
+      await screen.findByTestId("unknown-identifier");
 
-      await waitFor(() =>
-        expect(requestSignUpVerificationMock).toHaveBeenCalledWith({
-          email: "nobody@example.com",
-        }),
+      // Standing on the step, having typed nothing: no account, no link.
+      expect(registerMock).not.toHaveBeenCalled();
+      expect(requestSignUpVerificationMock).not.toHaveBeenCalled();
+
+      await fillPasswordPair(container, "a-strong-enough-password");
+      await userEvent.click(
+        screen.getByRole("button", { name: /create account/i }),
       );
+
+      // The account and the link are made by the same call, which is what
+      // lets sign-up open no session and still send mail.
+      await waitFor(() =>
+        expect(registerMock).toHaveBeenCalledWith(
+          expect.objectContaining({ email: "nobody@example.com" }),
+        ),
+      );
+      expect(requestSignUpVerificationMock).not.toHaveBeenCalled();
       // The same card the other doors end at: to the person waiting, arriving
       // here from the log-in form and from the sign-up form is one thing.
       expect(await screen.findByTestId("verification-sent")).toHaveTextContent(
         "nobody@example.com",
       );
+    });
+
+    /**
+     * The router reads the identity projection and `user.register` reads the
+     * account itself, so an account the projection has not caught up with is
+     * invisible to one and plain to the other. The screen used to say both
+     * things — "no account for that email yet", then "already registered" —
+     * and the second one was a dead end.
+     *
+     * @scenario Sign-up with an address that already has an account becomes a log-in
+     */
+    it("becomes the log-in picker when the address turns out to be held", async () => {
+      // Mount, then the address (nobody holds it), then the re-ask after
+      // `user.register` says otherwise.
+      routeMock
+        .mockResolvedValueOnce(localPicker)
+        .mockResolvedValueOnce(unknownIdentifier)
+        .mockResolvedValue(localPicker);
+      registerMock.mockRejectedValue({
+        data: {
+          error: {
+            code: "email_already_registered",
+            httpStatus: 409,
+            fault: "customer",
+          },
+        },
+      });
+
+      const { container } = renderScreen();
+      await enterEmail("sam@example.com");
+      await screen.findByTestId("unknown-identifier");
+      await fillPasswordPair(container, "a-strong-enough-password");
+      await userEvent.click(
+        screen.getByRole("button", { name: /create account/i }),
+      );
+
+      expect(await screen.findByTestId("method-picker")).toBeTruthy();
+      expect(screen.queryByTestId("unknown-identifier")).toBeNull();
+    });
+
+    /** @scenario The sign-up door never offers to use a passkey that already exists */
+    it("offers creating a passkey, never using one that already exists", async () => {
+      publicEnvRef.current = { IS_SAAS: true, PASSKEYS_ENABLED: true };
+      routeMock.mockResolvedValue(unknownIdentifier);
+
+      renderScreen();
+      await enterEmail("nobody@example.com");
+      await screen.findByTestId("unknown-identifier");
+
+      // Creating one for THIS address, which is the only thing a passkey can
+      // honestly do on a screen making a new account.
+      expect(screen.getByTestId("passkey-sign-up")).toBeTruthy();
+      // Using an existing one signs whoever owns it in, which is not a way to
+      // finish making this account — it is a way to end up somebody else.
+      expect(screen.queryByTestId("passkey-sign-in")).toBeNull();
     });
 
     /** @scenario An address with no account carries on as a sign-up */
@@ -703,7 +887,7 @@ describe("given the identifier-first sign-in screen", () => {
       renderScreen();
       await enterEmail("nobody@example.com");
       await userEvent.click(
-        await screen.findByRole("button", { name: /use a different email/i }),
+        await screen.findByRole("button", { name: /wrong email\?/i }),
       );
 
       expect(await screen.findByLabelText(/email/i)).toBeTruthy();

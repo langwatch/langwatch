@@ -1,6 +1,7 @@
-import { Heading, Text, VStack } from "@chakra-ui/react";
+import { VStack } from "@chakra-ui/react";
 import SettingsLayout from "../../components/SettingsLayout";
 import { AuthenticationSettings } from "../../components/settings/AuthenticationSettings";
+import { SettingsPageHeader } from "../../components/settings/SettingsPageHeader";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
@@ -22,19 +23,15 @@ function AuthenticationPage() {
 
   return (
     <SettingsLayout>
-      <VStack
-        align="stretch"
-        gap={6}
-        padding={6}
-        width="full"
-        maxWidth="1120px"
-      >
-        <VStack align="start" gap={1}>
-          <Heading>Authentication</Heading>
-          <Text color="fg.muted" fontSize="sm">
-            {`How everyone in ${organization.name} signs in, and how their accounts arrive.`}
-          </Text>
-        </VStack>
+      {/* No padding and no width cap of its own: `SettingsLayout` already
+          wraps every settings page in a padded, capped container, so the ones
+          this page added indented it inside an indent and made it narrower
+          than the three pages beside it. */}
+      <VStack align="stretch" gap={6} width="full">
+        <SettingsPageHeader
+          title="Authentication"
+          description={`How everyone in ${organization.name} signs in, and how their accounts arrive.`}
+        />
         <AuthenticationSettings organizationId={organization.id} />
       </VStack>
     </SettingsLayout>

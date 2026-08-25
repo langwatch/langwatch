@@ -2,6 +2,7 @@ import {
   Alert,
   Box,
   Button,
+  Heading,
   HStack,
   Spinner,
   Text,
@@ -177,11 +178,13 @@ export function GroupsSection({
 
   return (
     <>
-      <VStack align="stretch" gap={4} width="full">
-        <VStack align="start" gap={1}>
-          <Text fontSize="md" fontWeight={600}>
-            Groups
-          </Text>
+      <VStack align="stretch" gap={6} width="full">
+        {/* A HEADING, not bold text. It is the title of a section, so it
+            belongs in the document's heading order — a reader moving by
+            headings skipped this one entirely — and it wears the same `sm`
+            every other section title on these pages wears. */}
+        <VStack align="stretch" gap={2}>
+          <Heading size="sm">Groups</Heading>
           <Text color="fg.muted" fontSize="sm">
             Assign access to many people at once. Who is in a group your
             identity provider sends is theirs; what it grants is yours.

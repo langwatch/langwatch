@@ -163,8 +163,13 @@ describe("the single sign-on settings surface", () => {
       draw(<SingleSignOnSetup organizationId="org_acme" />);
 
       // Readable: the identity provider, the domain and where it stands.
-      expect(screen.getByText("okta")).toBeTruthy();
-      expect(screen.getByText("acme.com")).toBeTruthy();
+      // Named in more than one place on this screen — the connection's own
+      // card and the setup step that registered it — so this asks that it is
+      // readable, not that it appears exactly once.
+      expect(screen.getAllByText("okta").length).toBeGreaterThan(0);
+      // Likewise the domain: it is on the connection's card and in the row
+      // of the setup step that proves it.
+      expect(screen.getAllByText("acme.com").length).toBeGreaterThan(0);
       expect(screen.getByText("Not proved yet")).toBeTruthy();
       // In the words the status chip speaks, never the aggregate's own
       // vocabulary: a reader is told "Domain approved", not "APPROVED".
@@ -174,9 +179,14 @@ describe("the single sign-on settings surface", () => {
       // present. Every control named here is one this reader would be
       // refused; the read-only fields holding OUR addresses are not among
       // them, because copying those is something they can do.
+      // Every move the domain row can offer, whichever step it is on, plus
+      // the ones the rest of the screen offers.
       for (const refused of [
-        /get the record to publish/i,
-        /claim domain/i,
+        /prove this domain/i,
+        /prove with our licence/i,
+        /get a fresh record/i,
+        /claim it again/i,
+        /^remove$/i,
         /test sign-in/i,
         /grant a way back in/i,
         /go live/i,
@@ -202,12 +212,16 @@ describe("the single sign-on settings surface", () => {
 
       draw(<SingleSignOnSetup organizationId="org_acme" />);
 
+      // The step this row is actually on, whichever of them it is — the
+      // labels belong to `domainNextStepFor`, and the point here is that a
+      // manager is offered one at all.
       expect(
-        screen.getByRole("button", { name: /get the record to publish/i }),
+        screen.getByRole("button", {
+          name: /prove this domain|prove with our licence|get a fresh record|claim it again/i,
+        }),
       ).toBeTruthy();
-      expect(
-        screen.getByRole("button", { name: /claim domain/i }),
-      ).toBeTruthy();
+      // And the way back out, which only a manager is offered.
+      expect(screen.getByRole("button", { name: /^remove$/i })).toBeTruthy();
     });
   });
 

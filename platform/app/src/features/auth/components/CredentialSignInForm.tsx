@@ -53,7 +53,7 @@ type CredentialValues = z.infer<typeof credentialSchema>;
  *
  * On whether the address has an account: the SCREEN says nothing, but the
  * unified funnel deliberately does not pretend — an address with no account
- * converts to sign-up ("check your email") where a held account answers
+ * converts to sign-up (the credential step) where a held account answers
  * "invalid password". That asymmetry is ADR-117 §6 (Revision 2026-08-24),
  * which retired the no-oracle invariant at the screen level and scoped it to
  * the router and reset; the spec header in signin-signup-screens.feature
@@ -69,11 +69,15 @@ export function CredentialSignInForm({
   callbackUrl?: string;
   onUseDifferentEmail: () => void;
   /**
-   * Told when the address turned out to have no account, so a confirmation
-   * link went out instead. The password typed here is NOT kept — it is chosen
-   * once, after the address is confirmed, on the screen built to ask for it.
-   * Absent where an account is already known to exist, in which case a refusal
-   * is only ever a wrong password.
+   * Told when the address turned out to have no account, so the journey is a
+   * sign-up. NOTHING has been created and nothing has been sent: the screen's
+   * next move is the credential step, and the call that takes a password or a
+   * passkey there is what creates the account and mails the link.
+   *
+   * The password typed here is not kept and does not travel — it is chosen
+   * again on that step, typed twice and held to a length. Absent where an
+   * account is already known to exist, in which case a refusal is only ever a
+   * wrong password.
    */
   onSignUpStarted?: (email: string) => void;
 }) {
@@ -110,11 +114,12 @@ export function CredentialSignInForm({
       if (parsed.success) form.clearErrors("password");
     },
   });
-  // The same request the sign-up door makes, because from here on it IS the
-  // sign-up door: no password travels with it, and the one that was typed
-  // above is not kept.
-  const requestSignUpVerification =
-    api.auth.requestSignUpVerification.useMutation();
+  // The question the refusal above cannot answer on its own: does anybody hold
+  // this address? Asked of the ROUTER, which already answers it for the
+  // address step and sends nothing to anybody. It used to be asked by
+  // requesting a confirmation link and seeing whether that was refused, which
+  // mailed a stranger every time somebody mistyped their own address.
+  const route = api.auth.route.useMutation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const passwordField = useFocusWhenSettled();
@@ -131,8 +136,10 @@ export function CredentialSignInForm({
       email: address,
       password: values.password,
       callbackUrl,
-      convertToSignUp: onSignUpStarted
-        ? requestSignUpVerification.mutateAsync
+      addressHasNoAccount: onSignUpStarted
+        ? async ({ email: address }) =>
+            (await route.mutateAsync({ identifier: address })).outcome ===
+            "route_to_signup"
         : undefined,
     });
     setIsSubmitting(false);

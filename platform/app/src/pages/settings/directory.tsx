@@ -13,7 +13,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowLeft, Key, Plus, Trash2 } from "lucide-react";
+import { Key, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useSearchParams } from "react-router";
 import { DirectoryMembersSection } from "../../components/access/DirectoryMembersSection";
@@ -24,8 +24,9 @@ import { PermissionAlert } from "../../components/PermissionAlert";
 import SettingsLayout from "../../components/SettingsLayout";
 import { CopyValueRows } from "../../components/settings/CopyValueRows";
 import { ScimReconciliationPanel } from "../../components/settings/ScimReconciliationPanel";
+import { SettingsDisclosure } from "../../components/settings/SettingsDisclosure";
+import { SettingsPageHeader } from "../../components/settings/SettingsPageHeader";
 import { Dialog } from "../../components/ui/dialog";
-import { Link } from "../../components/ui/link";
 import { toaster } from "../../components/ui/toaster";
 import { showErrorToast } from "../../features/errors";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -162,23 +163,15 @@ function DirectorySettingsContent({
   return (
     <SettingsLayout>
       <VStack gap={6} width="full" align="start">
-        <VStack align="start" gap={2} width="full">
-          <Heading>Directory</Heading>
-          <Text color="fg.muted" fontSize="sm">
-            Your identity provider creates, updates and removes people here on
-            its own, over SCIM.
-          </Text>
-          {/* THE WAY BACK. This page is the second half of a subject whose
-              first half is Authentication, and until now the only route
-              between them ran one way. A reader who followed a card here and
-              wanted the connection itself had to find it in the menu again. */}
-          <Link href="/settings/authentication">
-            <Button size="xs" variant="ghost" paddingX={0}>
-              <ArrowLeft size={14} />
-              Authentication — the connections this comes from
-            </Button>
-          </Link>
-        </VStack>
+        {/* THE WAY BACK to Authentication is on the Authentication source
+            fact below, as a plus beside the sources themselves. A whole
+            sentence of a button under the page title said the same thing
+            louder, in the one place a reader is looking for the page's own
+            subject rather than for somewhere else to go. */}
+        <SettingsPageHeader
+          title="Directory"
+          description="Your identity provider creates, updates and removes people here on its own, over SCIM."
+        />
 
         {reach.maySeeSync && (
           <DirectorySummary
@@ -193,7 +186,10 @@ function DirectorySettingsContent({
           colorPalette="blue"
           width="full"
         >
-          <Tabs.List marginBottom={4}>
+          {/* The same gap Roles leaves under its own tabs. Two tabbed
+              settings pages sitting one menu item apart must not breathe
+              differently. */}
+          <Tabs.List marginBottom={6}>
             {reach.maySeeSync && (
               <Tabs.Trigger value="overview">Overview</Tabs.Trigger>
             )}
@@ -224,8 +220,9 @@ function DirectorySettingsContent({
           {reach.maySeeSync && (
             <Tabs.Content value="tokens">
               {/* TokensSection is a fragment of stacked blocks, so the tab
-                  supplies the column that spaces them. */}
-              <VStack gap={4} width="full" align="start">
+                  supplies the column that spaces them — the same column every
+                  other tab on this page uses. */}
+              <VStack gap={6} width="full" align="stretch">
                 <TokensSection
                   organizationId={organizationId}
                   mayManage={mayManageTokens}
@@ -268,7 +265,7 @@ function OverviewTab({
       : "";
 
   return (
-    <VStack gap={6} width="full" align="start">
+    <VStack gap={6} width="full" align="stretch">
       <ScimReconciliationPanel
         organizationId={organizationId}
         maySetUpSingleSignOn={maySetUpSingleSignOn}
@@ -389,7 +386,10 @@ function TokensSection({
     <>
       <VStack width="full" align="stretch" gap={2}>
         <HStack width="full">
-          <Heading size="md">Provisioning tokens</Heading>
+          {/* `sm`, like every other section heading on this page and on the
+              panels beside it. `md` made the Tokens tab read as a level above
+              the tabs it sits under. */}
+          <Heading size="sm">Provisioning tokens</Heading>
           <Spacer />
           {mayManage && (
             <Button size="sm" onClick={onGenerateOpen}>
@@ -401,18 +401,28 @@ function TokensSection({
         {/* WHAT THE THING IS, BEFORE THE TABLE OF THEM. "Provisioning token"
             names a mechanism to somebody who already knows it and nothing at
             all to anybody else, and the page below it went straight to
-            descriptions and last-used dates. */}
+            descriptions and last-used dates.
+
+            One sentence of it, though. The nine-line paragraph that used to
+            stand here answered every question at once, above a table somebody
+            had come to read — so it stopped being help and became the wall
+            they crossed to reach the page. What is left says what a token IS
+            and what to do with it; the rest is a fold below. */}
         <Text color="fg.muted" fontSize="sm" maxWidth="80ch">
           A provisioning token is the password your identity provider uses to
-          reach us. You issue one here, paste it into the provider alongside
-          the provisioning address, and from then on the provider can create,
-          update and remove people in this organization on its own — nobody
-          signs in to do it. Each token works against one single sign-on
-          connection and can only touch the people that connection
-          provisioned, so revoking one stops exactly that provider and nothing
-          else. The value is shown once when it is issued; if it is lost or
-          leaked, revoke it and issue another.
+          reach us. Issue one here and paste it into the provider alongside the
+          provisioning address.
         </Text>
+        <SettingsDisclosure summary="What a token can do, and what revoking one stops">
+          <Text color="fg.muted" fontSize="sm" maxWidth="80ch">
+            From then on the provider can create, update and remove people in
+            this organization on its own — nobody signs in to do it. Each token
+            works against one single sign-on connection and can only touch the
+            people that connection provisioned, so revoking one stops exactly
+            that provider and nothing else. The value is shown once when it is
+            issued; if it is lost or leaked, revoke it and issue another.
+          </Text>
+        </SettingsDisclosure>
       </VStack>
 
       <Card.Root width="full" overflow="hidden">

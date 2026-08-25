@@ -1,4 +1,5 @@
 import { api } from "~/utils/api";
+import { isRunningConnection } from "../logic/connectionLifecycle";
 
 /**
  * What the directory has been doing, read once for every surface that asks.
@@ -36,7 +37,16 @@ export function useDirectoryFacts({
     { enabled: canReadMembership && !!organizationId },
   );
 
-  const connections = reconciliation.data?.connections ?? [];
+  // The RUNNING ones. Every fact below is about what the directory is doing,
+  // and a connection that has been removed is not doing any of it: it
+  // provisions nobody, its tokens do nothing, and the last time it pushed is
+  // not this organization's last sync. Counting them put "+1 more" beside the
+  // live sources and made one working directory read as three. The removed
+  // ones are not hidden — the Directory page keeps them under their own
+  // heading, because the people they created are still members here.
+  const connections = (reconciliation.data?.connections ?? []).filter(
+    isRunningConnection,
+  );
   const lastPushedAtMs = connections.reduce<number | null>(
     (latest, connection) =>
       connection.lastPushedAtMs !== null &&

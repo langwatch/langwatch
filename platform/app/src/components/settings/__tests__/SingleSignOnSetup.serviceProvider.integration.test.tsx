@@ -98,9 +98,20 @@ describe("given an organization that may set single sign-on up and has no connec
 
   afterEach(cleanup);
 
+  /**
+   * The screen opens on the grid of identity providers, so the addresses and
+   * the fields are about a provider somebody has named. Okta's default
+   * protocol is OpenID Connect, and picking a PRODUCT leaves the protocol
+   * cards on screen — a preset pre-answers that question, it does not close
+   * it.
+   */
+  const pickOkta = () =>
+    fireEvent.click(screen.getByTestId("identity-provider-okta"));
+
   /** @scenario "LangWatch's own details are shown before the identity provider's are asked for" */
   it("shows the chosen protocol's addresses, and shows them above the fields to fill in", () => {
     const { container } = renderSetup();
+    pickOkta();
 
     // OpenID Connect is the default choice, and it needs exactly one of our
     // addresses. The other protocol's three are not a wall of URLs behind it.
@@ -112,7 +123,9 @@ describe("given an organization that may set single sign-on up and has no connec
     const ours = container.textContent?.indexOf(
       "Set LangWatch up in your identity provider",
     );
-    const theirs = container.textContent?.indexOf("Then tell us about it");
+    const theirs = container.textContent?.indexOf(
+      "Then bring back what Okta gives you",
+    );
     expect(ours).toBeGreaterThanOrEqual(0);
     expect(theirs).toBeGreaterThan(ours ?? 0);
   });
@@ -134,6 +147,7 @@ describe("given an organization that may set single sign-on up and has no connec
   /** @scenario "The administrator chooses which kind of provider they have" */
   it("offers both protocols by name, described by what the administrator holds", () => {
     renderSetup();
+    pickOkta();
 
     // Named by protocol — the word their identity provider's console uses —
     // and described by what they HAVE, because somebody handed a metadata
@@ -154,6 +168,7 @@ describe("given an organization that may set single sign-on up and has no connec
   /** @scenario "The administrator chooses which kind of provider they have" */
   it("asks for an issuer, a client id and a client secret by default", () => {
     renderSetup();
+    pickOkta();
 
     expect(screen.getByLabelText("Issuer address")).toBeDefined();
     expect(screen.getByLabelText("Client id")).toBeDefined();

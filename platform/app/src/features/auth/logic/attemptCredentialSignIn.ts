@@ -14,12 +14,18 @@ import { credentialSignInFailure } from "./credentialSignIn";
  * up at the log-in form, so the attempt carries on as a sign-up rather than
  * becoming a refusal they have to act on.
  *
- * What it does NOT do is keep the password. It asks for the same confirmation
- * link the sign-up door asks for, and the password is chosen once, afterwards,
- * on the one screen built to ask for it — typed twice and held to a length.
- * Banking whatever was typed into a field labelled `current-password` meant an
- * account could be created two ways, and the log-in way took a single
- * character and never asked twice.
+ * What it does NOT do is keep the password. The password is chosen once, on
+ * the credential step, typed twice and held to a length. Banking whatever was
+ * typed into a field labelled `current-password` meant an account could be
+ * created two ways, and the log-in way took a single character and never asked
+ * twice.
+ *
+ * Nor does it MAIL anything. It used to: the way it told the two situations
+ * apart was by asking for a confirmation link and seeing whether that was
+ * refused, so learning the address was free sent a stranger a message before
+ * they had chosen anything at all. Asking the router instead answers the same
+ * question and sends nothing, which is what lets the credential step come
+ * first on this door too.
  *
  * Kept out of the component because it is the one piece of this screen that is
  * a decision rather than a rendering, and because it is the piece a test wants
@@ -27,6 +33,12 @@ import { credentialSignInFailure } from "./credentialSignIn";
  */
 export type CredentialAttempt =
   | { outcome: "signed_in" }
+  /**
+   * Nobody holds this address, so the journey is a sign-up. Nothing has been
+   * created and nothing has been sent — the screen's next move is to ask for a
+   * credential, and the call that takes it is what creates the account and
+   * mails the link.
+   */
   | { outcome: "signing_up" }
   /**
    * The password was right and a second factor is still owed. Not a refusal:
@@ -45,21 +57,26 @@ export async function attemptCredentialSignIn({
   email,
   password,
   callbackUrl,
-  convertToSignUp,
+  addressHasNoAccount,
 }: {
   email: string;
   password: string;
   callbackUrl?: string;
   /**
-   * How an address with no account becomes a sign-up: it asks for the same
-   * confirmation link the sign-up door asks for, and takes no password. It
-   * REFUSES for an address that does have an account, which is what tells the
-   * two situations apart — so a wrong password stays a wrong password.
+   * Whether nobody holds this address — the one question that tells a wrong
+   * password apart from somebody signing up at the log-in form.
+   *
+   * A CHECK, deliberately, rather than the request that starts a sign-up.
+   * Answering it must cost the person nothing, because it is asked on every
+   * refused password: a stranger who mistypes their own address gets a screen
+   * that offers to create an account, not a message in somebody else's inbox.
    *
    * Absent where an account is already known to exist, in which case a refusal
-   * is only ever a wrong password.
+   * is only ever a wrong password. False on anything it cannot determine — a
+   * refusal that stands is the safe way to be wrong, since it never claims an
+   * address is free when it may not be.
    */
-  convertToSignUp?: (input: { email: string }) => Promise<unknown>;
+  addressHasNoAccount?: (input: { email: string }) => Promise<boolean>;
 }): Promise<CredentialAttempt> {
   let response: Awaited<ReturnType<typeof signIn>>;
   try {
@@ -93,16 +110,15 @@ export async function attemptCredentialSignIn({
     code: response?.code,
     message: response?.error,
   });
-  if (!looksLikeWrongCredentials || !convertToSignUp) return refused;
+  if (!looksLikeWrongCredentials || !addressHasNoAccount) return refused;
 
   try {
-    await convertToSignUp({ email });
+    if (!(await addressHasNoAccount({ email }))) return refused;
     return { outcome: "signing_up" };
   } catch {
-    // The address already has an account (so this really was a wrong
-    // password), or the request was rate-limited or could not be made. All
-    // three leave the honest refusal standing, which is the safe way to be
-    // wrong: it never claims a link is coming when none is.
+    // The check could not be made — rate-limited, or the request failed. The
+    // honest refusal stands, which is the safe way to be wrong: it never sends
+    // somebody off to create an account they may already have.
     return refused;
   }
 }

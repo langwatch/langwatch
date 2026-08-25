@@ -1,19 +1,11 @@
-import {
-  Alert,
-  Box,
-  Heading,
-  HStack,
-  Spinner,
-  Tabs,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Box, Spinner, Tabs, Text, VStack } from "@chakra-ui/react";
 import { useSearchParams } from "react-router";
 import { RoleAssignmentsPanel } from "~/components/access/RoleAssignmentsPanel";
 import { RolesPanel } from "~/components/access/RolesPanel";
 import { ROLE_ASSIGNMENT_WORDS } from "~/components/access/roleAssignments";
 import { useDrawer } from "~/hooks/useDrawer";
 import SettingsLayout from "../../components/SettingsLayout";
+import { SettingsPageHeader } from "../../components/settings/SettingsPageHeader";
 import { ContactSalesBlock } from "../../components/subscription/ContactSalesBlock";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useActivePlan } from "../../hooks/useActivePlan";
@@ -50,7 +42,10 @@ function RolesSettings() {
           <Alert.Root status="info">
             <Alert.Indicator />
             <Alert.Content>
-              <Alert.Title>Enterprise Feature</Alert.Title>
+              {/* Sentence case, like the identical alert Groups draws. The
+                  same lock spelled two ways is the same lock looking like two
+                  products. */}
+              <Alert.Title>Enterprise feature</Alert.Title>
               <Alert.Description>
                 Custom roles are available on Enterprise plans. Contact sales to
                 upgrade.
@@ -113,14 +108,10 @@ function RolesTabs({
 
   return (
     <VStack align="start" width="full" gap={6}>
-      <HStack justify="space-between" width="full">
-        <VStack align="start" gap={1}>
-          <Heading as="h2">Roles</Heading>
-          <Text color="fg.muted" fontSize="sm">
-            What a role can do, and who holds one.
-          </Text>
-        </VStack>
-      </HStack>
+      <SettingsPageHeader
+        title="Roles"
+        description="What a role can do, and who holds one."
+      />
 
       <Tabs.Root
         value={tab}

@@ -1,11 +1,10 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { HStack, Text } from "@chakra-ui/react";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity";
 import { useEffect, useRef, useState } from "react";
 import { AuthCard } from "~/components/auth/AuthCard";
 import { HandledErrorAlert, readHandledError } from "~/features/errors";
 import { api } from "~/utils/api";
 import { signIn } from "~/utils/auth-client";
-import Link from "~/utils/compat/next-link";
 import { useSearchParams } from "~/utils/compat/next-navigation";
 import { hardRedirect } from "~/utils/hardRedirect";
 import {
@@ -22,6 +21,7 @@ import {
   rememberPendingMethod,
 } from "../logic/lastUsedMethod";
 import { usePasskeyCeremony } from "../logic/passkeyCeremony";
+import { JOIN_BEFORE_CREATE_PATH } from "../logic/signUpDestination";
 import { useTwoStepChallenge } from "../logic/twoStepChallenge";
 import { AuthFinePrint } from "./AuthFinePrint";
 import { CheckYourEmail } from "./CheckYourEmail";
@@ -44,12 +44,6 @@ import {
   TwoStepChallengePanel,
   twoStepChallengeTitle,
 } from "./TwoStepChallengePanel";
-
-/**
- * Where a new account goes before it makes an organization: the
- * join-before-create step (D12 fills it; today it passes straight through).
- */
-const JOIN_BEFORE_CREATE_PATH = "/auth/join";
 
 /**
  * Sign-up (D13, ADR-117 §6).
@@ -158,12 +152,24 @@ export function VerificationFirstSignUp() {
 
   // What this instance offers with no address in hand, so the same social
   // buttons the log-in screen shows are available here from the first step.
+  //
+  // Every way in EXCEPT an existing passkey. A passkey ceremony started from
+  // here is a discoverable-credential request: the browser offers every
+  // passkey it holds for this site and picking one signs THAT account in. On
+  // the door whose whole purpose is to make a new account that is not another
+  // way to finish — it is a way to end up silently signed in as somebody else,
+  // and it looks like it worked. The passkey this door does offer is on the
+  // credential step, where it CREATES one for the address being registered
+  // (D07). Somebody who already has one is not stranded: "Or log in instead"
+  // is on the card and carries the address they typed.
   useEffect(() => {
     if (askedOnMount.current || verifyToken) return;
     askedOnMount.current = true;
     void decide({ identifier: null }).then((decision) => {
       if (decision?.outcome === "method_picker") {
-        setInstanceMethods(decision.methodSet);
+        setInstanceMethods(
+          decision.methodSet.filter((method) => method.kind !== "passkey"),
+        );
       }
     });
   }, [decide, verifyToken]);
@@ -364,6 +370,12 @@ export function VerificationFirstSignUp() {
             void decide({ identifier: signingUpEmail });
           }}
         />
+        {/* The other door, on this stage as on every other. It matters most
+            HERE: this door deliberately offers no EXISTING passkey, so for
+            somebody who already has an account and came to the wrong page,
+            this link is the way on — rather than a ceremony that would have
+            signed them into that account by accident, mid-sign-up. */}
+        <LogInLink callbackUrl={callbackUrl} label="Or log in instead" />
       </AuthCard>
     );
   }
