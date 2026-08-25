@@ -1,10 +1,6 @@
 import type { PrismaClient } from "~/generated/prisma/client";
 import { RESERVED_PROJECT_SECRET_NAMES } from "~/server/projects/reserved-secret-names";
-import { decrypt, encrypt } from "~/utils/encryption";
-import {
-  SecretNotFoundError,
-  SecretValueUnreadableError,
-} from "./secrets.errors";
+import { encrypt } from "~/utils/encryption";
 import { SecretsRepository } from "./secrets.repository";
 
 const MAX_SECRETS_PER_PROJECT = 50;
@@ -63,47 +59,6 @@ export class SecretsService {
       return null;
     }
     return toResponse(secret);
-  }
-
-  /**
-   * Read a secret's value back by name.
-   *
-   * The only route that returns a value. Callers hold `secrets:manage`, the
-   * write grain: whoever can replace a secret can already choose its next
-   * value, so reading the current one grants nothing further.
-   */
-  async getValueByName({
-    projectId,
-    name,
-  }: {
-    projectId: string;
-    name: string;
-  }): Promise<{ name: string; value: string; updatedAt: string }> {
-    const secret = await this.repo.findValueByNameInProject({
-      name,
-      projectId,
-    });
-
-    // Product-owned rows read as not-found, the same as the listing and the
-    // by-id read: the customer did not create them and must not read them here.
-    if (!secret || RESERVED_PROJECT_SECRET_NAMES.includes(secret.name)) {
-      throw new SecretNotFoundError();
-    }
-
-    let value: string;
-    try {
-      value = decrypt(secret.encryptedValue);
-    } catch (error) {
-      throw new SecretValueUnreadableError({
-        reasons: error instanceof Error ? [error] : [],
-      });
-    }
-
-    return {
-      name: secret.name,
-      value,
-      updatedAt: secret.updatedAt.toISOString(),
-    };
   }
 
   async create({

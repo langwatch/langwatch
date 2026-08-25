@@ -72,24 +72,6 @@ class SecretsFacade:
         _raise_for_status(response, operation="get")
         return response.json()
 
-    def get_value(self, name: str) -> str:
-        """
-        Read a secret's value back by name.
-
-        The only call that returns a value. It needs a key that can manage
-        secrets, because a caller that can replace a secret can already choose
-        its next value.
-
-        Args:
-            name: Secret name (UPPER_SNAKE_CASE).
-
-        Raises:
-            ValueError: The project holds no secret under that name.
-        """
-        response = self._http().get(f"/api/secrets/by-name/{_quote(name)}/value")
-        _raise_for_status(response, operation="get_value")
-        return response.json()["value"]
-
     def set(self, name: str, value: str) -> Dict[str, Any]:
         """
         Store a value under a name, whether or not the secret exists yet.

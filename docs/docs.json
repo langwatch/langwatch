@@ -1276,7 +1276,6 @@
               "api-reference/secrets/list-secrets",
               "api-reference/secrets/create-secrets",
               "api-reference/secrets/get-secrets",
-              "api-reference/secrets/get-value",
               "api-reference/secrets/update-secrets",
               "api-reference/secrets/delete-secrets"
             ]

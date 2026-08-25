@@ -1,16 +1,15 @@
-"""Unit coverage for the secrets facade upsert and value read.
+"""Unit coverage for the secrets facade upsert.
 
 Transport is a mounted httpx.MockTransport, so the tests assert on the calls
 the facade makes rather than on a live API.
 
-Spec: specs/secrets/secret-value-read.feature
+Spec: specs/secrets/secret-upsert.feature
 """
 
 import json
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
-import pytest
 
 from langwatch.secrets import SecretsFacade
 
@@ -34,8 +33,8 @@ class SecretsStub:
     def __init__(self, *, stored: Optional[Dict[str, str]] = None) -> None:
         self.stored: Dict[str, str] = dict(stored or {})
         self.calls: List[Tuple[str, str]] = []
-        # Set to a name to make the first create for it collide, the way a row
-        # running beside this one would.
+        # Set to a name to make the first create for it collide, the way a
+        # caller running beside this one would.
         self.claimed_on_create: Optional[str] = None
 
     def _id(self, name: str) -> str:
@@ -61,7 +60,7 @@ class SecretsStub:
             name = body["name"]
             if self.claimed_on_create == name:
                 self.claimed_on_create = None
-                self.stored[name] = "written-by-the-other-row"
+                self.stored[name] = "written-by-the-other-caller"
                 return httpx.Response(
                     409, json={"error": "A secret with that name already exists"}
                 )
@@ -78,21 +77,6 @@ class SecretsStub:
                     )
             return httpx.Response(404, json={"error": "secret_not_found"})
 
-        if request.method == "GET" and path.startswith("/api/secrets/by-name/"):
-            name = path.removeprefix("/api/secrets/by-name/").removesuffix(
-                "/value"
-            )
-            if name not in self.stored:
-                return httpx.Response(404, json={"error": "secret_not_found"})
-            return httpx.Response(
-                200,
-                json={
-                    "name": name,
-                    "value": self.stored[name],
-                    "updatedAt": "2026-01-01T00:00:00.000Z",
-                },
-            )
-
         raise AssertionError(f"unexpected call {request.method} {path}")
 
 
@@ -105,47 +89,29 @@ class TestSet:
     def test_creates_a_secret_the_project_does_not_hold(self):
         stub = SecretsStub()
 
-        facade_over(stub).set("ACME_SESSION", "first")
+        facade_over(stub).set("ACME_TOKEN", "first")
 
-        assert stub.stored == {"ACME_SESSION": "first"}
+        assert stub.stored == {"ACME_TOKEN": "first"}
         assert ("POST", "/api/secrets") in stub.calls
-        assert ("PUT", "/api/secrets/secret-ACME_SESSION") not in stub.calls
+        assert ("PUT", "/api/secrets/secret-ACME_TOKEN") not in stub.calls
 
     # @scenario "Storing a secret that exists replaces its value"
     def test_updates_a_secret_the_project_already_holds(self):
-        stub = SecretsStub(stored={"ACME_SESSION": "first"})
+        stub = SecretsStub(stored={"ACME_TOKEN": "first"})
 
-        facade_over(stub).set("ACME_SESSION", "second")
+        facade_over(stub).set("ACME_TOKEN", "second")
 
-        assert stub.stored == {"ACME_SESSION": "second"}
+        assert stub.stored == {"ACME_TOKEN": "second"}
         assert ("POST", "/api/secrets") not in stub.calls
-        assert ("PUT", "/api/secrets/secret-ACME_SESSION") in stub.calls
+        assert ("PUT", "/api/secrets/secret-ACME_TOKEN") in stub.calls
 
-    # @scenario "A secret created by a row running beside this one is updated instead"
+    # @scenario "A secret created by a caller running beside this one is updated instead"
     def test_updates_when_another_caller_creates_the_name_first(self):
         stub = SecretsStub()
-        stub.claimed_on_create = "ACME_SESSION"
+        stub.claimed_on_create = "ACME_TOKEN"
 
-        facade_over(stub).set("ACME_SESSION", "mine")
+        facade_over(stub).set("ACME_TOKEN", "mine")
 
-        assert stub.stored == {"ACME_SESSION": "mine"}
+        assert stub.stored == {"ACME_TOKEN": "mine"}
         assert ("POST", "/api/secrets") in stub.calls
-        assert ("PUT", "/api/secrets/secret-ACME_SESSION") in stub.calls
-
-
-class TestGetValue:
-    def test_reads_the_stored_value_back(self):
-        stub = SecretsStub(stored={"ACME_SESSION": "session-1"})
-
-        assert facade_over(stub).get_value("ACME_SESSION") == "session-1"
-        assert (
-            "GET",
-            "/api/secrets/by-name/ACME_SESSION/value",
-        ) in stub.calls
-
-    # @scenario "Reading a value the project does not hold names the missing secret"
-    def test_names_a_secret_the_project_does_not_hold(self):
-        stub = SecretsStub()
-
-        with pytest.raises(ValueError, match="not found"):
-            facade_over(stub).get_value("ACME_SESSION")
+        assert ("PUT", "/api/secrets/secret-ACME_TOKEN") in stub.calls

@@ -34678,7 +34678,7 @@ langwatch secret create AUTH0_AUDIENCE --value "https://api.your-company.interna
 langwatch secret create AUTH0_API_URL --value "https://api.your-company.internal/chat"
 ```
 
-Secret names must be `UPPER_SNAKE_CASE` (`^[A-Z][A-Z0-9_]*$`). Values are encrypted at rest, and the UI never shows one. `GET /api/secrets/by-name/{name}/value` is the only route that returns a value, and it needs an API key that can manage secrets; every other secrets route answers with names and timestamps. See [reusing one login across the rows of a run](#reusing-one-login-across-the-rows-of-a-run).
+Secret names must be `UPPER_SNAKE_CASE` (`^[A-Z][A-Z0-9_]*$`). Values are encrypted and never returned by any API.
 
 <Warning>
   Never paste the client secret into the agent's Python. The stored code is readable by anyone with project access; the `secrets` namespace exists so the credential is stored encrypted at rest and never persisted in the agent's source. At run time it is injected into the execution's memory and sent only to your token endpoint.
@@ -34752,191 +34752,6 @@ Create a scenario whose criteria can only pass if the agent got through the auth
 
 That answer exists only behind the auth wall, so the scenario passing is the proof that authentication works.
 
-## Reusing one login across the rows of a run
-
-The rows of an experiment or a dataset run are isolated on purpose, so that they
-can run in parallel. Each row starts cold, and a login on every row is the
-default result. There is no per-batch cache and no shared-state hook.
-
-Use the project's own secret store as the shared store. The agent writes the
-session there after it logs in, and reads it back at the start of every row
-through the LangWatch Python SDK. The value is encrypted at rest, and only a
-caller that can manage secrets can read it, so this is the correct place for a
-session token. A dataset row is the alternative, and it is stored in clear and
-is readable in the UI, so it suits a fixture and not a credential.
-
-Add two more project secrets so the agent can reach LangWatch:
-
-```bash
-langwatch secret create LANGWATCH_ENDPOINT --value "https://app.langwatch.ai"
-```
-
-Create `LANGWATCH_API_KEY` through the **Settings → Secrets** UI, with your
-project API key as the value. That key holds project access, so the agent must
-send it to `LANGWATCH_ENDPOINT` and to no other address.
-
-The whole agent is below. It is executed on every commit against the real
-code-agent runtime, so this is working code and not a sketch.
-
-```python shared_session_code_agent.py
-# Log in once and share the session across the rows of a run.
-#
-# Rows are isolated, so each one starts cold and a login on every row is the
-# default result. This agent keeps one session in the project's encrypted
-# secret store and reads it back through the LangWatch SDK at the start of
-# every row, so only the rows that start at the same moment log in.
-#
-# The runner injects `secrets` as a namespace (not the stdlib module of that
-# name), the entry point is `class Code` with `__call__`, and every declared
-# output key must be returned.
-
-import json
-import sys
-import time
-
-import langwatch
-import requests
-
-SESSION_ENTRY_NAME = "ACME_SESSION"  # the project secret that holds the session
-SESSION_TTL_SECONDS = 15 * 60  # what the target system promises
-REFRESH_MARGIN_SECONDS = 60  # refresh this early; keep it under the TTL
-
-
-class Code:
-    def __call__(self, message: str):
-        langwatch.setup(
-            api_key=secret("LANGWATCH_API_KEY"),
-            endpoint_url=secret("LANGWATCH_ENDPOINT"),
-            # The run already reports this row; a second exporter only adds
-            # work inside the runner's time budget.
-            skip_open_telemetry_setup=True,
-        )
-
-        response = requests.post(
-            secret("ACME_API_URL"),
-            json={"message": message},
-            headers={"Authorization": f"Bearer {get_session()}"},
-            timeout=30,
-        )
-        # raise_for_status names the URL and the status code and nothing else.
-        response.raise_for_status()
-
-        return {"output": response.json()["reply"]}
-
-
-def get_session():
-    """Return a session token. This is the one line each row calls."""
-    stored = read_stored_session()
-    if stored is not None:
-        return stored
-
-    session = login()
-    store_session(session)
-    return session
-
-
-def read_stored_session():
-    """Return the stored session while it is fresh, else None."""
-    try:
-        entry = json.loads(langwatch.secrets.get_value(SESSION_ENTRY_NAME))
-        session = entry["session"]
-        age = time.time() - float(entry["issued_at"])
-    except Exception:  # noqa: BLE001 - no stored session is a valid answer
-        report("is not stored yet, or could not be read", "this row logs in")
-        return None
-
-    # Anything this agent did not write is a miss, never a token to send: an
-    # empty or non-string session becomes an empty Bearer header, and an age
-    # that is negative or not a number comes from a hand-written entry.
-    if not isinstance(session, str) or not session:
-        report("does not hold a session", "this row logs in")
-        return None
-    if not 0 <= age < SESSION_TTL_SECONDS - REFRESH_MARGIN_SECONDS:
-        return None
-    return session
-
-
-def login():
-    """Log in to the target system and return the session it gives back."""
-    response = requests.post(
-        secret("ACME_LOGIN_URL"),
-        json={
-            "username": secret("ACME_USERNAME"),
-            "password": secret("ACME_PASSWORD"),
-        },
-        timeout=10,
-        # A 307 or 308 redirect re-sends the POST body, password included.
-        allow_redirects=False,
-    )
-    response.raise_for_status()
-    return response.json()["session"]
-
-
-def store_session(session):
-    """Write the session back, with the time it was issued. A failure here does
-    not fail the row: the row holds a working session already, and the only
-    cost is that the next row logs in again."""
-    entry = json.dumps({"session": session, "issued_at": int(time.time())})
-    try:
-        langwatch.secrets.set(SESSION_ENTRY_NAME, entry)
-    except Exception:  # noqa: BLE001 - the row must still answer
-        report("could not be stored", "the next row will log in again")
-
-
-def report(state, consequence):
-    """Say on stderr what the store did, in this agent's own words.
-
-    Nothing from the exception reaches the output. An error message can quote
-    the credential that caused it, and a run shows stderr.
-    """
-    print(f"{SESSION_ENTRY_NAME} {state}, {consequence}", file=sys.stderr)
-
-
-def secret(name):
-    """Read a project secret, and name it when the project does not hold it."""
-    namespace = globals().get("secrets")
-    value = getattr(namespace, name, None) if namespace else None
-    if not value:
-        raise RuntimeError(
-            f"project secret {name} is missing. Add it in Settings -> Secrets."
-        )
-    return value
-```
-
-<Note>
-  The `langwatch.secrets.set` and `langwatch.secrets.get_value` calls need
-  `langwatch` **1.3.0** or later. Pin it in the sandbox before you use this
-  agent.
-</Note>
-
-### Setting the two numbers
-
-`SESSION_TTL_SECONDS` is what the target system promises. `REFRESH_MARGIN_SECONDS`
-is how early the agent replaces the session, and it has to sit between the
-duration of your slowest row and `SESSION_TTL_SECONDS`. Below the slowest row, a
-session can expire in the middle of a call. At or above the TTL, every session
-reads as stale and every row logs in again.
-
-### What this pattern does and does not do
-
-The agent reads the store when the row runs, not when the row is prepared, so a
-row picks up whatever the newest session is at that moment. Three results
-follow:
-
-- A run over a dataset logs in once and every row after that reuses the session.
-- Rows that start at the same moment can each read an empty store, so each of
-  them logs in once. Both sessions are valid and the last write wins. No lock
-  prevents this. Keep the login idempotent on the target system, or lower the
-  run's parallelism when the target rate-limits the login.
-- A failed write does not fail the row. The row already holds a working session,
-  and the only cost is that the next row logs in again. The agent says on stderr
-  what the store did, in its own fixed words, and nothing from the exception
-  reaches the output: an error message can quote the credential that caused it.
-
-The source of this file is
-[`shared_session_code_agent.py`](https://github.com/langwatch/langwatch/blob/main/services/nlpgo/app/engine/blocks/codeblock/examples/shared_session_code_agent.py).
-
-
 ## Troubleshooting
 
 | Symptom | Likely cause |
@@ -34945,9 +34760,6 @@ The source of this file is
 | `missing_output` error | The Python returned a dict without one of the agent's declared output keys. |
 | Credential works locally but not on the platform | The secret name in `secrets.NAME` doesn't match a stored project secret, or the value was stored in a different project. |
 | Timeout | Token fetch + downstream call exceeded the 60s runner budget. Check both endpoints' latency. |
-| Every row logs in again | The session was not written back. Check the run output for the store failure, and check that `LANGWATCH_API_KEY` and `LANGWATCH_ENDPOINT` are project secrets. |
-| Rows that start together each log in, later rows do not | Expected. Each of them read an empty store, so each one logs in. The rows after them reuse the stored session. |
-| `ACME_SESSION is not stored yet, or could not be read, this row logs in` | The line does not tell the two causes apart, so check both. Nothing is stored yet, which is expected on the first row and after a failed write, or the read did not get through: `LANGWATCH_API_KEY` must be able to manage secrets and `LANGWATCH_ENDPOINT` must point at your instance. |
 
 ---
 
@@ -68280,15 +68092,6 @@ openapi: "DELETE /api/secrets/{id}"
 ---
 title: "Get a secret by its ID"
 openapi: "GET /api/secrets/{id}"
----
-
----
-
-# FILE: ./api-reference/secrets/get-value.mdx
-
----
-title: "Read a secret's value by name"
-openapi: "GET /api/secrets/by-name/{name}/value"
 ---
 
 ---
