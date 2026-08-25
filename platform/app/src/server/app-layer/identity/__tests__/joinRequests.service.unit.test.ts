@@ -77,7 +77,10 @@ function harness({
   const requests = {
     requestJoin: vi.fn(async () => []),
     approveJoin: vi.fn(async () => []),
-    rejectJoin: vi.fn(async () => []),
+    // The command is declared so `mock.calls` carries its type: the
+    // assertion below is that a field is ABSENT from it, and an untyped
+    // mock makes that a cast rather than a check.
+    rejectJoin: vi.fn(async (_command: Record<string, unknown>) => []),
     withdrawJoin: vi.fn(async () => []),
     expireJoin: vi.fn(async () => []),
   };
@@ -338,9 +341,11 @@ describe("given an administrator rejecting a request", () => {
         adminUserId: "user_ana",
       });
 
-      const [command] = requests.rejectJoin.mock.calls[0] as [
-        Record<string, unknown>,
-      ];
+      // Pinned before the absence check below: `not.toHaveProperty` on an
+      // `undefined` command passes for the wrong reason, so the test would
+      // stay green if the rejection stopped stating anything at all.
+      expect(requests.rejectJoin).toHaveBeenCalledTimes(1);
+      const [command] = requests.rejectJoin.mock.calls[0] ?? [];
       expect(command).not.toHaveProperty("reason");
       // The notifier is told WHO to tell, and nothing about the rejector
       // reaches the requester's mail.

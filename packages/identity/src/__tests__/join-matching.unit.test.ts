@@ -3,11 +3,28 @@ import {
   coarseColleagueCount,
   isPublicEmailDomain,
   type JoinCandidateOrganization,
+  type JoinLookupDecision,
+  type JoinOffer,
   joinDomainOf,
   organizationAdmitsDomainAutomatically,
   PUBLIC_EMAIL_DOMAINS,
   resolveJoinLookup,
 } from "../join-matching";
+
+/**
+ * The offers behind an `ask`, or a failure naming the outcome that arrived.
+ *
+ * Narrowing rather than casting: a decision that stopped being `ask` fails
+ * here, where the message says what it became, instead of reading
+ * `organizations` off a variant that does not have them.
+ */
+function asked(decision: JoinLookupDecision): readonly JoinOffer[] {
+  if (decision.outcome !== "ask") {
+    throw new Error(`expected an "ask" decision, got "${decision.outcome}"`);
+  }
+  return decision.organizations;
+}
+
 
 /**
  * The reveal discipline, as a table of refusals.
@@ -56,7 +73,7 @@ describe("given a verified work address", () => {
       });
       // Nothing about who those colleagues are: the offer's whole shape is
       // three fields, and none of them names a person.
-      expect(Object.keys((decision as { organizations: object[] }).organizations[0]!)).toEqual([
+      expect(Object.keys(asked(decision)[0]!)).toEqual([
         "organizationId",
         "name",
         "colleagueCount",
@@ -79,9 +96,7 @@ describe("given a verified work address", () => {
 
       expect(decision.outcome).toBe("ask");
       expect(
-        (decision as { organizations: { organizationId: string }[] }).organizations.map(
-          (organization) => organization.organizationId,
-        ),
+        asked(decision).map((organization) => organization.organizationId),
       ).toEqual(["org_acme", "org_acme_labs"]);
     });
 
@@ -89,8 +104,7 @@ describe("given a verified work address", () => {
     it("rounds the member count rather than reporting it exactly", () => {
       const decision = lookup([{ ...acme, memberCount: 117 }]);
 
-      const offered = (decision as { organizations: { colleagueCount: number }[] })
-        .organizations[0]!;
+      const offered = asked(decision)[0]!;
       expect(offered.colleagueCount).not.toBe(117);
       expect(offered.colleagueCount).toBe(100);
     });
