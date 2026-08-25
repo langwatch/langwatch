@@ -234,6 +234,24 @@ describe("redactAttributeNative", () => {
           }).text,
         ).toBe("[SECRET]");
       });
+
+      // `langwatch.input` and `langwatch.output` are the reason the rule reads
+      // the name and never a namespace: they carry the chat content itself, so
+      // a `langwatch.*` rule would take the shape rules off the largest
+      // customer text in the product.
+      /** @scenario "The shape rules still run on an attribute that is not an identifier" */
+      it.each([
+        "langwatch.input",
+        "langwatch.output",
+      ])("replaces a vendor key sent inside %s", (key) => {
+        const { text } = redactAttributeNative({
+          key,
+          value: `here is the key sk-ant-${"A".repeat(40)} use it`,
+          policy: policy({}),
+        });
+        expect(text).toContain("[SECRET]");
+        expect(text).not.toContain("sk-ant-");
+      });
     });
 
     describe("when the value is a credential a vendor minted", () => {
