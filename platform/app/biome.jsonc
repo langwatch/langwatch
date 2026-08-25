@@ -316,6 +316,31 @@
 			}
 		},
 		{
+			// The two seed entrypoints are the same category as the
+			// `scripts/dogfood/**` block above — operator tooling that ships to
+			// nobody — but they sit outside its globs, so the same shape was
+			// tolerated in one place and reported in the other. `main()` in each
+			// is one long linear script: read the environment, upsert a user, an
+			// organization, a team, a project, print what it did. Its length is a
+			// count of the fixtures it seeds, not of anything tangled, and
+			// splitting it into named helpers that each run once would scatter a
+			// procedure that reads top to bottom today.
+			//
+			// Narrower than that block on purpose: only the two length/complexity
+			// rules are off. The promise and empty-block rules stay on, because a
+			// seed script that silently swallows a failed write is a seed script
+			// that lies about the database it left behind.
+			"includes": ["prisma/seed.ts", "scripts/seed-local-admin.ts"],
+			"linter": {
+				"rules": {
+					"complexity": {
+						"noExcessiveCognitiveComplexity": "off",
+						"noExcessiveLinesPerFunction": "off"
+					}
+				}
+			}
+		},
+		{
 			// A floating promise in a test is still an unhandled rejection, but
 			// these are assertion chains and setup calls where the assertion
 			// already owns the failure. Scoped to test files only.
