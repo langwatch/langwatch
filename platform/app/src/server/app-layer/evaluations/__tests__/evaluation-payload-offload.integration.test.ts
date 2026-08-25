@@ -29,7 +29,6 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { getApp } from "~/server/app-layer/app";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
-import { EvaluationService } from "~/server/evaluations/evaluation.service";
 import { EventRepositoryClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventRepositoryClickHouse";
 import {
   EVALUATION_REPORTED_EVENT_TYPE,
@@ -291,47 +290,6 @@ describe("evaluation inputs offload (integration)", () => {
         storedObjects,
       });
       expect(resolved).toEqual(originalInputs);
-    });
-  });
-
-  describe("given an offloaded evaluation read through the lazy getEvaluationInputs seam", () => {
-    /** @scenario "reading an offloaded evaluation run returns the full inputs" */
-    it("returns the full inputs so the caller cannot tell they were offloaded", async () => {
-      const storedObjects = buildStoredObjects();
-      const evaluationId = `eval-lazy-${nanoid()}`;
-      const originalInputs = {
-        ...inputsOfSize(EVAL_INPUTS_INLINE_MAX_BYTES + 2048),
-        tag: "lazy-read",
-      };
-
-      const { inputs: offloaded } = await offloadInputsIfOversized({
-        inputs: originalInputs,
-        projectId: tenantId,
-        evaluationId,
-        storedObjects,
-      });
-      await getApp().evaluations.upsertRun({
-        data: makeEvalData({ evaluationId, inputs: offloaded }),
-        tenantId,
-      });
-
-      // The v1 read service resolves the marker at the read boundary. Inject
-      // the same stored-objects service the write used (its client is the test
-      // client via the getClickHouseClientForTenant mock).
-      // The repository is injected so the read goes through the same test
-      // client the write used. The fixture App resolves one too, but the
-      // injected dependency path is the one this asserts on.
-      const service = new EvaluationService({
-        resolveInputsMarker: ({ projectId, inputs }) =>
-          resolveInputsMarker({ projectId, inputs, storedObjects }),
-        service: getApp().evaluations,
-      });
-      const readInputs = await service.getEvaluationInputs({
-        projectId: tenantId,
-        evaluationId,
-      });
-
-      expect(readInputs).toEqual(originalInputs);
     });
   });
 

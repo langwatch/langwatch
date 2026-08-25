@@ -30,7 +30,8 @@ Evaluation persistence is private to the server package. One ClickHouse
 repository owns runs, summaries, per-trace reads and deferred inputs; a second
 private repository owns the monitor-performance query. The trace reader retries
 without the heavy `Inputs` column when the first read exceeds ClickHouse
-memory. `EvaluationAdapter` constructs both.
+memory. An injected input-resolution port resolves durable ADR-040 markers at
+the Evaluation read boundary. `EvaluationAdapter` constructs the repositories.
 
 ## Dependencies
 
@@ -48,8 +49,7 @@ replay, monitor performance and trace-result reads use the flat
 `app.evaluations` capability. Manual evaluation still uses the protected Trace
 reader because worker execution intentionally has internal visibility; that
 transport moves only after Trace access policy becomes a portable input. The
-arbitrary-data REST runner and stored-object input resolver are also explicit
-migration seams, not feature contracts.
+arbitrary-data REST runner remains an explicit migration seam.
 
 ## Runtime and registration
 

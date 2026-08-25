@@ -81,12 +81,6 @@ vi.mock("~/server/filters/clickhouse", () => ({
   }),
 }));
 
-vi.mock("~/server/evaluations/evaluation.service", () => ({
-  EvaluationService: Object.assign(vi.fn(), {
-    create: () => ({}),
-  }),
-}));
-
 // Mirror the sibling test's tracer passthrough — the span exposes BOTH
 // setAttribute (singular) and setAttributes (plural), matching the real OTel
 // Span interface (TraceIOExtractionService calls setAttributes).

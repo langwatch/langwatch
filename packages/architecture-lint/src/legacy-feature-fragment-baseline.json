@@ -269,7 +269,6 @@
     {"feature":"evaluation","file":"platform/app/src/server/app-layer/evaluations/types.ts","kind":"legacy-implementation"},
     {"feature":"evaluation","file":"platform/app/src/server/evaluations/evaluation-run.mappers.ts","kind":"legacy-implementation"},
     {"feature":"evaluation","file":"platform/app/src/server/evaluations/evaluation-run.types.ts","kind":"legacy-implementation"},
-    {"feature":"evaluation","file":"platform/app/src/server/evaluations/evaluation.service.ts","kind":"legacy-implementation"},
     {"feature":"evaluation","file":"platform/app/src/server/evaluations/evaluationMappings.ts","kind":"legacy-implementation"},
     {"feature":"evaluation","file":"platform/app/src/server/evaluations/evaluatorDisplayNames.ts","kind":"legacy-implementation"},
     {"feature":"evaluation","file":"platform/app/src/server/evaluations/evaluators.generated.ts","kind":"legacy-implementation"},

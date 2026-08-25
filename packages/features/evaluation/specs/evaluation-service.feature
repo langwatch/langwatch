@@ -17,6 +17,7 @@ Feature: Evaluation service boundary
     When the Evaluation service reads them
     Then it uses its private repository
     And a memory-limited trace read retries without the heavy Inputs column
+    And durable input markers are resolved before the value leaves the service
 
   Scenario: Monitor performance uses the same capability
     Given monitors need current and previous evaluation performance

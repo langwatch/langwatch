@@ -2,6 +2,7 @@ import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { EvaluationService as EvaluationServiceContract } from "@langwatch/evaluation-contract";
 import {
   EvaluationExecutionPort,
+  EvaluationInputsResolutionPort,
   type EvaluationClickHouseResolver,
   type EvaluationRetentionFloorPort,
 } from "../ports/evaluation.port";
@@ -13,8 +14,20 @@ export type EvaluationAdapterOptions = {
   resolveClickHouse: EvaluationClickHouseResolver;
   retentionFloor: EvaluationRetentionFloorPort;
   execution: EvaluationExecutionPort;
+  inputResolution?: EvaluationInputsResolutionPort;
   workflows: WorkflowService;
 };
+
+class PassthroughEvaluationInputsResolution
+  extends EvaluationInputsResolutionPort
+{
+  async resolve(input: {
+    tenantId: string;
+    inputs: Record<string, unknown> | null;
+  }): Promise<Record<string, unknown> | null> {
+    return input.inputs;
+  }
+}
 
 /** Composes one Evaluation service from ClickHouse and canonical capabilities. */
 export class EvaluationAdapter {
@@ -28,6 +41,8 @@ export class EvaluationAdapter {
         resolveClient: options.resolveClickHouse,
       }),
       execution: options.execution,
+      inputResolution:
+        options.inputResolution ?? new PassthroughEvaluationInputsResolution(),
       workflows: options.workflows,
     });
   }

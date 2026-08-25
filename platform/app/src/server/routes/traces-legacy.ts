@@ -124,6 +124,8 @@ secured.access(tracesViewAuth).get("/trace/:id", async (c) => {
     const traceService = TraceService.create(
       prisma,
       buildTraceBlobResolutionDeps(),
+      undefined,
+      c.app.evaluations,
     );
     const trace = await traceService.getById(project.id, traceId, protections, {
       full: true,

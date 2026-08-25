@@ -90,6 +90,7 @@ export const evaluationsRouter = createTRPCRouter({
         settings: input.settings,
         mappings: input.mappings ?? null,
         protections,
+        evaluations: ctx.app.evaluations,
       });
 
       // Dispatch to evaluation processing pipeline when flag is ON

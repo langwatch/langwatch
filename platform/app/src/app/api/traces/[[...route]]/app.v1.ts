@@ -505,6 +505,8 @@ export function registerTracesRoutes(
       const traceService = TraceService.create(
         prisma,
         buildTraceBlobResolutionDeps(),
+        undefined,
+        c.app.evaluations,
       );
 
       let trace;

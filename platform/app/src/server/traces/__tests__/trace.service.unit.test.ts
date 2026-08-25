@@ -23,17 +23,9 @@ const mockClickHouseInstance = {
   resolveTraceIdByPrefix: mockResolveTraceIdByPrefixCH,
 };
 
-const mockEvalInstance = {};
-
 vi.mock("../clickhouse-trace.service", () => ({
   ClickHouseTraceService: Object.assign(vi.fn(), {
     create: () => mockClickHouseInstance,
-  }),
-}));
-
-vi.mock("~/server/evaluations/evaluation.service", () => ({
-  EvaluationService: Object.assign(vi.fn(), {
-    create: () => mockEvalInstance,
   }),
 }));
 

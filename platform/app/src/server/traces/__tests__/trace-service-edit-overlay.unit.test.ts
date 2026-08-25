@@ -56,10 +56,6 @@ vi.mock(
   }),
 );
 
-vi.mock("~/server/evaluations/evaluation.service", () => ({
-  EvaluationService: Object.assign(vi.fn(), { create: () => ({}) }),
-}));
-
 vi.mock("~/server/db", () => ({ prisma: {} }));
 
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({

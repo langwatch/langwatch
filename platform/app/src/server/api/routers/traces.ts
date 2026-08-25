@@ -38,7 +38,12 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const traceService = TraceService.create(ctx.prisma);
+      const traceService = TraceService.create(
+        ctx.prisma,
+        undefined,
+        undefined,
+        ctx.app.evaluations,
+      );
       return traceService.getAllTracesForProject(input, protections, {
         scrollId: input.scrollId,
       });
@@ -84,7 +89,12 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const traceService = TraceService.create(ctx.prisma);
+      const traceService = TraceService.create(
+        ctx.prisma,
+        undefined,
+        undefined,
+        ctx.app.evaluations,
+      );
       const evaluations = await traceService.getEvaluationsMultiple(
         input.projectId,
         [input.traceId],
@@ -109,7 +119,12 @@ export const tracesRouter = createTRPCRouter({
     )
     .permission("traces:view")
     .query(async ({ input, ctx }) => {
-      const traceService = TraceService.create(ctx.prisma);
+      const traceService = TraceService.create(
+        ctx.prisma,
+        undefined,
+        undefined,
+        ctx.app.evaluations,
+      );
       return traceService.getEvaluationInputs(
         input.projectId,
         input.evaluationId,
@@ -129,7 +144,12 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const traceService = TraceService.create(ctx.prisma);
+      const traceService = TraceService.create(
+        ctx.prisma,
+        undefined,
+        undefined,
+        ctx.app.evaluations,
+      );
       return traceService.getEvaluationsMultiple(
         input.projectId,
         input.traceIds,

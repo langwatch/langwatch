@@ -117,7 +117,12 @@ beforeEach(() => {
 });
 
 function expectConstructedWithDeps() {
-  expect(mockCreate).toHaveBeenCalledWith(undefined, BLOB_DEPS);
+  expect(mockCreate).toHaveBeenCalledWith(
+    undefined,
+    BLOB_DEPS,
+    undefined,
+    expect.anything(),
+  );
 }
 
 describe("runEvaluation — #4991 full blob resolution on evaluator reads", () => {
@@ -142,6 +147,7 @@ describe("runEvaluation — #4991 full blob resolution on evaluator reads", () =
           mappings: traceMapping,
           level: "trace",
           protections,
+          evaluations: {} as never,
         });
 
         expectConstructedWithDeps();
@@ -176,6 +182,7 @@ describe("runEvaluation — #4991 full blob resolution on evaluator reads", () =
           mappings: traceMapping,
           level: "thread",
           protections,
+          evaluations: {} as never,
         });
 
         expectConstructedWithDeps();

@@ -2,10 +2,13 @@ import type { EvaluationService } from "@langwatch/evaluation-contract";
 import {
   EvaluationAdapter,
   EvaluationExecutionPort,
+  EvaluationInputsResolutionPort,
   type EvaluationClickHouseResolver,
   type EvaluationRetentionFloorPort,
 } from "@langwatch/evaluation-server";
 import type { WorkflowService } from "@langwatch/workflow-contract";
+import { resolveInputsMarker } from "~/server/app-layer/evaluations/evaluation-inputs-offload";
+import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 
 type EvaluationExecutionInput = Parameters<EvaluationExecutionPort["execute"]>[0];
 type EvaluationExecutionOutput = Awaited<
@@ -21,8 +24,33 @@ export type AppEvaluationRuntimeOptions = {
   resolveClickHouse: EvaluationClickHouseResolver;
   retentionFloor: EvaluationRetentionFloorPort;
   execution: EvaluationExecutionPort;
+  inputResolution?: EvaluationInputsResolutionPort;
   workflows: WorkflowService;
 };
+
+/** App infrastructure adapter for ADR-040 durable Evaluation inputs. */
+export class AppEvaluationInputsResolutionPort
+  extends EvaluationInputsResolutionPort
+{
+  static create(): AppEvaluationInputsResolutionPort {
+    return new AppEvaluationInputsResolutionPort();
+  }
+
+  private constructor() {
+    super();
+  }
+
+  resolve(input: {
+    tenantId: string;
+    inputs: Record<string, unknown> | null;
+  }): Promise<Record<string, unknown> | null> {
+    return resolveInputsMarker({
+      projectId: input.tenantId,
+      inputs: input.inputs,
+      storedObjects: createStoredObjectsService({ projectId: input.tenantId }),
+    });
+  }
+}
 
 /** Adapts the existing trace/evaluator engine at the process boundary. */
 export class AppEvaluationExecutionPort extends EvaluationExecutionPort {
@@ -55,6 +83,11 @@ export class AppEvaluationRuntime {
   }
 
   build(): EvaluationService {
-    return EvaluationAdapter.create(this.options);
+    return EvaluationAdapter.create({
+      ...this.options,
+      inputResolution:
+        this.options.inputResolution ??
+        AppEvaluationInputsResolutionPort.create(),
+    });
   }
 }

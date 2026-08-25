@@ -98,6 +98,7 @@ vi.mock("~/server/app-layer/app", () => ({
       createShare: vi.fn(),
       unshare: vi.fn(),
     },
+    evaluations: {},
   })),
 }));
 
@@ -196,6 +197,8 @@ describe("legacy GET /api/trace/:id (singular)", () => {
           blobStore: expect.anything(),
           ioExtractionService: expect.anything(),
         }),
+        undefined,
+        expect.anything(),
       );
     });
 

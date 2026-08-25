@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Evaluation, Trace } from "~/server/tracer/types";
+import { appContextMiddlewareFor } from "~/app/api/middleware/app-context";
 
 // Mock TraceService to verify routing goes through it
 const mockGetById = vi.fn();
@@ -103,6 +104,10 @@ const { AmbiguousTraceIdPrefixError } = await import(
 // Build a wrapper app that injects the project variable (mimicking auth middleware)
 // and adds an error handler that mirrors the real app's JSON error responses
 const testApp = new Hono();
+testApp.use(
+  "*",
+  appContextMiddlewareFor({ evaluations: {} } as never),
+);
 testApp.use("*", async (c, next) => {
   c.set("project" as never, { id: "project-123", apiKey: "key-123" });
   await next();

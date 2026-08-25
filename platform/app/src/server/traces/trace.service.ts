@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import type { EvaluationService } from "@langwatch/evaluation-contract";
 import { getLangWatchTracer } from "langwatch";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
@@ -10,7 +11,6 @@ import {
 import type { LogRecordStorageService } from "~/server/app-layer/traces/log-record-storage.service";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { prisma as defaultPrisma } from "~/server/db";
-import { EvaluationService } from "~/server/evaluations/evaluation.service";
 import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/evaluation-run.mappers";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import type { Evaluation, Trace } from "~/server/tracer/types";
@@ -182,7 +182,6 @@ export class TraceService {
   private readonly tracer = getLangWatchTracer("langwatch.traces.service");
   private readonly logger = createLogger("langwatch:traces:service");
   private readonly clickHouseService: ClickHouseTraceService;
-  private readonly evaluationService: EvaluationService;
   private readonly injectedLogRecordStorage?: LogRecordStorageService;
   private cachedLogRecordStorage?: LogRecordStorageService;
   private cachedEditOverlayService?: TraceEditOverlayService;
@@ -190,6 +189,7 @@ export class TraceService {
     readonly prisma: PrismaClient,
     blobResolutionDeps?: BlobResolutionDeps,
     logRecordStorage?: LogRecordStorageService,
+    private evaluationService?: EvaluationService,
   ) {
     // Build the resolver callbacks when deps are present. They are passed to
     // ClickHouseTraceService so resolution happens at the NormalizedSpan level
@@ -208,7 +208,6 @@ export class TraceService {
       resolveTraceSpans: resolveTraceSpansFn,
       resolveTraceSpansBatch: resolveTraceSpansBatchFn,
     });
-    this.evaluationService = EvaluationService.create();
     // Injected store for the read-time Claude Code content enrichment; the
     // default comes LAZILY from the App on first use (see
     // logRecordStorageService), so construction here stays free of ClickHouse
@@ -320,8 +319,22 @@ export class TraceService {
     prisma: PrismaClient = defaultPrisma,
     blobResolutionDeps?: BlobResolutionDeps,
     logRecordStorage?: LogRecordStorageService,
+    evaluationService?: EvaluationService,
   ): TraceService {
-    return new TraceService(prisma, blobResolutionDeps, logRecordStorage);
+    return new TraceService(
+      prisma,
+      blobResolutionDeps,
+      logRecordStorage,
+      evaluationService,
+    );
+  }
+
+  /** Completes the intentional Evaluation execution/read cycle at boot. */
+  connectEvaluations(evaluations: EvaluationService): void {
+    if (this.evaluationService && this.evaluationService !== evaluations) {
+      throw new Error("TraceService EvaluationService is already connected");
+    }
+    this.evaluationService = evaluations;
   }
 
   /**
@@ -614,7 +627,7 @@ export class TraceService {
   async getEvaluationsMultiple(
     projectId: string,
     traceIds: string[],
-    protections: Protections,
+    _protections: Protections,
   ): Promise<Record<string, Evaluation[]>> {
     return this.tracer.withActiveSpan(
       "TraceService.getEvaluationsMultiple",
@@ -622,10 +635,9 @@ export class TraceService {
         attributes: { "tenant.id": projectId, "trace.count": traceIds.length },
       },
       async () => {
-        const result = await this.evaluationService.getEvaluationsMultiple({
-          projectId,
+        const result = await this.evaluations().findTraceEvaluations({
+          tenantId: projectId,
           traceIds,
-          protections,
         });
 
         return mapTraceEvaluationsToLegacyEvaluations(result);
@@ -655,12 +667,19 @@ export class TraceService {
         },
       },
       async () => {
-        return this.evaluationService.getEvaluationInputs({
-          projectId,
+        return this.evaluations().tryGetInputs({
+          tenantId: projectId,
           evaluationId,
         });
       },
     );
+  }
+
+  private evaluations(): EvaluationService {
+    if (!this.evaluationService) {
+      throw new Error("TraceService requires EvaluationService for evaluation reads");
+    }
+    return this.evaluationService;
   }
 
   /**

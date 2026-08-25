@@ -4,6 +4,7 @@ export {
 } from "./adapters/clickhouse.evaluation.adapter";
 export {
   EvaluationExecutionPort,
+  EvaluationInputsResolutionPort,
   EvaluationRetentionFloorPort,
   type EvaluationClickHouseResolver,
   type EvaluationClickHouseClient,

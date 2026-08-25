@@ -2,6 +2,7 @@ import {
   EvaluatorConfigError,
   EvaluatorNotFoundError,
 } from "~/server/app-layer/evaluations/errors";
+import type { EvaluationService } from "@langwatch/evaluation-contract";
 import { setupModelEnv } from "~/server/app-layer/evaluations/evaluation-execution.factories";
 import { codeEvaluatorIdFromCheckType } from "~/server/evaluators/codeEvaluator";
 import { runCodeEvaluator } from "~/server/evaluators/runCodeEvaluator";
@@ -271,6 +272,7 @@ export const runEvaluationForTrace = async ({
   level,
   protections,
   workflowId,
+  evaluations,
 }: {
   projectId: string;
   traceId: string;
@@ -280,12 +282,15 @@ export const runEvaluationForTrace = async ({
   level?: "trace" | "thread";
   protections: Protections;
   workflowId?: string | null;
+  evaluations: EvaluationService;
 }): Promise<EvaluationResultWithThreadId> => {
   // #4991: the trace being evaluated is read content-first — resolve the
   // FULL offloaded IO (ADR-022) so the evaluator never scores a preview.
   const traceService = TraceService.create(
     undefined,
     buildTraceBlobResolutionDeps(),
+    undefined,
+    evaluations,
   );
   const trace = await traceService.getById(projectId, traceId, protections, {
     full: true,

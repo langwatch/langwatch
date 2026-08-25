@@ -768,6 +768,7 @@ export function initializeDefaultApp(options?: {
     }).build(),
     "EvaluationService",
   );
+  traceService.connectEvaluations(evaluationService);
   const traceList = traced(
     new TraceListService(
       clickhouseEnabled

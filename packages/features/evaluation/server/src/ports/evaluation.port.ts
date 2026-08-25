@@ -7,6 +7,14 @@ export abstract class EvaluationExecutionPort {
   abstract execute(input: ExecuteEvaluationCommand): Promise<EvaluationExecutionResult>;
 }
 
+/** Resolves Evaluation-owned durable input markers at the read boundary. */
+export abstract class EvaluationInputsResolutionPort {
+  abstract resolve(input: {
+    tenantId: string;
+    inputs: Record<string, unknown> | null;
+  }): Promise<Record<string, unknown> | null>;
+}
+
 export type EvaluationFeatureDependencies = {
   workflows: WorkflowService;
 };

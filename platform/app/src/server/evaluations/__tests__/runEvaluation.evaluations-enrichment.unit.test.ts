@@ -127,6 +127,7 @@ describe("runEvaluationForTrace evaluations enrichment", () => {
           },
         } as never,
         protections,
+        evaluations: {} as never,
       });
 
       // The enrichment must have queried the trace's evaluations...
@@ -165,6 +166,7 @@ describe("runEvaluationForTrace evaluations enrichment", () => {
             },
           } as never,
           protections,
+          evaluations: {} as never,
         }),
       ).resolves.toBeDefined();
 

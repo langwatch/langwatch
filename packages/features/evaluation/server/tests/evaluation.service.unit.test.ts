@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import { EvaluationNotFoundError } from "@langwatch/evaluation-contract";
 import { EvaluationService } from "../src/services/evaluation.service";
-import { EvaluationExecutionPort } from "../src/ports/evaluation.port";
+import {
+  EvaluationExecutionPort,
+  EvaluationInputsResolutionPort,
+} from "../src/ports/evaluation.port";
 import { EvaluationRunRepository } from "../src/repositories/evaluation.repository";
 import {
   MonitorPerformanceRepository,
@@ -36,6 +39,15 @@ class FakeExecution extends EvaluationExecutionPort {
   execute = vi.fn(async () => ({ status: "processed" as const, score: 1 }));
 }
 
+class FakeInputsResolution extends EvaluationInputsResolutionPort {
+  resolve = vi.fn(
+    async (input: {
+      tenantId: string;
+      inputs: Record<string, unknown> | null;
+    }) => input.inputs,
+  );
+}
+
 class FakeMonitorPerformanceRepository extends MonitorPerformanceRepository {
   constructor(private readonly buckets: MonitorPerformanceBucket[] = []) {
     super();
@@ -52,7 +64,10 @@ describe("EvaluationService", () => {
     execution = new FakeExecution(),
     monitorPerformance = new FakeMonitorPerformanceRepository(),
   ) => EvaluationService.create({
-    repository, execution, monitorPerformance,
+    repository,
+    execution,
+    inputResolution: new FakeInputsResolution(),
+    monitorPerformance,
     workflows: { assertInProject: vi.fn() } as unknown as WorkflowService,
   });
 
@@ -73,6 +88,7 @@ describe("EvaluationService", () => {
     const evaluation = EvaluationService.create({
       repository: value,
       execution,
+      inputResolution: new FakeInputsResolution(),
       monitorPerformance: new FakeMonitorPerformanceRepository(),
       workflows,
     });
@@ -95,6 +111,31 @@ describe("EvaluationService", () => {
         evaluationId: "evaluation_1",
       }),
     ).resolves.toBeNull();
+  });
+
+  it("resolves durable input markers inside the canonical service", async () => {
+    const repository = new FakeRepository();
+    repository.tryFindInputs = vi.fn(async () => ({ marker: "object_1" }));
+    const inputResolution = new FakeInputsResolution();
+    inputResolution.resolve.mockResolvedValue({ question: "whole input" });
+    const evaluation = EvaluationService.create({
+      repository,
+      execution: new FakeExecution(),
+      inputResolution,
+      monitorPerformance: new FakeMonitorPerformanceRepository(),
+      workflows: { assertInProject: vi.fn() } as unknown as WorkflowService,
+    });
+
+    await expect(
+      evaluation.tryGetInputs({
+        tenantId: "project_1",
+        evaluationId: "evaluation_1",
+      }),
+    ).resolves.toEqual({ question: "whole input" });
+    expect(inputResolution.resolve).toHaveBeenCalledWith({
+      tenantId: "project_1",
+      inputs: { marker: "object_1" },
+    });
   });
 
   it("summarizes score and guardrail performance through its private read model", async () => {

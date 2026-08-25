@@ -260,7 +260,12 @@ export const sharedTraceRouter = createTRPCRouter({
           traceId,
           ...occurredAtHint,
         }),
-        TraceService.create(ctx.prisma).getEvaluationsMultiple(
+        TraceService.create(
+          ctx.prisma,
+          undefined,
+          undefined,
+          ctx.app.evaluations,
+        ).getEvaluationsMultiple(
           projectId,
           [traceId],
           protections,

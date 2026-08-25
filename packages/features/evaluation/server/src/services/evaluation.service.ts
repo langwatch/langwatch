@@ -21,7 +21,11 @@ import {
   type ExecuteEvaluationCommand,
   type UpsertEvaluationRunCommand,
 } from "@langwatch/evaluation-contract";
-import type { EvaluationExecutionPort, EvaluationFeatureDependencies } from "../ports/evaluation.port";
+import type {
+  EvaluationExecutionPort,
+  EvaluationFeatureDependencies,
+  EvaluationInputsResolutionPort,
+} from "../ports/evaluation.port";
 import type {
   MonitorPerformanceBucket,
   MonitorPerformanceRepository,
@@ -32,6 +36,7 @@ export type EvaluationServiceOptions = {
   repository: EvaluationRunRepository;
   monitorPerformance: MonitorPerformanceRepository;
   execution: EvaluationExecutionPort;
+  inputResolution: EvaluationInputsResolutionPort;
   workflows: EvaluationFeatureDependencies["workflows"];
 };
 
@@ -121,13 +126,18 @@ export class EvaluationService extends EvaluationServiceContract {
     );
   }
 
-  tryGetInputs(input: {
+  async tryGetInputs(input: {
     tenantId: string;
     evaluationId: string;
   }): Promise<Record<string, unknown> | null> {
-    return this.options.repository.tryFindInputs(
-      evaluationInputsQuerySchema.parse(input),
+    const query = evaluationInputsQuerySchema.parse(input);
+    const inputs = await this.options.repository.tryFindInputs(
+      query,
     );
+    return this.options.inputResolution.resolve({
+      tenantId: query.tenantId,
+      inputs,
+    });
   }
 
   async getMonitorPerformance(
