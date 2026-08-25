@@ -131,7 +131,7 @@ describe("given an expired invitation", () => {
   describe("when its holder asks for a fresh one", () => {
     /** @scenario The invitee can ask for a fresh invitation when theirs expired */
     it("tells every admin who can send one", async () => {
-      const service = new InviteService(prisma);
+      const service = InviteService.create(prisma);
 
       const result = await service.requestFreshInvite({
         inviteCode: "code-expired-1",
@@ -149,7 +149,7 @@ describe("given an expired invitation", () => {
 
     /** @scenario The invitee can ask for a fresh invitation when theirs expired */
     it("mints nothing — no code is rotated and no invitation is written", async () => {
-      const service = new InviteService(prisma);
+      const service = InviteService.create(prisma);
 
       await service.requestFreshInvite({
         inviteCode: "code-expired-1",
@@ -164,7 +164,7 @@ describe("given an expired invitation", () => {
       sendInviteReRequestEmail
         .mockRejectedValueOnce(new Error("bounced"))
         .mockResolvedValueOnce(undefined);
-      const service = new InviteService(prisma);
+      const service = InviteService.create(prisma);
 
       const result = await service.requestFreshInvite({
         inviteCode: "code-expired-1",
@@ -182,7 +182,7 @@ describe("given an expired invitation", () => {
         ...expired,
         expiration: new Date("2026-09-30T00:00:00Z"),
       });
-      const service = new InviteService(prisma);
+      const service = InviteService.create(prisma);
 
       await expect(
         service.requestFreshInvite({
@@ -200,7 +200,7 @@ describe("given an expired invitation", () => {
         ...expired,
         status: "REVOKED",
       });
-      const service = new InviteService(prisma);
+      const service = InviteService.create(prisma);
 
       await expect(
         service.requestFreshInvite({

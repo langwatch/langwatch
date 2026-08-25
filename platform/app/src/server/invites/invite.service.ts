@@ -1382,7 +1382,7 @@ export class InviteService {
    * `invite`). So the order is membership-and-acceptance first, grants
    * after, and that order is what makes the invite lifecycle
    * consistent: **a PENDING invite never carries grants**. `revokeInvite` can
-   * therefore delete one without hunting for access to take back — there is
+   * therefore retire one without hunting for access to take back — there is
    * none — and the window a crash opens leaves a member who holds a seat and
    * no grants, which is less access than the invite asked for rather than
    * more.

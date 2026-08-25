@@ -104,7 +104,10 @@ function foldInto(store: InMemoryStateStore, events: IdentityEvent[]): void {
     occurredAt: events[events.length - 1]?.occurredAt ?? T0,
     createdAt: previous?.createdAt ?? T0,
     updatedAt: T0,
-    version: 1,
+    // The identity projection's own version, so the seeded row is shaped like
+    // one its fold wrote. Never compared on load — the executor stamps its
+    // own on every store — so it is fixture realism, not a gate.
+    version: "2026-08-20",
   });
 }
 

@@ -129,6 +129,10 @@ describe("identifier write gate", () => {
         }),
         upsertRecord: vi.fn(async () => undefined),
         upsertRecordUnlessRolledBack: vi.fn(async () => true),
+        // Load-bearing `true`: the anyone-gate short-circuits a `false`
+        // before the per-user read runs, so stubbing it closed would pass
+        // this test without ever reaching the `findRecord` that throws.
+        hasFinalizedTenant: vi.fn(async () => true),
       };
       await expect(
         isUserOnIdentityWrites({ userId: USER, state }),
