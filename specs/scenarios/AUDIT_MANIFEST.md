@@ -6,7 +6,7 @@ Tracking: https://github.com/langwatch/langwatch/issues/3458
 
 ## Agent Testing v2 additions
 
-Three spec files were added for Agent Testing v2. They are outside the #3458
+Four spec files were added for Agent Testing v2. They are outside the #3458
 audit: they describe behavior being built now, not legacy debt.
 
 | File | Tagging | Note |

@@ -50801,7 +50801,7 @@
                           },
                           "scenarioVersion": {
                             "type": [
-                              "number",
+                              "integer",
                               "null"
                             ],
                             "description": "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed."
@@ -51081,7 +51081,7 @@
                     },
                     "scenarioVersion": {
                       "type": [
-                        "number",
+                        "integer",
                         "null"
                       ],
                       "description": "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed."
@@ -51861,7 +51861,8 @@
               "enum": [
                 "custom",
                 "folder"
-              ]
+              ],
+              "default": "custom"
             },
             "description": "Which kind of suite to list. Defaults to custom, so callers that predate folders keep seeing exactly the run plans they always did."
           }

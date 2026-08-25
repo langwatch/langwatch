@@ -227,8 +227,9 @@ function TestSection({
   pathname,
   pendingAnnotationCount,
 }: ProjectSectionProps & { pendingAnnotationCount: number | undefined }) {
-  // Agent Testing replaces the Simulations group with a single destination.
-  // While the flag is off the group stays exactly as it is.
+  // One destination replaces the Simulations group, and the two cannot both
+  // be offered: they address the same runs through different routes, so a menu
+  // holding both would give a person two links to the same work.
   const { enabled: agentTestingEnabled } = useFeatureFlag(
     "release_ui_agent_testing_v2_enabled",
     { projectId: project?.id, enabled: !!project?.id },

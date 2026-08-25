@@ -9,50 +9,31 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ChevronsDownUp, ChevronsUpDown, Inbox } from "lucide-react";
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-import { z } from "zod";
+import { lazy, Suspense, useCallback, useState } from "react";
 import { CopyButton } from "~/components/CopyButton";
 import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
 import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
-import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import { formatCost, formatLatency } from "~/components/shared/formatters";
-import { buildDisplayTitle } from "~/components/suites/run-history-transforms";
 import { HandledErrorAlert } from "~/features/errors";
 import { Chip } from "~/features/traces-v2/components/TraceDrawer/Chip";
 import { ConversationExpandContext } from "~/features/traces-v2/components/TraceDrawer/conversationView/expandContext";
 import { useDejaViewLink } from "~/hooks/useDejaViewLink";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
-import { useDrawerRunCallbacks } from "~/hooks/useDrawerRunCallbacks";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useRunScenario } from "~/hooks/useRunScenario";
-import { useScenarioTarget } from "~/hooks/useScenarioTarget";
-import { useSimulationStreamingState } from "~/hooks/useSimulationStreamingState";
-import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
-import { useTargetNameMap } from "~/hooks/useTargetNameMap";
-import { runParameterValuesSchema } from "~/server/scenarios/parameters";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
-import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { Drawer } from "../ui/drawer";
 import { CopyIdChip } from "./CopyIdChip";
 import { RunCriteriaChip } from "./RunCriteriaChip";
 import { RunDetailSection } from "./RunDetailSection";
-import { getRunStatePollInterval } from "./run-state-polling";
 import { ScenarioMessageRenderer } from "./ScenarioMessageRenderer";
 import { ScenarioRunActions } from "./ScenarioRunActions";
 import { ScenarioRunStatusIcon } from "./ScenarioRunStatusIcon";
-import {
-  hasNoResults,
-  shouldShowNoResponse,
-} from "./scenario-run-status.utils";
+import { hasNoResults } from "./scenario-run-status.utils";
 import { SimulationConsole } from "./simulation-console/SimulationConsole";
+import { useRunAgainActions } from "./useRunAgainActions";
+import { useRunDetailFacts } from "./useRunDetailFacts";
+import { useRunStateStream } from "./useRunStateStream";
 
 /**
  * The Agent Testing variant: wider, side by side when the width allows, and
@@ -74,18 +55,32 @@ function formatResultsForCopy(results: unknown): string {
 }
 
 /**
- * The names of the secrets the run used, as recorded on it.
- *
- * Read defensively, like the plain values beside them: a run recorded by an
- * older build has nothing here, and the section is simply shorter.
- */
-const secretParameterNamesSchema = z.array(z.string());
-
-/**
  * What a secret parameter shows in place of a value. There is no value to
  * show: the run records the name and nothing else.
  */
 const SECRET_VALUE_MASK = "••••••••";
+
+/**
+ * Whole-conversation view in Trace Explorer: every trace of this run carries
+ * the scenario.run_id attribute, so a scenarioRun:"<id>" search shows the
+ * full conversation. Same #<lens>?q= fragment contract as the command bar's
+ * trace links.
+ */
+function useOpenRunInTraces({
+  projectSlug,
+  scenarioRunId,
+}: {
+  projectSlug: string | undefined;
+  scenarioRunId: string | undefined;
+}) {
+  const router = useRouter();
+
+  return useCallback(() => {
+    if (!projectSlug || !scenarioRunId) return;
+    const query = encodeURIComponent(`scenarioRun:"${scenarioRunId}"`);
+    void router.push(`/${projectSlug}/traces#all-traces?q=${query}`);
+  }, [projectSlug, scenarioRunId, router]);
+}
 
 /**
  * Everything the run detail drawer knows about one run: the live state, the
@@ -102,7 +97,6 @@ export function useScenarioRunDetail({
 }) {
   const { openDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
-  const [runModalOpen, setRunModalOpen] = useState(false);
   const [scenarioEditorOpen, setScenarioEditorOpen] = useState(false);
 
   const dejaView = useDejaViewLink({
@@ -110,50 +104,13 @@ export function useScenarioRunDetail({
     tenantId: project?.id,
   });
 
-  const { streamingMessages, handleStreamingEvent, clearCompleted } =
-    useSimulationStreamingState(scenarioRunId ?? undefined);
-
-  // Live updates: matching SSE events selectively invalidate getRunState for
-  // this run, and streaming deltas flow through the streaming state above.
-  const { isConnected: sseConnected } = useSimulationUpdateListener({
-    projectId: project?.id ?? "",
-    enabled: !!project?.id && !!scenarioRunId && !!open,
-    debounceMs: 300,
-    filter: scenarioRunId ? { scenarioRunId } : undefined,
-    onStreamingEvent: handleStreamingEvent,
+  const stream = useRunStateStream({
+    scenarioRunId,
+    projectId: project?.id,
+    isOpen: open,
   });
-
-  const { data: scenarioState, error: runStateError } =
-    api.scenarios.getRunState.useQuery(
-      {
-        scenarioRunId: scenarioRunId ?? "",
-        projectId: project?.id ?? "",
-      },
-      {
-        enabled: !!project?.id && !!scenarioRunId && !!open,
-        // Finished runs never change — stop polling entirely. Live runs poll
-        // fast only while the event stream is down.
-        refetchInterval: (query) =>
-          getRunStatePollInterval({
-            status: query.state.data?.status,
-            sseConnected,
-          }),
-      },
-    );
-
-  // Clear streaming messages once server data includes them
-  useEffect(() => {
-    if (scenarioState?.messages) {
-      clearCompleted(
-        scenarioState.messages
-          .map((m: { id?: string }) => m.id)
-          .filter((id): id is string => !!id),
-      );
-    }
-  }, [scenarioState?.messages, clearCompleted]);
-
-  const scenarioId = scenarioState?.scenarioId;
-  const batchRunId = scenarioState?.batchRunId;
+  const scenarioId = stream.scenarioState?.scenarioId;
+  const batchRunId = stream.scenarioState?.batchRunId;
 
   const { data: scenarioData } =
     api.scenarios.getByIdIncludingArchived.useQuery(
@@ -161,174 +118,35 @@ export function useScenarioRunDetail({
       { enabled: !!project?.id && !!scenarioId },
     );
 
-  const targetNameMap = useTargetNameMap();
-
-  // Resolve display title with target name
-  const displayTitle = useMemo(() => {
-    const targetRefId = scenarioState?.metadata?.langwatch?.targetReferenceId;
-    const targetName = targetRefId
-      ? (targetNameMap.get(targetRefId) ?? null)
-      : null;
-    return buildDisplayTitle({
-      scenarioName: scenarioState?.name ?? "",
-      targetName,
-      iteration: undefined,
-    });
-  }, [scenarioState?.name, scenarioState?.metadata, targetNameMap]);
-
-  const { onRunComplete, onRunFailed } = useDrawerRunCallbacks();
-
-  const { runScenario, isRunning } = useRunScenario({
+  const facts = useRunDetailFacts({
+    scenarioState: stream.scenarioState,
+    streamingMessages: stream.streamingMessages,
+    scenarioRunId,
+    isOpen: open,
+  });
+  const actions = useRunAgainActions({
+    scenarioId,
     projectId: project?.id,
     projectSlug: project?.slug,
-    onRunComplete,
-    onRunFailed,
   });
-
-  const {
-    target: persistedTarget,
-    setTarget: persistTarget,
-    hasPersistedTarget,
-  } = useScenarioTarget(scenarioId);
-
-  const handleRunAgain = useCallback(
-    async (target: TargetValue, remember: boolean) => {
-      if (!scenarioId || !target) return;
-      if (remember) persistTarget(target);
-      try {
-        await runScenario({ scenarioId, target });
-      } catch (error) {
-        console.error("Failed to run scenario:", error);
-      }
-      setRunModalOpen(false);
-    },
-    [scenarioId, persistTarget, runScenario],
-  );
-
-  const handleRunAgainClick = useCallback(() => {
-    if (hasPersistedTarget && persistedTarget) {
-      void handleRunAgain(persistedTarget, true);
-    } else {
-      setRunModalOpen(true);
-    }
-  }, [hasPersistedTarget, persistedTarget, handleRunAgain]);
-
-  // Get the first traceId from scenario messages to open trace details drawer
-  const firstTraceId = useMemo(() => {
-    const messages = scenarioState?.messages ?? [];
-    for (const msg of messages) {
-      if (msg.trace_id) return msg.trace_id;
-    }
-    return undefined;
-  }, [scenarioState?.messages]);
-
-  // Whole-conversation view in Trace Explorer: every trace of this run
-  // carries the scenario.run_id attribute, so a scenarioRun:"<id>" search
-  // shows the full conversation. Same #<lens>?q= fragment contract as the
-  // command bar's trace links.
-  const router = useRouter();
-  const handleOpenInTraces = useCallback(() => {
-    if (!project?.slug || !scenarioRunId) return;
-    const query = encodeURIComponent(`scenarioRun:"${scenarioRunId}"`);
-    void router.push(`/${project.slug}/traces#all-traces?q=${query}`);
-  }, [project?.slug, scenarioRunId, router]);
-
-  // Relative time that auto-updates every 30s while the drawer is open
-  const [timeAgo, setTimeAgo] = useState<string | undefined>(undefined);
-  useEffect(() => {
-    if (!open || !scenarioState?.timestamp) {
-      setTimeAgo(undefined);
-      return;
-    }
-    const update = () => setTimeAgo(formatTimeAgo(scenarioState.timestamp));
-    update();
-    const interval = setInterval(update, 30_000);
-    return () => clearInterval(interval);
-  }, [open, scenarioState?.timestamp]);
-
-  const suiteId = scenarioState?.metadata?.langwatch?.simulationSuiteId;
-
-  const copyableIds = useMemo(() => {
-    if (!scenarioId || !batchRunId || !scenarioRunId) return undefined;
-    return [
-      { label: "Scenario", value: scenarioId },
-      { label: "Batch", value: batchRunId },
-      { label: "Run", value: scenarioRunId },
-      ...(suiteId ? [{ label: "Run plan", value: suiteId }] : []),
-    ];
-  }, [scenarioId, batchRunId, scenarioRunId, suiteId]);
-
-  const criteria = useMemo(() => {
-    if (!scenarioState?.results) return null;
-    const met = scenarioState.results.metCriteria?.length ?? 0;
-    const unmet = scenarioState.results.unmetCriteria?.length ?? 0;
-    return { met, total: met + unmet };
-  }, [scenarioState?.results]);
-
-  // The values this run actually resolved, as recorded when it was queued. A
-  // run from before parameters existed, or one whose scenarios declare none,
-  // has nothing here and shows no section at all.
-  const parameters = useMemo(() => {
-    const parsed = runParameterValuesSchema.safeParse(
-      scenarioState?.metadata?.parameters,
-    );
-    if (!parsed.success) return [];
-    return Object.entries(parsed.data);
-  }, [scenarioState?.metadata]);
-
-  // The credentials the run needed, by name. The values are not recorded, so
-  // the section shows the names and a mask in place of a value.
-  const secretParameterNames = useMemo(() => {
-    const parsed = secretParameterNamesSchema.safeParse(
-      scenarioState?.metadata?.secretParameterNames,
-    );
-    return parsed.success ? parsed.data : [];
-  }, [scenarioState?.metadata]);
-
-  const hasConversation =
-    (scenarioState?.messages ?? []).length > 0 ||
-    (streamingMessages ?? []).length > 0;
-  const conversationCount =
-    (scenarioState?.messages ?? []).length + (streamingMessages ?? []).length;
-
-  // A finished run that produced no messages (and didn't fail at the infra
-  // level) means the agent under test returned nothing — show an explicit
-  // "No response" state instead of silently omitting the conversation.
-  const showNoResponse = shouldShowNoResponse({
-    status: scenarioState?.status,
-    hasConversation,
-    hasError: Boolean(scenarioState?.results?.error),
+  const handleOpenInTraces = useOpenRunInTraces({
+    projectSlug: project?.slug,
+    scenarioRunId,
   });
 
   return {
     project,
     openDrawer,
-    scenarioState,
-    runStateError,
-    streamingMessages,
     scenarioId,
     batchRunId,
     scenarioData,
-    displayTitle,
-    isRunning,
-    runModalOpen,
-    setRunModalOpen,
+    dejaView,
     scenarioEditorOpen,
     setScenarioEditorOpen,
-    persistedTarget,
-    handleRunAgain,
-    handleRunAgainClick,
-    firstTraceId,
     handleOpenInTraces,
-    dejaView,
-    timeAgo,
-    copyableIds,
-    criteria,
-    parameters,
-    secretParameterNames,
-    hasConversation,
-    conversationCount,
-    showNoResponse,
+    ...stream,
+    ...facts,
+    ...actions,
   };
 }
 
@@ -387,7 +205,7 @@ function ClassicScenarioRunDetailDrawer({
     secretParameterNames,
     hasConversation,
     conversationCount,
-    showNoResponse,
+    shouldShowNoResponse,
   } = useScenarioRunDetail({ scenarioRunId, open: !!open });
 
   const [openSections, setOpenSections] = useState<string[]>([
@@ -619,7 +437,7 @@ function ClassicScenarioRunDetailDrawer({
 
                 {/* No-response — explicit empty state when a finished run
                     produced no messages (agent under test returned nothing). */}
-                {showNoResponse && (
+                {shouldShowNoResponse && (
                   <RunDetailSection
                     value="no-response"
                     title="Conversation"
@@ -649,7 +467,7 @@ function ClassicScenarioRunDetailDrawer({
                   value="results"
                   title="Results"
                   count={criteria?.total}
-                  isFirst={!hasConversation && !showNoResponse}
+                  isFirst={!hasConversation && !shouldShowNoResponse}
                 >
                   <Box
                     borderRadius="xl"

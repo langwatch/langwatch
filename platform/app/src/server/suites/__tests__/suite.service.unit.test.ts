@@ -1299,7 +1299,7 @@ describe("SuiteService", () => {
     });
   });
 
-  describe("run() on a folder", () => {
+  describe("when running a folder", () => {
     describe("when the folder carries a repeat count", () => {
       /** @scenario "A folder run honours the repeat count on the folder" */
       it("schedules cases x targets x repeat count runs", async () => {

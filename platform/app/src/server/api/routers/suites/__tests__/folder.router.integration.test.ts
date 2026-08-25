@@ -106,8 +106,11 @@ describe("suites.folders integration", () => {
     );
   });
 
+  // Creating a case writes its first version, and ScenarioVersion has no
+  // foreign key, so those rows outlive the case unless they go first.
   beforeEach(() =>
     cleanupTestRows(prisma, [
+      ["scenarioVersion", { projectId: { in: [projectId, otherProjectId] } }],
       ["scenario", { projectId: { in: [projectId, otherProjectId] } }],
       ["simulationSuite", { projectId: { in: [projectId, otherProjectId] } }],
     ]),
@@ -115,6 +118,7 @@ describe("suites.folders integration", () => {
 
   afterAll(() =>
     cleanupTestRows(prisma, [
+      ["scenarioVersion", { projectId: { in: [projectId, otherProjectId] } }],
       ["scenario", { projectId: { in: [projectId, otherProjectId] } }],
       ["simulationSuite", { projectId: { in: [projectId, otherProjectId] } }],
       ["project", { id: { in: [projectId, otherProjectId] } }],

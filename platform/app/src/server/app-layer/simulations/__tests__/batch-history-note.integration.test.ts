@@ -280,7 +280,7 @@ describe("a batch produced by an SDK or CI run", () => {
       expect(batch?.note).toBe("abc1234");
     });
 
-    /** @scenario "A note set directly by an SDK caller is kept as given" */
+    /** @scenario "A note set directly by an SDK caller reads like a platform note" */
     it("keeps the note and the other metadata keys the caller set", async () => {
       const scenarioSetId = `ci-kept-${nanoid()}`;
       const batchRunId = `batch-kept-${nanoid()}`;

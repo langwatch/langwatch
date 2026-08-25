@@ -536,6 +536,22 @@ describe("runSuiteCommand()", () => {
     });
   });
 
+  describe("when --note is exactly at the limit", () => {
+    it("schedules the run", async () => {
+      mockRun.mockResolvedValue(makeRunResult());
+
+      await runSuiteCommand({
+        id: "suite_abc123",
+        options: { note: "x".repeat(200) },
+      });
+
+      expect(mockRun).toHaveBeenCalledWith(
+        "suite_abc123",
+        expect.objectContaining({ note: "x".repeat(200) }),
+      );
+    });
+  });
+
   describe("when --note holds only spaces", () => {
     /** @scenario "Run a suite with a note of only spaces" */
     it("schedules the run with no note", async () => {
@@ -554,7 +570,7 @@ describe("runSuiteCommand()", () => {
   // its own: the same request, the same result, the same reporting.
   describe("when the id names a test suite folder", () => {
     /** @scenario "Run a test suite folder" */
-    it("runs it through the same path a run plan uses", async () => {
+    it("schedules a run for every scenario against every active target", async () => {
       mockRun.mockResolvedValue(makeRunResult({ batchRunId: "batch_folder" }));
 
       await runSuiteCommand({ id: "folder_abc", options: {} });

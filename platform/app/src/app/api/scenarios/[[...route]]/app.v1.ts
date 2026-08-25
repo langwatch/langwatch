@@ -384,10 +384,10 @@ function registerUpdateScenarioRoute(
         return c.json({ error: "Scenario not found" }, 404);
       }
 
-      const scenario = await service.update(
+      const scenario = await service.update({
         id,
-        project.id,
-        {
+        projectId: project.id,
+        data: {
           ...(body.name !== undefined && { name: body.name }),
           ...(body.situation !== undefined && { situation: body.situation }),
           ...(body.criteria !== undefined && { criteria: body.criteria }),
@@ -395,8 +395,8 @@ function registerUpdateScenarioRoute(
           ...(body.parameters !== undefined && { parameters: body.parameters }),
           ...(body.folderId !== undefined && { folderId: body.folderId }),
         },
-        { actor: actorFromRequest(c) },
-      );
+        options: { actor: actorFromRequest(c) },
+      });
 
       return c.json({
         ...toScenarioResponse(scenario),

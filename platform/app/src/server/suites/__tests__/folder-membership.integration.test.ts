@@ -62,8 +62,11 @@ async function folderScenarioIds(folderId: string): Promise<string[]> {
 /**
  * The invariant itself: every active case's folderId agrees with every
  * folder's scenarioIds, in both directions.
+ *
+ * Returns one line per disagreement, so each test holds the assertion and a
+ * failure names the folder and the cases that broke it.
  */
-async function expectInvariantHolds() {
+async function invariantBreaks(): Promise<string[]> {
   const folders = await prisma.simulationSuite.findMany({
     where: { projectId, kind: "folder", archivedAt: null },
   });
@@ -71,20 +74,34 @@ async function expectInvariantHolds() {
     where: { projectId, archivedAt: null },
     select: { id: true, folderId: true },
   });
+  const folderIdByCaseId = new Map(
+    activeCases.map((scenario) => [scenario.id, scenario.folderId]),
+  );
+
+  const breaks: string[] = [];
   for (const folder of folders) {
     const namedMembers = activeCases
       .filter((scenario) => scenario.folderId === folder.id)
       .map((scenario) => scenario.id)
       .sort();
-    expect([...folder.scenarioIds].sort()).toEqual(namedMembers);
-  }
-  for (const scenario of activeCases) {
-    for (const folder of folders) {
-      if (scenario.folderId !== folder.id) {
-        expect(folder.scenarioIds).not.toContain(scenario.id);
-      }
+    const heldMembers = [...folder.scenarioIds].sort();
+    if (heldMembers.join(",") !== namedMembers.join(",")) {
+      breaks.push(
+        `folder ${folder.id} holds [${heldMembers.join(", ")}] but the cases name [${namedMembers.join(", ")}]`,
+      );
+    }
+    const strangers = heldMembers.filter(
+      (caseId) =>
+        folderIdByCaseId.has(caseId) &&
+        folderIdByCaseId.get(caseId) !== folder.id,
+    );
+    if (strangers.length > 0) {
+      breaks.push(
+        `folder ${folder.id} holds [${strangers.join(", ")}], which name another folder`,
+      );
     }
   }
+  return breaks;
 }
 
 beforeAll(async () => {
@@ -134,7 +151,7 @@ describe("folder membership", () => {
 
       expect(scenario.folderId).toBe(folder.id);
       expect(await folderScenarioIds(folder.id)).toEqual([scenario.id]);
-      await expectInvariantHolds();
+      expect(await invariantBreaks()).toEqual([]);
     });
 
     /** @scenario "A case created from the All test cases view starts unfiled" */
@@ -142,7 +159,7 @@ describe("folder membership", () => {
       const scenario = await createCase({ name: "Unfiled" });
 
       expect(scenario.folderId).toBeNull();
-      await expectInvariantHolds();
+      expect(await invariantBreaks()).toEqual([]);
     });
   });
 
@@ -165,7 +182,7 @@ describe("folder membership", () => {
       expect(moved.folderId).toBe(checkout.id);
       expect(await folderScenarioIds(checkout.id)).toEqual([scenario.id]);
       expect(await folderScenarioIds(refunds.id)).toEqual([]);
-      await expectInvariantHolds();
+      expect(await invariantBreaks()).toEqual([]);
     });
 
     /** @scenario "Unfiling a case removes it from its folder" */
@@ -186,7 +203,7 @@ describe("folder membership", () => {
       expect(await folderScenarioIds(refunds.id)).toEqual([]);
       const listed = await scenarioService.getAll({ projectId });
       expect(listed.map((s) => s.id)).toContain(scenario.id);
-      await expectInvariantHolds();
+      expect(await invariantBreaks()).toEqual([]);
     });
 
     /** @scenario "A move that fails leaves both sides untouched" */
@@ -213,7 +230,7 @@ describe("folder membership", () => {
       });
       expect(kept?.folderId).toBe(refunds.id);
       expect(await folderScenarioIds(refunds.id)).toEqual([scenario.id]);
-      await expectInvariantHolds();
+      expect(await invariantBreaks()).toEqual([]);
     });
 
     /** @scenario "A case cannot be filed into a run plan that is not a folder" */
@@ -283,7 +300,7 @@ describe("folder membership", () => {
       await scenarioService.archive({ id: first.id, projectId });
 
       expect(await folderScenarioIds(refunds.id)).toEqual([second.id]);
-      await expectInvariantHolds();
+      expect(await invariantBreaks()).toEqual([]);
     });
 
     /** @scenario "Archiving many cases at once drops all of them from their folders" */
@@ -302,7 +319,7 @@ describe("folder membership", () => {
       expect(result.archived).toHaveLength(3);
       expect(result.failed).toHaveLength(0);
       expect(await folderScenarioIds(refunds.id)).toEqual([cases[3]!.id]);
-      await expectInvariantHolds();
+      expect(await invariantBreaks()).toEqual([]);
     });
 
     /** @scenario "Restoring an archived case puts it back in its folder" */
@@ -330,7 +347,7 @@ describe("folder membership", () => {
       });
 
       expect(await folderScenarioIds(refunds.id)).toEqual([scenario.id]);
-      await expectInvariantHolds();
+      expect(await invariantBreaks()).toEqual([]);
     });
   });
 
@@ -394,7 +411,7 @@ describe("folder membership", () => {
         scenario.id,
         copy.id,
       ]);
-      await expectInvariantHolds();
+      expect(await invariantBreaks()).toEqual([]);
     });
   });
 
@@ -413,26 +430,57 @@ describe("folder membership", () => {
           }),
         );
       }
-      await expectInvariantHolds();
+      expect(await invariantBreaks()).toEqual([]);
 
       await scenarioService.moveToFolder({
         scenarioId: cases[0]!.id,
         projectId,
         folderId: checkout.id,
       });
-      await expectInvariantHolds();
+      expect(await invariantBreaks()).toEqual([]);
 
       await scenarioService.archive({ id: cases[3]!.id, projectId });
-      await expectInvariantHolds();
+      expect(await invariantBreaks()).toEqual([]);
 
       await scenarioService.batchArchive({
         ids: [cases[1]!.id, cases[4]!.id],
         projectId,
       });
-      await expectInvariantHolds();
+      expect(await invariantBreaks()).toEqual([]);
 
       expect(await folderScenarioIds(refunds.id)).toEqual([cases[2]!.id]);
       expect(await folderScenarioIds(checkout.id)).toEqual([cases[0]!.id]);
+    });
+  });
+
+  describe("when two cases are filed into one folder at the same time", () => {
+    /** @scenario "Two cases filed into one folder at the same time both land in it" */
+    it("holds both of them", async () => {
+      const refunds = await createFolder("Refunds");
+      const first = await createCase({ name: "First" });
+      const second = await createCase({ name: "Second" });
+
+      // Both moves run at once on purpose. The reconcile reads the member
+      // list to decide what to write, so without the folder's row lock the
+      // one that commits second writes a list that never held the other's
+      // case.
+      await Promise.all([
+        scenarioService.moveToFolder({
+          scenarioId: first.id,
+          projectId,
+          folderId: refunds.id,
+        }),
+        scenarioService.moveToFolder({
+          scenarioId: second.id,
+          projectId,
+          folderId: refunds.id,
+        }),
+      ]);
+
+      expect(new Set(await folderScenarioIds(refunds.id))).toEqual(
+        new Set([first.id, second.id]),
+      );
+      expect(await invariantBreaks()).toEqual([]);
     });
   });
 });

@@ -36118,10 +36118,10 @@ The command exits when the batch is complete, and its exit code follows the resu
 `--note` keeps one short line with the batch: why it was run, or what changed. Every run in the batch carries it, and the platform shows it beside the run.
 
 ```bash
-langwatch suite run suite_abc123 --note "$(git log -1 --pretty=%s)" --wait
+langwatch suite run suite_abc123 --note "$(git log -1 --pretty=%s | cut -c1-200)" --wait
 ```
 
-The note is free text, up to 200 characters. `langwatch simulation-run list` and `langwatch simulation-run get` show it back.
+The note is free text, up to 200 characters, and a longer one is refused before the batch is queued. The `cut` above keeps a long commit subject inside that limit. `langwatch simulation-run list` and `langwatch simulation-run get` show the note back.
 
 ---
 

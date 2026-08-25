@@ -137,8 +137,14 @@ Each source sets it like this:
 onto every run in the batch, so a run carries its note from its first moment.
 The note is trimmed, and an empty note is dropped rather than stored as an
 empty string. A run without a note therefore records metadata identical to what
-it recorded before notes existed. A note over 200 characters is rejected at the
-boundary.
+it recorded before notes existed.
+
+The 200-character limit belongs to the input paths that start a run: the run
+dialog and the `--note` option of the CLI. Both refuse a longer note before any
+run is queued, so nothing is lost. A note that arrives on a `SCENARIO_RUN_STARTED`
+event from an SDK or a CI job is trimmed and dropped when blank, matching a
+platform note, but its length is not checked: the event reports a run that
+already happened, and refusing it over the note would lose the run itself.
 
 **Read path.** Batch history reads the note back from the run rows it already
 loads for the page. There is no second query and no join. A batch produced only

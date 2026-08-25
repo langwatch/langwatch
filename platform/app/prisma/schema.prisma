@@ -2480,6 +2480,7 @@ model Scenario {
   // there is what keeps two concurrent saves from sharing a number. See
   // specs/scenarios/scenario-versioning.feature.
   version         Int       @default(1)
+  versions        ScenarioVersion[]
   lastUpdatedById String?
   lastUpdatedBy   User?     @relation(fields: [lastUpdatedById], references: [id])
   archivedAt      DateTime?
@@ -2497,6 +2498,13 @@ model Scenario {
 model ScenarioVersion {
   id         String @id @default(nanoid())
   scenarioId String
+  /// Deleting the case takes its history with it. Under relationMode="prisma"
+  /// the cascade is the client's, so a raw SQL delete still has to clear these
+  /// rows itself.
+  scenario   Scenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  /// The project of the parent case, carried here so every read filters by
+  /// tenant without a join. The service is what keeps the pair honest: no
+  /// composite foreign key can, under relationMode="prisma".
   projectId  String
   version    Int
 

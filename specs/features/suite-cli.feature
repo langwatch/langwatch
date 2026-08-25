@@ -169,7 +169,7 @@ Feature: Suite (Run Plan) CLI Commands
   Scenario: Run a test suite folder
     Given my project has a folder with scenarios and active targets
     When I run "langwatch suite run <folder-id>"
-    Then the run is scheduled through the same path a run plan uses
+    Then a run is scheduled for every scenario of the folder against every active target
     And I see the job count and batch run ID
 
   @unit

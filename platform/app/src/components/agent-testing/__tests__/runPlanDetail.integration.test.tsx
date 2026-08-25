@@ -185,7 +185,7 @@ function renderDetail(
     periodMode: "relative",
     setPeriod: vi.fn(),
     setRelativePeriod: vi.fn(),
-    sseConnected: true,
+    isSseConnected: true,
     ...overrides,
   };
   const view = render(<RunPlanDetail {...props} />, { wrapper: Wrapper });
@@ -207,6 +207,10 @@ describe("<RunPlanDetail/>", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    // Restores spies a test installed on globals. A test that fails before
+    // its own restore would otherwise leave the stub in place for every test
+    // after it.
+    vi.restoreAllMocks();
   });
 
   /** @scenario "Choosing a run plan opens its runs" */
@@ -399,7 +403,7 @@ describe("<RunPlanDetail/>", () => {
           periodMode="relative"
           setPeriod={vi.fn()}
           setRelativePeriod={vi.fn()}
-          sseConnected
+          isSseConnected
         />
       </Wrapper>,
     );
@@ -532,7 +536,7 @@ describe("<RunPlanDetail/>", () => {
           periodMode="relative"
           setPeriod={vi.fn()}
           setRelativePeriod={vi.fn()}
-          sseConnected
+          isSseConnected
         />
       </ChakraProvider>,
     );
@@ -543,7 +547,7 @@ describe("<RunPlanDetail/>", () => {
 
   /** @scenario "When the live connection drops the results still update" */
   it("keeps refreshing on the fallback cadence when the live stream is down", () => {
-    renderDetail({ sseConnected: false });
+    renderDetail({ isSseConnected: false });
 
     const options = mockFreshnessQuery.mock.calls.at(-1)?.[1] as {
       refetchInterval: number | false;
@@ -666,8 +670,6 @@ describe("<RunPlanDetail/>", () => {
     ) as { scenarioSetId: string; mode: string };
     expect(body.scenarioSetId).toBe(SUITE_SET_ID);
     expect(body.mode).toBe("full");
-
-    fetchSpy.mockRestore();
   });
 
   /** @scenario "A run plan with no run in the period says so" */

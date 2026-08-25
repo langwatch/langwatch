@@ -87,6 +87,7 @@ Feature: Test case versions
     Then the save is refused with "scenario_stale_version"
     And the stored case is unchanged
     And the editor says the case changed and offers to reload it
+    And the offer says the reload discards the edits in the form
 
   # --- Cases that existed before versions ---
 

@@ -31,10 +31,6 @@ export interface ScenarioCreateModalProps {
   variant?: ScenarioEditorVariant;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────────────────────
-
 const MODAL_TITLE = "Create new scenario";
 /** What Agent Testing calls the same modal. */
 const AGENT_TESTING_MODAL_TITLE = "New test case";

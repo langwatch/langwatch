@@ -74,6 +74,11 @@ Feature: A note on a run
     And the full note is readable on hover
 
   # --- Limits ---
+  #
+  # These limits belong to the paths that START a run: the run dialog and the
+  # CLI. A note that arrives on a run event from an SDK or a CI job is trimmed
+  # the same way, but its length is not checked. See
+  # specs/suites/run-note-metadata-convention.feature.
 
   @unit
   Scenario: A note of only spaces is dropped

@@ -51,6 +51,7 @@ const scenarioRunResponseSchema = z.object({
     ),
   scenarioVersion: z
     .number()
+    .int()
     .nullable()
     .describe(
       "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed.",

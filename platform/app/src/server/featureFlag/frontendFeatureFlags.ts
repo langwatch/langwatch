@@ -114,7 +114,7 @@ export const FRONTEND_FEATURE_FLAGS = [
   // The Agent Testing v2 interface: one page with Test cases and Results
   // tabs, test suites as folders, run notes, test case versions, and the
   // wide run drawer (specs/features/agent-testing/). Off by default and
-  // purely additive — the current Simulations pages and menu group are
+  // purely additive: the current Simulations pages and menu group are
   // untouched while it is off, and the backend it calls is unflagged.
   "release_ui_agent_testing_v2_enabled",
 ] as const;

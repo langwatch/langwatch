@@ -1,9 +1,9 @@
 import chalk from "chalk";
-import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import { createSpinner } from "../../../utils/spinner";
 import { resolveCredentials } from "../../../utils/apiKey";
 import { failSpinner } from "../../../utils/spinnerError";
 import type { CommandResult } from "../../../utils/output";
+import { createCliScenariosService } from "../cli-scenarios-service";
 
 /**
  * One saved version of a test case, with the content it saved.
@@ -16,15 +16,22 @@ export const getScenarioVersionCommand = async (
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const versionNumber = parseInt(version, 10);
-  if (Number.isNaN(versionNumber) || versionNumber < 1) {
+  // Number(), not parseInt(): parseInt("2.7") is 2 and parseInt("2abc") is 2,
+  // so the command would silently read a version nobody asked for. The REST
+  // layer answers 422 for the same input, and the CLI refuses it the same way.
+  const versionNumber = Number(version.trim());
+  if (
+    version.trim() === "" ||
+    !Number.isInteger(versionNumber) ||
+    versionNumber < 1
+  ) {
     console.error(
       chalk.red(`Error: "${version}" is not a version number. Use a whole number, e.g. 2.`),
     );
     process.exit(1);
   }
 
-  const service = new ScenariosApiService();
+  const service = createCliScenariosService();
   const spinner = createSpinner(
     `Fetching version ${versionNumber} of scenario "${scenarioId}"...`,
   ).start();

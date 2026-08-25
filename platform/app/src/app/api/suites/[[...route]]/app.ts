@@ -107,7 +107,7 @@ const createSuiteInputSchema = z
 const listSuitesQuerySchema = z.object({
   kind: z
     .enum(["custom", "folder"])
-    .optional()
+    .default("custom")
     .describe(
       "Which kind of suite to list. Defaults to custom, so callers that predate folders keep seeing exactly the run plans they always did.",
     ),
@@ -211,7 +211,7 @@ secured.access(requires("scenarios:view")).get(
     const service = createService();
     const suites = await service.getAll({
       projectId: project.id,
-      ...(kind !== undefined && { kinds: [kind] }),
+      kinds: [kind],
     });
 
     return c.json(

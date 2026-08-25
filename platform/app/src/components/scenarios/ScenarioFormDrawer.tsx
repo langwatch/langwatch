@@ -103,6 +103,23 @@ type ModelOverrides = {
 };
 
 /**
+ * What a save without a run confirms. Agent Testing calls the record a test
+ * case; every other surface calls it a scenario.
+ */
+function savedToastTitle({
+  isAgentTesting,
+  isUpdate,
+}: {
+  isAgentTesting: boolean;
+  isUpdate: boolean;
+}): string {
+  if (isAgentTesting) {
+    return isUpdate ? "Test case updated" : "Test case created";
+  }
+  return isUpdate ? "Scenario updated" : "Scenario created";
+}
+
+/**
  * URL-based wrapper for ScenarioFormDrawer.
  * Reads scenarioId from drawer URL params and passes it as a prop.
  * Use this when rendering via the drawer registry / URL navigation.
@@ -270,6 +287,14 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const updateMutation = api.scenarios.update.useMutation({
     onSuccess: (data: Scenario) => {
       void utils.scenarios.getAll.invalidate({ projectId: project?.id ?? "" });
+      // The saved record goes into the cache before the refetch, not after
+      // it. `loadedVersion` reads from here, and a person who saves twice in
+      // a row would otherwise send the version of the save before and be
+      // refused for a conflict with their own write.
+      utils.scenarios.getById.setData(
+        { projectId: project?.id ?? "", id: data.id },
+        data,
+      );
       void utils.scenarios.getById.invalidate({
         projectId: project?.id ?? "",
         id: data.id,
@@ -583,13 +608,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         const saved = await handleSave({ data, skipTransition: true });
         if (saved) {
           toaster.create({
-            title: isAgentTesting
-              ? scenario
-                ? "Test case updated"
-                : "Test case created"
-              : scenario
-                ? "Scenario updated"
-                : "Scenario created",
+            title: savedToastTitle({ isAgentTesting, isUpdate: !!scenario }),
             type: "success",
           });
           onClose();
@@ -886,8 +905,10 @@ function ScenarioFormWithSuites({
 /**
  * Says the case changed since it was loaded, and offers the reload.
  *
- * The refused save wrote nothing, so reloading is safe; the person reads the
- * newer version and applies their change over it.
+ * The refused save wrote nothing, so nothing is lost by leaving the form as
+ * it is. Reloading is the destructive choice: it replaces the form with the
+ * newer version, and the edits in it go with it. The button says so, so the
+ * person can copy what they typed before pressing it.
  *
  * @see specs/scenarios/scenario-versioning.feature
  */
@@ -915,10 +936,12 @@ function StaleVersionNotice({
       <Text fontSize="xs" color="fg.muted">
         Somebody else saved{" "}
         {currentVersion > 0 ? `version ${currentVersion}` : "a newer version"}{" "}
-        while this one was open. Nothing was written.
+        while this one was open. Nothing was written, so your edits are still
+        here. Reloading replaces them with the newer version, so copy anything
+        you want to keep first.
       </Text>
       <Button size="xs" variant="outline" onClick={onReload}>
-        Reload the newer version
+        Discard my edits and reload
       </Button>
     </VStack>
   );

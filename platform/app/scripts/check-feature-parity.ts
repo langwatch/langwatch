@@ -547,12 +547,6 @@ const LEGACY_INERT: string[] = [
   "specs/scenarios/scenario-drawer-close-on-save.feature",
   "specs/scenarios/scenario-editor-new-agent-flow.feature",
   "specs/scenarios/scenario-library.feature",
-  // Agent Testing v2: restoring an older test case version. Written in phase
-  // 0 with the rest of the v2 specs so the append-only rule is agreed before
-  // the write path exists, and parked whole because restore ships in the last
-  // phase. Every scenario is @unimplemented on purpose, which is why the file
-  // enforces none. Remove this entry when the restore path lands and the
-  // scenarios take their @unit / @integration tags.
   "specs/secrets/secrets-manager.feature",
   // Helm chart behaviour, verified by charts/langwatch/tests/e2e-overlays.sh.
   // The checker now scans that directory (DEFAULT_SHELL_TEST_ROOTS), so these

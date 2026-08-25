@@ -78,8 +78,8 @@ Feature: The test suites rail
   Scenario: A person with read-only access sees no changing actions in the row menu
     Given a person with read-only access to the project
     When a test suite row menu is opened
-    Then "Open last run" is offered
-    And "New test case", "Edit suite" and "Archive suite" are not offered
+    Then "Open last run" is the only action offered
+    And "New test case", "Run suite", "Edit suite" and "Archive suite" are not offered
 
   # --- Selection ---
 

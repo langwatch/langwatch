@@ -9,16 +9,10 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { Button, HStack, Spinner, Table, Text } from "@chakra-ui/react";
-import { MoreVertical, Square } from "lucide-react";
-import { buildDisplayTitle } from "~/components/suites/run-history-transforms";
-import { isCancellableStatus } from "~/components/suites/useCancelScenarioRun";
+import { Table } from "@chakra-ui/react";
 import { ListTable } from "~/components/ui/ListTable";
-import { Menu } from "~/components/ui/menu";
-import { isTerminalStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
-import { LastResultLabel } from "../shared/LastResultLabel";
-import { ResultMetricsInline } from "../shared/ResultMetricsInline";
+import { RunResultRow } from "./RunResultRow";
 
 export type RunResultsTableProps = {
   scenarioRuns: ScenarioRunData[];
@@ -31,43 +25,6 @@ export type RunResultsTableProps = {
   /** Opens the editor of the test case the row ran. */
   onEditCase?: (scenarioRun: ScenarioRunData) => void;
 };
-
-/** The row menu: the one thing to do with a result is edit the case it ran. */
-function ResultRowActionsMenu({
-  displayName,
-  onEditCase,
-}: {
-  displayName: string;
-  onEditCase: () => void;
-}) {
-  const stop = (event: React.MouseEvent) => event.stopPropagation();
-
-  return (
-    <Menu.Root>
-      <Menu.Trigger asChild>
-        <Button
-          size="xs"
-          variant="ghost"
-          aria-label={`Actions for ${displayName}`}
-          onClick={stop}
-        >
-          <MoreVertical size={14} />
-        </Button>
-      </Menu.Trigger>
-      <Menu.Content>
-        <Menu.Item
-          value="edit-test-case"
-          onClick={(event) => {
-            stop(event);
-            onEditCase();
-          }}
-        >
-          Edit test case
-        </Menu.Item>
-      </Menu.Content>
-    </Menu.Root>
-  );
-}
 
 export function RunResultsTable({
   scenarioRuns,
@@ -91,85 +48,18 @@ export function RunResultsTable({
         </Table.Row>
       </Table.Header>
       <Table.Body>
-        {scenarioRuns.map((scenarioRun) => {
-          const canCancel =
-            !!onCancelRun && isCancellableStatus(scenarioRun.status);
-          const isCancelling = cancellingJobId === scenarioRun.scenarioRunId;
-          // A run that is still going has no duration and no cost to read: the
-          // numbers it carries so far are the ones it started with.
-          const hasSettled = isTerminalStatus(scenarioRun.status);
-          const displayName = buildDisplayTitle({
-            scenarioName: scenarioRun.name ?? scenarioRun.scenarioId,
-            targetName: resolveTargetName(scenarioRun),
-            iteration: iterationMap.get(scenarioRun.scenarioRunId),
-          });
-
-          return (
-            <Table.Row
-              key={scenarioRun.scenarioRunId}
-              cursor="pointer"
-              _hover={{ background: "bg.muted" }}
-              onClick={() => onScenarioRunClick(scenarioRun)}
-              data-testid={`run-result-row-${scenarioRun.scenarioRunId}`}
-            >
-              <Table.Cell>
-                <LastResultLabel
-                  status={scenarioRun.status}
-                  results={scenarioRun.results ?? undefined}
-                />
-              </Table.Cell>
-              <Table.Cell>
-                <Text fontSize="sm" truncate>
-                  {displayName}
-                </Text>
-              </Table.Cell>
-              <Table.Cell textAlign="right">
-                <HStack justify="flex-end">
-                  {hasSettled && (
-                    <ResultMetricsInline
-                      durationInMs={
-                        scenarioRun.durationInMs > 0
-                          ? scenarioRun.durationInMs
-                          : null
-                      }
-                      totalCost={scenarioRun.totalCost ?? null}
-                    />
-                  )}
-                </HStack>
-              </Table.Cell>
-              <Table.Cell textAlign="right">
-                <HStack gap={1} justify="flex-end">
-                  {canCancel ? (
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      aria-label={`Stop ${displayName}`}
-                      disabled={isCancelling}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onCancelRun?.(scenarioRun);
-                      }}
-                      data-testid="cancel-run-button"
-                    >
-                      {isCancelling ? (
-                        <Spinner size="xs" />
-                      ) : (
-                        <Square size={10} />
-                      )}
-                      Stop
-                    </Button>
-                  ) : null}
-                  {onEditCase && (
-                    <ResultRowActionsMenu
-                      displayName={displayName}
-                      onEditCase={() => onEditCase(scenarioRun)}
-                    />
-                  )}
-                </HStack>
-              </Table.Cell>
-            </Table.Row>
-          );
-        })}
+        {scenarioRuns.map((scenarioRun) => (
+          <RunResultRow
+            key={scenarioRun.scenarioRunId}
+            scenarioRun={scenarioRun}
+            resolveTargetName={resolveTargetName}
+            iterationMap={iterationMap}
+            onScenarioRunClick={onScenarioRunClick}
+            onCancelRun={onCancelRun}
+            cancellingJobId={cancellingJobId}
+            onEditCase={onEditCase}
+          />
+        ))}
       </Table.Body>
     </ListTable>
   );

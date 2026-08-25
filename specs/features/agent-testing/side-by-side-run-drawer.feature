@@ -78,7 +78,7 @@ Feature: The wide run detail drawer
 
   @integration
   Scenario: The v1 drawer keeps its width and its stacked results
-    Given the Agent Testing release flag is off
+    Given a project whose menu still shows Simulations rather than Agent Testing
     When a run is opened from the v1 simulations page
     Then the drawer has the width it has today
     And the results read under the conversation, in the section they are in today

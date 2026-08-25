@@ -1,10 +1,10 @@
 import chalk from "chalk";
-import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import { createSpinner } from "../../../utils/spinner";
 import { resolveCredentials } from "../../../utils/apiKey";
 import { formatTable } from "../../../utils/formatting";
 import { failSpinner } from "../../../utils/spinnerError";
 import type { CommandResult } from "../../../utils/output";
+import { createCliScenariosService } from "../cli-scenarios-service";
 
 /**
  * The saved versions of a test case, newest first.
@@ -20,7 +20,7 @@ export const listScenarioVersionsCommand = async (
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const service = new ScenariosApiService();
+  const service = createCliScenariosService();
   const spinner = createSpinner(
     `Fetching versions of scenario "${scenarioId}"...`,
   ).start();

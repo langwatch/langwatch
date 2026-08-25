@@ -314,12 +314,13 @@ export class ScenarioRepository {
     });
   }
 
-  async update(
-    id: string,
-    projectId: string,
-    data: UpdateScenarioInput,
-    tx?: ScenarioWriteClient,
-  ): Promise<Scenario> {
+  async update(params: {
+    id: string;
+    projectId: string;
+    data: UpdateScenarioInput;
+    tx?: ScenarioWriteClient;
+  }): Promise<Scenario> {
+    const { id, projectId, data, tx } = params;
     return tracer.withActiveSpan(
       "ScenarioRepository.update",
       {
@@ -354,13 +355,14 @@ export class ScenarioRepository {
    * newer save. Without it the counter increments atomically, so two callers
    * that both asked for "save over whatever is there" get two numbers.
    */
-  async updateWithVersionBump(
-    id: string,
-    projectId: string,
-    data: UpdateScenarioInput,
-    tx: ScenarioWriteClient,
-    expectedVersion?: number,
-  ): Promise<Scenario> {
+  async updateWithVersionBump(params: {
+    id: string;
+    projectId: string;
+    data: UpdateScenarioInput;
+    tx: ScenarioWriteClient;
+    expectedVersion?: number;
+  }): Promise<Scenario> {
+    const { id, projectId, data, tx, expectedVersion } = params;
     return tracer.withActiveSpan(
       "ScenarioRepository.updateWithVersionBump",
       {

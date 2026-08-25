@@ -36,8 +36,12 @@ async function createCaseAtVersion(name: string, version: number) {
     labels: [],
   });
   for (let next = 2; next <= version; next++) {
-    await scenarioService.update(scenario.id, projectId, {
-      situation: `${name} situation v${next}`,
+    await scenarioService.update({
+      id: scenario.id,
+      projectId,
+      data: {
+        situation: `${name} situation v${next}`,
+      },
     });
   }
   return scenario;
@@ -164,8 +168,12 @@ describe("the version stamp on suite runs", () => {
       idempotencyKey: `run-${nanoid(6)}`,
     });
 
-    await scenarioService.update(scenario.id, projectId, {
-      situation: "Edited after the run",
+    await scenarioService.update({
+      id: scenario.id,
+      projectId,
+      data: {
+        situation: "Edited after the run",
+      },
     });
     const stored = await scenarioService.getById({
       id: scenario.id,

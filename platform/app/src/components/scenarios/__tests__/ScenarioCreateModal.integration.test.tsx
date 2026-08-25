@@ -179,7 +179,7 @@ describe("<ScenarioCreateModal/>", () => {
       ).toBeInTheDocument();
     });
 
-    it("calls the same thing a test case in the Agent Testing interface", () => {
+    it("shows the Agent Testing test case labels", () => {
       render(
         <ScenarioCreateModal
           open={true}

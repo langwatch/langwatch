@@ -37,11 +37,33 @@ Feature: The run note travels in the run metadata
     And the note is present before any run finishes
 
   @integration
-  Scenario: A note set directly by an SDK caller is kept as given
+  Scenario: A note set directly by an SDK caller reads like a platform note
     Given an SDK run that sets "note" in its own run metadata
     When the run is stored
-    Then the note is kept unchanged
+    Then the note reads back on the run
     And the other metadata keys the caller set are kept too
+
+  @unit
+  Scenario: Spaces around a note on an SDK run are removed
+    Given an SDK run whose "note" has spaces around it
+    When the run event is read
+    Then the note reads without them
+
+  @unit
+  Scenario: A blank note on an SDK run is dropped
+    Given an SDK run whose "note" holds only spaces
+    When the run event is read
+    Then the run records no note
+
+  # The length limit belongs to the paths that START a run. An event reports a
+  # run that already happened, so refusing it over the length of its note would
+  # lose the run itself.
+  @unit
+  Scenario: A long note on an SDK run is kept rather than refused
+    Given an SDK run whose "note" holds two hundred and one characters
+    When the run event is read
+    Then the event is accepted
+    And the note is kept in full
 
   # --- The read side ---
 

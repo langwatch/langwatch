@@ -603,7 +603,7 @@ describe("Feature: Suites REST API", () => {
     });
 
     describe("when the run carries a note", () => {
-      async function createRunnableSuiteWithTwoCasesAndTwoTargets() {
+      async function createRunnableSuiteWithThreeCasesAndTwoTargets() {
         const first = await createScenario("Refund Flow");
         const second = await createScenario("Cancellation Flow");
         const third = await createScenario("Upgrade Flow");
@@ -630,7 +630,7 @@ describe("Feature: Suites REST API", () => {
       /** @scenario "Every run of a batch carries the note stamped at queue time" */
       /** @scenario "A note given on the command line is stored with the batch" */
       it("stamps the note on every queued run of the batch", async () => {
-        const suite = await createRunnableSuiteWithTwoCasesAndTwoTargets();
+        const suite = await createRunnableSuiteWithThreeCasesAndTwoTargets();
 
         const res = await helpers.api.post(`/api/suites/${suite.id}/run`, {
           idempotencyKey: "run-key-note-1",

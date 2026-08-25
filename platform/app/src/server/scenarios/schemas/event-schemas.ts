@@ -92,9 +92,19 @@ export const scenarioRunStartedSchema = baseScenarioEventSchema.extend({
        * One short line describing why the run was started. Any caller that can
        * set run metadata can set it, platform or SDK.
        *
+       * Trimmed, and dropped when it holds only spaces, so a note that arrives
+       * on an event reads the same as a note the platform stamped. The
+       * 200-character limit of the platform and CLI input paths is NOT applied
+       * here: an event is a record of a run that already happened, and
+       * refusing it over the length of its note would lose the run itself.
+       *
        * @see specs/suites/run-note-metadata-convention.feature
        */
-      note: z.string().optional(),
+      note: z
+        .string()
+        .trim()
+        .transform((note) => (note === "" ? undefined : note))
+        .optional(),
       langwatch: langwatchMetadataSchema.optional(),
     })
     .passthrough(),

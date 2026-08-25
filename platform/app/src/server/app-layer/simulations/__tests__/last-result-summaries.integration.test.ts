@@ -18,6 +18,8 @@ import { SimulationClickHouseRepository } from "../repositories/simulation.click
 
 const tenantId = `test-last-result-${nanoid()}`;
 const otherTenantId = `${tenantId}-other`;
+/** Its own tenant, so the unfiltered read sees only the rows of one test. */
+const unfilteredTenantId = `${tenantId}-all`;
 const now = Date.now();
 
 function makeRunRow({
@@ -100,7 +102,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (ch) {
-    for (const tenant of [tenantId, otherTenantId]) {
+    for (const tenant of [tenantId, otherTenantId, unfilteredTenantId]) {
       await ch.exec({
         query: `ALTER TABLE simulation_runs DELETE WHERE TenantId = {tenantId:String}`,
         query_params: { tenantId: tenant },
@@ -255,7 +257,7 @@ describe("getLastResultSummaries", () => {
 
   describe("when no scenario filter is given", () => {
     it("returns one summary per scenario that ran in the window", async () => {
-      const localTenant = `${tenantId}-all`;
+      const localTenant = unfilteredTenantId;
       const localRepo = repo;
       const first = `scen-a-${nanoid(6)}`;
       const second = `scen-b-${nanoid(6)}`;
@@ -279,11 +281,6 @@ describe("getLastResultSummaries", () => {
       expect(summaries.map((s) => s.scenarioId).sort()).toEqual(
         [first, second].sort(),
       );
-
-      await ch.exec({
-        query: `ALTER TABLE simulation_runs DELETE WHERE TenantId = {tenantId:String}`,
-        query_params: { tenantId: localTenant },
-      });
     });
   });
 });

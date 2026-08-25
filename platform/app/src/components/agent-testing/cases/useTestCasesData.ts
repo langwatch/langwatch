@@ -13,9 +13,16 @@ import { useMemo } from "react";
 import type { Period } from "~/components/PeriodSelector";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { parseSuiteTargets } from "~/server/suites/types";
-import { api } from "~/utils/api";
+import { api, type RouterOutputs } from "~/utils/api";
 import type { CaseLastResult } from "./CasesTable";
 import type { ExternalSetEntry, TestCase, TestSuiteEntry } from "./test-cases";
+
+type ScenarioRows = RouterOutputs["scenarios"]["getAll"];
+type FolderRows = RouterOutputs["suites"]["folders"]["getAll"];
+type ExternalSetRows = RouterOutputs["scenarios"]["getExternalSetSummaries"];
+type SuiteSummaries = RouterOutputs["suites"]["getSummaries"];
+type OrganizationWithMembers =
+  RouterOutputs["organization"]["getOrganizationWithMembersAndTheirTeams"];
 
 export type TestCasesData = {
   suites: TestSuiteEntry[];
@@ -29,15 +36,13 @@ export type TestCasesData = {
   isLoading: boolean;
 };
 
-export function useTestCasesData({
-  period,
-}: {
-  period: Period;
-}): TestCasesData {
+/** Every read the tab makes, still in the shape the server returned it. */
+function useTestCasesQueries(period: Period) {
   const { project, organization } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
   const startDate = period.startDate.getTime();
   const endDate = period.endDate.getTime();
+  const runWindow = { projectId, startDate, endDate };
 
   const { data: folders, isLoading: isFoldersLoading } =
     api.suites.folders.getAll.useQuery({ projectId }, { enabled: !!project });
@@ -46,21 +51,18 @@ export function useTestCasesData({
     api.scenarios.getAll.useQuery({ projectId }, { enabled: !!project });
 
   const { data: externalSetSummaries } =
-    api.scenarios.getExternalSetSummaries.useQuery(
-      { projectId, startDate, endDate },
-      { enabled: !!project },
-    );
+    api.scenarios.getExternalSetSummaries.useQuery(runWindow, {
+      enabled: !!project,
+    });
 
   const { data: lastResultRows, isLoading: isLastResultsLoading } =
-    api.scenarios.getLastResultSummaries.useQuery(
-      { projectId, startDate, endDate },
-      { enabled: !!project },
-    );
+    api.scenarios.getLastResultSummaries.useQuery(runWindow, {
+      enabled: !!project,
+    });
 
-  const { data: suiteSummaries } = api.suites.getSummaries.useQuery(
-    { projectId, startDate, endDate },
-    { enabled: !!project },
-  );
+  const { data: suiteSummaries } = api.suites.getSummaries.useQuery(runWindow, {
+    enabled: !!project,
+  });
 
   // Only to put a name on the "Added" cell. A project whose members cannot be
   // read shows the date alone rather than failing the table.
@@ -70,7 +72,20 @@ export function useTestCasesData({
       { enabled: !!organization?.id },
     );
 
-  const cases = useMemo<TestCase[]>(
+  return {
+    folders,
+    scenarios,
+    externalSetSummaries,
+    lastResultRows,
+    suiteSummaries,
+    organizationMembers,
+    isLastResultsLoading,
+    isLoading: isFoldersLoading || isScenariosLoading,
+  };
+}
+
+function useCaseEntries(scenarios: ScenarioRows | undefined): TestCase[] {
+  return useMemo<TestCase[]>(
     () =>
       (scenarios ?? []).map((scenario) => ({
         id: scenario.id,
@@ -83,8 +98,13 @@ export function useTestCasesData({
       })),
     [scenarios],
   );
+}
 
-  const suites = useMemo<TestSuiteEntry[]>(() => {
+function useSuiteEntries(
+  folders: FolderRows | undefined,
+  cases: TestCase[],
+): TestSuiteEntry[] {
+  return useMemo<TestSuiteEntry[]>(() => {
     const countByFolder = new Map<string, number>();
     for (const testCase of cases) {
       if (!testCase.folderId) continue;
@@ -101,47 +121,77 @@ export function useTestCasesData({
       targets: parseSuiteTargets(folder.targets ?? []),
     }));
   }, [folders, cases]);
+}
 
-  const externalSets = useMemo<ExternalSetEntry[]>(
+function useExternalSetEntries(
+  summaries: ExternalSetRows | undefined,
+): ExternalSetEntry[] {
+  return useMemo<ExternalSetEntry[]>(
     () =>
-      (externalSetSummaries ?? []).map((set) => ({
+      (summaries ?? []).map((set) => ({
         setId: set.scenarioSetId,
         lastRunTimestamp: set.lastRunTimestamp,
       })),
-    [externalSetSummaries],
+    [summaries],
   );
+}
 
-  const lastResults = useMemo<Map<string, CaseLastResult>>(() => {
+function useLastResultsByCase(
+  rows: CaseLastResult[] | undefined,
+): Map<string, CaseLastResult> {
+  return useMemo<Map<string, CaseLastResult>>(() => {
     const byScenario = new Map<string, CaseLastResult>();
-    for (const row of lastResultRows ?? []) byScenario.set(row.scenarioId, row);
+    for (const row of rows ?? []) byScenario.set(row.scenarioId, row);
     return byScenario;
-  }, [lastResultRows]);
+  }, [rows]);
+}
 
-  const suiteIdsWithRuns = useMemo(() => {
+function useSuiteIdsWithRuns(
+  summaries: SuiteSummaries | undefined,
+): Set<string> {
+  return useMemo(() => {
     const withRuns = new Set<string>();
-    for (const [suiteId, summary] of Object.entries(suiteSummaries ?? {})) {
+    for (const [suiteId, summary] of Object.entries(summaries ?? {})) {
       if (summary.lastRunTimestamp) withRuns.add(suiteId);
     }
     return withRuns;
-  }, [suiteSummaries]);
+  }, [summaries]);
+}
 
-  const authorNameById = useMemo<Record<string, string>>(() => {
+function useAuthorNames(
+  organizationMembers: OrganizationWithMembers | undefined,
+): Record<string, string> {
+  return useMemo<Record<string, string>>(() => {
     const names: Record<string, string> = {};
     for (const member of organizationMembers?.members ?? []) {
       if (member.user.name) names[member.user.id] = member.user.name;
     }
     return names;
   }, [organizationMembers]);
+}
+
+export function useTestCasesData({
+  period,
+}: {
+  period: Period;
+}): TestCasesData {
+  const queries = useTestCasesQueries(period);
+  const cases = useCaseEntries(queries.scenarios);
+  const suites = useSuiteEntries(queries.folders, cases);
+  const externalSets = useExternalSetEntries(queries.externalSetSummaries);
+  const lastResults = useLastResultsByCase(queries.lastResultRows);
+  const suiteIdsWithRuns = useSuiteIdsWithRuns(queries.suiteSummaries);
+  const authorNameById = useAuthorNames(queries.organizationMembers);
 
   return {
-    suites,
     cases,
+    suites,
     externalSets,
     lastResults,
-    isLastResultsLoading,
+    isLastResultsLoading: queries.isLastResultsLoading,
     suiteIdsWithRuns,
     authorNameById,
-    isLoading: isFoldersLoading || isScenariosLoading,
+    isLoading: queries.isLoading,
   };
 }
 

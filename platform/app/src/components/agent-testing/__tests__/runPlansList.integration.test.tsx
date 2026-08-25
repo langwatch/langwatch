@@ -181,7 +181,15 @@ describe("the Test Runs list", () => {
       },
     });
 
-    expect(plans[plans.length - 1]?.name).toBe("One-off runs");
+    // The external sets sort by their own run time, a run plan with no run
+    // falls below them, and the internal set stays under all of them however
+    // recently any of them ran.
+    expect(plans.map((plan) => plan.name)).toEqual([
+      "ci-regression",
+      "smoke-tests",
+      "Checkout",
+      "One-off runs",
+    ]);
   });
 
   /** @scenario The v2 Test Runs list names the internal set "One-off runs" */

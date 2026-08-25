@@ -10,6 +10,7 @@ import {
 import { isRecordNotFoundError } from "~/server/utils/prismaErrors";
 import {
   assertAssignableFolder,
+  type FolderMembershipClient,
   reconcileFolderMembership,
 } from "../suites/folder-membership";
 import {
@@ -86,6 +87,28 @@ function actorFor(lastUpdatedById: string | null | undefined): ScenarioActor {
   return lastUpdatedById
     ? { userId: lastUpdatedById, label: "user" }
     : { userId: null, label: "api" };
+}
+
+/**
+ * Recomputes the member list of every folder a write touched, once per folder.
+ * Nulls and repeats are dropped, so a move between two folders reconciles both
+ * and a move within one reconciles it once.
+ */
+async function reconcileFolders(params: {
+  projectId: string;
+  folderIds: (string | null | undefined)[];
+  tx: FolderMembershipClient;
+}): Promise<void> {
+  const touchedFolderIds = new Set(
+    params.folderIds.filter((folderId): folderId is string => !!folderId),
+  );
+  for (const folderId of touchedFolderIds) {
+    await reconcileFolderMembership({
+      projectId: params.projectId,
+      folderId,
+      tx: params.tx,
+    });
+  }
 }
 
 /** A stored version row as one history entry. */
@@ -263,115 +286,136 @@ export class ScenarioService {
     );
   }
 
-  async update(
-    id: string,
-    projectId: string,
-    data: UpdateScenarioInput,
-    options?: ScenarioWriteOptions,
-  ): Promise<Scenario> {
+  async update(params: {
+    id: string;
+    projectId: string;
+    data: UpdateScenarioInput;
+    options?: ScenarioWriteOptions;
+  }): Promise<Scenario> {
     return tracer.withActiveSpan(
       "ScenarioService.update",
       {
         kind: SpanKind.INTERNAL,
         attributes: {
-          "tenant.id": projectId,
-          "scenario.id": id,
+          "tenant.id": params.projectId,
+          "scenario.id": params.id,
         },
       },
       async () => {
-        logger.debug({ projectId, scenarioId: id }, "Updating scenario");
-        const actor = options?.actor ?? actorFor(data.lastUpdatedById);
-        // An update that names an editable field is a save: it bumps the
-        // version and records a version row. One that names none (a folder
-        // move, an author stamp) leaves the history alone.
-        const versioned = touchesVersionedFields(data);
+        logger.debug(
+          { projectId: params.projectId, scenarioId: params.id },
+          "Updating scenario",
+        );
         // One transaction holds the row, the version row and both folders'
         // member lists, so a write that fails part way leaves all of them
         // untouched.
-        return await this.prisma.$transaction(async (tx) => {
-          const existing = await tx.scenario.findFirst({
-            where: { id, projectId, archivedAt: null },
-          });
-          if (!existing) {
-            throw new ScenarioNotFoundError();
-          }
-          if (
-            options?.expectedVersion !== undefined &&
-            options.expectedVersion !== existing.version
-          ) {
-            // Refused before the write, not rolled back after it.
-            throw new ScenarioStaleVersionError({
-              currentVersion: existing.version,
-            });
-          }
-          if (data.folderId) {
-            await assertAssignableFolder({
-              projectId,
-              folderId: data.folderId,
-              tx,
-            });
-          }
-
-          let updated: Scenario;
-          if (versioned) {
-            try {
-              updated = await this.repository.updateWithVersionBump(
-                id,
-                projectId,
-                data,
-                tx,
-                options?.expectedVersion,
-              );
-            } catch (error) {
-              // The version rode in the WHERE and matched no row: a racing
-              // save landed between our read and our write.
-              if (
-                isRecordNotFoundError(error) &&
-                options?.expectedVersion !== undefined
-              ) {
-                throw new ScenarioStaleVersionError({
-                  currentVersion: existing.version,
-                });
-              }
-              throw error;
-            }
-            await this.repository.createVersionRow(
-              {
-                scenarioId: id,
-                projectId,
-                version: updated.version,
-                authorId: actor.userId,
-                authorLabel: actor.label,
-                changeDescription: options?.changeDescription ?? null,
-                snapshot: buildSnapshotEnvelope({
-                  fields: snapshotFieldsOf(updated),
-                  changedFields: diffSnapshotFields(
-                    snapshotFieldsOf(existing),
-                    snapshotFieldsOf(updated),
-                  ),
-                }),
-                schemaVersion: SCENARIO_SNAPSHOT_SCHEMA_VERSION,
-              },
-              tx,
-            );
-          } else {
-            updated = await this.repository.update(id, projectId, data, tx);
-          }
-
-          if (data.folderId !== undefined) {
-            const touchedFolderIds = new Set(
-              [existing.folderId, data.folderId].filter(
-                (folderId): folderId is string => !!folderId,
-              ),
-            );
-            for (const folderId of touchedFolderIds) {
-              await reconcileFolderMembership({ projectId, folderId, tx });
-            }
-          }
-          return updated;
-        });
+        return await this.prisma.$transaction(async (tx) =>
+          this.applyUpdate(tx, params),
+        );
       },
     );
+  }
+
+  /** The body of one update, inside the caller's transaction. */
+  private async applyUpdate(
+    tx: Prisma.TransactionClient,
+    params: {
+      id: string;
+      projectId: string;
+      data: UpdateScenarioInput;
+      options?: ScenarioWriteOptions;
+    },
+  ): Promise<Scenario> {
+    const { id, projectId, data, options } = params;
+    const existing = await tx.scenario.findFirst({
+      where: { id, projectId, archivedAt: null },
+    });
+    if (!existing) {
+      throw new ScenarioNotFoundError();
+    }
+    if (
+      options?.expectedVersion !== undefined &&
+      options.expectedVersion !== existing.version
+    ) {
+      // Refused before the write, not rolled back after it.
+      throw new ScenarioStaleVersionError({
+        currentVersion: existing.version,
+      });
+    }
+    if (data.folderId) {
+      await assertAssignableFolder({ projectId, folderId: data.folderId, tx });
+    }
+
+    // An update that names an editable field is a save: it bumps the version
+    // and records a version row. One that names none (a folder move, an
+    // author stamp) leaves the history alone.
+    const updated = touchesVersionedFields(data)
+      ? await this.saveNewVersion(tx, { existing, data, options })
+      : await this.repository.update({ id, projectId, data, tx });
+
+    if (data.folderId !== undefined) {
+      await reconcileFolders({
+        projectId,
+        folderIds: [existing.folderId, data.folderId],
+        tx,
+      });
+    }
+    return updated;
+  }
+
+  /** Writes the save, bumps the counter and appends the version row. */
+  private async saveNewVersion(
+    tx: Prisma.TransactionClient,
+    params: {
+      existing: Scenario;
+      data: UpdateScenarioInput;
+      options?: ScenarioWriteOptions;
+    },
+  ): Promise<Scenario> {
+    const { existing, data, options } = params;
+    const actor = options?.actor ?? actorFor(data.lastUpdatedById);
+    let updated: Scenario;
+    try {
+      updated = await this.repository.updateWithVersionBump({
+        id: existing.id,
+        projectId: existing.projectId,
+        data,
+        tx,
+        expectedVersion: options?.expectedVersion,
+      });
+    } catch (error) {
+      // The version rode in the WHERE and matched no row: a racing save
+      // landed between our read and our write.
+      if (
+        isRecordNotFoundError(error) &&
+        options?.expectedVersion !== undefined
+      ) {
+        throw new ScenarioStaleVersionError({
+          currentVersion: existing.version,
+        });
+      }
+      throw error;
+    }
+    await this.repository.createVersionRow(
+      {
+        scenarioId: existing.id,
+        projectId: existing.projectId,
+        version: updated.version,
+        authorId: actor.userId,
+        authorLabel: actor.label,
+        changeDescription: options?.changeDescription ?? null,
+        snapshot: buildSnapshotEnvelope({
+          fields: snapshotFieldsOf(updated),
+          changedFields: diffSnapshotFields(
+            snapshotFieldsOf(existing),
+            snapshotFieldsOf(updated),
+          ),
+        }),
+        schemaVersion: SCENARIO_SNAPSHOT_SCHEMA_VERSION,
+      },
+      tx,
+    );
+    return updated;
   }
 
   /**
@@ -529,10 +573,10 @@ export class ScenarioService {
           });
         }
         const { fields } = parseSnapshotEnvelope(row.snapshot);
-        return await this.update(
-          params.scenarioId,
-          params.projectId,
-          {
+        return await this.update({
+          id: params.scenarioId,
+          projectId: params.projectId,
+          data: {
             name: fields.name,
             situation: fields.situation,
             criteria: fields.criteria,
@@ -547,12 +591,12 @@ export class ScenarioService {
             minTurns: fields.minTurns,
             lastUpdatedById: params.actor.userId,
           },
-          {
+          options: {
             actor: params.actor,
             expectedVersion: scenario.version,
             changeDescription: `Restored from v${params.version}`,
           },
-        );
+        });
       },
     );
   }
@@ -576,8 +620,10 @@ export class ScenarioService {
         },
       },
       async () =>
-        this.update(params.scenarioId, params.projectId, {
-          folderId: params.folderId,
+        this.update({
+          id: params.scenarioId,
+          projectId: params.projectId,
+          data: { folderId: params.folderId },
         }),
     );
   }
@@ -717,18 +763,11 @@ export class ScenarioService {
                 tx,
               });
             }
-            const touchedFolderIds = new Set(
-              found
-                .map((id) => rowsById.get(id)?.folderId)
-                .filter((folderId): folderId is string => !!folderId),
-            );
-            for (const folderId of touchedFolderIds) {
-              await reconcileFolderMembership({
-                projectId: params.projectId,
-                folderId,
-                tx,
-              });
-            }
+            await reconcileFolders({
+              projectId: params.projectId,
+              folderIds: found.map((id) => rowsById.get(id)?.folderId),
+              tx,
+            });
           });
         }
 

@@ -114,7 +114,7 @@ vi.mock("~/utils/api", () => ({
     useUtils: () => ({
       scenarios: {
         getAll: { invalidate: vi.fn() },
-        getById: { invalidate: vi.fn() },
+        getById: { invalidate: vi.fn(), setData: vi.fn() },
         getByIdIncludingArchived: { invalidate: vi.fn() },
         listVersions: { invalidate: vi.fn() },
       },
@@ -236,6 +236,7 @@ function versionEntry(overrides: Record<string, unknown> = {}) {
 describe("the version chip in the case editor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.persistedTarget = null;
     mocks.mockParams = {};
     mocks.canManage = true;
     mocks.mockGetById.mockReturnValue({
@@ -325,10 +326,14 @@ describe("the version chip in the case editor", () => {
       "This test case changed since it was opened",
     );
     expect(notice).toHaveTextContent("version 6");
+    // The reload replaces the form, so the offer has to say the edits go.
+    expect(notice).toHaveTextContent("Reloading replaces them");
     expect(screen.queryByText(/unknown error/i)).not.toBeInTheDocument();
 
     await user.click(
-      within(notice).getByRole("button", { name: "Reload the newer version" }),
+      within(notice).getByRole("button", {
+        name: "Discard my edits and reload",
+      }),
     );
     await waitFor(() => expect(mocks.mockGetByIdRefetch).toHaveBeenCalled());
   });
@@ -405,6 +410,7 @@ describe("the case editor footer", () => {
 describe("the History drawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.persistedTarget = null;
     mocks.canManage = true;
     mocks.mockParams = { scenarioId: "case_1" };
     mocks.mockListVersions.mockReturnValue({

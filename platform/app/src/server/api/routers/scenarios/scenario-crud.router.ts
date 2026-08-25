@@ -148,18 +148,18 @@ export const scenarioCrudRouter = createTRPCRouter({
       const { id, projectId, expectedVersion, ...data } = input;
       const service = ScenarioService.create(ctx.prisma);
       try {
-        const result = await service.update(
+        const result = await service.update({
           id,
           projectId,
-          {
+          data: {
             ...data,
             lastUpdatedById: ctx.session.user.id,
           },
-          {
+          options: {
             actor: { userId: ctx.session.user.id, label: "user" },
             expectedVersion,
           },
-        );
+        });
 
         logger.info({ projectId, scenarioId: id }, "Scenario updated");
         return result;

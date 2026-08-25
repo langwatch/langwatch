@@ -291,13 +291,33 @@ describe("running a folder", () => {
       expect(managed.name).toBe("All test cases");
       expect(managed.labels).toContain("managed:run-all");
 
-      // A second run reuses the same managed suite with refreshed members.
+      // A second run reuses the same managed suite, and its membership is
+      // read again rather than replayed. A case added after the first run has
+      // to be scheduled, and a case archived after it must not be.
+      const added = await createCase({ name: "Added later" });
+      await scenarioService.archive({ id: unfiled.id, projectId });
+      queueSimulationRun.mockClear();
+
       const again = await suiteService.runAll({
         projectId,
         organizationId,
         idempotencyKey: `run-${nanoid(6)}`,
       });
+
       expect(again.suiteId).toBe(result.suiteId);
+      expect(again.jobCount).toBe(2);
+      expect(
+        new Set(
+          queueSimulationRun.mock.calls.map((call) => call[0].scenarioId),
+        ),
+      ).toEqual(new Set([filed.id, added.id]));
+
+      const refreshed = await prisma.simulationSuite.findFirstOrThrow({
+        where: { id: result.suiteId, projectId },
+      });
+      expect(new Set(refreshed.scenarioIds)).toEqual(
+        new Set([filed.id, added.id]),
+      );
     });
 
     it("refuses with suite_targets_required when no target was ever chosen", async () => {

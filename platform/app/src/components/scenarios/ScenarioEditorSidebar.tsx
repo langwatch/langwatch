@@ -16,10 +16,6 @@ type ScenarioEditorSidebarProps = {
   variant?: "agent-testing";
 };
 
-/**
- * Help sidebar for the scenario editor.
- * Provides tips and best practices for writing scenarios.
- */
 export function ScenarioEditorSidebar({
   form,
   variant,

@@ -323,7 +323,7 @@
                 "scenario list": "langwatch scenario list -o json",
                 "scenario get": "langwatch scenario get <id> -o json",
                 "scenario create": "langwatch scenario create \"angry user\" --situation \"User is frustrated with billing\" --folder \"Billing\"",
-                "scenario update": "langwatch scenario update <id> --folder \"Billing\"  (or --no-folder to unfile it)",
+                "scenario update": "langwatch scenario update <id> --folder \"Billing\"",
                 "scenario run": "langwatch scenario run <id> --target http:agent_abc123 --note \"after the timeout fix\" --wait",
                 "scenario delete": "langwatch scenario delete <id>",
                 "scenario version list": "langwatch scenario version list <id> -o json",
@@ -373,7 +373,7 @@
                 "simulation-run get"
               ],
               "hints": {
-                "simulation-run list": "langwatch simulation-run list --status FAILED -o json  (each run carries its batch note and the scenario version it used)",
+                "simulation-run list": "langwatch simulation-run list --status FAILED -o json",
                 "simulation-run get": "langwatch simulation-run get <runId> --full -o json"
               },
               "skill": null,

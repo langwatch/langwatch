@@ -33,6 +33,20 @@ async function createCase(name = "Refund flow") {
   );
 }
 
+async function createFolder(name: string) {
+  const slug = `${name.toLowerCase()}-${nanoid(6)}`;
+  return prisma.simulationSuite.create({
+    data: {
+      projectId,
+      name: `${name} ${nanoid(6)}`,
+      slug,
+      kind: "folder",
+      scenarioIds: [],
+      targets: [],
+    },
+  });
+}
+
 beforeAll(async () => {
   await getTestUser();
   const organization = await prisma.organization.findUnique({
@@ -94,11 +108,19 @@ describe("scenario versioning", () => {
     /** @scenario "Each save raises the version by one" */
     it("raises the version by one on each save, listed newest first", async () => {
       const scenario = await createCase();
-      await service.update(scenario.id, projectId, {
-        situation: "A customer asks for a replacement",
+      await service.update({
+        id: scenario.id,
+        projectId,
+        data: {
+          situation: "A customer asks for a replacement",
+        },
       });
-      await service.update(scenario.id, projectId, {
-        criteria: ["The agent replaces the item"],
+      await service.update({
+        id: scenario.id,
+        projectId,
+        data: {
+          criteria: ["The agent replaces the item"],
+        },
       });
 
       const stored = await service.getById({ id: scenario.id, projectId });
@@ -116,12 +138,20 @@ describe("scenario versioning", () => {
     /** @scenario "A save that changes nothing still records a version" */
     it("records a version with no changed field for a save that changes nothing", async () => {
       const scenario = await createCase();
-      await service.update(scenario.id, projectId, {
-        situation: "A customer asks for a replacement",
+      await service.update({
+        id: scenario.id,
+        projectId,
+        data: {
+          situation: "A customer asks for a replacement",
+        },
       });
 
-      await service.update(scenario.id, projectId, {
-        situation: "A customer asks for a replacement",
+      await service.update({
+        id: scenario.id,
+        projectId,
+        data: {
+          situation: "A customer asks for a replacement",
+        },
       });
 
       const stored = await service.getById({ id: scenario.id, projectId });
@@ -135,15 +165,24 @@ describe("scenario versioning", () => {
     });
 
     it("writes no version for a folder move", async () => {
+      const refunds = await createFolder("Refunds");
+      const checkout = await createFolder("Checkout");
       const scenario = await createCase();
-      await service.moveToFolder({
-        scenarioId: scenario.id,
-        projectId,
-        folderId: null,
-      });
+
+      // Filing, refiling and unfiling: every one of them moves the case
+      // between real folders, so an implementation that only skips the
+      // version when nothing changed cannot pass by accident.
+      for (const folderId of [refunds.id, checkout.id, null]) {
+        await service.moveToFolder({
+          scenarioId: scenario.id,
+          projectId,
+          folderId,
+        });
+      }
 
       const stored = await service.getById({ id: scenario.id, projectId });
       expect(stored?.version).toBe(1);
+      expect(stored?.folderId).toBeNull();
       const rows = await prisma.scenarioVersion.findMany({
         where: { projectId, scenarioId: scenario.id },
       });
@@ -156,15 +195,15 @@ describe("scenario versioning", () => {
     it("records the author, the date and the changed fields on each entry", async () => {
       const user = await getTestUser();
       const scenario = await createCase();
-      await service.update(
-        scenario.id,
+      await service.update({
+        id: scenario.id,
         projectId,
-        {
+        data: {
           name: "Replacement flow",
           criteria: ["The agent replaces the item"],
         },
-        { actor: { userId: user.id, label: "user" } },
-      );
+        options: { actor: { userId: user.id, label: "user" } },
+      });
 
       const { versions } = await service.listVersions({
         projectId,
@@ -183,12 +222,12 @@ describe("scenario versioning", () => {
     /** @scenario "A save over the public API is recorded with the API as its author" */
     it("records an API save with the API as its author and no person", async () => {
       const scenario = await createCase();
-      await service.update(
-        scenario.id,
+      await service.update({
+        id: scenario.id,
         projectId,
-        { situation: "Changed over the API" },
-        { actor: { userId: null, label: "api" } },
-      );
+        data: { situation: "Changed over the API" },
+        options: { actor: { userId: null, label: "api" } },
+      });
 
       const { versions } = await service.listVersions({
         projectId,
@@ -204,12 +243,12 @@ describe("scenario versioning", () => {
     /** @scenario "A save from the command line is recorded with the command line as its author" */
     it("records a CLI save with the command line as its author", async () => {
       const scenario = await createCase();
-      await service.update(
-        scenario.id,
+      await service.update({
+        id: scenario.id,
         projectId,
-        { situation: "Changed from the CLI" },
-        { actor: { userId: null, label: "cli" } },
-      );
+        data: { situation: "Changed from the CLI" },
+        options: { actor: { userId: null, label: "cli" } },
+      });
 
       const { versions } = await service.listVersions({
         projectId,
@@ -228,14 +267,26 @@ describe("scenario versioning", () => {
     it("gives two simultaneous saves the numbers 5 and 6", async () => {
       const scenario = await createCase();
       for (const text of ["second", "third", "fourth"]) {
-        await service.update(scenario.id, projectId, { situation: text });
+        await service.update({
+          id: scenario.id,
+          projectId,
+          data: { situation: text },
+        });
       }
       const atFour = await service.getById({ id: scenario.id, projectId });
       expect(atFour?.version).toBe(4);
 
       await Promise.all([
-        service.update(scenario.id, projectId, { situation: "fifth or sixth" }),
-        service.update(scenario.id, projectId, { situation: "sixth or fifth" }),
+        service.update({
+          id: scenario.id,
+          projectId,
+          data: { situation: "fifth or sixth" },
+        }),
+        service.update({
+          id: scenario.id,
+          projectId,
+          data: { situation: "sixth or fifth" },
+        }),
       ]);
 
       const stored = await service.getById({ id: scenario.id, projectId });
@@ -252,21 +303,29 @@ describe("scenario versioning", () => {
     it("refuses a save against a replaced version and leaves the case unchanged", async () => {
       const scenario = await createCase();
       for (const text of ["second", "third", "fourth"]) {
-        await service.update(scenario.id, projectId, { situation: text });
+        await service.update({
+          id: scenario.id,
+          projectId,
+          data: { situation: text },
+        });
       }
 
       // Somebody else saves, so the case moves to version 5.
-      await service.update(scenario.id, projectId, {
-        situation: "somebody else's save",
+      await service.update({
+        id: scenario.id,
+        projectId,
+        data: {
+          situation: "somebody else's save",
+        },
       });
 
       await expect(
-        service.update(
-          scenario.id,
+        service.update({
+          id: scenario.id,
           projectId,
-          { situation: "the stale editor's save" },
-          { expectedVersion: 4 },
-        ),
+          data: { situation: "the stale editor's save" },
+          options: { expectedVersion: 4 },
+        }),
       ).rejects.toThrow(ScenarioStaleVersionError);
 
       const stored = await service.getById({ id: scenario.id, projectId });
@@ -314,8 +373,12 @@ describe("scenario versioning", () => {
     it("starts real history above the synthesized entry on the first save", async () => {
       const scenario = await createPreVersioningCase();
 
-      await service.update(scenario.id, projectId, {
-        situation: "First save after versioning shipped",
+      await service.update({
+        id: scenario.id,
+        projectId,
+        data: {
+          situation: "First save after versioning shipped",
+        },
       });
 
       const stored = await service.getById({ id: scenario.id, projectId });
@@ -352,8 +415,12 @@ describe("scenario versioning", () => {
   describe("duplicates", () => {
     it("starts a duplicate at version 1 with its own v1 row", async () => {
       const scenario = await createCase();
-      await service.update(scenario.id, projectId, {
-        situation: "Edited before the copy",
+      await service.update({
+        id: scenario.id,
+        projectId,
+        data: {
+          situation: "Edited before the copy",
+        },
       });
 
       const copy = await service.duplicate({

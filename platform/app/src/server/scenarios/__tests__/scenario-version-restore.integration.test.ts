@@ -43,8 +43,12 @@ async function createCaseAtVersionFive() {
     { actor: apiActor },
   );
   for (const version of [2, 3, 4, 5]) {
-    await service.update(scenario.id, projectId, {
-      situation: `situation v${version}`,
+    await service.update({
+      id: scenario.id,
+      projectId,
+      data: {
+        situation: `situation v${version}`,
+      },
     });
   }
   return scenario;
@@ -203,7 +207,11 @@ describe("restoring a scenario version", () => {
       },
       { actor: apiActor },
     );
-    await service.update(scenario.id, projectId, { situation: "situation v2" });
+    await service.update({
+      id: scenario.id,
+      projectId,
+      data: { situation: "situation v2" },
+    });
 
     await service.restoreVersion({
       projectId,

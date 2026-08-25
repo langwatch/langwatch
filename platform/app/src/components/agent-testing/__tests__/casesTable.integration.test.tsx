@@ -462,7 +462,7 @@ describe("the test cases table", () => {
       screen.queryByTestId("folder-header-row-Refunds"),
     ).not.toBeInTheDocument();
     expect(screen.getByTestId("folder-header-row-Checkout")).toHaveTextContent(
-      "Double charge".length ? "1 test case" : "",
+      "1 test case",
     );
 
     const unfiled = { ...filed, folderId: null };

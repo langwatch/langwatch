@@ -152,7 +152,7 @@ describe("the window the Results tab reads", () => {
       },
     });
 
-    render(<ResultsTab sseConnected />, { wrapper: Wrapper });
+    render(<ResultsTab isSseConnected />, { wrapper: Wrapper });
 
     const push = mockRouterPush.mock.calls.find(
       (call) =>
@@ -177,7 +177,7 @@ describe("the window the Results tab reads", () => {
       },
     });
 
-    render(<ResultsTab sseConnected />, { wrapper: Wrapper });
+    render(<ResultsTab isSseConnected />, { wrapper: Wrapper });
 
     expect(
       mockRouterPush.mock.calls.filter(
@@ -192,7 +192,7 @@ describe("the window the Results tab reads", () => {
     routerState.asPath = "/test-project/agent-testing/results";
     mockSuiteSummaries.mockReturnValue({ data: {} });
 
-    render(<ResultsTab sseConnected />, { wrapper: Wrapper });
+    render(<ResultsTab isSseConnected />, { wrapper: Wrapper });
 
     expect(screen.getByTestId("agent-testing-run-plans")).toBeInTheDocument();
     expect(screen.getByText("Test Runs")).toBeInTheDocument();

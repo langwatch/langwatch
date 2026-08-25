@@ -282,8 +282,10 @@ describe("the note and the scenario version", () => {
       result!.table();
 
       const output = printed();
-      expect(output).toContain("Note:");
-      expect(output).toContain("Version:");
+      // Both keep their place with a dash, so the block reads the same down
+      // the whole list whether or not a run carries them.
+      expect(output).toContain("Note: —");
+      expect(output).toContain("Version: —");
       expect(output).toContain("run_abc123");
       expect(output).toContain("Login Flow Test");
     });

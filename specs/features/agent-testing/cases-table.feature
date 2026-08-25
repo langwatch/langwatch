@@ -42,7 +42,7 @@ Feature: The test cases table
     Given a test case with the labels "critical" and "billing"
     When its row is read
     Then both labels are shown as pills beside the name
-    And the pills are quieter than the case name
+    And each label gets its own pill colour
 
   @integration
   Scenario: The added column reads as one line with the author and the date
@@ -167,7 +167,7 @@ Feature: The test cases table
     When that suite is opened
     Then a line under the table reads when it last ran
     And the date sits directly left of the result of the whole set
-    And the two of them read at the right edge of the line
+    And nothing else sits on the line between them
 
   @integration
   Scenario: All test cases reads Last full run at

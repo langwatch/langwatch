@@ -21,7 +21,10 @@ import { AgentRepository } from "../agents/agent.repository";
 import { LlmConfigRepository } from "../prompt-config/repositories/llm-config.repository";
 import type { RunParameterValues } from "../scenarios/parameters";
 import { resolveRunParameters } from "../scenarios/resolve-run-parameters";
-import { encryptRunSecretValues } from "../scenarios/run-secret-values";
+import {
+  encryptRunSecretValues,
+  type RunSecretCiphertext,
+} from "../scenarios/run-secret-values";
 import {
   ScenarioRepository,
   type ScenarioRunConfig,
@@ -68,6 +71,46 @@ type ResolvedTargetReferences = {
   archived: SuiteTarget[];
   missing: SuiteTarget[];
 };
+
+/**
+ * Resolves the values each scenario of a run reads, split into the plain ones
+ * the child reads as `params` and the secret ones it reads as `secrets`.
+ *
+ * The secrets are encrypted here, at the last point that holds them in clear,
+ * so the queued event and everything folded from it carry ciphertext. Only
+ * scenarios that resolved at least one secret get an entry.
+ */
+async function resolveParameterMaps(params: {
+  scenarios: readonly ScenarioRunConfig[];
+  values?: RunParameterValues;
+}): Promise<{
+  parametersByScenarioId: Map<string, RunParameterValues>;
+  secretParametersByScenarioId: Map<string, RunSecretCiphertext>;
+}> {
+  const resolved = await resolveRunParameters({
+    scenarios: params.scenarios,
+    values: params.values,
+  });
+  return {
+    parametersByScenarioId: new Map(
+      [...resolved].map(([scenarioId, scenarioParameters]) => [
+        scenarioId,
+        scenarioParameters.parameters,
+      ]),
+    ),
+    secretParametersByScenarioId: new Map(
+      [...resolved]
+        .filter(
+          ([, scenarioParameters]) =>
+            Object.keys(scenarioParameters.secretParameters).length > 0,
+        )
+        .map(([scenarioId, scenarioParameters]) => [
+          scenarioId,
+          encryptRunSecretValues(scenarioParameters.secretParameters),
+        ]),
+    ),
+  };
+}
 
 export class SuiteService {
   constructor(
@@ -125,7 +168,7 @@ export class SuiteService {
    * Lists the project's suites of the given kinds.
    *
    * The default is deliberately "custom" only: every caller that predates
-   * folders — the v1 run plan list, the public suites endpoint — names no
+   * folders, the v1 run plan list and the public suites endpoint, names no
    * kind, and must never see a folder row (an empty folder would render 0/0
    * there and refuse to run). A caller that wants folders says so.
    */
@@ -159,7 +202,7 @@ export class SuiteService {
    * through the run dialog.
    *
    * Folder and plan slugs share one per-project namespace, so a name another
-   * suite already uses gets a numeric suffix instead of a refusal — a person
+   * suite already uses gets a numeric suffix instead of a refusal: a person
    * naming a folder must not be blocked by a run plan they may not even see.
    */
   async createFolder(params: {
@@ -520,57 +563,24 @@ export class SuiteService {
         const targets = parseSuiteTargets(suite.targets);
         span.setAttribute("suite.target_count", targets.length);
 
-        // A suite with no target at all — a folder before its first run —
+        // A suite with no target at all, a folder before its first run,
         // is refused before anything is resolved or scheduled.
         if (targets.length === 0) {
           throw new SuiteTargetsRequiredError();
         }
 
-        // A folder's membership is read from the scenarios that name it,
-        // archived ones included: the folder's scenarioIds cache holds only
-        // active members, and the run reports the archived ones as skipped.
-        const scenarioIds =
-          suite.kind === "folder"
-            ? (
-                await this.scenarioRepository.findManyByFolder({
-                  projectId,
-                  folderId: suite.id,
-                })
-              ).map((row) => row.id)
-            : suite.scenarioIds;
-
         const resolved = await this.resolveReferences({
-          scenarioIds,
+          scenarioIds: await this.readRunMembership({ suite, projectId }),
           projectId,
           organizationId,
           targets,
         });
 
-        // Every parameter check runs before the first job is scheduled, so a
-        // rejected run leaves nothing half-started behind it.
-        const resolvedParameters = await resolveRunParameters({
-          scenarios: resolved.scenarioConfigs,
-          values: params.parameters,
-        });
-        const parametersByScenarioId = new Map(
-          [...resolvedParameters].map(([scenarioId, scenarioParameters]) => [
-            scenarioId,
-            scenarioParameters.parameters,
-          ]),
-        );
-        // Encrypted here, at the last point that holds the values in clear, so
-        // the queued event and everything folded from it carry ciphertext.
-        const secretParametersByScenarioId = new Map(
-          [...resolvedParameters]
-            .filter(
-              ([, scenarioParameters]) =>
-                Object.keys(scenarioParameters.secretParameters).length > 0,
-            )
-            .map(([scenarioId, scenarioParameters]) => [
-              scenarioId,
-              encryptRunSecretValues(scenarioParameters.secretParameters),
-            ]),
-        );
+        const { parametersByScenarioId, secretParametersByScenarioId } =
+          await resolveParameterMaps({
+            scenarios: resolved.scenarioConfigs,
+            values: params.parameters,
+          });
 
         const result = await this.suiteRunService.startRun({
           suiteId: suite.id,
@@ -597,11 +607,33 @@ export class SuiteService {
   }
 
   /**
+   * The scenarios a run covers.
+   *
+   * A folder's membership is read from the scenarios that name it, archived
+   * ones included: the folder's scenarioIds cache holds only active members,
+   * and the run reports the archived ones as skipped. Any other suite runs the
+   * scenarioIds it stores.
+   */
+  private async readRunMembership(params: {
+    suite: SimulationSuite;
+    projectId: string;
+  }): Promise<string[]> {
+    if (params.suite.kind !== "folder") {
+      return params.suite.scenarioIds;
+    }
+    const members = await this.scenarioRepository.findManyByFolder({
+      projectId: params.projectId,
+      folderId: params.suite.id,
+    });
+    return members.map((member) => member.id);
+  }
+
+  /**
    * Runs every non-archived scenario of the project through the managed
    * "All test cases" suite.
    *
    * The suite is a per-project singleton found by {@link RUN_ALL_SUITE_LABEL}
-   * (never by name — a person may name their own plan "All test cases"). Its
+   * (never by name, since a person may name their own plan "All test cases"). Its
    * scenarioIds are refreshed to all active scenarios at each run, and the
    * targets chosen in the run dialog are persisted onto it so the next run
    * preselects them. It is a kind "custom" suite, so v1 lists it as an

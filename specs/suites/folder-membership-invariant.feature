@@ -90,3 +90,12 @@ Feature: Folder membership never disagrees with itself
     When the cases are created, moved, archived and batch-archived in turn
     Then after each step every active case names at most one folder
     And every folder holds exactly the active cases that name it
+
+  # --- Two writers at once ---
+
+  @integration
+  Scenario: Two cases filed into one folder at the same time both land in it
+    Given a folder "Refunds" and two unfiled test cases
+    When both cases are filed into "Refunds" at the same time
+    Then "Refunds" holds both of them
+    And neither case is left naming a folder that does not hold it

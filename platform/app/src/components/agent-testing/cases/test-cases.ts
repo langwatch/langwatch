@@ -77,6 +77,27 @@ export function collectLabels(cases: TestCase[]): string[] {
   return Array.from(labels).sort();
 }
 
+/** The cases of each folder, and the ones that name no folder at all. */
+function bucketCasesByFolder(cases: TestCase[]): {
+  byFolder: Map<string, TestCase[]>;
+  unfiled: TestCase[];
+} {
+  const byFolder = new Map<string, TestCase[]>();
+  const unfiled: TestCase[] = [];
+
+  for (const testCase of cases) {
+    if (!testCase.folderId) {
+      unfiled.push(testCase);
+      continue;
+    }
+    const bucket = byFolder.get(testCase.folderId);
+    if (bucket) bucket.push(testCase);
+    else byFolder.set(testCase.folderId, [testCase]);
+  }
+
+  return { byFolder, unfiled };
+}
+
 /**
  * The rows of the All test cases view, grouped under their test suite.
  *
@@ -90,18 +111,7 @@ export function groupCasesByFolder({
   cases: TestCase[];
   suites: TestSuiteEntry[];
 }): CaseGroup[] {
-  const byFolder = new Map<string, TestCase[]>();
-  const unfiled: TestCase[] = [];
-
-  for (const testCase of cases) {
-    if (!testCase.folderId) {
-      unfiled.push(testCase);
-      continue;
-    }
-    const bucket = byFolder.get(testCase.folderId);
-    if (bucket) bucket.push(testCase);
-    else byFolder.set(testCase.folderId, [testCase]);
-  }
+  const { byFolder, unfiled } = bucketCasesByFolder(cases);
 
   const groups: CaseGroup[] = [];
   for (const suite of suites) {
