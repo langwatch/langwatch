@@ -1,8 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { describeRoute, resolver } from "hono-openapi";
-import { z } from "zod";
+import { z } from "zod/v4";
 import { createProjectApp, requires } from "~/server/api/security";
-import { appFromContext } from "~/app/api/middleware/app-context";
 import { validator as zValidator } from "~/server/api/validation";
 import { monitorMappingsSchema } from "~/server/tracer/tracesMapping";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
@@ -144,7 +143,7 @@ secured.access(requires("evaluations:view")).get(
     const project = c.get("project");
     logger.info({ projectId: project.id }, "Listing monitors");
 
-    const monitors = await appFromContext(c).monitors.getAllForProject({
+    const monitors = await c.app.monitors.getAllForProject({
       projectId: project.id,
     });
 
@@ -188,7 +187,7 @@ secured.access(requires("evaluations:view")).get(
     const { id } = c.req.param();
     logger.info({ projectId: project.id, monitorId: id }, "Getting monitor");
 
-    const monitor = await appFromContext(c).monitors.tryGetMonitorById({
+    const monitor = await c.app.monitors.tryGetMonitorById({
       id,
       projectId: project.id,
     });
@@ -238,7 +237,7 @@ secured.access(requires("evaluations:create")).post(
     const body = c.req.valid("json");
     logger.info({ projectId: project.id }, "Creating monitor");
 
-    const monitor = await appFromContext(c).monitors.create({
+    const monitor = await c.app.monitors.create({
       projectId: project.id,
       name: body.name,
       checkType: body.checkType,
@@ -295,7 +294,7 @@ secured.access(requires("evaluations:update")).patch(
     const body = c.req.valid("json");
     logger.info({ projectId: project.id, monitorId: id }, "Updating monitor");
 
-    const existing = await appFromContext(c).monitors.tryGetMonitorById({
+    const existing = await c.app.monitors.tryGetMonitorById({
       id,
       projectId: project.id,
     });
@@ -304,7 +303,7 @@ secured.access(requires("evaluations:update")).patch(
       return c.json({ error: "Monitor not found" }, 404);
     }
 
-    const monitor = await appFromContext(c).monitors.update({
+    const monitor = await c.app.monitors.update({
       id,
       projectId: project.id,
       name: body.name ?? existing.name,
@@ -370,7 +369,7 @@ secured.access(requires("evaluations:update")).post(
       "Toggling monitor",
     );
 
-    const existing = await appFromContext(c).monitors.tryGetMonitorById({
+    const existing = await c.app.monitors.tryGetMonitorById({
       id,
       projectId: project.id,
     });
@@ -379,7 +378,7 @@ secured.access(requires("evaluations:update")).post(
       return c.json({ error: "Monitor not found" }, 404);
     }
 
-    await appFromContext(c).monitors.toggle({
+    await c.app.monitors.toggle({
       id,
       projectId: project.id,
       enabled,
@@ -420,7 +419,7 @@ secured.access(requires("evaluations:manage")).delete(
     const { id } = c.req.param();
     logger.info({ projectId: project.id, monitorId: id }, "Deleting monitor");
 
-    const existing = await appFromContext(c).monitors.tryGetMonitorById({
+    const existing = await c.app.monitors.tryGetMonitorById({
       id,
       projectId: project.id,
     });
@@ -429,7 +428,7 @@ secured.access(requires("evaluations:manage")).delete(
       return c.json({ error: "Monitor not found" }, 404);
     }
 
-    await appFromContext(c).monitors.delete({
+    await c.app.monitors.delete({
       id,
       projectId: project.id,
     });

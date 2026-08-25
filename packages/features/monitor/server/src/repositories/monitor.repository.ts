@@ -16,6 +16,7 @@ export abstract class MonitorRepository {
   abstract findAllByIds(input: { monitorIds: string[]; projectId: string }): Promise<Monitor[]>;
   abstract setEnabled(input: MonitorToggleInput): Promise<void>;
   abstract create(input: MonitorCreateInput & { id: string; slug: string; mappings: MonitorMappingState }): Promise<Monitor>;
+  abstract createReplica(input: Monitor): Promise<Monitor>;
   abstract update(input: MonitorUpdateInput & { slug: string; mappings: MonitorMappingState }): Promise<Monitor>;
   abstract delete(input: { id: string; projectId: string }): Promise<void>;
   abstract deleteForExperiment(input: {

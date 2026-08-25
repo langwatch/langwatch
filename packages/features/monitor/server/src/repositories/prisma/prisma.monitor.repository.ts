@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   monitorMappingsInputSchema,
   monitorSchema,
@@ -111,6 +111,31 @@ export class PrismaMonitorRepository extends MonitorRepository {
         executionMode: input.executionMode,
         evaluatorId: input.evaluatorId,
         level: input.level ?? "trace",
+        threadIdleTimeout: input.threadIdleTimeout,
+        slug: input.slug,
+      },
+    });
+    return mapMonitor(row);
+  }
+
+  async createReplica(input: Monitor): Promise<Monitor> {
+    const row = await this.database.monitor.create({
+      data: {
+        id: input.id,
+        projectId: input.projectId,
+        name: input.name,
+        checkType: input.checkType,
+        preconditions: input.preconditions as Prisma.InputJsonValue,
+        parameters: input.parameters as Prisma.InputJsonValue,
+        mappings:
+          input.mappings === null
+            ? Prisma.JsonNull
+            : input.mappings as Prisma.InputJsonValue,
+        sample: input.sample,
+        enabled: input.enabled,
+        executionMode: input.executionMode,
+        evaluatorId: input.evaluatorId,
+        level: input.level,
         threadIdleTimeout: input.threadIdleTimeout,
         slug: input.slug,
       },

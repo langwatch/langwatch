@@ -25,6 +25,14 @@ Feature: Monitor service boundary
     When a project reads enabled ON_MESSAGE monitors
     Then only that project's enabled ON_MESSAGE monitors are returned
 
+  Scenario: Replicating a monitor creates a disabled target monitor
+    Given a monitor in a source project
+    And any linked evaluator has been copied to the target project
+    When the Monitor service replicates the monitor with the target evaluator id
+    Then the target monitor has a unique name and slug
+    And the target monitor is disabled
+    And the source monitor is unchanged
+
   Scenario: Missing monitor reads throw
     Given no monitor exists for the project and id
     When a caller requests it

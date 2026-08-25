@@ -938,7 +938,11 @@ export function initializeDefaultApp(options?: {
   }
 
   const monitors = traced(
-    PostgresMonitorAdapter.create({ database: prisma, evaluators }),
+    PostgresMonitorAdapter.create({
+      database: prisma,
+      evaluators,
+      generateId: () => generate(KSUID_RESOURCES.MONITOR).toString(),
+    }),
     "MonitorService",
   );
   const automation = AppAutomationRuntime.create({

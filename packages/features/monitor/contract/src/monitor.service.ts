@@ -3,6 +3,7 @@ import type {
   MonitorCreateInput,
   MonitorIdInput,
   MonitorNameAvailabilityInput,
+  MonitorReplicationInput,
   MonitorSummary,
   MonitorToggleInput,
   MonitorUpdateInput,
@@ -24,4 +25,5 @@ export abstract class MonitorService {
     experimentId: string;
   }): Promise<void>;
   abstract isNameAvailable(input: MonitorNameAvailabilityInput): Promise<{ available: boolean }>;
+  abstract replicate(input: MonitorReplicationInput): Promise<Monitor>;
 }

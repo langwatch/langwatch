@@ -6,12 +6,14 @@ import {
   monitorIdInputSchema,
   monitorMappingsInputSchema,
   monitorNameAvailabilityInputSchema,
+  monitorReplicationInputSchema,
   monitorToggleInputSchema,
   monitorUpdateInputSchema,
   type Monitor,
   type MonitorCreateInput,
   type MonitorIdInput,
   type MonitorNameAvailabilityInput,
+  type MonitorReplicationInput,
   type MonitorSummary,
   type MonitorToggleInput,
   type MonitorUpdateInput,
@@ -118,6 +120,34 @@ export class MonitorService extends MonitorServiceContract {
   async isNameAvailable(input: MonitorNameAvailabilityInput): Promise<{ available: boolean }> {
     const parsed = monitorNameAvailabilityInputSchema.parse(input);
     return { available: await this.options.repository.isNameAvailable(parsed) };
+  }
+
+  async replicate(input: MonitorReplicationInput): Promise<Monitor> {
+    const parsed = monitorReplicationInputSchema.parse(input);
+    const source = await this.getById({
+      id: parsed.sourceMonitorId,
+      projectId: parsed.sourceProjectId,
+    });
+    if (parsed.evaluatorId) {
+      await this.options.evaluators.getById({
+        id: parsed.evaluatorId,
+        projectId: parsed.targetProjectId,
+      });
+    }
+
+    const name = await this.uniqueName(parsed.targetProjectId, source.name);
+    const id = (this.options.generateId ?? defaultGenerateId)();
+    return this.options.repository.createReplica({
+      ...source,
+      id,
+      projectId: parsed.targetProjectId,
+      experimentId: null,
+      evaluatorId: parsed.evaluatorId,
+      name,
+      slug: `${slugify(name)}-${id.slice(-5)}`,
+      enabled: false,
+      mappings: source.mappings ?? { mapping: {}, expansions: [] },
+    });
   }
 
   private async uniqueName(projectId: string, baseName: string): Promise<string> {

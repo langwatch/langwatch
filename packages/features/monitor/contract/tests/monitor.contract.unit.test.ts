@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { monitorMappingsInputSchema, monitorSchema } from "../src/monitor";
+import {
+  monitorMappingsInputSchema,
+  monitorReplicationInputSchema,
+  monitorSchema,
+} from "../src/monitor";
 
 describe("Monitor contract", () => {
   it("normalises legacy empty mappings", () => {
@@ -30,5 +34,16 @@ describe("Monitor contract", () => {
       updatedAt: new Date(),
     });
     expect(monitor.projectId).toBe("project_1");
+  });
+
+  it("parses a portable monitor replication command", () => {
+    expect(
+      monitorReplicationInputSchema.parse({
+        sourceMonitorId: "monitor_1",
+        sourceProjectId: "project_1",
+        targetProjectId: "project_2",
+        evaluatorId: null,
+      }),
+    ).toMatchObject({ targetProjectId: "project_2" });
   });
 });

@@ -1,14 +1,9 @@
-import { generate } from "@langwatch/ksuid";
 import { TRPCError } from "@trpc/server";
-import { customAlphabet } from "nanoid";
-import { ZodError, z } from "zod";
-import { EvaluationExecutionMode, Prisma } from "~/generated/prisma/client";
-import { getApp } from "~/server/app-layer";
+import { ZodError, z } from "zod/v4";
+import { EvaluationExecutionMode } from "~/generated/prisma/client";
 import { checkDeclaredPermission } from "~/server/app-layer/authz/trpc-middleware";
 import { MonitorNotFoundError } from "@langwatch/monitor-contract";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
-import { KSUID_RESOURCES } from "~/utils/constants";
-import { slugify } from "~/utils/slugify";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
@@ -22,21 +17,6 @@ import { copyEvaluatorToProject } from "./copyEvaluatorToProject";
 
 const PERFORMANCE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
 
-/**
- * Generates a unique slug for a monitor.
- * Format: slugified-name-XXXXX (where XXXXX is a 5-char nanoid)
- * This ensures uniqueness even when creating multiple monitors with the same name.
- */
-const generateMonitorSlug = (name: string): string => {
-  const nanoidShort = customAlphabet("0123456789abcdefghijklmnopqrstuvwxyz", 5);
-  const baseSlug = slugify(name);
-  return baseSlug ? `${baseSlug}-${nanoidShort()}` : nanoidShort();
-};
-
-/**
- * Finds a unique name for a monitor by appending (2), (3), etc. if needed.
- * Checks existing monitors in the project to avoid conflicts.
- */
 export const monitorsRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
@@ -81,7 +61,7 @@ export const monitorsRouter = createTRPCRouter({
         endDate: endMs,
         filters: {},
       });
-      return getApp().evaluations.performance.getPerformance({
+      return ctx.app.evaluations.performance.getPerformance({
         tenantId: input.projectId,
         monitors: performanceMonitors,
         previousStartMs: previousPeriodStartDate.getTime(),
@@ -161,8 +141,6 @@ export const monitorsRouter = createTRPCRouter({
     .permission("evaluations:manage")
     .mutation(async ({ input, ctx }) => {
       const { monitorId, projectId, sourceProjectId } = input;
-      const prisma = ctx.prisma;
-
       const hasSourcePermission = await probeProjectPermission(
         ctx,
         sourceProjectId,
@@ -176,10 +154,14 @@ export const monitorsRouter = createTRPCRouter({
         });
       }
 
-      const source = await prisma.monitor.findFirst({
-        where: { id: monitorId, projectId: sourceProjectId },
-      });
-      if (!source) {
+      let source;
+      try {
+        source = await ctx.app.monitors.getById({
+          id: monitorId,
+          projectId: sourceProjectId,
+        });
+      } catch (error) {
+        if (!(error instanceof MonitorNotFoundError)) throw error;
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Monitor not found",
@@ -205,44 +187,15 @@ export const monitorsRouter = createTRPCRouter({
         newWorkflowId = copiedEvaluator.workflowId;
       }
 
-      let uniqueName = source.name;
-      let suffix = 2;
-      while (
-        !(
-          await ctx.app.monitors.isNameAvailable({
-            projectId,
-            name: uniqueName,
-          })
-        ).available
-      ) {
-        uniqueName = `${source.name} (${suffix})`;
-        suffix += 1;
-      }
-
       try {
         // Replicas start disabled: a real-time evaluator runs (and bills) on
         // every matching trace, so the user opts in after reviewing it in the
         // target project rather than having it fire the moment it is replicated.
-        return await prisma.monitor.create({
-          data: {
-            id: generate(KSUID_RESOURCES.MONITOR).toString(),
-            projectId,
-            name: uniqueName,
-            checkType: source.checkType,
-            slug: generateMonitorSlug(source.name),
-            preconditions: source.preconditions as Prisma.InputJsonValue,
-            parameters: source.parameters as Prisma.InputJsonValue,
-            mappings:
-              source.mappings === null
-                ? Prisma.JsonNull
-                : (source.mappings as Prisma.InputJsonValue),
-            sample: source.sample,
-            enabled: false,
-            executionMode: source.executionMode,
-            evaluatorId: newEvaluatorId,
-            level: source.level,
-            threadIdleTimeout: source.threadIdleTimeout,
-          },
+        return await ctx.app.monitors.replicate({
+          sourceMonitorId: monitorId,
+          sourceProjectId,
+          targetProjectId: projectId,
+          evaluatorId: newEvaluatorId,
         });
       } catch (createError) {
         // Roll back the evaluator (and its workflow) we copied for this monitor
@@ -253,7 +206,7 @@ export const monitorsRouter = createTRPCRouter({
             .catch(() => undefined);
         }
         if (newWorkflowId) {
-          await prisma.workflow
+          await ctx.prisma.workflow
             .deleteMany({ where: { id: newWorkflowId, projectId } })
             .catch(() => undefined);
         }

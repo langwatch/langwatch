@@ -144,3 +144,20 @@ export const monitorNameAvailabilityInputSchema = z
 export type MonitorNameAvailabilityInput = z.infer<
   typeof monitorNameAvailabilityInputSchema
 >;
+
+/**
+ * Copies the monitor configuration into another project. The evaluator, when
+ * present, is copied by the caller's canonical Evaluator service first and its
+ * new id is then supplied here.
+ */
+export const monitorReplicationInputSchema = z
+  .object({
+    sourceMonitorId: z.string().min(1),
+    sourceProjectId: z.string().min(1),
+    targetProjectId: z.string().min(1),
+    evaluatorId: z.string().min(1).nullable(),
+  })
+  .strict();
+export type MonitorReplicationInput = z.infer<
+  typeof monitorReplicationInputSchema
+>;

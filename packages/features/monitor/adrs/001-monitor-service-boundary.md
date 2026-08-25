@@ -1,4 +1,4 @@
-# ADR-001: Monitor owns monitor CRUD and runtime reads
+# ADR-001: Monitor owns monitor lifecycle and runtime reads
 
 **Status:** Accepted
 
@@ -6,17 +6,16 @@
 
 ## Context
 
-Monitor persistence and monitor reads are currently split between the
-application service and tRPC handlers. The handlers also construct Prisma
-repositories per request and duplicate evaluator validation and mapping
-normalisation.
+Monitor persistence and monitor reads previously leaked into compatibility
+handlers, including monitor replication. That duplicated tenant scoping, name
+de-duplication, mapping normalisation, and the safe disabled initial state.
 
 ## Decision
 
 Create one canonical `MonitorService` contract. It owns tenant-scoped CRUD,
-name checks, enabled `ON_MESSAGE` reads, and the monitor reads used by
-evaluation and automation callers. Persistence remains private to the server
-package.
+replication, name checks, enabled `ON_MESSAGE` reads, and the monitor reads
+used by evaluation and automation callers. Persistence remains private to the
+server package.
 
 Create and update validate evaluator ownership through the canonical
 `EvaluatorService`. Creation requires an evaluator. Updating an existing
@@ -31,8 +30,11 @@ service boundary so `{}`, null, undefined, and malformed legacy values become
 mutation input and are applied to every repository predicate.
 
 The package does not own performance analytics or evaluator/workflow copying.
-Those operations require their existing dedicated services and remain
-compatibility-router seams until those services expose the required commands.
+Performance analytics belongs to the evaluation analytics capability. An
+Evaluator-backed monitor copy first copies the evaluator through the canonical
+Evaluator service; Monitor then persists the disabled replica with that new
+evaluator id. The compatibility router owns the cross-feature rollback while
+workflow copying remains there.
 
 ## Contracts and validation
 
@@ -57,14 +59,15 @@ connection once at boot.
 ## Runtime
 
 The process creates one `PostgresMonitorAdapter` and injects the canonical
-Evaluator service and database at boot. API and worker callers receive only
-`MonitorService`; they do not construct Prisma or repositories per request.
+Evaluator service, database, and KSUID generator at boot. API and worker
+callers receive only `MonitorService`; they do not construct Prisma or
+repositories per request.
 
 ## Public surfaces and transports
 
 Existing tRPC and REST routes keep their current URLs and procedure names.
-They will become thin compatibility handlers over `MonitorService` in the
-composition integration. This package does not register routes.
+They are thin compatibility handlers over `MonitorService`. This package does
+not register routes.
 
 ## Runtime and registration
 
@@ -87,6 +90,5 @@ canonical Evaluator service error.
 ## Consequences
 
 All monitor callers can share the same tenant-scoped behavior and validation.
-Legacy URL/procedure shapes remain unchanged while their handlers migrate to
-the service. Performance and copy flows are explicit follow-up integrations,
-not speculative methods on Monitor.
+Legacy URL/procedure shapes remain unchanged. Performance remains a separate
+evaluation read model; monitor replication now has one owner.

@@ -43,6 +43,10 @@ class FakeRepository extends MonitorRepository {
     if (!this.value) throw new Error("missing fake monitor");
     return this.value;
   }
+  async createReplica(input: Monitor) {
+    this.value = input;
+    return input;
+  }
   async update(input: MonitorUpdateInput & { slug: string; mappings: MonitorMappingState }) {
     this.value = { ...monitor, ...input };
     if (!this.value) throw new Error("missing fake monitor");
@@ -91,5 +95,29 @@ describe("MonitorService", () => {
     repository.value = null;
     const service = MonitorService.create({ repository, evaluators: evaluator });
     await expect(service.getById({ id: "missing", projectId: "project_1" })).rejects.toBeInstanceOf(MonitorNotFoundError);
+  });
+
+  it("replicates a monitor disabled into the target project", async () => {
+    const repository = new FakeRepository();
+    const service = MonitorService.create({
+      repository,
+      evaluators: evaluator,
+      generateId: () => "monitor_replica",
+    });
+
+    const replica = await service.replicate({
+      sourceMonitorId: "monitor_1",
+      sourceProjectId: "project_1",
+      targetProjectId: "project_2",
+      evaluatorId: null,
+    });
+
+    expect(replica).toMatchObject({
+      id: "monitor_replica",
+      projectId: "project_2",
+      evaluatorId: null,
+      enabled: false,
+      experimentId: null,
+    });
   });
 });
