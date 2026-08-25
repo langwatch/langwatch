@@ -1,6 +1,9 @@
 /**
  * The results of one run as a table: one row per test case and target pair,
- * with the verdict, the duration and the cost.
+ * with the verdict, the evaluators, the duration and the cost.
+ *
+ * The table is a grid inside one bordered card, the way the Test cases table
+ * is drawn, so both tabs read as one surface.
  *
  * A row that is still going can be stopped on its own. A row that finished
  * carries no Stop control. The time and the cost are only read once the run
@@ -9,10 +12,17 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { Table } from "@chakra-ui/react";
-import { ListTable } from "~/components/ui/ListTable";
+import { Box, Text } from "@chakra-ui/react";
+import { isCancellableStatus } from "~/components/suites/useCancelScenarioRun";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import { FG_FAINT, TABLE_HEADER_BG } from "../shared/design";
 import { RunResultRow } from "./RunResultRow";
+
+/**
+ * The columns of the table. The last one holds the row menu, and grows to fit
+ * a Stop control while the run still has one to offer.
+ */
+const RESULT_COLUMNS = "120px minmax(0,1fr) minmax(220px,auto) 130px auto";
 
 export type RunResultsTableProps = {
   scenarioRuns: ScenarioRunData[];
@@ -24,6 +34,8 @@ export type RunResultsTableProps = {
   cancellingJobId?: string | null;
   /** Opens the editor of the test case the row ran. */
   onEditCase?: (scenarioRun: ScenarioRunData) => void;
+  /** Runs the test case the row ran again, on its own. */
+  onRerunCase?: (scenarioRun: ScenarioRunData) => void;
 };
 
 export function RunResultsTable({
@@ -34,33 +46,69 @@ export function RunResultsTable({
   onCancelRun,
   cancellingJobId,
   onEditCase,
+  onRerunCase,
 }: RunResultsTableProps) {
+  const hasStoppable =
+    !!onCancelRun &&
+    scenarioRuns.some((scenarioRun) => isCancellableStatus(scenarioRun.status));
+
   return (
-    <ListTable size="sm" data-testid="run-results-table">
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader width="170px">Result</Table.ColumnHeader>
-          <Table.ColumnHeader>Test case</Table.ColumnHeader>
-          <Table.ColumnHeader width="150px" textAlign="right">
-            Time · cost
-          </Table.ColumnHeader>
-          <Table.ColumnHeader width="130px" />
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
+    <Box
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="xl"
+      overflowX="auto"
+      data-testid="run-results-table"
+    >
+      <Box
+        display="grid"
+        gridTemplateColumns={RESULT_COLUMNS}
+        columnGap={3}
+        alignItems="center"
+        paddingX={4}
+        paddingY={2}
+        background={TABLE_HEADER_BG}
+        borderBottomWidth="1px"
+        borderBottomColor="border"
+        fontSize="10.5px"
+        fontWeight="semibold"
+        textTransform="uppercase"
+        letterSpacing="0.025em"
+        color={FG_FAINT}
+      >
+        <Text as="span">Result</Text>
+        <Text as="span">Test case</Text>
+        <Text as="span">Evaluators</Text>
+        <Text as="span" textAlign="right">
+          Time · cost
+        </Text>
+        <Text as="span" />
+      </Box>
+
+      <Box
+        css={{
+          "& > * + *": {
+            borderTopWidth: "1px",
+            borderTopColor: "var(--chakra-colors-border-muted)",
+          },
+        }}
+      >
         {scenarioRuns.map((scenarioRun) => (
           <RunResultRow
             key={scenarioRun.scenarioRunId}
             scenarioRun={scenarioRun}
+            templateColumns={RESULT_COLUMNS}
+            hasStoppable={hasStoppable}
             resolveTargetName={resolveTargetName}
             iterationMap={iterationMap}
             onScenarioRunClick={onScenarioRunClick}
             onCancelRun={onCancelRun}
             cancellingJobId={cancellingJobId}
             onEditCase={onEditCase}
+            onRerunCase={onRerunCase}
           />
         ))}
-      </Table.Body>
-    </ListTable>
+      </Box>
+    </Box>
   );
 }

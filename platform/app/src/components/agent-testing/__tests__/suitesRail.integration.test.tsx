@@ -25,27 +25,6 @@ vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({ query: {}, push: vi.fn(), isReady: true }),
 }));
 
-// The real picker renders; this only records how the rail asked for it, which
-// is what decides the direction it opens in. jsdom has no layout, so the
-// placement never reaches the DOM.
-const periodSelectorProps = vi.hoisted(() => ({
-  current: null as Record<string, unknown> | null,
-}));
-
-vi.mock("~/components/PeriodSelector", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("~/components/PeriodSelector")>();
-  return {
-    ...actual,
-    PeriodSelector: (
-      props: React.ComponentProps<typeof actual.PeriodSelector>,
-    ) => {
-      periodSelectorProps.current = props as unknown as Record<string, unknown>;
-      return <actual.PeriodSelector {...props} />;
-    },
-  };
-});
-
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
@@ -373,21 +352,23 @@ describe("the test suites rail", () => {
     renderRail();
 
     const rail = screen.getByTestId("agent-testing-suite-rail");
-    expect(
-      within(rail).getByRole("button", { name: "Last 30 days" }),
-    ).toBeInTheDocument();
-    expect(periodSelectorProps.current?.size).toBe("xs");
+    const picker = within(rail).getByTestId("results-period-picker");
+    expect(picker).toHaveAccessibleName("Last 30 days");
+    expect(picker).toHaveTextContent("30d");
   });
 
   /** @scenario "The period picker opens upward at the foot of the rail" */
-  it("opens the period list above the control", async () => {
+  it("offers the three windows and names what it cannot reach", async () => {
     const user = userEvent.setup();
     renderRail();
 
-    await user.click(screen.getByRole("button", { name: "Last 30 days" }));
+    await user.click(screen.getByTestId("results-period-picker"));
 
-    expect(await screen.findByText("Select Date Range")).toBeInTheDocument();
-    expect(periodSelectorProps.current?.placement).toBe("top-start");
+    expect(await screen.findByText("Last 7 days")).toBeInTheDocument();
+    expect(screen.getByText("Last 15 days")).toBeInTheDocument();
+    expect(
+      screen.getByText("Runs older than 30 days are in cold storage."),
+    ).toBeInTheDocument();
   });
 
   /** @scenario "Changing the period reloads the last results and the runs" */
@@ -395,7 +376,7 @@ describe("the test suites rail", () => {
     const user = userEvent.setup();
     const { props } = renderRail();
 
-    await user.click(screen.getByRole("button", { name: "Last 30 days" }));
+    await user.click(screen.getByTestId("results-period-picker"));
     await user.click(await screen.findByText("Last 7 days"));
 
     // usePeriodSelector writes the window into the address, and every read of

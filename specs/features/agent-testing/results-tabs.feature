@@ -94,6 +94,27 @@ Feature: The Results tab
     And choosing it opens the editor of that test case
 
   @integration
+  Scenario: The row menu of a result runs the test case again on its own
+    Given a finished run of one case
+    When the row menu of the result is opened
+    Then it offers "Open the conversation"
+    And it offers "Rerun this test case"
+
+  @integration
+  Scenario: A test suite is run from the header of its run plan
+    Given a run plan that is a test suite
+    When the top of the results is read
+    Then a Run control is offered beside Edit
+    And choosing it opens the run dialog on that suite
+
+  @integration
+  Scenario: A set that runs from code has no Run and no Edit
+    Given a run plan that a code run writes into
+    When the top of the results is read
+    Then no Run control is offered
+    And no Edit control is offered
+
+  @integration
   Scenario: The classic grid can be switched on and stays on
     Given the results of a run are shown as a table
     When the grid toggle is chosen

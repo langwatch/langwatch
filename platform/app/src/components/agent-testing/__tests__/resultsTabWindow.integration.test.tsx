@@ -51,6 +51,7 @@ vi.mock("~/utils/api", () => ({
     suites: {
       getAll: { useQuery: mockSuitesGetAll },
       getSummaries: { useQuery: mockSuiteSummaries },
+      getById: { useQuery: () => ({ data: undefined }) },
     },
     scenarios: {
       getExternalSetSummaries: {

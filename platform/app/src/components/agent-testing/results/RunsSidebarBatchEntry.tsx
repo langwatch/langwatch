@@ -36,6 +36,7 @@ export function RunsSidebarBatchEntry({
 }: RunsSidebarBatchEntryProps) {
   const now = useNow();
   const summary = computeBatchRunSummary({ batchRun: batch });
+  const isRunning = summary.inProgressCount + summary.queuedCount > 0;
 
   return (
     <RunsSidebarEntry
@@ -50,6 +51,9 @@ export function RunsSidebarBatchEntry({
       timeAgo={formatTimeAgoCompact(batch.timestamp, now)}
       passRate={summary.passRate}
       passedCount={summary.passedCount}
+      isRunning={isRunning}
+      judgedCount={summary.completedCount}
+      totalCount={summary.totalCount}
       isSelected={isSelected}
       onClick={() => onSelect(batch.batchRunId)}
       testId={`runs-sidebar-item-${batch.batchRunId}`}

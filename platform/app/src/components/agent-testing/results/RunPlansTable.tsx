@@ -1,6 +1,9 @@
 /**
- * The Test Runs list: every run plan of the project, with how its last run
- * went and how long ago it was.
+ * The Test Runs list: every run plan of the project, what it covers, how many
+ * cases it holds and how its last run went.
+ *
+ * The list is a grid inside one card, the way the Test cases table is drawn,
+ * so both tabs read as one surface.
  *
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/suites/one-off-runs-surface.feature
@@ -10,14 +13,15 @@ import {
   Badge,
   Box,
   Button,
+  chakra,
   EmptyState,
   HStack,
   Skeleton,
-  Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import {
+  ChevronRight,
   FlaskConical,
   Folder,
   FolderCode,
@@ -29,15 +33,22 @@ import type {
   PeriodMode,
   RelativePresetKey,
 } from "~/components/PeriodSelector";
-import { PeriodSelector } from "~/components/PeriodSelector";
 import { RunMetricsSummary } from "~/components/suites/RunMetricsSummary";
-import { RunSummaryCounts } from "~/components/suites/RunSummaryCounts";
-import { ListTable } from "~/components/ui/ListTable";
 import { Menu } from "~/components/ui/menu";
 import { useNow } from "~/hooks/useNow";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { ContentColumn } from "../shared/ContentColumn";
-import { type RunPlan, toRunGroupSummary } from "./run-plans";
+import { FG_FAINT, FG_MUTED, ROW_HOVER_BG, TABLE_HEADER_BG } from "../shared/design";
+import { AgentTestingPeriodPicker, periodDays } from "../shared/PeriodPicker";
+import { planScopeNote, type RunPlan, toRunGroupSummary } from "./run-plans";
+
+/**
+ * The columns of the list. The prototype carries a count of runs in the
+ * window between the result and the chevron; the plan queries only read the
+ * last run, so that place holds the row menu instead.
+ */
+const PLAN_COLUMNS =
+  "minmax(0,1fr) 60px 58px minmax(0,560px) 32px 20px";
 
 export type RunPlansTableProps = {
   plans: RunPlan[];
@@ -84,24 +95,18 @@ function PlanBadge({ kind }: { kind: RunPlan["kind"] }) {
  * no verdict yet says nothing at all: the metrics pill would be an empty grey
  * pill, which reads as a broken row rather than as an absent number.
  */
-function LastResultCell({ plan }: { plan: RunPlan }) {
+function LastResultCell({ plan, days }: { plan: RunPlan; days: number }) {
   if (!plan.lastRun || plan.lastRun.lastRunTimestamp === null) {
     return (
-      <Text fontSize="xs" color="fg.muted">
-        No run in this period
+      <Text fontSize="11px" color={FG_FAINT}>
+        nothing in {days} days
       </Text>
     );
   }
 
   if (plan.lastRun.settledCount === 0) return null;
 
-  const summary = toRunGroupSummary(plan.lastRun);
-  return (
-    <HStack gap={2} flexWrap="wrap">
-      <RunMetricsSummary summary={summary} />
-      <RunSummaryCounts summary={summary} />
-    </HStack>
-  );
+  return <RunMetricsSummary summary={toRunGroupSummary(plan.lastRun)} />;
 }
 
 function PlanRowMenu({
@@ -119,6 +124,9 @@ function PlanRowMenu({
         <Button
           size="xs"
           variant="ghost"
+          minWidth="24px"
+          height="24px"
+          paddingX={0}
           aria-label={`Actions for ${plan.name}`}
           onClick={(event) => event.stopPropagation()}
         >
@@ -151,35 +159,102 @@ function PlanRowMenu({
   );
 }
 
+/** One row of the list: what the plan is, what it holds and how it went. */
+function PlanRow({
+  plan,
+  days,
+  onSelectPlan,
+  onEditPlan,
+}: {
+  plan: RunPlan;
+  days: number;
+  onSelectPlan: (planSlug: string) => void;
+  onEditPlan: (suiteId: string) => void;
+}) {
+  const now = useNow();
+
+  return (
+    <Box
+      display="grid"
+      gridTemplateColumns={PLAN_COLUMNS}
+      columnGap={3}
+      alignItems="center"
+      paddingX={4}
+      paddingY="10px"
+      cursor="pointer"
+      _hover={{ background: ROW_HOVER_BG }}
+      onClick={() => onSelectPlan(plan.slug)}
+      data-testid={`run-plan-row-${plan.slug}`}
+    >
+      <HStack gap={2} minWidth={0}>
+        <PlanIcon kind={plan.kind} />
+        <Box minWidth={0}>
+          <HStack gap={1.5} minWidth={0}>
+            <Text fontSize="12.5px" fontWeight="medium" color="fg" truncate>
+              {plan.name}
+            </Text>
+            <PlanBadge kind={plan.kind} />
+          </HStack>
+          <Text fontSize="10.5px" color={FG_FAINT} truncate>
+            {planScopeNote(plan.kind)}
+          </Text>
+        </Box>
+      </HStack>
+
+      <Text fontSize="12px" color={FG_MUTED}>
+        {plan.caseCount ?? "-"}
+      </Text>
+
+      <Text fontSize="10.5px" color={FG_FAINT} whiteSpace="nowrap">
+        {plan.lastRun?.lastRunTimestamp
+          ? formatTimeAgoCompact(plan.lastRun.lastRunTimestamp, now)
+          : ""}
+      </Text>
+
+      <HStack gap={1.5} flexWrap="wrap" minWidth={0}>
+        <LastResultCell plan={plan} days={days} />
+      </HStack>
+
+      <HStack
+        justify="flex-end"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <PlanRowMenu
+          plan={plan}
+          onOpenLastRun={() => onSelectPlan(plan.slug)}
+          onEditPlan={onEditPlan}
+        />
+      </HStack>
+
+      <ChevronRight size={13} color="var(--chakra-colors-fg-muted)" />
+    </Box>
+  );
+}
+
 export function RunPlansTable({
   plans,
   isLoading,
   hasAnyPlans,
   period,
-  periodMode,
-  setPeriod,
   setRelativePeriod,
   onSelectPlan,
   onEditPlan,
 }: RunPlansTableProps) {
-  const now = useNow();
+  const days = periodDays(period);
 
   return (
     <ContentColumn data-testid="agent-testing-run-plans">
-      <HStack gap={2}>
-        <Text fontSize="sm" fontWeight="semibold">
+      <HStack gap={2} height="32px">
+        <Text fontSize="14px" fontWeight="semibold" color="fg">
           Test Runs
         </Text>
-        <Text fontSize="xs" color="fg.muted">
+        <Text fontSize="11.5px" color={FG_FAINT}>
           {plans.length === 1 ? "1 run plan" : `${plans.length} run plans`}
         </Text>
         <Box flex={1} />
-        <PeriodSelector
+        <AgentTestingPeriodPicker
           period={period}
-          mode={periodMode}
-          setPeriod={setPeriod}
           setRelativePeriod={setRelativePeriod}
-          size="xs"
         />
       </HStack>
 
@@ -202,60 +277,59 @@ export function RunPlansTable({
           </EmptyState.Content>
         </EmptyState.Root>
       ) : (
-        <ListTable size="sm">
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Run plan</Table.ColumnHeader>
-              <Table.ColumnHeader width="80px">Cases</Table.ColumnHeader>
-              <Table.ColumnHeader width="110px">Last run</Table.ColumnHeader>
-              <Table.ColumnHeader>Last result</Table.ColumnHeader>
-              <Table.ColumnHeader width="52px" />
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
+        <Box
+          borderWidth="1px"
+          borderColor="border"
+          borderRadius="xl"
+          background="bg.panel"
+          overflow="hidden"
+          boxShadow="0 1px 2px rgb(16 16 32 / 0.04)"
+          data-testid="agent-testing-run-plans-table"
+        >
+          <Box
+            display="grid"
+            gridTemplateColumns={PLAN_COLUMNS}
+            columnGap={3}
+            alignItems="center"
+            paddingX={4}
+            paddingY={2}
+            background={TABLE_HEADER_BG}
+            borderBottomWidth="1px"
+            borderBottomColor="border"
+            fontSize="10.5px"
+            fontWeight="semibold"
+            textTransform="uppercase"
+            letterSpacing="0.025em"
+            color={FG_FAINT}
+          >
+            <Text as="span">Run plan</Text>
+            <Text as="span">Cases</Text>
+            <Text as="span" gridColumn="span 2">
+              Last run
+            </Text>
+            <Text as="span" />
+            <Text as="span" />
+          </Box>
+
+          <chakra.div
+            css={{
+              "& > * + *": {
+                borderTopWidth: "1px",
+                borderTopColor: "var(--chakra-colors-border-muted)",
+              },
+            }}
+          >
             {plans.map((plan) => (
-              <Table.Row
+              <PlanRow
                 key={plan.slug}
-                cursor="pointer"
-                _hover={{ background: "bg.muted" }}
-                onClick={() => onSelectPlan(plan.slug)}
-                data-testid={`run-plan-row-${plan.slug}`}
-              >
-                <Table.Cell>
-                  <HStack gap={2} minWidth={0}>
-                    <PlanIcon kind={plan.kind} />
-                    <Text fontSize="sm" fontWeight="medium" truncate>
-                      {plan.name}
-                    </Text>
-                    <PlanBadge kind={plan.kind} />
-                  </HStack>
-                </Table.Cell>
-                <Table.Cell>
-                  <Text fontSize="sm" color="fg.muted">
-                    {plan.caseCount ?? "-"}
-                  </Text>
-                </Table.Cell>
-                <Table.Cell>
-                  <Text fontSize="xs" color="fg.muted" whiteSpace="nowrap">
-                    {plan.lastRun?.lastRunTimestamp
-                      ? formatTimeAgoCompact(plan.lastRun.lastRunTimestamp, now)
-                      : ""}
-                  </Text>
-                </Table.Cell>
-                <Table.Cell>
-                  <LastResultCell plan={plan} />
-                </Table.Cell>
-                <Table.Cell textAlign="right">
-                  <PlanRowMenu
-                    plan={plan}
-                    onOpenLastRun={() => onSelectPlan(plan.slug)}
-                    onEditPlan={onEditPlan}
-                  />
-                </Table.Cell>
-              </Table.Row>
+                plan={plan}
+                days={days}
+                onSelectPlan={onSelectPlan}
+                onEditPlan={onEditPlan}
+              />
             ))}
-          </Table.Body>
-        </ListTable>
+          </chakra.div>
+        </Box>
       )}
     </ContentColumn>
   );

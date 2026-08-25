@@ -9,6 +9,7 @@ import type { BatchRun } from "~/components/suites/run-history-transforms";
 import { ScenarioRunContent } from "~/components/suites/ScenarioRunContent";
 import { useCan } from "~/hooks/useCan";
 import { useNow } from "~/hooks/useNow";
+import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { PeriodControls } from "./period-controls";
 import {
@@ -31,11 +32,13 @@ export type RunPlanRunResultsProps = {
   cancel: ReturnType<typeof useRunPlanCancel>;
   viewMode: ReturnType<typeof useRunPlanViewMode>["viewMode"];
   periodControls: Pick<PeriodControls, "period" | "setRelativePeriod">;
+  /** Runs one test case again, from its result row. */
+  onRerunCase?: (scenarioRun: ScenarioRunData) => void;
 };
 
 type SelectedRunResultsProps = Pick<
   RunPlanRunResultsProps,
-  "plan" | "selection" | "cancel" | "viewMode"
+  "plan" | "selection" | "cancel" | "viewMode" | "onRerunCase"
 > & { batch: BatchRun };
 
 /** The run that is on screen, once there is one to read. */
@@ -45,6 +48,7 @@ function SelectedRunResults({
   selection,
   cancel,
   viewMode,
+  onRerunCase,
 }: SelectedRunResultsProps) {
   const { can } = useCan();
   const now = useNow();
@@ -79,6 +83,7 @@ function SelectedRunResults({
           onCancelRun={onCancelRun}
           cancellingJobId={cancel.cancellingJobId}
           onEditCase={can("scenarios:manage") ? rows.handleEditCase : undefined}
+          onRerunCase={onRerunCase}
         />
       )}
     </>
@@ -92,6 +97,7 @@ export function RunPlanRunResults({
   cancel,
   viewMode,
   periodControls,
+  onRerunCase,
 }: RunPlanRunResultsProps) {
   if (batches.error) {
     return (
@@ -120,6 +126,7 @@ export function RunPlanRunResults({
       selection={selection}
       cancel={cancel}
       viewMode={viewMode}
+      onRerunCase={onRerunCase}
     />
   );
 }

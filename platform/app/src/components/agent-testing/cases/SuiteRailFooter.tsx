@@ -7,7 +7,7 @@
 
 import { HStack, IconButton, Spacer } from "@chakra-ui/react";
 import { PanelLeftOpen, PanelRightOpen } from "lucide-react";
-import { PeriodSelector } from "~/components/PeriodSelector";
+import { AgentTestingPeriodPicker } from "../shared/PeriodPicker";
 import type { SuiteRailProps } from "./SuiteRail";
 
 export type SuiteRailFooterProps = Pick<
@@ -24,21 +24,15 @@ export function SuiteRailFooter({
   collapsed,
   onToggleCollapsed,
   period,
-  periodMode,
-  setPeriod,
   setRelativePeriod,
 }: SuiteRailFooterProps) {
   return (
     <HStack gap={2} paddingX={3} paddingBottom={4} paddingTop={4}>
       {!collapsed && (
-        <PeriodSelector
+        <AgentTestingPeriodPicker
           period={period}
-          mode={periodMode}
-          setPeriod={setPeriod}
           setRelativePeriod={setRelativePeriod}
-          size="xs"
-          triggerVariant="ghost"
-          placement="top-start"
+          compact
         />
       )}
       <Spacer />

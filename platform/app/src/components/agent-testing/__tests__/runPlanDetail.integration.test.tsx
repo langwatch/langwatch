@@ -30,6 +30,16 @@ const mockCancelJob = vi.hoisted(() => vi.fn());
 const mockCancelBatchRun = vi.hoisted(() => vi.fn());
 const mockOpenDrawer = vi.hoisted(() => vi.fn());
 const mockRouterPush = vi.hoisted(() => vi.fn());
+const mockGetSuiteById = vi.hoisted(() =>
+  vi.fn(() => ({
+    data: {
+      id: "suite_1",
+      name: "Checkout",
+      scenarioIds: ["scen_1"],
+      targets: [],
+    },
+  })),
+);
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -58,6 +68,7 @@ vi.mock("~/utils/api", () => ({
       },
     },
     agents: { getAll: { useQuery: vi.fn(() => ({ data: [] })) } },
+    suites: { getById: { useQuery: mockGetSuiteById } },
     prompts: {
       getAllPromptsForProject: { useQuery: vi.fn(() => ({ data: [] })) },
     },
@@ -434,6 +445,50 @@ describe("<RunPlanDetail/>", () => {
     });
   });
 
+  /** @scenario "The row menu of a result runs the test case again on its own" */
+  it("offers the conversation and a rerun on the row menu", async () => {
+    const user = userEvent.setup();
+    setRuns([makeRun({ scenarioRunId: "run_a", scenarioId: "scen_7" })]);
+    renderDetail();
+
+    await user.click(screen.getByRole("button", { name: /^Actions for / }));
+
+    expect(
+      await screen.findByRole("menuitem", { name: "Open the conversation" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitem", { name: "Rerun this test case" }),
+    ).toBeInTheDocument();
+  });
+
+  /** @scenario "A test suite is run from the header of its run plan" */
+  it("offers Run and Edit in the header of a test suite plan", () => {
+    renderDetail();
+
+    expect(screen.getByTestId("run-plan-button")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
+  });
+
+  /** @scenario "A set that runs from code has no Run and no Edit" */
+  it("offers neither Run nor Edit on a set that runs from code", () => {
+    renderDetail({
+      plan: {
+        slug: "external:nightly-ci",
+        name: "nightly-ci",
+        kind: "external",
+        scenarioSetId: "nightly-ci",
+        suiteId: null,
+        caseCount: null,
+        lastRun: null,
+      },
+    });
+
+    expect(screen.queryByTestId("run-plan-button")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Edit" }),
+    ).not.toBeInTheDocument();
+  });
+
   /** @scenario "Only the selected run is shown, not every previous run" */
   it("shows the results of the selected run alone", () => {
     setRuns([
@@ -464,8 +519,11 @@ describe("<RunPlanDetail/>", () => {
 
     const detail = screen.getByTestId("agent-testing-run-plan-detail");
     expect(within(detail).getByText("Checkout")).toBeInTheDocument();
+    expect(screen.getByText("Test suite")).toBeInTheDocument();
     expect(screen.getByTestId("view-mode-toggle")).toBeInTheDocument();
-    expect(screen.getByTestId("export-runs-button")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "More actions for Checkout" }),
+    ).toBeInTheDocument();
 
     const sidebar = screen.getByTestId("agent-testing-runs-sidebar");
     expect(
@@ -656,7 +714,10 @@ describe("<RunPlanDetail/>", () => {
       .mockResolvedValue(new Response("", { status: 200 }));
     renderDetail();
 
-    await user.click(screen.getByTestId("export-runs-button"));
+    await user.click(
+      screen.getByRole("button", { name: "More actions for Checkout" }),
+    );
+    await user.click(await screen.findByTestId("export-runs-button"));
     const dialog = await screen.findByRole("dialog");
     expect(
       within(dialog).getByText("Export Scenario Runs"),

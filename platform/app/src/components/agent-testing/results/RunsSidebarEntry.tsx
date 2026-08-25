@@ -2,12 +2,19 @@
  * One entry of the runs rail: the name of the run, the note the person left
  * with it, how long ago it started and how it went.
  *
+ * A run that is still going reads its progress instead of a pass rate it does
+ * not have yet.
+ *
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/suites/run-notes.feature
  */
 
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { PassRateCircle } from "~/components/shared/PassRateIndicator";
+import {
+  getPassRateGradientColor,
+  PassRateCircle,
+} from "~/components/shared/PassRateIndicator";
+import { FG_FAINT, FG_MUTED } from "../shared/design";
 
 export type RunsSidebarEntryProps = {
   title: string;
@@ -17,6 +24,11 @@ export type RunsSidebarEntryProps = {
   passedCount: number | null;
   isSelected: boolean;
   isPending?: boolean;
+  /** True while the run still has cases to judge. */
+  isRunning?: boolean;
+  /** How far a running run has got, for its "3/8 judged" line. */
+  judgedCount?: number | null;
+  totalCount?: number | null;
   onClick?: () => void;
   testId: string;
 };
@@ -30,8 +42,8 @@ function EntryNote({
 
   return (
     <Text
-      fontSize="11px"
-      color="fg.muted"
+      fontSize="10.5px"
+      color={FG_MUTED}
       truncate
       title={note}
       data-testid={`${testId}-note`}
@@ -45,18 +57,41 @@ function EntryNote({
 function EntryResult({
   passRate,
   passedCount,
+  isRunning,
+  judgedCount,
+  totalCount,
   testId,
-}: Pick<RunsSidebarEntryProps, "passRate" | "passedCount" | "testId">) {
+}: Pick<
+  RunsSidebarEntryProps,
+  | "passRate"
+  | "passedCount"
+  | "isRunning"
+  | "judgedCount"
+  | "totalCount"
+  | "testId"
+>) {
+  if (isRunning && typeof totalCount === "number") {
+    return (
+      <Text fontSize="10.5px" color={FG_MUTED} data-testid={`${testId}-result`}>
+        {judgedCount ?? 0}/{totalCount} judged
+      </Text>
+    );
+  }
+
   if (passRate === null && passedCount === null) return null;
 
   return (
     <HStack gap={1} data-testid={`${testId}-result`}>
-      <PassRateCircle passRate={passRate} size="8px" />
-      <Text fontSize="11px" fontWeight="medium" color="fg.muted">
+      <PassRateCircle passRate={passRate} size="6px" />
+      <Text
+        fontSize="10.5px"
+        fontWeight="semibold"
+        color={getPassRateGradientColor(passRate)}
+      >
         {passRate === null ? "-" : `${Math.round(passRate)}%`}
       </Text>
       {passedCount !== null ? (
-        <Text fontSize="11px" color="fg.muted">
+        <Text fontSize="10.5px" color={FG_FAINT}>
           · {passedCount} passed
         </Text>
       ) : null}
@@ -69,16 +104,20 @@ function EntryTitleLine({
   title,
   timeAgo,
   isPending,
+  isRunning,
   testId,
-}: Pick<RunsSidebarEntryProps, "title" | "timeAgo" | "isPending" | "testId">) {
+}: Pick<
+  RunsSidebarEntryProps,
+  "title" | "timeAgo" | "isPending" | "isRunning" | "testId"
+>) {
   return (
     <HStack gap={1.5} width="full" data-testid={`${testId}-title`}>
-      {isPending ? <Spinner size="xs" /> : null}
-      <Text fontSize="xs" fontWeight="semibold" truncate>
+      {isPending || isRunning ? <Spinner size="xs" boxSize="11px" /> : null}
+      <Text fontSize="12px" fontWeight="semibold" truncate>
         {title}
       </Text>
       <Box flex={1} />
-      <Text fontSize="10px" color="fg.muted" whiteSpace="nowrap">
+      <Text fontSize="10px" color={FG_FAINT} whiteSpace="nowrap">
         {timeAgo}
       </Text>
     </HStack>
@@ -93,6 +132,9 @@ export function RunsSidebarEntry({
   passedCount,
   isSelected,
   isPending,
+  isRunning,
+  judgedCount,
+  totalCount,
   onClick,
   testId,
 }: RunsSidebarEntryProps) {
@@ -108,7 +150,7 @@ export function RunsSidebarEntry({
       textAlign="left"
       cursor={onClick ? "pointer" : "default"}
       background={isSelected ? "bg.muted" : undefined}
-      _hover={onClick ? { background: "bg.muted" } : undefined}
+      _hover={onClick ? { background: "bg.muted/60" } : undefined}
       onClick={onClick}
       aria-current={isSelected ? "true" : undefined}
       data-testid={testId}
@@ -118,12 +160,16 @@ export function RunsSidebarEntry({
         title={title}
         timeAgo={timeAgo}
         isPending={isPending}
+        isRunning={isRunning}
         testId={testId}
       />
       <EntryNote note={note} testId={testId} />
       <EntryResult
         passRate={passRate}
         passedCount={passedCount}
+        isRunning={isRunning}
+        judgedCount={judgedCount}
+        totalCount={totalCount}
         testId={testId}
       />
     </VStack>

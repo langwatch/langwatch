@@ -5,10 +5,12 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { Box, Button, EmptyState, Skeleton, VStack } from "@chakra-ui/react";
-import { FlaskConical, RefreshCw } from "lucide-react";
+import { Box, EmptyState, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { RefreshCw } from "lucide-react";
 import type { Period, RelativePresetKey } from "~/components/PeriodSelector";
 import { HandledErrorAlert } from "~/features/errors";
+import { FG_MUTED } from "../shared/design";
+import { SmallButton } from "../shared/SmallButton";
 import type { PeriodControls } from "./period-controls";
 
 const DAY_MS = 86_400_000;
@@ -38,9 +40,9 @@ export function RunsLoadError({
         <Box maxWidth="420px" width="100%">
           <HandledErrorAlert error={error} fallbackTitle="Couldn't load runs" />
         </Box>
-        <Button size="sm" variant="outline" onClick={onRetry}>
-          <RefreshCw size={14} /> Try again
-        </Button>
+        <SmallButton onClick={onRetry}>
+          <RefreshCw size={13} /> Try again
+        </SmallButton>
       </EmptyState.Content>
     </EmptyState.Root>
   );
@@ -63,24 +65,19 @@ export function NoRunInPeriod({
   const wider = nextWiderWindow(period);
 
   return (
-    <EmptyState.Root paddingY={12}>
-      <EmptyState.Content>
-        <EmptyState.Indicator>
-          <FlaskConical size={28} />
-        </EmptyState.Indicator>
-        <EmptyState.Title>No run in this period</EmptyState.Title>
-        <EmptyState.Description>
-          This run plan has no run inside the selected period.
-        </EmptyState.Description>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => setRelativePeriod(wider.key)}
-          data-testid="widen-period-button"
-        >
-          {wider.label}
-        </Button>
-      </EmptyState.Content>
-    </EmptyState.Root>
+    <VStack align="center" gap={3} paddingY={10}>
+      <Text fontSize="12.5px" fontWeight="medium" textAlign="center">
+        No run in this period
+      </Text>
+      <Text fontSize="12.5px" color={FG_MUTED} textAlign="center">
+        This run plan has no run inside the selected period.
+      </Text>
+      <SmallButton
+        onClick={() => setRelativePeriod(wider.key)}
+        data-testid="widen-period-button"
+      >
+        {wider.label}
+      </SmallButton>
+    </VStack>
   );
 }

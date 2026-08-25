@@ -9,6 +9,7 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { RunMetricsSummary } from "~/components/suites/RunMetricsSummary";
 import type { RunGroupSummary } from "~/components/suites/run-history-transforms";
+import { FG_MUTED } from "../shared/design";
 
 export type RunSummaryLineProps = {
   title: string;
@@ -25,26 +26,30 @@ export function RunSummaryLine({
 }: RunSummaryLineProps) {
   return (
     <HStack gap={2.5} flexWrap="wrap" data-testid="run-summary-line">
-      <Text fontSize="sm" fontWeight="semibold">
+      <Text fontSize="12.5px" fontWeight="semibold">
         {title}
       </Text>
-      <Text fontSize="xs" color="fg.muted">
+      <Text fontSize="11.5px" color={FG_MUTED}>
         {timeAgo}
       </Text>
       {note ? (
         <Text
-          fontSize="xs"
-          color="fg.muted"
+          fontSize="11.5px"
+          color={FG_MUTED}
           fontStyle="italic"
           truncate
+          minWidth={0}
           title={note}
           data-testid="run-summary-note"
         >
-          {note}
+          &ldquo;{note}&rdquo;
         </Text>
       ) : null}
       <Box flex={1} />
-      {summary ? <RunMetricsSummary summary={summary} /> : null}
+      {/* The evaluator pills of a run will read to the left of the pass pill. */}
+      <HStack gap={1.5} flexWrap="wrap">
+        {summary ? <RunMetricsSummary summary={summary} /> : null}
+      </HStack>
     </HStack>
   );
 }

@@ -67,6 +67,19 @@ export type RunPlan = {
   lastRun: RunPlanLastRun | null;
 };
 
+/**
+ * The line under the name of a run plan, which says what the plan covers.
+ *
+ * A test suite runs the cases filed under it. An external set runs whatever
+ * the code that pushed it ran. One-off runs is not a plan at all: it is where
+ * a single case lands when it is run on its own.
+ */
+export function planScopeNote(kind: RunPlanKind): string {
+  if (kind === "external") return "External set · runs from code";
+  if (kind === "one-off") return "Single test cases, run one at a time";
+  return "Test suite";
+}
+
 /** The suite fields a run plan is built from. */
 export type RunPlanSuite = {
   id: string;

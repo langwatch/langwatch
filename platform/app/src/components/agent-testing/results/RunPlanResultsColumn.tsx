@@ -7,7 +7,9 @@
 
 import { ScenarioRunExportDialog } from "~/components/suites/ScenarioRunExportDialog";
 import { useExportScenarioRuns } from "~/components/suites/useExportScenarioRuns";
+import { useCan } from "~/hooks/useCan";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { RunDialog } from "../run/RunDialog";
 import { ContentColumn } from "../shared/ContentColumn";
 import type { PeriodControls } from "./period-controls";
 import type { RunPlanDetailProps } from "./RunPlanDetail";
@@ -17,6 +19,7 @@ import { RUNS_SIDEBAR_WIDTH } from "./RunsSidebar";
 import type { RunPlan } from "./run-plans";
 import type { RunPlanBatches, RunPlanSelection } from "./useRunPlanBatches";
 import { useRunPlanCancel } from "./useRunPlanCancel";
+import { useRunPlanRunDialog } from "./useRunPlanRunDialog";
 import { useRunPlanViewMode } from "./useRunPlanViewMode";
 
 export type RunPlanResultsColumnProps = {
@@ -35,7 +38,10 @@ export function RunPlanResultsColumn({
   onEditPlan,
 }: RunPlanResultsColumnProps) {
   const { project } = useOrganizationTeamProject();
+  const { can } = useCan();
+  const canManage = can("scenarios:manage");
   const { viewMode, handleViewModeChange } = useRunPlanViewMode();
+  const runDialog = useRunPlanRunDialog({ plan, canManage });
 
   const cancel = useRunPlanCancel({
     scenarioSetId: plan.scenarioSetId,
@@ -71,6 +77,7 @@ export function RunPlanResultsColumn({
           onExport={exportRuns.openExportDialog}
           isExportDisabled={isExportDisabled}
           onEditPlan={onEditPlan}
+          onRunPlan={canManage ? runDialog.runPlan : undefined}
         />
 
         <RunPlanRunResults
@@ -80,6 +87,7 @@ export function RunPlanResultsColumn({
           cancel={cancel}
           viewMode={viewMode}
           periodControls={periodControls}
+          onRerunCase={canManage ? runDialog.rerunCase : undefined}
         />
       </ContentColumn>
 
@@ -90,6 +98,16 @@ export function RunPlanResultsColumn({
         runCount={batches.allRuns.length}
         hasFiltersApplied={false}
       />
+
+      {/* The dialog carries the whole target and parameter machinery, so it is
+          only mounted once a person asks for a run. */}
+      {runDialog.subject && (
+        <RunDialog
+          subject={runDialog.subject}
+          onClose={runDialog.close}
+          onRunStarted={runDialog.onRunStarted}
+        />
+      )}
     </>
   );
 }

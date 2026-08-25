@@ -117,7 +117,7 @@ describe("the Test Runs list", () => {
     expect(screen.getByText("Refunds")).toBeInTheDocument();
     expect(screen.getByText("Nightly plan")).toBeInTheDocument();
 
-    const rows = screen.getAllByRole("row").slice(1);
+    const rows = screen.getAllByTestId(/^run-plan-row-/);
     expect(rows).toHaveLength(4);
     expect(within(rows[3]!).getByText("One-off runs")).toBeInTheDocument();
   });
@@ -237,7 +237,7 @@ describe("the Test Runs list", () => {
 
     const row = screen.getByTestId("run-plan-row-checkout");
     expect(within(row).getByText("100%")).toBeInTheDocument();
-    expect(within(row).getByText("3 passed")).toBeInTheDocument();
+    expect(within(row).getByText("Test suite")).toBeInTheDocument();
     expect(within(row).getByText("2h ago")).toBeInTheDocument();
   });
 

@@ -8,15 +8,16 @@
 
 import { Box, Button, Text, VStack } from "@chakra-ui/react";
 import { ArrowLeft } from "lucide-react";
-import { PeriodSelector } from "~/components/PeriodSelector";
+import { FG_FAINT, FG_MUTED } from "../shared/design";
 import type { PeriodControls } from "./period-controls";
+import { AgentTestingPeriodPicker } from "../shared/PeriodPicker";
 import { RunsSidebarBatchEntry } from "./RunsSidebarBatchEntry";
 import { RunsSidebarEntry } from "./RunsSidebarEntry";
 import type { RunPlan } from "./run-plans";
 import type { RunPlanBatches } from "./useRunPlanBatches";
 
 /** How wide the runs rail is. */
-export const RUNS_SIDEBAR_WIDTH = 240;
+export const RUNS_SIDEBAR_WIDTH = 230;
 
 export type RunsSidebarProps = {
   plan: RunPlan;
@@ -78,13 +79,22 @@ function RunsList({
       ))}
 
       {isEmptyShown ? (
-        <Text fontSize="xs" color="fg.muted" paddingX={1} paddingTop={2}>
+        <Text fontSize="11.5px" color={FG_FAINT} paddingX={1} paddingTop={2}>
           No run in this period.
         </Text>
       ) : null}
 
       {hasMore ? (
-        <Button size="xs" variant="outline" onClick={loadMore}>
+        <Button
+          size="xs"
+          variant="ghost"
+          height="26px"
+          fontSize="11.5px"
+          color={FG_MUTED}
+          justifyContent="flex-start"
+          paddingX={3}
+          onClick={loadMore}
+        >
           Load More...
         </Button>
       ) : null}
@@ -114,18 +124,22 @@ export function RunsSidebar({
       height="full"
       paddingX={3}
       paddingY={4}
-      borderRightWidth="1px"
-      borderColor="border"
       overflow="auto"
       data-testid="agent-testing-runs-sidebar"
     >
       <Button
         size="xs"
         variant="ghost"
+        height="28px"
+        fontSize="12px"
+        fontWeight="medium"
+        color={FG_MUTED}
         justifyContent="flex-start"
+        paddingX="10px"
+        marginBottom={1}
         onClick={onBack}
       >
-        <ArrowLeft size={14} /> Run plans
+        <ArrowLeft size={13} /> Run plans
       </Button>
 
       {isPendingShown ? <PendingEntry /> : null}
@@ -140,15 +154,11 @@ export function RunsSidebar({
 
       <Box flex={1} minHeight={4} />
 
-      <Box paddingLeft={1}>
-        <PeriodSelector
+      <Box paddingLeft={1} paddingTop={4}>
+        <AgentTestingPeriodPicker
           period={periodControls.period}
-          mode={periodControls.periodMode}
-          setPeriod={periodControls.setPeriod}
           setRelativePeriod={periodControls.setRelativePeriod}
-          size="xs"
-          triggerVariant="ghost"
-          placement="top-start"
+          compact
         />
       </Box>
     </VStack>
