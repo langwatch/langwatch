@@ -20,7 +20,7 @@ export function TestSignInSection({
   canManage: boolean;
   testSignIn: SelfServeGoLiveView["testSignIn"];
 }) {
-  const { start, sending } = useTestSignIn({ connectionId });
+  const { start, sending, callbackFailure } = useTestSignIn({ connectionId });
 
   return (
     <VStack align="stretch" gap={3}>
@@ -30,6 +30,28 @@ export function TestSignInSection({
         that proves the connection carries a real person — not a setting we can
         tick for you.
       </Text>
+      {callbackFailure && (
+        <Alert.Root status="error">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>
+              {providerName} sent you back with an error
+            </Alert.Title>
+            <Alert.Description>
+              <VStack align="start" gap={1}>
+                <Text fontFamily="mono" fontSize="xs">
+                  {callbackFailure}
+                </Text>
+                <Text fontSize="sm">
+                  These are {providerName}&apos;s own words. Check them against
+                  the application you created there — the redirect address and
+                  the client values are the usual suspects — then try again.
+                </Text>
+              </VStack>
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
+      )}
       {testSignIn.done && (
         <Alert.Root status="success">
           <Alert.Indicator />
