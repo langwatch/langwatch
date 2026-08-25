@@ -16,8 +16,17 @@ composition adapters.
 Provider schemas, sentinels, action vocabulary, graph-alert/report policy, and
 reusable templating live in the automation contract. Browser-safe authoring
 helpers live in `automation-web`; threshold/series policy lives in the contract
-and delivery persistence policy lives in `automation-server`. These are package
-slices, not second services.
+and delivery persistence policy lives in `automation-server`. The server package
+also owns persist-cap runaway containment as a claim-gated policy over injected
+pause, counting, notification, and telemetry ports. These are package slices,
+not second services.
+
+Graph-trigger evaluation, heartbeat candidate selection, and runaway containment
+are operations on the same concrete `AutomationService`. Construction receives
+canonical Analytics/Project services plus explicit notifier, ClickHouse,
+provider, claim, and telemetry ports; Eventing supplies only trigger id/reason
+and heartbeat time.
+Graph incident persistence is a private Automation repository.
 
 ## Context
 
@@ -47,7 +56,7 @@ repositories. Prisma-shaped database access enters through
 
 ## Runtime and registration
 
-`PrismaAutomationAdapter` exposes explicit static construction for the process
+`PostgresAutomationAdapter` exposes explicit static construction for the process
 composition root. Importing the package does not register routes or create
 services.
 
@@ -67,6 +76,19 @@ discovery uses `try*` names; invalid unsubscribe tokens use the dedicated
 Portable trigger, action, cadence, provider, fire-history, and suppression
 values are Zod 4 schemas. Repository adapters map database rows at the feature
 boundary, so Prisma types do not leak through contract or web exports.
+
+Runaway containment preserves the existing UTC-day cap, 60-second evaluation
+and pause claims, 90%/100-trace misconfiguration threshold, suppression-aware
+recipient selection, and failure containment. The app supplies Redis,
+ClickHouse, Prisma, mail, and metrics capabilities without moving those
+process-specific dependencies into the feature.
+
+The graph evaluator preserves row-ceiling isolation, threshold/no-data
+semantics, source-aware heartbeat batching, open-incident claiming,
+provider retry/terminal classification, delivery gating, and last-run updates.
+The app composition edge retains provider implementations; graph source and
+incident discovery remain private Automation repository operations. It does not
+construct a second graph service or repository.
 
 ## Consequences
 

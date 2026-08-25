@@ -1,38 +1,44 @@
-/** Minimal Prisma-shaped capability consumed by the private persistence adapters.
- * Keeping this port structural means the feature never imports a process Prisma
- * singleton and can be composed against the app's typed client. */
+/**
+ * Narrow database capability accepted by the Postgres composition adapter.
+ *
+ * The generated Prisma client is deliberately not part of this port. The
+ * process hands the adapter its already-created client structurally; only the
+ * private Prisma repositories know the generated delegate details. Arguments
+ * are intentionally object-shaped (rather than `unknown`) and every result
+ * is normalized by its semantic repository before it reaches Automation.
+ */
+type DelegateCall<TResult> = {
+  bivariant(args: Record<string, unknown>): Promise<TResult>;
+}["bivariant"];
+
+type RawQuery = <T>(strings: TemplateStringsArray, ...values: any[]) => Promise<T>;
+type RawExecute = (strings: TemplateStringsArray, ...values: any[]) => Promise<number>;
+
+type Delegate = {
+  findFirst: DelegateCall<unknown | null>;
+  findMany: DelegateCall<unknown[]>;
+  create: DelegateCall<unknown>;
+  update: DelegateCall<unknown>;
+  delete: DelegateCall<unknown>;
+  deleteMany: DelegateCall<{ count: number }>;
+  createMany: DelegateCall<{ count: number }>;
+  groupBy: DelegateCall<unknown[]>;
+};
+
+/** Process-owned persistence boundary used only by Automation's Prisma adapters. */
+export abstract class AutomationDatabasePort {
+  abstract readonly database: AutomationDatabase;
+}
+
 export type AutomationDatabase = {
-  project: { findFirst(args: unknown): Promise<unknown> };
-  trigger: {
-    findFirst(args: unknown): Promise<unknown>;
-    findMany(args: unknown): Promise<unknown[]>;
-    /** Cross-tenant report reconciliation is supplied by the host adapter. */
-    findActiveReportTargets(): Promise<unknown[]>;
-    create(args: unknown): Promise<unknown>;
-    update(args: unknown): Promise<unknown>;
+  project: Pick<Delegate, "findFirst" | "findMany">;
+  trigger: Pick<Delegate, "findFirst" | "findMany" | "create" | "update">;
+  triggerSent: Delegate;
+  emailSuppression: Pick<Delegate, "findFirst" | "findMany" | "create" | "deleteMany">;
+  customGraph: Pick<Delegate, "findFirst" | "findMany"> & {
+    findUnique: DelegateCall<unknown | null>;
   };
-  triggerSent: {
-    create(args: unknown): Promise<unknown>;
-    createMany(args: unknown): Promise<{ count: number }>;
-    findFirst(args: unknown): Promise<unknown>;
-    findMany(args: unknown): Promise<unknown[]>;
-    groupBy(args: unknown): Promise<unknown[]>;
-  };
-  emailSuppression: {
-    findFirst(args: unknown): Promise<unknown>;
-    findMany(args: unknown): Promise<unknown[]>;
-    create(args: unknown): Promise<unknown>;
-    deleteMany(args: unknown): Promise<{ count: number }>;
-  };
-  customGraph: {
-    findUnique(args: unknown): Promise<unknown>;
-    findMany(args: unknown): Promise<unknown[]>;
-  };
-  webhookEndpointDelivery: {
-    create(args: unknown): Promise<unknown>;
-    findMany(args: unknown): Promise<unknown[]>;
-  };
-  /** System-owned maintenance query for the shared webhook delivery log. */
-  $queryRaw<T>(strings: TemplateStringsArray, ...values: unknown[]): Promise<T>;
-  $executeRaw(strings: TemplateStringsArray, ...values: unknown[]): Promise<number>;
+  webhookEndpointDelivery: Pick<Delegate, "create" | "findMany">;
+  $queryRaw: RawQuery;
+  $executeRaw: RawExecute;
 };

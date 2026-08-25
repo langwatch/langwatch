@@ -6,3 +6,5 @@ export type UnsubscribeTokenPayload = {
 export abstract class UnsubscribeTokenVerifier {
   abstract tryVerify(token: string): UnsubscribeTokenPayload | null;
 }
+
+export abstract class UnsubscribeTokenVerifierPort extends UnsubscribeTokenVerifier {}

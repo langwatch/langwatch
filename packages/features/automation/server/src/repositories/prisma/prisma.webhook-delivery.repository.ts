@@ -47,7 +47,7 @@ export class PrismaWebhookDeliveryRepository extends WebhookDeliveryRepository {
       orderBy: { firedAt: "desc" },
       take: input.limit,
     });
-    return rows.map((row) => {
+    return rows.map((row: unknown) => {
       const value = row as Record<string, unknown>;
       return {
         id: String(value.id),

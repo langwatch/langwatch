@@ -20,10 +20,24 @@ import type { ScheduledJobRecord } from "../src/ports/scheduled-jobs.port";
 import { SchedulerWake } from "../src/ports/scheduler-wake.port";
 import { CustomGraphRepository } from "../src/repositories/custom-graph.repository";
 import { WebhookDeliveryRepository } from "../src/repositories/webhook-delivery.repository";
+import { GraphTriggerSentRepository } from "../src/repositories/graph-trigger-sent.repository";
 import type {
   WebhookDeliveryInput,
   WebhookDeliveryRow,
 } from "@langwatch/automation-contract";
+import { createAutomationTestRuntime } from "../src/testing";
+
+class EmptyGraphTriggerSent extends GraphTriggerSentRepository {
+  findProjectsWithGraphTriggers = async () => [];
+  findProjectsWithOpenGraphTriggerSent = async () => new Set<string>();
+  tryFindGraphTriggerSource = async () => undefined;
+  findOpenTriggerIdsForProject = async () => new Set<string>();
+  tryFindOpenForGraphAlert = async () => null;
+  tryFindLatestForGraphAlert = async () => null;
+  tryClaimOpenForGraphAlert = async () => null;
+  deleteOpenClaim = async () => undefined;
+  markResolvedById = async () => undefined;
+}
 
 class EmptyCustomGraphs extends CustomGraphRepository {
   tryFindById(): Promise<null> {
@@ -261,6 +275,8 @@ const makeService = (
     clock: new Clock(),
     customGraphs: new EmptyCustomGraphs(),
     webhookDeliveries,
+    graphTriggerSent: new EmptyGraphTriggerSent(),
+    ...createAutomationTestRuntime(),
   });
 
 describe("AutomationService trigger and fire-history lifecycle", () => {
@@ -431,6 +447,8 @@ describe("AutomationService email suppression", () => {
       clock: new Clock(),
       customGraphs: new EmptyCustomGraphs(),
       webhookDeliveries: new EmptyWebhookDeliveries(),
+      graphTriggerSent: new EmptyGraphTriggerSent(),
+      ...createAutomationTestRuntime(),
     });
     await service.suppressEmail({
       projectId: "p",
@@ -491,6 +509,8 @@ describe("AutomationService email suppression", () => {
       clock: new Clock(),
       customGraphs: new EmptyCustomGraphs(),
       webhookDeliveries: new EmptyWebhookDeliveries(),
+      graphTriggerSent: new EmptyGraphTriggerSent(),
+      ...createAutomationTestRuntime(),
     });
 
     expect(await service.reconcileReportSchedules()).toEqual({ repaired: 1 });

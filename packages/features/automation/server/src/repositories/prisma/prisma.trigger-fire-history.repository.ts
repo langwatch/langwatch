@@ -37,6 +37,7 @@ export class PrismaTriggerFireHistoryRepository extends TriggerFireHistoryReposi
       this.database.triggerSent.groupBy({
         by: ["triggerId"],
         where: { projectId: input.projectId },
+        orderBy: { triggerId: "asc" },
         _max: { createdAt: true },
       }),
       this.database.triggerSent.groupBy({
@@ -45,6 +46,7 @@ export class PrismaTriggerFireHistoryRepository extends TriggerFireHistoryReposi
           projectId: input.projectId,
           createdAt: { gte: input.firesSince },
         },
+        orderBy: { triggerId: "asc" },
         _count: { _all: true },
       }),
       this.database.triggerSent.findMany({
@@ -58,7 +60,7 @@ export class PrismaTriggerFireHistoryRepository extends TriggerFireHistoryReposi
       }),
     ]);
     const recentCountByTriggerId = new Map(
-      recentCounts.map((row) => {
+      recentCounts.map((row: unknown) => {
         const value = row as {
           triggerId: string;
           _count: { _all: number };
@@ -67,9 +69,9 @@ export class PrismaTriggerFireHistoryRepository extends TriggerFireHistoryReposi
       }),
     );
     const firingTriggerIds = new Set(
-      openIncidents.map((row) => (row as { triggerId: string }).triggerId),
+      openIncidents.map((row: unknown) => (row as { triggerId: string }).triggerId),
     );
-    return lastFired.map((row) => {
+    return lastFired.map((row: unknown) => {
       const value = row as {
         triggerId: string;
         _max: { createdAt: Date | null };

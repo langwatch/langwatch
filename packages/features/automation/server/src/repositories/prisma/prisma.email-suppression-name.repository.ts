@@ -40,7 +40,7 @@ export class PrismaEmailSuppressionNameRepository extends EmailSuppressionNameRe
       select: { id: true, name: true },
     });
     return new Map(
-      rows.map((row) => {
+      rows.map((row: unknown) => {
         const value = row as { id: string; name: string };
         return [value.id, value.name] as const;
       }),

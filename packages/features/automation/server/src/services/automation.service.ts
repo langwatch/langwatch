@@ -14,6 +14,10 @@ import {
   type TriggerSummary,
   type UpdateTriggerCommand,
   updateTriggerCommandSchema,
+  type GraphTriggerEvaluationReason,
+  type GraphTriggerEvaluationResult,
+  type GraphTriggerSweepCandidate,
+  type AutomationPersistCapBreach,
 } from "@langwatch/automation-contract";
 import type {
   CustomGraph,
@@ -30,6 +34,18 @@ import { AutomationClock } from "../ports/automation-clock.port";
 import { ReportScheduleService } from "./report-schedule.service";
 import { CustomGraphRepository } from "../repositories/custom-graph.repository";
 import { WebhookDeliveryRepository } from "../repositories/webhook-delivery.repository";
+import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository";
+import type {
+  AutomationGraphNotifierPort,
+  AutomationGraphTelemetryPort,
+  AutomationHeartbeatPort,
+  AutomationSlackBotTokenDecryptorPort,
+  AutomationDispatchErrorPort,
+} from "../ports/automation-graph.port";
+import { AutomationRunawayPort } from "../ports/automation-runaway.port";
+import type { AnalyticsService } from "@langwatch/analytics-contract";
+import type { ProjectService } from "@langwatch/project-contract";
+import { AutomationGraphService } from "./automation-graph.service";
 
 const normalize = (email: string): string => email.trim().toLowerCase();
 /** Canonical process service for all Automation behaviour: trigger lifecycle,
@@ -50,9 +66,11 @@ export class AutomationService extends AutomationCapability {
     private readonly clock: AutomationClock,
     private readonly customGraphs: CustomGraphRepository,
     private readonly webhookDeliveries: WebhookDeliveryRepository,
+    private readonly graph: AutomationGraphService,
   ) {
     super();
   }
+
   static create(deps: {
     triggers: TriggerRepository;
     history: TriggerFireHistoryRepository;
@@ -63,8 +81,33 @@ export class AutomationService extends AutomationCapability {
     clock: AutomationClock;
     customGraphs: CustomGraphRepository;
     webhookDeliveries: WebhookDeliveryRepository;
+    graphTriggerSent: GraphTriggerSentRepository;
+    projects: ProjectService;
+    analytics: AnalyticsService;
+    notifier: AutomationGraphNotifierPort;
+    baseHost: string;
+    telemetry: AutomationGraphTelemetryPort;
+    slackTokens: AutomationSlackBotTokenDecryptorPort;
+    dispatchErrors: AutomationDispatchErrorPort;
+    heartbeat: AutomationHeartbeatPort;
+    runaway: AutomationRunawayPort;
   }): AutomationService {
-    return new AutomationService(
+    const graph = AutomationGraphService.create({
+      triggers: deps.triggers,
+      customGraphs: deps.customGraphs,
+      projects: deps.projects,
+      analytics: deps.analytics,
+      triggerSent: deps.graphTriggerSent,
+      notifier: deps.notifier,
+      telemetry: deps.telemetry,
+      slackTokens: deps.slackTokens,
+      dispatchErrors: deps.dispatchErrors,
+      heartbeat: deps.heartbeat,
+      runaway: deps.runaway,
+      clock: deps.clock,
+      baseHost: deps.baseHost,
+    });
+    const service = new AutomationService(
       deps.triggers,
       deps.history,
       deps.suppressions,
@@ -74,11 +117,34 @@ export class AutomationService extends AutomationCapability {
       deps.clock,
       deps.customGraphs,
       deps.webhookDeliveries,
+      graph,
     );
+    return service;
   }
+
+  evaluateGraphTrigger(input: {
+    triggerId: string;
+    projectId: string;
+    reason: GraphTriggerEvaluationReason;
+  }): Promise<GraphTriggerEvaluationResult> {
+    return this.graph.evaluate(input);
+  }
+
+  async decideGraphTriggerHeartbeat(input: {
+    now: Date;
+  }): Promise<GraphTriggerSweepCandidate[]> {
+    return this.graph.decideHeartbeat(input);
+  }
+
+  handlePersistCapBreach(input: AutomationPersistCapBreach): Promise<void> {
+    return this.graph.handlePersistCapBreach(input);
+  }
+
   private async active(projectId: string): Promise<TriggerSummary[]> {
     const cached = this.activeCache.get(projectId);
-    if (cached && cached.expires > this.clock.now().getTime()) return cached.value;
+    if (cached && cached.expires > this.clock.now().getTime()) {
+      return cached.value;
+    }
     const value = await this.triggers.findActiveForProject(projectId);
     this.activeCache.set(projectId, {
       expires: this.clock.now().getTime() + 60_000,
@@ -86,25 +152,31 @@ export class AutomationService extends AutomationCapability {
     });
     return value;
   }
+
   getById(input: { triggerId: string; projectId: string }): Promise<Trigger> {
     return this.triggers.findByIdOrThrow(input);
   }
+
   tryGetById(input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
     return this.triggers.tryFindById(input);
   }
+
   getAllForProject(input: { projectId: string }): Promise<Trigger[]> {
     return this.triggers.findAllByProjectId(input);
   }
+
   async create(input: CreateTriggerCommand): Promise<Trigger> {
     const trigger = await this.triggers.create(createTriggerCommandSchema.parse(input));
     await this.invalidate(input.projectId);
     return trigger;
   }
+
   async update(input: UpdateTriggerCommand): Promise<Trigger> {
     const trigger = await this.triggers.update(updateTriggerCommandSchema.parse(input));
     await this.invalidate(input.projectId);
     return trigger;
   }
+
   async archive(input: { triggerId: string; projectId: string }): Promise<Trigger> {
     await this.getById(input);
     const trigger = await this.triggers.update({
@@ -115,6 +187,7 @@ export class AutomationService extends AutomationCapability {
     await this.invalidate(input.projectId);
     return trigger;
   }
+
   async softDeleteById(input: {
     triggerId: string;
     projectId: string;
@@ -128,28 +201,33 @@ export class AutomationService extends AutomationCapability {
     await this.invalidate(input.projectId);
     return trigger;
   }
+
   tryGetByCustomGraphId(input: {
     projectId: string;
     customGraphId: string;
   }): Promise<Trigger | null> {
     return this.triggers.tryFindByCustomGraphId(input);
   }
+
   getByCustomGraphIds(input: {
     projectId: string;
     customGraphIds: string[];
   }): Promise<Trigger[]> {
     return this.triggers.findByCustomGraphIds(input);
   }
+
   async getActiveTraceTriggersForProject(projectId: string): Promise<TriggerSummary[]> {
     return (await this.active(projectId)).filter(
       (trigger) => !trigger.customGraphId && trigger.triggerKind !== "REPORT",
     );
   }
+
   async getActiveGraphTriggersForProject(projectId: string): Promise<TriggerSummary[]> {
     return (await this.active(projectId)).filter(
       (trigger) => trigger.customGraphId !== null && trigger.triggerKind !== "REPORT",
     );
   }
+
   claimSend(input: {
     triggerId: string;
     traceId: string;
@@ -157,6 +235,7 @@ export class AutomationService extends AutomationCapability {
   }): Promise<boolean> {
     return this.triggers.claimSend(input);
   }
+
   isSendClaimed(input: {
     triggerId: string;
     traceId: string;
@@ -164,6 +243,7 @@ export class AutomationService extends AutomationCapability {
   }): Promise<boolean> {
     return this.triggers.isSendClaimed(input);
   }
+
   filterSendClaimed(input: {
     triggerId: string;
     traceIds: string[];
@@ -171,16 +251,20 @@ export class AutomationService extends AutomationCapability {
   }): Promise<Set<string>> {
     return this.triggers.findClaimedTraceIds(input);
   }
+
   updateLastRunAt(input: { triggerId: string; projectId: string }): Promise<void> {
     return this.triggers.updateLastRunAt(input);
   }
+
   invalidate(projectId: string): Promise<void> {
     this.activeCache.delete(projectId);
     return Promise.resolve();
   }
+
   getReportSchedules(input: { projectId: string }): Promise<ReportSchedule[]> {
     return this.reportSchedules.getAll(input);
   }
+
   syncReportSchedule(input: {
     projectId: string;
     triggerId: string;
@@ -193,12 +277,16 @@ export class AutomationService extends AutomationCapability {
       schedule: { cron: input.cron, timezone: input.timezone },
     });
   }
+
   removeReportSchedule(input: { projectId: string; triggerId: string }): Promise<void> {
     return this.reportSchedules.remove(input);
   }
+
   async reconcileReportSchedules(): Promise<{ repaired: number }> {
     const reports = await this.triggers.findActiveReportTargets();
-    if (reports.length === 0) return { repaired: 0 };
+    if (reports.length === 0) {
+      return { repaired: 0 };
+    }
 
     const scheduledTargetIds = new Set<string>();
     const projectIds = new Set(reports.map((report) => report.projectId));
@@ -211,10 +299,14 @@ export class AutomationService extends AutomationCapability {
 
     let repaired = 0;
     for (const report of reports) {
-      if (scheduledTargetIds.has(report.id)) continue;
+      if (scheduledTargetIds.has(report.id)) {
+        continue;
+      }
 
       const parsed = ReportScheduleService.tryExtract(report.actionParams);
-      if (!parsed) continue;
+      if (!parsed) {
+        continue;
+      }
 
       await this.reportSchedules.sync({
         projectId: report.projectId,
@@ -226,12 +318,14 @@ export class AutomationService extends AutomationCapability {
 
     return { repaired };
   }
+
   getFireStats(input: { projectId: string }): Promise<TriggerFireStats[]> {
     return this.history.findAllStatsForProject({
       projectId: input.projectId,
       firesSince: new Date(this.clock.now().getTime() - 30 * 24 * 60 * 60 * 1000),
     });
   }
+
   getRecentFires(input: {
     projectId: string;
     triggerId?: string;
@@ -248,6 +342,7 @@ export class AutomationService extends AutomationCapability {
           limit: input.limit,
         });
   }
+
   recordFire(input: {
     projectId: string;
     triggerId: string;
@@ -265,9 +360,11 @@ export class AutomationService extends AutomationCapability {
       resolvedAt: input.resolvedAt ?? null,
     });
   }
+
   getSuppressions(input: { projectId: string }): Promise<EmailSuppression[]> {
     return this.suppressions.findAll(input);
   }
+
   async getAllEnriched(input: {
     projectId: string;
   }): Promise<Array<EmailSuppression & { triggerName: string | null }>> {
@@ -284,33 +381,42 @@ export class AutomationService extends AutomationCapability {
       triggerName: row.triggerId ? (names.get(row.triggerId) ?? null) : null,
     }));
   }
+
   async tryResolveUnsubscribeView(input: { token: string }): Promise<{
     projectName: string;
     triggerName: string | null;
     email: string;
   } | null> {
     const payload = this.verifier.tryVerify(input.token);
-    if (!payload) return null;
+    if (!payload) {
+      return null;
+    }
     const names = await this.names.tryLookupNames(payload);
-    if (!names) return null;
+    if (!names) {
+      return null;
+    }
     return {
       projectName: names.projectName,
       triggerName: names.triggerName,
       email: maskEmail(payload.email),
     };
   }
+
   async confirmUnsubscribe(input: {
     token: string;
     scope: "trigger" | "project";
   }): Promise<void> {
     const payload = this.verifier.tryVerify(input.token);
-    if (!payload) throw new InvalidUnsubscribeTokenError();
+    if (!payload) {
+      throw new InvalidUnsubscribeTokenError();
+    }
     await this.suppressEmail({
       projectId: payload.projectId,
       email: payload.email,
       triggerId: input.scope === "project" ? null : payload.triggerId,
     });
   }
+
   suppressEmail(input: SuppressEmailCommand): Promise<EmailSuppression> {
     const parsed = suppressEmailCommandSchema.parse(input);
     return this.suppressions.create({
@@ -320,9 +426,11 @@ export class AutomationService extends AutomationCapability {
       reason: parsed.reason ?? "unsubscribe",
     });
   }
+
   removeSuppression(input: { id: string; projectId: string }): Promise<void> {
     return this.suppressions.delete(input);
   }
+
   async filterSuppressed(input: {
     projectId: string;
     triggerId: string;
@@ -335,27 +443,32 @@ export class AutomationService extends AutomationCapability {
     const blocked = new Set(rows.map((row) => normalize(row.email)));
     return input.emails.filter((email) => !blocked.has(normalize(email)));
   }
+
   tryGetCustomGraph(input: {
     customGraphId: string;
     projectId: string;
   }): Promise<CustomGraph | null> {
     return this.customGraphs.tryFindById(input);
   }
+
   customGraphExistsInProject(input: {
     customGraphId: string;
     projectId: string;
   }): Promise<boolean> {
     return this.customGraphs.existsInProject(input);
   }
+
   getCustomGraphNamesByIds(input: {
     customGraphIds: string[];
     projectId: string;
   }): Promise<CustomGraphNameRef[]> {
     return this.customGraphs.findAllNamesByIds(input);
   }
+
   recordWebhookDelivery(input: WebhookDeliveryInput): Promise<void> {
     return this.webhookDeliveries.create(input);
   }
+
   getRecentWebhookDeliveries(input: {
     projectId: string;
     triggerId: string;
@@ -363,6 +476,7 @@ export class AutomationService extends AutomationCapability {
   }): Promise<WebhookDeliveryRow[]> {
     return this.webhookDeliveries.findAllRecentByTriggerId(input);
   }
+
   pruneWebhookDeliveries(now?: Date): Promise<number> {
     return this.webhookDeliveries.pruneExpired(now);
   }

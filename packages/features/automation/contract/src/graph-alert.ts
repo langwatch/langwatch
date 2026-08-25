@@ -76,6 +76,84 @@ export const graphAlertActionParamsSchema = z.object({
 
 export type GraphAlertActionParams = z.infer<typeof graphAlertActionParamsSchema>;
 
+export type BuildGraphAlertTriggerDataInput = {
+  id: string;
+  name: string;
+  projectId: string;
+  action: "SEND_EMAIL" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK";
+  alertType: "CRITICAL" | "WARNING" | "INFO";
+  customGraphId: string;
+  actionParams: GraphAlertActionParams & Record<string, unknown>;
+};
+
+export type GraphAlertTriggerData = {
+  id: string;
+  name: string;
+  projectId: string;
+  action: BuildGraphAlertTriggerDataInput["action"];
+  actionParams: Record<string, unknown>;
+  filters: Record<string, never>;
+  alertType: BuildGraphAlertTriggerDataInput["alertType"];
+  active: true;
+  customGraphId: string;
+};
+
+/** Event/heartbeat reason carried through the singular AutomationService. */
+export type GraphTriggerEvaluationReason =
+  | "real-time"
+  | "heartbeat-absence"
+  | "heartbeat-resolve";
+
+export type GraphTriggerEvaluationStatus =
+  | "fired"
+  | "already_firing"
+  | "resolved"
+  | "not_breached"
+  | "skipped"
+  | "not_delivered";
+
+export type GraphTriggerEvaluationResult = {
+  triggerId: string;
+  projectId: string;
+  reason: GraphTriggerEvaluationReason;
+  status: GraphTriggerEvaluationStatus;
+  detail?: string;
+  value?: number;
+  didSend?: boolean;
+  renderErrors?: string[];
+  missingVariables?: string[];
+};
+
+/** Heartbeat decisions are returned to the Eventing scheduler for dispatch. */
+export type GraphTriggerSweepCandidate = {
+  triggerId: string;
+  projectId: string;
+  reason: GraphTriggerEvaluationReason;
+};
+
+/** Portable writer for the single graph-alert trigger row shape. */
+export function buildGraphAlertTriggerData({
+  id,
+  name,
+  projectId,
+  action,
+  alertType,
+  customGraphId,
+  actionParams,
+}: BuildGraphAlertTriggerDataInput): GraphAlertTriggerData {
+  return {
+    id,
+    name: name.replace(/^\s*alert:\s*/i, "").trim(),
+    projectId,
+    action,
+    actionParams: { ...actionParams },
+    filters: {},
+    alertType,
+    active: true,
+    customGraphId,
+  };
+}
+
 /** Parses an existing row while preserving provider destination keys. */
 export function extractGraphAlertFromTriggerRow(
   actionParams: unknown,

@@ -23,7 +23,9 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
     "croner": "^10.0.1"
   },
   "devDependencies": {

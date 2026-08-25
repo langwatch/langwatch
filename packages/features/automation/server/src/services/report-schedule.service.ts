@@ -14,6 +14,7 @@ export class ReportScheduleService {
     private readonly clock: AutomationClock,
     private readonly wake: SchedulerWake,
   ) {}
+
   static create(deps: {
     jobs: ScheduledJobStore;
     clock: AutomationClock;
@@ -21,15 +22,20 @@ export class ReportScheduleService {
   }): ReportScheduleService {
     return new ReportScheduleService(deps.jobs, deps.clock, deps.wake);
   }
+
   static computeNextRunAt(input: { cron: string; timezone: string; after: Date }): Date {
     const next = new Cron(input.cron, { timezone: input.timezone }).nextRun(input.after);
-    if (!next) throw new Error(`No report run exists after ${input.after.toISOString()}`);
+    if (!next) {
+      throw new Error(`No report run exists after ${input.after.toISOString()}`);
+    }
     return next;
   }
+
   static tryExtract(actionParams: unknown): ReportActionParams | null {
     const parsed = reportActionParamsSchema.safeParse(actionParams);
     return parsed.success ? parsed.data : null;
   }
+
   async sync(input: {
     projectId: string;
     triggerId: string;
@@ -48,6 +54,7 @@ export class ReportScheduleService {
     });
     this.wake.publish();
   }
+
   async remove(input: { projectId: string; triggerId: string }): Promise<void> {
     await this.jobs.deactivateForTarget({
       projectId: input.projectId,
@@ -55,6 +62,7 @@ export class ReportScheduleService {
       targetId: input.triggerId,
     });
   }
+
   async getAll(input: { projectId: string }): Promise<
     Array<{
       triggerId: string;

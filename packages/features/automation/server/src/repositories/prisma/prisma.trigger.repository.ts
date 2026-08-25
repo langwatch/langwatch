@@ -26,11 +26,17 @@ export class PrismaTriggerRepository extends TriggerRepository {
     const rows = await this.database.trigger.findMany({
       where: { projectId, active: true, deleted: false },
     });
-    return rows.map((row) => mapTriggerRow(row));
+    return rows.map((row: unknown) => mapTriggerRow(row));
   }
   async findActiveReportTargets(): Promise<ReportScheduleTarget[]> {
-    const rows = await this.database.trigger.findActiveReportTargets();
-    return rows as ReportScheduleTarget[];
+    return this.database.$queryRaw<ReportScheduleTarget[]>`
+			SELECT "id", "projectId", "actionParams"
+			FROM "Trigger"
+			WHERE "triggerKind" = 'REPORT'
+			  AND "active" = true
+			  AND "deleted" = false
+			-- @tenancy: report-schedule reconciliation cross-tenant sweep (worker boot)
+		`;
   }
   async claimSend(input: {
     triggerId: string;
@@ -70,7 +76,7 @@ export class PrismaTriggerRepository extends TriggerRepository {
       select: { traceId: true },
     });
     return new Set(
-      rows.flatMap((row) => {
+      rows.flatMap((row: unknown) => {
         const id = (row as { traceId?: unknown }).traceId;
         return typeof id === "string" ? [id] : [];
       }),
@@ -106,7 +112,7 @@ export class PrismaTriggerRepository extends TriggerRepository {
       where: { projectId: input.projectId, deleted: false },
       orderBy: { createdAt: "desc" },
     });
-    return rows.map((row) => mapTriggerRow(row));
+    return rows.map((row: unknown) => mapTriggerRow(row));
   }
   async tryFindByCustomGraphId(input: {
     projectId: string;
@@ -128,7 +134,7 @@ export class PrismaTriggerRepository extends TriggerRepository {
         customGraphId: { in: input.customGraphIds },
       },
     });
-    return rows.map((row) => mapTriggerRow(row));
+    return rows.map((row: unknown) => mapTriggerRow(row));
   }
   async create(input: CreateTriggerCommand): Promise<Trigger> {
     const row = await this.database.trigger.create({

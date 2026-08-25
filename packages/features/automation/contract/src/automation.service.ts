@@ -10,7 +10,22 @@ import type {
   TriggerFireStats,
   TriggerSummary,
 } from "./trigger.queries";
+import type {
+  GraphTriggerEvaluationReason,
+  GraphTriggerEvaluationResult,
+  GraphTriggerSweepCandidate,
+} from "./graph-alert";
+import type { AutomationPersistCapBreach } from "./runaway";
 export abstract class AutomationService {
+  abstract evaluateGraphTrigger(input: {
+    triggerId: string;
+    projectId: string;
+    reason: GraphTriggerEvaluationReason;
+  }): Promise<GraphTriggerEvaluationResult>;
+  abstract decideGraphTriggerHeartbeat(input: {
+    now: Date;
+  }): Promise<GraphTriggerSweepCandidate[]>;
+  abstract handlePersistCapBreach(input: AutomationPersistCapBreach): Promise<void>;
   abstract getById(input: { triggerId: string; projectId: string }): Promise<Trigger>;
   abstract tryGetById(input: {
     triggerId: string;

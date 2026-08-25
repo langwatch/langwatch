@@ -27,3 +27,29 @@ Feature: Automation ownership
     Given an active report trigger with a report source
     When active automation projections are loaded for dispatch
     Then the report trigger is absent from both trace and graph projections
+
+  Scenario: Persist-cap containment pauses a condition-less automation once
+    Given a condition-less trace automation has exceeded its daily persist cap
+    When runaway containment evaluates the breach
+    Then it claims the containment check before evaluating project traffic
+    And it pauses the automation with the runaway reason
+    And it sends at most one limit notification for the UTC day
+
+  Scenario: Persist-cap containment leaves a busy filtered automation active
+    Given a filtered automation has exceeded its daily persist cap
+    And its confirmed matches cover less than 90 percent of at least 100 project traces
+    When runaway containment evaluates the breach
+    Then it leaves the automation active
+    And it sends at most one ceiling notification for the UTC day
+
+  Scenario: Graph threshold evaluation uses the singular AutomationService
+    Given an active graph trigger and its custom graph
+    When Eventing evaluates the trigger with a real-time or heartbeat reason
+    Then threshold, no-data, delivery, retry, and open-incident decisions run through AutomationService
+    And the service claims at most one open graph incident per trigger
+
+  Scenario: Graph heartbeat isolates projects and metric sources
+    Given graph triggers across trace-backed and evaluation-backed projects
+    When the heartbeat checks recent slim-table activity
+    Then it batches recency by project and source
+    And a failed project does not suppress candidates for other projects
