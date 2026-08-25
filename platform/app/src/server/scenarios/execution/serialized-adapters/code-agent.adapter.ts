@@ -169,6 +169,13 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
       template_adapter: "default" as const,
       secrets: this.config.secrets,
       params,
+      // The run's own credential, when the platform minted one. The engine
+      // injects it into the sandbox next to its LangWatch endpoint, so the
+      // code under test reaches the project's agent cache with no wiring of
+      // its own. An absent field injects nothing.
+      ...(this.config.sandboxApiKey
+        ? { sandbox_api_key: this.config.sandboxApiKey }
+        : {}),
       nodes: [
         this.buildEntryNode(inputs),
         this.buildCodeNode(inputs, outputs),

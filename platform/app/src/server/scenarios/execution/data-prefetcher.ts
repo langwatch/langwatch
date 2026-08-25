@@ -37,6 +37,7 @@ import { validateWorkflowAgentMappings } from "./validate-workflow-mappings";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
 
+import { tryMintAgentSandboxApiKey } from "~/server/api-key/agent-sandbox-key";
 import { decrypt } from "~/utils/encryption";
 import {
   AgentRepository,
@@ -146,11 +147,29 @@ export interface WorkflowVersionFetcher {
   }): Promise<{ workflowId: string; dsl: Record<string, unknown> } | null>;
 }
 
-/** Minimal interface for project lookup */
+/**
+ * Minimal interface for project lookup.
+ *
+ * The organization comes along because minting a run's sandbox key needs it,
+ * and the project row is already being read.
+ */
 export interface ProjectFetcher {
   findUnique(projectId: string): Promise<{
     apiKey: string | null;
+    team: { organizationId: string } | null;
   } | null>;
+}
+
+/**
+ * Mints the short-lived credential a code agent's sandbox authenticates with.
+ * Answers undefined when the platform could not mint one, which leaves the run
+ * to do its work once per row.
+ */
+export interface SandboxKeyMinter {
+  mint(params: {
+    projectId: string;
+    organizationId: string;
+  }): Promise<string | undefined>;
 }
 
 /**
@@ -215,6 +234,7 @@ export interface DataPrefetcherDependencies {
   modelResolver: ModelResolver;
   projectSecretsFetcher: ProjectSecretsFetcher;
   traceWaitBudgetResolver: TraceWaitBudgetResolver;
+  sandboxKeyMinter: SandboxKeyMinter;
 }
 
 // ============================================================================
@@ -499,6 +519,17 @@ export async function prefetchScenarioData({
   // prompt with this run plan, so they arrive with the suite rather than with
   // the prompt. Agents carry their own on the agent record, already loaded
   // above.
+  // One key for the whole run, not one per turn: every turn of this run shares
+  // the cache entries it writes, and a key per turn would leave a row of live
+  // credentials behind each run. A run that cannot get one still runs, and
+  // every turn does its own work.
+  if (adapterData.type === "code" && project.organizationId) {
+    adapterData.sandboxApiKey = await deps.sandboxKeyMinter.mint({
+      projectId: context.projectId,
+      organizationId: project.organizationId,
+    });
+  }
+
   if (adapterData.type === "prompt") {
     adapterData.scenarioMappings = suiteOverrides?.targets?.find(
       (candidate) =>
@@ -719,7 +750,10 @@ async function fetchScenario({
 }
 
 type FetchProjectResult =
-  | { success: true; data: { apiKey: string } }
+  | {
+      success: true;
+      data: { apiKey: string; organizationId: string | null };
+    }
   | { success: false; error: string };
 
 async function fetchProject(
@@ -733,7 +767,13 @@ async function fetchProject(
   if (!project.apiKey) {
     return { success: false, error: `Project ${projectId} missing API key` };
   }
-  return { success: true, data: { apiKey: project.apiKey } };
+  return {
+    success: true,
+    data: {
+      apiKey: project.apiKey,
+      organizationId: project.team?.organizationId ?? null,
+    },
+  };
 }
 
 /** Failure result propagated from hydrateLlmParameters through the fetch chain */
@@ -1295,8 +1335,11 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
       findUnique: async (projectId) =>
         prisma.project.findUnique({
           where: { id: projectId },
-          select: { apiKey: true },
+          select: { apiKey: true, team: { select: { organizationId: true } } },
         }),
+    },
+    sandboxKeyMinter: {
+      mint: (params) => tryMintAgentSandboxApiKey({ prisma, ...params }),
     },
     modelResolver: {
       resolve: async (featureKey, projectId) => {
