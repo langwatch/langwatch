@@ -3,6 +3,7 @@ import { createSpinner } from "../utils/spinner";
 import { PromptsApiService, PromptsError } from "@/client-sdk/services/prompts";
 import { resolveCredentials } from "../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../utils/formatting";
+import { parsePositiveIntOrNull } from "../utils/positiveInt";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { failSpinner } from "../utils/spinnerError";
 import type { CommandResult } from "../utils/output";
@@ -20,8 +21,7 @@ export interface PromptListOptions {
  */
 const resolveLimit = (raw: string | undefined): number | undefined => {
   if (raw === undefined) return undefined;
-  const parsed = parseInt(raw, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+  return parsePositiveIntOrNull(raw) ?? undefined;
 };
 
 export const listCommand = async (
@@ -62,6 +62,18 @@ export const listCommand = async (
         table: () => {
           if (prompts.length === 0) {
             console.log();
+            if (cut) {
+              // The cap ran before the published filter, so the page can hold
+              // only drafts while the server holds published prompts too.
+              // Saying "none on the server" here would be false.
+              console.log(
+                chalk.gray(
+                  `No published prompts in the first ${allPrompts.length} of ${fetched.length}. Raise or drop --limit to see the rest.`,
+                ),
+              );
+              console.log();
+              return;
+            }
             console.log(chalk.gray("No prompts found on the server."));
             console.log(chalk.gray("Create your first prompt with:"));
             console.log(chalk.cyan("  langwatch prompt init"));

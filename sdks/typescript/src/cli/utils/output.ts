@@ -46,6 +46,7 @@
 import type * as yaml from "js-yaml";
 import { Option, type Command } from "commander";
 import { setOutputFormat } from "./outputScope";
+import { parsePositiveIntOrNull } from "./positiveInt";
 
 /**
  * js-yaml is only needed for `-o yaml`, so it is loaded lazily and memoized:
@@ -175,8 +176,10 @@ export const resolveOutputOptions = (
 
   // A cap that is not a positive whole number is ignored rather than obeyed: a
   // typo must not turn a list into one row and read as the whole answer.
-  const cap = raw.limit === undefined ? NaN : parseInt(raw.limit, 10);
-  const limit = Number.isFinite(cap) && cap > 0 ? cap : undefined;
+  const limit =
+    raw.limit === undefined
+      ? undefined
+      : (parsePositiveIntOrNull(raw.limit) ?? undefined);
 
   return {
     format,
