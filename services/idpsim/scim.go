@@ -21,8 +21,11 @@ const (
 func (s *Server) scimAuthorized(t *Tenant, w http.ResponseWriter, r *http.Request) bool {
 	token, ok := bearerToken(r)
 	if !ok || subtle.ConstantTimeCompare([]byte(token), []byte(t.SCIMToken)) != 1 {
-		s.record(t, "scim.auth", OutcomeRefused, "", "",
-			"a SCIM request arrived with a missing or wrong bearer token")
+		s.record(t, Event{
+			Kind:    "scim.auth",
+			Outcome: OutcomeRefused,
+			Detail:  "a SCIM request arrived with a missing or wrong bearer token",
+		})
 		scimError(w, http.StatusUnauthorized, "invalid or missing bearer token")
 		return false
 	}
@@ -121,36 +124,52 @@ func (s *Server) handleSCIMUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodGet:
-		users := t.Users()
-		if userName, ok := parseEqFilter(r.URL.Query().Get("filter"), "userName"); ok {
-			users = filterUsers(users, userName)
-		}
-		resources := make([]map[string]any, 0, len(users))
-		for _, u := range users {
-			resources = append(resources, scimUserResource(u))
-		}
-		writeJSON(w, http.StatusOK, scimList(resources))
+		s.listSCIMUsers(w, t, r.URL.Query().Get("filter"))
 	case http.MethodPost:
-		var body scimUserBody
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			scimError(w, http.StatusBadRequest, "unparseable user resource")
-			return
-		}
-		if body.UserName == "" {
-			scimError(w, http.StatusBadRequest, "userName is required")
-			return
-		}
-		if _, exists := t.FindUser(body.UserName); exists {
-			scimError(w, http.StatusConflict, "userName already exists")
-			return
-		}
-		u := body.toUser(fmt.Sprintf("t%d-scim-%s", t.ID, randomToken()[:8]))
-		t.AddUser(u)
-		s.record(t, "scim.user.create", OutcomeOK, "", u.Email, "provisioned "+u.UserName+" over SCIM")
-		writeJSON(w, http.StatusCreated, scimUserResource(u))
+		s.createSCIMUser(w, t, r)
 	default:
 		scimError(w, http.StatusMethodNotAllowed, "unsupported method")
 	}
+}
+
+// listSCIMUsers answers a directory read, honoring the one filter shape
+// provisioning clients use for lookups.
+func (s *Server) listSCIMUsers(w http.ResponseWriter, t *Tenant, filter string) {
+	users := t.Users()
+	if userName, ok := parseEqFilter(filter, "userName"); ok {
+		users = filterUsers(users, userName)
+	}
+	resources := make([]map[string]any, 0, len(users))
+	for _, u := range users {
+		resources = append(resources, scimUserResource(u))
+	}
+	writeJSON(w, http.StatusOK, scimList(resources))
+}
+
+// createSCIMUser provisions a user from a SCIM create.
+func (s *Server) createSCIMUser(w http.ResponseWriter, t *Tenant, r *http.Request) {
+	var body scimUserBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		scimError(w, http.StatusBadRequest, "unparseable user resource")
+		return
+	}
+	if body.UserName == "" {
+		scimError(w, http.StatusBadRequest, "userName is required")
+		return
+	}
+	if _, exists := t.FindUser(body.UserName); exists {
+		scimError(w, http.StatusConflict, "userName already exists")
+		return
+	}
+	u := body.toUser(fmt.Sprintf("t%d-scim-%s", t.ID, randomToken()[:8]))
+	t.AddUser(u)
+	s.record(t, Event{
+		Kind:    "scim.user.create",
+		Outcome: OutcomeOK,
+		Subject: u.Email,
+		Detail:  "provisioned " + u.UserName + " over SCIM",
+	})
+	writeJSON(w, http.StatusCreated, scimUserResource(u))
 }
 
 // handleSCIMUser reads, replaces, patches and deletes one user.
@@ -180,27 +199,56 @@ func (s *Server) handleSCIMUser(w http.ResponseWriter, r *http.Request) {
 		body.applyTo(u)
 		writeJSON(w, http.StatusOK, scimUserResource(u))
 	case http.MethodPatch:
-		wasActive := u.Active
-		if !applySCIMPatch(w, r, func(path string, value any) {
-			applyUserPatch(u, path, value)
-		}) {
-			return
-		}
-		detail := "updated " + u.UserName + " over SCIM"
-		if wasActive != u.Active {
-			detail = "deactivated " + u.UserName + " over SCIM"
-			if u.Active {
-				detail = "reactivated " + u.UserName + " over SCIM"
-			}
-		}
-		s.record(t, "scim.user.update", OutcomeOK, "", u.Email, detail)
-		writeJSON(w, http.StatusOK, scimUserResource(u))
+		s.patchSCIMUser(w, r, scimUserTarget{Tenant: t, User: u})
 	case http.MethodDelete:
 		t.RemoveUser(u.ID)
-		s.record(t, "scim.user.delete", OutcomeOK, "", u.Email, "deprovisioned "+u.UserName+" over SCIM")
+		s.record(t, Event{
+			Kind:    "scim.user.delete",
+			Outcome: OutcomeOK,
+			Subject: u.Email,
+			Detail:  "deprovisioned " + u.UserName + " over SCIM",
+		})
 		w.WriteHeader(http.StatusNoContent)
 	default:
 		scimError(w, http.StatusMethodNotAllowed, "unsupported method")
+	}
+}
+
+// patchSCIMUser applies a PATCH and records it in the words that matter to
+// someone watching the feed: deactivation is what provisioning is usually
+// doing, and it should not read as a generic "updated".
+func (s *Server) patchSCIMUser(w http.ResponseWriter, r *http.Request, target scimUserTarget) {
+	u := target.User
+	wasActive := u.Active
+	if !applySCIMPatch(w, r, func(path string, value any) {
+		applyUserPatch(u, path, value)
+	}) {
+		return
+	}
+	s.record(target.Tenant, Event{
+		Kind:    "scim.user.update",
+		Outcome: OutcomeOK,
+		Subject: u.Email,
+		Detail:  patchDetail(u, wasActive),
+	})
+	writeJSON(w, http.StatusOK, scimUserResource(u))
+}
+
+// scimUserTarget is the user a SCIM operation resolved to, and the tenant it
+// belongs to.
+type scimUserTarget struct {
+	Tenant *Tenant
+	User   *User
+}
+
+func patchDetail(u *User, wasActive bool) string {
+	switch {
+	case wasActive == u.Active:
+		return "updated " + u.UserName + " over SCIM"
+	case u.Active:
+		return "reactivated " + u.UserName + " over SCIM"
+	default:
+		return "deactivated " + u.UserName + " over SCIM"
 	}
 }
 
@@ -272,32 +320,50 @@ func applySCIMPatch(w http.ResponseWriter, r *http.Request, apply func(path stri
 
 // applyUserPatch mutates one user for one patch operation. A pathless replace
 // carries a value object whose keys are the paths.
+// userPatchSetters is the set of user attributes a PATCH may address, keyed by
+// the lowercased SCIM path. A table rather than a switch, so adding an
+// attribute is one line and no branch.
+var userPatchSetters = map[string]func(*User, any){
+	"active":          func(u *User, v any) { u.Active = valueAsBool(v) },
+	"username":        func(u *User, v any) { setString(&u.UserName, v) },
+	"name.givenname":  func(u *User, v any) { setString(&u.GivenName, v) },
+	"name.familyname": func(u *User, v any) { setString(&u.FamilyName, v) },
+	"externalid":      func(u *User, v any) { setString(&u.ExternalID, v) },
+}
+
 func applyUserPatch(u *User, path string, value any) {
-	switch path {
-	case "":
-		if m, ok := value.(map[string]any); ok {
-			for k, v := range m {
-				applyUserPatch(u, strings.ToLower(k), v)
-			}
+	// A pathless operation carries an object whose keys are themselves the
+	// paths — the shape most identity providers actually send.
+	if path == "" {
+		for key, v := range pathlessValues(value) {
+			applyUserPatch(u, key, v)
 		}
-	case "active":
-		u.Active = valueAsBool(value)
-	case "username":
-		if s, ok := value.(string); ok {
-			u.UserName = s
-		}
-	case "name.givenname":
-		if s, ok := value.(string); ok {
-			u.GivenName = s
-		}
-	case "name.familyname":
-		if s, ok := value.(string); ok {
-			u.FamilyName = s
-		}
-	case "externalid":
-		if s, ok := value.(string); ok {
-			u.ExternalID = s
-		}
+		return
+	}
+	if set, ok := userPatchSetters[path]; ok {
+		set(u, value)
+	}
+}
+
+// pathlessValues reads the {path: value} object of a pathless operation,
+// lowercasing the keys. A value that is not an object yields nothing.
+func pathlessValues(value any) map[string]any {
+	m, ok := value.(map[string]any)
+	if !ok {
+		return nil
+	}
+	out := make(map[string]any, len(m))
+	for k, v := range m {
+		out[strings.ToLower(k)] = v
+	}
+	return out
+}
+
+// setString assigns only when the patch actually carried a string, so a
+// malformed operation leaves the attribute alone rather than blanking it.
+func setString(dst *string, value any) {
+	if s, ok := value.(string); ok {
+		*dst = s
 	}
 }
 
@@ -344,8 +410,11 @@ func (s *Server) handleSCIMGroups(w http.ResponseWriter, r *http.Request) {
 			MemberIDs: body.memberIDs(),
 		}
 		t.AddGroup(g)
-		s.record(t, "scim.group.create", OutcomeOK, "", "",
-			fmt.Sprintf("created the group %s with %d member(s) over SCIM", g.Name, len(g.MemberIDs)))
+		s.record(t, Event{
+			Kind:    "scim.group.create",
+			Outcome: OutcomeOK,
+			Detail:  fmt.Sprintf("created the group %s with %d member(s) over SCIM", g.Name, len(g.MemberIDs)),
+		})
 		writeJSON(w, http.StatusCreated, scimGroupResource(t, g))
 	default:
 		scimError(w, http.StatusMethodNotAllowed, "unsupported method")
@@ -400,33 +469,39 @@ func (b scimGroupBody) memberIDs() []string {
 	return ids
 }
 
+// groupPatchSetters is the set of group attributes a PATCH may address, keyed
+// by the lowercased SCIM path ("remove:" prefixed for removals).
+var groupPatchSetters = map[string]func(*Group, any){
+	"displayname":    func(g *Group, v any) { setString(&g.Name, v) },
+	"members":        func(g *Group, v any) { g.MemberIDs = append(g.MemberIDs, patchMemberIDs(v)...) },
+	"remove:members": func(g *Group, v any) { g.MemberIDs = withoutMembers(g.MemberIDs, patchMemberIDs(v)) },
+}
+
 func applyGroupPatch(g *Group, path string, value any) {
-	switch path {
-	case "displayname":
-		if s, ok := value.(string); ok {
-			g.Name = s
+	if path == "" {
+		for key, v := range pathlessValues(value) {
+			applyGroupPatch(g, key, v)
 		}
-	case "members":
-		g.MemberIDs = append(g.MemberIDs, patchMemberIDs(value)...)
-	case "remove:members":
-		removed := map[string]bool{}
-		for _, id := range patchMemberIDs(value) {
-			removed[id] = true
-		}
-		kept := g.MemberIDs[:0]
-		for _, id := range g.MemberIDs {
-			if !removed[id] {
-				kept = append(kept, id)
-			}
-		}
-		g.MemberIDs = kept
-	case "":
-		if m, ok := value.(map[string]any); ok {
-			for k, v := range m {
-				applyGroupPatch(g, strings.ToLower(k), v)
-			}
+		return
+	}
+	if set, ok := groupPatchSetters[path]; ok {
+		set(g, value)
+	}
+}
+
+// withoutMembers drops the named members, preserving the order of the rest.
+func withoutMembers(members, removing []string) []string {
+	removed := make(map[string]bool, len(removing))
+	for _, id := range removing {
+		removed[id] = true
+	}
+	kept := make([]string, 0, len(members))
+	for _, id := range members {
+		if !removed[id] {
+			kept = append(kept, id)
 		}
 	}
+	return kept
 }
 
 func patchMemberIDs(value any) []string {

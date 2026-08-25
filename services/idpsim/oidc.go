@@ -84,70 +84,127 @@ func (s *Server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	q := r.URL.Query()
-	redirectURI := q.Get("redirect_uri")
-	if redirectURI == "" {
+	req := parseAuthorizeRequest(r.URL.Query())
+	if req.RedirectURI == "" {
 		http.Error(w, "redirect_uri is required", http.StatusBadRequest)
 		return
 	}
-	clientID := q.Get("client_id")
-	// A registered client may only be sent back to an address it registered.
-	// The refusal is rendered here rather than redirected: bouncing an error to
-	// an address the client did not register is the exact move a real IdP must
-	// refuse, and a developer who mistyped the redirect address learns far more
-	// from a page that names both addresses than from a silent bounce.
-	if app, registered := t.ApplicationByClientID(clientID); registered && !app.redirectAllowed(redirectURI) {
-		s.record(t, "oidc.authorize", OutcomeRefused, clientID, "",
-			"redirect address "+redirectURI+" is not registered for "+app.Name)
-		s.refusalPage(w, t, http.StatusBadRequest, "That redirect address is not registered",
-			"The application "+app.Name+" asked to be sent back to "+redirectURI+", which is not one of the addresses it registered.",
-			"Register that address on the tenant page, or fix the redirect address in the application's own configuration. A {placeholder} segment matches any single segment, so the address LangWatch shows before a connection exists can be registered exactly as written.")
+	if s.refuseUnregisteredRedirect(w, t, req) {
 		return
 	}
-	if rt := q.Get("response_type"); rt != "code" {
-		s.record(t, "oidc.authorize", OutcomeRefused, clientID, "",
-			"unsupported response_type "+rt+" — this provider issues authorization codes")
-		oauthRedirectError(w, r, redirectURI, q.Get("state"), "unsupported_response_type")
+	if req.ResponseType != "code" {
+		s.record(t, Event{
+			Kind: "oidc.authorize", Outcome: OutcomeRefused, Client: req.ClientID,
+			Detail: "unsupported response_type " + req.ResponseType + " — this provider issues authorization codes",
+		})
+		oauthRedirectError(w, r, req.errorOf("unsupported_response_type"))
 		return
 	}
+	if req.Hint == "" {
+		s.serveAccountPicker(w, t, r.URL)
+		return
+	}
+	user, ok := t.FindUser(req.Hint)
+	if !ok || !user.Active {
+		s.record(t, Event{
+			Kind: "oidc.authorize", Outcome: OutcomeRefused, Client: req.ClientID,
+			Subject: req.Hint, Detail: "no active user matches the login hint " + req.Hint,
+		})
+		oauthRedirectError(w, r, req.errorOf("access_denied"))
+		return
+	}
+	code := t.MintCode(req.codeFor(user), s.now())
+	s.record(t, Event{
+		Kind: "oidc.authorize", Outcome: OutcomeOK, Client: req.ClientID, Subject: user.Email,
+		Detail: "signed in as " + user.Email + ", sending an authorization code back to " + req.RedirectURI,
+	})
+	req.redirectWithCode(w, r, code)
+}
+
+// authorizeRequest is one parsed authorization request. Reading the query once
+// into a value keeps the handler about the decisions rather than about
+// url.Values lookups.
+type authorizeRequest struct {
+	ClientID     string
+	RedirectURI  string
+	ResponseType string
+	State        string
+	Nonce        string
+	Scope        string
+	// Hint is the login_hint (or its `user` alias): who to sign in as without
+	// showing the picker.
+	Hint            string
+	Challenge       string
+	ChallengeMethod string
+}
+
+func parseAuthorizeRequest(q url.Values) authorizeRequest {
 	hint := q.Get("login_hint")
 	if hint == "" {
 		hint = q.Get("user")
 	}
-	if hint == "" {
-		s.serveAccountPicker(w, t, r.URL)
-		return
+	return authorizeRequest{
+		ClientID: q.Get("client_id"), RedirectURI: q.Get("redirect_uri"),
+		ResponseType: q.Get("response_type"), State: q.Get("state"),
+		Nonce: q.Get("nonce"), Scope: q.Get("scope"), Hint: hint,
+		Challenge: q.Get("code_challenge"), ChallengeMethod: q.Get("code_challenge_method"),
 	}
-	user, ok := t.FindUser(hint)
-	if !ok || !user.Active {
-		s.record(t, "oidc.authorize", OutcomeRefused, clientID, hint,
-			"no active user matches the login hint "+hint)
-		oauthRedirectError(w, r, redirectURI, q.Get("state"), "access_denied")
-		return
+}
+
+func (req authorizeRequest) errorOf(code string) authError {
+	return authError{RedirectURI: req.RedirectURI, State: req.State, Code: code}
+}
+
+func (req authorizeRequest) codeFor(user *User) *authCode {
+	return &authCode{
+		UserID: user.ID, ClientID: req.ClientID, RedirectURI: req.RedirectURI,
+		Nonce: req.Nonce, Scope: req.Scope,
+		CodeChallenge: req.Challenge, ChallengeMeth: req.ChallengeMethod,
 	}
-	code := t.MintCode(&authCode{
-		UserID:        user.ID,
-		ClientID:      clientID,
-		RedirectURI:   redirectURI,
-		Nonce:         q.Get("nonce"),
-		Scope:         q.Get("scope"),
-		CodeChallenge: q.Get("code_challenge"),
-		ChallengeMeth: q.Get("code_challenge_method"),
-	}, s.now())
-	s.record(t, "oidc.authorize", OutcomeOK, clientID, user.Email,
-		"signed in as "+user.Email+", sending an authorization code back to "+redirectURI)
-	dest, err := url.Parse(redirectURI)
+}
+
+// redirectWithCode sends the browser back to the client with the code.
+func (req authorizeRequest) redirectWithCode(w http.ResponseWriter, r *http.Request, code string) {
+	dest, err := url.Parse(req.RedirectURI)
 	if err != nil {
 		http.Error(w, "redirect_uri is not a valid URL", http.StatusBadRequest)
 		return
 	}
-	dq := dest.Query()
-	dq.Set("code", code)
-	if state := q.Get("state"); state != "" {
-		dq.Set("state", state)
+	q := dest.Query()
+	q.Set("code", code)
+	if req.State != "" {
+		q.Set("state", req.State)
 	}
-	dest.RawQuery = dq.Encode()
+	dest.RawQuery = q.Encode()
 	http.Redirect(w, r, dest.String(), http.StatusFound)
+}
+
+// refuseUnregisteredRedirect stops a registered client being sent to an
+// address it did not register, reporting whether it refused.
+//
+// The refusal is a page rather than a redirect on purpose: bouncing an error
+// to an address the client never registered is the exact move a real identity
+// provider must refuse, and someone who has just mistyped a redirect address
+// learns far more from a page naming both than from a silent bounce.
+func (s *Server) refuseUnregisteredRedirect(w http.ResponseWriter, t *Tenant, req authorizeRequest) bool {
+	app, registered := t.ApplicationByClientID(req.ClientID)
+	if !registered || app.redirectAllowed(req.RedirectURI) {
+		return false
+	}
+	s.record(t, Event{
+		Kind: "oidc.authorize", Outcome: OutcomeRefused, Client: req.ClientID,
+		Detail: "redirect address " + req.RedirectURI + " is not registered for " + app.Name,
+	})
+	s.refusalPage(w, t, refusalNotice{
+		Status: http.StatusBadRequest,
+		Title:  "That redirect address is not registered",
+		Detail: "The application " + app.Name + " asked to be sent back to " + req.RedirectURI +
+			", which is not one of the addresses it registered.",
+		Hint: "Register that address on the tenant page, or fix the redirect address in the " +
+			"application's own configuration. A {placeholder} segment matches any single segment, " +
+			"so the address LangWatch shows before a connection exists can be registered exactly as written.",
+	})
+	return true
 }
 
 func (s *Server) serveAccountPicker(w http.ResponseWriter, t *Tenant, authorizeURL *url.URL) {
@@ -167,18 +224,22 @@ func (s *Server) serveAccountPicker(w http.ResponseWriter, t *Tenant, authorizeU
 	_ = pickerTemplate.Execute(w, map[string]any{"TenantID": t.ID, "Users": rows})
 }
 
+// authError is one OAuth authorization-endpoint refusal, on its way back to
+// the client's redirect address.
+type authError struct{ RedirectURI, State, Code string }
+
 // oauthRedirectError sends the OAuth error back to the client's redirect URI
 // when it is parseable, per RFC 6749; otherwise it degrades to a plain 400.
-func oauthRedirectError(w http.ResponseWriter, r *http.Request, redirectURI, state, code string) {
-	dest, err := url.Parse(redirectURI)
+func oauthRedirectError(w http.ResponseWriter, r *http.Request, e authError) {
+	dest, err := url.Parse(e.RedirectURI)
 	if err != nil {
-		http.Error(w, code, http.StatusBadRequest)
+		http.Error(w, e.Code, http.StatusBadRequest)
 		return
 	}
 	q := dest.Query()
-	q.Set("error", code)
-	if state != "" {
-		q.Set("state", state)
+	q.Set("error", e.Code)
+	if e.State != "" {
+		q.Set("state", e.State)
 	}
 	dest.RawQuery = q.Encode()
 	http.Redirect(w, r, dest.String(), http.StatusFound)
@@ -209,57 +270,38 @@ func (s *Server) handleToken(w http.ResponseWriter, r *http.Request) {
 		oauthError(w, "unsupported_grant_type", "only authorization_code is supported")
 		return
 	}
+	req := parseTokenRequest(r)
 	// Authenticate the client BEFORE redeeming: a code is single-use, so
 	// burning one on a request that fails client authentication would turn a
 	// wrong secret into a second, confusing "already used" failure on retry.
-	clientID, clientSecret := clientCredentials(r)
-	if app, registered := t.ApplicationByClientID(clientID); registered {
-		if subtle.ConstantTimeCompare([]byte(clientSecret), []byte(app.Secret)) != 1 {
-			s.record(t, "oidc.token", OutcomeRefused, clientID, "",
-				"wrong client secret for "+app.Name)
-			oauthError(w, "invalid_client", "the client secret does not match the one registered for "+app.Name)
-			return
-		}
+	if !s.clientAuthenticated(w, t, req) {
+		return
 	}
-	code, ok := t.RedeemCode(r.PostForm.Get("code"), s.now())
+	code, ok := s.redeemForExchange(w, t, req)
 	if !ok {
-		s.record(t, "oidc.token", OutcomeRefused, clientID, "",
-			"the authorization code was unknown, expired, or already exchanged")
-		oauthError(w, "invalid_grant", "unknown, expired or already-used code")
-		return
-	}
-	if code.ClientID != "" && clientID != code.ClientID {
-		s.record(t, "oidc.token", OutcomeRefused, clientID, "",
-			"the code was issued to "+code.ClientID+", not "+clientID)
-		oauthError(w, "invalid_grant", "code was issued to a different client")
-		return
-	}
-	if uri := r.PostForm.Get("redirect_uri"); uri != "" && uri != code.RedirectURI {
-		s.record(t, "oidc.token", OutcomeRefused, clientID, "",
-			"redirect address "+uri+" does not match the one the code was issued for")
-		oauthError(w, "invalid_grant", "redirect_uri does not match the authorization request")
-		return
-	}
-	if !pkceSatisfied(code, r.PostForm.Get("code_verifier")) {
-		s.record(t, "oidc.token", OutcomeRefused, clientID, "",
-			"PKCE verification failed — the code verifier does not match the challenge")
-		oauthError(w, "invalid_grant", "PKCE verification failed")
 		return
 	}
 	user, ok := t.UserByID(code.UserID)
 	if !ok {
-		s.record(t, "oidc.token", OutcomeRefused, clientID, "",
-			"the user the code was issued for no longer exists")
-		oauthError(w, "invalid_grant", "the code's user no longer exists")
+		s.refuseToken(w, t, tokenRefusal{
+			ClientID: req.ClientID, Code: "invalid_grant",
+			Description: "the code's user no longer exists",
+			Detail:      "the user the code was issued for no longer exists",
+		})
 		return
 	}
-	idToken, err := s.mintIDToken(t, user, clientID, code.Nonce)
+	idToken, err := s.mintIDToken(t, user, audience{ClientID: req.ClientID, Nonce: code.Nonce})
 	if err != nil {
 		http.Error(w, "signing the ID token failed", http.StatusInternalServerError)
 		return
 	}
-	s.record(t, "oidc.token", OutcomeOK, clientID, user.Email,
-		"exchanged the code for an ID token and an access token")
+	s.record(t, Event{
+		Kind:    "oidc.token",
+		Outcome: OutcomeOK,
+		Client:  req.ClientID,
+		Subject: user.Email,
+		Detail:  "exchanged the code for an ID token and an access token",
+	})
 	writeJSON(w, http.StatusOK, map[string]any{
 		"access_token": t.MintAccessToken(user.ID, code.Scope, s.now()),
 		"token_type":   "Bearer",
@@ -267,6 +309,102 @@ func (s *Server) handleToken(w http.ResponseWriter, r *http.Request) {
 		"scope":        code.Scope,
 		"id_token":     idToken,
 	})
+}
+
+// tokenRequest is one parsed token-endpoint exchange.
+type tokenRequest struct {
+	ClientID     string
+	ClientSecret string
+	Code         string
+	RedirectURI  string
+	Verifier     string
+}
+
+func parseTokenRequest(r *http.Request) tokenRequest {
+	id, secret := clientCredentials(r)
+	return tokenRequest{
+		ClientID: id, ClientSecret: secret,
+		Code:        r.PostForm.Get("code"),
+		RedirectURI: r.PostForm.Get("redirect_uri"),
+		Verifier:    r.PostForm.Get("code_verifier"),
+	}
+}
+
+// tokenRefusal is one refused exchange: what the client is told, and what the
+// tenant's activity feed records about it.
+type tokenRefusal struct {
+	ClientID    string
+	Code        string
+	Description string
+	Detail      string
+}
+
+// refuseToken answers the client and files the refusal in one step, so each
+// check in the exchange stays about the thing it checks.
+func (s *Server) refuseToken(w http.ResponseWriter, t *Tenant, ref tokenRefusal) {
+	s.record(t, Event{
+		Kind: "oidc.token", Outcome: OutcomeRefused,
+		Client: ref.ClientID, Detail: ref.Detail,
+	})
+	oauthError(w, ref.Code, ref.Description)
+}
+
+// clientAuthenticated checks a registered client's secret, reporting whether
+// the exchange may continue. An unregistered client id is accepted with any
+// secret — the zero-setup path — and the feed says so either way.
+func (s *Server) clientAuthenticated(w http.ResponseWriter, t *Tenant, req tokenRequest) bool {
+	app, registered := t.ApplicationByClientID(req.ClientID)
+	if !registered {
+		return true
+	}
+	if subtle.ConstantTimeCompare([]byte(req.ClientSecret), []byte(app.Secret)) == 1 {
+		return true
+	}
+	s.refuseToken(w, t, tokenRefusal{
+		ClientID: req.ClientID, Code: "invalid_client",
+		Description: "the client secret does not match the one registered for " + app.Name,
+		Detail:      "wrong client secret for " + app.Name,
+	})
+	return false
+}
+
+// redeemForExchange consumes the authorization code and checks it belongs to
+// this exchange: same client, same redirect address, matching PKCE verifier.
+func (s *Server) redeemForExchange(w http.ResponseWriter, t *Tenant, req tokenRequest) (*authCode, bool) {
+	code, ok := t.RedeemCode(req.Code, s.now())
+	if !ok {
+		s.refuseToken(w, t, tokenRefusal{
+			ClientID: req.ClientID, Code: "invalid_grant",
+			Description: "unknown, expired or already-used code",
+			Detail:      "the authorization code was unknown, expired, or already exchanged",
+		})
+		return nil, false
+	}
+	if code.ClientID != "" && req.ClientID != code.ClientID {
+		s.refuseToken(w, t, tokenRefusal{
+			ClientID: req.ClientID, Code: "invalid_grant",
+			Description: "code was issued to a different client",
+			Detail:      "the code was issued to " + code.ClientID + ", not " + req.ClientID,
+		})
+		return nil, false
+	}
+	if req.RedirectURI != "" && req.RedirectURI != code.RedirectURI {
+		s.refuseToken(w, t, tokenRefusal{
+			ClientID: req.ClientID, Code: "invalid_grant",
+			Description: "redirect_uri does not match the authorization request",
+			Detail:      "redirect address " + req.RedirectURI + " does not match the one the code was issued for",
+		})
+		return nil, false
+	}
+	if !pkceSatisfied(code, req.Verifier) {
+		s.refuseToken(w, t, tokenRefusal{
+			ClientID: req.ClientID, Code: "invalid_grant",
+			Description: "PKCE verification failed",
+			Detail:      "PKCE verification failed — the code verifier does not match the challenge",
+		})
+		return nil, false
+	}
+	return code, true
 }
 
 // pkceSatisfied enforces RFC 7636: a code minted with a challenge is only
@@ -288,9 +426,13 @@ func pkceSatisfied(code *authCode, verifier string) bool {
 	}
 }
 
+// audience is who an ID token is being minted for.
+type audience struct{ ClientID, Nonce string }
+
 // mintIDToken signs the tenant's ID token with the standard claims the app's
 // profile mapping reads (email, picture, and the name-fallback family).
-func (s *Server) mintIDToken(t *Tenant, user *User, clientID, nonce string) (string, error) {
+func (s *Server) mintIDToken(t *Tenant, user *User, aud audience) (string, error) {
+	clientID, nonce := aud.ClientID, aud.Nonce
 	now := s.now()
 	claims := jwt.MapClaims{
 		"iss":                t.BaseURL,
@@ -339,7 +481,12 @@ func (s *Server) handleUserinfo(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "the token's user no longer exists", http.StatusUnauthorized)
 		return
 	}
-	s.record(t, "oidc.userinfo", OutcomeOK, "", user.Email, "returned the profile claims for "+user.Email)
+	s.record(t, Event{
+		Kind:    "oidc.userinfo",
+		Outcome: OutcomeOK,
+		Subject: user.Email,
+		Detail:  "returned the profile claims for " + user.Email,
+	})
 	writeJSON(w, http.StatusOK, map[string]any{
 		"sub":                t.Subject(user),
 		"email":              user.Email,

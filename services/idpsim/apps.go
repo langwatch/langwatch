@@ -54,15 +54,24 @@ func (t *Tenant) ApplicationByClientID(clientID string) (*Application, bool) {
 	return nil, false
 }
 
+// Registration is what a relying party tells the tenant about itself. The
+// credentials are the tenant's answer, not part of the question.
+type Registration struct {
+	Name         string
+	RedirectURIs []string
+	EntityID     string
+	ACSURL       string
+}
+
 // RegisterApplication mints credentials for a new relying party and stores it.
-func (t *Tenant) RegisterApplication(name string, redirectURIs []string, entityID, acsURL string, now time.Time) *Application {
+func (t *Tenant) RegisterApplication(reg Registration, now time.Time) *Application {
 	app := &Application{
 		ClientID:     fmt.Sprintf("idpsim-t%d-%s", t.ID, randomToken()[:8]),
 		Secret:       randomToken() + randomToken(),
-		Name:         name,
-		RedirectURIs: redirectURIs,
-		EntityID:     entityID,
-		ACSURL:       acsURL,
+		Name:         reg.Name,
+		RedirectURIs: reg.RedirectURIs,
+		EntityID:     reg.EntityID,
+		ACSURL:       reg.ACSURL,
 		CreatedAt:    now,
 	}
 	t.mu.Lock()
@@ -118,20 +127,26 @@ func redirectMatches(pattern, candidate string) bool {
 	if !strings.EqualFold(p.Scheme, c.Scheme) || !strings.EqualFold(p.Host, c.Host) {
 		return false
 	}
-	pSegs, cSegs := strings.Split(p.Path, "/"), strings.Split(c.Path, "/")
-	if len(pSegs) != len(cSegs) {
+	return pathMatches(p.Path, c.Path)
+}
+
+// pathMatches compares two paths segment by segment, treating a whole
+// {placeholder} segment in the pattern as a wildcard for exactly one segment.
+func pathMatches(pattern, candidate string) bool {
+	patternSegs, candidateSegs := strings.Split(pattern, "/"), strings.Split(candidate, "/")
+	if len(patternSegs) != len(candidateSegs) {
 		return false
 	}
-	for i, seg := range pSegs {
+	for i, seg := range patternSegs {
 		if isPlaceholder(seg) {
 			// A placeholder stands for a real segment, so an empty one (a
 			// trailing slash, a doubled separator) must not satisfy it.
-			if cSegs[i] == "" {
+			if candidateSegs[i] == "" {
 				return false
 			}
 			continue
 		}
-		if seg != cSegs[i] {
+		if seg != candidateSegs[i] {
 			return false
 		}
 	}

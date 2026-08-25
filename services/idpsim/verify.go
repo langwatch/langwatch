@@ -95,16 +95,24 @@ func (v *verificationStore) Snapshot() (txt map[string][]string, tokens map[stri
 // that owns the domain, so "has the verifier actually come and looked?" is
 // something you can see rather than guess at. A domain no tenant owns is not
 // recorded: there is no page it would show up on.
-func (s *Server) recordVerification(domain, kind string, found bool, detail string) {
-	t, ok := s.tenantByDomain(domain)
+func (s *Server) recordVerification(l verificationLookup) {
+	t, ok := s.tenantByDomain(l.Domain)
 	if !ok {
 		return
 	}
 	outcome := OutcomeOK
-	if !found {
+	if !l.Found {
 		outcome = OutcomeRefused
 	}
-	s.record(t, kind, outcome, "", "", detail)
+	s.record(t, Event{Kind: l.Kind, Outcome: outcome, Detail: l.Detail})
+}
+
+// verificationLookup is one domain-verification check somebody made.
+type verificationLookup struct {
+	Domain string
+	Kind   string
+	Found  bool
+	Detail string
 }
 
 // recordDNSLookup is what the DNS server calls on every TXT question.
@@ -113,7 +121,9 @@ func (s *Server) recordDNSLookup(domain string, found bool) {
 	if !found {
 		detail = "a DNS TXT lookup arrived for " + domain + ", which is not configured here"
 	}
-	s.recordVerification(domain, "verification.dns", found, detail)
+	s.recordVerification(verificationLookup{
+		Domain: domain, Kind: "verification.dns", Found: found, Detail: detail,
+	})
 }
 
 // tenantByDomain finds the tenant that owns a domain.
@@ -142,13 +152,17 @@ func (s *Server) handleWellKnownVerification(w http.ResponseWriter, r *http.Requ
 	}
 	token, ok := s.verification.Token(domain)
 	if !ok {
-		s.recordVerification(domain, "verification.http", false,
-			"someone asked for a verification token for "+domain+", which is not configured")
+		s.recordVerification(verificationLookup{
+			Domain: domain, Kind: "verification.http", Found: false,
+			Detail: "someone asked for a verification token for " + domain + ", which is not configured",
+		})
 		http.NotFound(w, r)
 		return
 	}
-	s.recordVerification(domain, "verification.http", true,
-		"served the verification token for "+domain+" over HTTP")
+	s.recordVerification(verificationLookup{
+		Domain: domain, Kind: "verification.http", Found: true,
+		Detail: "served the verification token for " + domain + " over HTTP",
+	})
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	_, _ = w.Write([]byte(token))
 }

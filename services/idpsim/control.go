@@ -25,7 +25,7 @@ func (s *Server) handleControlState(w http.ResponseWriter, _ *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"tenants":            tenants,
-		"dnsAddr":            s.dnsAddr,
+		"dnsAddr":            s.DNSAddr(),
 		"txtRecords":         txt,
 		"verificationTokens": tokens,
 	})
@@ -95,8 +95,16 @@ func (s *Server) handleControlRegisterApp(w http.ResponseWriter, r *http.Request
 		http.Error(w, "an application needs a name", http.StatusBadRequest)
 		return
 	}
-	app := t.RegisterApplication(body.Name, body.RedirectURIs, body.EntityID, body.ACSURL, s.now())
-	s.record(t, "app.register", OutcomeOK, app.ClientID, "", "registered the application "+app.Name)
+	app := t.RegisterApplication(Registration{
+		Name: body.Name, RedirectURIs: body.RedirectURIs,
+		EntityID: body.EntityID, ACSURL: body.ACSURL,
+	}, s.now())
+	s.record(t, Event{
+		Kind:    "app.register",
+		Outcome: OutcomeOK,
+		Client:  app.ClientID,
+		Detail:  "registered the application " + app.Name,
+	})
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"name": app.Name, "issuer": t.BaseURL,
 		"clientId": app.ClientID, "clientSecret": app.Secret,

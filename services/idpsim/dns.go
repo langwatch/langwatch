@@ -22,18 +22,28 @@ type dnsServer struct {
 	observe func(domain string, found bool)
 }
 
-// startDNS binds the UDP listener and serves until ctx ends. addr="" disables
-// the server. The returned address is the bound one, so tests can bind :0.
-func startDNS(ctx context.Context, addr string, store *verificationStore, observe func(domain string, found bool)) (*dnsServer, error) {
-	if addr == "" {
+// dnsConfig is what the verification DNS listener needs to run.
+type dnsConfig struct {
+	// Addr is the UDP address to bind; "" disables the server entirely.
+	Addr  string
+	Store *verificationStore
+	// Observe, when set, is told about every TXT question.
+	Observe func(domain string, found bool)
+}
+
+// startDNS binds the UDP listener and serves until ctx ends. The returned
+// address is the bound one, so a caller (or a test) can pass :0 and still
+// learn where it landed.
+func startDNS(ctx context.Context, cfg dnsConfig) (*dnsServer, error) {
+	if cfg.Addr == "" {
 		return nil, nil
 	}
 	var lc net.ListenConfig
-	conn, err := lc.ListenPacket(ctx, "udp", addr)
+	conn, err := lc.ListenPacket(ctx, "udp", cfg.Addr)
 	if err != nil {
-		return nil, fmt.Errorf("binding verification DNS listener on %s: %w", addr, err)
+		return nil, fmt.Errorf("binding verification DNS listener on %s: %w", cfg.Addr, err)
 	}
-	s := &dnsServer{store: store, conn: conn, observe: observe}
+	s := &dnsServer{store: cfg.Store, conn: conn, observe: cfg.Observe}
 	go func() {
 		<-ctx.Done()
 		_ = conn.Close()
@@ -82,37 +92,9 @@ func (s *dnsServer) answer(packet []byte) ([]byte, bool) {
 	}
 	switch question.Type {
 	case dnsmessage.TypeTXT:
-		values, ok := s.store.TXT(domain)
-		if s.observe != nil {
-			s.observe(domain, ok)
-		}
-		if !ok {
-			reply.RCode = dnsmessage.RCodeNameError
-			break
-		}
-		for _, v := range values {
-			reply.Answers = append(reply.Answers, dnsmessage.Resource{
-				Header: dnsmessage.ResourceHeader{
-					Name: question.Name, Type: dnsmessage.TypeTXT,
-					Class: dnsmessage.ClassINET, TTL: 30,
-				},
-				Body: &dnsmessage.TXTResource{TXT: []string{v}},
-			})
-		}
+		reply.Answers, reply.RCode = s.answerTXT(question, domain)
 	case dnsmessage.TypeA:
-		if _, ok := s.store.TXT(domain); !ok {
-			if _, ok := s.store.Token(domain); !ok {
-				reply.RCode = dnsmessage.RCodeNameError
-				break
-			}
-		}
-		reply.Answers = append(reply.Answers, dnsmessage.Resource{
-			Header: dnsmessage.ResourceHeader{
-				Name: question.Name, Type: dnsmessage.TypeA,
-				Class: dnsmessage.ClassINET, TTL: 30,
-			},
-			Body: &dnsmessage.AResource{A: [4]byte{127, 0, 0, 1}},
-		})
+		reply.Answers, reply.RCode = s.answerA(question, domain)
 	default:
 		reply.RCode = dnsmessage.RCodeNameError
 	}
@@ -121,4 +103,52 @@ func (s *dnsServer) answer(packet []byte) ([]byte, bool) {
 		return nil, false
 	}
 	return packed, true
+}
+
+// answerTXT serves the domain's verification records, and tells the observer
+// whether there were any — that is the signal that a verifier actually came
+// and looked.
+func (s *dnsServer) answerTXT(question dnsmessage.Question, domain string) ([]dnsmessage.Resource, dnsmessage.RCode) {
+	values, ok := s.store.TXT(domain)
+	if s.observe != nil {
+		s.observe(domain, ok)
+	}
+	if !ok {
+		return nil, dnsmessage.RCodeNameError
+	}
+	answers := make([]dnsmessage.Resource, 0, len(values))
+	for _, v := range values {
+		answers = append(answers, dnsmessage.Resource{
+			Header: recordHeader(question.Name, dnsmessage.TypeTXT),
+			Body:   &dnsmessage.TXTResource{TXT: []string{v}},
+		})
+	}
+	return answers, dnsmessage.RCodeSuccess
+}
+
+// answerA points a configured domain at loopback, so a verifier that resolves
+// before it fetches keeps working.
+func (s *dnsServer) answerA(question dnsmessage.Question, domain string) ([]dnsmessage.Resource, dnsmessage.RCode) {
+	if !s.known(domain) {
+		return nil, dnsmessage.RCodeNameError
+	}
+	return []dnsmessage.Resource{{
+		Header: recordHeader(question.Name, dnsmessage.TypeA),
+		Body:   &dnsmessage.AResource{A: [4]byte{127, 0, 0, 1}},
+	}}, dnsmessage.RCodeSuccess
+}
+
+// known reports whether either verification channel is configured for a domain.
+func (s *dnsServer) known(domain string) bool {
+	if _, ok := s.store.TXT(domain); ok {
+		return true
+	}
+	_, ok := s.store.Token(domain)
+	return ok
+}
+
+func recordHeader(name dnsmessage.Name, recordType dnsmessage.Type) dnsmessage.ResourceHeader {
+	return dnsmessage.ResourceHeader{
+		Name: name, Type: recordType, Class: dnsmessage.ClassINET, TTL: 30,
+	}
 }

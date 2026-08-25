@@ -203,8 +203,8 @@ func TestBusyDNSPortDoesNotStopTheSimulator(t *testing.T) {
 		t.Fatalf("the simulator refused to start because the DNS port was busy: %v", err)
 	case <-time.After(250 * time.Millisecond):
 	}
-	assert.NotEmpty(t, s.dnsAddr, "it should say where it put the DNS listener instead")
-	assert.NotEqual(t, busy.LocalAddr().String(), s.dnsAddr)
+	assert.NotEmpty(t, s.DNSAddr(), "it should say where it put the DNS listener instead")
+	assert.NotEqual(t, busy.LocalAddr().String(), s.DNSAddr())
 
 	cancel()
 	assert.NoError(t, <-errCh)

@@ -65,7 +65,19 @@ input[type=text], textarea {
   font: inherit; font-size: .9rem;
 }
 textarea { min-height: 4.5rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82rem; }
+.scroll { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; }
+/* A client id or secret is one long unbreakable token. Left to wrap inside a
+   narrow table cell it breaks after every character and the row grows to a
+   screenful, so in a table it stays on one line and truncates — the copy
+   button is how the value is meant to be taken anyway, and the full string is
+   on the element's title. */
+td .copy .val {
+  display: inline-block; max-width: 17ch; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; vertical-align: bottom;
+}
+td .mono { overflow-wrap: anywhere; }
+td .copy { flex-wrap: nowrap; }
 th, td { text-align: left; padding: .4rem .6rem .4rem 0; border-top: 1px solid var(--line);
          font-size: .875rem; vertical-align: baseline; }
 th { color: var(--muted); font-weight: 600; font-size: .8rem; border-top: 0; }
@@ -194,19 +206,21 @@ segment here matches whatever real id turns up, so you do not have to come back 
 <section class="panel">
 <h2>Registered applications</h2>
 {{if .Tenant.Apps}}
+<div class="scroll">
 <table>
 <tr><th>Name</th><th>Client id</th><th>Client secret</th><th>Redirect addresses</th><th></th></tr>
 {{range .Tenant.Apps}}
 <tr>
   <td>{{.Name}}</td>
-  <td><span class="copy"><span class="val">{{.ClientID}}</span><button data-copy="{{.ClientID}}">copy</button></span></td>
-  <td><span class="copy"><span class="val">{{.Secret}}</span><button data-copy="{{.Secret}}">copy</button></span></td>
+  <td><span class="copy"><span class="val" title="{{.ClientID}}">{{.ClientID}}</span><button data-copy="{{.ClientID}}">copy</button></span></td>
+  <td><span class="copy"><span class="val" title="{{.Secret}}">{{.Secret}}</span><button data-copy="{{.Secret}}">copy</button></span></td>
   <td>{{range .RedirectURIs}}<div class="mono">{{.}}</div>{{end}}
       {{if .ACSURL}}<div class="mono hint">SAML → {{.ACSURL}}</div>{{end}}</td>
   <td><form method="post" action="{{$.Tenant.BaseURL}}/apps/{{.ClientID}}/delete"><button type="submit">remove</button></form></td>
 </tr>
 {{end}}
 </table>
+</div>
 <p class="hint">A registered client must present its secret and one of its redirect addresses.
 A client id this tenant does not know is still accepted with anything — that is the
 zero-setup path, and the feed below says which of the two happened.</p>
@@ -320,7 +334,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		views = append(views, viewOf(t))
 	}
 	s.renderPage(w, indexPage, map[string]any{
-		"Tenants": views, "DNSAddr": s.dnsAddr,
+		"Tenants": views, "DNSAddr": s.DNSAddr(),
 	})
 }
 
@@ -334,7 +348,7 @@ func (s *Server) handleTenantPage(w http.ResponseWriter, r *http.Request) {
 	}
 	data := map[string]any{
 		"Tenant": viewOf(t),
-		"Root":   s.cfg.BaseURL, "DNSAddr": s.dnsAddr,
+		"Root":   s.cfg.BaseURL, "DNSAddr": s.DNSAddr(),
 	}
 	// ?registered=<client id> is where the registration POST lands, so the
 	// credentials are shown once, at the top, right after they are minted.
@@ -361,15 +375,26 @@ func (s *Server) handleRegisterApplication(w http.ResponseWriter, r *http.Reques
 	}
 	name := strings.TrimSpace(r.PostForm.Get("name"))
 	if name == "" {
-		s.refusalPage(w, t, http.StatusBadRequest, "That application needs a name",
-			"Every registration is listed by name, so it needs one.",
-			"Give it whatever the application calls itself — LangWatch, say.")
+		s.refusalPage(w, t, refusalNotice{
+			Status: http.StatusBadRequest,
+			Title:  "That application needs a name",
+			Detail: "Every registration is listed by name, so it needs one.",
+			Hint:   "Give it whatever the application calls itself — LangWatch, say.",
+		})
 		return
 	}
-	app := t.RegisterApplication(name, splitLines(r.PostForm.Get("redirect_uris")),
-		strings.TrimSpace(r.PostForm.Get("entity_id")), strings.TrimSpace(r.PostForm.Get("acs_url")), s.now())
-	s.record(t, "app.register", OutcomeOK, app.ClientID, "",
-		"registered the application "+app.Name)
+	app := t.RegisterApplication(Registration{
+		Name:         name,
+		RedirectURIs: splitLines(r.PostForm.Get("redirect_uris")),
+		EntityID:     strings.TrimSpace(r.PostForm.Get("entity_id")),
+		ACSURL:       strings.TrimSpace(r.PostForm.Get("acs_url")),
+	}, s.now())
+	s.record(t, Event{
+		Kind:    "app.register",
+		Outcome: OutcomeOK,
+		Client:  app.ClientID,
+		Detail:  "registered the application " + app.Name,
+	})
 	http.Redirect(w, r, t.BaseURL+"/?registered="+app.ClientID, http.StatusSeeOther)
 }
 
@@ -382,19 +407,33 @@ func (s *Server) handleRemoveApplication(w http.ResponseWriter, r *http.Request)
 	}
 	clientID := r.PathValue("client")
 	if t.RemoveApplication(clientID) {
-		s.record(t, "app.remove", OutcomeOK, clientID, "", "un-registered an application")
+		s.record(t, Event{
+			Kind:    "app.remove",
+			Outcome: OutcomeOK,
+			Client:  clientID,
+			Detail:  "un-registered an application",
+		})
 	}
 	http.Redirect(w, r, t.BaseURL+"/", http.StatusSeeOther)
+}
+
+// refusalNotice is what a refusal page says: what happened, and what to go and
+// change about it.
+type refusalNotice struct {
+	Status int
+	Title  string
+	Detail string
+	Hint   string
 }
 
 // refusalPage explains a refusal in the browser, because the person reading it
 // is mid-way through wiring two systems together and needs to know which one
 // to go and fix.
-func (s *Server) refusalPage(w http.ResponseWriter, t *Tenant, status int, title, detail, hint string) {
+func (s *Server) refusalPage(w http.ResponseWriter, t *Tenant, n refusalNotice) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(status)
+	w.WriteHeader(n.Status)
 	_ = refusal.Execute(w, map[string]any{
-		"Title": title, "Detail": detail, "Hint": hint,
+		"Title": n.Title, "Detail": n.Detail, "Hint": n.Hint,
 		"TenantID": t.ID, "TenantURL": t.BaseURL, "Root": s.cfg.BaseURL,
 	})
 }

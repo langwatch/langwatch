@@ -55,10 +55,10 @@ func (t *Tenant) Activity() []Event {
 	return out
 }
 
-// record is the server's shorthand, so handlers read as one line per outcome.
-func (s *Server) record(t *Tenant, kind, outcome, client, subject, detail string) {
-	t.Record(Event{
-		At: s.now(), Kind: kind, Outcome: outcome,
-		Client: client, Subject: subject, Detail: detail,
-	})
+// record stamps an event with the server's clock and files it. Handlers name
+// the fields they are setting rather than passing five bare strings in an
+// order nobody can recall at the call site.
+func (s *Server) record(t *Tenant, ev Event) {
+	ev.At = s.now()
+	t.Record(ev)
 }

@@ -36,7 +36,9 @@ func pushDirectory(ctx context.Context, t *Tenant, req scimPushRequest) scimPush
 
 	targetIDs := map[string]string{} // simulator user id -> target-minted id
 	for _, u := range t.Users() {
-		created, err := scimCreate(ctx, client, base+"/Users", req.Token, scimUserResource(u))
+		created, err := scimCreate(ctx, client, scimPost{
+			URL: base + "/Users", Token: req.Token, Resource: scimUserResource(u),
+		})
 		if err != nil {
 			result.Failures = append(result.Failures, fmt.Sprintf("user %s: %v", u.UserName, err))
 			continue
@@ -47,16 +49,13 @@ func pushDirectory(ctx context.Context, t *Tenant, req scimPushRequest) scimPush
 		}
 	}
 	for _, g := range t.Groups() {
-		members := []map[string]any{}
-		for _, id := range g.MemberIDs {
-			if mapped, ok := targetIDs[id]; ok {
-				members = append(members, map[string]any{"value": mapped})
-			}
-		}
-		_, err := scimCreate(ctx, client, base+"/Groups", req.Token, map[string]any{
-			"schemas":     []string{scimGroupSchema},
-			"displayName": g.Name,
-			"members":     members,
+		_, err := scimCreate(ctx, client, scimPost{
+			URL: base + "/Groups", Token: req.Token,
+			Resource: map[string]any{
+				"schemas":     []string{scimGroupSchema},
+				"displayName": g.Name,
+				"members":     mappedMembers(g, targetIDs),
+			},
 		})
 		if err != nil {
 			result.Failures = append(result.Failures, fmt.Sprintf("group %s: %v", g.Name, err))
@@ -67,19 +66,39 @@ func pushDirectory(ctx context.Context, t *Tenant, req scimPushRequest) scimPush
 	return result
 }
 
-func scimCreate(ctx context.Context, client *http.Client, url, token string, resource map[string]any) (map[string]any, error) {
+// mappedMembers translates a group's membership onto the ids the target minted
+// when the users were pushed. A member the target never accepted is left out
+// rather than sent as a dangling reference.
+func mappedMembers(g *Group, targetIDs map[string]string) []map[string]any {
+	members := []map[string]any{}
+	for _, id := range g.MemberIDs {
+		if mapped, ok := targetIDs[id]; ok {
+			members = append(members, map[string]any{"value": mapped})
+		}
+	}
+	return members
+}
+
+// scimPost is one create the simulator sends to an external SCIM service
+// provider.
+type scimPost struct {
+	URL      string
+	Token    string
+	Resource map[string]any
+}
+
+func scimCreate(ctx context.Context, client *http.Client, post scimPost) (map[string]any, error) {
 	// The target mints its own id; sending ours would be an SP-side identifier.
-	resource = withoutKey(resource, "id")
-	body, err := json.Marshal(resource)
+	body, err := json.Marshal(withoutKey(post.Resource, "id"))
 	if err != nil {
 		return nil, err
 	}
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, post.URL, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
 	httpReq.Header.Set("Content-Type", "application/scim+json")
-	httpReq.Header.Set("Authorization", "Bearer "+token)
+	httpReq.Header.Set("Authorization", "Bearer "+post.Token)
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, err

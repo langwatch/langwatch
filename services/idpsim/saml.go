@@ -82,31 +82,18 @@ func (s *Server) handleSAMLSSO(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	idp := s.samlIDP(t)
-	req, err := saml.NewIdpAuthnRequest(&idp, r)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("unreadable SAML request: %v", err), http.StatusBadRequest)
-		return
-	}
-	// Pre-read the request's issuer and ACS URL so the permissive registry can
-	// echo them back through Validate's metadata lookup.
-	var pre saml.AuthnRequest
-	if err := xml.Unmarshal(req.RequestBuffer, &pre); err != nil {
-		http.Error(w, fmt.Sprintf("unparseable SAML request: %v", err), http.StatusBadRequest)
-		return
-	}
-	sp := permissiveSPProvider{acsURL: pre.AssertionConsumerServiceURL}
-	if pre.Issuer != nil {
-		sp.entityID = pre.Issuer.Value
-	}
-	idp.ServiceProviderProvider = sp
-	if err := req.Validate(); err != nil {
-		http.Error(w, fmt.Sprintf("invalid SAML request: %v", err), http.StatusBadRequest)
+	req, sp, ok := s.readAuthnRequest(w, t, r)
+	if !ok {
 		return
 	}
 	user, ok := s.samlUser(t, r)
 	if !ok {
-		s.record(t, "saml.sso", OutcomeRefused, sp.entityID, "", "the tenant has no active user to assert")
+		s.record(t, Event{
+			Kind:    "saml.sso",
+			Outcome: OutcomeRefused,
+			Client:  sp.entityID,
+			Detail:  "the tenant has no active user to assert",
+		})
 		http.Error(w, "the tenant has no active user to assert", http.StatusBadRequest)
 		return
 	}
@@ -126,12 +113,46 @@ func (s *Server) handleSAMLSSO(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("building the assertion failed: %v", err), http.StatusInternalServerError)
 		return
 	}
-	s.record(t, "saml.sso", OutcomeOK, sp.entityID, user.Email,
-		"signed an assertion for "+user.Email+", posting it to "+sp.acsURL)
+	s.record(t, Event{
+		Kind:    "saml.sso",
+		Outcome: OutcomeOK,
+		Client:  sp.entityID,
+		Subject: user.Email,
+		Detail:  "signed an assertion for " + user.Email + ", posting it to " + sp.acsURL,
+	})
 	if err := req.WriteResponse(w); err != nil {
 		http.Error(w, fmt.Sprintf("writing the response failed: %v", err), http.StatusInternalServerError)
 		return
 	}
+}
+
+// readAuthnRequest parses and validates the incoming AuthnRequest, returning
+// it alongside the service-provider registry built from the request itself.
+// It writes the refusal and reports false when the request cannot be read.
+func (s *Server) readAuthnRequest(w http.ResponseWriter, t *Tenant, r *http.Request) (*saml.IdpAuthnRequest, permissiveSPProvider, bool) {
+	idp := s.samlIDP(t)
+	req, err := saml.NewIdpAuthnRequest(&idp, r)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("unreadable SAML request: %v", err), http.StatusBadRequest)
+		return nil, permissiveSPProvider{}, false
+	}
+	// Pre-read the request's issuer and ACS URL so the permissive registry can
+	// echo them back through Validate's metadata lookup.
+	var pre saml.AuthnRequest
+	if err := xml.Unmarshal(req.RequestBuffer, &pre); err != nil {
+		http.Error(w, fmt.Sprintf("unparseable SAML request: %v", err), http.StatusBadRequest)
+		return nil, permissiveSPProvider{}, false
+	}
+	sp := permissiveSPProvider{acsURL: pre.AssertionConsumerServiceURL}
+	if pre.Issuer != nil {
+		sp.entityID = pre.Issuer.Value
+	}
+	idp.ServiceProviderProvider = sp
+	if err := req.Validate(); err != nil {
+		http.Error(w, fmt.Sprintf("invalid SAML request: %v", err), http.StatusBadRequest)
+		return nil, permissiveSPProvider{}, false
+	}
+	return req, sp, true
 }
 
 // samlUser picks who the assertion names: an explicit login_hint, or the
