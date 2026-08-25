@@ -118,6 +118,15 @@ classes expose `static create`. Repository and store ports are abstract classes;
 technology-specific implementations are concrete classes. Pure schemas, value
 objects, mapper functions, and test builders do not need artificial classes.
 
+Strict feature services have objective ceilings for module and method lines,
+direct statements, cyclomatic branches, and source-line length; Oxlint also
+rejects duplicate members or literal keys, public constructors behind `create`,
+and multiple statements on one line. Existing service and port debt is listed
+in checked-in inventories that must match the current measured value and may
+only shrink. A strict contract that has a declaration build config or build
+script uses `rootDir: src`, source-only includes, and an explicit test
+exclusion, discovered from the feature catalogue rather than a maintained list.
+
 API classes only translate authentication-authorized transport input into the
 contract service and map its result or handled errors. They do not import a
 repository, store, projection, migration, or infrastructure adapter. Services

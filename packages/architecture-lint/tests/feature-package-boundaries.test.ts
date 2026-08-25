@@ -271,6 +271,63 @@ describe("feature package boundary lint", () => {
     expect(policies()).toContain("package-role");
   });
 
+  it("rejects camelCase filenames across strict contract, server, and web sources", () => {
+    featurePackage({ feature: "agent", role: "contract" });
+    featurePackage({ feature: "agent", role: "server" });
+    featurePackage({ feature: "agent", role: "web" });
+    write(
+      "packages/features/agent/contract/src/agentCommands.ts",
+      "export const value = true;",
+    );
+    write(
+      "packages/features/agent/server/src/services/agentService.service.ts",
+      "export const value = true;",
+    );
+    write(
+      "packages/features/agent/server/src/repositories/prisma.agent.repository.ts",
+      "export const value = true;",
+    );
+    write("packages/features/agent/web/src/agentCard.tsx", "export const value = true;");
+
+    const violations = lintWorkspace({ root, declarations: false }).filter(
+      ({ policy }) => policy === "feature-source-filename",
+    );
+    expect(violations).toHaveLength(4);
+    expect(violations.map(({ file }) => file)).toEqual([
+      "packages/features/agent/contract/src/agentCommands.ts",
+      "packages/features/agent/server/src/repositories/prisma.agent.repository.ts",
+      "packages/features/agent/server/src/services/agentService.service.ts",
+      "packages/features/agent/web/src/agentCard.tsx",
+    ]);
+  });
+
+  it("accepts canonical dotted artifact roles with kebab-case subjects", () => {
+    featurePackage({ feature: "agent", role: "contract" });
+    featurePackage({ feature: "agent", role: "server" });
+    write(
+      "packages/features/agent/contract/src/this-this.service.ts",
+      "export abstract class ThisThisService {}",
+    );
+    write(
+      "packages/features/agent/server/src/repositories/prisma-ingestion-source.repository.ts",
+      "export abstract class PrismaIngestionSourceRepository {}",
+    );
+    write(
+      "packages/features/agent/server/src/adapters/clickhouse-trace.adapter.ts",
+      "export class ClickhouseTraceAdapter { static create() { return new ClickhouseTraceAdapter(); } }",
+    );
+    write(
+      "packages/features/agent/server/src/ports/simulation-execution.port.ts",
+      "export abstract class SimulationExecutionPort {}",
+    );
+
+    expect(
+      lintWorkspace({ root, declarations: false }).filter(
+        ({ policy }) => policy === "feature-source-filename",
+      ),
+    ).toEqual([]);
+  });
+
   /** @scenario Cross-feature collaboration uses only contracts */
   it("rejects another feature server even through a type-only import", () => {
     featurePackage({ feature: "workflow", role: "server" });
@@ -402,7 +459,7 @@ describe("strict feature source layout", () => {
       "export const runtime = true;",
     );
     write(
-      "packages/features/agent/server/src/repositories/prisma/prisma-agent.repository.ts",
+      "packages/features/agent/server/src/repositories/prisma/prisma.agent.extra.repository.ts",
       "export class PrismaAgentRepository {}",
     );
 

@@ -138,6 +138,14 @@ tester.run("feature-module-classes", plugin.rules["feature-module-classes"], {
       code: "export abstract class AgentRepository {}",
     },
     {
+      filename: "packages/features/api-key/server/src/ports/credential.port.ts",
+      code: "export type CredentialId = string; export abstract class CredentialPort { abstract load(id: CredentialId): Promise<void>; }",
+    },
+    {
+      filename: "packages/features/automation/server/src/ports/automation-graph.port.ts",
+      code: "export abstract class AutomationGraphNotifierPort { abstract dispatch(): Promise<void>; }",
+    },
+    {
       filename:
         "packages/features/agent/server/src/repositories/prisma/prisma.agent.repository.ts",
       code: "export class PrismaAgentRepository { static create() { return new PrismaAgentRepository(); } }",
@@ -168,6 +176,16 @@ tester.run("feature-module-classes", plugin.rules["feature-module-classes"], {
       code: "class AgentApi { static create() { return new AgentApi(); } }",
       errors: [{ messageId: "concrete" }],
     },
+    {
+      filename: "packages/features/api-key/server/src/ports/credential.port.ts",
+      code: "export type CredentialPort = { load(id: string): Promise<void>; };",
+      errors: [{ messageId: "abstract" }],
+    },
+    {
+      filename: "packages/features/api-key/server/src/ports/credential.port.ts",
+      code: "export abstract class CredentialPort { abstract load(id: string): Promise<void>; } export type LegacyCredentialPort = { load(id: string): Promise<void>; };",
+      errors: [{ messageId: "abstract" }],
+    },
   ],
 });
 
@@ -188,6 +206,74 @@ tester.run("service-classes", plugin.rules["service-classes"], {
       filename: "packages/features/agent/server/src/services/agent.service.ts",
       code: "export class AgentService {}",
       errors: [{ messageId: "create" }],
+    },
+  ],
+});
+
+tester.run("service-quality", plugin.rules["service-quality"], {
+  valid: [
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export class AgentService {\nstatic create() {\nreturn new AgentService();\n}\nprivate constructor() {}\nasync run() {\nconst value = await Promise.resolve(true);\nreturn value;\n}\n}",
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: 'export class AgentService {\nstatic create() {\nreturn new AgentService();\n}\nprivate constructor() {}\n["literal"]() {\nreturn true;\n}\n}',
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export class AgentService {\nstatic create() {\nreturn new AgentService();\n}\nprivate constructor() {}\noverload(input: string): string;\noverload(input: number): string;\noverload(input: string | number) {\nreturn String(input);\n}\n}",
+    },
+  ],
+  invalid: [
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export class AgentService {\nstatic create() { return new AgentService(); }\nconstructor() {}\nrun() { return { repeated: 1, repeated: 2 }; }\n}",
+      errors: [{ messageId: "publicConstructor" }, { messageId: "duplicateObjectKey" }],
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: 'export class AgentService {\nstatic create() {\nreturn new AgentService();\n}\nprivate constructor() {}\nrun() {\nreturn { ["repeated"]: 1, ["repeated"]: 2 };\n}\n}',
+      errors: [{ messageId: "duplicateObjectKey" }],
+    },
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: 'export class AgentService {\nstatic create() { return new AgentService(); }\nprivate constructor() {}\noverload(input: string): string;\noverload(input: number): string;\noverload(input: string | number) { return String(input); }\noverload = () => "invalid second implementation";\n}',
+      languageOptions: { parserOptions: { ignoreNonFatalErrors: true } },
+      errors: [{ messageId: "duplicateMember" }],
+    },
+  ],
+});
+
+tester.run("max-statements-per-line", plugin.rules["max-statements-per-line"], {
+  valid: [
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export class AgentService {\nstatic create() { return new AgentService(); }\nprivate constructor() {}\nrun() { return true; }\noverload(input: string): string;\noverload(input: number): string;\noverload(input: string | number) {\nreturn String(input);\n}\n}",
+    },
+  ],
+  invalid: [
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export class AgentService {\nstatic create() { return new AgentService(); }\nprivate constructor() {}\nrun() {\nconst first = 1; const second = 2;\nreturn first + second;\n}\n}",
+      errors: [{ messageId: "maxStatementsPerLine" }],
+    },
+  ],
+});
+
+tester.run("service-member-spacing", plugin.rules["service-member-spacing"], {
+  valid: [
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export class AgentService {\nfirst() {}\n\n// This belongs to the following method.\nsecond() {}\n}",
+    },
+  ],
+  invalid: [
+    {
+      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      code: "export class AgentService {\nfirst() {}\nsecond() {}\n}",
+      output: "export class AgentService {\nfirst() {}\n\nsecond() {}\n}",
+      errors: [{ messageId: "memberSpacing" }],
     },
   ],
 });
@@ -275,6 +361,223 @@ tester.run("service-dependencies", plugin.rules["service-dependencies"], {
       filename: "platform/app/src/server/app-layer/organizations/organization.service.ts",
       code: 'import type { PrismaClient } from "~/generated/prisma/client"; export class OrganizationService { constructor(readonly prisma: PrismaClient) {} }',
       errors: [{ messageId: "databaseClient" }],
+    },
+  ],
+});
+
+tester.run("runtime-undefined", plugin.rules["runtime-undefined"], {
+  valid: [
+    {
+      filename: "packages/features/agent/contract/src/example.ts",
+      code: `type Missing = undefined;
+interface Result { value?: undefined }
+const object = { undefined: 1 };
+object.undefined;
+export { value as undefined };`,
+    },
+    {
+      filename: "packages/features/agent/contract/src/example.ts",
+      code: `import { undefined as absent } from "fixture";
+export { undefined } from "fixture";
+const value = "undefined";`,
+    },
+    {
+      filename: "packages/features/agent/contract/src/example.ts",
+      code: `function read(undefined: unknown) { return undefined; }`,
+    },
+  ],
+  invalid: [
+    {
+      filename: "packages/features/agent/contract/src/example.ts",
+      code: `const a = undefined;
+const b = obj[undefined];
+const c = undefined as string;
+const d = ({ undefined });`,
+      output: `const a = void 0;
+const b = obj[void 0];
+const c = void 0 as string;
+const d = ({ undefined: void 0 });`,
+      errors: [
+        { messageId: "runtimeUndefined" },
+        { messageId: "runtimeUndefined" },
+        { messageId: "runtimeUndefined" },
+        { messageId: "runtimeUndefined" },
+      ],
+    },
+    {
+      filename: "packages/features/agent/contract/src/example.ts",
+      code: `function read(value = undefined) { return value; }
+if (value === undefined) throw undefined;`,
+      output: `function read(value = void 0) { return value; }
+if (value === void 0) throw void 0;`,
+      errors: [
+        { messageId: "runtimeUndefined" },
+        { messageId: "runtimeUndefined" },
+        { messageId: "runtimeUndefined" },
+      ],
+    },
+  ],
+});
+
+tester.run("logical-statement-spacing", plugin.rules["logical-statement-spacing"], {
+  valid: [
+    {
+      filename: "packages/features/agent/server/src/example.ts",
+      code: `function run() {
+  if (ready) {
+    start();
+  }
+
+  // Keep this explanatory comment with the next operation.
+  finish();
+
+  return true;
+}`,
+    },
+    {
+      filename: "packages/features/agent/server/src/example.ts",
+      code: `function run() {
+  if (ready) finish();
+  else wait();
+
+  try {
+    work();
+  } catch {
+    recover();
+  } finally {
+    cleanup();
+  }
+}`,
+    },
+    {
+      filename: "packages/features/agent/server/src/example.ts",
+      code: `function run() {
+  return true;
+}`,
+    },
+  ],
+  invalid: [
+    {
+      filename: "packages/features/agent/server/src/example.ts",
+      code: `function run() {
+  if (ready) {
+    start();
+  }
+  // Preserve this comment.
+  finish();
+  return true;
+}`,
+      output: `function run() {
+  if (ready) {
+    start();
+  }
+
+  // Preserve this comment.
+  finish();
+
+  return true;
+}`,
+      errors: [{ messageId: "statementSpacing" }, { messageId: "statementSpacing" }],
+    },
+    {
+      filename: "packages/features/agent/server/src/example.ts",
+      code: "function run() { if (ready) { start(); } finish(); }",
+      output: "function run() { if (ready) { start(); }\n\n finish(); }",
+      errors: [{ messageId: "statementSpacing" }],
+    },
+    {
+      filename: "packages/features/agent/server/src/example.ts",
+      code: `function run() {
+  if (ready) {
+    start();
+  } // Keep this trailing comment attached.
+  finish();
+}`,
+      output: `function run() {
+  if (ready) {
+    start();
+  } // Keep this trailing comment attached.
+
+  finish();
+}`,
+      errors: [{ messageId: "statementSpacing" }],
+    },
+    {
+      filename: "packages/features/agent/server/src/example.ts",
+      code: "function run() {\r\n  try { work(); } catch { recover(); } finally { cleanup(); }\r\n  return true;\r\n}",
+      output:
+        "function run() {\r\n  try { work(); } catch { recover(); } finally { cleanup(); }\r\n\r\n  return true;\r\n}",
+      errors: [{ messageId: "statementSpacing" }],
+    },
+  ],
+});
+
+tester.run("boolean-wall", plugin.rules["boolean-wall"], {
+  valid: [
+    {
+      filename: "packages/architecture-lint/src/feature-catalogue.ts",
+      code: "const validName = entry.id === id && entry.root === root; const ordered = left < right; return validName && ordered;",
+    },
+    {
+      filename: "packages/architecture-lint/src/feature-catalogue.ts",
+      code: "return first && second && third;",
+    },
+    {
+      filename: "packages/architecture-lint/src/feature-catalogue.ts",
+      code: "return (first && second) || third;",
+    },
+    {
+      filename: "packages/architecture-lint/src/feature-catalogue.ts",
+      code: "return first ?? second ?? third ?? fourth;",
+    },
+    {
+      filename: "packages/architecture-lint/src/feature-catalogue.ts",
+      code: "return first && (second ?? third ?? fourth);",
+    },
+  ],
+  invalid: [
+    {
+      filename: "packages/architecture-lint/src/feature-catalogue.ts",
+      code: `return entry.id === id &&
+  entry.root === root &&
+  entry.classification === classification &&
+  entry.subjects.length > 0;`,
+      errors: [{ messageId: "booleanWall" }],
+    },
+    {
+      filename: "packages/architecture-lint/src/feature-catalogue.ts",
+      code: "return (first && second) || (third && fourth);",
+      errors: [{ messageId: "booleanWall" }],
+    },
+    {
+      filename: "packages/architecture-lint/src/feature-catalogue.ts",
+      code: "return (first && second && third && fourth) ?? fallback;",
+      errors: [{ messageId: "booleanWall" }],
+    },
+  ],
+});
+
+tester.run("awaited-return-chain", plugin.rules["awaited-return-chain"], {
+  valid: [
+    {
+      filename: "packages/features/api-key/server/src/services/api-key.service.ts",
+      code: "export class ApiKeyService { async run() { return await this.repository.list(); } }",
+    },
+    {
+      filename: "packages/features/api-key/server/src/services/api-key.service.ts",
+      code: "export class ApiKeyService { async run() { return this.repository.list().map((item) => item.id); } }",
+    },
+  ],
+  invalid: [
+    {
+      filename: "packages/features/api-key/server/src/services/api-key.service.ts",
+      code: "export class ApiKeyService { async run() { return (await this.repository.list()).map((item) => item.id); } }",
+      errors: [{ messageId: "awaitedReturnChain" }],
+    },
+    {
+      filename: "packages/features/api-key/server/src/services/api-key.service.ts",
+      code: "export class ApiKeyService { async run() { return (await this.repository.list()).data.items; } }",
+      errors: [{ messageId: "awaitedReturnChain" }],
     },
   ],
 });

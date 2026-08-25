@@ -16,12 +16,11 @@ type SourceImport = {
 
 function isWithin(root: string, path: string): boolean {
   const pathFromRoot = relative(root, path);
-  return (
-    pathFromRoot === "" ||
-    (!pathFromRoot.startsWith(`..${sep}`) &&
-      pathFromRoot !== ".." &&
-      !isAbsolute(pathFromRoot))
-  );
+  const escapesRoot =
+    pathFromRoot.startsWith(`..${sep}`) ||
+    pathFromRoot === ".." ||
+    isAbsolute(pathFromRoot);
+  return pathFromRoot === "" || !escapesRoot;
 }
 
 function sourceLine(source: string, offset: number): number {
@@ -33,14 +32,13 @@ function sourceLine(source: string, offset: number): number {
 }
 
 function sourceImports(root: string): SourceImport[] {
-  return walkFiles(
-    root,
-    (file) =>
-      SOURCE_FILE.test(file) &&
-      !/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file) &&
-      !file.includes(`${sep}__tests__${sep}`) &&
-      !file.includes(`${sep}__mocks__${sep}`),
-  ).flatMap((file) => {
+  return walkFiles(root, (file) => {
+    const isProductionSource =
+      SOURCE_FILE.test(file) && !/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file);
+    const isNotTestDirectory =
+      !file.includes(`${sep}__tests__${sep}`) && !file.includes(`${sep}__mocks__${sep}`);
+    return isProductionSource && isNotTestDirectory;
+  }).flatMap((file) => {
     const source = readFileSync(file, "utf8");
     return ts
       .preProcessFile(source, true, true)

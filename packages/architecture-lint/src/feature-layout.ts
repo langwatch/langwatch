@@ -9,6 +9,25 @@ import type {
 } from "./types";
 
 const NAME = "[a-z0-9]+(?:-[a-z0-9]+)*";
+const NAME_RE = new RegExp(`^${NAME}$`);
+const CANONICAL_ARTIFACTS = new Set([
+  "adapter",
+  "api",
+  "commands",
+  "errors",
+  "events",
+  "intent",
+  "migration",
+  "port",
+  "process",
+  "projection",
+  "queries",
+  "repository",
+  "service",
+  "store",
+  "subscriber",
+]);
+const TEST_LEVELS = new Set(["unit", "integration", "e2e"]);
 const CONTRACT_ARTIFACT = new RegExp(
   `^${NAME}\\.(?:commands|errors|events|queries|service)\\.ts$`,
 );
@@ -21,15 +40,17 @@ const SERVER_PATTERNS = [
   new RegExp(`^fixtures/${NAME}\\.fixture\\.ts$`),
   new RegExp(`^services/${NAME}\\.service\\.ts$`),
   new RegExp(`^ports/${NAME}\\.port\\.ts$`),
-  new RegExp(`^repositories/${NAME}\\.repository\\.ts$`),
-  new RegExp(`^repositories/(${NAME})/\\1\\.${NAME}\\.(?:mapper|repository)\\.ts$`),
-  new RegExp(`^stores/${NAME}\\.store\\.ts$`),
-  new RegExp(`^stores/(${NAME})/\\1\\.${NAME}\\.store\\.ts$`),
+  new RegExp(`^repositories/${NAME}(?:\\.${NAME})?\\.repository\\.ts$`),
+  new RegExp(
+    `^repositories/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.(?:mapper|repository)\\.ts$`,
+  ),
+  new RegExp(`^stores/${NAME}(?:\\.${NAME})?\\.store\\.ts$`),
+  new RegExp(`^stores/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.store\\.ts$`),
   new RegExp(`^projections/${NAME}\\.projection\\.ts$`),
   new RegExp(`^subscribers/${NAME}\\.subscriber\\.ts$`),
   new RegExp(`^processes/${NAME}\\.process\\.ts$`),
   new RegExp(`^intents/${NAME}\\.intent\\.ts$`),
-  new RegExp(`^adapters/${NAME}\\.${NAME}\\.adapter\\.ts$`),
+  new RegExp(`^adapters/${NAME}(?:\\.${NAME})?\\.adapter\\.ts$`),
   new RegExp(`^api/${NAME}/${NAME}\\.api\\.ts$`),
   new RegExp(`^migrations/${NAME}-import\\.${NAME}\\.migration\\.ts$`),
 ] as const;
@@ -44,6 +65,46 @@ function violation(
   allowed: string,
 ): ArchitectureViolation {
   return { policy: "feature-source-layout", file, message, allowed };
+}
+
+function filenameViolation(file: string, name: string): ArchitectureViolation {
+  return {
+    policy: "feature-source-filename",
+    file,
+    message: `Strict feature source filename ${JSON.stringify(name)} is not lower-case kebab case with dotted architectural qualifiers.`,
+    allowed:
+      "Use lower-case kebab subject names and canonical dotted roles, for example langy-turn-preparation.service.ts or prisma-ingestion-source.repository.ts.",
+  };
+}
+
+export function isLowerKebabFilename(name: string): boolean {
+  const extension = name.match(/\.[cm]?[jt]sx?$/)?.[0];
+  if (!extension) return false;
+  if (name.endsWith(".d.ts")) return true;
+  const stem = name.slice(0, -extension.length);
+  const parts = stem.split(".");
+  if (parts.length === 1) return NAME_RE.test(parts[0]!);
+  if (parts.length === 2 && CANONICAL_ARTIFACTS.has(parts[1]!)) {
+    return NAME_RE.test(parts[0]!);
+  }
+  if (parts.length === 3 && parts[2] === "test" && TEST_LEVELS.has(parts[1]!)) {
+    return NAME_RE.test(parts[0]!);
+  }
+  if (CANONICAL_ARTIFACTS.has(parts.at(-1)!)) return false;
+  // Non-architectural domain qualifiers (for example generated/native) are
+  // retained when their components are already lower kebab case. Recognised
+  // architecture roles above intentionally have the stricter one-stem form.
+  return parts.every((part) => NAME_RE.test(part));
+}
+
+function lintSourceFilenames(pkg: ClassifiedPackage): ArchitectureViolation[] {
+  const violations: ArchitectureViolation[] = [];
+  const files = walkFiles(`${pkg.root}/src`, (path) => /\.[cm]?[jt]sx?$/.test(path));
+  for (const file of files) {
+    const name = file.slice(file.lastIndexOf("/") + 1);
+    if (!isLowerKebabFilename(name)) violations.push(filenameViolation(file, name));
+  }
+  return violations;
 }
 
 function lintContract(pkg: ClassifiedPackage): ArchitectureViolation[] {
@@ -77,7 +138,7 @@ function lintContract(pkg: ClassifiedPackage): ArchitectureViolation[] {
       continue;
     }
     if (CONTRACT_ARTIFACT_SUFFIX.test(name)) {
-      if (!CONTRACT_ARTIFACT.test(name)) {
+      if (!CONTRACT_ARTIFACT.test(name) && isLowerKebabFilename(name)) {
         violations.push(
           violation(
             file,
@@ -313,6 +374,7 @@ export function lintFeatureLayouts(
   const violations: ArchitectureViolation[] = [];
   for (const pkg of packages) {
     if (pkg.layoutVersion !== 0) continue;
+    violations.push(...lintSourceFilenames(pkg));
     violations.push(...lintOwnedSubjects(pkg, catalogue, packages));
     if (pkg.kind === "contract") violations.push(...lintContract(pkg));
     if (pkg.kind === "server") {

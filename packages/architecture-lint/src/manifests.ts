@@ -8,7 +8,7 @@ function exportKeys(exportsValue: unknown): string[] {
 }
 
 function isZod4Range(value: string | undefined): boolean {
-  return value !== undefined && /(?:^|[^\d])4(?:\.|$)/.test(value);
+  return value !== void 0 && /(?:^|[^\d])4(?:\.|$)/.test(value);
 }
 
 function isEnterpriseRuntimeDependency(name: string): boolean {
@@ -81,7 +81,7 @@ export function lintManifests(packages: ClassifiedPackage[]): ArchitectureViolat
           policy: "public-exports",
           file: pkg.manifestPath,
           specifier: key,
-          message: `Export \"${key}\" is not a deliberate public entry point.`,
+          message: `Export "${key}" is not a deliberate public entry point.`,
           allowed: "Name each supported capability explicitly.",
         });
       }
@@ -90,7 +90,7 @@ export function lintManifests(packages: ClassifiedPackage[]): ArchitectureViolat
           policy: "public-exports",
           file: pkg.manifestPath,
           specifier: key,
-          message: `Private implementation surface \"${key}\" cannot be exported.`,
+          message: `Private implementation surface "${key}" cannot be exported.`,
         });
       }
     }
@@ -98,7 +98,7 @@ export function lintManifests(packages: ClassifiedPackage[]): ArchitectureViolat
     if (pkg.feature) {
       const zodVersion = manifestDependencies(pkg.manifest).zod;
       const requiresZod = pkg.kind === "contract";
-      if ((requiresZod || zodVersion !== undefined) && !isZod4Range(zodVersion)) {
+      if ((requiresZod || zodVersion !== void 0) && !isZod4Range(zodVersion)) {
         violations.push({
           policy: "retired-package-runtime",
           file: pkg.manifestPath,
@@ -201,17 +201,15 @@ export function lintManifests(packages: ClassifiedPackage[]): ArchitectureViolat
           message: "A core package cannot depend on an enterprise package.",
         });
       }
-      if (
-        pkg.feature &&
-        target.feature &&
-        pkg.feature !== target.feature &&
-        target.kind !== "contract"
-      ) {
+      const isForeignFeature = pkg.feature !== target.feature;
+      const isImplementationTarget = target.kind !== "contract";
+      const hasFeaturePair = pkg.feature && target.feature;
+      if (hasFeaturePair && isForeignFeature && isImplementationTarget) {
         violations.push({
           policy: "cross-feature",
           file: pkg.manifestPath,
           specifier: dependency,
-          message: `Feature \"${pkg.feature}\" cannot depend on ${target.kind} package \"${target.name}\".`,
+          message: `Feature "${pkg.feature}" cannot depend on ${target.kind} package "${target.name}".`,
           allowed: `Depend on ${target.enterprise ? `@langwatch/enterprise-${target.feature}-contract` : `@langwatch/${target.feature}-contract`}.`,
         });
       }

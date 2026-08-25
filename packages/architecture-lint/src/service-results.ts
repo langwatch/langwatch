@@ -8,6 +8,12 @@ function lineOf(source: ts.SourceFile, node: ts.Node): number {
   return source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
 }
 
+function promiseTypeArgument(node: ts.TypeNode): ts.TypeNode | undefined {
+  if (!ts.isTypeReferenceNode(node) || !ts.isIdentifier(node.typeName)) return void 0;
+  if (node.typeName.text !== "Promise" || node.typeArguments?.length !== 1) return void 0;
+  return node.typeArguments[0];
+}
+
 function containsNullableType(node: ts.TypeNode): boolean {
   if (
     node.kind === ts.SyntaxKind.UndefinedKeyword ||
@@ -16,14 +22,8 @@ function containsNullableType(node: ts.TypeNode): boolean {
     return true;
   }
   if (ts.isUnionTypeNode(node)) return node.types.some(containsNullableType);
-  if (
-    ts.isTypeReferenceNode(node) &&
-    ts.isIdentifier(node.typeName) &&
-    node.typeName.text === "Promise" &&
-    node.typeArguments?.length === 1
-  ) {
-    return containsNullableType(node.typeArguments[0]!);
-  }
+  const promiseArgument = promiseTypeArgument(node);
+  if (promiseArgument) return containsNullableType(promiseArgument);
   return false;
 }
 
@@ -34,32 +34,35 @@ function definitelyNonNullableType(node: ts.TypeNode): boolean {
   if (ts.isUnionTypeNode(node)) {
     return node.types.every(definitelyNonNullableType);
   }
-  if (
-    ts.isTypeReferenceNode(node) &&
-    ts.isIdentifier(node.typeName) &&
-    node.typeName.text === "Promise" &&
-    node.typeArguments?.length === 1
-  ) {
-    return definitelyNonNullableType(node.typeArguments[0]!);
-  }
+  const promiseArgument = promiseTypeArgument(node);
+  if (promiseArgument) return definitelyNonNullableType(promiseArgument);
   if (ts.isLiteralTypeNode(node)) {
     return node.literal.kind !== ts.SyntaxKind.NullKeyword;
   }
-  return (
-    [
-      ts.SyntaxKind.StringKeyword,
-      ts.SyntaxKind.NumberKeyword,
-      ts.SyntaxKind.BooleanKeyword,
-      ts.SyntaxKind.BigIntKeyword,
-      ts.SyntaxKind.SymbolKeyword,
-      ts.SyntaxKind.ObjectKeyword,
-      ts.SyntaxKind.VoidKeyword,
-    ].includes(node.kind) ||
-    ts.isTypeLiteralNode(node) ||
-    ts.isArrayTypeNode(node) ||
-    ts.isTupleTypeNode(node) ||
-    ts.isFunctionTypeNode(node)
+  const primitiveType = [
+    ts.SyntaxKind.StringKeyword,
+    ts.SyntaxKind.NumberKeyword,
+    ts.SyntaxKind.BooleanKeyword,
+    ts.SyntaxKind.BigIntKeyword,
+    ts.SyntaxKind.SymbolKeyword,
+    ts.SyntaxKind.ObjectKeyword,
+    ts.SyntaxKind.VoidKeyword,
+  ].includes(node.kind);
+  const containerType = ts.isTypeLiteralNode(node) || ts.isArrayTypeNode(node);
+  const callableType = ts.isTupleTypeNode(node) || ts.isFunctionTypeNode(node);
+  const compositeType = containerType || callableType;
+  return primitiveType || compositeType;
+}
+
+function isPublicNamedClassMethod(node: ts.Node): node is ts.MethodDeclaration {
+  if (!ts.isMethodDeclaration(node)) return false;
+  const isClassMember =
+    ts.isClassDeclaration(node.parent) || ts.isClassExpression(node.parent);
+  const hasName = node.name !== void 0 && ts.isIdentifier(node.name);
+  const isPublic = !node.modifiers?.some(
+    (modifier) => modifier.kind === ts.SyntaxKind.PrivateKeyword,
   );
+  return isClassMember && hasName && isPublic;
 }
 
 function lintResultContract(file: string): ArchitectureViolation[] {
@@ -72,14 +75,9 @@ function lintResultContract(file: string): ArchitectureViolation[] {
   );
   const violations: ArchitectureViolation[] = [];
   const visit = (node: ts.Node): void => {
-    if (
-      ts.isMethodDeclaration(node) &&
-      (ts.isClassDeclaration(node.parent) || ts.isClassExpression(node.parent)) &&
-      node.name &&
-      ts.isIdentifier(node.name) &&
-      !node.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.PrivateKeyword)
-    ) {
-      const name = node.name.text;
+    if (isPublicNamedClassMethod(node)) {
+      const name = ts.isIdentifier(node.name) ? node.name.text : void 0;
+      if (!name) return;
       if (name.startsWith("require")) {
         violations.push({
           policy: "fallible-result-naming",

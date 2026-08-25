@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { z } from "zod";
 import type {
   ArchitectureViolation,
   FeatureCatalogueEntry,
@@ -7,7 +8,43 @@ import type {
 } from "./types";
 
 const NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const ENTRY_KEYS = ["classification", "id", "root", "subjects"] as const;
+const featureNameSchema = z.string().regex(NAME);
+const featureSubjectsSchema = z
+  .array(featureNameSchema)
+  .min(1)
+  .refine((subjects) => new Set(subjects).size === subjects.length)
+  .refine((subjects) =>
+    subjects.every((subject, index) => {
+      const previous = subjects[index - 1];
+      const comparison = previous?.localeCompare(subject);
+      const ordered = comparison !== void 0 && comparison < 0;
+
+      return index === 0 || ordered;
+    }),
+  );
+const featureCatalogueEntryKeysSchema = z
+  .object({
+    classification: z.unknown(),
+    id: z.unknown(),
+    root: z.unknown(),
+    subjects: z.unknown(),
+  })
+  .strict();
+const featureCatalogueEntrySchema = z
+  .object({
+    classification: z.enum(["core", "enterprise"]),
+    id: featureNameSchema,
+    root: z.string(),
+    subjects: featureSubjectsSchema,
+  })
+  .strict();
+const featureCatalogueSchema = z
+  .object({
+    features: z.array(z.unknown()),
+    version: z.literal(0),
+  })
+  .passthrough();
+const jsonObjectSchema = z.record(z.string(), z.unknown());
 
 function issue(file: string, message: string, allowed?: string): ArchitectureViolation {
   return { policy: "feature-catalogue", file, message, allowed };
@@ -35,9 +72,9 @@ export function readFeatureCatalogue(
     return [];
   }
 
-  let parsed: unknown;
+  let rawCatalogue: unknown;
   try {
-    parsed = JSON.parse(readFileSync(path, "utf8"));
+    rawCatalogue = JSON.parse(readFileSync(path, "utf8"));
   } catch (error) {
     violations.push(
       issue(
@@ -48,12 +85,8 @@ export function readFeatureCatalogue(
     return [];
   }
 
-  if (
-    typeof parsed !== "object" ||
-    parsed === null ||
-    (parsed as { version?: unknown }).version !== 0 ||
-    !Array.isArray((parsed as { features?: unknown }).features)
-  ) {
+  const catalogueResult = featureCatalogueSchema.safeParse(rawCatalogue);
+  if (!catalogueResult.success) {
     violations.push(
       issue(path, "Feature catalogue must contain version 0 and a features array."),
     );
@@ -64,19 +97,14 @@ export function readFeatureCatalogue(
   const ids = new Set<string>();
   const roots = new Set<string>();
   const subjectOwners = new Map<string, string>();
-  const rawFeatures = (parsed as { features: unknown[] }).features;
 
-  for (const [index, raw] of rawFeatures.entries()) {
-    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+  for (const [index, raw] of catalogueResult.data.features.entries()) {
+    if (!jsonObjectSchema.safeParse(raw).success) {
       violations.push(issue(path, `Feature catalogue entry ${index} must be an object.`));
       continue;
     }
-    const value = raw as Record<string, unknown>;
-    const keys = Object.keys(value).sort();
-    if (
-      keys.length !== ENTRY_KEYS.length ||
-      !ENTRY_KEYS.every((key, keyIndex) => key === keys[keyIndex])
-    ) {
+
+    if (!featureCatalogueEntryKeysSchema.safeParse(raw).success) {
       violations.push(
         issue(
           path,
@@ -86,23 +114,8 @@ export function readFeatureCatalogue(
       continue;
     }
 
-    const id = value.id;
-    const classification = value.classification;
-    const root = value.root;
-    const subjects = value.subjects;
-    if (
-      typeof id !== "string" ||
-      !NAME.test(id) ||
-      (classification !== "core" && classification !== "enterprise") ||
-      typeof root !== "string" ||
-      !Array.isArray(subjects) ||
-      subjects.length === 0 ||
-      !subjects.every((subject) => typeof subject === "string" && NAME.test(subject)) ||
-      new Set(subjects).size !== subjects.length ||
-      ![...subjects]
-        .sort()
-        .every((subject, subjectIndex) => subject === subjects[subjectIndex])
-    ) {
+    const entryResult = featureCatalogueEntrySchema.safeParse(raw);
+    if (!entryResult.success) {
       violations.push(
         issue(
           path,
@@ -113,6 +126,7 @@ export function readFeatureCatalogue(
       continue;
     }
 
+    const { classification, id, root, subjects } = entryResult.data;
     const expected = expectedRoot(id, classification);
     if (root !== expected) {
       violations.push(
@@ -135,7 +149,7 @@ export function readFeatureCatalogue(
     ids.add(id);
     roots.add(root);
 
-    for (const subject of subjects as string[]) {
+    for (const subject of subjects) {
       const owner = subjectOwners.get(subject);
       if (owner && owner !== id) {
         violations.push(
@@ -153,7 +167,7 @@ export function readFeatureCatalogue(
       id,
       root,
       classification,
-      subjects: subjects as string[],
+      subjects,
     });
   }
 

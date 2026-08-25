@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
+import { z } from "zod";
 import { walkFiles } from "./files";
 import { exportedSubpaths } from "./manifests";
 import type {
@@ -58,6 +59,13 @@ type LegacyBaselineDocument = {
   edges: Partial<Record<LegacyApplicationBoundaryKind, Record<string, string[]>>>;
 };
 
+const legacyBaselineSchema = z
+  .object({
+    version: z.literal(1),
+    edges: z.record(z.string(), z.record(z.string(), z.array(z.string()))),
+  })
+  .strict();
+
 const LEGACY_KINDS: readonly LegacyApplicationBoundaryKind[] = [
   "backend-to-browser",
   "browser-to-backend",
@@ -71,12 +79,11 @@ function workspacePath(root: string, path: string): string {
 
 function isWithin(root: string, path: string): boolean {
   const pathFromRoot = relative(root, path);
-  return (
-    pathFromRoot === "" ||
-    (!pathFromRoot.startsWith(`..${sep}`) &&
-      pathFromRoot !== ".." &&
-      !isAbsolute(pathFromRoot))
-  );
+  const escapesRoot =
+    pathFromRoot.startsWith(`..${sep}`) ||
+    pathFromRoot === ".." ||
+    isAbsolute(pathFromRoot);
+  return pathFromRoot === "" || !escapesRoot;
 }
 
 function sourceLineStarts(source: string): number[] {
@@ -168,14 +175,13 @@ function importsIn(file: string): SourceImport[] {
 }
 
 function sourceImports(root: string): SourceImport[] {
-  return walkFiles(
-    root,
-    (file) =>
-      SOURCE_FILE.test(file) &&
-      !/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file) &&
-      !file.includes(`${sep}__tests__${sep}`) &&
-      !file.includes(`${sep}__mocks__${sep}`),
-  ).flatMap(importsIn);
+  return walkFiles(root, (file) => {
+    const isProductionSource =
+      SOURCE_FILE.test(file) && !/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file);
+    const isNotTestDirectory =
+      !file.includes(`${sep}__tests__${sep}`) && !file.includes(`${sep}__mocks__${sep}`);
+    return isProductionSource && isNotTestDirectory;
+  }).flatMap(importsIn);
 }
 
 function packageForSpecifier(
@@ -191,7 +197,7 @@ function packageForRelativeImport(
   packages: ClassifiedPackage[],
   sourceImport: SourceImport,
 ): ClassifiedPackage | undefined {
-  if (!sourceImport.specifier.startsWith(".")) return undefined;
+  if (!sourceImport.specifier.startsWith(".")) return void 0;
   const target = resolve(dirname(sourceImport.file), sourceImport.specifier);
   return packages.find((pkg) => isWithin(pkg.root, target));
 }
@@ -201,7 +207,7 @@ function packageForPhysicalApplicationSpecifier(
   specifier: string,
 ): ClassifiedPackage | undefined {
   const match = specifier.match(/^(?:\.\/|\.\.\/)*apps\/(ui|api|worker|server)(?:\/|$)/);
-  if (!match) return undefined;
+  if (!match) return void 0;
   return packages.find(
     (pkg) => pkg.kind === "application" && pkg.applicationRole === match[1],
   );
@@ -253,7 +259,7 @@ function lintClassifiedSourceImports(
   for (const pkg of sourcePackages) {
     for (const sourceImport of sourceImports(join(pkg.root, "src"))) {
       const resolvedTarget = targetPackage(packages, sourceImport);
-      const target = resolvedTarget === pkg ? undefined : resolvedTarget;
+      const target = resolvedTarget === pkg ? void 0 : resolvedTarget;
       if (pkg.kind === "application" && target?.kind === "application") {
         violations.push({
           policy: "application-boundary",
@@ -313,12 +319,13 @@ function lintClassifiedSourceImports(
         });
       }
 
+      const hasImplementationTarget = target !== void 0 && target.kind !== "contract";
+      const hasForbiddenRuntimeImport = ENTERPRISE_ROOT_RUNTIME_IMPORT.some((pattern) =>
+        pattern.test(sourceImport.specifier),
+      );
       if (
         pkg.kind === "enterprise-root" &&
-        ((target !== undefined && target.kind !== "contract") ||
-          ENTERPRISE_ROOT_RUNTIME_IMPORT.some((pattern) =>
-            pattern.test(sourceImport.specifier),
-          ))
+        (hasImplementationTarget || hasForbiddenRuntimeImport)
       ) {
         violations.push({
           policy: "enterprise-composition",
@@ -494,7 +501,7 @@ function resolveLegacySpecifier(
   if (sourceImport.specifier.startsWith(".")) {
     return resolve(dirname(sourceImport.file), sourceImport.specifier);
   }
-  return undefined;
+  return void 0;
 }
 
 function legacyEdgeKey(edge: LegacyApplicationBoundaryEdge): string {
@@ -516,7 +523,7 @@ function legacyKind(
   if (importer === "enterprise" && target !== "enterprise" && target !== "unknown") {
     return "enterprise-to-application";
   }
-  return undefined;
+  return void 0;
 }
 
 export function collectLegacyApplicationBoundaryEdges(
@@ -603,13 +610,8 @@ function readLegacyBaseline(root: string): {
       ],
     };
   }
-  const document = value as Partial<LegacyBaselineDocument>;
-  if (
-    document.version !== 1 ||
-    typeof document.edges !== "object" ||
-    document.edges === null ||
-    Array.isArray(document.edges)
-  ) {
+  const documentResult = legacyBaselineSchema.safeParse(value);
+  if (!documentResult.success) {
     return {
       baseline: [],
       violations: [
@@ -624,7 +626,9 @@ function readLegacyBaseline(root: string): {
   }
 
   const baseline: LegacyApplicationBoundaryEdge[] = [];
-  const kindKeys = Object.keys(document.edges);
+  const document = documentResult.data;
+  const edges = document.edges as LegacyBaselineDocument["edges"];
+  const kindKeys = Object.keys(edges);
   const canonicalKinds = LEGACY_KINDS.filter((kind) => kindKeys.includes(kind));
   if (kindKeys.some((kind, index) => kind !== canonicalKinds[index])) {
     violations.push({
@@ -634,7 +638,7 @@ function readLegacyBaseline(root: string): {
     });
   }
   for (const kind of canonicalKinds) {
-    const importers = document.edges[kind];
+    const importers = edges[kind];
     if (typeof importers !== "object" || importers === null || Array.isArray(importers)) {
       violations.push({
         policy: "application-migration-baseline",

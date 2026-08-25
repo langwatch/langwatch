@@ -52,7 +52,7 @@ function readFeatureConfiguration(
       message: "Feature ownership roots must declare a layoutVersion in feature.json.",
       allowed: "Use layoutVersion 0, the initial strict feature layout.",
     });
-    return { layoutVersion: undefined };
+    return { layoutVersion: void 0 };
   }
 
   let value: unknown;
@@ -64,13 +64,13 @@ function readFeatureConfiguration(
       file: path,
       message: `feature.json must be valid JSON: ${error instanceof Error ? error.message : String(error)}`,
     });
-    return { layoutVersion: undefined };
+    return { layoutVersion: void 0 };
   }
 
   const layoutVersion =
     typeof value === "object" && value !== null && "layoutVersion" in value
       ? (value as { layoutVersion?: unknown }).layoutVersion
-      : undefined;
+      : void 0;
   if (layoutVersion !== 0) {
     violations.push({
       policy: "feature-source-layout",
@@ -78,7 +78,7 @@ function readFeatureConfiguration(
       message: `Unsupported feature layoutVersion ${JSON.stringify(layoutVersion)}.`,
       allowed: "The only supported version is 0, the initial strict layout.",
     });
-    return { layoutVersion: undefined };
+    return { layoutVersion: void 0 };
   }
 
   const keys = Object.keys(value as Record<string, unknown>);
@@ -152,7 +152,7 @@ export function discoverClassifiedPackages(root: string): {
           violations.push({
             policy: "feature-layout",
             file: manifestPath,
-            message: `Unknown feature package role \"${roleName}\".`,
+            message: `Unknown feature package role "${roleName}".`,
             allowed:
               "Use contract, server, or web; documentation belongs at the feature root.",
           });
@@ -168,7 +168,7 @@ export function discoverClassifiedPackages(root: string): {
           violations.push({
             policy: "feature-layout",
             file: manifestPath,
-            message: `Package name must be \"${expectedName}\", found ${JSON.stringify(manifest.name)}.`,
+            message: `Package name must be "${expectedName}", found ${JSON.stringify(manifest.name)}.`,
           });
         }
         packages.push({
@@ -470,7 +470,7 @@ export function discoverClassifiedPackages(root: string): {
       violations.push({
         policy: "feature-layout",
         file: pkg.manifestPath,
-        message: `Duplicate package name \"${pkg.name}\"; first declared by ${existing}.`,
+        message: `Duplicate package name "${pkg.name}"; first declared by ${existing}.`,
       });
     } else {
       names.set(pkg.name, pkg.manifestPath);

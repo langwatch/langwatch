@@ -13,5 +13,26 @@
     "langwatch/feature-module-classes": "error",
     "langwatch/service-classes": "error",
     "langwatch/service-dependencies": "error"
-  }
+  },
+  "overrides": [
+    {
+      "files": ["packages/architecture-lint/src/**/*.ts"],
+      "rules": {
+        "langwatch/boolean-wall": "error"
+      }
+    },
+    {
+      "files": [
+        "packages/features/*/server/src/services/**/*.service.ts",
+        "packages/enterprise/features/*/server/src/services/**/*.service.ts"
+      ],
+      "rules": {
+        "curly": "error",
+        "langwatch/max-statements-per-line": "error",
+        "langwatch/service-member-spacing": "error",
+        "langwatch/service-quality": "error",
+        "langwatch/awaited-return-chain": "error"
+      }
+    }
+  ]
 }

@@ -41,6 +41,14 @@ Feature: Strict versioned feature source layout
     And concrete runtime classes expose static create
     And standalone factories do not replace the class
 
+  @unit @architecture
+  Scenario: Strict services, ports, and contract builds remain mechanically bounded
+    Given a layout-version-0 feature service, port, or declaration build
+    When architecture lint and scoped Oxlint check it
+    Then a service exceeds neither its objective quality ceiling nor its shrinking reviewed inventory
+    And a new port exports an abstract class ending in Port rather than a callback type bag
+    And a contract build includes only src with rootDir src and explicitly excludes tests
+
   @unit @architecture @eventing
   Scenario: Eventing roles remain mechanically distinct
     Given a layout-version-0 feature uses Eventing

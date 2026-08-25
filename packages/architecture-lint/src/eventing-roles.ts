@@ -100,12 +100,12 @@ function lintRoleFile(file: string, role: EventingRole): ArchitectureViolation[]
   };
 
   const visit = (node: ts.Node): void => {
-    if (
+    const isPurityRole = role === "projection" || role === "process";
+    const isIoImport =
       ts.isImportDeclaration(node) &&
       ts.isStringLiteral(node.moduleSpecifier) &&
-      isIoModule(node.moduleSpecifier.text) &&
-      (role === "projection" || role === "process")
-    ) {
+      isIoModule(node.moduleSpecifier.text);
+    if (isIoImport && isPurityRole) {
       add(
         `eventing-${role}-purity`,
         node,
@@ -127,14 +127,14 @@ function lintRoleFile(file: string, role: EventingRole): ArchitectureViolation[]
       );
     }
 
-    if (
-      (ts.isFunctionDeclaration(node) ||
-        ts.isFunctionExpression(node) ||
-        ts.isArrowFunction(node) ||
-        ts.isMethodDeclaration(node)) &&
-      node.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword) &&
-      (role === "projection" || role === "process")
-    ) {
+    const isFunctionDeclaration =
+      ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node);
+    const isCallableDeclaration =
+      ts.isArrowFunction(node) || ts.isMethodDeclaration(node);
+    const isAsyncDeclaration =
+      (isFunctionDeclaration || isCallableDeclaration) &&
+      node.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.AsyncKeyword);
+    if (isAsyncDeclaration && isPurityRole) {
       add(
         `eventing-${role}-purity`,
         node,
@@ -147,11 +147,7 @@ function lintRoleFile(file: string, role: EventingRole): ArchitectureViolation[]
 
     if (ts.isCallExpression(node)) {
       const name = callName(node.expression);
-      if (
-        name &&
-        SIDE_EFFECT_CALLS.has(name) &&
-        (role === "projection" || role === "process")
-      ) {
+      if (name && SIDE_EFFECT_CALLS.has(name) && isPurityRole) {
         add(
           `eventing-${role}-purity`,
           node,

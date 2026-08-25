@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { walkFiles } from "./files";
+import { z } from "zod";
 import type {
   ArchitectureViolation,
   ClassifiedPackage,
@@ -22,6 +23,16 @@ const REMNANT_KINDS = [
   "page-shell",
   "transport",
 ] as const;
+const legacyFragmentEntrySchema = z
+  .object({
+    feature: z.string(),
+    file: z.string(),
+    kind: z.enum(REMNANT_KINDS),
+  })
+  .strict();
+const legacyBaselineSchema = z
+  .object({ version: z.literal(0), fragments: z.array(z.unknown()) })
+  .strict();
 
 export type LegacyFeatureFragmentKind = (typeof REMNANT_KINDS)[number];
 
@@ -29,11 +40,6 @@ export type LegacyFeatureFragment = {
   feature: string;
   file: string;
   kind: LegacyFeatureFragmentKind;
-};
-
-type LegacyFeatureFragmentBaseline = {
-  version: 0;
-  fragments: LegacyFeatureFragment[];
 };
 
 function workspacePath(root: string, path: string): string {
@@ -127,14 +133,12 @@ export function collectLegacyFeatureFragments(
   const legacyRoot = join(root, "platform", "app", "src");
   const fragments: LegacyFeatureFragment[] = [];
 
-  for (const file of walkFiles(
-    legacyRoot,
-    (path) =>
-      SOURCE_FILE.test(path) &&
-      !TEST_SOURCE.test(path) &&
-      !path.includes(`${sep}__tests__${sep}`) &&
-      !path.includes(`${sep}__mocks__${sep}`),
-  )) {
+  for (const file of walkFiles(legacyRoot, (path) => {
+    const isProductionSource = SOURCE_FILE.test(path) && !TEST_SOURCE.test(path);
+    const isNotTestDirectory =
+      !path.includes(`${sep}__tests__${sep}`) && !path.includes(`${sep}__mocks__${sep}`);
+    return isProductionSource && isNotTestDirectory;
+  })) {
     const workspaceFile = workspacePath(root, file);
     const segments = sourceSegments(workspaceFile);
     const matchingFeatures = new Set<string>();
@@ -190,12 +194,8 @@ function readBaseline(root: string): {
     };
   }
 
-  if (
-    typeof value !== "object" ||
-    value === null ||
-    (value as Partial<LegacyFeatureFragmentBaseline>).version !== 0 ||
-    !Array.isArray((value as Partial<LegacyFeatureFragmentBaseline>).fragments)
-  ) {
+  const baselineResult = legacyBaselineSchema.safeParse(value);
+  if (!baselineResult.success) {
     return {
       baseline: [],
       violations: [
@@ -211,20 +211,16 @@ function readBaseline(root: string): {
 
   const violations: ArchitectureViolation[] = [];
   const baseline: LegacyFeatureFragment[] = [];
-  const entries = (value as LegacyFeatureFragmentBaseline).fragments;
-  for (const [index, entry] of entries.entries()) {
-    if (
-      typeof entry !== "object" ||
-      entry === null ||
-      Array.isArray(entry) ||
-      Object.keys(entry).length !== 3 ||
-      !["feature", "file", "kind"].every(
-        (key, keyIndex) => Object.keys(entry)[keyIndex] === key,
-      ) ||
-      typeof entry.feature !== "string" ||
-      typeof entry.file !== "string" ||
-      !REMNANT_KINDS.includes(entry.kind)
-    ) {
+  for (const [index, entry] of baselineResult.data.fragments.entries()) {
+    const isObjectEntry =
+      typeof entry === "object" && entry !== null && !Array.isArray(entry);
+    const keys = isObjectEntry ? Object.keys(entry) : [];
+    const hasCanonicalKeys =
+      isObjectEntry &&
+      keys.length === 3 &&
+      ["feature", "file", "kind"].every((key, keyIndex) => keys[keyIndex] === key);
+    const entryResult = legacyFragmentEntrySchema.safeParse(entry);
+    if (!entryResult.success || !hasCanonicalKeys) {
       violations.push({
         policy: "legacy-feature-fragment-baseline",
         file: path,
@@ -233,7 +229,7 @@ function readBaseline(root: string): {
       });
       continue;
     }
-    baseline.push(entry);
+    baseline.push(entryResult.data);
   }
 
   if (

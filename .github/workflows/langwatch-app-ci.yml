@@ -934,7 +934,7 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/web..."
+          install: "@langwatch/web... @langwatch/architecture-lint..."
 
       # The ADR-076 workspace invariants: one lockfile, one workspace
       # definition, no member carrying overrides pnpm would ignore, the app and
@@ -952,6 +952,44 @@ jobs:
 
       - name: Oxfmt (blocking)
         run: pnpm format:check
+
+      - name: Architecture policy tests (blocking)
+        run: |
+          pnpm --filter @langwatch/architecture-lint typecheck
+          pnpm --filter @langwatch/architecture-lint test
+
+      # Debt inventories are ceilings, not a second place to hide debt. Compare
+      # each one with the merge-base copy when it exists. The first reviewed
+      # inventory bootstraps explicitly; after that, the CLI rejects growth.
+      - name: Read architecture debt inventories at the merge base
+        shell: bash
+        env:
+          PULL_REQUEST_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          MERGE_GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+        run: |
+          set -euo pipefail
+          base_sha="${PULL_REQUEST_BASE_SHA:-${MERGE_GROUP_BASE_SHA:-}}"
+          if [ -z "$base_sha" ]; then
+            base_sha="$(git rev-parse HEAD^)"
+          fi
+          merge_base="$(git merge-base "$base_sha" HEAD)"
+          reference_directory="$RUNNER_TEMP/architecture-lint-baselines"
+          mkdir -p "$reference_directory"
+          for baseline in service-quality-baseline.json port-module-baseline.json; do
+            source_path="packages/architecture-lint/src/$baseline"
+            reference="$reference_directory/$baseline"
+            if git cat-file -e "$merge_base:$source_path"; then
+              git show "$merge_base:$source_path" > "$reference"
+            else
+              rm -f "$reference"
+            fi
+          done
+
+      - name: Architecture debt inventories (blocking)
+        run: |
+          pnpm --filter @langwatch/architecture-lint lint -- \
+            --shrinking-baseline-only \
+            --baseline-reference-dir "$RUNNER_TEMP/architecture-lint-baselines"
 
       # THE GATE. Everything below this step is annotation, not enforcement.
       #

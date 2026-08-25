@@ -10,12 +10,22 @@ const IGNORED_DIRECTORIES = new Set([
   "node_modules",
 ]);
 
-export function walkFiles(root: string, accept: (path: string) => boolean): string[] {
+export function walkFiles(
+  root: string,
+  accept: (path: string) => boolean,
+  options?: { ignoredDirectories?: ReadonlySet<string> },
+): string[] {
   const found: string[] = [];
 
   const visit = (directory: string) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
-      if (entry.isDirectory() && IGNORED_DIRECTORIES.has(entry.name)) continue;
+      if (
+        entry.isDirectory() &&
+        (IGNORED_DIRECTORIES.has(entry.name) ||
+          options?.ignoredDirectories?.has(entry.name))
+      ) {
+        continue;
+      }
       const path = join(directory, entry.name);
       if (entry.isDirectory()) {
         visit(path);

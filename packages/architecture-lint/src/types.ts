@@ -30,6 +30,7 @@ export type PackageManifest = {
   private?: boolean;
   license?: string;
   exports?: unknown;
+  scripts?: Record<string, string>;
   dependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
   optionalDependencies?: Record<string, string>;
@@ -64,4 +65,5 @@ export type LintWorkspaceOptions = {
   declarations?: boolean;
   legacyApplicationMigration?: boolean;
   legacyFeatureFragments?: boolean;
+  serviceQualityBaselineReference?: string;
 };
