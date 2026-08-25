@@ -25,7 +25,7 @@ export interface StoredProjection<State> {
 
 /** Direct persistence boundary used by `.withPostgresProjection()`. */
 export interface StateProjectionStore<State> {
-  load(
+  tryLoad(
     key: string,
     context: ProjectionStoreContext,
   ): Promise<StoredProjection<State> | null>;

@@ -127,7 +127,6 @@
       "platform/app/src/server/stored-objects/project-storage-destination.ts": ["~/env.mjs"],
       "platform/app/src/server/stored-objects/stored-objects-factory.ts": ["~/env.mjs"],
       "platform/app/src/server/stored-objects/value-media-extractor.ts": ["~/shared/content-parts/media-markers","~/shared/content-parts/visit-content-part","~/shared/traces/mediaParts"],
-      "platform/app/src/server/suites/errors.ts": ["~/features/errors/logic/codes"],
       "platform/app/src/server/tracer/collector/piiCheck.ts": ["../../../env.mjs"],
       "platform/app/src/server/traces/clickhouse-trace.service.ts": ["~/prompts/prompt-playground/llmParameterMap"],
       "platform/app/src/server/traces/trace-blob-resolution.deps.ts": ["~/env.mjs"],

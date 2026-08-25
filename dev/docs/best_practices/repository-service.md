@@ -182,7 +182,7 @@ export { suiteTargetSchema, type SuiteTarget } from "~/server/suites/types";
 ```typescript
 // BAD: Domain type defined in API layer, imported by service
 // server/api/routers/suites/schemas.ts   <-- defined here
-// server/suites/suite.service.ts         <-- imports from API layer (wrong direction)
+// packages/features/suite/server/src/services/suite.service.ts  <-- imports from API layer (wrong direction)
 ```
 
 **Rule of thumb:** If a type represents a business concept (not just a request shape), it belongs in the domain layer. Request-specific schemas (like `createSuiteSchema` with its validation messages) can stay in the router schemas file since they're API concerns.

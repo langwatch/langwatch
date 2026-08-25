@@ -11,7 +11,7 @@
 # Product ownership, singular names and canonical cross-feature services remain
 # owned by singular-feature-ownership.feature.
 # License and plan behaviour remains owned by
-# ../../packages/features/entitlements/specs/entitlement-resolution.feature and
+# ../../packages/features/entitlement/specs/entitlement-resolution.feature and
 # ../licensing/license-validation.feature. Locked capability discovery remains
 # owned by ../licensing/self-hosted-enterprise-discovery.feature.
 # Repository lint and format migration is owned by oxc-toolchain.feature.

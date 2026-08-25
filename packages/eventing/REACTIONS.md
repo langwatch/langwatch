@@ -58,6 +58,11 @@ apply the action in one database transaction. Queue deduplication alone is not
 the idempotency boundary. Each product subscriber must have a redelivery test
 that handles the same source event twice and observes one result.
 
+In a strict feature package that contract test is named
+`tests/subscribers/<subject>.subscriber.redelivery.test.ts`. A subscriber that
+needs to record a new durable fact calls the owning feature command/pipeline;
+it never constructs or appends the event itself.
+
 ## Process managers
 
 A process manager owns durable multi-event orchestration:
@@ -76,6 +81,12 @@ A process manager owns durable multi-event orchestration:
 The evolution is pure and synchronous. It derives state, the next wake and
 deterministically keyed intents from an event or wake input. Intent executors
 perform I/O and are retry-safe.
+
+Strict feature packages make that split physical:
+`processes/<subject>.process.ts` contains evolution and
+`intents/<subject>.intent.ts` contains the executor. Architecture lint rejects
+async, network, timer, dynamic-import, and direct event-append work from the
+process definition.
 
 The runtime commits inbox identity, process state, wake state and intent
 messages through the process-store port. Concrete Postgres transaction and

@@ -133,6 +133,22 @@ happens through injected feature contracts within a process or through an
 existing network boundary between processes. Packaging one app's artifact
 beside another does not create a source dependency.
 
+### Documentation moves with ownership
+
+A vertical feature move includes its feature-specific ADRs, Gherkin specs and
+developer documentation. They move to the feature root, are corrected after
+the code boundary is real, and are edited down to current behaviour, durable
+decisions and useful history explaining why the boundary exists. They are not
+live implementation diaries and do not repeat repository-wide policy already
+owned by an architecture ADR or the feature-format README.
+
+`dev/docs` keeps only cross-cutting repository, deployment and application
+decisions. A document spanning several features may stay in the top-level
+corpus, but a document owned by one feature may not remain there as a second
+source of truth. The same rule applies when `platform/app` is split: UI-, API-
+and worker-specific boot documentation follows its application, while shared
+product behaviour follows the feature package.
+
 Combined local development is the sole composition exception and does not live
 in an application package. `tools/dev-runtime` is a private contributor
 workspace package. It may import intentional `./runtime` construction entry
@@ -185,7 +201,7 @@ not confused with the legal source license: signed-license schemas, validation,
 issuance, activation, persistence and UI move into the ordinary strict
 `packages/enterprise/features/licensing/{contract,server,web}` surfaces.
 Licensing remains a source of entitlement information as decided by the
-[Entitlements feature](../../../packages/features/entitlements/adrs/001-provider-neutral-plan-resolution.md);
+[Entitlements feature](../../../packages/features/entitlement/adrs/001-provider-neutral-plan-resolution.md);
 it does not replace the provider-neutral plan decision or make SaaS depend on a
 signed self-host license.
 
@@ -210,10 +226,12 @@ define extension contracts but never import enterprise implementations.
 Enterprise is a legal and composition group, not a broad product feature.
 ADR-112's singular ownership catalogue applies inside it. The Enterprise
 catalogue contains `audit-log`, `billing`, `governance`, `licensing`,
-`managed-provider`, `scim`, `sso`, and `webhook`. SaaS deployment integrations
-move to core `packages/features/saas`, and platform administration moves with
-operational tooling to core `packages/features/ops`; neither is covered by the
-Enterprise source license or listed by the portable Enterprise catalogue.
+`managed-provider`, `saas`, `scim`, `sso`, and `webhook`. SaaS deployment
+integrations remain under `packages/enterprise/features/saas` because their
+source is covered by the Enterprise license, even though SaaS activation is
+not itself an Enterprise entitlement check. Platform administration moves
+with operational tooling to core `packages/features/ops` and is not listed by
+the portable Enterprise catalogue.
 
 There is no replacement `ee` alias, `apps/*/ee` tree, catch-all enterprise
 implementation package or permanent enterprise legacy root. The portable root
@@ -332,8 +350,10 @@ The repository migrates in dependency order:
    packages; update workspace discovery and staging for those paths in the same
    stage; then extract `platform/app/ee` feature by feature into
    `packages/enterprise/features`, replacing `@ee/*` imports with package
-   exports. Move non-Enterprise SaaS to core and merge platform Admin into core
-   Ops rather than carrying their temporary Enterprise locations forward;
+   exports. Keep SaaS beneath the Enterprise legal root while treating its
+   runtime activation separately from Enterprise entitlement, and merge
+   platform Admin into core Ops rather than carrying that temporary Enterprise
+   location forward;
 4. establish ADR-112's singular ownership catalogue and lint before further
    product extraction. Correct existing plural roots, then extract the identity
    spine and remaining core product behaviour feature by feature. Each vertical

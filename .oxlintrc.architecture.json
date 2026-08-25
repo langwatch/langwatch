@@ -7,20 +7,11 @@
     }
   ],
   "rules": {
+    "langwatch/api-context-services": "error",
+    "langwatch/environment-boundaries": "error",
     "langwatch/package-boundaries": "error",
     "langwatch/feature-module-classes": "error",
     "langwatch/service-classes": "error",
-    "langwatch/no-conditional-spread": "error"
-  },
-  "overrides": [
-    {
-      "files": [
-        "packages/features/*/server/src/**/*.ts",
-        "packages/enterprise/features/*/server/src/**/*.ts"
-      ],
-      "rules": {
-        "no-nested-ternary": "error"
-      }
-    }
-  ]
+    "langwatch/service-dependencies": "error"
+  }
 }

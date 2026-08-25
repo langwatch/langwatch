@@ -27,12 +27,18 @@ Feature: Singular feature ownership
         | user           | packages/features/user           |
         | organization   | packages/features/organization   |
         | project        | packages/features/project        |
+        | role           | packages/features/role           |
         | auth           | packages/features/auth           |
         | authz          | packages/features/authz          |
         | api-key        | packages/features/api-key        |
+        | dashboard      | packages/features/dashboard      |
+        | data-privacy   | packages/features/data-privacy   |
+        | github         | packages/features/github         |
         | model-provider | packages/features/model-provider |
+        | presence       | packages/features/presence       |
         | prompt         | packages/features/prompt         |
         | dataset        | packages/features/dataset        |
+        | topic          | packages/features/topic          |
 
     @architecture @naming
     Scenario: Feature roots and package names use the singular catalogue identifier
@@ -55,6 +61,21 @@ Feature: Singular feature ownership
       When its dependencies are inspected
       Then each durable domain retains its own feature service contract
       And the use case composes those contracts without creating an AI configuration feature
+
+    @architecture @granularity
+    Scenario: Analytical products do not collapse into the query engine
+      Given Dashboard owns dashboards, graphs, saved workbench charts, and ordering
+      And Topic owns topic models and clustering runs
+      When those features need analytical data
+      Then they consume the canonical Analytics service
+      And Analytics does not own their durable lifecycle
+
+    @architecture @granularity
+    Scenario: Shared GitHub lifecycle does not belong to one consumer
+      Given Coding Agent and Langy both use GitHub installations and pull-request linkage
+      When their dependencies are inspected
+      Then GitHub owns the installation, webhook, repository, and pull-request lifecycle
+      And Coding Agent and Langy consume the canonical GitHub service
 
   Rule: The catalogue makes ownership expansion explicit
 
@@ -100,12 +121,13 @@ Feature: Singular feature ownership
   Rule: Core and Enterprise ownership remain truthful
 
     @architecture @licensing
-    Scenario: SaaS is not an Enterprise feature
-      Given SaaS deployment integrations are not Enterprise licensed
+    Scenario: SaaS remains inside the Enterprise source-license boundary
+      Given SaaS deployment integrations contain Enterprise-licensed vendor integration source
       When package ownership and the Enterprise catalogue are inspected
-      Then SaaS lives at packages/features/saas
-      And its packages use the @langwatch/saas prefix
-      And the Enterprise catalogue does not contain saas
+      Then SaaS lives at packages/enterprise/features/saas
+      And its packages use the @langwatch/enterprise-saas prefix
+      And the Enterprise catalogue contains saas
+      And deployment-mode activation is not described as an Enterprise entitlement gate
 
     @architecture @ops
     Scenario: Platform administration belongs to core Ops

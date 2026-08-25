@@ -115,12 +115,14 @@ describe("external member peer links", () => {
 			join(appRoot, "platform", "app", "node_modules", "zod", "package.json"),
 			"{}",
 		);
-		mkdirSync(join(appRoot, "packages", "langy"), { recursive: true });
+		mkdirSync(join(appRoot, "packages", "langy-contract"), {
+			recursive: true,
+		});
 		writeFileSync(
-			join(appRoot, "packages", "langy", "package.json"),
+			join(appRoot, "packages", "langy-contract", "package.json"),
 			JSON.stringify({
-				name: "@langwatch/langy",
-				peerDependencies: { zod: ">=3.25.0 <5", "left-pad": "*" },
+				name: "@langwatch/langy-contract",
+				peerDependencies: { zod: ">=4.0.0 <5", "left-pad": "*" },
 			}),
 		);
 		return appRoot;
@@ -132,11 +134,11 @@ describe("external member peer links", () => {
 			// apis lose the global registrations. The link IS the peer contract.
 			const appRoot = await makeAppTree();
 			const linked = linkExternalMemberPeers(appRoot);
-			expect(linked).toContain("langy:zod");
+			expect(linked).toContain("langy-contract:zod");
 			const linkPath = join(
 				appRoot,
 				"packages",
-				"langy",
+				"langy-contract",
 				"node_modules",
 				"zod",
 				"package.json",
@@ -157,7 +159,7 @@ describe("external member peer links", () => {
 			const appRoot = await makeAppTree();
 			linkExternalMemberPeers(appRoot);
 			const target = readlinkSync(
-				join(appRoot, "packages", "langy", "node_modules", "zod"),
+				join(appRoot, "packages", "langy-contract", "node_modules", "zod"),
 			);
 			expect(isAbsolute(target)).toBe(false);
 		});
@@ -169,11 +171,16 @@ describe("external member peer links", () => {
 			// but the directory entry still blocks symlinkSync. An app-tree wipe
 			// leaves exactly this state behind.
 			const root = await makeAppTree();
-			const memberNm = join(root, "packages", "langy", "node_modules");
+			const memberNm = join(
+				root,
+				"packages",
+				"langy-contract",
+				"node_modules",
+			);
 			mkdirSync(memberNm, { recursive: true });
 			symlinkSync(join(root, "not-there"), join(memberNm, "zod"));
 			const linked = linkExternalMemberPeers(root);
-			expect(linked).toContain("langy:zod");
+			expect(linked).toContain("langy-contract:zod");
 			expect(existsSync(join(memberNm, "zod", "package.json"))).toBe(true);
 		});
 	});

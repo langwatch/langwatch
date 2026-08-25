@@ -137,6 +137,12 @@ Projection definitions require their store, version and evolution operations;
 the pipeline builder prevents a projection from being registered through an
 ambiguous storage-agnostic method.
 
+Projection source cannot perform network calls, use timers, await work, or
+fabricate another durable event. Static architecture lint enforces those
+observable boundaries. CPU cost cannot be proven statically, so
+`es_projection_duration_milliseconds` remains the operational guard for
+unbounded or unexpectedly heavy evolution.
+
 ### 5. Subscribers say which consistency boundary they observe
 
 Subscriber authoring has two methods with distinct consistency boundaries:
@@ -203,6 +209,13 @@ Process handlers must be retry-safe. This decision does not introduce broad
 cross-feature database transactions or make a process manager a substitute
 for an application service.
 
+Feature source separates pure process evolution from its intent executors:
+`processes/<subject>.process.ts` derives state, wakes, and deterministic intent
+keys; `intents/<subject>.intent.ts` performs retry-safe I/O. When an intent or
+subscriber needs another durable domain event, it invokes the owning feature
+command/pipeline. Projections, process evolution, and subscribers never
+construct or append durable events directly.
+
 ### 7. The public API is sealed and linted
 
 Each framework package has a deliberate root API and a small number of named
@@ -217,6 +230,12 @@ CI enforces:
 - no repository returns Prisma-generated types outside its adapter boundary;
 - product pipelines depend on other features through contracts/services, not
   their repositories;
+- projection and process evolution source contains no asynchronous, network,
+  timer, dynamic-import, or direct event-append work;
+- subscribers and intent executors create durable events only through owning
+  commands/pipelines;
+- every strict-package subscriber has a named redelivery test proving its
+  externally visible effect is idempotent for the source event;
 - event and projection registrations are unique;
 - compile-time misuse examples continue to fail.
 

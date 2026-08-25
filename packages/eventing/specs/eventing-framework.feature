@@ -63,6 +63,14 @@ Feature: Eventing framework boundary and pipeline authoring
     Then the projection can be built without a Redis projection cache
     And ClickHouse cache and append options are not offered
 
+  @architecture @projection
+  Scenario: Projection evolution stays deterministic and bounded
+    Given production source is named as an Eventing projection
+    When architecture lint checks the projection
+    Then async functions, awaits, network modules, timers, dynamic imports and direct event appends are rejected
+    And projection persistence remains the Eventing executor and projection store responsibility
+    And runtime projection duration telemetry exposes CPU work that static lint cannot measure
+
   @unit @subscriber
   Scenario: An event subscriber receives no projection state
     Given an event subscriber interested in a declared event
@@ -85,6 +93,21 @@ Feature: Eventing framework boundary and pipeline authoring
     When the projection later commits successfully on retry
     Then the subscriber is staged with exactly that committed document
 
+  @architecture @subscriber @idempotency
+  Scenario: A strict-package subscriber proves redelivery safety
+    Given a feature subscriber performs an externally visible action
+    When architecture lint checks the feature package
+    Then a named redelivery test handles the same source event twice
+    And the test observes one externally visible result
+    And queue deduplication alone does not satisfy the rule
+
+  @architecture @subscriber
+  Scenario: A subscriber emits durable state through a command
+    Given a subscriber reaction needs to create another durable domain event
+    When its source is checked
+    Then it invokes the owning feature command or pipeline
+    And direct event construction or append is rejected
+
   @unit @replay
   Scenario: Replay rebuilds projections without repeating subscribers
     Given committed events for a selected aggregate
@@ -100,6 +123,15 @@ Feature: Eventing framework boundary and pipeline authoring
     Then its pure transition is persisted with an inbox record
     And resulting intents are persisted through its outbox contract
     And a retry does not apply the same event twice
+
+  @architecture @process-manager
+  Scenario: Process evolution and external work remain separate
+    Given a feature owns a durable process manager
+    When architecture lint checks its process and intent source
+    Then process evolution is synchronous and derives only state, wakes and deterministic intents
+    And network, timer, dynamic import and await work is rejected from the process definition
+    And retry-safe external work lives in the matching intent executor
+    And durable domain events enter through owning commands or pipelines
 
   @unit @process-manager
   Scenario: A process manager can schedule its next wake
