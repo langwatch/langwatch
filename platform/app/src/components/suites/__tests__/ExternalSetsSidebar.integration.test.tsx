@@ -40,6 +40,7 @@ function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
     name: "Critical Path",
     slug: "critical-path",
     kind: "custom",
+    scope: null,
     description: null,
     scenarioIds: [],
     targets: [],

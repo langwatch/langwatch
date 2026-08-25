@@ -45,6 +45,14 @@ export function PlanModalTabs({
           paddingY={2}
           fontSize="12.5px"
           cursor="pointer"
+          // The tab is a word with a line under it, so every piece of button
+          // chrome the browser paints on its own is turned off by hand.
+          appearance="none"
+          background="transparent"
+          borderRadius="0"
+          boxShadow="none"
+          borderWidth="0"
+          borderStyle="solid"
           borderBottomWidth="2px"
           borderBottomColor={tab === entry.id ? "fg" : "transparent"}
           fontWeight={tab === entry.id ? "medium" : "normal"}

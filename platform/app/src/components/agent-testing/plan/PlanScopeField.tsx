@@ -99,7 +99,7 @@ function FolderChoices({ editor }: { editor: PlanEditorState }) {
   }
 
   return (
-    <HStack gap={4} flexWrap="wrap" data-testid="plan-scope-folder-list">
+    <HStack gap={4} flexWrap="wrap" data-testid="plan-scope-suites-list">
       {folders.map((folder) => (
         <Checkbox
           key={folder.id}
@@ -130,7 +130,7 @@ function LabelChoices({ editor }: { editor: PlanEditorState }) {
   }
 
   return (
-    <HStack gap={1.5} flexWrap="wrap" data-testid="plan-scope-label-list">
+    <HStack gap={1.5} flexWrap="wrap" data-testid="plan-scope-labels-list">
       {suiteForm.allLabels.map((label) => (
         <chakra.button
           key={label}
@@ -188,7 +188,7 @@ function CaseChoices({ editor }: { editor: PlanEditorState }) {
       gap={2}
       maxHeight="160px"
       overflowY="auto"
-      data-testid="plan-scope-case-list"
+      data-testid="plan-scope-cases-list"
     >
       {groups.map((group) => (
         <Box key={group.id}>

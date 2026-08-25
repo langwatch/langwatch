@@ -20,6 +20,7 @@ function makeSuite(overrides: Partial<SimulationSuite> = {}): SimulationSuite {
     name: "Test Suite",
     slug: "test-suite",
     kind: "custom",
+    scope: null,
     description: null,
     scenarioIds: ["scen_1", "scen_2", "scen_3"],
     targets: [
