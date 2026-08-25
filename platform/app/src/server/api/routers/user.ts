@@ -1,32 +1,23 @@
-import { CliBootstrapService } from "@ee/governance/services/cliBootstrap.service";
-import { findHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
-import { PersonalUsageService } from "@ee/governance/services/personalUsage.service";
-import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
-import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
-import { RoutingPolicyService } from "@ee/governance/services/routingPolicy.service";
 import { resolveAuthProvider } from "~/runtime/app/features/sso";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
 import { z } from "zod";
-import { getApp } from "~/server/app-layer/app";
+import {
+  EmailAlreadyRegisteredError,
+  UserAvatarRateLimitedError,
+} from "@langwatch/user-contract";
 import { NoAdminConfiguredError } from "~/server/app-layer/organizations/errors";
 import {
   Auth0ApiError,
   changeAuth0Password,
 } from "~/server/auth0/passwordService";
 import { revokeOtherSessionsForUser } from "~/server/better-auth/revokeSessions";
-import { GatewayBudgetService } from "~/server/gateway/budget.service";
-import { BudgetOverviewService } from "~/server/gateway/budgetOverview.service";
 import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRequestEmail";
 import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
 import { trackServerEvent } from "~/server/posthog";
 import { rateLimit } from "~/server/rateLimit";
-import { AvatarRateLimitedError } from "~/server/user-avatar/avatar";
-import { UserAvatarService } from "~/server/user-avatar/avatar.service";
-import { EmailAlreadyRegisteredError } from "~/server/users/errors";
-import { UserService } from "~/server/users/user.service";
 import { getClientIp } from "~/utils/getClientIp";
 import { isAdmin as checkIsAdmin } from "~/runtime/app/features/admin";
 import { env } from "../../../env.mjs";
@@ -42,15 +33,7 @@ export const userRouter = createTRPCRouter({
     })
     .query(async ({ ctx }) => {
       const userId = ctx.session.user.impersonator?.id ?? ctx.session.user.id;
-      const user = await ctx.prisma.user.findUniqueOrThrow({
-        where: { id: userId },
-        select: { tracesExplorerTourDismissedAt: true },
-      });
-
-      return {
-        dismissed: user.tracesExplorerTourDismissedAt !== null,
-        dismissedAt: user.tracesExplorerTourDismissedAt,
-      };
+      return ctx.app.users.getTraceExplorerTourPreference({ id: userId });
     }),
   dismissTraceExplorerTour: protectedProcedure
     .input(z.object({}))
@@ -59,16 +42,7 @@ export const userRouter = createTRPCRouter({
     })
     .mutation(async ({ ctx }) => {
       const userId = ctx.session.user.impersonator?.id ?? ctx.session.user.id;
-      const user = await ctx.prisma.user.update({
-        where: { id: userId },
-        data: { tracesExplorerTourDismissedAt: new Date() },
-        select: { tracesExplorerTourDismissedAt: true },
-      });
-
-      return {
-        dismissed: true as const,
-        dismissedAt: user.tracesExplorerTourDismissedAt,
-      };
+      return ctx.app.users.dismissTraceExplorerTour({ id: userId });
     }),
   /**
    * Whether the current user is a platform admin (email listed in ADMIN_EMAILS).
@@ -191,14 +165,7 @@ export const userRouter = createTRPCRouter({
       // last-login timestamp with the admin's activity.
       if (ctx.session.user.impersonator) return;
 
-      await ctx.prisma.user.update({
-        where: {
-          id: ctx.session.user.id,
-        },
-        data: {
-          lastLoginAt: new Date(),
-        },
-      });
+      await ctx.app.users.updateLastLogin({ id: ctx.session.user.id });
     }),
   getSsoStatus: protectedProcedure
     .input(z.object({}))
@@ -206,7 +173,7 @@ export const userRouter = createTRPCRouter({
       reason: "operates on the session user's own account, no tenant scope",
     })
     .query(async ({ ctx }) => {
-      return UserService.create(ctx.prisma).getSsoStatus({
+      return ctx.app.users.getSsoStatus({
         id: ctx.session.user.id,
       });
     }),
@@ -216,7 +183,7 @@ export const userRouter = createTRPCRouter({
       reason: "operates on the session user's own account, no tenant scope",
     })
     .query(async ({ ctx }) => {
-      return UserService.create(ctx.prisma).getAccountInfo({
+      return ctx.app.users.getAccountInfo({
         id: ctx.session.user.id,
       });
     }),
@@ -510,7 +477,7 @@ export const userRouter = createTRPCRouter({
 
       // UserService.deactivate also force-revokes all the user's sessions
       // (Redis cache + DB) — see iter-24 progress notes for why.
-      await UserService.create(ctx.prisma).deactivate({ id: input.userId });
+      await ctx.app.users.deactivate({ id: input.userId });
       return { success: true };
     }),
   reactivate: protectedProcedure
@@ -525,7 +492,7 @@ export const userRouter = createTRPCRouter({
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
-      await UserService.create(ctx.prisma).reactivate({ id: input.userId });
+      await ctx.app.users.reactivate({ id: input.userId });
       return { success: true };
     }),
 
@@ -562,14 +529,14 @@ export const userRouter = createTRPCRouter({
         max: 10,
       });
       if (!limit.allowed) {
-        throw new AvatarRateLimitedError();
+        throw new UserAvatarRateLimitedError();
       }
 
       // `AvatarValidationError` is a handled error, so `handledErrorMiddleware`
       // carries its code and meta to the client on its own. Catching it here to
       // rewrap it as a BAD_REQUEST would only replace the code with the raw
       // message — the thing #5984 closed.
-      return await new UserAvatarService(ctx.prisma).setAvatar({
+      return await ctx.app.users.setAvatar({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
         imageDataUrl: input.imageDataUrl,
@@ -590,7 +557,7 @@ export const userRouter = createTRPCRouter({
       reason: "operates on the session user's own account, no tenant scope",
     })
     .mutation(async ({ ctx }) => {
-      await new UserAvatarService(ctx.prisma).removeAvatar({
+      await ctx.app.users.removeAvatar({
         userId: ctx.session.user.id,
       });
       return { success: true };
@@ -633,16 +600,15 @@ export const userRouter = createTRPCRouter({
         });
       }
 
-      const workspaceService = new PersonalWorkspaceService(ctx.prisma);
-      const workspace = await workspaceService.ensure({
+      const workspace = await ctx.app.organizations.ensurePersonalWorkspace({
         userId,
         organizationId: input.organizationId,
         displayName: ctx.session.user.name,
         displayEmail: ctx.session.user.email,
       });
 
-      const policyService = new RoutingPolicyService(ctx.prisma);
-      const defaultPolicy = await policyService.resolveDefaultForUser({
+      const defaultPolicy =
+        await ctx.app.governance.routingPolicies.tryResolveDefaultForUser({
         organizationId: input.organizationId,
         personalTeamId: workspace.team.id,
       });
@@ -693,8 +659,8 @@ export const userRouter = createTRPCRouter({
       }
 
       // Find the user's personal project. If none yet, return empty-state.
-      const workspaceService = new PersonalWorkspaceService(ctx.prisma);
-      const workspace = await workspaceService.findExisting({
+      const workspace =
+        await ctx.app.organizations.tryFindPersonalWorkspace({
         userId,
         organizationId: input.organizationId,
       });
@@ -716,21 +682,19 @@ export const userRouter = createTRPCRouter({
       const window =
         input.windowStartMs && input.windowEndMs
           ? {
-              start: new Date(input.windowStartMs),
-              end: new Date(input.windowEndMs),
+              startMs: input.windowStartMs,
+              endMs: input.windowEndMs,
             }
           : undefined;
 
-      const usage = PersonalUsageService.create(
-        getApp().governance.personalUsage,
-      );
+      const usage = ctx.app.governance.personalUsage;
 
       // Ingestion-source ledger rows (Claude Code OTLP, etc.) land under
       // the org's hidden Governance Project tenant. Resolve it read-only
       // so the PRINCIPAL-ledger union is scoped to this org's tenant.
-      const governanceProject = await findHiddenGovernanceProject({
-        prisma: ctx.prisma,
+      const governanceProject = await ctx.app.projects.tryFindInternal({
         organizationId: input.organizationId,
+        kind: "internal_governance",
       });
 
       // Run the rollup queries in parallel — they're independent and the
@@ -797,15 +761,14 @@ export const userRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 
-      const workspaceService = new PersonalWorkspaceService(ctx.prisma);
-      const workspace = await workspaceService.findExisting({
+      const workspace =
+        await ctx.app.organizations.tryFindPersonalWorkspace({
         userId,
         organizationId: input.organizationId,
       });
       if (!workspace) return { status: "ok" as const };
 
-      const vkService = PersonalVirtualKeyService.create(ctx.prisma);
-      const vks = await vkService.list({
+      const vks = await ctx.app.governance.personalVirtualKeys.list({
         userId,
         organizationId: input.organizationId,
       });
@@ -821,11 +784,7 @@ export const userRouter = createTRPCRouter({
       // (`_ingestion_:<sourceId>`).
       const sentinelVk = `_ingestion_:user:${userId}`;
 
-      const budgetService = GatewayBudgetService.create(
-        ctx.prisma,
-        getApp().gateway.budgets,
-      );
-      const decision = await budgetService.check({
+      const decision = await ctx.app.gateway.budgetDecisions.check({
         organizationId: input.organizationId,
         teamId: workspace.team.id,
         projectId: workspace.project.id,
@@ -908,12 +867,7 @@ export const userRouter = createTRPCRouter({
     )
     .permission("organization:view")
     .query(async ({ ctx, input }) => {
-      const service = BudgetOverviewService.create(
-        ctx.prisma,
-        getApp().gateway.budgets,
-        getApp().governance.personalUsage,
-      );
-      return await service.overviewForUser({
+      return await ctx.app.gateway.budgetOverview.overviewForUser({
         organizationId: input.organizationId,
         userId: ctx.session.user.id,
         includeTopModels: input.includeTopModels,
@@ -944,11 +898,7 @@ export const userRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("organization:view")
     .query(async ({ ctx, input }) => {
-      const service = CliBootstrapService.create({
-        prisma: ctx.prisma,
-        budgetRepository: getApp().gateway.budgets,
-      });
-      return await service.resolve({
+      return await ctx.app.governance.cliBootstrap.resolve({
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
       });
@@ -1047,9 +997,9 @@ export const userRouter = createTRPCRouter({
       reason: "operates on the session user's own account, no tenant scope",
     })
     .mutation(async ({ ctx, input }) => {
-      await ctx.prisma.user.update({
-        where: { id: ctx.session.user.id },
-        data: { lastHomePath: input.path },
+      await ctx.app.users.setLastHomePath({
+        id: ctx.session.user.id,
+        path: input.path,
       });
       return { ok: true as const };
     }),
@@ -1067,11 +1017,8 @@ export const userRouter = createTRPCRouter({
     .permission("organization:view")
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
-      const [user, firstProject] = await Promise.all([
-        ctx.prisma.user.findUnique({
-          where: { id: userId },
-          select: { lastHomePath: true },
-        }),
+      const [lastHomePath, firstProject] = await Promise.all([
+        ctx.app.users.getLastHomePath({ id: userId }),
         ctx.prisma.project.findFirst({
           where: {
             team: {
@@ -1085,7 +1032,7 @@ export const userRouter = createTRPCRouter({
         }),
       ]);
       return {
-        lastHomePath: user?.lastHomePath ?? null,
+        lastHomePath,
         firstProjectSlug: firstProject?.slug ?? null,
         // The governance-home option is shown for any user who could
         // possibly land there via auto-detection — gate on the resolver's

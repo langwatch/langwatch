@@ -7,10 +7,9 @@ import {
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
-  type User,
 } from "~/generated/prisma/client";
+import type { UserProfile, UserService } from "@langwatch/user-contract";
 import { getApp } from "~/server/app-layer/app";
-import { UserService } from "~/server/users/user.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   SCIM_ENTERPRISE_USER_SCHEMA,
@@ -35,13 +34,15 @@ export class ScimService {
   constructor({
     prisma,
     writer = getApp().authzGrants,
+    users = getApp().users,
   }: {
     prisma: PrismaClient;
     writer?: AuthzGrantsService;
+    users?: UserService;
   }) {
     this.prisma = prisma;
     this.writer = writer;
-    this.userService = UserService.create(prisma);
+    this.userService = users;
   }
 
   /**
@@ -91,6 +92,7 @@ export class ScimService {
   static create(options: {
     prisma: PrismaClient;
     writer?: AuthzGrantsService;
+    users?: UserService;
   }): ScimService {
     return new ScimService(options);
   }
@@ -254,7 +256,7 @@ export class ScimService {
     const email = request.userName;
     const name = this.buildNameFromRequest(request);
 
-    const existingUser = await this.userService.findByEmail({ email });
+    const existingUser = await this.userService.tryFindByEmail({ email });
 
     if (existingUser) {
       const existingMembership = await this.prisma.organizationUser.findUnique({
@@ -310,7 +312,7 @@ export class ScimService {
         costCenter: this.costCenterFromRequest(request),
       });
 
-      const reloadedUser = await this.userService.findById({
+      const reloadedUser = await this.userService.tryFindById({
         id: existingUser.id,
       });
       if (!reloadedUser) {
@@ -462,7 +464,7 @@ export class ScimService {
       costCenter: this.costCenterFromRequest(request),
     });
 
-    const reloadedUser = await this.userService.findById({ id });
+    const reloadedUser = await this.userService.tryFindById({ id });
     if (!reloadedUser) {
       return this.scimError({ status: "404", detail: "User not found" });
     }
@@ -561,7 +563,7 @@ export class ScimService {
       }
     }
 
-    const reloadedUser = await this.userService.findById({ id });
+    const reloadedUser = await this.userService.tryFindById({ id });
     if (!reloadedUser) {
       return this.scimError({ status: "404", detail: "User not found" });
     }
@@ -615,7 +617,7 @@ export class ScimService {
     return null;
   }
 
-  toScimUser(user: User): ScimUser {
+  toScimUser(user: UserProfile): ScimUser {
     const { givenName, familyName } = this.splitName(user.name ?? "");
 
     return {
