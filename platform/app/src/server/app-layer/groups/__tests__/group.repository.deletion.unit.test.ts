@@ -25,6 +25,13 @@ function prismaWith(group: Record<string, unknown>) {
     group: {
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       findFirst: vi.fn().mockResolvedValue(null),
+      // The destructive pair is PRESENT and spied rather than absent. Absent,
+      // `"delete" in prisma.group` is false however the repository behaves --
+      // the assertion could not fail, and the regression this file exists to
+      // catch is exactly a `deleteMany` where a mark belongs. Present, a
+      // repository that deletes calls one of these and the test says so.
+      delete: vi.fn().mockResolvedValue({}),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
       ...group,
     },
   };
@@ -53,8 +60,8 @@ describe("PrismaGroupRepository", () => {
         deletedAt: null,
       });
       expect(args.data.deletedAt).toBeInstanceOf(Date);
-      expect("delete" in prisma.group).toBe(false);
-      expect("deleteMany" in prisma.group).toBe(false);
+      expect(prisma.group.delete).not.toHaveBeenCalled();
+      expect(prisma.group.deleteMany).not.toHaveBeenCalled();
     });
 
     /** @scenario "Deleting a group moves the organization's change counter" */
