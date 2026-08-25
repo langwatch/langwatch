@@ -210,6 +210,96 @@ describe("normalizeEvaluators", () => {
       expect(normalized?.comparison).toBeUndefined();
     });
   });
+
+  /**
+   * The shape a saved evaluation really held: an exact-match evaluator that was
+   * given a comparison config, so it rendered and ran as a standalone
+   * comparison column instead of as a score on every target column.
+   */
+  describe("given a plain evaluator saved with a comparison config", () => {
+    const stored = () =>
+      [
+        {
+          id: "evaluator_q5RPFdOD",
+          evaluatorType: "langevals/exact_match",
+          inputs: [],
+          comparison: {
+            variants: ["target-1", "target-2"],
+            goldenField: "l3",
+            hasGoldenAnswer: true,
+            variantOutputPaths: { "target-1": ["output"] },
+          },
+          mappings: {
+            "ds-1": {
+              "target-1": {
+                output: {
+                  type: "source",
+                  source: "target",
+                  sourceId: "target-1",
+                  sourceField: "output",
+                },
+                expected_output: {
+                  type: "source",
+                  source: "dataset",
+                  sourceId: "ds-1",
+                  sourceField: "l3",
+                },
+              },
+            },
+          },
+          localEvaluatorConfig: { name: "L3 category exact match" },
+        },
+      ] as unknown as EvaluatorConfig[];
+
+    /** @scenario "A stored comparison config on a plain evaluator is repaired" */
+    it("reads back as an evaluator attached to every target column", () => {
+      const [normalized] = normalizeEvaluators(stored());
+
+      expect(normalized?.comparison).toBeUndefined();
+    });
+
+    /** @scenario "A stored comparison config on a plain evaluator is repaired" */
+    it("keeps the per-target mappings, which an attached evaluator already needs", () => {
+      const [normalized] = normalizeEvaluators(stored());
+
+      expect(normalized?.mappings).toEqual(stored()[0]!.mappings);
+    });
+
+    it("keeps the rest of the evaluator", () => {
+      const [normalized] = normalizeEvaluators(stored());
+
+      expect(normalized?.id).toBe("evaluator_q5RPFdOD");
+      expect(normalized?.evaluatorType).toBe("langevals/exact_match");
+      expect(normalized?.localEvaluatorConfig?.name).toBe(
+        "L3 category exact match",
+      );
+    });
+  });
+
+  describe("given the comparison judge with a comparison config", () => {
+    it("leaves the standalone comparison column untouched", () => {
+      const comparison = {
+        variants: ["target-1", "target-2"],
+        hasGoldenAnswer: true,
+        goldenField: "expected_output",
+        includeMetrics: [] as ("cost" | "duration")[],
+        randomizeOrder: true,
+      };
+      const evaluators = [
+        {
+          id: "evaluator_compare",
+          evaluatorType: COMPARISON_EVALUATOR_TYPE,
+          inputs: [],
+          mappings: {},
+          comparison,
+        },
+      ] as unknown as EvaluatorConfig[];
+
+      const [normalized] = normalizeEvaluators(evaluators);
+
+      expect(normalized?.comparison).toEqual(comparison);
+    });
+  });
 });
 
 describe("normalizeTargets", () => {

@@ -118,6 +118,94 @@ describe("payload schemas", () => {
     });
   });
 
+  /**
+   * The dispatcher parses the payload with this schema before any page or
+   * transform sees it, so what the schema refuses is what the agent is told.
+   */
+  describe("given an addEvaluator payload with a comparison config", () => {
+    const withComparison = (evaluatorType: string) => ({
+      evaluatorType,
+      inputs: [],
+      comparison: {
+        variants: ["target-a", "target-b"],
+        hasGoldenAnswer: true,
+        goldenField: "expected_output",
+        includeMetrics: [],
+        randomizeOrder: true,
+      },
+    });
+
+    describe("when the evaluator is the comparison judge", () => {
+      it("accepts it", () => {
+        expect(
+          addEvaluatorPayloadSchema.safeParse(
+            withComparison("langevals/select_best_compare"),
+          ).success,
+        ).toBe(true);
+      });
+    });
+
+    describe("when the evaluator is any other type", () => {
+      /** @scenario "Only the comparison judge can be a standalone comparison column" */
+      it("refuses it on the comparison field", () => {
+        const result = addEvaluatorPayloadSchema.safeParse(
+          withComparison("langevals/exact_match"),
+        );
+
+        expect(result.success).toBe(false);
+        expect(
+          result.success
+            ? []
+            : result.error.issues.map((issue) => issue.path.join(".")),
+        ).toContain("comparison");
+      });
+    });
+  });
+
+  describe("given an addEvaluator payload naming a type no evaluator has", () => {
+    /** @scenario "An evaluator names a type that exists" */
+    it("refuses it on the evaluatorType field", () => {
+      const result = addEvaluatorPayloadSchema.safeParse({
+        evaluatorType: "langevals/does_not_exist",
+        inputs: [],
+      });
+
+      expect(result.success).toBe(false);
+      expect(
+        result.success
+          ? []
+          : result.error.issues.map((issue) => issue.path.join(".")),
+      ).toContain("evaluatorType");
+    });
+
+    it("accepts the whole-workflow evaluator, which has no id in its type", () => {
+      expect(
+        addEvaluatorPayloadSchema.safeParse({
+          evaluatorType: "workflow",
+          inputs: [],
+        }).success,
+      ).toBe(true);
+    });
+
+    it("accepts a code evaluator, whose type carries a row id", () => {
+      expect(
+        addEvaluatorPayloadSchema.safeParse({
+          evaluatorType: "code/evaluator_abc",
+          inputs: [],
+        }).success,
+      ).toBe(true);
+    });
+
+    it("refuses a namespace prefix with no row id behind it", () => {
+      expect(
+        addEvaluatorPayloadSchema.safeParse({
+          evaluatorType: "custom/",
+          inputs: [],
+        }).success,
+      ).toBe(false);
+    });
+  });
+
   describe("when a generated id is given as a blank string", () => {
     it("rejects it on addTarget and on addEvaluator", () => {
       expect(

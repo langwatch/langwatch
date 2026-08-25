@@ -82,6 +82,28 @@ Feature: Workbench actions
     Then the run is refused instead of covering every target
 
   # ============================================================================
+  # Adding an evaluator
+  # ============================================================================
+
+  @unit
+  Scenario: Only the comparison judge can be a standalone comparison column
+    When I ask to add a plain evaluator together with a comparison config
+    Then the change is refused and says which evaluator can be a comparison column
+    And it says to leave the comparison config out so the evaluator grades every column
+
+  @unit
+  Scenario: An evaluator names a type that exists
+    When I ask to add an evaluator under a type no evaluator has
+    Then the change is refused and says how to list the types the workbench accepts
+
+  @integration
+  Scenario: A stored comparison config on a plain evaluator is repaired
+    Given a saved evaluation whose plain evaluator carries a comparison config
+    When the assistant edits that evaluation
+    Then the evaluator reads back as a score attached to every target column
+    And the edit is saved rather than refused for a field nobody typed
+
+  # ============================================================================
   # What the assistant is allowed to do, and what it can see
   # ============================================================================
 

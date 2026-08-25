@@ -1,10 +1,13 @@
 import { z } from "zod";
 import type { Field } from "~/optimization_studio/types/dsl";
 import { fieldSchema } from "~/optimization_studio/types/dsl";
+import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators";
 import {
+  COMPARISON_COLUMN_REFUSAL,
   datasetColumnSchema,
   evaluatorConfigSchema,
   fieldMappingSchema,
+  isComparisonEvaluatorType,
   localPromptConfigSchema,
   targetConfigSchema,
 } from "../types";
@@ -142,6 +145,26 @@ export type SetEvaluatorMappingPayload = z.infer<
 // Evaluators
 // ============================================================================
 
+/**
+ * A project's own evaluators are stored under one of these prefixes, followed
+ * by the row id, so their types cannot be checked against a fixed list. The
+ * whole-workflow evaluator has no id in its type at all.
+ *
+ * Same set `mappingValidation` treats as defined outside the built-in catalog,
+ * which is what keeps a type accepted here from failing mapping validation
+ * later for not being in the catalog.
+ */
+const DB_EVALUATOR_TYPE_PREFIXES = ["custom/", "code/"];
+const WORKFLOW_EVALUATOR_TYPE = "workflow";
+
+const isKnownEvaluatorType = (evaluatorType: string): boolean =>
+  Object.hasOwn(AVAILABLE_EVALUATORS, evaluatorType) ||
+  evaluatorType === WORKFLOW_EVALUATOR_TYPE ||
+  DB_EVALUATOR_TYPE_PREFIXES.some(
+    (prefix) =>
+      evaluatorType.startsWith(prefix) && evaluatorType.length > prefix.length,
+  );
+
 export const addEvaluatorPayloadSchema = evaluatorConfigSchema
   .pick({
     evaluatorType: true,
@@ -160,6 +183,36 @@ export const addEvaluatorPayloadSchema = evaluatorConfigSchema
         z.record(z.string(), z.record(z.string(), fieldMappingSchema)),
       )
       .default({}),
+  })
+  /**
+   * Two rules the field types alone cannot state, both refused with the reason
+   * so the caller can correct the payload instead of guessing:
+   *
+   * - the type has to name an evaluator that exists, otherwise the column is
+   *   added and every row of it fails at run time;
+   * - only the comparison judge may carry a `comparison` config, otherwise the
+   *   column renders as a standalone comparison and runs as something that
+   *   never receives the candidates it is asked to compare.
+   */
+  .superRefine((payload, ctx) => {
+    if (!isKnownEvaluatorType(payload.evaluatorType)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["evaluatorType"],
+        message: `Unknown evaluator type "${payload.evaluatorType}". Run "langwatch evaluator types" to list every type this workbench accepts.`,
+      });
+    }
+
+    if (
+      payload.comparison &&
+      !isComparisonEvaluatorType(payload.evaluatorType)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["comparison"],
+        message: COMPARISON_COLUMN_REFUSAL,
+      });
+    }
   });
 export type AddEvaluatorPayload = Omit<
   z.input<typeof addEvaluatorPayloadSchema>,
