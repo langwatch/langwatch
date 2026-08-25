@@ -194,6 +194,12 @@ function ResetPasswordForm({ token }: { token: string }) {
                 <Alert.Root status="error" width="full">
                   <Alert.Indicator />
                   <Alert.Content>
+                    {/* no-raw-error-toast-ok — this is not an error's own
+                        message. `serverError` is a local shape whose `message`
+                        is always copy this file wrote: every branch of
+                        `describeResetRefusal` returns a hand-written string,
+                        and the transport catch does too. Nothing from the
+                        server reaches the reader. */}
                     <Alert.Description>{serverError.message}</Alert.Description>
                     {/* A new link is the remedy only when the link is the
                         problem — offered for a refused password, it sends
