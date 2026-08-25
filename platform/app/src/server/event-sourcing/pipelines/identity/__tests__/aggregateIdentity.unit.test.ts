@@ -31,6 +31,7 @@ function fact(overrides: Partial<IdentifierFact>): IdentifierFact {
     identifierId: "idf_1",
     userId: USER,
     provider: "google",
+    issuer: null,
     value: "sam.j@acme.com",
     domain: "acme.com",
     identifierHash: null,
@@ -115,6 +116,7 @@ describe("identity event aggregate type", () => {
           accountId: null,
           provider: "google" as const,
           providerId: "google",
+          issuer: "https://accounts.google.com",
           providerAccountId: "gid_9",
           value: "Sam.J@Acme.com",
           ceremony: { flow: "better-auth" },
@@ -182,6 +184,8 @@ describe("identity event aggregate type", () => {
       const declared = createIdentityPipeline({
         identityProjectionStore: {} as never,
         identityGuards: {} as never,
+        mfaProjectionStore: {} as never,
+        mfaGuards: {} as never,
       }).metadata.aggregateType;
       const events = await handler.handle(command(data) as never);
 
@@ -210,6 +214,7 @@ describe("identity event aggregate type", () => {
         accountId: null,
         provider: "google" as const,
         providerId: "google",
+        issuer: "https://accounts.google.com",
         providerAccountId: "gid_9",
         value: "Sam.J@Acme.com",
         ceremony: { flow: "better-auth" },

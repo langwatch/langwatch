@@ -7,6 +7,8 @@ import {
   identifierDeadEndedPayloadSchema,
   identifierDetachedPayloadSchema,
   identifierVerifiedPayloadSchema,
+  LINK_PROPOSED_EVENT_TYPE,
+  linkProposedPayloadSchema,
   PRIMARY_CHANGED_EVENT_TYPE,
   primaryChangedPayloadSchema,
   USER_ERASED_EVENT_TYPE,
@@ -70,6 +72,12 @@ export const userErasedEventSchema = EventSchema.extend({
 });
 export type UserErasedEvent = z.infer<typeof userErasedEventSchema>;
 
+export const linkProposedEventSchema = EventSchema.extend({
+  type: z.literal(LINK_PROPOSED_EVENT_TYPE),
+  data: linkProposedPayloadSchema,
+});
+export type LinkProposedEvent = z.infer<typeof linkProposedEventSchema>;
+
 export const identityEventSchema = z.discriminatedUnion("type", [
   identifierAttachedEventSchema,
   identifierVerifiedEventSchema,
@@ -77,5 +85,6 @@ export const identityEventSchema = z.discriminatedUnion("type", [
   primaryChangedEventSchema,
   identifierDetachedEventSchema,
   userErasedEventSchema,
+  linkProposedEventSchema,
 ]);
 export type IdentityEvent = z.infer<typeof identityEventSchema>;

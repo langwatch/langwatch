@@ -450,6 +450,11 @@ const LEGACY_INERT: string[] = [
   "specs/features/workflow-cli.feature",
   "specs/home/onboarding-progress-ui.feature",
   "specs/home/voice-agents-home-banner.feature",
+  // Wave 3's specs, every scenario @unimplemented on purpose: each deliverable's
+  // specs ship ahead of the code, and the PR that builds each surface binds its
+  // file as it lands. Remove each entry with its first binding.
+  "specs/identity/org-admin-identity-surface.feature",
+  "specs/identity/platform-ops-identity-lookup.feature",
   "specs/langy/langy-agent-service-conventions.feature",
   "specs/langy/langy-baseline.feature",
   "specs/langy/langy-card-taxonomy.feature",

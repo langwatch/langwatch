@@ -13,6 +13,9 @@ import {
   MARK_PRIMARY_COMMAND_TYPE,
   type MarkPrimaryCommandData,
   markPrimaryCommandDataSchema,
+  PROPOSE_LINK_COMMAND_TYPE,
+  type ProposeLinkCommandData,
+  proposeLinkCommandDataSchema,
   VERIFY_IDENTIFIER_COMMAND_TYPE,
   type VerifyIdentifierCommandData,
   verifyIdentifierCommandDataSchema,
@@ -22,11 +25,12 @@ import type { IdentityLedger } from "./identity-ledger";
 import type {
   IdentityAdoptionWrites,
   IdentityCeremonyWrites,
+  IdentityLinkProposalWrites,
   IdentityVerificationWrites,
 } from "./identity-writes";
 
 /**
- * The identity write surface (ADR-101 §2, ADR-115 §3): five verbs, each
+ * The identity write surface (ADR-101 §2, ADR-115 §3): six verbs, each
  * the same move — parse the input, run the guard, hand the command and its
  * facts to the ledger. The guard vetoes before any fact exists; the ledger
  * (the app's) appends waited, folds on the calling path and stages last.
@@ -37,7 +41,8 @@ export class IdentityService
   implements
     IdentityCeremonyWrites,
     IdentityVerificationWrites,
-    IdentityAdoptionWrites
+    IdentityAdoptionWrites,
+    IdentityLinkProposalWrites
 {
   constructor(
     private readonly guards: IdentityGuards,
@@ -87,6 +92,14 @@ export class IdentityService
     return this.commit(
       { type: ERASE_USER_COMMAND_TYPE, data },
       await this.guards.eraseUser(data),
+    );
+  }
+
+  async proposeLink(input: ProposeLinkCommandData): Promise<IdentityFact[]> {
+    const data = proposeLinkCommandDataSchema.parse(input);
+    return this.commit(
+      { type: PROPOSE_LINK_COMMAND_TYPE, data },
+      await this.guards.proposeLink(data),
     );
   }
 

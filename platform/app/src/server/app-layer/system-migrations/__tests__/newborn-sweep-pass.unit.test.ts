@@ -77,6 +77,15 @@ vi.mock("../../identity/runtime", () => ({
     enrolledAutomatically: false,
     migrateTenant: vi.fn(),
   }),
+  connectionGrandfatherMigration: () => ({
+    name: "identity-d04-connection-grandfather",
+    title: "grandfather",
+    description: "grandfather",
+    requiresOperatorConfirmation: false,
+    runsAutomaticallyOnSelfHosted: false,
+    enrolledAutomatically: false,
+    migrateTenant: vi.fn(),
+  }),
   identityNewbornReconciliation: () => ({ runPass: stubs.runPass }),
 }));
 

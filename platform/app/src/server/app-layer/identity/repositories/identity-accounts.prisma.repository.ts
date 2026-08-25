@@ -11,6 +11,7 @@ interface LinkedIdentifierRow {
   userId: string;
   provider: string;
   providerId: string | null;
+  issuer: string | null;
   value: string | null;
   accountId: string | null;
   providerAccountId: string | null;
@@ -300,6 +301,10 @@ function toAccountRow({
     // OAuth and enterprise IdP into `oidc`.
     providerId:
       credential?.provider ?? identifier.providerId ?? identifier.provider,
+    // Stated on the attach, never derived: a real OIDC connection's issuer
+    // is its own URL. Null only for an identifier attached before the fact
+    // carried one, where the adapter falls back to the synthetic form.
+    issuer: identifier.issuer,
     // better-auth's `accountId` is the PROVIDER's subject. A credential
     // account's subject is the mailbox, which is the identifier value.
     accountId: identifier.providerAccountId ?? identifier.value ?? "",
