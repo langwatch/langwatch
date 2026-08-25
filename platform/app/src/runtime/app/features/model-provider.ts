@@ -6,9 +6,11 @@ import {
   ModelProviderCredentialPolicy,
   ModelProviderOnboardingDefaults,
   ModelTranslationPort,
+  CodexTokenRefresher,
   PostgresModelProviderAdapter,
 } from "@langwatch/model-provider-server";
 import type {
+  CodexTokenKeys,
   ModelCostRate,
   ModelDefaultFeature,
   ModelProviderApiKeyValidation,
@@ -40,6 +42,10 @@ import { MASKED_KEY_PLACEHOLDER } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import { readCustomKeys } from "~/server/modelProviders/customKeys";
 import { seedOnboardingDefaultsForProvider } from "~/server/modelProviders/seedOnboardingDefaults";
+import {
+  CodexAccountService,
+  CodexAuthError,
+} from "~/server/modelProviders/codexAccount.service";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 import {
@@ -285,6 +291,26 @@ class AppModelProviderCredentialPolicy extends ModelProviderCredentialPolicy {
   }
 }
 
+class AppCodexTokenRefresher extends CodexTokenRefresher {
+  private readonly account = new CodexAccountService();
+
+  async refresh(input: {
+    tokens: CodexTokenKeys;
+  }): Promise<
+    { status: "refreshed"; tokens: CodexTokenKeys } | { status: "session_expired" }
+  > {
+    try {
+      const tokens = await this.account.refresh(input.tokens);
+      return { status: "refreshed", tokens };
+    } catch (error) {
+      if (error instanceof CodexAuthError && error.kind === "refresh_rejected") {
+        return { status: "session_expired" };
+      }
+      throw error;
+    }
+  }
+}
+
 class AppModelProviderOnboardingDefaults extends ModelProviderOnboardingDefaults {
   constructor(private readonly database: PrismaClient) {
     super();
@@ -420,6 +446,7 @@ export class AppModelProviderRuntime {
       managedProviders: this.options.managedProviders,
       credentials: new AppModelProviderCredentialCodec(),
       credentialPolicy: new AppModelProviderCredentialPolicy(),
+      codexTokenRefresher: new AppCodexTokenRefresher(),
       onboardingDefaults: new AppModelProviderOnboardingDefaults(this.options.database),
       authorization: this.options.permissions
         ? new AppModelProviderAuthorization(this.options.permissions)

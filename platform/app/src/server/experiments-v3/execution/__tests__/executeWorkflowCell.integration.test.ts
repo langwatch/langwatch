@@ -48,6 +48,7 @@ vi.mock("~/optimization_studio/server/load-datasets.adapter", () => ({
 
 import { executeWorkflowCell } from "../orchestrator";
 import type { EvaluationV3Event, ExecutionCell } from "../types";
+import { getApp } from "~/server/app-layer/app";
 
 const workflowDsl = {
   nodes: [
@@ -106,6 +107,7 @@ const run = async (cell: ExecutionCell): Promise<EvaluationV3Event[]> => {
     projectId: "p1",
     workflowDsl,
     datasetColumns: [{ id: "col_1", name: "question", type: "string" }],
+    modelProviders: getApp().modelProviders,
   })) {
     events.push(event);
   }

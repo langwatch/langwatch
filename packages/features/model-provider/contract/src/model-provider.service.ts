@@ -24,6 +24,8 @@ import type {
   ModelProviderTestConnectionInput,
   ModelProviderCodexStatus,
   ModelProviderCodexStatusInput,
+  ModelProviderCodexGatewayRefresh,
+  ModelProviderCodexGatewayRefreshInput,
   ModelProviderWriteInput,
   TranslateInput,
   TranslateOutput,
@@ -62,6 +64,9 @@ export abstract class ModelProviderService {
   abstract getCodexStatus(
     input: ModelProviderCodexStatusInput,
   ): Promise<ModelProviderCodexStatus>;
+  abstract refreshCodexForGateway(
+    input: ModelProviderCodexGatewayRefreshInput,
+  ): Promise<ModelProviderCodexGatewayRefresh>;
   abstract isManagedProvider(input: {
     organizationId: string;
     provider: string;

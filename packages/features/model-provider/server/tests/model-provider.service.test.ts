@@ -4,6 +4,7 @@ import {
   type ModelDefaultConfig,
   type ModelProvider,
   type ModelProviderApiKeyValidation,
+  type CodexTokenKeys,
 } from "@langwatch/model-provider-contract";
 import { ProjectService, projectWithTeamSchema } from "@langwatch/project-contract";
 import { ModelProviderService } from "../src/services/model-provider.service";
@@ -13,6 +14,7 @@ import {
   ModelDefaultRepository,
   ModelProviderCatalog,
   ModelProviderCredentialPolicy,
+  CodexTokenRefresher,
   ModelProviderOnboardingDefaults,
   ModelProviderRepository,
   ModelTranslationPort,
@@ -45,6 +47,7 @@ function provider(overrides: Partial<ModelProvider> = {}): ModelProvider {
 
 class Providers extends ModelProviderRepository {
   rows = [provider()];
+  updates: ModelProvider[] = [];
   tryFindById(input: { id: string }): Promise<ModelProvider | null> {
     return Promise.resolve(this.rows.find((row) => row.id === input.id) ?? null);
   }
@@ -67,6 +70,7 @@ class Providers extends ModelProviderRepository {
   }
   update(input: ModelProvider): Promise<ModelProvider> {
     this.rows = this.rows.map((row) => (row.id === input.id ? input : row));
+    this.updates.push(input);
     return Promise.resolve(input);
   }
   delete(input: { id: string }): Promise<void> {
@@ -86,6 +90,24 @@ class Providers extends ModelProviderRepository {
     return Promise.resolve(
       this.rows.some((row) => row.id === id && row.customKeys !== null),
     );
+  }
+}
+
+class CodexRefresher extends CodexTokenRefresher {
+  calls = 0;
+  failure: Error | null = null;
+  result:
+    | { status: "refreshed"; tokens: CodexTokenKeys }
+    | { status: "session_expired" } = {
+    status: "session_expired",
+  };
+
+  refresh(): Promise<
+    { status: "refreshed"; tokens: CodexTokenKeys } | { status: "session_expired" }
+  > {
+    this.calls += 1;
+    if (this.failure) return Promise.reject(this.failure);
+    return Promise.resolve(this.result);
   }
 }
 
@@ -355,11 +377,13 @@ class OnboardingDefaults extends ModelProviderOnboardingDefaults {
 function service(
   providers = new Providers(),
   catalog: ModelProviderCatalog = new Catalog(),
+  codexTokenRefresher = new CodexRefresher(),
 ) {
   return ModelProviderService.create({
     repository: providers,
     projects: new Projects(),
     credentialPolicy: new CredentialPolicy(),
+    codexTokenRefresher,
     defaults: new Defaults(),
     costs: new Costs(),
     catalog,
@@ -480,6 +504,7 @@ describe("ModelProviderService", () => {
       repository: providers,
       projects: new Projects(),
       credentialPolicy: new CredentialPolicy(),
+      codexTokenRefresher: new CodexRefresher(),
       defaults: new Defaults(),
       costs: new Costs(),
       catalog: new Catalog(),
@@ -499,5 +524,137 @@ describe("ModelProviderService", () => {
         scopes: [{ scopeType: "PROJECT", scopeId: "project_1" }],
       },
     ]);
+  });
+
+  it("persists a Codex token rotation through the canonical repository", async () => {
+    const providers = new Providers();
+    const refreshed: CodexTokenKeys = {
+      CODEX_ACCESS_TOKEN: "new-access",
+      CODEX_REFRESH_TOKEN: "new-refresh",
+      CODEX_ID_TOKEN: "id-token",
+      CODEX_ACCOUNT_ID: "account-1",
+      CODEX_PLAN: "plus",
+      CODEX_EMAIL: "person@example.test",
+      CODEX_TOKENS_SAVED_AT: "2026-01-01T00:00:00.000Z",
+    };
+    providers.rows = [
+      provider({
+        provider: "openai_codex",
+        customKeys: {
+          ...refreshed,
+          CODEX_ACCESS_TOKEN: "old-access",
+          CODEX_TOKENS_SAVED_AT: "2020-01-01T00:00:00.000Z",
+        },
+      }),
+    ];
+    const refresher = new CodexRefresher();
+    refresher.result = { status: "refreshed", tokens: refreshed };
+
+    await expect(
+      service(providers, new Catalog(), refresher).refreshCodexForGateway({
+        providerRowId: "mp_1",
+      }),
+    ).resolves.toEqual({
+      status: "refreshed",
+      accessToken: "new-access",
+      accountId: "account-1",
+    });
+    expect(providers.updates).toHaveLength(1);
+    expect(providers.updates[0]?.customKeys).toEqual(refreshed);
+  });
+
+  it("does not persist a rejected Codex session", async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({
+        provider: "openai_codex",
+        customKeys: {
+          CODEX_ACCESS_TOKEN: "old-access",
+          CODEX_REFRESH_TOKEN: "old-refresh",
+          CODEX_ID_TOKEN: "id-token",
+          CODEX_ACCOUNT_ID: "account-1",
+          CODEX_PLAN: "plus",
+          CODEX_EMAIL: "person@example.test",
+          CODEX_TOKENS_SAVED_AT: "2020-01-01T00:00:00.000Z",
+        },
+      }),
+    ];
+
+    await expect(
+      service(providers).refreshCodexForGateway({ providerRowId: "mp_1" }),
+    ).resolves.toEqual({ status: "session_expired" });
+    expect(providers.updates).toHaveLength(0);
+  });
+
+  it("reuses a token that another gateway request just refreshed", async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({
+        provider: "openai_codex",
+        customKeys: {
+          CODEX_ACCESS_TOKEN: "fresh-access",
+          CODEX_REFRESH_TOKEN: "fresh-refresh",
+          CODEX_ID_TOKEN: "id-token",
+          CODEX_ACCOUNT_ID: "account-1",
+          CODEX_PLAN: "plus",
+          CODEX_EMAIL: "person@example.test",
+          CODEX_TOKENS_SAVED_AT: new Date().toISOString(),
+        },
+      }),
+    ];
+    const refresher = new CodexRefresher();
+
+    await expect(
+      service(providers, new Catalog(), refresher).refreshCodexForGateway({
+        providerRowId: "mp_1",
+      }),
+    ).resolves.toEqual({
+      status: "refreshed",
+      accessToken: "fresh-access",
+      accountId: "account-1",
+    });
+    expect(refresher.calls).toBe(0);
+    expect(providers.updates).toHaveLength(0);
+  });
+
+  it("does not refresh a row owned by another provider", async () => {
+    const providers = new Providers();
+    const refresher = new CodexRefresher();
+
+    await expect(
+      service(providers, new Catalog(), refresher).refreshCodexForGateway({
+        providerRowId: "mp_1",
+      }),
+    ).resolves.toEqual({ status: "not_connected" });
+    expect(refresher.calls).toBe(0);
+    expect(providers.updates).toHaveLength(0);
+  });
+
+  it("propagates a transient Codex issuer failure without persisting tokens", async () => {
+    const providers = new Providers();
+    providers.rows = [
+      provider({
+        provider: "openai_codex",
+        customKeys: {
+          CODEX_ACCESS_TOKEN: "old-access",
+          CODEX_REFRESH_TOKEN: "old-refresh",
+          CODEX_ID_TOKEN: "id-token",
+          CODEX_ACCOUNT_ID: "account-1",
+          CODEX_PLAN: "plus",
+          CODEX_EMAIL: "person@example.test",
+          CODEX_TOKENS_SAVED_AT: "2020-01-01T00:00:00.000Z",
+        },
+      }),
+    ];
+    const refresher = new CodexRefresher();
+    const failure = new Error("issuer unavailable");
+    refresher.failure = failure;
+
+    await expect(
+      service(providers, new Catalog(), refresher).refreshCodexForGateway({
+        providerRowId: "mp_1",
+      }),
+    ).rejects.toBe(failure);
+    expect(providers.updates).toHaveLength(0);
   });
 });

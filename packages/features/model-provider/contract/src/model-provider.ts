@@ -173,6 +173,29 @@ export const modelProviderCodexStatusSchema = z.discriminatedUnion("connected", 
 ]);
 export type ModelProviderCodexStatus = z.infer<typeof modelProviderCodexStatusSchema>;
 
+/** Internal gateway recovery for a Codex provider credential. */
+export const modelProviderCodexGatewayRefreshInputSchema = z
+  .object({ providerRowId: z.string().min(1) })
+  .strict();
+export type ModelProviderCodexGatewayRefreshInput = z.infer<
+  typeof modelProviderCodexGatewayRefreshInputSchema
+>;
+
+export const modelProviderCodexGatewayRefreshSchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      status: z.literal("refreshed"),
+      accessToken: z.string().min(1),
+      accountId: z.string(),
+    })
+    .strict(),
+  z.object({ status: z.literal("not_connected") }).strict(),
+  z.object({ status: z.literal("session_expired") }).strict(),
+]);
+export type ModelProviderCodexGatewayRefresh = z.infer<
+  typeof modelProviderCodexGatewayRefreshSchema
+>;
+
 export const modelProviderApiKeyValidationInputSchema = modelProviderTenantInputSchema
   .extend({
     provider: z.string().min(1),

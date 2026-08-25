@@ -11,6 +11,7 @@
  */
 
 import { HandledError } from "@langwatch/handled-error";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
@@ -86,6 +87,7 @@ export type OrchestratorInput = {
   datasetColumns: Array<{ id: string; name: string; type: string }>;
   loadedPrompts: Map<string, VersionedPrompt>;
   loadedAgents: Map<string, TypedAgent>;
+  modelProviders: ModelProviderService;
   /** Evaluators loaded from DB - settings and names are fetched fresh from here */
   loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
   /** Studio workflows loaded for workflow targets (committed DSL run per row) */
@@ -978,6 +980,7 @@ type CellEvaluatorContext = {
   traceId: string;
   targetNodes: Set<string>;
   config: ResultMapperConfig;
+  modelProviders: ModelProviderService;
   isAborted?: () => Promise<boolean>;
 };
 
@@ -998,6 +1001,7 @@ async function* runOneCellEvaluator({
   traceId,
   targetNodes,
   config,
+  modelProviders,
   isAborted,
 }: CellEvaluatorContext & {
   evaluatorId: string;
@@ -1022,7 +1026,13 @@ async function* runOneCellEvaluator({
   const evaluatorEvents: StudioServerEvent[] = [];
   await studioBackendPostEvent({
     projectId,
-    message: await addEnvs(evaluatorEvent, projectId),
+    modelProviders,
+    message: await addEnvs(
+      evaluatorEvent,
+      projectId,
+      modelProviders,
+      getApp().managedProviders,
+    ),
     isAborted,
     onEvent: (serverEvent) => {
       evaluatorEvents.push(serverEvent);
@@ -1124,6 +1134,7 @@ export async function* executeCell(
     agent?: TypedAgent;
     evaluators?: Map<string, { id: string; name: string; config: unknown }>;
   },
+  modelProviders: ModelProviderService,
   resultMapperConfig?: ResultMapperConfig,
   isAborted?: () => Promise<boolean>,
 ): AsyncGenerator<EvaluationV3Event> {
@@ -1199,7 +1210,7 @@ export async function* executeCell(
 
       // Add environment variables and process datasets
       const enrichedEvent = await loadDatasets(
-        await addEnvs(rawEvent, projectId),
+        await addEnvs(rawEvent, projectId, modelProviders, getApp().managedProviders),
         projectId,
         getApp().dataset,
       );
@@ -1209,6 +1220,7 @@ export async function* executeCell(
 
       await studioBackendPostEvent({
         projectId,
+        modelProviders,
         message: enrichedEvent,
         isAborted,
         onEvent: (serverEvent) => {
@@ -1278,6 +1290,7 @@ export async function* executeCell(
         traceId,
         targetNodes,
         config: cellConfig,
+        modelProviders,
         isAborted,
       });
     }
@@ -1311,6 +1324,7 @@ export async function* executeWorkflowCell({
   loadedEvaluators,
   resultMapperConfig,
   isAborted,
+  modelProviders,
 }: {
   cell: ExecutionCell;
   projectId: string;
@@ -1319,6 +1333,7 @@ export async function* executeWorkflowCell({
   loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
   resultMapperConfig?: ResultMapperConfig;
   isAborted?: () => Promise<boolean>;
+  modelProviders: ModelProviderService;
 }): AsyncGenerator<EvaluationV3Event> {
   yield {
     type: "cell_started",
@@ -1356,7 +1371,7 @@ export async function* executeWorkflowCell({
     };
 
     const enrichedEvent = await loadDatasets(
-      await addEnvs(rawEvent, projectId),
+      await addEnvs(rawEvent, projectId, modelProviders, getApp().managedProviders),
       projectId,
       getApp().dataset,
     );
@@ -1364,6 +1379,7 @@ export async function* executeWorkflowCell({
     const events: StudioServerEvent[] = [];
     await studioBackendPostEvent({
       projectId,
+      modelProviders,
       message: enrichedEvent,
       isAborted,
       onEvent: (serverEvent) => {
@@ -1955,6 +1971,7 @@ export async function* runOrchestrator(
     runId: providedRunId,
     concurrency: requestedConcurrency,
     seedTargetOutputs,
+    modelProviders,
   } = input;
 
   // Use requested concurrency, environment variable, or default
@@ -2343,12 +2360,14 @@ export async function* runOrchestrator(
                   loadedEvaluators,
                   resultMapperConfig,
                   isAborted: checkAbort,
+                  modelProviders,
                 })
               : executeCell(
                   cell,
                   projectId,
                   datasetColumns,
                   loadedData,
+                  modelProviders,
                   resultMapperConfig,
                   checkAbort,
                 );
@@ -2584,6 +2603,7 @@ export async function* runOrchestrator(
                   projectId,
                   datasetColumns,
                   loadedData,
+                  modelProviders,
                   resultMapperConfig,
                   checkAbort,
                 )) {

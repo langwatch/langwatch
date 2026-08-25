@@ -4,6 +4,7 @@ import {
   ModelProviderCatalog,
   ModelProviderCredentialCodec,
   ModelProviderCredentialPolicy,
+  CodexTokenRefresher,
   ModelProviderOnboardingDefaults,
   ModelTranslationPort,
   type ManagedProviderService,
@@ -25,6 +26,7 @@ export interface PostgresModelProviderAdapterOptions {
   authorization?: ModelProviderAuthorization;
   credentials: ModelProviderCredentialCodec;
   credentialPolicy: ModelProviderCredentialPolicy;
+  codexTokenRefresher: CodexTokenRefresher;
   onboardingDefaults?: ModelProviderOnboardingDefaults;
 }
 
@@ -46,6 +48,7 @@ export class PostgresModelProviderAdapter {
       ),
       projects: this.options.projects,
       credentialPolicy: this.options.credentialPolicy,
+      codexTokenRefresher: this.options.codexTokenRefresher,
       onboardingDefaults: this.options.onboardingDefaults,
       defaults: PrismaModelDefaultRepository.create(this.options.database),
       costs: PrismaModelCostRepository.create(this.options.database),

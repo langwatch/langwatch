@@ -8,12 +8,23 @@ import type {
 } from "~/experiments-v3/types";
 import { createInitialResults, createInitialUIState } from "~/experiments-v3/types";
 import type { Project } from "~/generated/prisma/client";
-import { resetApp } from "~/server/app-layer/app";
+import { getApp, resetApp } from "~/server/app-layer/app";
 import { initializeDefaultApp } from "~/server/app-layer/presets";
 import { getTestProject } from "~/utils/testUtils";
 import { abortManager } from "../abortManager";
-import { type OrchestratorInput, runOrchestrator } from "../orchestrator";
+import {
+  type OrchestratorInput as ProductionOrchestratorInput,
+  runOrchestrator,
+} from "../orchestrator";
 import type { EvaluationV3Event } from "../types";
+
+type OrchestratorInput = Omit<ProductionOrchestratorInput, "modelProviders">;
+
+const runTestOrchestrator = (input: OrchestratorInput) =>
+  runOrchestrator({
+    ...input,
+    modelProviders: getApp().modelProviders,
+  });
 
 /**
  * Integration tests for the orchestrator against langwatch_nlp.
@@ -169,7 +180,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
     input: OrchestratorInput,
   ): Promise<EvaluationV3Event[]> => {
     const events: EvaluationV3Event[] = [];
-    for await (const event of runOrchestrator(input)) {
+    for await (const event of runTestOrchestrator(input)) {
       events.push(event);
     }
     return events;
@@ -1203,7 +1214,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
       let runId: string | undefined;
 
       // Collect events and set abort after getting first result
-      for await (const event of runOrchestrator(input)) {
+      for await (const event of runTestOrchestrator(input)) {
         events.push(event);
 
         // Capture runId from execution_started
@@ -1258,7 +1269,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
       let runId: string | undefined;
       let abortRequested = false;
 
-      for await (const event of runOrchestrator(input)) {
+      for await (const event of runTestOrchestrator(input)) {
         events.push(event);
 
         if (event.type === "execution_started") {
@@ -1316,7 +1327,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
       let runId: string | undefined;
       const startTime = Date.now();
 
-      for await (const event of runOrchestrator(input)) {
+      for await (const event of runTestOrchestrator(input)) {
         events.push(event);
 
         if (event.type === "execution_started") {

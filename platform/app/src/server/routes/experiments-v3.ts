@@ -14,7 +14,7 @@ import { createLogger } from "@langwatch/observability";
 import { type Context, Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { describeRoute, resolver } from "hono-openapi";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { createInitialUIState, type EvaluationsV3State } from "~/experiments-v3/types";
 import { persistedEvaluationsV3StateSchema } from "~/experiments-v3/types/persistence";
 import { ExperimentType } from "~/generated/prisma/client";
@@ -293,6 +293,7 @@ secured.access(sessionAuth).post(
           datasetColumns,
           loadedPrompts,
           loadedAgents,
+          modelProviders: c.app.modelProviders,
           loadedEvaluators,
           loadedWorkflows,
           concurrency: request.concurrency,
@@ -619,6 +620,7 @@ secured.access(apiKeyAuthRun).post(
             datasetColumns,
             loadedPrompts: loadedPrompts as Map<string, VersionedPrompt>,
             loadedAgents: loadedAgents as Map<string, TypedAgent>,
+            modelProviders: c.app.modelProviders,
             loadedEvaluators,
             loadedWorkflows,
           });
@@ -665,6 +667,7 @@ secured.access(apiKeyAuthRun).post(
       datasetColumns,
       loadedPrompts: loadedPrompts as Map<string, VersionedPrompt>,
       loadedAgents: loadedAgents as Map<string, TypedAgent>,
+      modelProviders: c.app.modelProviders,
       loadedEvaluators,
       loadedWorkflows,
     });

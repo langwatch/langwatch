@@ -40,7 +40,6 @@ import {
   attributedUserBucketScopeId,
   bucketScopeIdFor,
 } from "~/server/gateway/budgetResolution.service";
-import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { GatewayConfigMaterialiser } from "~/server/gateway/config.materialiser";
 import { signGatewayJwt } from "~/server/gateway/gatewayJwt";
 import {
@@ -61,8 +60,6 @@ import {
 } from "~/server/gateway/virtualKey.crypto";
 import { ROUTING_POLICY_SELECT } from "~/server/gateway/virtualKey.repository";
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
-import { CodexGatewayRefreshService } from "~/server/modelProviders/codexAccount.service";
-import { ModelProviderRepository } from "~/server/modelProviders/modelProvider.repository";
 
 // `verifySecret` applies the HMAC verifier as the builder chain for every
 // route (uniform with `files/.../app.ts`), rather than an app-wide
@@ -101,6 +98,10 @@ const guardrailCheckRequestSchema = z.object({
     })
     .optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+const codexRefreshRequestSchema = z.object({
+  provider_row_id: z.string().min(1),
 });
 
 // ── auth middleware ─────────────────────────────────────────────────────
@@ -485,10 +486,10 @@ secured.access(gatewayPolicy()).post("/resolve-key", async (c) => {
  *           codex_not_connected
  */
 secured.access(gatewayPolicy()).post("/codex/refresh", async (c) => {
-  const body = (await c.req.json().catch(() => ({}))) as {
-    provider_row_id?: string;
-  };
-  if (!body.provider_row_id || typeof body.provider_row_id !== "string") {
+  const parsed = codexRefreshRequestSchema.safeParse(
+    await c.req.json().catch(() => null),
+  );
+  if (!parsed.success) {
     return c.json(
       {
         error: {
@@ -500,11 +501,9 @@ secured.access(gatewayPolicy()).post("/codex/refresh", async (c) => {
       400,
     );
   }
-  const service = new CodexGatewayRefreshService(
-    new ModelProviderRepository(prisma),
-    new ChangeEventRepository(prisma),
-  );
-  const result = await service.refreshForGateway(body.provider_row_id);
+  const result = await c.app.modelProviders.refreshCodexForGateway({
+    providerRowId: parsed.data.provider_row_id,
+  });
   if (result.status === "not_connected") {
     return c.json(
       {
@@ -519,7 +518,7 @@ secured.access(gatewayPolicy()).post("/codex/refresh", async (c) => {
   }
   if (result.status === "session_expired") {
     logger.warn(
-      { providerRowId: body.provider_row_id },
+      { providerRowId: parsed.data.provider_row_id },
       "codex session expired; user must sign in again",
     );
     return c.json(
@@ -725,7 +724,11 @@ secured.access(gatewayPolicy()).post("/guardrail/check", async (c) => {
       400,
     );
   }
-  const verdict = await GatewayGuardrailEvaluationService.create(prisma).check({
+  const verdict = await GatewayGuardrailEvaluationService.create(
+    prisma,
+    c.app.modelProviders,
+    c.app.managedProviders,
+  ).check({
     projectId: parsed.data.project_id,
     guardrailIds: parsed.data.guardrail_ids,
     direction: parsed.data.direction,

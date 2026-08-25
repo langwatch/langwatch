@@ -8,6 +8,7 @@ import {
 import { extractPersistedState } from "~/experiments-v3/types/persistence";
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { ExperimentService } from "@langwatch/experiment-contract";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type {
   Entry,
   Field,
@@ -58,13 +59,15 @@ export class WorkflowEvaluationService {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly experiments: ExperimentService,
+    private readonly modelProviders: ModelProviderService,
   ) {}
 
   static create(
     prisma: PrismaClient,
     experiments: ExperimentService,
+    modelProviders: ModelProviderService,
   ): WorkflowEvaluationService {
-    return new WorkflowEvaluationService(prisma, experiments);
+    return new WorkflowEvaluationService(prisma, experiments, modelProviders);
   }
 
   async triggerEvaluation({
@@ -258,6 +261,7 @@ export class WorkflowEvaluationService {
       datasetColumns,
       loadedPrompts,
       loadedAgents,
+      modelProviders: this.modelProviders,
       loadedEvaluators,
       loadedWorkflows,
     });

@@ -5,7 +5,6 @@ import {
   CODEX_OAUTH_ISSUER,
   CODEX_VERIFICATION_URL,
   type CodexTokenKeys,
-  codexTokenKeysSchema,
 } from "./codexAccount.schema";
 
 /**
@@ -299,109 +298,6 @@ function isTerminalOAuthRejection(error: unknown): error is CodexAuthError {
     error.status < 500 &&
     error.message.includes("invalid_grant")
   );
-}
-
-/**
- * The gateway's 401 recovery: refresh a provider row's stored tokens and
- * hand back a fresh access token, persisting the rotation. A row refreshed
- * within the last few seconds is returned as-is instead of refreshed again,
- * so a STAGGERED burst of 401s (the second arriving after the first has
- * persisted its rotation) collapses into one issuer round-trip. This is a
- * best-effort window, not a lock: two 401s that both read the stale tokens
- * before either persists can still double-refresh, and the loser's call
- * fails once the issuer rotates the one-time refresh token — the gateway
- * then surfaces that as a re-auth, which is the correct terminal state
- * anyway. A per-row single-flight lock would close the gap if it proves real
- * under load.
- */
-export class CodexGatewayRefreshService {
-  /** A token this fresh is the one we just minted — don't refresh again. */
-  static readonly JUST_REFRESHED_WINDOW_MS = 30_000;
-
-  constructor(
-    private readonly repository: {
-      findByIdWithDecryptedKeys: (id: string) => Promise<{
-        provider: string;
-        organizationId: string;
-        customKeys: unknown;
-      } | null>;
-      replaceCustomKeys: (args: {
-        id: string;
-        customKeys: Record<string, unknown>;
-      }) => Promise<void>;
-    },
-    /**
-     * The gateway's cache-invalidation feed. A rotation MUST land here: the
-     * gateway resolves credentials into an in-memory bundle, and without a
-     * MODEL_PROVIDER_UPDATED event it keeps dispatching with the pre-rotation
-     * access token — every request 401s, refreshes again, and rotates the
-     * token in a loop.
-     */
-    private readonly changeEvents: {
-      append: (input: {
-        organizationId: string;
-        kind: "MODEL_PROVIDER_UPDATED";
-        modelProviderId: string;
-      }) => Promise<unknown>;
-    },
-    private readonly engine: CodexAccountService = new CodexAccountService(),
-  ) {}
-
-  async refreshForGateway(
-    providerRowId: string,
-  ): Promise<
-    | { status: "refreshed"; accessToken: string; accountId: string }
-    | { status: "not_connected" }
-    | { status: "session_expired" }
-  > {
-    const row = await this.repository.findByIdWithDecryptedKeys(providerRowId);
-    if (row?.provider !== "openai_codex") {
-      return { status: "not_connected" };
-    }
-    const parsed = codexTokenKeysSchema.safeParse(row.customKeys ?? {});
-    if (!parsed.success) return { status: "not_connected" };
-    const keys = parsed.data;
-
-    const savedAtMs = Date.parse(keys.CODEX_TOKENS_SAVED_AT);
-    if (
-      Number.isFinite(savedAtMs) &&
-      Date.now() - savedAtMs < CodexGatewayRefreshService.JUST_REFRESHED_WINDOW_MS
-    ) {
-      return {
-        status: "refreshed",
-        accessToken: keys.CODEX_ACCESS_TOKEN,
-        accountId: keys.CODEX_ACCOUNT_ID,
-      };
-    }
-
-    let refreshed: CodexTokenKeys;
-    try {
-      refreshed = await this.engine.refresh(keys);
-    } catch (error) {
-      if (error instanceof CodexAuthError && error.kind === "refresh_rejected") {
-        return { status: "session_expired" };
-      }
-      throw error;
-    }
-    await this.repository.replaceCustomKeys({
-      id: providerRowId,
-      customKeys: refreshed,
-    });
-    // Evict the gateway's cached bundle for this credential so the NEXT
-    // dispatch resolves the rotated token instead of replaying the stale one
-    // into another 401 -> refresh loop. The in-flight retry already carries
-    // the fresh token from this response.
-    await this.changeEvents.append({
-      organizationId: row.organizationId,
-      kind: "MODEL_PROVIDER_UPDATED",
-      modelProviderId: providerRowId,
-    });
-    return {
-      status: "refreshed",
-      accessToken: refreshed.CODEX_ACCESS_TOKEN,
-      accountId: refreshed.CODEX_ACCOUNT_ID,
-    };
-  }
 }
 
 export interface CodexClaims {

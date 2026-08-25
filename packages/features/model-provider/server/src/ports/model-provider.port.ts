@@ -5,6 +5,7 @@ import type {
   ModelDefaultScope,
   ModelProvider,
   ModelProviderApiKeyValidation,
+  CodexTokenKeys,
   ModelProviderSummary,
   ModelDefaultFeature,
   ModelProviderService,
@@ -88,6 +89,15 @@ export abstract class ModelProviderCredentialPolicy {
   abstract maskHeaders(
     value: Array<{ key: string; value: string }>,
   ): Array<{ key: string; value: string }>;
+}
+
+/** OAuth exchange boundary owned by the application runtime. */
+export abstract class CodexTokenRefresher {
+  abstract refresh(input: {
+    tokens: CodexTokenKeys;
+  }): Promise<
+    { status: "refreshed"; tokens: CodexTokenKeys } | { status: "session_expired" }
+  >;
 }
 
 export abstract class ModelDefaultRepository {
