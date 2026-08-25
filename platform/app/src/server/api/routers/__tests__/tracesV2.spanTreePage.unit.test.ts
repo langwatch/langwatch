@@ -28,6 +28,58 @@ const row = (
 });
 
 describe("mapSpanSummaryPage", () => {
+  it("preserves the complete public node shape", () => {
+    const page = mapSpanSummaryPage({
+      rows: [
+        {
+          spanId: "span-1",
+          parentSpanId: "parent-1",
+          spanName: "tool call",
+          durationMs: 25,
+          statusCode: 2,
+          spanType: "tool",
+          toolName: "search",
+          requestId: "request-1",
+          querySource: "source-1",
+          toolUseId: "tool-use-1",
+          model: "gpt-5",
+          cost: 0.0125,
+          inputTokens: 100,
+          outputTokens: 20,
+          cacheReadTokens: 30,
+          cacheCreationTokens: 10,
+          startTimeMs: 1_000,
+          updatedAtMs: 2_000,
+        },
+      ],
+      hasMore: false,
+    });
+
+    expect(page).toEqual({
+      nodes: [
+        {
+          spanId: "span-1",
+          parentSpanId: "parent-1",
+          name: "tool call",
+          type: "tool",
+          startTimeMs: 1_000,
+          endTimeMs: 1_025,
+          durationMs: 25,
+          status: "error",
+          model: "gpt-5",
+          toolName: "search",
+          cost: 0.0125,
+          inputTokens: 100,
+          outputTokens: 20,
+          cacheReadTokens: 30,
+          cacheCreationTokens: 10,
+          updatedAtMs: 2_000,
+        },
+      ],
+      nextCursor: null,
+    });
+  });
+
   describe("when the repository reports more spans past the page", () => {
     it("keys the next cursor off the page's last row", () => {
       const page = mapSpanSummaryPage({
