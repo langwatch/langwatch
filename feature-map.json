@@ -1524,6 +1524,35 @@
           "consumes": []
         },
         {
+          "id": "settings.agent-cache",
+          "name": "Agent Cache",
+          "description": "A per-project store an agent keeps its own run state in, encrypted at rest, where each entry expires by itself",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": "langwatch.cache",
+                "typescript": null
+              },
+              "cli": null,
+              "skill": null,
+              "docs": "https://langwatch.ai/docs/agent-simulations/authenticated-agents.md"
+            },
+            "platform": {
+              "ui": null,
+              "mcp": null,
+              "skill": null,
+              "docs": "https://langwatch.ai/docs/api-reference/agent-cache/overview.md"
+            },
+            "api": "/api/agent-cache",
+            "docs": "https://langwatch.ai/docs/agent-simulations/authenticated-agents.md"
+          },
+          "sync": null,
+          "produces": [
+            "agent-cache"
+          ],
+          "consumes": []
+        },
+        {
           "id": "settings.model-defaults",
           "name": "Model Defaults",
           "description": "Cascading default models per role or feature, scoped to project, team, or organization",

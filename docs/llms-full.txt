@@ -34752,6 +34752,195 @@ Create a scenario whose criteria can only pass if the agent got through the auth
 
 That answer exists only behind the auth wall, so the scenario passing is the proof that authentication works.
 
+## Reusing one login across the rows of a run
+
+The rows of an experiment or a dataset run are isolated on purpose, so that they
+can run in parallel. Each row starts cold, and a login on every row is the
+default result.
+
+The **agent cache** is where an agent keeps what it produced during a run. It is
+a per-project store: the agent writes the session there after it logs in, and
+reads it back at the start of every row. Values are encrypted at rest, and each
+entry expires by itself, so nothing has to clean up after a run that stopped
+halfway. A dataset row is the alternative, and it is stored in clear and is
+readable in the UI, so it suits a fixture and not a credential.
+
+There is nothing to set up. The platform gives each run its own LangWatch
+credential inside the sandbox, so the agent needs no `langwatch.setup()` call
+and no LangWatch secret. That credential reaches the agent cache and nothing
+else, and it expires on its own after the run.
+
+The whole agent is below. It is executed on every commit against the real
+code-agent runtime, so this is working code and not a sketch.
+
+```python shared_session_code_agent.py
+# Log in once and share the session across the rows of a run.
+#
+# Rows are isolated, so each one starts cold and a login on every row is the
+# default result. This agent keeps one session in the project's agent cache and
+# reads it back at the start of every row, so only the rows that start at the
+# same moment log in.
+#
+# The platform gives the sandbox its own LangWatch credential, so there is no
+# setup call to write and no LangWatch secret to create. The runner injects
+# `secrets` as a namespace (not the stdlib module of that name), the entry
+# point is `class Code` with `__call__`, and every declared output key must be
+# returned.
+
+import sys
+
+import langwatch
+import requests
+
+SESSION_ENTRY_NAME = "ACME_SESSION"  # the cache entry that holds the session
+SESSION_TTL_SECONDS = 15 * 60  # what the target system promises
+REFRESH_MARGIN_SECONDS = 60  # store it for less, so it is never sent stale
+
+
+class Code:
+    def __call__(self, message: str):
+        response = requests.post(
+            secret("ACME_API_URL"),
+            json={"message": message},
+            headers={"Authorization": f"Bearer {get_session()}"},
+            timeout=30,
+        )
+        # raise_for_status names the URL and the status code and nothing else.
+        response.raise_for_status()
+
+        return {"output": response.json()["reply"]}
+
+
+def get_session():
+    """Return a session token. This is the one line each row calls."""
+    try:
+        stored = langwatch.cache.get(SESSION_ENTRY_NAME)
+    except Exception:  # noqa: BLE001 - a cache that cannot answer is a miss
+        report("could not be read", "this row logs in")
+        stored = None
+    if stored:
+        return stored
+
+    session = login()
+    store_session(session)
+    return session
+
+
+def login():
+    """Log in to the target system and return the session it gives back."""
+    response = requests.post(
+        secret("ACME_LOGIN_URL"),
+        json={
+            "username": secret("ACME_USERNAME"),
+            "password": secret("ACME_PASSWORD"),
+        },
+        timeout=10,
+        # A 307 or 308 redirect re-sends the POST body, password included.
+        allow_redirects=False,
+    )
+    response.raise_for_status()
+    return response.json()["session"]
+
+
+def store_session(session):
+    """Store the session for the rows that follow, for a little less than the
+    target system promises. A failure here does not fail the row: this row
+    holds a working session already, and the only cost is that the next row
+    logs in again."""
+    try:
+        langwatch.cache.set(
+            SESSION_ENTRY_NAME,
+            session,
+            ttl_seconds=SESSION_TTL_SECONDS - REFRESH_MARGIN_SECONDS,
+        )
+    except Exception:  # noqa: BLE001 - the row must still answer
+        report("could not be stored", "the next row will log in again")
+
+
+def report(state, consequence):
+    """Say on stderr what the cache did, in this agent's own words.
+
+    Nothing from the exception reaches the output. An error message can quote
+    the credential that caused it, and a run shows stderr.
+    """
+    print(f"{SESSION_ENTRY_NAME} {state}, {consequence}", file=sys.stderr)
+
+
+def secret(name):
+    """Read a project secret, and name it when the project does not hold it."""
+    namespace = globals().get("secrets")
+    value = getattr(namespace, name, None) if namespace else None
+    if not value:
+        raise RuntimeError(
+            f"project secret {name} is missing. Add it in Settings -> Secrets."
+        )
+    return value
+```
+
+<Note>
+  `langwatch.cache` needs `langwatch` **1.3.0** or later. Pin it in the sandbox
+  before you use this agent.
+</Note>
+
+### Setting the two numbers
+
+`SESSION_TTL_SECONDS` is what the target system promises.
+`REFRESH_MARGIN_SECONDS` is how much of that the agent gives up, so a session
+it hands out is never about to lapse. The margin has to sit between the duration
+of your slowest row and `SESSION_TTL_SECONDS`. Below the slowest row, a session
+can expire in the middle of a call. At or above the promise, every entry is
+already gone by the time the next row reads it, and every row logs in again.
+
+The lifetime is the only thing that decides freshness. The agent stores no
+timestamp and does no arithmetic on one: an entry the platform still answers
+with is good, and an entry it no longer holds is a miss.
+
+### Cache limits
+
+| Rule | Value |
+|---|---|
+| Entry name | `UPPER_SNAKE_CASE` (`^[A-Z][A-Z0-9_]*$`), up to 64 characters |
+| Value size | Up to 32 KB |
+| Lifetime | 5 seconds to 24 hours, 15 minutes by default |
+
+### What this pattern does and does not do
+
+The agent reads the cache when the row runs, not when the row is prepared, so a
+row picks up whatever the newest session is at that moment. Four results follow:
+
+- A run over a dataset logs in once and every row after that reuses the session.
+- Rows that start at the same moment can each read an empty cache, so each of
+  them logs in once. Both sessions are valid and the last write wins. No lock
+  prevents this. Keep the login idempotent on the target system, or lower the
+  run's parallelism when the target rate-limits the login.
+- A failed read is a miss, and the row logs in. That covers an entry that was
+  never written, one whose lifetime has passed, and one the platform can no
+  longer read after a key rotation.
+- A failed write does not fail the row. The row already holds a working session,
+  and the only cost is that the next row logs in again. The agent says on stderr
+  what the cache did, in its own fixed words, and nothing from the exception
+  reaches the output: an error message can quote the credential that caused it.
+
+The source of this file is
+[`shared_session_code_agent.py`](https://github.com/langwatch/langwatch/blob/main/services/nlpgo/app/engine/blocks/codeblock/examples/shared_session_code_agent.py).
+
+### Reading and writing the cache yourself
+
+The three calls the facade offers:
+
+```python
+langwatch.cache.set("ACME_SESSION", session, ttl_seconds=840)
+langwatch.cache.get("ACME_SESSION", default=None)
+langwatch.cache.delete("ACME_SESSION")
+```
+
+`get` answers the default when the project holds no live entry under that name,
+so a read needs no `try`/`except` around it. Every other refusal raises.
+
+The same three operations are available over REST, at
+[`/api/agent-cache/{name}`](/api-reference/agent-cache/get-entry). Outside a
+run, a request needs an API key that can manage the agent cache.
+
 ## Troubleshooting
 
 | Symptom | Likely cause |
@@ -64666,6 +64855,63 @@ The hybrid setup requires coordination with our team to configure the secure con
 <Card title="Interested in hybrid setup?" icon="envelope" href="mailto:support@langwatch.ai">
   Contact our team to discuss your requirements and get started with a hybrid deployment.
 </Card>
+
+---
+
+# FILE: ./api-reference/agent-cache/delete-entry.mdx
+
+---
+title: "Remove a cache entry"
+openapi: "DELETE /api/agent-cache/{name}"
+---
+
+---
+
+# FILE: ./api-reference/agent-cache/get-entry.mdx
+
+---
+title: "Read a cache entry"
+openapi: "GET /api/agent-cache/{name}"
+---
+
+---
+
+# FILE: ./api-reference/agent-cache/overview.mdx
+
+---
+title: "Overview"
+description: "A per-project store an agent keeps its own run state in. Values are encrypted at rest and each entry expires by itself."
+---
+
+## Intro
+
+The agent cache holds what an agent produced during a run, so the work happens
+once for the run instead of once for every row. A login session and a handle
+that cost money to obtain are the usual entries.
+
+Names are `UPPER_SNAKE_CASE` and up to 64 characters. A value is up to 32 KB. A
+lifetime is between 5 seconds and 24 hours, and is 15 minutes when the request
+names none.
+
+There is no listing route: names come from the agent code that wrote them.
+
+Every route needs an API key that can manage the agent cache. A read returns the
+value, so a caller that can overwrite an entry can already choose what the next
+read answers.
+
+Inside a code agent, use the [Python SDK's
+`langwatch.cache`](/agent-simulations/authenticated-agents#reusing-one-login-across-the-rows-of-a-run)
+rather than these routes directly. The platform gives each run its own
+credential, so agent code needs no key of its own.
+
+---
+
+# FILE: ./api-reference/agent-cache/put-entry.mdx
+
+---
+title: "Store a cache entry"
+openapi: "PUT /api/agent-cache/{name}"
+---
 
 ---
 

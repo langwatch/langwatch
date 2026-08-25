@@ -926,6 +926,13 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Update a secret's value](https://langwatch.ai/docs/api-reference/secrets/update-secrets.md)
 - [Delete a secret](https://langwatch.ai/docs/api-reference/secrets/delete-secrets.md)
 
+## Agent Cache
+
+- [Overview](https://langwatch.ai/docs/api-reference/agent-cache/overview.md): A per-project store an agent keeps its own run state in. Values are encrypted at rest and each entry expires by itself.
+- [Read a cache entry](https://langwatch.ai/docs/api-reference/agent-cache/get-entry.md)
+- [Store a cache entry](https://langwatch.ai/docs/api-reference/agent-cache/put-entry.md)
+- [Remove a cache entry](https://langwatch.ai/docs/api-reference/agent-cache/delete-entry.md)
+
 ## Model Providers
 
 - [Overview](https://langwatch.ai/docs/api-reference/model-providers/overview.md): Manage model provider configurations (API keys for OpenAI, Anthropic, etc.) used across the platform.
