@@ -4,7 +4,43 @@ import { api } from "~/utils/api";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { PromptTemplateFieldsContext } from "../hooks/usePromptTemplateFields";
 import type { TargetConfig } from "../types";
-import { getFieldsUsedByPromptTemplate } from "../utils/mappingValidation";
+import {
+  getFieldsUsedByPromptTemplate,
+  type PromptTemplateMessage,
+} from "../utils/mappingValidation";
+
+/** What one resolved prompt query answers with, of the parts read here. */
+type ResolvedPrompt = {
+  version?: number;
+  messages: PromptTemplateMessage[];
+};
+
+/**
+ * The variables one column's template really consumes.
+ *
+ * Undefined when the answer is not the template this column runs: the query
+ * asks for the pinned version, so a version mismatch means describing the
+ * column from the wrong template, which is worse than describing nothing.
+ */
+const fieldsUsedByTarget = ({
+  target,
+  prompt,
+}: {
+  target: TargetConfig;
+  prompt: ResolvedPrompt | null | undefined;
+}): Set<string> | undefined => {
+  if (!prompt) return undefined;
+  if (
+    target.promptVersionNumber !== undefined &&
+    target.promptVersionNumber !== prompt.version
+  ) {
+    return undefined;
+  }
+  return getFieldsUsedByPromptTemplate({
+    messages: prompt.messages,
+    declaredFieldIds: (target.inputs ?? []).map((input) => input.identifier),
+  });
+};
 
 /**
  * Resolves the variables every prompt target's saved template consumes and
@@ -72,31 +108,13 @@ export const PromptTemplateFieldsProvider = ({
 
   const fieldsByTargetId = useMemo(() => {
     const byTargetId = new Map<string, Set<string>>();
-
     promptTargets.forEach((target, index) => {
-      const prompt = promptQueries[index]?.data;
-      if (!prompt) return;
-      // The query asks for the pinned version, so a mismatch here means the
-      // answer is not the template this column runs. Leaving the column out
-      // rather than describing it from the wrong template.
-      if (
-        target.promptVersionNumber !== undefined &&
-        target.promptVersionNumber !== prompt.version
-      ) {
-        return;
-      }
-
-      byTargetId.set(
-        target.id,
-        getFieldsUsedByPromptTemplate({
-          messages: prompt.messages,
-          declaredFieldIds: (target.inputs ?? []).map(
-            (input) => input.identifier,
-          ),
-        }),
-      );
+      const fields = fieldsUsedByTarget({
+        target,
+        prompt: promptQueries[index]?.data,
+      });
+      if (fields) byTargetId.set(target.id, fields);
     });
-
     return byTargetId;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolvedSignature]);

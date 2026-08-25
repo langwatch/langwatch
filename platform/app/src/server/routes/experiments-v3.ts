@@ -389,10 +389,17 @@ secured.access(sessionAuth).post(
         });
 
         for await (const event of orchestrator) {
+          // The store first, the customer second. The `execution_started`
+          // frame names the run, and the page hands that id to a poller as
+          // soon as it reads it, so a frame released before the store knows
+          // the run makes the first poll read 404 on a healthy run. Ordering
+          // it this way keeps the store a superset of what the page has seen.
+          // The mirror swallows its own failures, so a store outage still
+          // cannot stop the run.
+          await mirror.record(event);
           await stream.writeSSE({
             data: JSON.stringify(event),
           });
-          await mirror.record(event);
 
           if (event.type === "done" || event.type === "stopped") {
             if (session?.user?.id) {
@@ -426,18 +433,20 @@ secured.access(sessionAuth).post(
         // No `rowIndex`: the orchestrator itself threw, so the whole run is
         // gone and the mapper says so, rather than blaming one row.
         const failure = mapThrownErrorEvent({ error });
-        await stream.writeSSE({
-          data: JSON.stringify(failure),
-        });
         if (failure.type === "error") {
           // The code, never the thrown message: a poller reads this straight
-          // out of the run API.
+          // out of the run API. Written before the frame, for the same reason
+          // the loop above records first: a poller must never read the run as
+          // still going after the page has been told it died.
           await mirror.fail({
             code: failure.message,
             domainError: failure.domainError,
             traceId: failure.traceId,
           });
         }
+        await stream.writeSSE({
+          data: JSON.stringify(failure),
+        });
       }
     });
   },

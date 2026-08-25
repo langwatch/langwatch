@@ -83,17 +83,36 @@ const executionRequest = {
   scope: { type: "full" as const },
 };
 
-const execute = async () => {
+const post = async () => {
   const { app } = await import("../experiments-v3");
-  const res = await app.request("/api/experiments/execute", {
+  return app.request("/api/experiments/execute", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(executionRequest),
   });
+};
+
+const execute = async () => {
+  const res = await post();
   // Drain the stream so the handler runs to completion before we assert.
   await res.text();
   return res;
 };
+
+/** Whether a promise settles inside a window, without waiting on it further. */
+const settlesWithin = ({
+  work,
+  ms,
+}: {
+  work: Promise<unknown>;
+  ms: number;
+}): Promise<"released" | "nothing yet"> =>
+  Promise.race([
+    work.then(() => "released" as const),
+    new Promise<"nothing yet">((resolve) =>
+      setTimeout(() => resolve("nothing yet"), ms),
+    ),
+  ]);
 
 beforeEach(() => {
   createRun.mockClear();
@@ -133,6 +152,40 @@ describe("POST /api/experiments/execute", () => {
         total: 2,
         completed: 2,
       });
+    });
+  });
+
+  describe("when the store write that opens the run is still in flight", () => {
+    /** @scenario "The run id is not given out before the run API can answer for it" */
+    it("holds the frame that names the run until the run API can answer for it", async () => {
+      orchestratorEvents.events = [
+        { type: "execution_started", runId: "quick-plain-doe", total: 1 },
+        { type: "done", summary: { total: 1, completed: 1 } },
+      ];
+
+      let openTheRun = (): void => undefined;
+      createRun.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            openTheRun = () => resolve();
+          }),
+      );
+
+      const res = await post();
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("the response carries no stream");
+      const frame = reader.read();
+
+      // The page reads the id off this frame, calls onRunStarted and may poll
+      // at once. Releasing the frame first makes that poll read 404 on a
+      // healthy run, and a caller takes 404 for a run that never existed.
+      expect(await settlesWithin({ work: frame, ms: 100 })).toBe("nothing yet");
+
+      openTheRun();
+      expect(new TextDecoder().decode((await frame).value)).toContain(
+        "quick-plain-doe",
+      );
+      await reader.cancel();
     });
   });
 

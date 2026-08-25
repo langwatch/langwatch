@@ -206,6 +206,13 @@ Feature: Evaluation execution - UI
     And a failed run reports the failure's code, never the thrown message
     And a run id nothing knows about is still not found
 
+  @integration
+  Scenario: The run id is not given out before the run API can answer for it
+    Given the workbench page starts a run
+    When the page reads the frame that names the run
+    Then the run API already knows that run
+    And a poll sent the moment the page learns the id is not answered "not found"
+
   # ==========================================================================
   # Multiple Datasets And Pinned Versions
   # ==========================================================================
