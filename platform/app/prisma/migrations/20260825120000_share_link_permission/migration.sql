@@ -1,0 +1,34 @@
+-- ADR-092 §8: a share link states the permission it confers.
+--
+-- Until now every link conferred exactly `traces:view`, spelled as a constant
+-- in two places (`SHARE_LINK_PERMISSION` in the ledger's projection mapping,
+-- and a literal in the collector). The ledger head already had a column for
+-- the fact - `Grant.permission` - and the compat head did not, so a link that
+-- said anything else could not survive a rollback onto the legacy table.
+-- This is that column.
+--
+-- Nullable with NO default and NO backfill, deliberately. NULL is what every
+-- one of the existing rows means, and it reads as `traces:view` at every
+-- consumer (`shareLinkPermissionsGranted` in `@langwatch/authz`). A DEFAULT
+-- would write that same meaning as a literal string and then leave the
+-- allowlist's own name for it - the reader would have two spellings of "the
+-- ordinary link" to keep in step. So: absent means default, and the default
+-- lives in the code where the allowlist that validates it lives.
+--
+-- Purely additive: no constraint, no index, no rewrite of the table. An older
+-- deploy reading these rows never selects the column and is unaffected; a
+-- newer deploy reading a row an older one wrote sees NULL and grants exactly
+-- what it granted yesterday.
+--
+-- Not an enum, for the same reason `Grant.permission` is not: the vocabulary
+-- is `SHARE_LINK_PERMISSIONS` in `@langwatch/authz`, validated at the mint,
+-- and a second copy of it in the database would be one more thing that can
+-- disagree. A value outside the allowlist grants literally itself, never an
+-- implication (see `shareLinkPermissionsGranted`).
+--
+-- To roll back, uncomment and run manually. Dropping the column loses every
+-- non-default link's permission - each such link silently becomes read-only.
+-- ALTER TABLE "ShareLink" DROP COLUMN "permission";
+
+-- AlterTable
+ALTER TABLE "ShareLink" ADD COLUMN "permission" TEXT;

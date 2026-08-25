@@ -287,9 +287,28 @@ describe("compat share link mapping", () => {
         projectId: "proj_chatbot",
         userId: "user_alice",
         visibility: "PUBLIC",
+        // The default folds to ABSENCE, not to its own name: an ordinary
+        // link's compat row must stay identical to the ones already stored.
+        permission: null,
         expiresAt: new Date(1_756_000_000_000),
         maxViews: 5,
       });
+    });
+
+    /** @scenario "A non-default permission survives on both stores" */
+    it("carries a non-default permission onto the compat row", () => {
+      const row = grantFactToCompatShareLink({
+        grant: resourceFact({
+          resource: {
+            kind: "trace",
+            projectId: "proj_chatbot",
+            token: "tok_1",
+            permission: "annotations:create",
+          },
+        }),
+        organizationId: ORG,
+      });
+      expect(row?.permission).toBe("annotations:create");
     });
 
     it("keeps view accounting out of the shape entirely", () => {

@@ -256,6 +256,24 @@ describe("LedgerShareRepository", () => {
         expect(legacy.create).not.toHaveBeenCalled();
       });
 
+      /** @scenario "A minted link records what it confers on the grants ledger" */
+      it("states the link's own permission on the fact", async () => {
+        const { repository, writer } = buildRepository({ onEngine: true });
+
+        await repository.create({
+          ...createParams,
+          permission: "annotations:create",
+        });
+
+        expect(writer.attachResourceGrant).toHaveBeenCalledWith(
+          expect.objectContaining({
+            resource: expect.objectContaining({
+              permission: "annotations:create",
+            }),
+          }),
+        );
+      });
+
       it("names the audience an organization-visible link is for", async () => {
         const { repository, writer } = buildRepository({ onEngine: true });
 

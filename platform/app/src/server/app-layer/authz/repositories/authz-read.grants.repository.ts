@@ -358,6 +358,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
         resourceKind: true,
         scopeId: true,
         projectId: true,
+        permission: true,
         expiresAt: true,
         maxViews: true,
       },
@@ -551,6 +552,10 @@ type ShareLinkGrantCandidateRow = {
   resourceKind: string | null;
   scopeId: string;
   projectId: string | null;
+  /** The grant's own permission column - the ledger head has carried it
+   *  since the tier existed, and this is where the collector finally reads
+   *  it instead of assuming `traces:view`. */
+  permission: string | null;
   expiresAt: Date | null;
   maxViews: number | null;
 };
@@ -581,6 +586,7 @@ function shareLinkRowFrom({
       resourceId: row.scopeId,
       projectId: row.projectId,
       visibility,
+      permission: row.permission,
       expiresAt: row.expiresAt,
       maxViews: row.maxViews,
       viewCount: viewCounts.get(row.id) ?? 0,

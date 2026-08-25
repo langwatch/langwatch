@@ -1,3 +1,4 @@
+import type { ShareLinkPermission } from "@langwatch/authz";
 import type { ShareLink, ShareVisibility } from "~/generated/prisma/client";
 
 export type ShareResourceType = "TRACE" | "THREAD";
@@ -22,6 +23,14 @@ export interface CreateShareLinkParams {
   expiresAt?: Date | null;
   maxViews?: number | null;
   userId?: string | null;
+  /**
+   * What the link confers, from the closed allowlist in `@langwatch/authz`
+   * (`SHARE_LINK_PERMISSIONS`). Omitted stores null, which every reader takes
+   * as `traces:view` — so a caller that never mentions it mints exactly the
+   * row it minted before the column existed. Validated at the service, not
+   * here: a repository stores what it is told.
+   */
+  permission?: ShareLinkPermission;
 }
 
 export interface ShareRepository {

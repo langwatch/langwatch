@@ -663,6 +663,7 @@ describe("GrantsAuthzReadRepository", () => {
           resourceKind: true,
           scopeId: true,
           projectId: true,
+          permission: true,
           expiresAt: true,
           maxViews: true,
         },

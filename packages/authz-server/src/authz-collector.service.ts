@@ -6,6 +6,7 @@
  * scope resolution. One snapshot per (principal, organization) feeds any
  * number of pure decide() calls.
  */
+import { shareLinkPermissionsGranted } from "@langwatch/authz";
 import type {
   AuthzPrincipalRef,
   AuthzScopeRef,
@@ -193,15 +194,15 @@ export class AuthzCollectorService {
    * ADR-092 §8 / stage A5 — resource-tier grants for a resource scope's
    * links (the resource itself plus shareable ancestors).
    *
-   * SHIM: storage is the ADR-057 `ShareLink` table, read as grants of
-   * `traces:view` with the audience its visibility implies. Two ADR-057
-   * invariants are preserved here: possession of the token — not row
-   * existence — is what activates a grant (no presented tokens, no reads,
-   * no grants), and liveness (expiry, view budget) is filtered before the
-   * engine ever sees a row. View CONSUMPTION stays in ShareService: this
-   * reader is pure. The C5 migration extends ShareLink into full
-   * ResourceGrant storage (per-row permission, principal audiences) rather
-   * than adding a parallel table.
+   * SHIM: storage is the ADR-057 `ShareLink` table, read as grants of the
+   * permission the row itself names — `traces:view` for every row that names
+   * none — with the audience its visibility implies. Two ADR-057 invariants
+   * are preserved here: possession of the token — not row existence — is what
+   * activates a grant (no presented tokens, no reads, no grants), and liveness
+   * (expiry, view budget) is filtered before the engine ever sees a row. View
+   * CONSUMPTION stays in ShareService: this reader is pure. The C5 migration
+   * extends ShareLink into full ResourceGrant storage (principal audiences)
+   * rather than adding a parallel table.
    */
   async collectResourceGrants({
     scope,
@@ -226,23 +227,30 @@ export class AuthzCollectorService {
       links,
     });
     const now = this.now();
-    return rows
-      .filter((row) => isLiveShareLink(row, now))
-      .map((row) => ({
+    return rows.filter((row) => isLiveShareLink(row, now)).flatMap((row) => {
+      // The row's own project anchors both the grant and its audience: a
+      // row can only be reached through a query already scoped to this
+      // project, and taking the audience from anywhere else would let a
+      // grant name a project it does not sit in.
+      const audience = audienceForVisibility({
+        visibility: row.visibility,
+        organizationId: scope.organizationId,
+        projectId: row.projectId,
+      });
+      // ONE stored permission, expanded into one ResourceGrant per permission
+      // it confers - which is how "annotate implies view" is represented
+      // without the engine learning a cross-resource implication it does not
+      // have. `matchResourceGrant` already scans the LIST and tests each
+      // entry, so nothing downstream changes. A null column (every link
+      // minted before the column existed) expands to `traces:view` alone.
+      return shareLinkPermissionsGranted(row.permission).map((permission) => ({
         kind: kindForResourceType(row.resourceType),
         id: row.resourceId,
         projectId: row.projectId,
-        permission: "traces:view",
-        // The row's own project anchors both the grant and its audience: a
-        // row can only be reached through a query already scoped to this
-        // project, and taking the audience from anywhere else would let a
-        // grant name a project it does not sit in.
-        audience: audienceForVisibility({
-          visibility: row.visibility,
-          organizationId: scope.organizationId,
-          projectId: row.projectId,
-        }),
+        permission,
+        audience,
       }));
+    });
   }
 
   /** The reader for ONE snapshot: the routing decision behind it is taken

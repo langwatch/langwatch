@@ -454,7 +454,10 @@ function shareLinkToFact({
       kind: row.resourceType === "THREAD" ? "thread" : "trace",
       projectId: row.projectId,
       token: row.token,
-      permission: SHARE_LINK_PERMISSION,
+      // The legacy row's own permission, defaulted the same way every other
+      // reader defaults it — an import must not downgrade a link that was
+      // minted saying something other than "view".
+      permission: row.permission ?? SHARE_LINK_PERMISSION,
       ...(row.userId === null ? {} : { createdByUserId: row.userId }),
       ...(row.expiresAtMs === null ? {} : { expiresAtMs: row.expiresAtMs }),
       ...(row.maxViews === null ? {} : { maxViews: row.maxViews }),

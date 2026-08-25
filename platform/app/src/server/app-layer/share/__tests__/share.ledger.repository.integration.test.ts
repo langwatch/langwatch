@@ -310,5 +310,76 @@ describe("given a cut-over organization's capped share link", () => {
         [],
       );
     });
+
+    /**
+     * The per-row permission end to end, against the real column rather than
+     * a stub of it: a link on the SAME trace, minted saying it allows
+     * annotating, read back through the grant head and expanded by the
+     * collector. The neighbouring view-only link is the control — the two
+     * differ in exactly one column and confer different things.
+     *
+     * @scenario "A non-default permission survives on both stores"
+     */
+    it("expands a link's stored permission into everything it confers", async () => {
+      const annotateToken = `--test-share-token-annotate-${ns}`;
+      const annotateId = `share_annotate_${ns}`;
+      await prisma.shareLink.create({
+        data: {
+          id: annotateId,
+          token: annotateToken,
+          resourceType: ShareResourceType.TRACE,
+          resourceId: traceId,
+          projectId: project.id,
+          visibility: ShareVisibility.PUBLIC,
+          permission: "annotations:create",
+        },
+      });
+      await prisma.grant.create({
+        data: {
+          id: annotateId,
+          organizationId: organization.id,
+          principalType: GrantPrincipalType.ANYONE,
+          principalId: null,
+          roleKey: null,
+          source: "grants-service",
+          scopeType: GrantScopeType.RESOURCE,
+          scopeId: traceId,
+          token: annotateToken,
+          permission: "annotations:create",
+          resourceKind: "TRACE",
+          projectId: project.id,
+          occurredAt: new Date(),
+        },
+      });
+
+      const collector = new AuthzCollectorService(engineReader());
+      const scope = await collector.resolveResourceScopeRef({
+        projectId: project.id,
+        kind: "trace",
+        id: traceId,
+        shareTokens: [annotateToken],
+      });
+      const grants = await collector.collectResourceGrants({ scope: scope! });
+
+      expect(grants.map((grant) => grant.permission)).toEqual([
+        "traces:view",
+        "annotations:create",
+      ]);
+
+      // The control: the view-only link on the same trace still says one
+      // thing, so the expansion followed the row and not the trace.
+      const viewOnlyScope = await collector.resolveResourceScopeRef({
+        projectId: project.id,
+        kind: "trace",
+        id: traceId,
+        shareTokens: [token],
+      });
+      const viewOnlyGrants = await collector.collectResourceGrants({
+        scope: viewOnlyScope!,
+      });
+      expect(viewOnlyGrants.map((grant) => grant.permission)).toEqual([
+        "traces:view",
+      ]);
+    });
   });
 });

@@ -238,6 +238,7 @@ export class PrismaAuthzReadRepository implements AuthzReadRepository {
         resourceId: true,
         projectId: true,
         visibility: true,
+        permission: true,
         expiresAt: true,
         maxViews: true,
         viewCount: true,

@@ -1,3 +1,9 @@
+import {
+  DEFAULT_SHARE_LINK_PERMISSION,
+  isShareLinkPermission,
+  SHARE_LINK_PERMISSIONS,
+  type ShareLinkPermission,
+} from "@langwatch/authz";
 import { createLogger } from "@langwatch/observability";
 import type { ShareLink, ShareVisibility } from "~/generated/prisma/client";
 import type { PinnedTraceService } from "~/server/data-retention/pinning/pinnedTrace.service";
@@ -6,6 +12,7 @@ import {
   ShareLinkExpiredError,
   ShareLinkForbiddenError,
   ShareLinkNotFoundError,
+  ShareLinkPermissionNotAllowedError,
   TraceSharingDisabledError,
 } from "./errors";
 import type {
@@ -29,6 +36,24 @@ export function isShareViewExhausted(
   share: Pick<ShareLink, "maxViews" | "viewCount">,
 ): boolean {
   return share.maxViews != null && share.viewCount >= share.maxViews;
+}
+
+/**
+ * The permission a mint asked for, or the refusal. Absent means the default,
+ * which is how every existing caller passes through unchanged; anything
+ * outside the allowlist is a knowable failure the caller can act on, so it
+ * gets a code and the set of values it should have sent.
+ */
+function assertShareLinkPermission(
+  permission: string | null | undefined,
+): ShareLinkPermission {
+  if (permission == null) return DEFAULT_SHARE_LINK_PERMISSION;
+  if (!isShareLinkPermission(permission)) {
+    throw new ShareLinkPermissionNotAllowedError(
+      Object.keys(SHARE_LINK_PERMISSIONS),
+    );
+  }
+  return permission;
 }
 
 export interface ShareViewer {
@@ -166,6 +191,12 @@ export class ShareService {
    * hand out a capability nothing can redeem. The `ShareLink.threadId` column
    * stays — unpopulated — for when the aggregate can carry the surrounding
    * conversation. See ADR-057's follow-ups.
+   *
+   * `permission` is what the link confers (ADR-092 §8). Omitted stores
+   * nothing, which every reader takes as `traces:view` — so a caller that
+   * does not mention it mints the row it minted before the column existed.
+   * The allowlist is validated HERE rather than at the router, because the
+   * router is not the only way in and a repository stores what it is told.
    */
   async createShare({
     projectId,
@@ -175,6 +206,7 @@ export class ShareService {
     expiresAt,
     maxViews,
     userId,
+    permission,
   }: {
     projectId: string;
     resourceType: ShareResourceType;
@@ -183,6 +215,7 @@ export class ShareService {
     expiresAt?: Date | null;
     maxViews?: number | null;
     userId?: string | null;
+    permission?: string | null;
   }): Promise<ShareLink> {
     if (
       resourceType === "TRACE" &&
@@ -190,6 +223,8 @@ export class ShareService {
     ) {
       throw new TraceSharingDisabledError();
     }
+
+    const requested = assertShareLinkPermission(permission);
 
     const share = await this.repo.create({
       token: generateShareToken(),
@@ -200,6 +235,11 @@ export class ShareService {
       expiresAt,
       maxViews,
       userId,
+      // The default is stored as absence, not as its own name: an ordinary
+      // link's row must not start differing from the ones already there.
+      ...(requested === DEFAULT_SHARE_LINK_PERMISSION
+        ? {}
+        : { permission: requested }),
     });
 
     if (resourceType === "TRACE") {
