@@ -89,27 +89,17 @@ function AccessContent({
           {JOINING_LABEL[joinRequests.joining.domainJoin]}
         </AccessFact>
         <AccessFact label="Waiting to join">
-          {joinRequests.requests.length === 0
-            ? "Nobody"
-            : `${joinRequests.requests.length} ${joinRequests.requests.length === 1 ? "person" : "people"}`}
+          {waitingLabel(joinRequests.requests.length)}
         </AccessFact>
         <AccessFact label="Two-step verification">
-          {twoStep.show
-            ? twoStep.mfaRequired
-              ? "Required"
-              : "Optional"
-            : "Optional"}
+          {twoStep.show && twoStep.mfaRequired ? "Required" : "Optional"}
         </AccessFact>
         <AccessFact label="Domains verified">
-          {canViewSso ? (
-            setup.isLoading ? (
-              <Skeleton height="4" width="10" />
-            ) : (
-              String(verifiedDomains)
-            )
-          ) : (
-            "—"
-          )}
+          {domainsValue({
+            canViewSso,
+            isLoading: setup.isLoading,
+            count: verifiedDomains,
+          })}
         </AccessFact>
       </SimpleGrid>
 
@@ -150,6 +140,25 @@ function AccessContent({
       />
     </VStack>
   );
+}
+
+function waitingLabel(count: number): string {
+  if (count === 0) return "Nobody";
+  return `${count} ${count === 1 ? "person" : "people"}`;
+}
+
+function domainsValue({
+  canViewSso,
+  isLoading,
+  count,
+}: {
+  canViewSso: boolean;
+  isLoading: boolean;
+  count: number;
+}): ReactNode {
+  if (!canViewSso) return "—";
+  if (isLoading) return <Skeleton height="4" width="10" />;
+  return String(count);
 }
 
 /** One answered question, in the stat-tile register the directory overview
