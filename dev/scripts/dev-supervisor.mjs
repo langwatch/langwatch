@@ -29,13 +29,21 @@
  *      never take down anything we did not start.
  *   2. Watches the group it was launched FROM. When that group's leader dies,
  *      the stack goes down: SIGTERM, then SIGKILL for whatever ignored it.
- *   3. Posts a SENTINEL outside both groups. A hard session teardown SIGKILLs
- *      the launching group as a whole — the shell, the pnpm chain, and this
- *      supervisor in it — and the stack is detached exactly so that teardown
- *      cannot reach it, which also means its watcher dies watching. The
- *      sentinel is a process group of its own that answers to neither kill:
- *      it idles while the supervisor or the launcher is alive, takes the
- *      stack down when both are gone, and exits the moment the stack does.
+ *   3. Puts a SENTINEL between itself and the stack. A hard session teardown
+ *      SIGKILLs the launching group as a whole — the shell, the pnpm chain,
+ *      and this supervisor in it — and the stack is detached exactly so that
+ *      teardown cannot reach it, which also means its watcher dies watching.
+ *      The sentinel is a session of its own that answers to neither kill: it
+ *      idles while the supervisor or the launcher is alive, takes the stack
+ *      down when both are gone, and goes when the last lane does.
+ *
+ * The sentinel is started BEFORE the stack and is what spawns it, so there is
+ * no instant in which a detached stack exists with nothing outside the doomed
+ * group watching it. Starting the stack first and the sentinel second would
+ * leave exactly that window, and a SIGKILL landing in it reproduces the
+ * original leak in full. The two talk over a pipe on fd 3: the sentinel
+ * reports the stack's pid as soon as it has one, so the supervisor can still
+ * address the stack itself, and its exit code when it ends.
  *
  * Watching the launching group rather than our own parent is what makes this
  * work at any depth: `pnpm dev` at the repo root delegates through several
@@ -59,6 +67,7 @@
  */
 
 import { spawn, spawnSync } from "node:child_process";
+import fs from "node:fs";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
 
@@ -70,7 +79,10 @@ const WATCH_INTERVAL_MS = 1_000;
 const NESTED = "LANGWATCH_DEV_SUPERVISED";
 /** Re-entry flag for the sentinel process; never typed by hand. */
 const SENTINEL_FLAG = "--sentinel";
+/** The pipe the sentinel reports the stack's pid, then its exit code, on. */
+const HANDSHAKE_FD = 3;
 const PREFIX = "dev-supervisor:";
+const SELF = fileURLToPath(import.meta.url);
 
 const stderr = (msg) => process.stderr.write(msg);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -201,62 +213,202 @@ function stackControls({ target, graceMs }) {
   return { takeDown, anyAlive };
 }
 
-/**
- * The sentinel: a group of its own, so no teardown aimed at the launcher or
- * the stack can take it before it has done its job. It idles while either the
- * supervisor or the launcher is alive (whichever of them is up owns the
- * stack's lifetime), takes the stack down when both are gone, and exits as
- * soon as the stack itself is gone — including when the stack was taken down
- * properly and the sentinel was simply never needed.
- *
- * Anything after the three pids in its argv is the guarded command, carried
- * only so `ps` shows what a sentinel is standing for.
- */
-async function runSentinel(args, env) {
-  const stackPid = Number.parseInt(args[0] ?? "", 10);
-  const supervisorPid = Number.parseInt(args[1] ?? "", 10);
-  const leaderPid = Number.parseInt(args[2] ?? "", 10);
-  if (!Number.isInteger(stackPid) || stackPid <= 1) return 64;
+/** The sentinel's half of the handshake. A closed pipe is never a failure. */
+function tell(value) {
+  try {
+    fs.writeSync(HANDSHAKE_FD, `${value}\n`);
+  } catch {
+    // Nobody listening: run by hand, or the supervisor is already gone.
+  }
+}
 
-  const everyMs = positiveInt(env.LANGWATCH_DEV_WATCH_MS, WATCH_INTERVAL_MS);
-  const stack = stackControls({
-    target: -stackPid,
-    graceMs: positiveInt(env.LANGWATCH_DEV_GRACE_MS, DEFAULT_GRACE_MS),
-  });
-  const watched = (pid) => Number.isInteger(pid) && pid > 1 && alive(pid);
-
-  for (;;) {
-    if (!stack.anyAlive()) return 0;
-    if (!watched(supervisorPid) && !watched(leaderPid)) {
-      await stack.takeDown();
-      return 0;
-    }
-    await sleep(everyMs);
+function hangUp() {
+  try {
+    fs.closeSync(HANDSHAKE_FD);
+  } catch {
+    // Already closed, or never a pipe.
   }
 }
 
 /**
- * Posts the sentinel for a detached stack. Failing to post one is not a gate:
- * the supervisor's own watch still covers every case except its own SIGKILL.
+ * The sentinel: the stack's parent, in a session of its own, so no teardown
+ * aimed at the launching group can reach it and the stack is never without a
+ * guard outside that group. It idles while either the supervisor or the
+ * launcher is alive (whichever of them is up owns the stack's lifetime),
+ * takes the stack down when both are gone, and exits once the last lane is
+ * gone — including when the stack was taken down properly and the sentinel
+ * was simply never needed.
+ *
+ * Anything after the two pids in its argv is the guarded command, which it
+ * runs and which `ps` therefore shows as what a sentinel stands for.
  */
-function startSentinel({ stackPid, leader, argv, env }) {
+async function runSentinel(args, env) {
+  const supervisorPid = Number.parseInt(args[0] ?? "", 10);
+  const leaderPid = Number.parseInt(args[1] ?? "", 10);
+  const argv = args.slice(2);
+  if (argv.length === 0) return 64;
+
+  const child = startChild(argv, env, true);
+  // Out before anything else can happen to the stack. From here the supervisor
+  // can address it, and this process is already its parent either way.
+  tell(child?.pid ?? 0);
+  if (child === null) {
+    hangUp();
+    return 127;
+  }
+
+  let code = null;
+  const settled = new Promise((resolve) => {
+    child.on("error", (err) => {
+      stderr(`${PREFIX} could not start ${argv[0]} (${err.message})\n`);
+      resolve(127);
+    });
+    child.on("close", (status, signal) =>
+      resolve(exitCodeFor({ code: status, signal })),
+    );
+  });
+  void settled.then((value) => {
+    code = value;
+  });
+
+  const stack = stackControls({
+    target: -child.pid,
+    graceMs: positiveInt(env.LANGWATCH_DEV_GRACE_MS, DEFAULT_GRACE_MS),
+  });
+  const everyMs = positiveInt(env.LANGWATCH_DEV_WATCH_MS, WATCH_INTERVAL_MS);
+  const watched = (pid) => Number.isInteger(pid) && pid > 1 && alive(pid);
+  let reported = false;
+  const report = () => {
+    if (reported) return;
+    reported = true;
+    tell(code ?? exitCodeFor(null));
+    hangUp();
+  };
+
+  for (;;) {
+    if (code !== null) report();
+    // Only once the stack has been seen to settle: a group that has not been
+    // observed yet reads as "quiet" while the command is still being exec'd.
+    if (reported && !stack.anyAlive()) break;
+    if (!watched(supervisorPid) && !watched(leaderPid)) {
+      await stack.takeDown();
+      break;
+    }
+    if (code === null) await Promise.race([settled, sleep(everyMs)]);
+    else await sleep(everyMs);
+  }
+
+  report();
+  return code ?? exitCodeFor(null);
+}
+
+/**
+ * Starts the sentinel, which starts the stack. Returns null when it could not
+ * be started, which is never a gate: the caller falls back to running the
+ * command itself, unguarded against its own SIGKILL but running.
+ */
+function startSentinel({ leader, argv, env }) {
+  let proc = null;
   try {
-    const child = spawn(
+    proc = spawn(
       process.execPath,
       [
-        fileURLToPath(import.meta.url),
+        SELF,
         SENTINEL_FLAG,
-        String(stackPid),
         String(process.pid),
-        String(leader),
+        String(leader ?? 0),
         ...argv,
       ],
-      { detached: true, stdio: "ignore", env },
+      {
+        detached: true,
+        // The stack's stdio is ours, passed down a level; fd 3 is the pipe it
+        // answers on. Node closes it on exec, so the stack never holds it open.
+        stdio: ["inherit", "inherit", "inherit", "pipe"],
+        env,
+      },
     );
-    child.unref();
   } catch (err) {
     stderr(`${PREFIX} could not post the sentinel (${err.message})\n`);
+    return null;
   }
+  // It outlives us on purpose, so it must never be what holds our exit open.
+  // The handshake pipe is what keeps us alive while the stack runs.
+  proc.unref();
+
+  let resolvePid = null;
+  const pid = new Promise((r) => {
+    resolvePid = r;
+  });
+  let onExit = () => {};
+  readHandshake(proc.stdio[HANDSHAKE_FD], {
+    onPid: (value) => resolvePid(value),
+    onExit: (value) => onExit(value ?? exitCodeFor(null)),
+  });
+
+  return {
+    target: async () => {
+      const stackPid = await pid;
+      return stackPid === null ? null : -stackPid;
+    },
+    onFailed: () => {},
+    onExit: (cb) => {
+      onExit = cb;
+    },
+  };
+}
+
+/**
+ * The supervisor's half of the handshake: the stack's pid, then its exit code.
+ * Two lines rather than waiting on the sentinel itself, which stays up as long
+ * as any lane does and would otherwise make a stack that exits on its own look
+ * like one this had to wait for. An end with nothing on it answers both.
+ */
+function readHandshake(stream, { onPid, onExit }) {
+  if (!stream) {
+    onPid(null);
+    onExit(null);
+    return;
+  }
+  let buffer = "";
+  let seen = 0;
+  const take = (line) => {
+    if (seen >= 2) return;
+    const value = Number.parseInt(line, 10);
+    const parsed = Number.isInteger(value) ? value : null;
+    seen += 1;
+    if (seen === 1) onPid(parsed !== null && parsed > 1 ? parsed : null);
+    else onExit(parsed);
+  };
+
+  stream.setEncoding("utf8");
+  stream.on("data", (chunk) => {
+    buffer += chunk;
+    for (let nl = buffer.indexOf("\n"); nl !== -1; nl = buffer.indexOf("\n")) {
+      take(buffer.slice(0, nl));
+      buffer = buffer.slice(nl + 1);
+    }
+  });
+  const end = () => {
+    while (seen < 2) take("");
+  };
+  stream.on("end", end);
+  stream.on("error", end);
+}
+
+/** Runs the command in this process, the way an unguarded run always did. */
+function startDirect(argv, env, detached) {
+  const child = startChild(argv, env, detached);
+  if (child === null) return null;
+  return {
+    target: async () => (detached ? -child.pid : child.pid),
+    onFailed: (cb) =>
+      child.on("error", (err) => {
+        stderr(`${PREFIX} could not start ${argv[0]} (${err.message})\n`);
+        cb(127);
+      }),
+    onExit: (cb) =>
+      child.on("close", (code, signal) => cb(exitCodeFor({ code, signal }))),
+  };
 }
 
 /** Polls for the launcher's death, or null when there is nothing to watch. */
@@ -273,27 +425,39 @@ function watchLauncher({ leader, env, onGone }) {
 }
 
 /**
- * Runs the command and returns its exit code. With `detached`, the child leads
+ * Starts the run this supervisor reports on. A detached run goes through a
+ * sentinel, which is what actually spawns the stack; anything else runs the
+ * command here. A sentinel that cannot be started falls back to the direct
+ * run rather than failing the command.
+ */
+function startRun(argv, env, { detached, leader }) {
+  if (detached) {
+    const sentinel = startSentinel({ leader, argv, env });
+    if (sentinel !== null) return sentinel;
+  }
+  return startDirect(argv, env, detached);
+}
+
+/**
+ * Runs the command and returns its exit code. With `detached`, the stack leads
  * a process group of its own and every takedown targets that group.
  */
 function passThrough(argv, env, { detached, leader = null }) {
-  const child = startChild(argv, env, detached);
-  if (child === null) return Promise.resolve(127);
-  if (detached) startSentinel({ stackPid: child.pid, leader, argv, env });
+  const run = startRun(argv, env, { detached, leader });
+  if (run === null) return Promise.resolve(127);
 
   return new Promise((resolve) => {
-    const stack = stackControls({
-      target: detached ? -child.pid : child.pid,
-      graceMs: positiveInt(env.LANGWATCH_DEV_GRACE_MS, DEFAULT_GRACE_MS),
-    });
     let watch = null;
     let takingDown = false;
-    let childResult = null;
+    let settled = false;
+    let stackCode = null;
 
     // clearInterval ignores null, so the watch never needs guarding.
-    const finish = () => {
+    const finish = (code) => {
+      if (settled) return;
+      settled = true;
       clearInterval(watch);
-      resolve(exitCodeFor(childResult));
+      resolve(code);
     };
 
     const stop = async (why) => {
@@ -301,12 +465,19 @@ function passThrough(argv, env, { detached, leader = null }) {
       takingDown = true;
       clearInterval(watch);
       if (why !== null) stderr(`${PREFIX} ${why}, stopping the dev stack.\n`);
-      if (!(await stack.takeDown())) {
-        stderr(
-          `${PREFIX} some of the dev stack outlived SIGKILL, giving up.\n`,
-        );
+      const target = await run.target();
+      if (target !== null) {
+        const stack = stackControls({
+          target,
+          graceMs: positiveInt(env.LANGWATCH_DEV_GRACE_MS, DEFAULT_GRACE_MS),
+        });
+        if (!(await stack.takeDown())) {
+          stderr(
+            `${PREFIX} some of the dev stack outlived SIGKILL, giving up.\n`,
+          );
+        }
       }
-      finish();
+      finish(stackCode ?? exitCodeFor(null));
     };
 
     watch = watchLauncher({ leader, env, onGone: stop });
@@ -317,17 +488,13 @@ function passThrough(argv, env, { detached, leader = null }) {
       process.on(signal, () => void stop(null));
     }
 
-    child.on("error", (err) => {
-      stderr(`${PREFIX} could not start ${argv[0]} (${err.message})\n`);
-      clearInterval(watch);
-      resolve(127);
-    });
+    run.onFailed((code) => finish(code));
 
-    child.on("close", (code, signal) => {
-      childResult = { code, signal };
+    run.onExit((code) => {
+      stackCode = code;
       // Mid-takedown this is just one lane going quiet; `stop` decides when the
       // stack is actually down.
-      if (!takingDown) finish();
+      if (!takingDown) finish(code);
     });
   });
 }

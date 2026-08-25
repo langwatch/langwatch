@@ -139,16 +139,71 @@ function launchFrom(command: string, env: Record<string, string> = {}): number {
   return child.pid as number;
 }
 
-/** Every live pid whose command line carries this test's marker. */
-function stackPids(): number[] {
+/** How a sentinel is told from a supervisor: it re-enters behind this flag. */
+const SENTINEL_FLAG = "--sentinel";
+
+/** The live pids whose command line carries this test's marker and passes `keep`. */
+function markedPids(keep: (line: string) => boolean): number[] {
   const out = spawnSync("ps", ["-Ao", "pid=", "-o", "command="], {
     encoding: "utf8",
   }).stdout;
   return out
     .split("\n")
-    .filter((l) => l.includes(marker) && !l.includes("pkill"))
+    .filter((l) => l.includes(marker) && !l.includes("pkill") && keep(l))
     .map((l) => Number.parseInt(l.trim(), 10))
     .filter((n) => Number.isInteger(n));
+}
+
+/** Every live pid whose command line carries this test's marker. */
+function stackPids(): number[] {
+  return markedPids(() => true);
+}
+
+/**
+ * The sentinels posted for this test's stack. A sentinel carries the guarded
+ * command in its argv, so the marker tells this test's sentinels from the ones
+ * any other run posted.
+ */
+function sentinelPids(): number[] {
+  return markedPids(
+    (l) => l.includes("dev-supervisor.mjs") && l.includes(SENTINEL_FLAG),
+  );
+}
+
+/** Every live pid, with its parent, as `ps` reports them. */
+function processTree(): { pid: number; ppid: number; command: string }[] {
+  const out = spawnSync(
+    "ps",
+    ["-Ao", "pid=", "-o", "ppid=", "-o", "command="],
+    {
+      encoding: "utf8",
+    },
+  ).stdout;
+  const rows: { pid: number; ppid: number; command: string }[] = [];
+  for (const line of out.split("\n")) {
+    const match = /^(\d+)\s+(\d+)\s+(.*)$/.exec(line.trim());
+    if (match === null) continue;
+    const [, pid, ppid, command] = match;
+    if (pid === undefined || ppid === undefined || command === undefined) {
+      continue;
+    }
+    rows.push({
+      pid: Number.parseInt(pid, 10),
+      ppid: Number.parseInt(ppid, 10),
+      command,
+    });
+  }
+  return rows;
+}
+
+/** Whether a pid still exists, for the launcher this test must not disturb. */
+function pidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === "EPERM";
+  }
 }
 
 async function waitUntil(
@@ -323,20 +378,10 @@ describe("dev stack supervisor", () => {
      * not the script body that mentions the supervisor.
      */
     function supervisorPid(): number | null {
-      const out = spawnSync("ps", ["-Ao", "pid=", "-o", "command="], {
-        encoding: "utf8",
-      }).stdout;
-      const line = out
-        .split("\n")
-        .find(
-          (l) =>
-            l.includes("dev-supervisor.mjs") &&
-            l.includes(marker) &&
-            !l.includes("--sentinel"),
-        );
-      if (!line) return null;
-      const pid = Number.parseInt(line.trim(), 10);
-      return Number.isInteger(pid) ? pid : null;
+      const [pid] = markedPids(
+        (l) => l.includes("dev-supervisor.mjs") && !l.includes(SENTINEL_FLAG),
+      );
+      return pid ?? null;
     }
 
     describe("when the supervisor and the shell are both killed by pid", () => {
@@ -385,13 +430,51 @@ describe("dev stack supervisor", () => {
       });
     });
 
+    describe("when the stack is running", () => {
+      /** @scenario "The stack is never running without a guard outside the doomed group" */
+      it("was started by the sentinel, so it was never unguarded", async () => {
+        const stack = writeStack(DEEP_STACK);
+        launchFrom(`node ${asBashWord(SUPERVISOR)} ${asBashWord(stack)}`);
+        expect(await stackIsUp()).toBe(true);
+
+        // The stack script's own process, and who created it. A sentinel
+        // posted AFTER the stack would leave the supervisor as the parent, and
+        // with it the window this asserts away: for as long as posting takes,
+        // a detached stack whose only watcher is inside the doomed group.
+        const tree = processTree();
+        const stackProc = tree.find(
+          (p) => p.command.includes(stack) && !p.command.includes(SUPERVISOR),
+        );
+        expect(stackProc).toBeDefined();
+
+        const parent = tree.find((p) => p.pid === stackProc?.ppid);
+        expect(parent?.command).toContain("dev-supervisor.mjs");
+        expect(parent?.command).toContain(SENTINEL_FLAG);
+      });
+    });
+
     describe("when the stack exits on its own", () => {
       /** @scenario "Supervision leaves nothing behind when the stack exits on its own" */
       it("leaves no sentinel running", async () => {
-        const result = runSupervised(["sh", "-c", `: ${marker}`]);
+        // The stack runs until this test releases it, so the sentinel can be
+        // observed alive first: a run that never posted one would otherwise
+        // pass this test by having nothing to leave behind.
+        const stopFile = path.join(scratch, "stop");
+        const stack = writeStack(
+          `while [ ! -f ${asBashWord(stopFile)} ]; do sleep 0.1; done`,
+        );
+        const launcher = launchFrom(
+          `node ${asBashWord(SUPERVISOR)} ${asBashWord(stack)}`,
+        );
+        expect(await stackIsUp()).toBe(true);
+        expect(await waitUntil(() => sentinelPids().length > 0)).toBe(true);
 
-        expect(result.status).toBe(0);
-        expect(await waitUntil(() => stackPids().length === 0)).toBe(true);
+        writeFileSync(stopFile, "", "utf8");
+
+        // Nobody was killed: the stack ended by itself and the sentinel went
+        // with it, leaving the launcher that is still there untouched.
+        expect(await waitUntil(() => sentinelPids().length === 0)).toBe(true);
+        expect(pidAlive(launcher)).toBe(true);
       });
     });
   });

@@ -104,6 +104,17 @@ Feature: A dev stack does not outlive whoever started it
     When the supervisor and the shell are both killed without any signal reaching the stack
     Then the whole stack is taken down anyway
 
+  # A sentinel started after the stack would leave a window: for as long as it
+  # takes to start, a detached stack exists that the doomed group is still the
+  # only watcher of, and a SIGKILL landing there leaks the stack for good. So
+  # the sentinel is started first and is what starts the stack.
+
+  @unit
+  Scenario: The stack is never running without a guard outside the doomed group
+    Given a dev stack started from a shell
+    When the stack is running
+    Then the sentinel is what started it, so no window exists in which it had no guard
+
   @unit
   Scenario: A killed supervisor alone does not take a living launcher's stack
     Given a dev stack started from a shell
