@@ -48,3 +48,30 @@ export class PermissionDeniedError extends HandledError {
     return this.meta.denialReason as AuthzDenialReason;
   }
 }
+
+/**
+ * The request named its scope field and left it empty, so there is nothing to
+ * check a permission against.
+ *
+ * This is the answer a `.min(1)` on the input schema would have given, raised
+ * from the one seam every declaration passes through so no procedure can miss
+ * it. It is deliberately NOT a denial: refusing an empty id as "you may not
+ * touch this" would tell a caller their own blank string is a scope someone
+ * else owns. It is equally not a wiring bug — the caller can fix it by naming
+ * a scope, which is exactly what makes it handled.
+ *
+ * `fieldErrors` is the shape the client's form mapper and the `validation_error`
+ * presentation entry already read, so the copy a customer sees needs no new
+ * registry entry. Scope ids are wire identifiers the customer never sees, so
+ * that copy stays generic on purpose.
+ */
+export class BlankScopeIdError extends HandledError {
+  constructor({ field }: { field: string }) {
+    super("validation_error", "The request did not name a scope to act in.", {
+      httpStatus: 400,
+      fault: "customer",
+      meta: { fieldErrors: { [field]: ["Required"] } },
+    });
+    this.name = "BlankScopeIdError";
+  }
+}
