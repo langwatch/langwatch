@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import { getApp } from "~/server/app-layer/app";
+import type { App } from "~/server/app-layer/app";
 import { redactPatchForViewer } from "~/server/traces/edit-overlay/redactTraceEditOverlayPatch";
 import { restoreWithheldEdits } from "~/server/traces/edit-overlay/restoreWithheldTraceEdits";
 import { traceEditOverlayPatchSchema } from "~/server/traces/edit-overlay/traceEditOverlay.schemas";
@@ -22,17 +22,19 @@ async function isTraceWindowRedacted({
   projectId,
   traceId,
   protections,
+  traceSummary,
 }: {
   projectId: string;
   traceId: string;
   protections: Protections;
+  traceSummary: App["traces"]["summary"];
 }): Promise<boolean> {
   const visibilityCutoffMs = protections.visibilityCutoffMs;
   if (visibilityCutoffMs === null || visibilityCutoffMs === undefined) {
     return false;
   }
   try {
-    const summary = await getApp().traces.summary.getByTraceId(
+    const summary = await traceSummary.getByTraceId(
       projectId,
       traceId,
       { visibilityCutoffMs, full: false },
@@ -64,7 +66,7 @@ export const traceEditOverlayRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
     .permission("traces:view")
     .query(async ({ ctx, input }) => {
-      const overlay = await getApp().traces.editOverlay.getByTraceId({
+      const overlay = await ctx.app.traces.editOverlay.getByTraceId({
         projectId: input.projectId,
         traceId: input.traceId,
       });
@@ -77,6 +79,7 @@ export const traceEditOverlayRouter = createTRPCRouter({
         projectId: input.projectId,
         traceId: input.traceId,
         protections,
+        traceSummary: ctx.app.traces.summary,
       });
 
       return {
@@ -107,7 +110,7 @@ export const traceEditOverlayRouter = createTRPCRouter({
     )
     .permission("annotations:update")
     .mutation(async ({ ctx, input }) => {
-      const editOverlay = getApp().traces.editOverlay;
+      const editOverlay = ctx.app.traces.editOverlay;
       const stored = await editOverlay.getByTraceId({
         projectId: input.projectId,
         traceId: input.traceId,
@@ -131,6 +134,7 @@ export const traceEditOverlayRouter = createTRPCRouter({
         projectId: input.projectId,
         traceId: input.traceId,
         protections,
+        traceSummary: ctx.app.traces.summary,
       });
 
       const saved = await editOverlay.upsert({
@@ -158,8 +162,8 @@ export const traceEditOverlayRouter = createTRPCRouter({
   delete: protectedProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
     .permission("annotations:update")
-    .mutation(async ({ input }) => {
-      await getApp().traces.editOverlay.delete({
+    .mutation(async ({ input, ctx }) => {
+      await ctx.app.traces.editOverlay.delete({
         projectId: input.projectId,
         traceId: input.traceId,
       });
