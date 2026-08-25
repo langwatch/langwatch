@@ -2,6 +2,7 @@ import { Box, Flex } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import "../authFrontDoor.css";
+import { CastleSnake } from "./CastleSnake";
 import { FrontDoorGround } from "./FrontDoorGround";
 import { FrontDoorValuePanel } from "./FrontDoorValuePanel";
 import { LogoHandoff } from "./LogoHandoff";
@@ -63,6 +64,10 @@ export function FrontDoorShell({
       overflowX="hidden"
     >
       <LogoHandoff />
+      {/* Renders nothing until somebody double-taps the castle. Mounted here
+          so it exists exactly where the front door exists — same flag, same
+          screens — and nowhere else. */}
+      <CastleSnake />
       {isHosted ? (
         <FrontDoorGround protect={headline ? "left" : "center"} />
       ) : null}
