@@ -20,6 +20,7 @@
     "lint:declarations": "tsx src/cli.ts --root ../.. --no-legacy-application-migration",
     "lint:migration": "tsx src/cli.ts --root ../.. --no-declarations",
     "review:comment-blocks": "tsx src/cli.ts --root ../.. --no-declarations --no-legacy-application-migration --review-comment-blocks --all-comment-blocks",
+    "review:test-quality": "tsx src/cli.ts --root ../.. --review-test-quality",
     "rename-package": "tsx src/rename-workspace-package.cli.ts",
     "rename-feature-sources": "tsx src/rename-feature-sources.cli.ts",
     "typecheck": "tsc --noEmit",

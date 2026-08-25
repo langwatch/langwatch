@@ -9,6 +9,7 @@ import {
   lintServiceQualityBaseline,
   lintStrictPortModules,
   lintStrictPortBaseline,
+  lintTestQuality,
   lintWorkspace,
 } from "./index";
 
@@ -55,27 +56,32 @@ const baselinePolicyViolations =
       ]
     : void 0;
 const reviewCommentBlocks = process.argv.includes("--review-comment-blocks");
+const reviewTestQuality = process.argv.includes("--review-test-quality");
+const changedFiles = changedSourceFiles(root);
 const commentBlocks = lintCommentBlocks(root, {
-  files: process.argv.includes("--all-comment-blocks")
-    ? void 0
-    : changedSourceFiles(root),
+  files: process.argv.includes("--all-comment-blocks") ? void 0 : changedFiles,
 });
 const violations = reviewCommentBlocks
   ? commentBlocks.violations
-  : baselinePolicyViolations
-    ? baselinePolicyViolations
-    : lintWorkspace(
-        {
-          root,
-          declarations: !process.argv.includes("--no-declarations"),
-          legacyApplicationMigration: !process.argv.includes(
-            "--no-legacy-application-migration",
-          ),
-          legacyFeatureFragments: !process.argv.includes("--no-legacy-feature-fragments"),
-          serviceQualityBaselineReference: resolvedServiceQualityBaselineReference,
-        },
-        commentBlocks,
-      );
+  : reviewTestQuality
+    ? lintTestQuality(root, { files: changedFiles })
+    : baselinePolicyViolations
+      ? baselinePolicyViolations
+      : lintWorkspace(
+          {
+            root,
+            changedFiles,
+            declarations: !process.argv.includes("--no-declarations"),
+            legacyApplicationMigration: !process.argv.includes(
+              "--no-legacy-application-migration",
+            ),
+            legacyFeatureFragments: !process.argv.includes(
+              "--no-legacy-feature-fragments",
+            ),
+            serviceQualityBaselineReference: resolvedServiceQualityBaselineReference,
+          },
+          commentBlocks,
+        );
 
 if (reviewCommentBlocks && commentBlocks.reviews.length > 0) {
   process.stdout.write(
@@ -89,8 +95,9 @@ if (reviewCommentBlocks && commentBlocks.reviews.length > 0) {
 }
 
 if (violations.length === 0) {
-  if (reviewCommentBlocks) {
-    process.stdout.write("architecture-lint: comment-block review complete\n");
+  if (reviewCommentBlocks || reviewTestQuality) {
+    const review = reviewCommentBlocks ? "comment-block" : "test-quality";
+    process.stdout.write(`architecture-lint: ${review} review complete\n`);
   } else {
     if (baselineCheck?.serviceQuality.bootstrapped) {
       process.stdout.write(
@@ -105,12 +112,13 @@ if (violations.length === 0) {
     process.stdout.write("architecture-lint: package boundaries are sealed\n");
   }
 } else {
-  const displayViolations = reviewCommentBlocks
-    ? violations.map((violation) => ({
-        ...violation,
-        file: relative(root, violation.file) || violation.file,
-      }))
-    : violations;
+  const displayViolations =
+    reviewCommentBlocks || reviewTestQuality
+      ? violations.map((violation) => ({
+          ...violation,
+          file: relative(root, violation.file) || violation.file,
+        }))
+      : violations;
   process.stderr.write(`${displayViolations.map(formatViolation).join("\n\n")}\n`);
   process.exitCode = 1;
 }

@@ -13,6 +13,7 @@ import { lintPrismaBoundaries } from "./prisma-boundaries";
 import { lintStrictPortModules } from "./port-modules";
 import { lintServiceResultContracts } from "./service-results";
 import { lintServiceQuality } from "./service-quality";
+import { lintTestQuality } from "./test-quality";
 import type { ArchitectureViolation, LintWorkspaceOptions } from "./types";
 import { discoverClassifiedPackages } from "./workspace";
 
@@ -58,6 +59,8 @@ export { lintServiceQualityBaseline } from "./service-quality";
 export { lintServiceQuality } from "./service-quality";
 export { lintServiceQualityFile } from "./service-quality";
 export { lintStrictContractBuildConfigs } from "./contract-build-config";
+export { lintTestQuality } from "./test-quality";
+export type { TestQualityLintOptions } from "./test-quality";
 export { lintStrictPortModules } from "./port-modules";
 export { lintStrictPortBaseline } from "./port-modules";
 export { readStrictPortBaselineFile } from "./port-modules";
@@ -72,11 +75,12 @@ export type { FilenameMigrationPlan, FilenameRename } from "./filename-migration
 
 export function lintWorkspace(
   options: LintWorkspaceOptions,
-  commentBlocks = lintCommentBlocks(options.root, {
-    files: changedSourceFiles(options.root),
-  }),
+  commentBlocks?: ReturnType<typeof lintCommentBlocks>,
 ): ArchitectureViolation[] {
   const root = resolve(options.root);
+  const changedFiles = options.changedFiles ?? changedSourceFiles(root);
+  const resolvedCommentBlocks =
+    commentBlocks ?? lintCommentBlocks(root, { files: changedFiles });
   const discovery = discoverClassifiedPackages(root);
   const violations = [
     ...discovery.violations,
@@ -100,7 +104,8 @@ export function lintWorkspace(
       options.serviceQualityBaselineReference,
     ),
     ...lintCycles(discovery.packages),
-    ...commentBlocks.violations,
+    ...resolvedCommentBlocks.violations,
+    ...lintTestQuality(root, { files: changedFiles }),
     ...(options.declarations === false ? [] : lintDeclarations(discovery.packages)),
   ];
   return violations

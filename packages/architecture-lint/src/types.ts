@@ -62,6 +62,7 @@ export type ArchitectureViolation = {
 
 export type LintWorkspaceOptions = {
   root: string;
+  changedFiles?: readonly string[];
   declarations?: boolean;
   legacyApplicationMigration?: boolean;
   legacyFeatureFragments?: boolean;
