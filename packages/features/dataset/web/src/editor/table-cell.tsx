@@ -1,12 +1,8 @@
 import { Skeleton, VStack } from "@chakra-ui/react";
-import { type Cell, flexRender } from "@tanstack/react-table";
+import { type Cell, flexRender, type RowData } from "@tanstack/react-table";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
-import { type DatasetTableRowData, useDatasetTable } from "@langwatch/dataset-web";
-import { EditableCell } from "./EditableCell";
-
-// ============================================================================
-// Types
-// ============================================================================
+import { type DatasetTableRowData, useDatasetTable } from "./dataset-table-context";
+import { EditableCell } from "./editable-cell";
 
 /**
  * How a column behaves in the shared dataset table. "dataset" cells are
@@ -15,11 +11,13 @@ import { EditableCell } from "./EditableCell";
  */
 export type ColumnType = "checkbox" | "dataset" | "target" | "comparison";
 
-type ColumnMeta = {
-  columnType: ColumnType;
-  columnId: string;
-  dataType?: DatasetColumnType; // The actual data type (string, json, list, etc.)
-};
+declare module "@tanstack/react-table" {
+  interface ColumnMeta<TData extends RowData, TValue> {
+    columnType?: ColumnType;
+    columnId?: string;
+    dataType?: DatasetColumnType; // The actual data type (string, json, list, etc.)
+  }
+}
 
 type TableCellProps<TData extends DatasetTableRowData> = {
   cell: Cell<TData, unknown>;
@@ -27,10 +25,6 @@ type TableCellProps<TData extends DatasetTableRowData> = {
   activeDatasetId: string;
   isLoading?: boolean;
 };
-
-// ============================================================================
-// Component
-// ============================================================================
 
 /**
  * Renders a single table cell with selection and interaction support.
@@ -45,42 +39,41 @@ export const TableCell = <TData extends DatasetTableRowData>({
   const { selectedCell, setSelectedCell, setEditingCell, toggleRowSelection } =
     useDatasetTable();
 
-  const meta = cell.column.columnDef.meta as ColumnMeta | undefined;
+  const meta = cell.column.columnDef.meta;
 
-  // Cells without meta just render normally
-  if (!meta) {
+  if (!meta?.columnType || !meta.columnId) {
     return (
       <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
     );
   }
 
+  const { columnId, columnType, dataType } = meta;
+
   const isSelected =
-    selectedCell?.row === rowIndex && selectedCell?.columnId === meta.columnId;
+    selectedCell?.row === rowIndex && selectedCell?.columnId === columnId;
 
   const handleSelect = () => {
-    setSelectedCell({ row: rowIndex, columnId: meta.columnId });
+    setSelectedCell({ row: rowIndex, columnId });
   };
 
   const handleActivate = () => {
-    if (meta.columnType === "dataset") {
-      setSelectedCell({ row: rowIndex, columnId: meta.columnId });
-      setEditingCell({ row: rowIndex, columnId: meta.columnId });
-    } else if (meta.columnType === "checkbox") {
+    if (columnType === "dataset") {
+      setSelectedCell({ row: rowIndex, columnId });
+      setEditingCell({ row: rowIndex, columnId });
+    } else if (columnType === "checkbox") {
       toggleRowSelection(rowIndex);
     }
   };
 
-  // Selected cell styles
   const selectedStyles = {
     outline: isSelected ? "2px solid var(--chakra-colors-blue-500)" : "none",
     outlineOffset: "-1px",
-    position: isSelected ? ("relative" as const) : undefined,
-    zIndex: isSelected ? 5 : undefined,
+    position: isSelected ? ("relative" as const) : void 0,
+    zIndex: isSelected ? 5 : void 0,
     height: "100%",
   };
 
-  // Show skeleton when loading (except checkbox column)
-  if (isLoading && meta.columnType !== "checkbox") {
+  if (isLoading && columnType !== "checkbox") {
     return (
       <td key={cell.id}>
         <VStack align="stretch" gap={1}>
@@ -92,8 +85,9 @@ export const TableCell = <TData extends DatasetTableRowData>({
     );
   }
 
-  // For dataset cells, use the EditableCell component
-  if (meta.columnType === "dataset") {
+  if (columnType === "dataset") {
+    const cellValue = cell.getValue();
+
     return (
       <td
         key={cell.id}
@@ -102,17 +96,16 @@ export const TableCell = <TData extends DatasetTableRowData>({
         style={selectedStyles}
       >
         <EditableCell
-          value={(cell.getValue() as string) ?? ""}
+          value={typeof cellValue === "string" ? cellValue : ""}
           row={rowIndex}
-          columnId={meta.columnId}
+          columnId={columnId}
           datasetId={activeDatasetId}
-          dataType={meta.dataType}
+          dataType={dataType}
         />
       </td>
     );
   }
 
-  // For other cells (checkbox, target)
   return (
     <td
       key={cell.id}

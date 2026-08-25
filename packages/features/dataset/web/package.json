@@ -25,6 +25,8 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@emotion/react": "^11.14.0",
     "@langwatch/dataset-contract": "workspace:*",
+    "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-virtual": "^3.14.5",
     "date-fns": "^4.1.0",
     "lucide-react": "^1.22.0",
     "nanoid": "^5.1.5",
@@ -33,9 +35,15 @@
     "zustand": "^4.5.7"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22.0.0",
     "@types/papaparse": "^5.3.15",
     "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.4",
+    "jsdom": "^30.0.1",
+    "react-dom": "^19.2.7",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
   }

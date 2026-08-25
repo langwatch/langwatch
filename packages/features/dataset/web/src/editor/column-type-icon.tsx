@@ -1,8 +1,3 @@
-/**
- * ColumnTypeIcon - Icon representing the type of a dataset column.
- *
- * Shared between Evaluations V3 and Batch Results tables.
- */
 import {
   BookOpen,
   Braces,
@@ -18,7 +13,7 @@ import {
   Type,
 } from "lucide-react";
 
-export type ColumnType =
+export type DatasetColumnIconType =
   | "string"
   | "number"
   | "boolean"
@@ -34,9 +29,7 @@ export type ColumnType =
   | string;
 
 type ColumnTypeIconProps = {
-  /** The type of the column */
-  type: ColumnType;
-  /** Size of the icon (default: 12) */
+  type: DatasetColumnIconType;
   size?: number;
 };
 

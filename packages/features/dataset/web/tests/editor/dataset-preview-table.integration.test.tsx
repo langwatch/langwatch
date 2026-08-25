@@ -18,7 +18,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import type { DatasetColumns } from "@langwatch/dataset-contract";
-import { DatasetPreviewTable } from "../DatasetPreviewTable";
+import { DatasetPreviewTable } from "../../src/editor/dataset-preview-table";
 
 const SENTINEL = "SENTINEL_PAST_THE_CAP";
 // Far past EditableCell's display cap (5000), marker at the very end so it
@@ -40,7 +40,12 @@ function renderTable({
 }) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <DatasetPreviewTable rows={rows} columns={columns} {...props} />
+      <DatasetPreviewTable
+        rows={rows}
+        columns={columns}
+        renderImage={() => null}
+        {...props}
+      />
     </ChakraProvider>,
   );
 }

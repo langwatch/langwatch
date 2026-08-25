@@ -39,7 +39,7 @@ import { Check, Download, Edit2, Plus, Trash2, Upload, X } from "react-feather";
 import { useStore } from "zustand";
 
 import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
-import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
+import { ExternalImage, getImageUrl } from "~/components/ExternalImage";
 import { Pagination } from "~/components/ui/Pagination";
 import { SelectionActionBar } from "~/components/ui/SelectionActionBar";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -60,9 +60,10 @@ import {
   type EditorRecord,
   rekeyEditorRecords,
   useTableKeyboardNavigation,
+  ColumnTypeIcon,
+  VirtualizedTableBody,
 } from "@langwatch/dataset-web";
 import { useDatasetRecordSync } from "./useDatasetRecordSync";
-import { VirtualizedTableBody } from "./VirtualizedTableBody";
 
 export type InMemoryDataset = {
   datasetId?: string;
@@ -89,6 +90,24 @@ const MAX_ROWS_WITHOUT_VIRTUALIZATION = 100;
  *  page comfortably fits the virtualized viewport while keeping each read
  *  bounded — an s3_jsonl page touches only the chunks overlapping the window. */
 const DATASET_EDITOR_PAGE_SIZE = 50;
+
+const renderImage = (value: string): ReactNode | null => {
+  const imageUrl = getImageUrl(value);
+  if (!imageUrl) {
+    return null;
+  }
+
+  return (
+    <ExternalImage
+      src={imageUrl}
+      minWidth="24px"
+      minHeight="24px"
+      maxHeight="80px"
+      maxWidth="100%"
+      expandable
+    />
+  );
+};
 
 const toEditorColumns = (columnTypes: DatasetColumns): EditorColumn[] =>
   columnTypes.map((col, index) => ({
@@ -548,6 +567,7 @@ export function DatasetEditorTable({
       setSelectedCell,
       toggleCellExpanded,
       toggleRowSelection,
+      renderImage,
       editorPortalRef,
     }),
     [

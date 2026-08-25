@@ -56,6 +56,19 @@ export {
   type DatasetTableRowData,
   type RowHeightMode,
 } from "./editor/dataset-table-context";
+export { ColumnTypeIcon, type DatasetColumnIconType } from "./editor/column-type-icon";
+export {
+  DatasetPreviewTable,
+  type DatasetPreviewRow,
+  type DatasetPreviewTableProps,
+} from "./editor/dataset-preview-table";
+export { EditableCell, JSON_LIKE_TYPES } from "./editor/editable-cell";
+export {
+  TableCell,
+  type ColumnType as DatasetTableColumnType,
+} from "./editor/table-cell";
+export { VirtualizedTableBody } from "./editor/virtualized-table-body";
+export { isTextLikelyOverflowing } from "./editor/text-overflow";
 export {
   createDatasetEditorStore,
   rekeyEditorRecords,

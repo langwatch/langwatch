@@ -7,8 +7,8 @@
 import type { Row } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import React, { useCallback } from "react";
-import type { DatasetTableRowData } from "@langwatch/dataset-web";
-import { TableCell } from "./TableCell";
+import type { DatasetTableRowData } from "./dataset-table-context";
+import { TableCell } from "./table-cell";
 
 // Fixed row height for compact mode
 const COMPACT_ROW_HEIGHT = 160;
@@ -71,7 +71,7 @@ function VirtualizedTableBodyImpl<TData extends DatasetTableRowData>({
           <tr
             key={row.id}
             data-index={row.index}
-            data-selected={selectedRows.has(row.index) ? "true" : undefined}
+            data-selected={selectedRows.has(row.index) ? "true" : void 0}
           >
             {row.getVisibleCells().map((cell) => (
               <TableCell
@@ -127,7 +127,7 @@ function VirtualizedTableBodyImpl<TData extends DatasetTableRowData>({
             key={row.id}
             data-index={virtualRow.index}
             style={{ height: `${COMPACT_ROW_HEIGHT}px` }}
-            data-selected={selectedRows.has(row.index) ? "true" : undefined}
+            data-selected={selectedRows.has(row.index) ? "true" : void 0}
           >
             {row.getVisibleCells().map((cell) => (
               <TableCell
