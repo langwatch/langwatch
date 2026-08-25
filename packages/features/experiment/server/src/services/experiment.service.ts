@@ -1,5 +1,10 @@
 import {
   completeExperimentRunInputSchema,
+  experimentDspyStepLookupSchema,
+  experimentDspyStepSchema,
+  experimentDspyStepSummarySchema,
+  experimentDspyStepsLookupSchema,
+  ExperimentDspyStepNotFoundError,
   ExperimentNotFoundError,
   ExperimentService as ExperimentServiceContract,
   experimentLookupSchema,
@@ -15,6 +20,10 @@ import {
   saveExperimentInputSchema,
   startExperimentRunInputSchema,
   type Experiment,
+  type ExperimentDspyStep,
+  type ExperimentDspyStepLookup,
+  type ExperimentDspyStepSummary,
+  type ExperimentDspyStepsLookup,
   type ExperimentLookup,
   type ExperimentPage,
   type ExperimentPageInput,
@@ -36,9 +45,10 @@ import {
 } from "@langwatch/experiment-contract";
 import {
   ArchivedExperimentWriteError,
-} from "../repositories/prisma/prisma.experiment.repository";
-import type { ExperimentRepository } from "../repositories/experiment.repository";
+  type ExperimentRepository,
+} from "../repositories/experiment.repository";
 import type { ExperimentRunRepository } from "../repositories/experiment-run.repository";
+import type { ExperimentDspyRepository } from "../repositories/experiment-dspy.repository";
 import {
   UnavailableExperimentExecutionPort,
   type ExperimentExecutionPort,
@@ -47,6 +57,7 @@ import {
 export type ExperimentServiceOptions = {
   repository: ExperimentRepository;
   runRepository: ExperimentRunRepository;
+  dspyRepository: ExperimentDspyRepository;
   execution?: ExperimentExecutionPort;
   slugify: (value: string) => string;
   newId: () => string;
@@ -260,6 +271,32 @@ export class ExperimentService extends ExperimentServiceContract {
     await this.execution.completeExperimentRun(
       completeExperimentRunInputSchema.parse(input),
     );
+  }
+
+  async upsertDspyStep(input: ExperimentDspyStep): Promise<void> {
+    await this.options.dspyRepository.upsert(experimentDspyStepSchema.parse(input));
+  }
+
+  async listDspySteps(
+    input: ExperimentDspyStepsLookup,
+  ): Promise<ExperimentDspyStepSummary[]> {
+    const values = await this.options.dspyRepository.list(
+      experimentDspyStepsLookupSchema.parse(input),
+    );
+    return values.map((value) => experimentDspyStepSummarySchema.parse(value));
+  }
+
+  async getDspyStep(
+    input: ExperimentDspyStepLookup,
+  ): Promise<ExperimentDspyStep> {
+    const lookup = experimentDspyStepLookupSchema.parse(input);
+    const value = await this.options.dspyRepository.tryGet(lookup);
+    if (!value) {
+      throw new ExperimentDspyStepNotFoundError(
+        `${lookup.tenantId}/${lookup.experimentId}/${lookup.runId}/${lookup.stepIndex}`,
+      );
+    }
+    return experimentDspyStepSchema.parse(value);
   }
 
   listRuns(input: ExperimentRunListInput): Promise<Record<string, ExperimentRun[]>> {

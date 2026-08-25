@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   experimentSchema,
   experimentRunWithItemsSchema,
+  experimentDspyStepSchema,
   experimentTypeSchema,
   saveExperimentInputSchema,
 } from "../src";
@@ -55,5 +56,26 @@ describe("Experiment contract", () => {
       timestamps: { createdAt: 1, updatedAt: 1 },
     });
     expect(result.success).toBe(true);
+  });
+
+  it("validates DSPy steps at the Experiment boundary", () => {
+    expect(
+      experimentDspyStepSchema.safeParse({
+        tenantId: "project_1",
+        experimentId: "experiment_1",
+        runId: "run_1",
+        stepIndex: "0",
+        score: 0.5,
+        label: "score",
+        optimizerName: "MIPROv2",
+        optimizerParameters: {},
+        predictors: [],
+        examples: [],
+        llmCalls: [],
+        createdAt: 1,
+        insertedAt: 1,
+        updatedAt: 1,
+      }).success,
+    ).toBe(true);
   });
 });

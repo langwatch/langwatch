@@ -21,6 +21,12 @@ import type {
   RecordTargetResultInput,
   StartExperimentRunInput,
 } from "./experiment-run";
+import type {
+  ExperimentDspyStep,
+  ExperimentDspyStepLookup,
+  ExperimentDspyStepSummary,
+  ExperimentDspyStepsLookup,
+} from "./experiment-dspy";
 
 export abstract class ExperimentService {
   abstract getById(input: ExperimentLookup): Promise<Experiment>;
@@ -61,4 +67,11 @@ export abstract class ExperimentService {
   abstract completeExperimentRun(
     input: CompleteExperimentRunInput,
   ): Promise<void>;
+  abstract upsertDspyStep(input: ExperimentDspyStep): Promise<void>;
+  abstract listDspySteps(
+    input: ExperimentDspyStepsLookup,
+  ): Promise<ExperimentDspyStepSummary[]>;
+  abstract getDspyStep(
+    input: ExperimentDspyStepLookup,
+  ): Promise<ExperimentDspyStep>;
 }

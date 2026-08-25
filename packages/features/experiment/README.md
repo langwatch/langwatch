@@ -1,8 +1,7 @@
 # Experiment
 
-Experiment owns saved experiment definitions and their archive lifecycle. Run
-execution and projections belong to the server package; API and UI composition
-stay in the process applications.
+Experiment owns saved definitions, runs, and DSPy optimisation steps. API and
+UI composition stay in the process applications.
 
 - `contract`: Zod 4 values, commands, errors, and the canonical service.
 - `server`: service implementation and private persistence.

@@ -10,6 +10,13 @@ export type ExperimentRowState = {
   archived: boolean;
 };
 
+export class ArchivedExperimentWriteError extends Error {
+  constructor(readonly experimentId: string) {
+    super("Archived experiments cannot be changed");
+    this.name = "ArchivedExperimentWriteError";
+  }
+}
+
 export abstract class ExperimentRepository {
   abstract tryFindById(input: {
     id: string;

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   ExperimentNotFoundError,
+  ExperimentDspyStepNotFoundError,
+  type ExperimentDspyStep,
   type Experiment,
   type ExperimentRun,
   type SaveExperimentInput,
@@ -10,6 +12,7 @@ import type {
   ExperimentRowState,
 } from "../src/repositories/experiment.repository";
 import { ExperimentRunRepository } from "../src/repositories/experiment-run.repository";
+import { ExperimentDspyRepository } from "../src/repositories/experiment-dspy.repository";
 import { ExperimentService } from "../src/services/experiment.service";
 import { ExperimentExecutionPort } from "../src/execution/experiment-execution.port";
 
@@ -153,18 +156,78 @@ class MemoryExperimentExecutionPort extends ExperimentExecutionPort {
   completeExperimentRun = vi.fn(async () => {});
 }
 
+class MemoryExperimentDspyRepository extends ExperimentDspyRepository {
+  values: ExperimentDspyStep[] = [];
+
+  async upsert(input: ExperimentDspyStep): Promise<void> {
+    this.values = this.values.filter(
+      (value) =>
+        !(
+          value.tenantId === input.tenantId &&
+          value.experimentId === input.experimentId &&
+          value.runId === input.runId &&
+          value.stepIndex === input.stepIndex
+        ),
+    );
+    this.values.push(input);
+  }
+
+  async list(input: { tenantId: string; experimentId: string }) {
+    return this.values
+      .filter(
+        (value) =>
+          value.tenantId === input.tenantId &&
+          value.experimentId === input.experimentId,
+      )
+      .map((value) => ({
+        tenantId: value.tenantId,
+        experimentId: value.experimentId,
+        runId: value.runId,
+        stepIndex: value.stepIndex,
+        workflowVersionId: value.workflowVersionId,
+        score: value.score,
+        label: value.label,
+        optimizerName: value.optimizerName,
+        llmCallsTotal: value.llmCalls.length,
+        llmCallsTotalTokens: 0,
+        llmCallsTotalCost: 0,
+        createdAt: value.createdAt,
+      }));
+  }
+
+  async tryGet(input: {
+    tenantId: string;
+    experimentId: string;
+    runId: string;
+    stepIndex: string;
+  }) {
+    return (
+      this.values.find(
+        (value) =>
+          value.tenantId === input.tenantId &&
+          value.experimentId === input.experimentId &&
+          value.runId === input.runId &&
+          value.stepIndex === input.stepIndex,
+      ) ?? null
+    );
+  }
+}
+
 const build = (
   repository = new MemoryExperimentRepository(),
   execution = new MemoryExperimentExecutionPort(),
 ) => {
   const runRepository = new MemoryExperimentRunRepository();
+  const dspyRepository = new MemoryExperimentDspyRepository();
   return {
     repository,
     runRepository,
+    dspyRepository,
     execution,
     service: ExperimentService.create({
       repository,
       runRepository,
+      dspyRepository,
       execution,
       slugify: (value) => value.toLowerCase().replaceAll(" ", "-"),
       newId: () => "generated",
@@ -174,6 +237,54 @@ const build = (
 };
 
 describe("ExperimentService", () => {
+  const dspyStep: ExperimentDspyStep = {
+    tenantId: "project_1",
+    experimentId: "experiment_1",
+    runId: "run_1",
+    stepIndex: "0",
+    score: 0.5,
+    label: "score",
+    optimizerName: "MIPROv2",
+    optimizerParameters: {},
+    predictors: [],
+    examples: [],
+    llmCalls: [],
+    createdAt: 1,
+    insertedAt: 1,
+    updatedAt: 1,
+  };
+
+  it("owns DSPy step writes and reads", async () => {
+    const { service } = build();
+    await service.upsertDspyStep(dspyStep);
+
+    await expect(
+      service.getDspyStep({
+        tenantId: "project_1",
+        experimentId: "experiment_1",
+        runId: "run_1",
+        stepIndex: "0",
+      }),
+    ).resolves.toEqual(dspyStep);
+    await expect(
+      service.listDspySteps({
+        tenantId: "project_1",
+        experimentId: "experiment_1",
+      }),
+    ).resolves.toHaveLength(1);
+  });
+
+  it("throws the Experiment DSPy error when a step is absent", async () => {
+    await expect(
+      build().service.getDspyStep({
+        tenantId: "project_1",
+        experimentId: "experiment_1",
+        runId: "missing",
+        stepIndex: "0",
+      }),
+    ).rejects.toBeInstanceOf(ExperimentDspyStepNotFoundError);
+  });
+
   it("validates and delegates the four Eventing run commands unchanged", async () => {
     const { service, execution } = build();
     const start = {

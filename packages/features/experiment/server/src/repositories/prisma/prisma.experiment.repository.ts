@@ -9,6 +9,7 @@ import {
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
 import {
+  ArchivedExperimentWriteError,
   ExperimentRepository,
   type ExperimentRowState,
 } from "../experiment.repository";
@@ -16,13 +17,6 @@ import {
 export type ExperimentDatabase = Pick<PrismaClient, "experiment" | "$transaction">;
 
 const mapExperiment = (row: unknown): Experiment => experimentSchema.parse(row);
-
-export class ArchivedExperimentWriteError extends Error {
-  constructor(readonly experimentId: string) {
-    super("Archived experiments cannot be changed");
-    this.name = "ArchivedExperimentWriteError";
-  }
-}
 
 export class PrismaExperimentRepository extends ExperimentRepository {
   static create(database: ExperimentDatabase): PrismaExperimentRepository {

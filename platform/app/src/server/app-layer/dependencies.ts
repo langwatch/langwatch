@@ -84,7 +84,6 @@ import type { CodingAgentSessionService } from "./coding-agent/coding-agent-sess
 import type { CodingAgentSessionsListService } from "./coding-agent/coding-agent-sessions-list.service";
 import type { PullRequestUsageService } from "./coding-agent/pull-request-usage.service";
 import type { AppConfig } from "./config";
-import type { DspyStepService } from "./dspy-steps/dspy-step.service";
 import type { GithubService } from "@langwatch/github-contract";
 import type { LangyService } from "@langwatch/langy-contract";
 import type { BlobStoreService } from "./ops/blob-store.service";
@@ -187,9 +186,6 @@ export interface AppDependencies {
   };
   /** One process-owned Evaluation capability shared by transports and workers. */
   evaluations: EvaluationService;
-  dspySteps: {
-    steps: DspyStepService;
-  };
   /**
    * The ADR-034 analytics read API, built once in presets.ts and
    * handed out here instead of each of its ~6 callers (routers, REST apps,

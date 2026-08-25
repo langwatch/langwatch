@@ -8,6 +8,10 @@ import {
   ClickHouseExperimentRunRepository,
 } from "../repositories/clickhouse/clickhouse.experiment-run.repository";
 import {
+  ClickHouseExperimentDspyRepository,
+} from "../repositories/clickhouse/clickhouse.experiment-dspy.repository";
+import type { ExperimentDspyRetentionPort } from "../ports/experiment-dspy-retention.port";
+import {
   UnavailableExperimentExecutionPort,
 } from "../execution/experiment-execution.port";
 import { ExperimentService } from "../services/experiment.service";
@@ -17,12 +21,22 @@ export type PostgresExperimentAdapterOptions = {
   database: ExperimentDatabase & Pick<PrismaClient, "workflowVersion">;
   /** `null` explicitly represents a deployment without ClickHouse. */
   resolveClickHouseClient: (projectId: string) => Promise<{
+    insert(input: {
+      table: string;
+      values: unknown[];
+      format: "JSONEachRow";
+      clickhouse_settings?: {
+        async_insert?: 0 | 1;
+        wait_for_async_insert?: 0 | 1;
+      };
+    }): Promise<unknown>;
     query(input: {
       query: string;
       query_params: Record<string, unknown>;
       format: "JSONEachRow";
     }): Promise<{ json<T>(): Promise<T[]> }>;
   } | null>;
+  dspyRetention: ExperimentDspyRetentionPort;
   tupleParam: (values: string[]) => unknown;
   runHistoryTelemetry: {
     trace<T>(
@@ -139,6 +153,11 @@ export class PostgresExperimentAdapter {
         database: options.database,
         resolveClient: options.resolveClickHouseClient,
         tupleParam: options.tupleParam,
+        telemetry: options.runHistoryTelemetry,
+      }),
+      dspyRepository: ClickHouseExperimentDspyRepository.create({
+        resolveClient: options.resolveClickHouseClient,
+        retention: options.dspyRetention,
         telemetry: options.runHistoryTelemetry,
       }),
       execution:

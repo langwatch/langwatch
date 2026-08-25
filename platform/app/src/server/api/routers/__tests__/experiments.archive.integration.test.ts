@@ -363,15 +363,8 @@ describe("experiments.deleteExperiment", () => {
     });
   });
 
-  // The archive path used to issue side-effect calls that the feature
-  // file forbids: a ClickHouse mass-delete (lightweight-delete masks on
-  // cold-tier S3 parts) and an in-process DSpy step cleanup. Both were
-  // removed by deleting the corresponding imports from the router.
-  // The most reliable proof is a source-level check: with the imports gone
-  // there is no path by which the archive procedure can reach those
-  // services. Runtime fail-on-call mocks were considered but rejected
-  // because the resolver is reached from sibling list/enrichment paths and
-  // globally mocking it would break unrelated tests.
+  // Archive must not issue a ClickHouse mass-delete: lightweight-delete masks
+  // can leave cold-tier S3 parts behind.
   describe("when checking the router source file", () => {
     /** @scenario The delete-experiment code path does NOT contact ClickHouse */
     it("does not import getClickHouseClientForTenant", async () => {
@@ -379,14 +372,6 @@ describe("experiments.deleteExperiment", () => {
         fs.readFile(require.resolve("../experiments.ts"), "utf8"),
       );
       expect(src).not.toMatch(/getClickHouseClientForTenant/);
-    });
-
-    /** @scenario The delete-experiment code path does NOT call the DSpy step cleanup */
-    it("does not call dspySteps.steps.deleteByExperiment", async () => {
-      const src = await import("node:fs/promises").then((fs) =>
-        fs.readFile(require.resolve("../experiments.ts"), "utf8"),
-      );
-      expect(src).not.toMatch(/dspySteps\.steps\.deleteByExperiment/);
     });
   });
 

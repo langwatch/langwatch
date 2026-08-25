@@ -65,7 +65,6 @@ export class App {
   readonly traces: AppDependencies["traces"] & AppCommands["traces"];
   readonly evaluations: AppDependencies["evaluations"] &
     AppCommands["evaluations"];
-  readonly dspySteps: AppDependencies["dspySteps"];
   /** The ADR-034 analytics read API. */
   readonly analytics: AppDependencies["analytics"];
   /** The process-owned restricted analytics SQL service. */
@@ -182,7 +181,6 @@ export class App {
       deps.evaluations,
       deps.commands.evaluations,
     );
-    this.dspySteps = deps.dspySteps;
     this.analytics = deps.analytics;
     this.langWatchQL = deps.langWatchQL;
     this.dashboard = deps.dashboard;

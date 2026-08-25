@@ -15,8 +15,6 @@ export type { AppConfig } from "./config";
 export { createAppConfigFromEnv } from "./config";
 // Dependencies
 export type { AppDependencies } from "./dependencies";
-// DSPy Steps
-export { DspyStepService } from "./dspy-steps/dspy-step.service";
 // Monitors
 export { MonitorService } from "@langwatch/monitor-contract";
 export {

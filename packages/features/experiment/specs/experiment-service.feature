@@ -20,3 +20,9 @@ Feature: Experiment service boundary
     When the Experiment service archives it
     Then only Experiment persistence is changed
     And the transport composes WorkflowService and MonitorService cleanup
+
+  Scenario: DSPy steps use the Experiment service
+    Given a DSPy optimiser reports a step for an experiment run
+    When the step is written and read
+    Then the Experiment service validates the Zod 4 value
+    And uses its private ClickHouse repository

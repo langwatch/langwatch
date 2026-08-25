@@ -11,3 +11,15 @@ export class ExperimentNotFoundError extends NotFoundError {
     this.name = "ExperimentNotFoundError";
   }
 }
+
+export class ExperimentDspyStepNotFoundError extends NotFoundError {
+  declare readonly code: "dspy_step_not_found";
+
+  constructor(stepId: string, options: { reasons?: readonly Error[] } = {}) {
+    super("dspy_step_not_found", "DSPy step", stepId, {
+      meta: { stepId },
+      ...options,
+    });
+    this.name = "ExperimentDspyStepNotFoundError";
+  }
+}

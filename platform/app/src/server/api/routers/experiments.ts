@@ -1,4 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
+import { ExperimentDspyStepNotFoundError } from "@langwatch/experiment-contract";
 import { generate } from "@langwatch/ksuid";
 import type { JsonValue } from "@prisma/client/runtime/client";
 import { TRPCError } from "@trpc/server";
@@ -21,7 +22,6 @@ import {
   workflowJsonSchema,
 } from "../../../optimization_studio/types/dsl";
 import { slugify } from "../../../utils/slugify";
-import { DspyStepNotFoundError } from "../../app-layer/dspy-steps/errors";
 import { prisma } from "../../db";
 import type {
   DSPyRunsSummary,
@@ -520,7 +520,7 @@ export const experimentsRouter = createTRPCRouter({
         })
         .catch(mapExperimentError);
 
-      const steps = await ctx.app.dspySteps.steps.getStepsByExperiment({
+      const steps = await ctx.app.experiments.listDspySteps({
         tenantId: input.projectId,
         experimentId: experiment.id,
       });
@@ -603,7 +603,7 @@ export const experimentsRouter = createTRPCRouter({
         .catch(mapExperimentError);
 
       try {
-        const step = await ctx.app.dspySteps.steps.getStep({
+        const step = await ctx.app.experiments.getDspyStep({
           tenantId: input.projectId,
           experimentId: experiment.id,
           runId: input.runId,
@@ -635,7 +635,7 @@ export const experimentsRouter = createTRPCRouter({
 
         return result;
       } catch (error) {
-        if (error instanceof DspyStepNotFoundError) {
+        if (error instanceof ExperimentDspyStepNotFoundError) {
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "DSPy step not found",

@@ -66,7 +66,10 @@ import {
   AppWorkflowExecutionPort,
   AppWorkflowRuntime,
 } from "~/runtime/app/features/workflow";
-import { AppExperimentRuntime } from "~/runtime/app/features/experiment";
+import {
+  AppExperimentDspyRetentionPort,
+  AppExperimentRuntime,
+} from "~/runtime/app/features/experiment";
 import { AppExperimentEventingAdapter } from "~/runtime/app/features/experiment-eventing";
 import { AppExperimentRunHistoryTelemetry } from "~/runtime/app/features/experiment-run-history.telemetry";
 import { AppScenarioRuntime } from "~/runtime/app/features/scenario";
@@ -277,10 +280,7 @@ import type {
   AppDependencies,
   DataRetentionDependencies,
 } from "./dependencies";
-import { DspyStepService } from "./dspy-steps/dspy-step.service";
 import { ManagedProvidersAppAdapter } from "./enterprise/managed-providers.adapter";
-import { DspyStepClickHouseRepository } from "./dspy-steps/repositories/dspy-step.clickhouse.repository";
-import { NullDspyStepRepository } from "./dspy-steps/repositories/dspy-step.repository";
 import { PrismaEvaluationCostRecorder } from "./evaluations/evaluation-cost.recorder";
 import { createDefaultModelEnvResolver } from "./evaluations/evaluation-execution.factories";
 import { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
@@ -660,6 +660,8 @@ export function initializeDefaultApp(options?: {
         : async () => null,
       tupleParam: (values) => new TupleParam(values),
       runHistoryTelemetry: AppExperimentRunHistoryTelemetry.create(),
+      dspyRetention:
+        AppExperimentDspyRetentionPort.create(retentionPolicyCache),
       execution: AppExperimentEventingAdapter.create(
         () => commands.experimentRuns,
       ).build(),
@@ -780,17 +782,6 @@ export function initializeDefaultApp(options?: {
     "TraceListService",
   );
 
-  const dspySteps = traced(
-    new DspyStepService(
-      clickhouseEnabled
-        ? new DspyStepClickHouseRepository(
-            resolveClickHouseClient,
-            retentionPolicyCache,
-          )
-        : new NullDspyStepRepository(),
-    ),
-    "DspyStepService",
-  );
   // The Analytics read API, built once here (unconditional on
   // `clickhouseEnabled`, since the resolver itself already throws at query
   // time when ClickHouse isn't configured) and handed out as
@@ -2086,7 +2077,6 @@ export function initializeDefaultApp(options?: {
     suites,
     automation,
     triggerTemplates,
-    dspySteps: { steps: dspySteps },
     analytics: analyticsService,
     langWatchQL,
     dashboard: dashboardService,
@@ -2529,7 +2519,6 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       };
     })(),
     evaluations: testEvaluationService,
-    dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
     analytics: AnalyticsAdapter.create({
       resolveClient: async () => {
         throw new Error("ClickHouse not available in test app");
@@ -2555,6 +2544,8 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       resolveClickHouseClient: async () => null,
       tupleParam: (values) => new TupleParam(values),
       runHistoryTelemetry: AppExperimentRunHistoryTelemetry.create(),
+      dspyRetention:
+        AppExperimentDspyRetentionPort.create(testRetentionPolicyCache),
       slugify,
       newId: () => nanoid(8),
     }).build(),

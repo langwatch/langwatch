@@ -52,8 +52,7 @@ import {
   requireApiKeyPermission,
   type UnifiedAuthVariables,
 } from "~/server/api-key/auth-middleware";
-import { getApp } from "~/server/app-layer/app";
-import type { DspyStepData } from "~/server/app-layer/dspy-steps/types";
+import type { ExperimentDspyStep } from "@langwatch/experiment-contract";
 import {
   predefinedEventsSchemas,
   predefinedEventTypes,
@@ -1688,7 +1687,7 @@ const processDSPyStep = async (
       return llmCall;
     });
 
-  const stepData: DspyStepData = {
+  const stepData: ExperimentDspyStep = {
     tenantId: project.id,
     experimentId: experiment.id,
     runId: run_id,
@@ -1706,7 +1705,7 @@ const processDSPyStep = async (
     updatedAt: now,
   };
 
-  await getApp().dspySteps.steps.upsertStep(stepData);
+  await experiments.upsertDspyStep(stepData);
 
   logger.info(
     { stepId: param.index, runId: param.run_id, projectId: project.id },
