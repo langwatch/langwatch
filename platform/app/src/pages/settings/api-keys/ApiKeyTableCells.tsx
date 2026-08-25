@@ -60,19 +60,23 @@ export function ApiKeyCopyField({
 
   return (
     <HStack
-      gap={0}
+      gap={1.5}
       alignSelf="start"
       borderWidth="1px"
-      borderColor="border.subtle"
-      borderRadius="sm"
+      borderColor="border.muted"
+      borderRadius="md"
       background="bg.subtle"
-      paddingLeft={2}
+      paddingLeft={2.5}
+      paddingRight={1}
+      paddingY={0.5}
+      minHeight="7"
       maxWidth="full"
     >
       <Text
         fontFamily="mono"
         fontSize="xs"
         color="fg.muted"
+        whiteSpace="nowrap"
         truncate
         minWidth={0}
       >
@@ -82,6 +86,7 @@ export function ApiKeyCopyField({
         size="2xs"
         variant="ghost"
         color="fg.muted"
+        flexShrink={0}
         aria-label={copyLabel}
         onClick={handleCopy}
       >
