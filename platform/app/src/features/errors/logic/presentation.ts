@@ -1234,10 +1234,95 @@ const presentations = {
         : "A pending invite for this address already exists. Revoke it first to send a new one.";
     },
   },
+  invite_expired: {
+    title: "This invitation has expired",
+    describe: () =>
+      "Ask for a fresh one and whoever invited you can send it in one click.",
+  },
   invite_not_found: {
     title: "Invite not found",
     describe: () =>
       "It may have been revoked or already accepted. Reload to see the pending invites.",
+  },
+  invite_throttled: {
+    title: "That was just sent",
+    describe: (error) => {
+      const seconds = num(error, "retryAfterSeconds", 0);
+      const minutes = Math.ceil(seconds / 60);
+      return seconds > 0
+        ? `Check the inbox — including spam — and try again in ${minutes} ${minutes === 1 ? "minute" : "minutes"}.`
+        : "Check the inbox — including spam — before sending another.";
+    },
+  },
+  invite_wrong_account: {
+    title: "You're signed in as a different account",
+    describe: (error) => {
+      const hint = str(error, "invitedHint", "");
+      return hint
+        ? `This invitation was sent to ${hint}. Sign out and sign back in as that account to accept it.`
+        : "Sign out and sign back in as the account this invitation was sent to.";
+    },
+  },
+  // ---------------------------------------------------------------------
+  // Joining an organization (D12, ADR-117)
+  //
+  // `join_not_available` is the deliberately vague one, and it is vague on
+  // purpose: it answers an organization that does not exist, one that turned
+  // joining off, one whose identity provider already admits people, and an
+  // address nobody has verified. Copy that told those apart would be an
+  // oracle for which organizations exist and who works at them. So it names
+  // the ONE thing the reader can act on — ask a colleague — and stops.
+  // ---------------------------------------------------------------------
+  join_not_available: {
+    title: "Nothing to join with this address",
+    describe: () =>
+      "If you expected to find your team here, ask a colleague to send you an invitation.",
+  },
+  join_request_not_found: {
+    title: "That request is no longer there",
+    describe: () =>
+      "It may have been answered or withdrawn already. Refresh to see what is waiting now.",
+  },
+  join_request_not_pending: {
+    title: "That request was already answered",
+    describe: () =>
+      "Somebody approved, rejected or withdrew it. Refresh to see where it ended up.",
+  },
+  join_request_already_pending: {
+    title: "You have already asked",
+    describe: () =>
+      "Your request is waiting for an administrator. You will get an email either way.",
+  },
+  join_request_throttled: {
+    title: "Give it a moment",
+    describe: (error) => {
+      const seconds = num(error, "retryAfterSeconds", 0);
+      if (seconds <= 0) return "Try that again shortly.";
+      const days = Math.ceil(seconds / 86400);
+      if (seconds >= 86400) {
+        return `Try again in ${days} ${days === 1 ? "day" : "days"}.`;
+      }
+      const minutes = Math.ceil(seconds / 60);
+      return `Try again in ${minutes} ${minutes === 1 ? "minute" : "minutes"}.`;
+    },
+  },
+  join_auto_not_licensed: {
+    title: "Automatic joining needs a licence",
+    describe: () =>
+      "Colleagues can still ask to join and you approve them. To let them in without asking, add a licence.",
+  },
+  // Company domains only, and the copy stops there. Listing what counts as a
+  // consumer mail provider would turn the refusal into a way to enumerate
+  // the deny-list.
+  join_auto_domain_unproven: {
+    title: "That domain is not proven yet",
+    describe: () =>
+      "Automatic joining works for company domains that at least two of your members have verified. Personal email domains are never eligible.",
+  },
+  join_auto_connection_admits: {
+    title: "Your identity provider already admits that domain",
+    describe: () =>
+      "People on it sign in through single sign-on, so there is nothing for automatic joining to add.",
   },
   team_not_in_organization: {
     title: "That team isn't in this organization",
@@ -1353,6 +1438,27 @@ const presentations = {
     title: "SCIM token not found",
     describe: () =>
       "It may already be revoked. Reload to see the current tokens.",
+  },
+  scim_connection_required: {
+    // The connection is the token's whole authority, so this is a field the
+    // caller left out rather than a policy refusal — say which field.
+    title: "Choose a connection for this token",
+    describe: () =>
+      "A directory token works against one single sign-on connection. Pick the connection your identity provider syncs from.",
+  },
+  scim_connection_not_found: {
+    // Reads the same for a connection that never existed and one belonging to
+    // somebody else, on purpose: the copy must not confirm the second.
+    title: "Connection not found",
+    describe: () =>
+      "That single sign-on connection isn't one of this organization's. Reload to see the current connections.",
+  },
+  scim_write_outside_connection: {
+    // The identity provider is pointed at the wrong connection. Nothing about
+    // the person is wrong, so the fix is in the provider's configuration.
+    title: "That person belongs to another connection",
+    describe: () =>
+      "Each directory token only manages the people its own connection provisioned. Use the token issued for the connection this person came from.",
   },
   insufficient_permissions: {
     // Names the permission when the server sent one, for the same reason
@@ -1713,6 +1819,123 @@ const presentations = {
   identity_primary_requires_verified: {
     title: "Only a verified sign-in method can be primary",
     describe: () => "Verify this sign-in method first, then make it primary.",
+  },
+  identity_detach_strands_user: {
+    // Covers both shapes of the same problem: nothing verified left at all,
+    // and nothing left that a recovery message could reach. The remedy is
+    // the same either way, so the copy names the one that always works.
+    title: "You'd have no way back into your account",
+    describe: () =>
+      "This is your last way in, or the last one we could reach you at. Add a verified email address first, then remove this one.",
+  },
+  identity_mfa_code_invalid: {
+    // Deliberately says nothing about whether two-step verification is even
+    // set up on this account. A wrong code and a code for an enrollment
+    // nobody holds read identically here, on purpose.
+    title: "That code didn't work",
+    describe: () =>
+      "Check your authenticator app for the current code and enter it again.",
+  },
+  identity_mfa_enrollment_expired: {
+    title: "That setup took too long",
+    describe: () =>
+      "Start setting up two-step verification again, and scan the new code.",
+  },
+  identity_mfa_locked_out: {
+    title: "Too many incorrect codes",
+    describe: () =>
+      "Wait a few minutes and try again. If you've lost your authenticator, use a backup code or ask an administrator to reset it.",
+  },
+  identity_mfa_backup_codes_exhausted: {
+    title: "You've used every backup code",
+    describe: () =>
+      "Sign in with your authenticator app and generate a new set, or ask an administrator to reset two-step verification for you.",
+  },
+  identity_mfa_required_by_organization: {
+    title: "An organization you belong to requires two-step verification",
+    describe: () =>
+      "You can't turn it off while you're a member. Ask an administrator to lift the requirement, or leave the organization first.",
+  },
+  identity_mfa_enrollment_required: {
+    // Not an authentication failure: nobody is signed out and every other
+    // organization still works. The copy has to make that obvious, or people
+    // read it as a session problem and try signing in again.
+    title: "This organization requires two-step verification",
+    describe: () =>
+      "Set up two-step verification to continue here. You're still signed in, and your other organizations are unaffected.",
+  },
+  identity_passkey_ceremony_failed: {
+    title: "That passkey attempt didn't finish",
+    describe: () =>
+      "It may have been cancelled or timed out. Try again, or use another way to sign in.",
+  },
+  identity_passkey_not_recognized: {
+    // Same answer whether the credential belongs to somebody else or to
+    // nobody: this endpoint does not tell callers which passkeys exist.
+    title: "We couldn't use that passkey",
+    describe: () =>
+      "Try again, or sign in another way and check which passkeys are on your account.",
+  },
+  cannot_impersonate_without_second_factor: {
+    title: "Set up two-step verification first",
+    describe: () =>
+      "This organization requires two-step verification, so viewing it as another person requires it on your own account too.",
+  },
+  sso_connection_invalid_transition: {
+    title: "This single sign-on connection has moved on",
+    describe: () =>
+      "Someone else changed it, or it is no longer at the step this action applies to. Refresh to see where it is now.",
+  },
+  sso_connection_domain_taken: {
+    // Says the domain is spoken for and stops there: which organization holds
+    // it is not something a second claimant is entitled to learn from a
+    // refusal. Support has the history and can say more to the right person.
+    title: "That domain is already verified elsewhere",
+    describe: () =>
+      "Another single sign-on connection has already proved ownership of this domain. Contact support to resolve the claim.",
+  },
+  sso_connection_activation_blocked: {
+    title: "This connection isn't ready to go live",
+    describe: () =>
+      "Turning it on needs a verified domain, a successful test sign-in, and a way for someone to get in without the identity provider.",
+  },
+  sso_connection_string_edit_retired: {
+    title: "Single sign-on is configured on the connection now",
+    describe: () =>
+      "The old domain and provider fields no longer control where anyone signs in. Change the organization's single sign-on connection instead.",
+  },
+  sso_connection_teardown_strands_users: {
+    title: "Removing this connection would lock people out",
+    describe: () =>
+      "Some people can only sign in through it. Give them another verified sign-in method first, then remove it.",
+  },
+  sso_connection_operator_act_required: {
+    // Read by two very different people: a LangWatch operator whose session
+    // is no longer on the staff list, and an organization administrator who
+    // found the command another way. The words serve the second, because the
+    // first can read the trace id — and they point at the thing that IS
+    // available to an administrator rather than stopping at "no".
+    title: "Only LangWatch can decide this",
+    describe: () =>
+      "Approving a domain claim and vouching for a domain are LangWatch's to do. Prove the domain by publishing the record we give you, or contact support.",
+  },
+  sso_saml_not_self_serve: {
+    title: "SAML connections are set up with us",
+    describe: () =>
+      "Single sign-on you can set up yourself is OpenID Connect for now. Contact support to set up SAML and we will do it with you.",
+  },
+  identity_link_proposed: {
+    title: "An administrator needs to confirm this sign-in",
+    // Deliberately says nothing about whether an account exists, who holds the
+    // address, or what the evidence was. This is answered to whoever arrived,
+    // and that is not necessarily the owner of the address.
+    describe: () =>
+      "Your workspace administrator has been asked to confirm it. Try again once they have.",
+  },
+  identity_jit_disabled: {
+    title: "This workspace does not create accounts automatically",
+    describe: () =>
+      "Ask a workspace administrator to invite you, then sign in again.",
   },
   identity_unsupported_storage_query: {
     title: "We couldn't read your sign-in methods",

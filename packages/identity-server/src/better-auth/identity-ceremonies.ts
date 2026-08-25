@@ -5,6 +5,7 @@ import type { IdentityHeadsRepository } from "../identity-heads.repository";
 import type { IdentityUsersRepository } from "../identity-users.repository";
 import type { IdentityUserGate } from "../identity-user-gate";
 import type { IdentityCeremonyWrites } from "../identity-writes";
+import { issuerForProviderId } from "./account-queries";
 import type {
   CeremonyAccountRow,
   IdentityAccountCeremonies,
@@ -149,6 +150,16 @@ export class IdentityCeremonies implements IdentityAccountCeremonies {
       // better-auth's own id, unfolded: the projected `Account` row is keyed
       // by it, and `provider` above cannot answer for it.
       providerId,
+      // Verbatim from the row better-auth was about to write, so the fact
+      // records the issuer the library ITSELF keyed this account by rather
+      // than one we reconstructed. It falls back to the derivation only for
+      // a caller that predates 1.7 and names none — never in preference to
+      // an issuer better-auth stated, because a real OIDC connection's is
+      // its own and no rule of ours would arrive at it.
+      issuer:
+        typeof account.issuer === "string" && account.issuer.length > 0
+          ? account.issuer
+          : issuerForProviderId(providerId),
       providerAccountId:
         typeof account.accountId === "string" ? account.accountId : null,
       value,
@@ -191,6 +202,7 @@ export class IdentityCeremonies implements IdentityAccountCeremonies {
       accountId: null,
       provider: "email",
       providerId: null,
+      issuer: null,
       providerAccountId: null,
       value: email,
       occurredAtMs: this.clock.now(),

@@ -229,6 +229,10 @@ var table = []commandSpec{
 			if upRunsAttached(d.isAgent, stdoutIsTTY()) {
 				return runUpAttached(ctx, d, inv.raw)
 			}
+			// The foreground run dies with whoever launched it; the detached
+			// child above runs under Setsid and is naturally exempt.
+			ctx, unwatch := watchLaunchingGroup(ctx)
+			defer unwatch()
 			return d.orch.Up(ctx, d.params, d.opts)
 		},
 	},

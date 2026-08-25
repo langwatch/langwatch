@@ -8,10 +8,21 @@ import {
 
 describe("identifier normalization", () => {
   describe("when a raw email value arrives from a ceremony", () => {
-    it("folds case, trims, and strips the plus tag from the local part", () => {
+    it("folds case and trims, and keeps the plus tag it was given", () => {
       expect(normalizeIdentifierValue("  Sam.J+work@Acme.COM ")).toBe(
-        "sam.j@acme.com",
+        "sam.j+work@acme.com",
       );
+    });
+
+    it("holds a tagged address apart from the one it is tagged from", () => {
+      // Two addresses, two identifiers. The person chose the tag to keep this
+      // account separable, and their provider routes the two separately.
+      const tagged = normalizeIdentifierValue("sam+work@acme.com");
+
+      expect(tagged).not.toBe(normalizeIdentifierValue("sam@acme.com"));
+      // The DOMAIN is unchanged, which is what routing reads: a tagged
+      // address still reaches its organization's connection.
+      expect(identifierDomain(tagged)).toBe("acme.com");
     });
 
     it("keeps a value that is not email-shaped as a folded string", () => {

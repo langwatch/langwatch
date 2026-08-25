@@ -19,6 +19,7 @@ export interface IdentifierRowShape {
   identifierHash: string | null;
   accountId: string | null;
   providerId: string | null;
+  issuer: string | null;
   providerAccountId: string | null;
   state: string;
   connectionId: string | null;
@@ -47,6 +48,7 @@ export function rowToFact(row: IdentifierRowShape): IdentifierFact {
     identifierHash: row.identifierHash,
     accountId: row.accountId,
     providerId: row.providerId,
+    issuer: row.issuer,
     providerAccountId: row.providerAccountId,
     connectionId: row.connectionId,
     state: parseLifecycleState(row.state),
@@ -66,6 +68,7 @@ export function factToRow(fact: IdentifierFact): IdentifierRowShape {
     identifierHash: fact.identifierHash,
     accountId: fact.accountId,
     providerId: fact.providerId,
+    issuer: fact.issuer,
     providerAccountId: fact.providerAccountId,
     state: fact.state,
     connectionId: fact.connectionId,

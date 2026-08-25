@@ -13,6 +13,9 @@ export interface BackfillUserRow {
 export interface BackfillAccountRow {
   id: string;
   provider: string;
+  /** better-auth 1.7's account key half, as the legacy row carries it. Null
+   *  on a row written before the column existed and never backfilled. */
+  issuer: string | null;
   providerAccountId: string;
   createdAtMs: number;
 }

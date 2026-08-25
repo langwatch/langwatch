@@ -233,6 +233,10 @@ export class InMemoryIdentityStorage
       // the identifier's vocabulary is lossy for generic OAuth.
       providerId:
         credential?.providerId ?? identifier.providerId ?? identifier.provider,
+      // Stated on the attach, never derived — the Prisma repository serves
+      // it the same way, and a double that computed it here would hide the
+      // one behaviour these rows exist to prove.
+      issuer: identifier.issuer,
       accountId: identifier.providerAccountId ?? identifier.value ?? "",
       ...secrets,
       createdAt: credential?.createdAt ?? new Date(identifier.attachedAtMs),

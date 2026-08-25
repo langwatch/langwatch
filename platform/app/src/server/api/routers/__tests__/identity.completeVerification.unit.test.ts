@@ -76,6 +76,23 @@ vi.mock(
     // over an empty store is exactly that, and it holds nothing this suite
     // could accidentally assert against.
     identityStorageAdapter: () => memoryAdapter({}),
+    // The rest of the runtime's surface, named because the mock's own return
+    // type is `Record<keyof typeof IdentityRuntime, unknown>` — a new export
+    // that is not listed here fails the typecheck rather than silently
+    // resolving to `undefined` at the call site. None of these are reached:
+    // this suite calls `completeEmailVerification` and nothing else, so they
+    // stay inert rather than being modelled.
+    connectionGrandfatherMigration: () => ({}),
+    joinRequests: () => ({}),
+    joinRequestsService: () => ({}),
+    // These two are re-exported from ./signin-method-policy rather than built
+    // here, so they are the functions themselves, not factories returning one.
+    deploymentIsFederationCapable: () => false,
+    resolveSignInMethodPolicy: async () => ({}),
+    signInDomainRoutingPort: () => ({}),
+    signInRouter: () => ({}),
+    signUpVerification: () => ({}),
+    ssoConnections: () => ({}),
   }),
 );
 

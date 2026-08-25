@@ -389,6 +389,20 @@ jobs:
         if: matrix.shard == 1
         run: pnpm --filter @langwatch/clickhouse-client run test:unit
 
+      # @langwatch/redaction is the canonical secret and PII scrubber the
+      # ingestion pipeline runs on every attribute, and the CLI ships a
+      # byte-for-byte copy of it. Same reason again, and the sharpest one: its
+      # suite was the only thing asserting which values a rule must NOT take,
+      # and while it ran nowhere a rule change reached production that blanked
+      # the product's own record ids.
+      - name: Run @langwatch/redaction unit tests
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/redaction run test:unit
+
+      - name: Typecheck @langwatch/redaction
+        if: matrix.shard == 1
+        run: pnpm --filter @langwatch/redaction run typecheck
+
       # @langwatch/authz is the pure authorization engine (ADR-092) and
       # @langwatch/authz-server its storage-port runtime — raw TypeScript the
       # app inlines the same way, same shard-1 arrangement.
@@ -1335,12 +1349,23 @@ jobs:
             ${{ runner.os }}-vite-
 
       # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
-      # its postinstall always falls back to `node-gyp rebuild`. With
-      # pnpm/action-setup v6's npm-bootstrap path, node-gyp isn't on PATH
-      # by default — install it globally before any install that hits
-      # mcp-server's onlyBuiltDependencies allowlist.
+      # its postinstall always falls back to `node-gyp rebuild`, which pnpm
+      # runs with its own vendored node-gyp. That copy ships `gyp/gyp_main.py`
+      # mode 644, so an mtime-driven Makefile regeneration executes it and
+      # dies with "Permission denied" / error 126. Installing node-gyp
+      # globally does not displace it on its own: pnpm exports
+      # `npm_config_node_gyp` at its vendored copy and that wins over PATH.
+      # Point the variable at the published node-gyp, which ships the script
+      # executable. sdk-javascript-ci.yml and npx-server-smoke.yml do the same.
       - name: Install node-gyp (for node-pty postinstall)
-        run: npm install -g node-gyp@12.3.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install -g node-gyp@12.3.0
+          gyp="$(npm root -g)/node-gyp/bin/node-gyp.js"
+          test -f "$gyp"
+          test -x "$(dirname "$gyp")/../gyp/gyp_main.py"
+          echo "npm_config_node_gyp=$gyp" >> "$GITHUB_ENV"
 
       # One install. mcp-server is a workspace dependency of the app, so the
       # trailing `...` pulls it in — it used to be installed separately here
