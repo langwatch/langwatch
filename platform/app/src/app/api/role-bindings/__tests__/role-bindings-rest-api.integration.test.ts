@@ -537,13 +537,24 @@ describe("Feature: Role bindings REST API", () => {
           label: "future-end-date",
           hasOrgBinding: true,
         });
+        // Its own team. The shared ones already carry bindings from earlier
+        // tests in this file, and a create that collides answers 409 — which
+        // would fail this test for a reason that has nothing to do with the
+        // end date it exists to check.
+        const team = await prisma.team.create({
+          data: {
+            name: `RB Team End Date ${ns}`,
+            slug: `--test-rb-team-end-date-${ns}-${nanoid(6)}`,
+            organizationId: seeded.organization.id,
+          },
+        });
 
         const expiresAt = "2099-12-31T23:59:59.000Z";
         const response = await postBinding({
           userId: member.userId,
           role: "MEMBER",
           scopeType: "TEAM",
-          scopeId: teamAId,
+          scopeId: team.id,
           expiresAt,
         });
 
