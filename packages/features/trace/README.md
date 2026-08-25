@@ -22,5 +22,13 @@ The duplicate legacy `server/traces` full-span ClickHouse repository has been
 removed. The app-layer span-storage repository is now the single full-span
 reader until that complete migration.
 
+## Browser display toolkit
+
+`web` owns browser-safe, dependency-free trace presentation helpers: ANSI and
+preview formatting, prompt/SDK/origin labels, time and URL display state, and
+the billed-versus-bundled cost split. The app keeps compatibility facades while
+page composition, authentication, data fetching, and every trace transport
+response remain in the app.
+
 See [ADR-001](./adrs/001-trace-read-boundary.md) and the
 [read contract](./specs/trace-read-service.feature).

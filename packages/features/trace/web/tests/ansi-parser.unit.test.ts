@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type AnsiLine, hasAnsi, parseAnsi, stripAnsi, xterm256ToHex } from "../ansi";
+import { type AnsiLine, hasAnsi, parseAnsi, stripAnsi, xterm256ToHex } from "../src";
 
 /** Flatten a parsed result to plain text, joining lines with \n. */
 function textOf(lines: AnsiLine[]): string {

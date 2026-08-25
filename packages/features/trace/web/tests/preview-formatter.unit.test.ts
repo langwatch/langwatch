@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatPreview } from "../previewFormatter";
+import { formatPreview } from "../src";
 
 const opts = { maxChars: 80 };
 
@@ -7,7 +7,7 @@ describe("formatPreview", () => {
   describe("given empty input", () => {
     it("returns empty text without parsing", () => {
       expect(formatPreview(null, opts)).toEqual({ text: "" });
-      expect(formatPreview(undefined, opts)).toEqual({ text: "" });
+      expect(formatPreview(void 0, opts)).toEqual({ text: "" });
       expect(formatPreview("", opts)).toEqual({ text: "" });
     });
   });

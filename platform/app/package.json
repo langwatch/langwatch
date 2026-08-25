@@ -185,6 +185,7 @@
     "@langwatch/suite-contract": "workspace:*",
     "@langwatch/suite-server": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
+    "@langwatch/trace-web": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@langwatch/user-server": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",

@@ -33,3 +33,9 @@ Feature: Trace span-tree read service
     When the Trace package is introduced without the canonical cost calculator
     Then no existing route migrates to the package
     And the package keeps all fallback source attributes available for the canonical move
+
+  Scenario: Browser presentation remains transport-neutral
+    Given the browser display toolkit formats trace previews, costs, and terminal output
+    When it is consumed by the app trace explorer
+    Then it does not fetch, authorize, or reshape a trace response
+    And existing route payload fields and nullability remain authoritative in the app

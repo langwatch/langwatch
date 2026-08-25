@@ -19,7 +19,9 @@ validation.
 
 This slice does not move headers, full/detail reads, list/search, projections,
 eventing, overlays, evaluations, enrichment, resources, logs, or signals.
-Those paths move only with their complete response parity characterized.
+The browser package contains only dependency-free display helpers and cannot
+fetch, authorize, compose, or reshape a trace response. Those paths move only
+with their complete response parity characterized.
 
 ## Compatibility gate
 

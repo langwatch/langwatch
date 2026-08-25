@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isTerminalOrigin } from "../terminalOrigin";
+import { isTerminalOrigin } from "../src";
 
 describe("isTerminalOrigin", () => {
   describe("given a Claude Code service name", () => {

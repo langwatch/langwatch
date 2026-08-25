@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dedupeByValue } from "../dedupeByValue";
+import { dedupeByValue } from "../src";
 
 // Backs the SUPPLEMENT (not replace) merge of preloaded facet items with
 // server prefix-search results: the same value can appear in both lists, and

@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { formatTokens } from "../formatters";
+import { formatTokens } from "../src";
 
 describe("formatTokens", () => {
   describe("given nothing counted", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatBytes } from "../formatters";
+import { formatBytes } from "../src";
 
 /**
  * `formatBytes` humanises the trace's stored payload size (`_size_bytes` on

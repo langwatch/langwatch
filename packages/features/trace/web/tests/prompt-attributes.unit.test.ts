@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractPromptReference } from "../promptAttributes";
+import { extractPromptReference } from "../src";
 
 // Wire-format contract pinned by specs/nlp-go/prompt-spans-*.feature.
 // Each test exercises a single attribute permutation that nlpgo (or
@@ -10,7 +10,7 @@ describe("extractPromptReference", () => {
   describe("when no prompt attributes are present", () => {
     it("returns null for null/empty params", () => {
       expect(extractPromptReference(null)).toBeNull();
-      expect(extractPromptReference(undefined)).toBeNull();
+      expect(extractPromptReference(void 0)).toBeNull();
       expect(extractPromptReference({})).toBeNull();
     });
   });

@@ -4,7 +4,7 @@ import {
   NON_BILLABLE_ATTR,
   resolveNonBilledCost,
   splitTraceCost,
-} from "../costAttribution";
+} from "../src";
 
 describe("isNonBillableTrace", () => {
   describe("when the non-billable marker is 'true'", () => {
@@ -16,7 +16,7 @@ describe("isNonBillableTrace", () => {
   describe("when the marker is absent, empty, or 'false'", () => {
     it("returns false", () => {
       expect(isNonBillableTrace({})).toBe(false);
-      expect(isNonBillableTrace(undefined)).toBe(false);
+      expect(isNonBillableTrace(void 0)).toBe(false);
       expect(isNonBillableTrace(null)).toBe(false);
       expect(isNonBillableTrace({ [NON_BILLABLE_ATTR]: "false" })).toBe(false);
     });
@@ -48,7 +48,7 @@ describe("splitTraceCost", () => {
         billedCost: 0,
         nonBilledCost: 0,
       });
-      expect(splitTraceCost({ totalCost: undefined, nonBillable: false })).toEqual({
+      expect(splitTraceCost({ totalCost: void 0, nonBillable: false })).toEqual({
         billedCost: 0,
         nonBilledCost: 0,
       });

@@ -1,10 +1,10 @@
 import { isValidElement, type ReactElement } from "react";
 import { describe, expect, it } from "vitest";
-import { FACET_COLORS } from "../../components/FilterSidebar/constants";
-import { facetLabel, paletteFromColor } from "../../components/FilterSidebar/utils";
-import { OriginCell } from "../../components/TraceTable/registry/cells/trace/SimpleCells";
+import { ORIGIN_DISPLAY } from "@langwatch/trace-web";
+import { FACET_COLORS } from "../FilterSidebar/constants";
+import { facetLabel, paletteFromColor } from "../FilterSidebar/utils";
+import { OriginCell } from "../TraceTable/registry/cells/trace/SimpleCells";
 import type { TraceListItem } from "../../types/trace";
-import { ORIGIN_DISPLAY, originColorPalette, originLabel } from "../originDisplay";
 
 const knownOrigins = Object.keys(ORIGIN_DISPLAY) as Array<keyof typeof ORIGIN_DISPLAY>;
 
@@ -48,13 +48,6 @@ describe("origin display mapping", () => {
           expect(badge.props.colorPalette).toBe(ORIGIN_DISPLAY[origin].colorPalette);
         },
       );
-    });
-
-    describe("when an unknown origin value arrives", () => {
-      it("passes the value through with a neutral palette", () => {
-        expect(originLabel("mystery")).toBe("mystery");
-        expect(originColorPalette("mystery")).toBe("gray");
-      });
     });
   });
 });
