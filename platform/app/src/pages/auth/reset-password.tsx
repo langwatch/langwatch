@@ -201,7 +201,9 @@ function ResetPasswordForm({ token }: { token: string }) {
                         Nothing from the server reaches the reader. The marker
                         sits on the line itself because the guard reads the
                         slot's own lines, not the comment above them. */}
-                    <Alert.Description>{/* no-raw-error-toast-ok */ serverError.message}</Alert.Description>
+                    <Alert.Description>
+                      {/* no-raw-error-toast-ok */ serverError.message}
+                    </Alert.Description>
                     {/* A new link is the remedy only when the link is the
                         problem — offered for a refused password, it sends
                         somebody to burn a fresh link and meet the same wall. */}

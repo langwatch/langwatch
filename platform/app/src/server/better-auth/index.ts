@@ -17,15 +17,14 @@ import { createLogger } from "@langwatch/observability";
 import { RedisConfigService } from "@langwatch/redis-client";
 import { compare, hash } from "bcrypt";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
-import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError } from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { env } from "~/env.mjs";
 import { tryGetApp } from "~/server/app-layer/app";
 import {
-  identityBridgeCeremonies,
   deploymentIsFederationCapable,
+  identityBridgeCeremonies,
   identityCeremonies,
   identityStorageAdapter,
   resolveSignInMethodPolicy,

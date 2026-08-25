@@ -6,8 +6,8 @@ import { PersonalWorkspaceService } from "@ee/governance/services/personalWorksp
 import { RoutingPolicyService } from "@ee/governance/services/routingPolicy.service";
 import { resolveAuthProvider } from "@ee/sso/sso-gate";
 import { ValidationError } from "@langwatch/handled-error";
-import { issuerForProviderId } from "@langwatch/identity-server/better-auth";
 import { passwordProblem } from "@langwatch/identity";
+import { issuerForProviderId } from "@langwatch/identity-server/better-auth";
 import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
