@@ -385,6 +385,23 @@ Feature: Proving a domain by publishing a record
     When the sweep finds the well-known address answering without our token
     Then the proof on "acme.com" is wavering, with the same deadline a missing record earns
 
+  # ── Taking a domain back out ───────────────────────────────────────────
+
+  @integration
+  Scenario: A domain is taken back out of the connection
+    Given "ana" claimed a domain she no longer wants, proved or not yet
+    When she removes it from the setup page
+    Then the domain is gone from the connection — claim, approval, verification and pending ceremony with it
+    And the connection's state falls back to whatever its remaining domains have earned
+    And the history keeps every step the domain took
+
+  @integration
+  Scenario: A verified domain cannot be removed from a connection that decides sign-in
+    Given "acme.com" is verified on an ACTIVE connection
+    When "ana" tries to remove the domain
+    Then it is refused with the code "sso_connection_invalid_transition"
+    And the way to stop routing it is removing the connection itself, which is graced and strand-checked
+
   # ── Somebody else got there first ──────────────────────────────────────
 
   @integration

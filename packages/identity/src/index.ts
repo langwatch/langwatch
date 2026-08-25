@@ -41,6 +41,8 @@ export {
   DOMAIN_PROOF_RECOVERED_EVENT_TYPE,
   DOMAIN_PROOF_WAVERED_EVENT_TYPE,
   DOMAIN_VERIFIED_EVENT_TYPE,
+  DOMAIN_WITHDRAWN_EVENT_TYPE,
+  domainWithdrawnPayloadSchema,
   domainAttestedPayloadSchema,
   domainClaimApprovedPayloadSchema,
   domainClaimRejectedPayloadSchema,
@@ -182,6 +184,9 @@ export {
   VERIFY_DOMAIN_COMMAND_TYPE,
   type VerifyDomainCommandData,
   verifyDomainCommandDataSchema,
+  WITHDRAW_DOMAIN_COMMAND_TYPE,
+  type WithdrawDomainCommandData,
+  withdrawDomainCommandDataSchema,
 } from "./connection-commands";
 export {
   CannotImpersonateWithoutSecondFactorError,

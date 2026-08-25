@@ -21,6 +21,7 @@ import {
   ResumeConnectionCommand,
   SuspendConnectionCommand,
   VerifyDomainCommand,
+  WithdrawDomainCommand,
 } from "./commands/ssoConnectionCommands";
 import {
   CONNECTION_TEARDOWN_INITIAL_STATE,
@@ -62,6 +63,7 @@ const CONNECTION_COMMANDS = [
   ["requestVerification", RequestVerificationCommand],
   ["attestDomain", AttestDomainCommand],
   ["verifyDomain", VerifyDomainCommand],
+  ["withdrawDomain", WithdrawDomainCommand],
   ["activateConnection", ActivateConnectionCommand],
   ["suspendConnection", SuspendConnectionCommand],
   ["resumeConnection", ResumeConnectionCommand],

@@ -1187,6 +1187,30 @@ export class SsoSelfServeService {
     });
   }
 
+  /**
+   * Take a domain back out — a mistyped claim, a domain the company let go,
+   * a verification nobody wants any more. The guards refuse removing a
+   * VERIFIED domain from a connection that is deciding sign-in; everything
+   * else is the administrator's to tidy.
+   */
+  async removeDomain({
+    organizationId,
+    connectionId,
+    domain,
+    actor,
+  }: {
+    organizationId: string;
+    connectionId: string;
+    domain: string;
+    actor: SelfServeActor;
+  }): Promise<void> {
+    await this.requireOrganizationConnection({ organizationId, connectionId });
+    await this.deps.connections().withdrawDomain({
+      ...this.command({ organizationId, connectionId, actor }),
+      domain,
+    });
+  }
+
   /** The connection, and proof it is this organization's: a caller naming
    *  another tenant's connection reads the same not-found every miss does. */
   private async requireOrganizationConnection({

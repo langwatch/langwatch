@@ -39,6 +39,8 @@ export const REQUEST_VERIFICATION_COMMAND_TYPE =
   "lw.identity.request_verification" as const;
 export const ATTEST_DOMAIN_COMMAND_TYPE =
   "lw.identity.attest_domain" as const;
+export const WITHDRAW_DOMAIN_COMMAND_TYPE =
+  "lw.identity.withdraw_domain" as const;
 export const VERIFY_DOMAIN_COMMAND_TYPE = "lw.identity.verify_domain" as const;
 /**
  * What a re-check saw (ADR-123). Two verbs and no third, because a DNS
@@ -81,6 +83,7 @@ export const SSO_CONNECTION_COMMAND_TYPES = [
   DISCARD_CONNECTION_COMMAND_TYPE,
   REQUEST_VERIFICATION_COMMAND_TYPE,
   ATTEST_DOMAIN_COMMAND_TYPE,
+  WITHDRAW_DOMAIN_COMMAND_TYPE,
   VERIFY_DOMAIN_COMMAND_TYPE,
   RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
   RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
@@ -201,6 +204,18 @@ export type RequestVerificationCommandData = z.infer<
 export const attestDomainCommandDataSchema = commandDataSchema(domainShape);
 export type AttestDomainCommandData = z.infer<
   typeof attestDomainCommandDataSchema
+>;
+
+/**
+ * Take a domain back out of the connection — claim, approval, verification
+ * and pending ceremony with it. The guard refuses it for a VERIFIED domain
+ * on a connection that is deciding sign-in: while people route through a
+ * domain, the way to stop is removing the connection, which is graced and
+ * strand-checked, not tidying the domain out from under them.
+ */
+export const withdrawDomainCommandDataSchema = commandDataSchema(domainShape);
+export type WithdrawDomainCommandData = z.infer<
+  typeof withdrawDomainCommandDataSchema
 >;
 
 /**

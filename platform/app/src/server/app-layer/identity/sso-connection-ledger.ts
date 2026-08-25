@@ -41,6 +41,7 @@ import {
   type SsoConnectionFactInput,
   SUSPEND_CONNECTION_COMMAND_TYPE,
   VERIFY_DOMAIN_COMMAND_TYPE,
+  WITHDRAW_DOMAIN_COMMAND_TYPE,
 } from "@langwatch/identity";
 import type { SsoConnectionLedger } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
@@ -78,6 +79,7 @@ const SENDER_NAME_BY_COMMAND: Record<SsoConnectionCommandType, string> = {
   [DISCARD_CONNECTION_COMMAND_TYPE]: "discardConnection",
   [REQUEST_VERIFICATION_COMMAND_TYPE]: "requestVerification",
   [ATTEST_DOMAIN_COMMAND_TYPE]: "attestDomain",
+  [WITHDRAW_DOMAIN_COMMAND_TYPE]: "withdrawDomain",
   [VERIFY_DOMAIN_COMMAND_TYPE]: "verifyDomain",
   [ACTIVATE_CONNECTION_COMMAND_TYPE]: "activateConnection",
   [SUSPEND_CONNECTION_COMMAND_TYPE]: "suspendConnection",

@@ -1297,9 +1297,61 @@ describe("removing a connection from the setup page", () => {
   });
 });
 
+describe("taking a domain back out", () => {
+  /** @scenario "A domain is taken back out of the connection" */
+  it("removes the domain wherever it stood, and the state falls back to what remains", async () => {
+    await register();
+    await selfServe.claimDomain({
+      organizationId: ORG,
+      connectionId: CONNECTION,
+      domain: "acme.com",
+      actor: ANA,
+    });
+
+    await selfServe.removeDomain({
+      organizationId: ORG,
+      connectionId: CONNECTION,
+      domain: "acme.com",
+      actor: ANA,
+    });
+
+    const state = await held();
+    expect(state?.claimedDomains).toEqual([]);
+    expect(state?.approvedDomains).toEqual([]);
+    expect(state?.verifiedDomains).toEqual([]);
+    expect(state?.domainClaims).toEqual([]);
+    // Nothing else was in flight, so the journey is back at the start.
+    expect(state?.state).toBe("DRAFT");
+    // The history keeps every step: the claim and the withdrawal are both
+    // facts, and neither erased the other.
+    expect(commanded()).toContain("withdraw_domain");
+  });
+
+  /** @scenario "A verified domain cannot be removed from a connection that decides sign-in" */
+  it("refuses to pull a verified domain out from under a live connection", async () => {
+    seedOwnActiveConnection({ verifiedDomains: ["acme.com"] });
+
+    await selfServe
+      .removeDomain({
+        organizationId: ORG,
+        connectionId: CONNECTION,
+        domain: "acme.com",
+        actor: ANA,
+      })
+      .then(refused, (error) =>
+        expect((error as { code: string }).code).toBe(
+          "sso_connection_invalid_transition",
+        ),
+      );
+    expect((await held())?.verifiedDomains).toEqual(["acme.com"]);
+  });
+});
+
 /** This organization's own connection, already ACTIVE — seeded rather than
  *  walked through activation, because these tests are about leaving. */
-function seedOwnActiveConnection(): void {
+function seedOwnActiveConnection({
+  verifiedDomains = [],
+}: { verifiedDomains?: string[] } = {}): void {
   connections.seed({
     connectionId: CONNECTION,
     organizationId: ORG,
@@ -1308,7 +1360,7 @@ function seedOwnActiveConnection(): void {
     claimedDomains: [],
     domainClaims: [],
     approvedDomains: [],
-    verifiedDomains: [],
+    verifiedDomains,
     domainVerifications: [],
     pendingVerification: null,
     idpMetadata: {

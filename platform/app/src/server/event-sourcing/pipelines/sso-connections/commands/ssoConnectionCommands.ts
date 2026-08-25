@@ -42,6 +42,9 @@ import {
   VERIFY_DOMAIN_COMMAND_TYPE,
   type VerifyDomainCommandData,
   verifyDomainCommandDataSchema,
+  WITHDRAW_DOMAIN_COMMAND_TYPE,
+  type WithdrawDomainCommandData,
+  withdrawDomainCommandDataSchema,
 } from "@langwatch/identity";
 import type { SsoConnectionGuards } from "@langwatch/identity-server";
 import type { ZodTypeAny, z } from "zod";
@@ -171,6 +174,14 @@ export const VerifyDomainCommand = connectionCommand({
   verb: "verifyDomain",
 });
 export type VerifyDomainPayload = VerifyDomainCommandData;
+
+export const WithdrawDomainCommand = connectionCommand({
+  type: WITHDRAW_DOMAIN_COMMAND_TYPE,
+  schema: withdrawDomainCommandDataSchema,
+  description: "Take a domain back out of the connection",
+  verb: "withdrawDomain",
+});
+export type WithdrawDomainPayload = WithdrawDomainCommandData;
 
 export const ActivateConnectionCommand = connectionCommand({
   type: ACTIVATE_CONNECTION_COMMAND_TYPE,

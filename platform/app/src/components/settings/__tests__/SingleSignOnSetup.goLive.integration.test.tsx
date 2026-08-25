@@ -70,6 +70,7 @@ vi.mock("../../../utils/api", () => {
         checkDomainRecord: idle(),
         checkDomainFile: idle(),
         claimDomain: idle(),
+        removeDomain: idle(),
         activate: mutation(activateMock),
         grantBreakGlass: mutation(grantMock),
         renewBreakGlass: mutation(renewMock),

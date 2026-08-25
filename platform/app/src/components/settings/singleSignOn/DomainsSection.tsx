@@ -161,6 +161,7 @@ function DomainRow({
 }) {
   const claim = api.ssoSetup.claimDomain.useMutation();
   const prove = api.ssoSetup.proveDomain.useMutation();
+  const remove = api.ssoSetup.removeDomain.useMutation();
   const utils = api.useUtils();
   const chip = domainProofChipFor({
     proved,
@@ -226,6 +227,30 @@ function DomainRow({
             }
           >
             Claim it again
+          </Button>
+        )}
+        {/* The way back out, quiet beside the way forward. The server
+            refuses removing a verified domain from a live connection with
+            copy naming the alternative, so the dangerous case never goes
+            through this button. */}
+        {canManage && (
+          <Button
+            size="xs"
+            variant="ghost"
+            color="fg.muted"
+            _hover={{ color: "red.solid" }}
+            loading={remove.isPending}
+            onClick={() =>
+              remove.mutate(
+                { organizationId, connectionId, domain },
+                {
+                  onSuccess: () => void utils.ssoSetup.getSetup.invalidate(),
+                  onError: reportRefusal,
+                },
+              )
+            }
+          >
+            Remove
           </Button>
         )}
       </Table.Cell>

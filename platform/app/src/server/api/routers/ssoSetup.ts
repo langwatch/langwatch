@@ -166,6 +166,18 @@ export const ssoSetupRouter = createTRPCRouter({
       return ssoSelfServe().proveDomain({ ...input, actor });
     }),
 
+  /**
+   * Take a domain back out of the connection. Refused for a verified domain
+   * on a live connection — the connection itself is what leaves then.
+   */
+  removeDomain: protectedProcedure
+    .input(domainInput)
+    .permission("sso:manage")
+    .mutation(async ({ ctx, input }) => {
+      const actor = await audited({ ctx, action: "removeDomain", args: input });
+      return ssoSelfServe().removeDomain({ ...input, actor });
+    }),
+
   checkDomainRecord: protectedProcedure
     .input(domainInput)
     .permission("sso:manage")

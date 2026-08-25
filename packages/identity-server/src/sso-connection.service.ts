@@ -6,6 +6,9 @@ import {
   type ApproveDomainClaimCommandData,
   approveDomainClaimCommandDataSchema,
   ATTEST_DOMAIN_COMMAND_TYPE,
+  WITHDRAW_DOMAIN_COMMAND_TYPE,
+  type WithdrawDomainCommandData,
+  withdrawDomainCommandDataSchema,
   type AttestDomainCommandData,
   attestDomainCommandDataSchema,
   CLAIM_DOMAIN_COMMAND_TYPE,
@@ -143,6 +146,17 @@ export class SsoConnectionService {
     return this.commit(
       { type: ATTEST_DOMAIN_COMMAND_TYPE, data },
       await this.guards.attestDomain(data),
+    );
+  }
+
+  /** Take a domain back out of the connection, wherever it stood. */
+  async withdrawDomain(
+    input: WithdrawDomainCommandData,
+  ): Promise<SsoConnectionFact[]> {
+    const data = withdrawDomainCommandDataSchema.parse(input);
+    return this.commit(
+      { type: WITHDRAW_DOMAIN_COMMAND_TYPE, data },
+      await this.guards.withdrawDomain(data),
     );
   }
 

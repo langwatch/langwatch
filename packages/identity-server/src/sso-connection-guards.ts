@@ -69,6 +69,9 @@ import {
   VERIFICATION_REQUESTED_EVENT_TYPE,
   VERIFY_DOMAIN_COMMAND_TYPE,
   type VerifyDomainCommandData,
+  WITHDRAW_DOMAIN_COMMAND_TYPE,
+  type WithdrawDomainCommandData,
+  DOMAIN_WITHDRAWN_EVENT_TYPE,
 } from "@langwatch/identity";
 import type {
   SsoBreakGlassBindingRepository,
@@ -106,7 +109,29 @@ const ALLOWED_FROM: Record<
   [CLAIM_DOMAIN_COMMAND_TYPE]: ["DRAFT", "REJECTED", "VERIFIED", "ACTIVE"],
   [APPROVE_DOMAIN_CLAIM_COMMAND_TYPE]: ["CLAIMED"],
   [REJECT_DOMAIN_CLAIM_COMMAND_TYPE]: ["CLAIMED"],
-  [DISCARD_CONNECTION_COMMAND_TYPE]: ["DRAFT"],
+  // Every pre-live state, because "start over" is a self-serve act: nothing
+  // routes before ACTIVE, so a discard strands nobody however far the
+  // journey got. A LIVE connection leaves through teardown, which is graced
+  // and strand-checked, never through a discard.
+  [DISCARD_CONNECTION_COMMAND_TYPE]: [
+    "DRAFT",
+    "CLAIMED",
+    "APPROVED",
+    "VERIFICATION_PENDING",
+    "REJECTED",
+    "VERIFIED",
+  ],
+  // Any state where a domain can exist. The verb's own guard narrows this
+  // further: a VERIFIED domain on a routing connection is refused there.
+  [WITHDRAW_DOMAIN_COMMAND_TYPE]: [
+    "CLAIMED",
+    "APPROVED",
+    "VERIFICATION_PENDING",
+    "REJECTED",
+    "VERIFIED",
+    "ACTIVE",
+    "SUSPENDED",
+  ],
   // From CLAIMED, because the published record is what DECIDES a claim: a
   // customer is given the record the moment they claim, and the proof
   // landing states the approval and the verification together. From
@@ -475,6 +500,49 @@ export class SsoConnectionGuards {
    *   which is immediate, reversible, and taken by a human at the moment it
    *   matters.
    */
+  /**
+   * Take a domain back out. Two refusals, and both are the caller's next
+   * step rather than a dead end: a domain nothing in the state knows is an
+   * invalid transition (nothing to withdraw), and a VERIFIED domain on a
+   * connection that decides sign-in must leave through teardown — graced and
+   * strand-checked — never by tidying the list out from under the people
+   * routing through it.
+   */
+  async withdrawDomain(
+    data: WithdrawDomainCommandData,
+  ): Promise<SsoConnectionFactInput[]> {
+    const state = await this.require(data, WITHDRAW_DOMAIN_COMMAND_TYPE);
+    const domain = normalizeDomain(data.domain);
+    const known =
+      state.claimedDomains.includes(domain) ||
+      state.approvedDomains.includes(domain) ||
+      state.verifiedDomains.includes(domain) ||
+      state.pendingVerification?.domain === domain ||
+      state.domainClaims.some((claim) => claim.domain === domain);
+    if (!known) {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${data.connectionId}: domain ${domain} is not on this connection`,
+      );
+    }
+    const routing = state.state === "ACTIVE" || state.state === "SUSPENDED";
+    if (routing && state.verifiedDomains.includes(domain)) {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${data.connectionId}: ${domain} is verified on a live connection; remove the connection instead`,
+      );
+    }
+    return [
+      {
+        type: DOMAIN_WITHDRAWN_EVENT_TYPE,
+        data: {
+          connectionId: data.connectionId,
+          domain,
+          actor: data.actor,
+          source: data.source,
+        },
+      },
+    ];
+  }
+
   async attestDomain(
     data: AttestDomainCommandData,
   ): Promise<SsoConnectionFactInput[]> {

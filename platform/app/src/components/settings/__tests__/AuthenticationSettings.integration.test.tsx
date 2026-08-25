@@ -47,6 +47,7 @@ const apiDouble = {
       getSetup: { useQuery: mockGetSetup },
       register: mutationDouble(),
       claimDomain: mutationDouble(),
+      removeDomain: mutationDouble(),
       proveDomain: mutationDouble(),
       checkDomainRecord: mutationDouble(),
       activate: mutationDouble(),

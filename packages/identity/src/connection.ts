@@ -246,6 +246,8 @@ export const VERIFICATION_REQUESTED_EVENT_TYPE =
   "lw.identity.verification_requested" as const;
 export const DOMAIN_ATTESTED_EVENT_TYPE =
   "lw.identity.domain_attested" as const;
+export const DOMAIN_WITHDRAWN_EVENT_TYPE =
+  "lw.identity.domain_withdrawn" as const;
 export const DOMAIN_VERIFIED_EVENT_TYPE =
   "lw.identity.domain_verified" as const;
 export const DOMAIN_PROOF_WAVERED_EVENT_TYPE =
@@ -273,6 +275,7 @@ export const SSO_CONNECTION_EVENT_TYPES = [
   CONNECTION_DISCARDED_EVENT_TYPE,
   VERIFICATION_REQUESTED_EVENT_TYPE,
   DOMAIN_ATTESTED_EVENT_TYPE,
+  DOMAIN_WITHDRAWN_EVENT_TYPE,
   DOMAIN_VERIFIED_EVENT_TYPE,
   DOMAIN_PROOF_WAVERED_EVENT_TYPE,
   DOMAIN_PROOF_LAPSED_EVENT_TYPE,
@@ -381,6 +384,20 @@ export const domainAttestedPayloadSchema = z.object({
   /** The platform operator who attested. Recorded because an attested domain
    *  is exactly as trustworthy as the operator behind it, and a dispute is
    *  answered from this fact. */
+  actor: identityActorSchema,
+  ...sourced,
+});
+
+/**
+ * A domain taken back out of the connection, by whoever manages it. The
+ * fact carries only the domain and the actor: everything the domain had —
+ * claims, approvals, verifications, a pending ceremony — is derived state
+ * the fold recomputes without it, while the history keeps every step that
+ * was taken.
+ */
+export const domainWithdrawnPayloadSchema = z.object({
+  connectionId: z.string().min(1),
+  domain: z.string().min(1),
   actor: identityActorSchema,
   ...sourced,
 });
@@ -520,6 +537,10 @@ export const ssoConnectionFactInputSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal(DOMAIN_ATTESTED_EVENT_TYPE),
     data: domainAttestedPayloadSchema,
+  }),
+  z.object({
+    type: z.literal(DOMAIN_WITHDRAWN_EVENT_TYPE),
+    data: domainWithdrawnPayloadSchema,
   }),
   z.object({
     type: z.literal(DOMAIN_VERIFIED_EVENT_TYPE),
@@ -720,6 +741,39 @@ export function emptySsoConnection({
   };
 }
 
+/**
+ * What a pre-live connection's state is once a domain has been withdrawn:
+ * whatever its REMAINING domains have earned, in the lifecycle's own order.
+ * A connection past VERIFIED (ACTIVE, SUSPENDED, on its way out) keeps its
+ * state — routing is not re-decided by tidying a domain list.
+ */
+function stateAfterWithdrawal(state: {
+  state: SsoConnectionLifecycleState;
+  verifiedDomains: string[];
+  approvedDomains: string[];
+  pendingVerification: { domain: string } | null;
+  domainClaims: SsoDomainClaim[];
+}): SsoConnectionLifecycleState {
+  const beyondVerified: SsoConnectionLifecycleState[] = [
+    "ACTIVE",
+    "SUSPENDED",
+    "TEARDOWN_PENDING",
+    "TORN_DOWN",
+    "DISCARDED",
+  ];
+  if (beyondVerified.includes(state.state)) return state.state;
+  if (state.verifiedDomains.length > 0) return "VERIFIED";
+  if (state.pendingVerification !== null) return "VERIFICATION_PENDING";
+  if (state.approvedDomains.length > 0) return "APPROVED";
+  if (state.domainClaims.some((claim) => claim.state === "WAITING")) {
+    return "CLAIMED";
+  }
+  if (state.domainClaims.some((claim) => claim.state === "REJECTED")) {
+    return "REJECTED";
+  }
+  return "DRAFT";
+}
+
 const without = (domains: string[], domain: string): string[] =>
   domains.filter((held) => held !== domain);
 
@@ -888,6 +942,32 @@ export function reduceSsoConnection({
       };
     case CONNECTION_DISCARDED_EVENT_TYPE:
       return { ...touched, state: "DISCARDED" };
+    // A domain taken back out: every trace of it leaves the derived state —
+    // claims, approvals, verifications, the pending ceremony if it was its —
+    // and the connection's own state falls back to whatever the REMAINING
+    // domains have earned. The history keeps every step; only the state
+    // stops saying the domain is here.
+    case DOMAIN_WITHDRAWN_EVENT_TYPE: {
+      const domain = fact.data.domain;
+      const withdrawn = {
+        ...touched,
+        claimedDomains: without(state.claimedDomains, domain),
+        approvedDomains: without(state.approvedDomains, domain),
+        verifiedDomains: without(state.verifiedDomains, domain),
+        domainClaims: state.domainClaims.filter(
+          (claim) => claim.domain !== domain,
+        ),
+        domainVerifications: state.domainVerifications.filter(
+          (verification) => verification.domain !== domain,
+        ),
+        pendingVerification:
+          state.pendingVerification?.domain === domain
+            ? null
+            : state.pendingVerification,
+        rejection: state.rejection?.domain === domain ? null : state.rejection,
+      };
+      return { ...withdrawn, state: stateAfterWithdrawal(withdrawn) };
+    }
     case VERIFICATION_REQUESTED_EVENT_TYPE:
       return {
         ...touched,
