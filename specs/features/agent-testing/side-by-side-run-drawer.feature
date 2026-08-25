@@ -14,6 +14,10 @@ Feature: The wide run detail drawer
     repeats the chips at the top of the drawer: no status, no success rate, no
     criteria count and no duration.
 
+    The messages carry no section heading of their own, and no line is drawn
+    between them and the results. The results column is narrow, so the drawer
+    takes only the width the two parts need.
+
     The v1 drawer is not changed. Without the wide variant the drawer renders
     as it does today, at its current width and with the results below.
 
@@ -65,6 +69,13 @@ Feature: The wide run detail drawer
     And a met criterion carries a green check and an unmet one a red cross
 
   @integration
+  Scenario: The messages carry no heading and no line beside the results
+    Given a finished run open in the wide drawer
+    When the drawer is read
+    Then no "Conversation" heading sits over the messages
+    And no line is drawn between the messages and the results
+
+  @integration
   Scenario: The results panel is headed Results and repeats no chip
     Given a finished run open in the drawer
     When the results panel is read
@@ -77,6 +88,8 @@ Feature: The wide run detail drawer
     Given a finished run whose judge gave a reason for the whole run
     When the results are read
     Then that reason reads as a muted paragraph under the criteria
+    And the paragraph is headed "Judge reasoning"
+    And the line breaks the judge wrote are kept, and the text still wraps
 
   @integration
   Scenario: The drawer header offers Edit for the test case that ran

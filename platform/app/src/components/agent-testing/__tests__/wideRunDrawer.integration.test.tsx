@@ -276,8 +276,20 @@ describe("the wide run detail drawer", () => {
       screen.queryByTestId("wide-drawer-side-by-side"),
     ).not.toBeInTheDocument();
     const text = stacked.textContent ?? "";
-    expect(text.indexOf("Conversation")).toBeGreaterThanOrEqual(0);
-    expect(text.indexOf("Conversation")).toBeLessThan(text.indexOf("Results"));
+    expect(text.indexOf("I want my money back")).toBeGreaterThanOrEqual(0);
+    expect(text.indexOf("I want my money back")).toBeLessThan(
+      text.indexOf("Results"),
+    );
+  });
+
+  /** @scenario "The messages carry no heading and no line beside the results" */
+  it("draws no conversation heading and no line between the two columns", () => {
+    renderWide();
+
+    const conversation = screen.getByTestId("wide-drawer-conversation");
+    expect(within(conversation).queryByText("Conversation")).toBeNull();
+    // The columns meet with nothing drawn between them.
+    expect(conversation).not.toHaveStyle({ borderRightWidth: "1px" });
   });
 
   /** @scenario "Making the window narrower moves the results back under the conversation" */
@@ -494,7 +506,8 @@ describe("the wide run detail drawer", () => {
           verdict: Verdict.SUCCESS,
           metCriteria: ["stays polite"],
           unmetCriteria: [],
-          reasoning: "The agent stayed calm and answered the refund question.",
+          reasoning:
+            "The agent stayed calm and answered the refund question.\nIt named the refund window.",
         },
       }),
     );
@@ -505,6 +518,9 @@ describe("the wide run detail drawer", () => {
     expect(reasoning).toHaveTextContent(
       "The agent stayed calm and answered the refund question.",
     );
+    expect(within(panel).getByText("Judge reasoning")).toBeInTheDocument();
+    // The breaks the judge wrote are kept, and the text still wraps.
+    expect(window.getComputedStyle(reasoning).whiteSpace).toBe("pre-wrap");
     const text = panel.textContent ?? "";
     expect(text.indexOf("stays polite")).toBeLessThan(
       text.indexOf("The agent stayed calm"),

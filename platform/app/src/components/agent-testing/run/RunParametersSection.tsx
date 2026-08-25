@@ -9,7 +9,7 @@ import { Box, Input, VStack } from "@chakra-ui/react";
 import { RunParameterFields } from "~/components/suites/RunParameterFields";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { DIALOG_FIELD_STYLE, FieldLabel } from "../shared/DialogFields";
-import { RemoveBlockButton } from "./RemoveBlockButton";
+import { RemoveBlockButton } from "../shared/RemoveBlockButton";
 import type { RunDialogForm } from "./useRunDialogForm";
 
 export const PARAMETER_LINE_PLACEHOLDER = "plan=free, locale=de";

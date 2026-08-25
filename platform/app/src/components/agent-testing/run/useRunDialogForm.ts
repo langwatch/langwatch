@@ -18,7 +18,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
-import type { CustomizeRunChip } from "./CustomizeRunChips";
+import type { CustomizeChip } from "../shared/CustomizeChips";
 import type { PromptEntry } from "./PromptPicker";
 import {
   formatParameterLine,
@@ -273,8 +273,8 @@ function buildCustomizeRunChips({
   hasPublishedPrompts: boolean;
   onAddParameters: () => void;
   onRunAgainstPrompt: () => void;
-}): CustomizeRunChip[] {
-  const chips: CustomizeRunChip[] = [];
+}): CustomizeChip[] {
+  const chips: CustomizeChip[] = [];
   if (!fields.showNote) {
     chips.push({
       key: "note",

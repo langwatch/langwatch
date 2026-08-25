@@ -3,8 +3,8 @@
  *
  * The dialog asks four questions: what the case is called, which suite it
  * belongs to, what the user is trying to do, and what the judge must check.
- * Everything a run can override sits under Advanced, so the four questions
- * stay the whole form.
+ * Everything else, the parameters, the turn limits and the model overrides,
+ * waits behind a chip, so the four questions stay the whole form.
  *
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/features/agent-testing/case-version-history.feature
@@ -52,7 +52,12 @@ export function CaseModal({
           openHistoryOnOpen={openHistoryOnOpen}
         />
 
-        <Dialog.Body paddingX={5} paddingY={4}>
+        <Dialog.Body
+          paddingX={5}
+          paddingY={4}
+          maxHeight="66vh"
+          overflowY="auto"
+        >
           <CaseModalFields editor={editor} suites={suites} />
         </Dialog.Body>
 

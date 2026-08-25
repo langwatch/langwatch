@@ -152,12 +152,30 @@ Feature: The test cases table
     Then the case is saved
     And the run dialog opens for the case that was saved
 
+  # --- Customize test case ---
+
   @integration
-  Scenario: The model and turn overrides sit under Advanced
+  Scenario: The parameters, the turn limits and the models wait behind chips
     Given the case dialog is open
     When the body is read
-    Then the simulator model, the judge and the turn limits are not shown
-    And they are offered under "Advanced"
+    Then the parameters, the simulator model, the judge and the turn limits are not shown
+    And a "Customize test case" section offers "Add parameters", "Define min and max turns" and "Override models"
+
+  @integration
+  Scenario: A chip opens its block and the block can be removed again
+    Given the case dialog is open
+    When "Define min and max turns" is chosen
+    Then the min and the max turn fields are added to the form
+    And the chip is no longer offered
+    And removing the block takes the fields away and offers the chip again
+
+  @integration
+  Scenario: Editing a case opens the blocks it already uses
+    Given a stored case with parameters and a judge model of its own
+    When its editor is opened
+    Then the parameters block is open on the values of the case
+    And the model overrides block is open on that judge
+    And the turn limits stay behind their chip
 
   @integration
   Scenario: Clicking the Run button does not open the row

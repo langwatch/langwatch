@@ -1,6 +1,6 @@
 /**
  * The parts of the test case dialog: its heading, the four questions it asks,
- * what a run can override, and the line of actions at its foot.
+ * the blocks its chips open, and the line of actions at its foot.
  *
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/features/agent-testing/case-version-history.feature
@@ -9,7 +9,6 @@
 import {
   Box,
   Button,
-  Collapsible,
   Grid,
   HStack,
   Input,
@@ -19,15 +18,16 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { ChevronDown, ChevronRight, Play } from "lucide-react";
-import { useState } from "react";
+import { Play } from "lucide-react";
 import { UNFILED_OPTION_LABEL } from "~/components/scenarios/ScenarioForm";
 import { SimulationModelSelect } from "~/components/scenarios/SimulationModelSelect";
 import { Dialog } from "~/components/ui/dialog";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { TagList } from "~/components/ui/TagList";
+import { CustomizeChips } from "../shared/CustomizeChips";
 import { DIALOG_FIELD_STYLE, FieldLabel } from "../shared/DialogFields";
 import { FG_MUTED } from "../shared/design";
+import { RemoveBlockButton } from "../shared/RemoveBlockButton";
 import { SmallButton } from "../shared/SmallButton";
 import { CaseVersionHistoryPopover } from "./CaseVersionHistoryPopover";
 import type { TestSuiteEntry } from "./test-cases";
@@ -172,17 +172,19 @@ function SituationAndRubrics({
 }
 
 /** The declared parameters of the case, as one `name=value` line. */
-function ParametersField({
+function ParametersBlock({
   draft,
   setDraft,
+  onRemove,
 }: {
   draft: CaseDraft;
   setDraft: (update: Partial<CaseDraft>) => void;
+  onRemove: () => void;
 }) {
   return (
-    <Box>
+    <Box data-testid="case-parameters-block">
       <FieldLabel>
-        Parameters · optional
+        Parameters
         <FieldInfoTooltip
           description={PARAMETERS_HELP}
           docHref="/agent-simulations/scenario-parameters"
@@ -190,6 +192,7 @@ function ParametersField({
           trigger="hover"
           testId="case-parameters-info"
         />
+        <RemoveBlockButton label="Remove the parameters" onClick={onRemove} />
       </FieldLabel>
       <Input
         {...DIALOG_FIELD_STYLE}
@@ -226,8 +229,7 @@ export function CaseModalFields({
       )}
       <TitleAndSuiteRow draft={draft} setDraft={setDraft} suites={suites} />
       <SituationAndRubrics draft={draft} setDraft={setDraft} />
-      <ParametersField draft={draft} setDraft={setDraft} />
-      <AdvancedSection draft={draft} setDraft={setDraft} />
+      <CustomizeSection editor={editor} />
     </VStack>
   );
 }
@@ -288,97 +290,139 @@ export function CaseModalFooter({ editor }: { editor: CaseEditorState }) {
   );
 }
 
-/**
- * What a run can override, out of the way of the four questions the form
- * asks. A case that overrides nothing follows the project's models and the
- * SDK's turn limits.
- */
-function AdvancedSection({
+/** How long the conversation may run, and how early the judge may end it. */
+function TurnsBlock({
   draft,
   setDraft,
+  onRemove,
 }: {
   draft: CaseDraft;
   setDraft: (update: Partial<CaseDraft>) => void;
+  onRemove: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const ChevronIcon = open ? ChevronDown : ChevronRight;
+  return (
+    <VStack align="stretch" gap={2} data-testid="case-turns-block">
+      <Grid templateColumns="1fr 1fr" gap={3}>
+        <Box>
+          <FieldLabel>Max turns</FieldLabel>
+          <Input
+            {...DIALOG_FIELD_STYLE}
+            type="number"
+            aria-label="Max turns"
+            placeholder="Default: 10"
+            value={draft.maxTurns ?? ""}
+            onChange={(event) =>
+              setDraft({ maxTurns: toTurnCount(event.target.value) })
+            }
+          />
+        </Box>
+        <Box>
+          <FieldLabel>
+            Min turns
+            <RemoveBlockButton
+              label="Remove the turn limits"
+              onClick={onRemove}
+            />
+          </FieldLabel>
+          <Input
+            {...DIALOG_FIELD_STYLE}
+            type="number"
+            aria-label="Min turns"
+            placeholder="Default: none"
+            value={draft.minTurns ?? ""}
+            onChange={(event) =>
+              setDraft({ minTurns: toTurnCount(event.target.value) })
+            }
+          />
+        </Box>
+      </Grid>
+      <Text fontSize="11px" color={FG_MUTED}>
+        Max turns caps the conversation. Min turns keeps the judge from ending
+        the test early.
+      </Text>
+    </VStack>
+  );
+}
+
+/**
+ * The models this case runs on. A case that overrides neither follows the
+ * models of the project.
+ */
+function ModelsBlock({
+  draft,
+  setDraft,
+  onRemove,
+}: {
+  draft: CaseDraft;
+  setDraft: (update: Partial<CaseDraft>) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <Grid templateColumns="1fr 1fr" gap={3} data-testid="case-models-block">
+      <Box>
+        <FieldLabel>User simulator</FieldLabel>
+        <SimulationModelSelect
+          value={draft.simulatorModel}
+          onChange={(value) => setDraft({ simulatorModel: value })}
+          featureKey="scenarios.user_simulator"
+          size="sm"
+        />
+      </Box>
+      <Box>
+        <FieldLabel>
+          Judge
+          <RemoveBlockButton
+            label="Remove the model overrides"
+            onClick={onRemove}
+          />
+        </FieldLabel>
+        <SimulationModelSelect
+          value={draft.judgeModel}
+          onChange={(value) => setDraft({ judgeModel: value })}
+          featureKey="scenarios.judge"
+          size="sm"
+        />
+      </Box>
+    </Grid>
+  );
+}
+
+/**
+ * What the case can carry beyond the four questions: the parameters, the turn
+ * limits and the model overrides, each behind a chip until it is asked for.
+ */
+function CustomizeSection({ editor }: { editor: CaseEditorState }) {
+  const { draft, setDraft, customize } = editor;
 
   return (
-    <Collapsible.Root
-      open={open}
-      onOpenChange={({ open: nextOpen }) => setOpen(nextOpen)}
-    >
-      <Collapsible.Trigger asChild>
-        <HStack
-          gap={1}
-          cursor="pointer"
-          userSelect="none"
-          fontSize="11.5px"
-          fontWeight="medium"
-          color={FG_MUTED}
-          _hover={{ color: "fg" }}
-        >
-          <ChevronIcon size={13} />
-          <Text>Advanced</Text>
-        </HStack>
-      </Collapsible.Trigger>
-      <Collapsible.Content>
-        <VStack align="stretch" gap={3} paddingTop={3}>
-          <Grid templateColumns="1fr 1fr" gap={3}>
-            <Box>
-              <FieldLabel>User simulator</FieldLabel>
-              <SimulationModelSelect
-                value={draft.simulatorModel}
-                onChange={(value) => setDraft({ simulatorModel: value })}
-                featureKey="scenarios.user_simulator"
-                size="sm"
-              />
-            </Box>
-            <Box>
-              <FieldLabel>Judge</FieldLabel>
-              <SimulationModelSelect
-                value={draft.judgeModel}
-                onChange={(value) => setDraft({ judgeModel: value })}
-                featureKey="scenarios.judge"
-                size="sm"
-              />
-            </Box>
-          </Grid>
-          <Grid templateColumns="1fr 1fr" gap={3}>
-            <Box>
-              <FieldLabel>Max turns</FieldLabel>
-              <Input
-                {...DIALOG_FIELD_STYLE}
-                type="number"
-                aria-label="Max turns"
-                placeholder="Default: 10"
-                value={draft.maxTurns ?? ""}
-                onChange={(event) =>
-                  setDraft({ maxTurns: toTurnCount(event.target.value) })
-                }
-              />
-            </Box>
-            <Box>
-              <FieldLabel>Min turns</FieldLabel>
-              <Input
-                {...DIALOG_FIELD_STYLE}
-                type="number"
-                aria-label="Min turns"
-                placeholder="Default: none"
-                value={draft.minTurns ?? ""}
-                onChange={(event) =>
-                  setDraft({ minTurns: toTurnCount(event.target.value) })
-                }
-              />
-            </Box>
-          </Grid>
-          <Text fontSize="11px" color={FG_MUTED}>
-            Max turns caps the conversation. Min turns keeps the judge from
-            ending the test early.
-          </Text>
-        </VStack>
-      </Collapsible.Content>
-    </Collapsible.Root>
+    <VStack align="stretch" gap={4}>
+      {customize.showParameters && (
+        <ParametersBlock
+          draft={draft}
+          setDraft={setDraft}
+          onRemove={customize.removeParameters}
+        />
+      )}
+      {customize.showTurns && (
+        <TurnsBlock
+          draft={draft}
+          setDraft={setDraft}
+          onRemove={customize.removeTurns}
+        />
+      )}
+      {customize.showModels && (
+        <ModelsBlock
+          draft={draft}
+          setDraft={setDraft}
+          onRemove={customize.removeModels}
+        />
+      )}
+      <CustomizeChips
+        title="Customize test case"
+        chips={customize.chips}
+        testId="customize-case-chips"
+      />
+    </VStack>
   );
 }
 

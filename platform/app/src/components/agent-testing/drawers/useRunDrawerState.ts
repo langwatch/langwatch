@@ -31,8 +31,13 @@ export type RunDetail = ReturnType<typeof useScenarioRunDetail>;
 /** The stored run, on a drawer that already has one. */
 export type RunScenarioState = NonNullable<RunDetail["scenarioState"]>;
 
+/** How wide the drawer opens: the messages, then the results column. */
+export const WIDE_DRAWER_WIDTH = 950;
+
+export const WIDE_DRAWER_MAX_WIDTH = `${WIDE_DRAWER_WIDTH}px`;
+
 /** How wide the window must be before the results sit beside the conversation. */
-export const SIDE_BY_SIDE_MIN_WIDTH = 1100;
+export const SIDE_BY_SIDE_MIN_WIDTH = WIDE_DRAWER_WIDTH;
 
 /** True when the window gives the side-by-side layout enough room. */
 export function useSideBySideLayout(): boolean {

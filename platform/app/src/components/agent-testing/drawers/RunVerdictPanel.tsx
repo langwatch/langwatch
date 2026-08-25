@@ -55,19 +55,36 @@ export function orderVerdicts({
     .map((entry) => entry.verdict);
 }
 
-/** The heading of the panel. */
-function VerdictHeading() {
+/**
+ * One heading of the panel. The icon sits in a box of its own with no line
+ * height, so it centers on the capitals beside it rather than on the taller
+ * line box of the text.
+ */
+function PanelHeading({
+  children,
+  icon,
+}: {
+  children: React.ReactNode;
+  icon?: React.ReactNode;
+}) {
   return (
     <HStack
       gap={1.5}
+      alignItems="center"
       fontSize="10.5px"
       fontWeight="semibold"
       textTransform="uppercase"
       letterSpacing="0.025em"
       color={FG_MUTED}
     >
-      <Scale size={11} />
-      <Text as="span">Results</Text>
+      {icon ? (
+        <Box as="span" display="flex" lineHeight={0} flexShrink={0}>
+          {icon}
+        </Box>
+      ) : null}
+      <Text as="span" lineHeight="1">
+        {children}
+      </Text>
     </HStack>
   );
 }
@@ -110,7 +127,7 @@ export function RunVerdictPanel({
 }) {
   return (
     <VStack align="stretch" gap={2.5} data-testid="run-verdict-panel">
-      <VerdictHeading />
+      <PanelHeading icon={<Scale size={11} />}>Results</PanelHeading>
       {error ? (
         <Text
           fontSize="11.5px"
@@ -133,14 +150,21 @@ export function RunVerdictPanel({
         </Text>
       )}
       {reasoning ? (
-        <Text
-          fontSize="11.5px"
-          color={FG_MUTED}
-          whiteSpace="pre-wrap"
-          data-testid="run-verdict-reasoning"
-        >
-          {reasoning}
-        </Text>
+        <VStack align="stretch" gap={1.5} paddingTop={0.5}>
+          <PanelHeading>Judge reasoning</PanelHeading>
+          <Text
+            fontSize="11.5px"
+            color={FG_MUTED}
+            lineHeight="short"
+            // The judge writes in paragraphs and lists, so the breaks it wrote
+            // are kept while the text still wraps to the column.
+            whiteSpace="pre-wrap"
+            wordBreak="break-word"
+            data-testid="run-verdict-reasoning"
+          >
+            {reasoning}
+          </Text>
+        </VStack>
       ) : null}
     </VStack>
   );

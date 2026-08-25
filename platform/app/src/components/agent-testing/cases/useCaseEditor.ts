@@ -28,6 +28,10 @@ import {
   formatParameterLine,
   toParameterDefinitions,
 } from "../run/parameter-line";
+import {
+  type CaseCustomizeBlocks,
+  useCaseCustomizeBlocks,
+} from "./useCaseCustomizeBlocks";
 
 /** What a person types into the editor. */
 export type CaseDraft = {
@@ -98,6 +102,8 @@ export type CaseEditorState = {
   /** Says what a save would refuse, or nothing when the draft is complete. */
   problem: string | null;
   save: (options: { shouldRunAfterSave: boolean }) => void;
+  /** The optional blocks the chips of the dialog open. */
+  customize: CaseCustomizeBlocks;
 };
 
 /**
@@ -119,6 +125,9 @@ function useCaseDraft({
 }) {
   const [draft, setDraftState] = useState<CaseDraft>(EMPTY_DRAFT);
   const [version, setVersion] = useState<number | null>(null);
+  // Rises on every seeding, so what follows the draft knows it was replaced
+  // even when the case reads at the version it read before.
+  const [seedCount, setSeedCount] = useState(0);
 
   const seed = open ? (scenarioId ?? "new") : null;
   const seededFrom = useMemo(
@@ -129,6 +138,7 @@ function useCaseDraft({
   const seedFrom = useCallback((stored: Scenario) => {
     setDraftState(draftFromScenario(stored));
     setVersion(stored.version);
+    setSeedCount((count) => count + 1);
   }, []);
 
   useEffect(() => {
@@ -136,6 +146,7 @@ function useCaseDraft({
     if (!scenarioId) {
       setDraftState({ ...EMPTY_DRAFT, folderId });
       setVersion(null);
+      setSeedCount((count) => count + 1);
       return;
     }
     if (seededFrom) seedFrom(seededFrom);
@@ -150,7 +161,7 @@ function useCaseDraft({
     [],
   );
 
-  return { draft, setDraft, version, seedFrom };
+  return { draft, setDraft, version, seedCount, seedFrom };
 }
 
 /** The two writes the dialog makes, and the one refusal it can name. */
@@ -325,12 +336,14 @@ export function useCaseEditor({
     { enabled: open && !!projectId && !!scenarioId },
   );
 
-  const { draft, setDraft, version, seedFrom } = useCaseDraft({
+  const { draft, setDraft, version, seedCount, seedFrom } = useCaseDraft({
     open,
     scenarioId,
     folderId,
     scenario,
   });
+
+  const customize = useCaseCustomizeBlocks({ seedCount, draft, setDraft });
 
   const { createMutation, updateMutation, staleVersion, setStaleVersion } =
     useCaseWrites({ projectId, onSaved, runAfterSave });
@@ -376,5 +389,6 @@ export function useCaseEditor({
     reloadStale,
     problem,
     save,
+    customize,
   };
 }

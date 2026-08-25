@@ -69,6 +69,7 @@ export function TagList({ labels, onRemove, onAdd, tone }: TagListProps) {
           variant="outline"
           borderRadius="full"
           borderColor="border"
+          boxShadow="none"
           onClick={(e) => {
             e.stopPropagation();
             submittedRef.current = false;

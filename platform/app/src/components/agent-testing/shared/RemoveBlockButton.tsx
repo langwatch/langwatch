@@ -1,12 +1,13 @@
 /**
- * The small x that takes a block the chips added back out of the run dialog.
+ * The small x that takes a block the chips added back out of a dialog.
  *
  * @see specs/features/agent-testing/run-dialog.feature
+ * @see specs/features/agent-testing/cases-table.feature
  */
 
 import { chakra } from "@chakra-ui/react";
 import { X } from "lucide-react";
-import { FG_MUTED } from "../shared/design";
+import { FG_MUTED } from "./design";
 
 export function RemoveBlockButton({
   label,

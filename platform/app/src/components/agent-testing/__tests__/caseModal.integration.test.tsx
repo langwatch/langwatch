@@ -2,12 +2,18 @@
  * @vitest-environment jsdom
  *
  * The test case dialog of the Agent Testing page: what it asks, what its
- * footer holds, what it hides under Advanced, and what Save and Run does.
+ * footer holds, what its chips open, and what Save and Run does.
  *
  * @see specs/features/agent-testing/cases-table.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -189,20 +195,53 @@ describe("the test case dialog", () => {
       );
     });
 
-    /** @scenario "The model and turn overrides sit under Advanced" */
-    it("keeps the models and the turn limits under Advanced", async () => {
+    /** @scenario "The parameters, the turn limits and the models wait behind chips" */
+    it("keeps the parameters, the turn limits and the models behind chips", async () => {
+      openNew();
+      await screen.findByTestId("case-modal");
+
+      expect(screen.queryByLabelText("Parameters")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Max turns")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Min turns")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("case-models-block")).not.toBeInTheDocument();
+
+      const chips = screen.getByTestId("customize-case-chips");
+      expect(chips).toHaveTextContent("Customize test case");
+      expect(
+        within(chips).getByTestId("customize-chip-case-parameters"),
+      ).toHaveTextContent("Add parameters");
+      expect(
+        within(chips).getByTestId("customize-chip-case-turns"),
+      ).toHaveTextContent("Define min and max turns");
+      expect(
+        within(chips).getByTestId("customize-chip-case-models"),
+      ).toHaveTextContent("Override models");
+    });
+
+    /** @scenario "A chip opens its block and the block can be removed again" */
+    it("opens the turn fields on the chip and takes them away again", async () => {
       const user = userEvent.setup();
       openNew();
       await screen.findByTestId("case-modal");
 
-      expect(screen.getByLabelText("Max turns")).not.toBeVisible();
+      await user.click(screen.getByTestId("customize-chip-case-turns"));
 
-      await user.click(screen.getByText("Advanced"));
+      expect(await screen.findByLabelText("Max turns")).toBeVisible();
+      expect(screen.getByLabelText("Min turns")).toBeVisible();
+      expect(
+        screen.queryByTestId("customize-chip-case-turns"),
+      ).not.toBeInTheDocument();
+
+      await user.click(
+        screen.getByRole("button", { name: "Remove the turn limits" }),
+      );
 
       await waitFor(() =>
-        expect(screen.getByLabelText("Max turns")).toBeVisible(),
+        expect(screen.queryByLabelText("Max turns")).not.toBeInTheDocument(),
       );
-      expect(screen.getByLabelText("Min turns")).toBeVisible();
+      expect(
+        screen.getByTestId("customize-chip-case-turns"),
+      ).toBeInTheDocument();
     });
 
     /** @scenario "Save and Run saves the case and then asks what to run it against" */
@@ -229,6 +268,30 @@ describe("the test case dialog", () => {
   });
 
   describe("when a stored case is edited", () => {
+    /** @scenario "Editing a case opens the blocks it already uses" */
+    it("opens the blocks the stored case already carries", async () => {
+      mockGetById.mockReturnValue({
+        data: storedCase({
+          parameters: [{ name: "customer_plan", defaultValue: "free" }],
+          judgeModel: "openai/gpt-5-mini",
+        }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      render(<AgentTestingCaseEditor />, { wrapper: Wrapper });
+      useAgentTestingStore.getState().openCaseEditor({ scenarioId: "case_1" });
+
+      expect(await screen.findByLabelText("Parameters")).toHaveValue(
+        "customer_plan=free",
+      );
+      expect(screen.getByTestId("case-models-block")).toBeInTheDocument();
+      // Nothing the case does not use is opened: the turns stay on their chip.
+      expect(screen.queryByLabelText("Max turns")).not.toBeInTheDocument();
+      expect(
+        screen.getByTestId("customize-chip-case-turns"),
+      ).toBeInTheDocument();
+    });
+
     /** @scenario "Editing a case names its version and opens the history" */
     /** @scenario "History opens a popover listing the versions newest first" */
     it("names the version in the header and opens the history beside it", async () => {

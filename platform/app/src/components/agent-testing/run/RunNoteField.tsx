@@ -11,7 +11,7 @@
 import { Box, Input, Text } from "@chakra-ui/react";
 import { MAX_RUN_NOTE_LENGTH } from "~/server/scenarios/run-note";
 import { DIALOG_FIELD_STYLE, FieldLabel } from "../shared/DialogFields";
-import { RemoveBlockButton } from "./RemoveBlockButton";
+import { RemoveBlockButton } from "../shared/RemoveBlockButton";
 
 export function isNoteTooLong(note: string): boolean {
   return note.trim().length > MAX_RUN_NOTE_LENGTH;

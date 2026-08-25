@@ -22,6 +22,7 @@ import {
   type RunDrawerState,
   useRunDrawerState,
   useRunDrawerStop,
+  WIDE_DRAWER_MAX_WIDTH,
 } from "./useRunDrawerState";
 
 /** The drawer once the run has state, and the queued read until it does. */
@@ -84,7 +85,7 @@ export function AgentTestingRunDrawer({ open }: { open?: boolean }) {
         <Drawer.Content
           bg="transparent"
           paddingX={0}
-          maxWidth="1100px"
+          maxWidth={WIDE_DRAWER_MAX_WIDTH}
           overflow="hidden"
           borderRadius="lg"
           data-testid="agent-testing-run-drawer"

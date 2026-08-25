@@ -7,7 +7,7 @@
 
 import { Box, VStack } from "@chakra-ui/react";
 import { HandledErrorAlert } from "~/features/errors";
-import { CustomizeRunChips } from "./CustomizeRunChips";
+import { CustomizeChips } from "../shared/CustomizeChips";
 import { MissingProviderNotice } from "./MissingProviderNotice";
 import { RunNoteField } from "./RunNoteField";
 import { RunParametersSection } from "./RunParametersSection";
@@ -46,7 +46,11 @@ export function RunDialogFields({
 
       {form.showParams && <RunParametersSection form={form} isBusy={isBusy} />}
 
-      <CustomizeRunChips chips={form.chips} />
+      <CustomizeChips
+        title="Customize your run"
+        chips={form.chips}
+        testId="customize-run-chips"
+      />
 
       {form.missingProvider && <MissingProviderNotice />}
 

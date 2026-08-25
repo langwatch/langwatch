@@ -1,34 +1,40 @@
 /**
- * The "Customize your run" chips of the run dialog.
+ * The chips that customize a dialog: the run dialog and the test case dialog
+ * both offer their optional fields this way.
  *
- * Each chip adds one field to the form. A chip that was chosen is no longer
- * offered; removing its field offers it again.
+ * Each chip adds one block to the form. A chip that was chosen is no longer
+ * offered; removing its block offers it again.
  *
  * @see specs/features/agent-testing/run-dialog.feature
+ * @see specs/features/agent-testing/cases-table.feature
  */
 
 import { chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
-import { FG_MUTED } from "../shared/design";
+import { FG_MUTED } from "./design";
 
-export type CustomizeRunChip = {
+export type CustomizeChip = {
   key: string;
   label: string;
   onAdd: () => void;
 };
 
-export function CustomizeRunChips({ chips }: { chips: CustomizeRunChip[] }) {
+export function CustomizeChips({
+  title,
+  chips,
+  testId,
+}: {
+  /** What the section says the chips do. */
+  title: string;
+  chips: CustomizeChip[];
+  testId: string;
+}) {
   if (chips.length === 0) return null;
 
   return (
-    <VStack
-      align="stretch"
-      gap={2}
-      paddingTop={3}
-      data-testid="customize-run-chips"
-    >
+    <VStack align="stretch" gap={2} paddingTop={3} data-testid={testId}>
       <Text fontSize="11.5px" fontWeight="medium" color={FG_MUTED}>
-        Customize your run
+        {title}
       </Text>
       <HStack gap={2} flexWrap="wrap">
         {chips.map((chip) => (

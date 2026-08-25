@@ -16,8 +16,8 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { getRoutePath } from "~/utils/routes";
 import { FieldLabel } from "../shared/DialogFields";
 import { FG_MUTED } from "../shared/design";
+import { RemoveBlockButton } from "../shared/RemoveBlockButton";
 import { type PromptEntry, PromptPicker } from "./PromptPicker";
-import { RemoveBlockButton } from "./RemoveBlockButton";
 import {
   AgentBlocks,
   type RunDialogAgent,

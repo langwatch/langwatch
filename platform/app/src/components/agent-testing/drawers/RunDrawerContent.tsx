@@ -6,6 +6,9 @@
  * The results read as a plain list of the criteria the judge scored. They are
  * always open: they are the answer the drawer was opened for.
  *
+ * The messages carry no section heading and no line between them and the
+ * results, so the drawer reads as one page rather than two panes.
+ *
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  */
 
@@ -29,13 +32,20 @@ import { isTerminalStatus } from "~/server/scenarios/scenario-event.enums";
 import { orderVerdicts, RunVerdictPanel } from "./RunVerdictPanel";
 import { hasCriteria, type RunDetail } from "./useRunDrawerState";
 
+/** How wide the results read beside the conversation. */
+const RESULTS_COLUMN_WIDTH = "310px";
+
+/**
+ * The messages of the run. They carry no section heading: the drawer opens on
+ * the conversation, so a header over it says only what the reader can see.
+ */
 function ConversationSection({ detail }: { detail: RunDetail }) {
   const { scenarioState, project } = detail;
   if (!scenarioState) return null;
 
   if (detail.shouldShowNoResponse) {
     return (
-      <RunDetailSection value="no-response" title="Conversation" isFirst>
+      <ConversationBox>
         <VStack
           align="center"
           justify="center"
@@ -51,28 +61,23 @@ function ConversationSection({ detail }: { detail: RunDetail }) {
             The agent under test didn&apos;t return any messages for this run.
           </Text>
         </VStack>
-      </RunDetailSection>
+      </ConversationBox>
     );
   }
 
   if (!detail.hasConversation) {
     return (
-      <RunDetailSection value="conversation" title="Conversation" isFirst>
+      <ConversationBox>
         <HStack gap={2} color="fg.muted" paddingY={6} justify="center">
           <Spinner size="xs" />
           <Text fontSize="sm">Waiting for the first message</Text>
         </HStack>
-      </RunDetailSection>
+      </ConversationBox>
     );
   }
 
   return (
-    <RunDetailSection
-      value="conversation"
-      title="Conversation"
-      count={detail.conversationCount}
-      isFirst
-    >
+    <ConversationBox>
       <ConversationExpandContext.Provider
         value={{ isExpandable: true, shouldExpandAll: false }}
       >
@@ -83,7 +88,16 @@ function ConversationSection({ detail }: { detail: RunDetail }) {
           projectId={project?.id ?? ""}
         />
       </ConversationExpandContext.Provider>
-    </RunDetailSection>
+    </ConversationBox>
+  );
+}
+
+/** The padding the messages sit in, the same the sections take. */
+function ConversationBox({ children }: { children: React.ReactNode }) {
+  return (
+    <Box paddingX={4} paddingY={3} data-testid="run-drawer-conversation-body">
+      {children}
+    </Box>
   );
 }
 
@@ -160,24 +174,20 @@ function ParametersSection({ detail }: { detail: RunDetail }) {
   );
 }
 
-/** The conversation beside the results. */
+/**
+ * The conversation beside the results. Nothing is drawn between the two
+ * columns: the results start where the messages end.
+ */
 function SideBySideContent({ detail }: { detail: RunDetail }) {
   return (
     <Grid
-      templateColumns="minmax(0, 1fr) minmax(0, 460px)"
+      templateColumns={`minmax(0, 1fr) minmax(0, ${RESULTS_COLUMN_WIDTH})`}
       flex={1}
       minHeight={0}
       data-testid="wide-drawer-side-by-side"
     >
-      <Box
-        style={{ overflowY: "auto" }}
-        borderRightWidth="1px"
-        borderColor="border"
-        data-testid="wide-drawer-conversation"
-      >
-        <Accordion.Root multiple defaultValue={["conversation", "no-response"]}>
-          <ConversationSection detail={detail} />
-        </Accordion.Root>
+      <Box style={{ overflowY: "auto" }} data-testid="wide-drawer-conversation">
+        <ConversationSection detail={detail} />
       </Box>
       <Box style={{ overflowY: "auto" }} data-testid="wide-drawer-results">
         <ResultsSection detail={detail} isFirst />
@@ -198,12 +208,7 @@ function StackedContent({ detail }: { detail: RunDetail }) {
       overflowY="auto"
       data-testid="wide-drawer-stacked"
     >
-      <Accordion.Root
-        multiple
-        defaultValue={["conversation", "no-response", "parameters"]}
-      >
-        <ConversationSection detail={detail} />
-      </Accordion.Root>
+      <ConversationSection detail={detail} />
       <ResultsSection
         detail={detail}
         isFirst={!detail.hasConversation && !detail.shouldShowNoResponse}
