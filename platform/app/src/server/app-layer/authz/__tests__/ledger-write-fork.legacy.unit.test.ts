@@ -69,7 +69,7 @@ describe("given an organization the genesis import has not reached", () => {
             binding,
             {
               ...binding,
-              id: "rb_2",
+              bindingId: "rb_2",
               scopeId: "team_billing",
               expiresAtMs: 1_800_000_000_000,
             },
