@@ -31,6 +31,81 @@ export interface ObservedAction {
   settledAtMs: number;
 }
 
+/**
+ * The two calls the page makes on the server for one action.
+ *
+ * `complete` records what the tab answered before it posts, so the record holds
+ * the answer even when the completion itself fails.
+ */
+function actionTransport({
+  cookie,
+  conversationId,
+  record,
+}: {
+  cookie: string;
+  conversationId: string;
+  record: ObservedAction;
+}) {
+  return {
+    claim: ({ actionId }: { actionId: string }) =>
+      trpcMutate<{ isClaimed: boolean }>({
+        cookie,
+        path: "langy.claimUiAction",
+        input: { projectId: PROJECT_ID, conversationId, actionId },
+        timeoutMs: 15_000,
+      }),
+    complete: async (args: {
+      ok: boolean;
+      result?: unknown;
+      errorCode?: string;
+      [key: string]: unknown;
+    }) => {
+      record.ok = args.ok;
+      record.result = args.result;
+      record.errorCode = args.errorCode;
+      return trpcMutate<{ isAccepted: boolean }>({
+        cookie,
+        path: "langy.completeUiAction",
+        input: { projectId: PROJECT_ID, conversationId, ...args },
+        timeoutMs: 30_000,
+      });
+    },
+  };
+}
+
+/** Which list the settled action belongs on, and what the drop is worth saying. */
+function fileOutcome({
+  record,
+  outcome,
+  claimedActions,
+  droppedActions,
+}: {
+  record: ObservedAction;
+  outcome: UiActionExecution;
+  claimedActions: ObservedAction[];
+  droppedActions: ObservedAction[];
+}): void {
+  record.outcome = outcome;
+  record.settledAtMs = Date.now();
+  const isClaimed =
+    outcome === "executed" ||
+    outcome === "handler-failed" ||
+    outcome === "completion-failed";
+  if (isClaimed) {
+    claimedActions.push(record);
+    return;
+  }
+  droppedActions.push(record);
+  // The claim window is a hard 3 second constant server-side, so a drop is a
+  // timing report rather than a mystery: say how long the tab took, so a flake
+  // reads as latency instead of a lost action.
+  console.log(
+    `[fake-tab] ${record.kind} not claimed (${outcome}) after ${
+      record.settledAtMs - record.seenAtMs
+    }ms`,
+  );
+}
+
 export function createUiActionListener({
   adapter,
   cookie,
@@ -71,24 +146,7 @@ export function createUiActionListener({
         turnId: adapter?.state.currentTurnId ?? null,
         seen: seenKeys,
         handlers,
-        claim: ({ actionId }) =>
-          trpcMutate<{ isClaimed: boolean }>({
-            cookie,
-            path: "langy.claimUiAction",
-            input: { projectId: PROJECT_ID, conversationId, actionId },
-            timeoutMs: 15_000,
-          }),
-        complete: async (args) => {
-          record.ok = args.ok;
-          record.result = args.result;
-          record.errorCode = args.errorCode;
-          return trpcMutate<{ isAccepted: boolean }>({
-            cookie,
-            path: "langy.completeUiAction",
-            input: { projectId: PROJECT_ID, conversationId, ...args },
-            timeoutMs: 30_000,
-          });
-        },
+        ...actionTransport({ cookie, conversationId, record }),
         onHandlerError: ({ kind, message }) =>
           console.log(`[fake-tab] ${kind} failed: ${message.slice(0, 200)}`),
       })
@@ -101,27 +159,9 @@ export function createUiActionListener({
           );
           return "not-claimed";
         })
-        .then((outcome) => {
-          record.outcome = outcome;
-          record.settledAtMs = Date.now();
-          const claimed =
-            outcome === "executed" ||
-            outcome === "handler-failed" ||
-            outcome === "completion-failed";
-          if (claimed) {
-            claimedActions.push(record);
-          } else {
-            droppedActions.push(record);
-            // The claim window is a hard 3 second constant server-side, so a
-            // drop is a timing report rather than a mystery: say how long the
-            // tab took, so a flake reads as latency instead of a lost action.
-            console.log(
-              `[fake-tab] ${entry.kind} not claimed (${outcome}) after ${
-                record.settledAtMs - record.seenAtMs
-              }ms`,
-            );
-          }
-        }),
+        .then((outcome) =>
+          fileOutcome({ record, outcome, claimedActions, droppedActions }),
+        ),
     );
   };
 

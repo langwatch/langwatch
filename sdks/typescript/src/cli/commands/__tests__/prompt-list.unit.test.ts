@@ -90,10 +90,27 @@ describe("given a project with 44 prompts", () => {
   });
 
   describe("when the limit is not a positive number", () => {
-    it("is ignored rather than read as one prompt", async () => {
-      const result = await listCommand({ limit: "nonsense" });
+    /**
+     * Ending the command is what `experiment versions` does with the same flag.
+     * Dropping the value instead lists the whole server, and the caller reads
+     * that as the page they asked for.
+     */
+    it.each([["nonsense"], ["0"], ["-1"], ["1.5"]])(
+      "refuses %s rather than listing everything",
+      async (limit) => {
+        const exit = vi
+          .spyOn(process, "exit")
+          .mockImplementation((code?: string | number | null | undefined) => {
+            throw new Error(`process.exit(${String(code)})`);
+          });
+        const error = vi.spyOn(console, "error").mockImplementation(() => {});
 
-      expect(result?.data).toHaveLength(44);
-    });
+        await expect(listCommand({ limit })).rejects.toThrow("process.exit(1)");
+        expect(error.mock.calls[0]?.[0]).toContain("--limit takes");
+
+        exit.mockRestore();
+        error.mockRestore();
+      },
+    );
   });
 });

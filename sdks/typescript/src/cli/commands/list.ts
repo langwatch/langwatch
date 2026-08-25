@@ -15,13 +15,23 @@ export interface PromptListOptions {
 
 /**
  * `--limit` is the paging flag every other list command in this CLI takes, so a
- * caller that has used one of those reaches for it here too. Reading it as a
- * plain positive integer and ignoring anything else keeps a typo from silently
- * returning one prompt.
+ * caller that has used one of those reaches for it here too.
+ *
+ * A value that is not a positive whole number ends the command rather than
+ * being dropped: dropping it lists everything, and the caller reads the whole
+ * server as the page they asked for. This is what `experiment versions` does
+ * with the same flag.
  */
 const resolveLimit = (raw: string | undefined): number | undefined => {
   if (raw === undefined) return undefined;
-  return parsePositiveIntOrNull(raw) ?? undefined;
+  const parsed = parsePositiveIntOrNull(raw);
+  if (parsed === null) {
+    console.error(
+      `--limit takes a whole number of prompts, 1 or more. Got "${raw}".`,
+    );
+    process.exit(1);
+  }
+  return parsed;
 };
 
 export const listCommand = async (
