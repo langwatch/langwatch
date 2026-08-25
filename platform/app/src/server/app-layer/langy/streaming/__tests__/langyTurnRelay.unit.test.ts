@@ -152,12 +152,18 @@ function makeRelay(
       conversationId: string;
       turnId: string;
     }) => Promise<string | null>;
+    refreshHandoffTtl?: (a: {
+      conversationId: string;
+      turnId: string;
+    }) => Promise<void>;
   } = {},
 ) {
   const buffer = fakeBuffer();
   const conversations = over.conversations ?? fakeConversations();
   const resourceLinks = over.resourceLinks ?? fakeResourceLinks();
   const reserveFrameNonce = vi.fn(async () => over.fresh ?? true);
+  const refreshHandoffTtl =
+    over.refreshHandoffTtl ?? vi.fn(async () => undefined);
   const relay = new LangyTurnRelay({
     buffer,
     conversations,
@@ -165,12 +171,20 @@ function makeRelay(
     ...(over.readHandoffRunToken
       ? { readHandoffRunToken: over.readHandoffRunToken }
       : {}),
+    refreshHandoffTtl,
     resourceLinks,
     ...(over.resolveResourceUrl
       ? { resolveResourceUrl: over.resolveResourceUrl }
       : {}),
   });
-  return { relay, buffer, conversations, reserveFrameNonce, resourceLinks };
+  return {
+    relay,
+    buffer,
+    conversations,
+    reserveFrameNonce,
+    resourceLinks,
+    refreshHandoffTtl,
+  };
 }
 
 /** A real signed envelope for a payload object. */
@@ -211,6 +225,32 @@ describe("LangyTurnRelay", () => {
     it("routes a heartbeat to liveness with no content", async () => {
       const { relay, buffer } = makeRelay();
       await relay.handle(frame({ type: "heartbeat" }));
+      expect(buffer.heartbeat).toHaveBeenCalledWith({
+        conversationId: "conv-1",
+        turnId: "turn-1",
+      });
+    });
+
+    /** @scenario "A heartbeat keeps the turn's revival record alive" */
+    it("extends the turn's handoff on the same heartbeat", async () => {
+      const { relay, refreshHandoffTtl } = makeRelay();
+      await relay.handle(frame({ type: "heartbeat" }));
+      expect(refreshHandoffTtl).toHaveBeenCalledWith({
+        conversationId: "conv-1",
+        turnId: "turn-1",
+      });
+    });
+
+    /** @scenario "A heartbeat still counts when the revival record cannot be reached" */
+    it("still counts the heartbeat when the handoff store refuses", async () => {
+      const refreshHandoffTtl = vi.fn(async () => {
+        throw new Error("redis unavailable");
+      });
+      const { relay, buffer } = makeRelay({ refreshHandoffTtl });
+
+      const out = await relay.handle(frame({ type: "heartbeat" }));
+
+      expect(out).toEqual({ status: "applied" });
       expect(buffer.heartbeat).toHaveBeenCalledWith({
         conversationId: "conv-1",
         turnId: "turn-1",
