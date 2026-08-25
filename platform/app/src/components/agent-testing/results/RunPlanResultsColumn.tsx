@@ -5,27 +5,16 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { ScenarioRunExportDialog } from "~/components/suites/ScenarioRunExportDialog";
-import { useExportScenarioRuns } from "~/components/suites/useExportScenarioRuns";
-import { useCan } from "~/hooks/useCan";
-import { useNow } from "~/hooks/useNow";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
-import { RunDialog } from "../run/RunDialog";
 import { ContentColumn } from "../shared/ContentColumn";
 import type { PeriodControls } from "./period-controls";
 import type { RunPlanDetailProps } from "./RunPlanDetail";
-import {
-  RunPlanDetailHeader,
-  type RunPlanDetailRun,
-} from "./RunPlanDetailHeader";
+import { RunPlanDetailHeader } from "./RunPlanDetailHeader";
+import { RunPlanResultsDialogs } from "./RunPlanResultsDialogs";
 import { RunPlanRunResults } from "./RunPlanRunResults";
 import { RUNS_SIDEBAR_WIDTH } from "./RunsSidebar";
 import type { RunPlan } from "./run-plans";
 import type { RunPlanBatches, RunPlanSelection } from "./useRunPlanBatches";
-import { useRunPlanCancel } from "./useRunPlanCancel";
-import { useRunPlanRunDialog } from "./useRunPlanRunDialog";
-import { useRunPlanViewMode } from "./useRunPlanViewMode";
+import { useRunPlanResultsColumn } from "./useRunPlanResultsColumn";
 
 export type RunPlanResultsColumnProps = {
   plan: RunPlan;
@@ -42,39 +31,16 @@ export function RunPlanResultsColumn({
   periodControls,
   onEditPlan,
 }: RunPlanResultsColumnProps) {
-  const { project } = useOrganizationTeamProject();
-  const { can } = useCan();
-  const now = useNow();
-  const canManage = can("scenarios:manage");
-  const { viewMode, handleViewModeChange } = useRunPlanViewMode();
-  const runDialog = useRunPlanRunDialog({ plan, canManage });
-
-  const cancel = useRunPlanCancel({
-    scenarioSetId: plan.scenarioSetId,
-    selectedBatchRunId: selection.selectedBatch?.batchRunId ?? null,
-    refetch: batches.refetch,
-  });
-
-  const exportRuns = useExportScenarioRuns({
-    projectId: project?.id,
-    scenarioSetId: plan.scenarioSetId,
-    startDate: periodControls.period.startDate.getTime(),
-    endDate: periodControls.period.endDate.getTime(),
-  });
-
-  const isExportDisabled =
-    batches.isLoading ||
-    exportRuns.isExporting ||
-    batches.batchRuns.length === 0;
-
-  const run: RunPlanDetailRun | null = selection.selectedBatch
-    ? {
-        title: selection.title ?? "",
-        timeAgo: formatTimeAgoCompact(selection.selectedBatch.timestamp, now),
-        note: selection.note,
-        summary: selection.summary,
-      }
-    : null;
+  const {
+    canManage,
+    viewMode,
+    onViewModeChange,
+    cancel,
+    exportRuns,
+    isExportDisabled,
+    run,
+    runDialog,
+  } = useRunPlanResultsColumn({ plan, batches, selection, periodControls });
 
   return (
     <>
@@ -83,7 +49,7 @@ export function RunPlanResultsColumn({
           plan={plan}
           run={run}
           viewMode={viewMode}
-          onViewModeChange={handleViewModeChange}
+          onViewModeChange={onViewModeChange}
           onStopAll={
             cancel.canStop && selection.isBatchRunning
               ? cancel.handleCancelAll
@@ -107,23 +73,11 @@ export function RunPlanResultsColumn({
         />
       </ContentColumn>
 
-      <ScenarioRunExportDialog
-        isOpen={exportRuns.isDialogOpen}
-        onClose={exportRuns.closeExportDialog}
-        onExport={exportRuns.startExport}
+      <RunPlanResultsDialogs
+        exportRuns={exportRuns}
+        runDialog={runDialog}
         runCount={batches.allRuns.length}
-        hasFiltersApplied={false}
       />
-
-      {/* The dialog carries the whole target and parameter machinery, so it is
-          only mounted once a person asks for a run. */}
-      {runDialog.subject && (
-        <RunDialog
-          subject={runDialog.subject}
-          onClose={runDialog.close}
-          onRunStarted={runDialog.onRunStarted}
-        />
-      )}
     </>
   );
 }
