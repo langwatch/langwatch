@@ -51,6 +51,10 @@ import { useAskBeforeLeaving } from "@langwatch/workflow-web";
 import { PostEventProvider, usePostEvent } from "../hooks/usePostEvent";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 import { isConnectionAllowed } from "@langwatch/workflow-web";
+import { WorkflowNodeHostProvider } from "@langwatch/workflow-web";
+import type { Entry } from "@langwatch/workflow-contract";
+import { LLMModelDisplay } from "../../components/llmPromptConfigs/LLMModelDisplay";
+import { HoverableBigText } from "../../components/HoverableBigText";
 import { AutoSave } from "./AutoSave";
 import { StudioNodeDrawer } from "./drawers/StudioNodeDrawer";
 import DefaultEdge from "./Edge";
@@ -63,6 +67,10 @@ import {
   NodeSelectionPanelButton,
 } from "./node-selection-panel/NodeSelectionPanel";
 import { NodeComponents } from "./nodes";
+import { ComponentIcon } from "./ColorfulBlockIcons";
+import { useComponentExecution } from "../hooks/useComponentExecution";
+import { useComponentVersion } from "../hooks/useComponentVersion";
+import { useGetDatasetData } from "../hooks/useGetDatasetData";
 import { Optimize } from "./Optimize";
 import { ProgressToast } from "./ProgressToast";
 import { Publish } from "./Publish";
@@ -488,27 +496,41 @@ export function OptimizationStudioCanvas({
   const nodeTypes = useMemo(() => NodeComponents, []);
   const edgeTypes = useMemo(() => ({ default: DefaultEdge }), []);
   const { colorMode } = useColorMode();
+  const useEntryDatasetTotal = (dataset: Entry["dataset"]) =>
+    useGetDatasetData({ dataset, preview: true }).total;
+  const nodeHost = {
+    ComponentIcon,
+    HoverableBigText,
+    LLMModelDisplay,
+    useColorModeValue,
+    useComponentExecution,
+    useComponentVersion,
+    useEntryDatasetTotal,
+  };
 
   return (
-    <ReactFlow
-      nodeTypes={nodeTypes}
-      edgeTypes={edgeTypes}
-      colorMode={colorMode}
-      // ReactFlow defaults deleteKeyCode to "Backspace" only; also bind Delete
-      // so a selected node or connection is removable with either key.
-      deleteKeyCode={["Backspace", "Delete"]}
-      defaultViewport={{
-        zoom: defaultZoom,
-        x: 100,
-        y: Math.round(
-          ((typeof window !== "undefined" ? window.innerHeight - yAdjust : 0) || 300) / 2,
-        ),
-      }}
-      proOptions={{ hideAttribution: true }}
-      {...props}
-    >
-      <ReactFlowBackground />
-      {children}
-    </ReactFlow>
+    <WorkflowNodeHostProvider value={nodeHost}>
+      <ReactFlow
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        colorMode={colorMode}
+        // ReactFlow defaults deleteKeyCode to "Backspace" only; also bind Delete
+        // so a selected node or connection is removable with either key.
+        deleteKeyCode={["Backspace", "Delete"]}
+        defaultViewport={{
+          zoom: defaultZoom,
+          x: 100,
+          y: Math.round(
+            ((typeof window !== "undefined" ? window.innerHeight - yAdjust : 0) || 300) /
+              2,
+          ),
+        }}
+        proOptions={{ hideAttribution: true }}
+        {...props}
+      >
+        <ReactFlowBackground />
+        {children}
+      </ReactFlow>
+    </WorkflowNodeHostProvider>
   );
 }

@@ -1,7 +1,7 @@
 import type { Node, NodeProps } from "@xyflow/react";
 import { forwardRef, type Ref } from "react";
 import type { End } from "@langwatch/workflow-contract";
-import { ComponentNode } from "./Nodes";
+import { ComponentNode } from "./workflow-nodes";
 
 export const EndNode = forwardRef(function EndNode(
   props: NodeProps<Node<End>>,

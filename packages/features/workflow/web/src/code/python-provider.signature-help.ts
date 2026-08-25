@@ -1,7 +1,7 @@
 import type { Monaco } from "@monaco-editor/react";
 import type { editor, IDisposable, Position } from "monaco-editor";
-import { PYTHON_BUILTIN_BY_NAME, type PyMember } from "../pythonStdlib";
-import { scanImports } from "./shared";
+import { PYTHON_BUILTIN_BY_NAME, type PyMember } from "./python-stdlib";
+import { scanImports } from "./python-provider.shared";
 
 /**
  * Pop the parameter-hint widget when the user opens a call expression. Resolves
@@ -50,7 +50,7 @@ export function registerSignatureHelp(monaco: Monaco): IDisposable {
       if (callee.includes(".")) {
         const [owner, ...rest] = callee.split(".");
         const memberName = rest.join(".");
-        if (owner === undefined) return null;
+        if (owner === void 0) return null;
         const imports = scanImports(model.getValue());
         const mod = imports.get(owner);
         if (mod) {
@@ -86,7 +86,7 @@ export function registerSignatureHelp(monaco: Monaco): IDisposable {
           activeSignature: 0,
           activeParameter: Math.min(activeArgIdx, Math.max(0, params.length - 1)),
         },
-        dispose: () => undefined,
+        dispose: () => void 0,
       };
     },
   });

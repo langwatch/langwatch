@@ -41,6 +41,23 @@ Feature: Workflow service boundary
     Then declared entry defaults fill only missing values
     And the browser template does not pin a resolved project model
 
+  Scenario: Studio dataset transforms are portable browser behaviour
+    Given Studio, Prompts, or execution needs to reshape a dataset
+    When it converts records, fields, or train/test partitions
+    Then it uses the Workflow browser surface
+    And application modules retain only compatibility imports
+
+  Scenario: Code-node Python language support is portable browser behaviour
+    Given the Studio code editor registers Python providers
+    When it completes, validates, formats, hovers, or offers quick fixes
+    Then it uses the Workflow browser surface
+    And the application retains only Monaco editor chrome
+
+  Scenario: Canvas node renderers use explicit application host ports
+    Given Studio renders workflow nodes or palette entries
+    When a node needs application-only execution or dataset data
+    Then Workflow uses its injected browser host port
+
   Scenario: Execution materializes a saved entry dataset through DatasetService
     Given a Studio execution event references a saved entry dataset
     When Workflow materializes the event with an injected DatasetService

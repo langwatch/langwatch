@@ -1,7 +1,7 @@
-import { MODULES } from "@langwatch/workflow-web";
+import { MODULES } from "./studio-registry";
 import type { Component } from "@langwatch/workflow-contract";
-import type { NodeWithOptionalPosition } from "~/types";
-import { NodeDraggable } from "./NodeDraggable";
+import type { NodeWithOptionalPosition } from "@langwatch/workflow-contract";
+import { NodeDraggable } from "./workflow-node-draggable";
 
 type EvaluatorNodeDraggableProps = {
   onDragEnd?: (item: { node: NodeWithOptionalPosition<Component> }) => void;

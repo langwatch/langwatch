@@ -3,9 +3,9 @@ import type { Node, NodeProps } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import type { Ref } from "react";
 import { forwardRef, useEffect } from "react";
-import { useComponentVersion } from "../../hooks/useComponentVersion";
 import type { Custom } from "@langwatch/workflow-contract";
-import { ComponentNode } from "./Nodes";
+import { useWorkflowNodeHost } from "./workflow-node.host";
+import { ComponentNode } from "./workflow-nodes";
 
 export const CustomNode = forwardRef(function CustomNode(
   props: NodeProps<Node<Custom>>,
@@ -19,6 +19,7 @@ export const CustomNode = forwardRef(function CustomNode(
 });
 
 const LatestComponentVersionCheck = ({ node }: { node: NodeProps<Node<Custom>> }) => {
+  const { useComponentVersion } = useWorkflowNodeHost();
   const { currentVersion } = useComponentVersion(node);
 
   const updateNodeInternals = useUpdateNodeInternals();

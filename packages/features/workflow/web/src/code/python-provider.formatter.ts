@@ -1,3 +1,4 @@
+// Workflow code-node formatting provider.
 import type { Monaco } from "@monaco-editor/react";
 import type { editor, IDisposable } from "monaco-editor";
 

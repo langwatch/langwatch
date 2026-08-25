@@ -2861,18 +2861,27 @@ importers:
 
   packages/features/workflow/web:
     dependencies:
+      '@chakra-ui/react':
+        specifier: ^3.36.0
+        version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../../agent/contract
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
+      '@langwatch/design-system':
+        specifier: workspace:*
+        version: link:../../../design-system
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
       '@langwatch/workflow-contract':
         specifier: workspace:*
         version: link:../contract
+      '@monaco-editor/react':
+        specifier: ^4.7.0
+        version: 4.7.0(monaco-editor@0.55.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@xyflow/react':
         specifier: ^12.11.1
         version: 12.11.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(immer@11.1.8)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -2882,9 +2891,30 @@ importers:
       lodash-es:
         specifier: ^4.17.21
         version: 4.18.1
+      monaco-editor:
+        specifier: ^0.55.1
+        version: 0.55.1
       nanoid:
         specifier: ^5.1.5
         version: 5.1.16
+      react-dnd:
+        specifier: ^16.0.1
+        version: 16.0.1(@types/node@26.2.0)(@types/react@19.2.18)(react@19.2.8)
+      react-dnd-html5-backend:
+        specifier: ^16.0.1
+        version: 16.0.1
+      react-feather:
+        specifier: ^2.0.10
+        version: 2.0.10(react@19.2.8)
+      react-icons:
+        specifier: ^5.5.0
+        version: 5.7.0(react@19.2.8)
+      react-spinners:
+        specifier: ^0.17.0
+        version: 0.17.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      usehooks-ts:
+        specifier: ^3.1.1
+        version: 3.1.1(react@19.2.8)
       zod:
         specifier: ^4.4.3
         version: 4.4.3

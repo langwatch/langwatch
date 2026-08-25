@@ -13,13 +13,15 @@ import { useEvaluatorPickerFlow } from "../../hooks/useEvaluatorPickerFlow";
 import { usePromptPickerFlow } from "../../hooks/usePromptPickerFlow";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 import { MODULES } from "@langwatch/workflow-web";
+import {
+  AgentNodeDraggable,
+  EvaluatorNodeDraggable,
+  NodeDraggable,
+} from "@langwatch/workflow-web";
 import type { ComponentType, Custom, Field } from "@langwatch/workflow-contract";
 import { getInputsOutputs } from "@langwatch/workflow-contract";
 import { NodeComponents } from "../nodes";
-import { AgentNodeDraggable } from "./AgentNodeDraggable";
-import { EvaluatorNodeDraggable } from "./EvaluatorNodeDraggable";
 import { LlmSignatureNodeDraggable } from "./LlmSignatureNodeDraggable";
-import { NodeDraggable } from "./NodeDraggable";
 
 export function NodeSelectionPanelButton({
   isOpen,
@@ -141,28 +143,26 @@ export const NodeSelectionPanel = ({
 
           <EvaluatorNodeDraggable onDragEnd={handleEvaluatorDragEnd} />
 
-          {components &&
-            components.length > 0 &&
-            components.some((custom) => custom.isComponent) && (
-              <>
-                <Text fontWeight="500" padding={1}>
-                  Custom Components
-                </Text>
-                {components
-                  .filter((custom) => custom.isComponent)
-                  .map((custom) => {
-                    const isCurrentWorkflow = custom.id === workflow?.workflow_id;
-                    return (
-                      <NodeDraggable
-                        key={custom.id}
-                        component={createCustomComponent(custom as Custom)}
-                        type="custom"
-                        disableDrag={isCurrentWorkflow}
-                      />
-                    );
-                  })}
-              </>
-            )}
+          {components?.some((custom) => custom.isComponent) && (
+            <>
+              <Text fontWeight="500" padding={1}>
+                Custom Components
+              </Text>
+              {components
+                .filter((custom) => custom.isComponent)
+                .map((custom) => {
+                  const isCurrentWorkflow = custom.id === workflow?.workflow_id;
+                  return (
+                    <NodeDraggable
+                      key={custom.id}
+                      component={createCustomComponent(custom as Custom)}
+                      type="custom"
+                      disableDrag={isCurrentWorkflow}
+                    />
+                  );
+                })}
+            </>
+          )}
         </VStack>
         <HStack width="full" padding={3} paddingLeft={5} gap={4} background="bg">
           <Tooltip showArrow content="Star us on GitHub">

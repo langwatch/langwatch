@@ -4,12 +4,11 @@ import type { Ref } from "react";
 import { forwardRef } from "react";
 import { useDrop } from "react-dnd";
 import { MoreHorizontal, Trash2 } from "react-feather";
-import { useColorModeValue } from "../../../components/ui/color-mode";
-import { Menu } from "../../../components/ui/menu";
-import { useWorkflowStore } from "@langwatch/workflow-web";
+import { Menu } from "@langwatch/design-system/menu";
+import { useWorkflowStore } from "./hooks/use-workflow-store";
 import type { ComponentType, PromptingTechnique } from "@langwatch/workflow-contract";
-import { ComponentIcon } from "../ColorfulBlockIcons";
-import { ComponentNode, selectionColor } from "./Nodes";
+import { useWorkflowNodeHost } from "./workflow-node.host";
+import { ComponentNode, selectionColor } from "./workflow-nodes";
 
 export const PromptingTechniqueDraggingNode = forwardRef(
   function PromptingTechniqueDraggingNode(
@@ -62,10 +61,11 @@ export function PromptingTechniqueWrapper({
     ref: string;
   };
 }) {
+  const { ComponentIcon, useColorModeValue } = useWorkflowNodeHost();
   const { node, setNode, deleteNode, deselectAllNodes } = useWorkflowStore((state) => ({
     node: decoratedBy?.ref
       ? state.nodes.find((node) => node.id === decoratedBy.ref)
-      : undefined,
+      : void 0,
     setNode: state.setNode,
     deleteNode: state.deleteNode,
     deselectAllNodes: state.deselectAllNodes,

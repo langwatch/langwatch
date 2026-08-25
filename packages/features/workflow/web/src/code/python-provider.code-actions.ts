@@ -9,7 +9,7 @@ import {
   MISSING_CLASS_CODE,
   MISSING_OUTPUT_KEY,
   MIXED_INDENT,
-} from "./shared";
+} from "./python-provider.shared";
 
 /**
  * Quick fixes for the scaffold-missing diagnostics. Monaco renders the
@@ -37,7 +37,7 @@ export function registerCodeActions(
         );
       });
       if (matching.length === 0) {
-        return { actions: [], dispose: () => undefined };
+        return { actions: [], dispose: () => void 0 };
       }
       const fullRange = model.getFullModelRange();
       const source = model.getValue();
@@ -195,7 +195,7 @@ export function registerCodeActions(
           });
         }
       }
-      return { actions, dispose: () => undefined };
+      return { actions, dispose: () => void 0 };
     },
   });
 }

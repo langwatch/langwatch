@@ -2,9 +2,9 @@ import { HStack, Text } from "@chakra-ui/react";
 import type { Node, NodeProps } from "@xyflow/react";
 import { forwardRef, type Ref } from "react";
 import { Database } from "react-feather";
-import { useGetDatasetData } from "../../hooks/useGetDatasetData";
 import type { Component, Entry } from "@langwatch/workflow-contract";
-import { ComponentNode, NodeSectionTitle } from "./Nodes";
+import { useWorkflowNodeHost } from "./workflow-node.host";
+import { ComponentNode, NodeSectionTitle } from "./workflow-nodes";
 
 /**
  * The workflow's entry point on the canvas. Renders the entry fields
@@ -19,10 +19,8 @@ export const EntryNode = forwardRef(function EntryNode(
 ) {
   const data = props.data as Entry;
 
-  const { total } = useGetDatasetData({
-    dataset: data.dataset,
-    preview: true,
-  });
+  const { useEntryDatasetTotal } = useWorkflowNodeHost();
+  const total = useEntryDatasetTotal(data.dataset);
 
   return (
     <ComponentNode ref={ref} {...props} outputsTitle="Inputs" hidePlayButton>
@@ -42,7 +40,7 @@ export const EntryNode = forwardRef(function EntryNode(
             <Text fontSize="11px" truncate>
               {data.dataset.name ?? "Dataset"}
             </Text>
-            {total !== undefined && total !== null && (
+            {total !== void 0 && total !== null && (
               <Text fontSize="11px" color="fg.subtle" flexShrink={0}>
                 ({total} {total === 1 ? "row" : "rows"})
               </Text>

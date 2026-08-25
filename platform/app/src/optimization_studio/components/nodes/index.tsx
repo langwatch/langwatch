@@ -1,11 +1,13 @@
 import type { ComponentType } from "@langwatch/workflow-contract";
-import { CustomNode } from "./CustomNode";
-import { EndNode } from "./EndNode";
-import { EntryNode } from "./EntryNode";
-import { EvaluatorNode } from "./EvaluatorNode";
+import {
+  CustomNode,
+  EndNode,
+  EntryNode,
+  EvaluatorNode,
+  PromptingTechniqueNode,
+  SignatureNode,
+} from "@langwatch/workflow-web";
 import { ComponentNode } from "./Nodes";
-import { PromptingTechniqueNode } from "./PromptingTechniqueNode";
-import { SignatureNode } from "./SignatureNode";
 
 export const NodeComponents: Record<
   ComponentType,

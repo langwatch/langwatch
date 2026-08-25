@@ -7,7 +7,7 @@ import {
   PYTHON_STDLIB_MODULE_NAMES,
   type PyMember,
   type PyModule,
-} from "../pythonStdlib";
+} from "./python-stdlib";
 import {
   ATTR_ACCESS,
   type ContractRef,
@@ -16,7 +16,7 @@ import {
   IMPORT_MODULE_PREFIX,
   INSERT_AS_SNIPPET,
   scanImports,
-} from "./shared";
+} from "./python-provider.shared";
 
 function itemKind(monaco: Monaco, kind: PyMember["kind"]): languages.CompletionItemKind {
   switch (kind) {
@@ -87,7 +87,7 @@ export function registerCompletion(
       const importMemberMatch = IMPORT_MEMBER_PREFIX.exec(lineBefore);
       if (importMemberMatch) {
         const moduleName = importMemberMatch[1];
-        const mod = moduleName ? PYTHON_STDLIB_MODULE_BY_NAME.get(moduleName) : undefined;
+        const mod = moduleName ? PYTHON_STDLIB_MODULE_BY_NAME.get(moduleName) : void 0;
         if (mod) {
           return {
             suggestions: mod.members.map((m) =>

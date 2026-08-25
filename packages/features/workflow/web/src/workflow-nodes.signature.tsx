@@ -1,11 +1,17 @@
 import type { Node, NodeProps } from "@xyflow/react";
 import { forwardRef, type Ref } from "react";
 import type { Signature } from "@langwatch/workflow-contract";
-import { ComponentNode } from "./Nodes";
+import { ComponentNode } from "./workflow-nodes";
 import {
   PromptingTechniqueDropArea,
   PromptingTechniqueWrapper,
-} from "./PromptingTechniqueNode";
+} from "./workflow-nodes.prompting-technique";
+
+const isPromptingTechniqueReference = (value: unknown): value is { ref: string } =>
+  typeof value === "object" &&
+  value !== null &&
+  "ref" in value &&
+  typeof value.ref === "string";
 
 /**
  * SignatureNode represents an LLM calling node in the workflow editor.
@@ -26,13 +32,17 @@ export const SignatureNode = forwardRef(function SignatureNode(
   props: NodeProps<Node<Signature>>,
   ref: Ref<HTMLDivElement>,
 ) {
-  const parameters = Object.fromEntries(
-    props.data.parameters?.map((p) => [p.identifier, p]) ?? [],
-  );
+  const promptingTechniqueValue = props.data.parameters?.find(
+    (parameter) => parameter.identifier === "prompting_technique",
+  )?.value;
 
   return (
     <PromptingTechniqueWrapper
-      decoratedBy={parameters.prompting_technique?.value as { ref: string } | undefined}
+      decoratedBy={
+        isPromptingTechniqueReference(promptingTechniqueValue)
+          ? promptingTechniqueValue
+          : void 0
+      }
     >
       <PromptingTechniqueDropArea id={props.id}>
         <ComponentNode ref={ref} {...props} />
