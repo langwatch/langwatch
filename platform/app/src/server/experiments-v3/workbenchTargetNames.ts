@@ -106,12 +106,20 @@ const loadPrompts = async ({
   prisma: PrismaClient;
 }): Promise<Map<string, { handle?: string | null }>> => {
   const service = new PromptService(prisma);
+  // One lookup per distinct prompt, all in flight at once: the agent branch and
+  // the evaluator branch beside this one batch their rows, so a serial loop
+  // here sets the latency floor for the whole resolution.
+  const found = await Promise.all(
+    idsOf(targets, "prompt", (t) => t.promptId).map(async (promptId) => ({
+      promptId,
+      prompt: await service.getPromptByIdOrHandle({
+        idOrHandle: promptId,
+        projectId,
+      }),
+    })),
+  );
   const byId = new Map<string, { handle?: string | null }>();
-  for (const promptId of idsOf(targets, "prompt", (t) => t.promptId)) {
-    const prompt = await service.getPromptByIdOrHandle({
-      idOrHandle: promptId,
-      projectId,
-    });
+  for (const { promptId, prompt } of found) {
     if (prompt) byId.set(promptId, prompt);
   }
   return byId;

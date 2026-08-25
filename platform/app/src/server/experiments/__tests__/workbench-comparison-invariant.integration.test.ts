@@ -13,6 +13,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { COMPARISON_EVALUATOR_TYPE } from "~/experiments-v3/types";
 import type { PersistedEvaluationsV3State } from "~/experiments-v3/types/persistence";
 import type { Project } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
@@ -79,7 +80,7 @@ const brokenEvaluator = {
 
 const comparisonJudge = {
   id: "evaluator_compare",
-  evaluatorType: "langevals/select_best_compare",
+  evaluatorType: COMPARISON_EVALUATOR_TYPE,
   inputs: [],
   comparison: COMPARISON_CONFIG,
   mappings: {},
@@ -196,8 +197,10 @@ describe("workbench comparison invariant", () => {
         expect(after.workbenchState).toEqual(before.workbenchState);
       });
     });
+  });
 
-    describe("when the comparison judge carries the same config", () => {
+  describe("given a state whose comparison judge carries a comparison config", () => {
+    describe("when it is saved", () => {
       it("accepts the standalone comparison column", async () => {
         const { experimentId, version } = await createEvaluation();
 
@@ -244,6 +247,10 @@ describe("workbench comparison invariant", () => {
           id: experimentId,
         });
 
+        // A read seam that answered with nothing would make `?.comparison`
+        // undefined and this assertion green, so the row is asserted first.
+        expect(current.state).toBeDefined();
+        expect(current.state?.evaluators).toHaveLength(1);
         expect(current.state?.evaluators[0]?.comparison).toBeUndefined();
       });
 

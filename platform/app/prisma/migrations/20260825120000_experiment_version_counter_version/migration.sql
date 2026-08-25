@@ -22,10 +22,19 @@
 -- DROP INDEX "ExperimentVersion_projectId_experimentId_counterVersion_idx";
 -- ALTER TABLE "ExperimentVersion" DROP COLUMN "counterVersion";
 
+-- LOCKING NOTE: `SET NOT NULL` takes an ACCESS EXCLUSIVE lock and plain
+-- `CREATE INDEX` blocks writes for the length of the build, so version writes
+-- wait. "ExperimentVersion" holds a few rows per experiment and this runs
+-- during deploy, so the pause is short. The `CONCURRENTLY` form would avoid the
+-- lock but cannot run inside a transaction, which the Prisma migration runner
+-- requires.
+
 -- AlterTable
 ALTER TABLE "ExperimentVersion" ADD COLUMN "counterVersion" INTEGER;
 
-UPDATE "ExperimentVersion" SET "counterVersion" = "version" WHERE "counterVersion" IS NULL;
+UPDATE "ExperimentVersion"
+SET "counterVersion" = "version"
+WHERE "counterVersion" IS NULL;
 
 ALTER TABLE "ExperimentVersion" ALTER COLUMN "counterVersion" SET NOT NULL;
 

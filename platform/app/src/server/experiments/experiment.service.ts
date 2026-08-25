@@ -83,7 +83,15 @@ export interface WorkbenchVersionSummary {
   commitMessage: string | null;
   authorId: string | null;
   authorLabel: string;
+  /** When the row was first written. */
   createdAt: Date;
+  /**
+   * When the row was last written. The rolling autosave row is rewritten in
+   * place, so this is what says how old its content is; `createdAt` on that
+   * row is the start of the session. Numbered rows are never rewritten, so
+   * the two are the same on them.
+   */
+  updatedAt: Date;
 }
 
 /**

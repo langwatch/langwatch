@@ -429,7 +429,12 @@ const workbenchVersionSchema = z.object({
     .describe("Who wrote it: user, langy or api")
     .openapi({ example: "user" }),
   authorId: z.string().nullable().describe("User id, when a person wrote it"),
-  createdAt: z.string().describe("ISO 8601 timestamp"),
+  createdAt: z.string().describe("ISO 8601 timestamp of the first write"),
+  updatedAt: z
+    .string()
+    .describe(
+      "ISO 8601 timestamp of the last write. The autosave row is rewritten in place, so this is what says how old its content is.",
+    ),
 });
 
 export const listWorkbenchVersionsResponseSchema = z.object({

@@ -96,7 +96,7 @@ export const experimentVersionsCommand = async (
             Version: versionOf(version),
             Author: authorOf(version),
             Message: version.commitMessage ?? chalk.gray("—"),
-            Saved: formatRelativeTime(version.createdAt),
+            Saved: formatRelativeTime(version.updatedAt),
           })),
           headers: ["Version", "Author", "Message", "Saved"],
           colorMap: {
@@ -122,6 +122,19 @@ export const experimentVersionsCommand = async (
             `Use ${chalk.cyan(`langwatch experiment restore ${slug} <version>`)} to bring one back.`,
           ),
         );
+
+        // The autosave row is named rather than numbered, because its number
+        // moves with every save and the numbered rows do not follow it. Restore
+        // still takes that number, so the handle is stated here rather than
+        // being unreachable from the table.
+        const autosave = result.versions.find((version) => version.autoSaved);
+        if (autosave) {
+          console.log(
+            chalk.gray(
+              `The autosave restores as version ${chalk.cyan(autosave.version)}.`,
+            ),
+          );
+        }
       },
     };
   } catch (error) {

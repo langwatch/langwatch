@@ -9400,8 +9400,10 @@ export interface operations {
                             authorLabel: string;
                             /** @description User id, when a person wrote it */
                             authorId: string | null;
-                            /** @description ISO 8601 timestamp */
+                            /** @description ISO 8601 timestamp of the first write */
                             createdAt: string;
+                            /** @description ISO 8601 timestamp of the last write. The autosave row is rewritten in place, so this is what says how old its content is. */
+                            updatedAt: string;
                         }[];
                         /** @description Pass as `cursor` to read the next page, null on the last one */
                         nextCursor: number | null;

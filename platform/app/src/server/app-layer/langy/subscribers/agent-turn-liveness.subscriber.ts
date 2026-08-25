@@ -163,15 +163,17 @@ export function createAgentTurnLivenessSubscriber(
 
       if (stalledMs > MAX_STALL_MS) {
         // This is the branch that kills a user's turn — it must never be
-        // silent. `reason` says which guard tripped: too stale to revive, or
-        // stale AND nothing to revive with.
+        // silent. Only the stall grace decides here, so `reason` says so for
+        // every turn this branch fails; `hasHandoff` says separately whether
+        // there was anything left to revive it with.
         logger.warn(
           {
             projectId,
             conversationId,
             turnId,
             stalledMs,
-            reason: handoff ? "stall_expired" : "no_handoff",
+            reason: "stall_expired",
+            hasHandoff: handoff !== null,
           },
           "failing a stalled langy turn",
         );

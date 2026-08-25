@@ -19,6 +19,12 @@ interface VersionEntry {
   authorId: string | null;
   authorName: string | null;
   createdAt: Date | string;
+  /**
+   * When the row was last written. The autosave row is rewritten in place, so
+   * its `createdAt` is the start of the session and only this says how old
+   * what it holds is.
+   */
+  updatedAt: Date | string;
 }
 
 /**
@@ -169,7 +175,7 @@ function VersionRow({
         </HStack>
         <Text color="fg.muted" fontSize="xs" lineClamp={2}>
           {entry.commitMessage ? `${entry.commitMessage} · ` : ""}
-          {formatTimeAgo(new Date(entry.createdAt).getTime())}
+          {formatTimeAgo(new Date(entry.updatedAt).getTime())}
         </Text>
       </VStack>
 

@@ -459,6 +459,7 @@ export class ExperimentRepository {
       authorId: string | null;
       authorLabel: string;
       createdAt: Date;
+      updatedAt: Date;
     }>
   > {
     const client = options?.tx ?? this.prisma;
@@ -478,6 +479,7 @@ export class ExperimentRepository {
         authorId: true,
         authorLabel: true,
         createdAt: true,
+        updatedAt: true,
       },
       orderBy: { counterVersion: "desc" },
       take: input.take,

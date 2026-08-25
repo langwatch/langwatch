@@ -1342,7 +1342,12 @@ describe("orchestrator", () => {
       const loadedPrompts = new Map<
         string,
         { handle: string } & Record<string, unknown>
-      >([["prompt_X", { handle: "shared-handle" } as never]]);
+      >([
+        [
+          promptLoadKey({ promptId: "prompt_X" }),
+          { handle: "shared-handle" } as never,
+        ],
+      ]);
 
       const { cells } = generateComparisonCells({
         scopedRowIndices: undefined,

@@ -59,11 +59,11 @@ const TARGET_ID = "category_classifier";
 const createClassifierTarget = ({
   messages,
   mappedFields,
-  localPromptConfig = true,
+  hasLocalPromptConfig = true,
 }: {
   messages: Array<{ role: "system" | "user"; content: string }>;
   mappedFields: string[];
-  localPromptConfig?: boolean;
+  hasLocalPromptConfig?: boolean;
 }): TargetConfig => {
   const inputs = [
     { identifier: "input" as const, type: "str" as const },
@@ -88,7 +88,7 @@ const createClassifierTarget = ({
     inputs,
     outputs: [{ identifier: "output", type: "str" }],
     mappings,
-    ...(localPromptConfig
+    ...(hasLocalPromptConfig
       ? {
           localPromptConfig: {
             llm: { model: "gpt-5-mini" },
@@ -229,7 +229,7 @@ describe("TargetHeader missing mappings", () => {
       createClassifierTarget({
         messages: [],
         mappedFields: ["brand", "product_name"],
-        localPromptConfig: false,
+        hasLocalPromptConfig: false,
       });
 
     it("keeps the alert icon off when the template skips the declared variable", () => {
@@ -263,7 +263,7 @@ describe("TargetHeader missing mappings", () => {
         createClassifierTarget({
           messages: [],
           mappedFields: [],
-          localPromptConfig: false,
+          hasLocalPromptConfig: false,
         }),
         { onRun, onEdit },
       );

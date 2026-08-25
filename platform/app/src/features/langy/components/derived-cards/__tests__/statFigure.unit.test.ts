@@ -61,6 +61,11 @@ describe("formatStatFigure", () => {
       expect(formatStatFigure({ value: 0, unit: "usd" })).toBe("0 usd");
     });
 
+    /** @scenario "A reading of zero is still drawn as zero" */
+    it("draws negative zero as zero, with no sign", () => {
+      expect(formatStatFigure({ value: -0, unit: "usd" })).toBe("0 usd");
+    });
+
     it("leaves readings a hundredth and larger as they were", () => {
       expect(formatStatFigure({ value: 0.01, unit: "usd" })).toBe("0.01 usd");
       expect(formatStatFigure({ value: 0.5, unit: "usd" })).toBe("0.5 usd");

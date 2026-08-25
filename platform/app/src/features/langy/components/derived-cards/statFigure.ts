@@ -62,12 +62,16 @@ const SMALL_MAGNITUDE_SIGNIFICANT_DIGITS = 6;
  * digits rather than decimal places, so they never read as zero; everything
  * else keeps the grouped, three-decimal drawing that suits a whole number.
  */
-const formatNumber = (value: number): string =>
-  value !== 0 && Math.abs(value) < SMALL_MAGNITUDE
-    ? value.toLocaleString(undefined, {
+const formatNumber = (value: number): string => {
+  // `toLocaleString` keeps the sign of negative zero, so a reading of -0 would
+  // be drawn as "-0". Zero is zero to a reader.
+  const reading = value === 0 ? 0 : value;
+  return reading !== 0 && Math.abs(reading) < SMALL_MAGNITUDE
+    ? reading.toLocaleString(undefined, {
         maximumSignificantDigits: SMALL_MAGNITUDE_SIGNIFICANT_DIGITS,
       })
-    : value.toLocaleString();
+    : reading.toLocaleString();
+};
 
 /** The full figure a reader sees, number and unit together. */
 export const formatStatFigure = ({

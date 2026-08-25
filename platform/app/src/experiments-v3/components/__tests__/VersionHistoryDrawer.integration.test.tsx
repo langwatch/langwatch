@@ -108,6 +108,7 @@ const versions = [
     authorId: null,
     authorName: null,
     createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
   },
   {
     version: 11,
@@ -118,6 +119,7 @@ const versions = [
     authorId: "user_1",
     authorName: "Ada Lovelace",
     createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
   },
   {
     version: 1,
@@ -128,6 +130,7 @@ const versions = [
     authorId: "user_1",
     authorName: "Ada Lovelace",
     createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+    updatedAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
   },
 ];
 
@@ -171,6 +174,17 @@ describe("VersionHistoryDrawer", () => {
     });
 
     /** @scenario "The version history shows the autosave as an autosave" */
+    it("ages the autosave row by its last write, not by its first", async () => {
+      renderDrawer();
+
+      // The row is rewritten in place all session, so its createdAt is three
+      // hours old while what it holds is five minutes old.
+      await screen.findByText("Autosave");
+      expect(screen.getByText(/5 minutes ago/)).toBeDefined();
+      expect(screen.queryByText(/3 hours ago/)).toBeNull();
+    });
+
+    /** @scenario "The version history shows the autosave as an autosave" */
     it("names the autosave row rather than numbering it", async () => {
       renderDrawer();
 
@@ -184,7 +198,10 @@ describe("VersionHistoryDrawer", () => {
     it("badges the version the workbench holds and offers no restore on it", async () => {
       renderDrawer();
 
-      expect(await screen.findByText("Current")).toBeDefined();
+      // Which row carries it is the whole claim: the badge sits beside the
+      // title, so the row it names has to be the one the workbench holds.
+      const badge = await screen.findByText("Current");
+      expect(badge.parentElement?.textContent).toContain("v2");
       // Two rows are older than the open workbench, and each of those can be
       // brought back. The one it already holds cannot.
       expect(screen.getAllByText("Restore")).toHaveLength(2);
@@ -238,7 +255,8 @@ describe("VersionHistoryDrawer", () => {
       storeWorkbenchVersion = 3;
       renderDrawer();
 
-      expect(await screen.findByText("Current")).toBeDefined();
+      const badge = await screen.findByText("Current");
+      expect(badge.parentElement?.textContent).toContain("v2");
       expect(screen.getAllByText("Restore")).toHaveLength(2);
     });
   });

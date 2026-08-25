@@ -10,6 +10,7 @@
  * a CI run are readable the same way.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { UNNAMED_FAILURE } from "~/server/experiments-v3/execution/types";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 
 wireDefaultTestApp();
@@ -166,6 +167,7 @@ describe("POST /api/experiments/execute", () => {
 
       expect(failRun).toHaveBeenCalledTimes(1);
       const failure = failRun.mock.calls[0]?.[1] as { code: string };
+      expect(failure.code).toBe(UNNAMED_FAILURE);
       expect(failure.code).not.toContain("db-1.internal");
     });
   });

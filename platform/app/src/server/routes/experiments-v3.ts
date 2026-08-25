@@ -9,10 +9,7 @@
  * - GET  /api/experiments/runs/:runId (poll run status)
  * - GET  /api/experiments/runs/:runId/results (per-row results)
  */
-import {
-  HandledError,
-  type SerializedHandledError,
-} from "@langwatch/handled-error";
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
@@ -52,9 +49,9 @@ import {
 } from "~/server/experiments-v3/execution/orchestrator";
 import { mapThrownErrorEvent } from "~/server/experiments-v3/execution/resultMapper";
 import { runStateManager } from "~/server/experiments-v3/execution/runStateManager";
+import { createRunStateMirror } from "~/server/experiments-v3/execution/runStateMirror";
 import { prepareSavedStateExecution } from "~/server/experiments-v3/execution/savedStateExecution";
 import {
-  type EvaluationV3Event,
   type ExecutionScope,
   executionRequestSchema,
   runInputsBodySchema,
@@ -277,74 +274,6 @@ const parseOptionalPositiveInt = (value: string | undefined) => {
   if (!/^\d+$/.test(value)) return undefined;
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
-};
-
-/**
- * Mirrors a streaming run into the run-state store the polling runner writes.
- *
- * A run started by an open tab used to exist only inside that tab, so
- * `GET /runs/:runId` answered 404 for it and `langwatch experiment status`
- * could not follow a run it had just started. The store is Redis, so a poll
- * served by a different process finds the run too.
- *
- * The run's id is minted by the orchestrator and arrives on the first frame,
- * which is why this is fed the stream rather than told the id up front.
- */
-const createRunStateMirror = ({
-  projectId,
-  experimentId,
-  experimentSlug,
-}: {
-  projectId: string;
-  experimentId?: string;
-  experimentSlug: string;
-}) => {
-  let runId: string | undefined;
-  let ended = false;
-
-  const recordEnd = async (event: EvaluationV3Event): Promise<void> => {
-    if (!runId) return;
-    if (event.type === "done") {
-      ended = true;
-      await runStateManager.completeRun(runId, event.summary);
-      return;
-    }
-    if (event.type === "stopped") {
-      ended = true;
-      await runStateManager.stopRun(runId);
-    }
-  };
-
-  return {
-    async record(event: EvaluationV3Event): Promise<void> {
-      if (event.type === "execution_started") {
-        runId = event.runId;
-        await runStateManager.createRun({
-          runId: event.runId,
-          projectId,
-          experimentId,
-          experimentSlug,
-          total: event.total,
-        });
-        return;
-      }
-      if (!runId) return;
-      await runStateManager.addEvent(runId, event);
-      await recordEnd(event);
-    },
-    /**
-     * Not called once the run has reported how it ended: a write that fails
-     * after the last frame would rewrite a finished run as a failed one.
-     */
-    async fail(failure: {
-      code: string;
-      domainError?: SerializedHandledError;
-      traceId?: string;
-    }): Promise<void> {
-      if (!runId || ended) return;
-      await runStateManager.failRun(runId, failure);
-    },
-  };
 };
 
 // ── POST /execute ────────────────────────────────────────────────────
@@ -1393,6 +1322,7 @@ secured.access(apiKeyAuthExperimentsView).get(
         authorLabel: version.authorLabel,
         authorId: version.authorId,
         createdAt: version.createdAt.toISOString(),
+        updatedAt: version.updatedAt.toISOString(),
       })),
       nextCursor,
     });
