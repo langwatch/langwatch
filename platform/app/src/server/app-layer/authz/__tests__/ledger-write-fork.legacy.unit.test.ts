@@ -59,17 +59,34 @@ describe("given an organization the genesis import has not reached", () => {
       expect(bumpAuthzEpoch).not.toHaveBeenCalled();
     });
 
-    it("still writes a binding in the same batch that carries no end date", async () => {
-      const { writer, db } = harness({ onLedger: false });
+    it("refuses the whole batch, so an undated sibling is not written either", async () => {
+      const { writer, db, sent } = harness({ onLedger: false });
 
-      await writer.attachBindings({
-        organizationId: ORG_ID,
-        bindings: [binding],
-        actor: ACTOR,
-        onDuplicate: "reject",
-      });
+      await expect(
+        writer.attachBindings({
+          organizationId: ORG_ID,
+          bindings: [
+            binding,
+            {
+              ...binding,
+              id: "rb_2",
+              scopeId: "team_billing",
+              expiresAtMs: 1_800_000_000_000,
+            },
+          ],
+          actor: ACTOR,
+          onDuplicate: "reject",
+        }),
+      ).rejects.toMatchObject({ code: "grant_expiry_not_supported" });
 
-      expect(db.roleBinding.create).toHaveBeenCalledTimes(1);
+      // All or nothing, and this is the direction that matters: the refusal
+      // scans the batch before it writes anything, so a caller who re-sends
+      // without the expiring binding cannot land a duplicate of the undated
+      // one. A partial write here would be the worst of both -- half the
+      // grant an admin asked for, and no error they could act on.
+      expect(db.roleBinding.create).not.toHaveBeenCalled();
+      expect(db.roleBinding.createMany).not.toHaveBeenCalled();
+      expect(sent).toEqual([]);
     });
   });
 
