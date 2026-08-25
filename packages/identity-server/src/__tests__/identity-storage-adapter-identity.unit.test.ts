@@ -381,6 +381,73 @@ describe("better-auth over the identity storage adapter", () => {
       });
     });
 
+    describe("when the user holding one way in is erased", () => {
+      /**
+       * The regression this pairing produced: better-auth deletes a user by
+       * fanning an account delete out per row BEFORE `user.delete.before`
+       * runs, so every row met the detach guards — which exist to stop
+       * somebody unlinking their last method and locking themselves out.
+       * Nobody is locked out of an account that is being erased, so a user
+       * holding a single sign-in method could not be deleted at all.
+       *
+       * @scenario "Erasing a user removes the one way in they hold"
+       */
+      it("erases them, rather than refusing to strand the person being erased", async () => {
+        await signUp(stack.auth, EMAIL);
+        const userId = userIdOf(stack);
+        const context = await stack.auth.$context;
+        const [identifier] = statedIdentifiers(stack);
+        // The one method they hold, and it is verified — precisely the shape
+        // the strands guard refuses to remove from a LIVING user.
+        expect(statedIdentifiers(stack)).toHaveLength(1);
+        expect(identifier?.state).toBe("VERIFIED");
+
+        await context.internalAdapter.deleteUser(userId);
+
+        expect(stack.db.user).toHaveLength(0);
+        expect(stack.storage.credentials.size).toBe(0);
+        // Never a detach per row: that is what asked the guard, and it would
+        // also say the same removal twice. The erase itself is stated by
+        // `beforeUserDelete`, which this suite deliberately leaves unwired —
+        // the adapter has to be right on its own (see the file header).
+        expect(stack.commands.map((command) => command.type)).not.toContain(
+          "lw.identity.detach_identifier",
+        );
+      });
+
+      /**
+       * The other half, and the reason the fix is scoped to the erase rather
+       * than to the guard: unlinking that same last method from a user who is
+       * staying must still be refused.
+       *
+       * @scenario "Unlinking the last way in is still refused for a living user"
+       */
+      it("still refuses to unlink that same method while the user stays", async () => {
+        await signUp(stack.auth, EMAIL);
+        const context = await stack.auth.$context;
+        const [identifier] = statedIdentifiers(stack);
+        const accountId = identifier?.accountId as string;
+
+        await expect(
+          context.internalAdapter.deleteAccount(accountId),
+        ).rejects.toMatchObject({
+          body: { code: "identity_detach_strands_user" },
+        });
+
+        // Still theirs, and still a way in.
+        expect(
+          statedIdentifiers(stack).find(
+            (candidate) => candidate.accountId === accountId,
+          )?.state,
+        ).toBe("VERIFIED");
+        expect(
+          (await stack.auth.api.signInEmail({
+            body: { email: EMAIL, password: PASSWORD },
+          })).user.email,
+        ).toBe(EMAIL);
+      });
+    });
+
     describe("when better-auth issues an account query with an unenumerated operator", () => {
       /** @scenario "An operator the branch has not enumerated never reads as an equality" */
       it("refuses rather than reading `ne` as an equality and deleting the row it spared", async () => {

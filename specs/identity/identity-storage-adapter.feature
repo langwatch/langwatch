@@ -438,3 +438,25 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     When each IdP's callback looks its own account up
     Then each resolves to its own user
     And neither is served the other's account
+
+  # ── Erasing a user, versus unlinking one of their methods ──────────────
+  #
+  # better-auth deletes a user by fanning an account delete out per row
+  # BEFORE `user.delete.before` runs. Each of those rows meets the detach
+  # guards, which were written for somebody unlinking a method and keeping
+  # their account — so a user holding one way in could not be deleted at
+  # all. The erase says itself once, whole; the rows go quietly with it.
+
+  @unit
+  Scenario: Erasing a user removes the one way in they hold
+    Given a latched user whose only sign-in method is verified
+    When better-auth deletes that user
+    Then the user is erased, with their identifiers and credentials
+    And the strands refusal never answers, because nobody is left to strand
+
+  @unit
+  Scenario: Unlinking the last way in is still refused for a living user
+    Given a latched user whose only sign-in method is verified
+    When that one method is unlinked on its own
+    Then the removal is refused with the handled code "identity_detach_strands_user"
+    And the method still signs them in afterwards

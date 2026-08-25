@@ -239,6 +239,31 @@ function identityCustomAdapter({
       return typeof clause?.value === "string" ? clause.value : null;
     };
 
+    /**
+     * Whether an `account` write is scoped to one user and NOTHING else —
+     * every row they hold, named by no provider, subject or row id.
+     *
+     * That shape reaches `deleteMany` from exactly one place: better-auth
+     * erasing the user. A delete that names anything further is somebody
+     * unlinking a method, and must keep meeting the guards that decide
+     * whether removing it would strand them.
+     */
+    const isWholeUserScope = (
+      model: string,
+      where: readonly CleanedWhere[] | undefined,
+    ): boolean => {
+      const canonical = canonicalWhere(model, where);
+      const clause = canonical[0];
+      return (
+        canonical.length === 1 &&
+        clause !== undefined &&
+        clause.field === "userId" &&
+        (clause.operator === undefined ||
+          clause.operator.toLowerCase() === "eq") &&
+        typeof clause.value === "string"
+      );
+    };
+
     /** The record a `user` query names outright — the same narrowing
      *  `namedUserId` applies, one field over, because on the `user` model the
      *  user IS the record. */
@@ -800,7 +825,18 @@ function identityCustomAdapter({
             operation: "deleteMany",
             where,
           });
-          if (rows !== null) return detachOnIdentityBranch(rows);
+          if (rows !== null) {
+            return detachOnIdentityBranch(rows, {
+              // Every account row of one user, named by nothing else, is
+              // better-auth erasing that user: `deleteUser` fans this out
+              // before `user.delete.before` runs. The erase is stated ONCE by
+              // `beforeUserDelete`, so the rows go without a detach apiece —
+              // which is also what keeps the strands guard, written for
+              // unlinking a method from a LIVING user, from refusing to let a
+              // user holding one way in be deleted at all.
+              erasingUser: isWholeUserScope(model, where),
+            });
+          }
         }
         return legacy.deleteMany({ model, where });
       },
@@ -838,13 +874,19 @@ function identityCustomAdapter({
      */
     async function detachOnIdentityBranch(
       rows: readonly IdentityAccountRow[],
+      { erasingUser = false }: { erasingUser?: boolean } = {},
     ): Promise<number> {
-      for (const row of rows) {
-        await ceremonies.beforeAccountDelete({
-          id: row.id,
-          userId: row.userId,
-          providerId: row.providerId,
-        });
+      // An erase states itself, whole, through `beforeUserDelete`. Detaching
+      // each row on the way would state the same removal twice and would ask
+      // a guard about stranding a user who is being erased.
+      if (!erasingUser) {
+        for (const row of rows) {
+          await ceremonies.beforeAccountDelete({
+            id: row.id,
+            userId: row.userId,
+            providerId: row.providerId,
+          });
+        }
       }
       const accountIds = rows.map((row) => row.id);
       await accounts.deleteCredentials({ accountIds });
