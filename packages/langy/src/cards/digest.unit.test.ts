@@ -119,6 +119,33 @@ describe("extractDigest, given a collection read", () => {
       expect(digest.counts).toEqual({ returned: 1, total: 41 });
     });
   });
+
+  describe("when a reduced result states no total of its own", () => {
+    /** @scenario A list too large for the chat counts the rows the reduction removed */
+    it("counts the rows the marker stands for, not just the sample", () => {
+      const digest = extractDigest({
+        resource: "prompt",
+        verb: "list",
+        output: JSON.stringify([
+          { id: "prompt_1" },
+          { id: "prompt_2" },
+          "… 29 more items truncated",
+        ]),
+      });
+
+      expect(digest.counts).toEqual({ returned: 2, total: 31 });
+    });
+
+    it("counts a plain list of its rows when nothing was removed", () => {
+      const digest = extractDigest({
+        resource: "prompt",
+        verb: "list",
+        output: JSON.stringify([{ id: "prompt_1" }, { id: "prompt_2" }]),
+      });
+
+      expect(digest.counts).toEqual({ returned: 2, total: 2 });
+    });
+  });
 });
 
 describe("extractDigest, given a single-resource read", () => {

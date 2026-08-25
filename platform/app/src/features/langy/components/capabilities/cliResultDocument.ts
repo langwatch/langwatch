@@ -21,7 +21,9 @@
  */
 import {
   asJsonDocument,
+  isTruncationMarker,
   paginationSchema,
+  resolveTotal,
   textValueSchema,
 } from "@langwatch/langy";
 
@@ -49,7 +51,7 @@ export function textValue(raw: unknown): string | undefined {
  * different from an EMPTY one, and the difference is the whole point: an empty list
  * is the honest answer "nothing matched".
  */
-export function collectionOf(document: unknown): unknown[] | null {
+function rawCollectionOf(document: unknown): unknown[] | null {
   if (Array.isArray(document)) return document;
   if (!document || typeof document !== "object") return null;
 
@@ -77,6 +79,19 @@ export function collectionOf(document: unknown): unknown[] | null {
 }
 
 /**
+ * The rows a card draws. An oversized result is reduced upstream, which leaves a
+ * marker in the array in place of the rows it removed. The marker is a record of
+ * a count, not a result, so it never reaches a row: `totalOf` reads it instead.
+ */
+export function collectionOf(document: unknown): unknown[] | null {
+  const raw = rawCollectionOf(document);
+  if (!raw) return null;
+  return raw.some(isTruncationMarker)
+    ? raw.filter((row) => !isTruncationMarker(row))
+    : raw;
+}
+
+/**
  * A paginated document's true total, which may exceed the rows it returned.
  *
  * The platform counts two ways — `totalHits` for traces, `total` for the paged
@@ -88,9 +103,16 @@ export function totalOf(document: unknown): number | null {
 
   const { pagination } = document as { pagination?: unknown };
   const parsed = paginationSchema.safeParse(pagination);
-  if (!parsed.success) return null;
+  const stated = parsed.success
+    ? (parsed.data.totalHits ?? parsed.data.total ?? null)
+    : null;
+  if (stated !== null) return stated;
 
-  return parsed.data.totalHits ?? parsed.data.total ?? null;
+  // No stated total. Count the array instead, and count the rows the reduction
+  // removed along with the ones it kept, or a reduced list reports the size of
+  // its own sample as the size of the result.
+  const raw = rawCollectionOf(document);
+  return raw ? resolveTotal({ rows: raw }) : null;
 }
 
 /**

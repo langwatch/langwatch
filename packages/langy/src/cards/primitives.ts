@@ -49,9 +49,34 @@ export const paginationSchema = z.looseObject({
 export type Pagination = z.infer<typeof paginationSchema>;
 
 /**
+ * How many rows the upstream reduction took out of an array, read back from the
+ * marker it leaves behind in their place ("… 29 more items truncated").
+ *
+ * Zero for every other value, so a caller can fold this over rows without first
+ * asking which of them are markers.
+ */
+export const truncatedAwayCount = (row: unknown): number => {
+  if (typeof row !== "string") return 0;
+  const match = /^…\s*(\d+)\s+more items truncated$/.exec(row.trim());
+  return match ? Number(match[1]) : 0;
+};
+
+/** Whether a row is the reduction's marker rather than a result. */
+export const isTruncationMarker = (row: unknown): boolean =>
+  truncatedAwayCount(row) > 0;
+
+/**
  * The one true total behind a result: what the query matched, which is NOT the
  * same as how many rows came back. This is the number the stat card rolls up, so
  * getting it right is the difference between "1,204 traces" and "25 traces".
+ *
+ * A paginated result states its own total and that always wins. A result that
+ * states none is counted, and the count has to include the rows the reduction
+ * removed: their marker is the only record left that they existed, so dropping
+ * it turns "41 prompts" into "12 prompts" beside an answer that says 41.
+ *
+ * Pass the rows as the document holds them, markers included. A marker counts
+ * as the rows it stands for, never as one row of its own.
  */
 export const resolveTotal = ({
   pagination,
@@ -59,8 +84,14 @@ export const resolveTotal = ({
 }: {
   pagination?: Pagination | null;
   rows: readonly unknown[];
-}): number =>
-  pagination?.totalHits ?? pagination?.total ?? rows.length;
+}): number => {
+  const stated = pagination?.totalHits ?? pagination?.total;
+  if (stated !== undefined) return stated;
+  return rows.reduce<number>((count, row) => {
+    const removed = truncatedAwayCount(row);
+    return count + (removed > 0 ? removed : 1);
+  }, 0);
+};
 
 /**
  * A text field the platform sends either bare (`"hello"`) or wrapped in the trace
