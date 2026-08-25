@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 import type { AutomationAction, AutomationKind } from "./automation";
 import { triggerActionSchema, triggerKindSchema } from "./trigger";
 

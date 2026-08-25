@@ -112,4 +112,4 @@ export type ResolvedOrganizationApiKeyToken = Extract<
   { ok: true }
 >["resolved"];
 import { projectWithTeamSchema } from "@langwatch/project-contract";
-import { z } from "zod/v4";
+import { z } from "zod";

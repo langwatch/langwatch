@@ -1,4 +1,4 @@
-import type { ZodTypeAny } from "zod/v4";
+import type { ZodTypeAny } from "zod";
 import type { AlertType, TriggerAction } from "./trigger";
 
 export type Category = "notify" | "action";

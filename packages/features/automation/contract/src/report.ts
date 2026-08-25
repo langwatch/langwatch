@@ -1,5 +1,5 @@
 import { Cron } from "croner";
-import { z } from "zod/v4";
+import { z } from "zod";
 
 export const MIN_REPORT_INTERVAL_MS = 15 * 60 * 1000;
 const GAP_PROBE_RUNS = 5;

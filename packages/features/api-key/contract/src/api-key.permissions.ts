@@ -6,7 +6,7 @@ import {
   permissionResource,
   permissionSatisfiedBy,
 } from "@langwatch/authz-contract";
-import { z } from "zod/v4";
+import { z } from "zod";
 
 export const API_KEY_PERMISSION_MODES = [
   "all",

@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 import type { PreviewEnvelope, SharedDef } from "../provider-types";
 
 export const WEBHOOK_METHODS = ["POST", "PUT", "PATCH"] as const;

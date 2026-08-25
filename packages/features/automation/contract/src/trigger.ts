@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 import { NOTIFICATION_CADENCES } from "./cadences";
 
 export const triggerActionSchema = z.enum([

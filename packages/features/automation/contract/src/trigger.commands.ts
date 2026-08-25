@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 import { alertTypeSchema, triggerActionSchema, triggerKindSchema } from "./trigger";
 
 const jsonObjectSchema = z.record(z.string(), z.unknown());
