@@ -1,20 +1,10 @@
 import { auditLog } from "~/runtime/app/features/audit-log";
 import type { AdminAuditRequest, AuditLogRequestLike } from "@langwatch/ops-contract";
-import {
-  AdminAuditSink,
-  mapUserToBackofficeRow,
-  ORGANIZATION_SAFE_SELECT,
-  PostgresOpsAdapter,
-  PROJECT_SAFE_SELECT,
-  USER_BACKOFFICE_INCLUDE,
-} from "@langwatch/ops-server";
+import { AdminAuditSink, PostgresOpsAdapter } from "@langwatch/ops-server";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Cluster, Redis } from "ioredis";
+import type { UserService } from "@langwatch/user-contract";
 export { auditLog };
-export {
-  mapUserToBackofficeRow,
-  ORGANIZATION_SAFE_SELECT,
-  PROJECT_SAFE_SELECT,
-  USER_BACKOFFICE_INCLUDE,
-};
 
 /**
  * App composition adapter. The audit runtime remains a named legacy residual
@@ -38,10 +28,19 @@ function auditLogRequestFrom(value: AdminAuditRequest): AuditLogRequestLike {
   };
 }
 
-export type AppOpsRuntimeOptions = Omit<
-  Parameters<typeof PostgresOpsAdapter.create>[0],
-  "audit"
->;
+/**
+ * The app's process-composition inputs for the Ops feature.
+ *
+ * Audit recording is intentionally absent: the application supplies that
+ * adapter itself, keeping the Ops package's repositories and collaborators
+ * private to its process-owned implementation.
+ */
+export interface AppOpsRuntimeOptions {
+  database: PrismaClient;
+  adminEmails: string | readonly string[];
+  redis?: Redis | Cluster | undefined;
+  users: UserService;
+}
 
 export class AppOpsRuntime {
   private constructor(private readonly options: AppOpsRuntimeOptions) {}

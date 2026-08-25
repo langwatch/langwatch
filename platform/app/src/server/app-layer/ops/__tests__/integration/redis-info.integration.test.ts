@@ -4,7 +4,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
-import { computeEngineCpuPercent } from "../../redis-engine-cpu";
+import { computeEngineCpuPercent } from "@langwatch/ops-server";
 
 // Reproduces the body of OpsMetricsCollector.getRedisInfo() against the same
 // IORedis client used in production, so the parsing stays honest against a

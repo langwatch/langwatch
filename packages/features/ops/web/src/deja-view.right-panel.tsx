@@ -1,6 +1,6 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
-import { JsonViewer } from "~/components/ops/JsonViewer";
-import type { EventResult } from "./types";
+import { JsonViewer } from "./json-viewer";
+import type { EventResult } from "./deja-view.types";
 
 export function RightPanel({ event }: { event: EventResult }) {
   return (

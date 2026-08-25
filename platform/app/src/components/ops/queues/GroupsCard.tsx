@@ -24,15 +24,15 @@ import { useOpsPermission } from "~/hooks/useOpsPermission";
 import type { GroupInfo } from "~/server/app-layer/ops/types";
 import { api } from "~/utils/api";
 import { grafanaGroupLogsUrl, grafanaGroupTracesUrl } from "~/utils/grafanaLinks";
-import { GroupStateBadge } from "./GroupStateBadge";
 import {
   classifyGroup,
   describeNextRun,
+  GroupStateBadge,
   isOverdue,
   matchesStatusFilter,
   sortGroupsBySeverity,
-} from "./pipelineUtils";
-import type { StatusFilter } from "./types";
+  type StatusFilter,
+} from "@langwatch/ops-web";
 
 const GROUPS_VIEWPORT_HEIGHT = 480;
 const GROUPS_ROW_HEIGHT = 36;

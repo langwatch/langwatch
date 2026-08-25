@@ -1,6 +1,6 @@
 import { Badge, Card, HStack, Table, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
-import { middleEllipsis } from "~/components/ops/queues/clusterGroups";
+import { middleEllipsis } from "@langwatch/ops-web";
 import { api } from "~/utils/api";
 
 const VISIBLE_ROWS = 12;

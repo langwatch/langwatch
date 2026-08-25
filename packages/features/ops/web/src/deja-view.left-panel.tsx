@@ -6,7 +6,6 @@ export function LeftPanel({
   eventSubscribers,
   selectedProjection,
   onSelectProjection,
-  currentEventType,
 }: {
   projections: Array<{
     projectionName: string;
@@ -21,7 +20,6 @@ export function LeftPanel({
   }>;
   selectedProjection: string | null;
   onSelectProjection: (name: string | null) => void;
-  currentEventType: string | null;
 }) {
   return (
     <Box

@@ -2169,6 +2169,9 @@ importers:
       '@langwatch/ops-contract':
         specifier: workspace:*
         version: link:../contract
+      lucide-react:
+        specifier: ^1.22.0
+        version: 1.22.0(react@19.2.8)
       react:
         specifier: ^19.2.7
         version: 19.2.8

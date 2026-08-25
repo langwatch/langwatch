@@ -1,14 +1,15 @@
 import { Status } from "@chakra-ui/react";
-import type { ConnectionStatus as ConnectionStatusType } from "~/hooks/useOpsSSE";
 import { formatDurationMs } from "./formatters";
-import { isSnapshotStale } from "./snapshotStaleness";
+import { isSnapshotStale } from "./ops.snapshot-staleness";
 
-const colorMap: Record<ConnectionStatusType, "green" | "orange" | "red"> = {
+export type OpsConnectionStatus = "connected" | "connecting" | "disconnected";
+
+const colorMap: Record<OpsConnectionStatus, "green" | "orange" | "red"> = {
   connected: "green",
   connecting: "orange",
   disconnected: "red",
 };
-const labelMap: Record<ConnectionStatusType, string> = {
+const labelMap: Record<OpsConnectionStatus, string> = {
   connected: "Live",
   connecting: "Connecting",
   disconnected: "Disconnected",
@@ -29,7 +30,7 @@ export function ConnectionStatusIndicator({
   computedAtMs,
   now = Date.now(),
 }: {
-  status: ConnectionStatusType;
+  status: OpsConnectionStatus;
   /** When the snapshot behind this page was computed, in ms. Null when unknown. */
   computedAtMs?: number | null;
   now?: number;

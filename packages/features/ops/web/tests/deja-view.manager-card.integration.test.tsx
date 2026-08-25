@@ -9,16 +9,12 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { AggregateProcessManager } from "~/server/app-layer/ops/manager-explorer.service";
+import { ManagerCard, type DejaViewProcessManager } from "../src";
 
-import { ManagerCard } from "../ManagerCard";
-
-const running: AggregateProcessManager = {
+const running: DejaViewProcessManager = {
   processName: "langyConversation",
-  pipelineName: "langy-conversation-processing",
   eventTypes: ["langy.turn.started"],
   intentTypes: ["dispatchTurn"],
-  hasWake: false,
   instance: {
     state: { turnStatus: "running" },
     revision: 2,
@@ -31,14 +27,11 @@ const running: AggregateProcessManager = {
       intentType: "dispatchTurn",
       status: "pending",
       attempts: 0,
-      nextAttemptAt: 0,
-      createdAt: 1_700_000_000_000,
-      sourceEventId: "e1",
     },
   ],
 };
 
-const renderCard = (manager: AggregateProcessManager) =>
+const renderCard = (manager: DejaViewProcessManager) =>
   render(
     <ChakraProvider value={defaultSystem}>
       <ManagerCard manager={manager} />

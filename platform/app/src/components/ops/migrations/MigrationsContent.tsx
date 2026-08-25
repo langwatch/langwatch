@@ -19,7 +19,7 @@ import { toaster } from "~/components/ui/toaster";
 import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { api, type RouterOutputs } from "~/utils/api";
-import { JsonViewer } from "../JsonViewer";
+import { JsonViewer } from "@langwatch/ops-web";
 import { ConfirmDialog } from "../shared/ConfirmDialog";
 
 const STATUS_COLOR: Record<string, string> = {

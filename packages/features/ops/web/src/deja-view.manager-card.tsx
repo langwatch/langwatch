@@ -1,21 +1,38 @@
 import { Badge, Box, HStack, Spacer, Text, VStack, Wrap } from "@chakra-ui/react";
 
-import { JsonViewer } from "~/components/ops/JsonViewer";
-import { formatTimeAgo } from "@langwatch/ops-web";
-import type {
-  AggregateProcessManager,
-  AggregateProcessManagerInstance,
-  AggregateProcessManagerOutboxMessage,
-} from "~/server/app-layer/ops/manager-explorer.service";
+import { formatTimeAgo } from "./formatters";
+import { JsonViewer } from "./json-viewer";
 
-const OUTBOX_PALETTE: Record<AggregateProcessManagerOutboxMessage["status"], string> = {
+export interface DejaViewProcessManagerOutboxMessage {
+  messageKey: string;
+  intentType: string;
+  attempts: number;
+  status: "pending" | "dispatched" | "dead" | "discarded";
+}
+
+export interface DejaViewProcessManagerInstance {
+  revision: number;
+  updatedAt: number;
+  nextWakeAt: number | null;
+  state: unknown;
+}
+
+export interface DejaViewProcessManager {
+  processName: string;
+  eventTypes: readonly string[];
+  intentTypes: readonly string[];
+  instance: DejaViewProcessManagerInstance | null;
+  outbox: DejaViewProcessManagerOutboxMessage[];
+}
+
+const OUTBOX_PALETTE: Record<DejaViewProcessManagerOutboxMessage["status"], string> = {
   pending: "yellow",
   dispatched: "green",
   dead: "red",
   discarded: "gray",
 };
 
-function instanceStatus(instance: AggregateProcessManagerInstance | null): {
+function instanceStatus(instance: DejaViewProcessManagerInstance | null): {
   label: string;
   palette: string;
 } {
@@ -55,7 +72,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function EmittedCommands({ outbox }: { outbox: AggregateProcessManagerOutboxMessage[] }) {
+function EmittedCommands({ outbox }: { outbox: DejaViewProcessManagerOutboxMessage[] }) {
   return (
     <Field label="Emitted commands">
       <VStack align="stretch" gap={1}>
@@ -80,7 +97,7 @@ function EmittedCommands({ outbox }: { outbox: AggregateProcessManagerOutboxMess
   );
 }
 
-export function ManagerCard({ manager }: { manager: AggregateProcessManager }) {
+export function ManagerCard({ manager }: { manager: DejaViewProcessManager }) {
   const status = instanceStatus(manager.instance);
   const { instance } = manager;
 

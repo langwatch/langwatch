@@ -5,17 +5,20 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 import { HandledErrorAlert } from "~/features/errors";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
-import { AggregateTable } from "./AggregateTable";
+import {
+  AggregateTable,
+  type EventResult,
+  EventTimeline,
+  LeftPanel,
+  ReplayHeader,
+  RightPanel,
+  SearchHeader,
+  buildFragment,
+  parseFragment,
+} from "@langwatch/ops-web";
 import { CenterPanel } from "./CenterPanel";
-import { EventTimeline } from "./EventTimeline";
-import { buildFragment, parseFragment } from "./fragment";
 import { KeyboardHints } from "./KeyboardHints";
-import { LeftPanel } from "./LeftPanel";
 import { ManagerPanel } from "./ManagerPanel";
-import { ReplayHeader } from "./ReplayHeader";
-import { RightPanel } from "./RightPanel";
-import { SearchHeader } from "./SearchHeader";
-import type { EventResult } from "./types";
 
 export function DejaViewContent() {
   const router = useRouter();
@@ -357,7 +360,6 @@ export function DejaViewContent() {
                 eventSubscribers={matchingEventSubscribers}
                 selectedProjection={selectedProjection}
                 onSelectProjection={setSelectedProjection}
-                currentEventType={currentEvent?.eventType ?? null}
               />
 
               <CenterPanel

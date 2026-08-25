@@ -2,8 +2,7 @@ import { Box, Text, VStack } from "@chakra-ui/react";
 
 import { describeError } from "~/features/errors";
 import { api } from "~/utils/api";
-
-import { ManagerCard } from "./ManagerCard";
+import { ManagerCard } from "@langwatch/ops-web";
 
 /**
  * The process-manager state machines for the aggregate on screen: each machine

@@ -16,12 +16,12 @@ import {
   TieredBlobStore,
   TTL_HELPER_LUA,
 } from "@langwatch/group-queue/operational";
+import { normalizeErrorMessage } from "@langwatch/ops-server";
 import { createLogger } from "@langwatch/observability";
 import type IORedis from "ioredis";
 import type { ChainableCommander, Cluster } from "ioredis";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { createStorageRegistry } from "~/server/stored-objects/stored-objects-factory";
-import { normalizeErrorMessage } from "../normalize-error-message";
 import type { ParkedTenant } from "../snapshot/snapshot.types";
 import type { ErrorCluster, GroupInfo, ParkedGroupInfo, QueueInfo } from "../types";
 import type {

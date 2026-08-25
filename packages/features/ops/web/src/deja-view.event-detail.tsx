@@ -1,7 +1,7 @@
 import { Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { JsonViewer } from "~/components/ops/JsonViewer";
-import { formatTimestamp, hashEventTypeColor } from "./fragment";
-import type { EventResult } from "./types";
+import { JsonViewer } from "./json-viewer";
+import { formatTimestamp, hashEventTypeColor } from "./deja-view.fragment";
+import type { EventResult } from "./deja-view.types";
 
 export function EventDetail({
   event,

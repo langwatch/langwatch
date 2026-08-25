@@ -16,8 +16,7 @@ import {
 import { ArrowLeft } from "lucide-react";
 import { useMemo } from "react";
 import { formatDuration } from "@langwatch/ops-web";
-import { PhaseTimeline } from "~/components/ops/shared/PhaseTimeline";
-import { replayStateColor } from "~/components/ops/shared/ReplayStateBadge";
+import { PhaseTimeline, replayStateColor } from "@langwatch/ops-web";
 import { Link } from "~/components/ui/link";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { useReplayStatus } from "~/hooks/useReplayStatus";

@@ -1,5 +1,5 @@
 import { Badge } from "@chakra-ui/react";
-import type { GroupClassification } from "./pipelineUtils";
+import type { GroupClassification } from "./queue.pipeline-utils";
 
 export function GroupStateBadge({ c }: { c: GroupClassification }) {
   switch (c.state) {

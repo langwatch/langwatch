@@ -1,9 +1,9 @@
-import { formatTimeAgo } from "@langwatch/ops-web";
-import type { GroupInfo, PipelineNode } from "~/server/app-layer/ops/types";
-import type { StatusFilter } from "./types";
+import { formatTimeAgo } from "./formatters";
+import type { OpsPipelineNode, OpsQueueGroup } from "./queue.presentation";
+import type { StatusFilter } from "./queue.types";
 
 export function isNodePaused(
-  node: PipelineNode,
+  node: OpsPipelineNode,
   parentPath: string,
   pausedKeys: Set<string>,
 ): boolean {
@@ -23,20 +23,25 @@ export function isNodeDirectlyPaused(nodePath: string, pausedKeys: Set<string>):
   return pausedKeys.has(nodePath);
 }
 
-export function filterTree(nodes: PipelineNode[], query: string): PipelineNode[] | null {
+export function filterTree(
+  nodes: OpsPipelineNode[],
+  query: string,
+): OpsPipelineNode[] | null {
   if (!query.trim()) return nodes;
   const lower = query.toLowerCase();
 
-  function prune(node: PipelineNode): PipelineNode | null {
+  function prune(node: OpsPipelineNode): OpsPipelineNode | null {
     if (node.name.toLowerCase().includes(lower)) return node;
     const filtered = node.children
       .map(prune)
-      .filter((c): c is PipelineNode => c !== null);
+      .filter((c): c is OpsPipelineNode => c !== null);
     if (filtered.length > 0) return { ...node, children: filtered };
     return null;
   }
 
-  const result = nodes.map(prune).filter((n): n is PipelineNode => n !== null);
+  const result = nodes
+    .map(prune)
+    .filter((node): node is OpsPipelineNode => node !== null);
   return result.length > 0 ? result : null;
 }
 
@@ -83,13 +88,13 @@ const FAILING_ERROR_MAX_AGE_MS = 15 * 60 * 1000;
  * "waiting out backoff" (the re-stage keeps it alive for the backoff window),
  * which is why the retry check outranks it.
  */
-function hasUnclearedError(g: GroupInfo, attempt: number, now: number): boolean {
+function hasUnclearedError(g: OpsQueueGroup, attempt: number, now: number): boolean {
   if (g.errorMessage === null) return false;
   if (attempt > 0) return true;
   return g.errorTimestamp !== null && now - g.errorTimestamp < FAILING_ERROR_MAX_AGE_MS;
 }
 
-export function classifyGroup(g: GroupInfo, now = Date.now()): GroupClassification {
+export function classifyGroup(g: OpsQueueGroup, now = Date.now()): GroupClassification {
   const attempt = g.retryCount ?? 0;
   const isFailing = hasUnclearedError(g, attempt, now);
   const deferredUntilMs = g.score > now ? g.score : null;
@@ -126,7 +131,7 @@ const STATE_SEVERITY: Record<GroupState, number> = {
  * Trouble first, then depth. The server orders by pending count alone, which
  * buries one blocked group under two hundred healthy fan-out rows.
  */
-export function sortGroupsBySeverity<T extends GroupInfo>(
+export function sortGroupsBySeverity<T extends OpsQueueGroup>(
   groups: T[],
   now = Date.now(),
 ): T[] {
@@ -162,7 +167,7 @@ export function describeNextRun(c: GroupClassification, now = Date.now()): strin
 }
 
 export function matchesStatusFilter(
-  g: GroupInfo,
+  g: OpsQueueGroup,
   filter: StatusFilter,
   now = Date.now(),
 ): boolean {

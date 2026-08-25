@@ -1,4 +1,4 @@
-import { EVENT_TYPE_COLORS } from "./types";
+import { EVENT_TYPE_COLORS } from "./deja-view.types";
 
 export function hashEventTypeColor(eventType: string): string {
   let hash = 0;

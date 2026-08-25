@@ -39,7 +39,16 @@ const deleteScript = new CachedLuaScript(BLOB_OPERATOR_DELETE_LUA);
  * none of them, so the two are gathered separately and only joined for the rows
  * actually returned.
  */
-type BlobFacts = Omit<OpsBlobSummary, "sweepOutcome">;
+interface BlobFacts {
+  queueName: string;
+  projectId: string;
+  hash: string;
+  sizeBytes: number;
+  ttlSeconds: number | null;
+  liveLeases: number;
+  holderTokens: number;
+  earliestLeaseDeadlineMs: number | null;
+}
 
 /** Hard ceiling on a page regardless of what the caller asks for. */
 const MAX_PAGE = 200;

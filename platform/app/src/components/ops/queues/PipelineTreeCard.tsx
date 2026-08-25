@@ -5,9 +5,7 @@ import { showErrorToast } from "~/features/errors";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import type { PipelineNode } from "~/server/app-layer/ops/types";
 import { api } from "~/utils/api";
-import { PipelineTreeFilter } from "./PipelineTreeFilter";
-import { PipelineTreeNode } from "./PipelineTreeNode";
-import { filterTree } from "./pipelineUtils";
+import { filterTree, PipelineTreeFilter, PipelineTreeNode } from "@langwatch/ops-web";
 
 export function PipelineTreeCard({
   pipelineTree,
@@ -161,7 +159,6 @@ export function PipelineTreeCard({
                   onPause={handlePause}
                   onUnpause={handleUnpause}
                   hasAccess={hasAccess}
-                  queueNames={queueNames}
                 />
               </Box>
             ))}

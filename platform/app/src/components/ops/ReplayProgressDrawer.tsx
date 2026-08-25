@@ -13,11 +13,7 @@ import {
 import { useMemo } from "react";
 import { parseActiveProjections } from "~/components/ops/replay-progress/parseActiveProjections";
 import { formatDuration } from "@langwatch/ops-web";
-import {
-  PHASE_ICONS,
-  PHASE_LABELS,
-  PhaseTimeline,
-} from "~/components/ops/shared/PhaseTimeline";
+import { PHASE_ICONS, PHASE_LABELS, PhaseTimeline } from "@langwatch/ops-web";
 import {
   DrawerBody,
   DrawerCloseTrigger,

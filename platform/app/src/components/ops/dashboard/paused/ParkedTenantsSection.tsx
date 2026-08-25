@@ -9,7 +9,7 @@ import {
 } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
-import { middleEllipsis } from "~/components/ops/queues/clusterGroups";
+import { middleEllipsis } from "@langwatch/ops-web";
 import { formatCount, formatTimeAgo } from "@langwatch/ops-web";
 import type { DashboardData } from "~/server/app-layer/ops/types";
 import { api } from "~/utils/api";

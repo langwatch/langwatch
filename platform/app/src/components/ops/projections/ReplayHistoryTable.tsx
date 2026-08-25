@@ -1,7 +1,7 @@
 import { Badge, Card, HStack, Status, Table, Text } from "@chakra-ui/react";
 import { ArrowRight } from "lucide-react";
 import { formatDuration } from "@langwatch/ops-web";
-import { replayStateColor } from "~/components/ops/shared/ReplayStateBadge";
+import { replayStateColor } from "@langwatch/ops-web";
 import type { ReplayHistoryEntry } from "~/server/app-layer/ops/repositories/replay.repository";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";

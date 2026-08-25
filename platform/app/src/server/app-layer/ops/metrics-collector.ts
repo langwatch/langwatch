@@ -1,5 +1,10 @@
 import * as os from "node:os";
 import { createLogger } from "@langwatch/observability";
+import {
+  computeEngineCpuPercent,
+  normalizeErrorMessage,
+  type RedisCpuSample,
+} from "@langwatch/ops-server";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import {
@@ -12,8 +17,6 @@ import {
   mergeHistogramCounts,
   windowPercentiles,
 } from "~/shared/ops/latency";
-import { normalizeErrorMessage } from "./normalize-error-message";
-import { computeEngineCpuPercent, type RedisCpuSample } from "./redis-engine-cpu";
 import type { QueueRepository } from "./repositories/queue.repository";
 import type { SnapshotRepository } from "./snapshot/snapshot.repository";
 import { type DetailSnapshot, SNAPSHOT_VERSION } from "./snapshot/snapshot.types";

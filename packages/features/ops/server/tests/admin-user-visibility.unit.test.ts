@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { mapUserToBackofficeRow, type UserWithBackofficeIncludes } from "../src";
+import type { UserWithBackofficeIncludes } from "@langwatch/ops-contract";
+import { PrismaAdminUserMapper } from "../src/repositories/prisma/prisma.admin-user.mapper";
+
+const mapUserToBackofficeRow = PrismaAdminUserMapper.map;
 
 /**
  * Pins the Backoffice Users list's project-visibility rule: a user who has

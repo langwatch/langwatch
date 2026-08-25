@@ -9,7 +9,7 @@ import {
 } from "@chakra-ui/react";
 import { CalendarClock } from "lucide-react";
 import { useMemo } from "react";
-import { middleEllipsis } from "~/components/ops/queues/clusterGroups";
+import { middleEllipsis } from "@langwatch/ops-web";
 import { formatTimeAgo } from "@langwatch/ops-web";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { api, type RouterOutputs } from "~/utils/api";

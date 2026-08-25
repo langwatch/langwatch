@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import type { GroupInfo } from "~/server/app-layer/ops/types";
+import type { OpsQueueGroup } from "../src";
 import {
   classifyGroup,
   describeNextRun,
   matchesStatusFilter,
   sortGroupsBySeverity,
-} from "../pipelineUtils";
+} from "../src";
 
 const NOW = 1_755_100_000_000;
 
-function makeGroup(overrides: Partial<GroupInfo> = {}): GroupInfo {
+function makeGroup(overrides: Partial<OpsQueueGroup> = {}): OpsQueueGroup {
   return {
     groupId: "project_a/map/spanStorage/span-map:1",
     pendingJobs: 1,

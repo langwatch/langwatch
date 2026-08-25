@@ -11,7 +11,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { useState } from "react";
-import { middleEllipsis } from "~/components/ops/queues/clusterGroups";
+import { middleEllipsis } from "@langwatch/ops-web";
 import { formatTimeAgo } from "@langwatch/ops-web";
 import { Drawer } from "~/components/ui/drawer";
 import { useDrawer } from "~/hooks/useDrawer";

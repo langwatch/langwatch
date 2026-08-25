@@ -25,9 +25,10 @@ Own browser-safe clients, formatters, and reusable controls in the web package.
 
 Only package roots are public. The contract exposes Zod 4 DTOs, blob-store
 result types, and `OpsService`; the server exposes its composition adapter while
-blob-store services/repositories remain private; the web package exposes `AdminClient`, the
-impersonation banner, and reusable blob controls. The application still owns
-the Hono route, tRPC procedures, and app-specific Backoffice views.
+blob-store services/repositories remain private; the web package exposes
+`AdminClient`, shared impersonation and JSON-inspection presentation, and
+reusable blob controls. The application still owns the Hono route, tRPC
+procedures, page shells, and app-specific Backoffice view composition.
 
 ## Dependencies
 

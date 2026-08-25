@@ -1,7 +1,7 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { useEffect, useRef } from "react";
-import { formatTimestamp, hashEventTypeColor } from "./fragment";
-import type { EventResult } from "./types";
+import { formatTimestamp, hashEventTypeColor } from "./deja-view.fragment";
+import type { EventResult } from "./deja-view.types";
 
 export function EventTimeline({
   events,

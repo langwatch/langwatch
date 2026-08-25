@@ -1,9 +1,11 @@
 import { Badge, Box, Button, Center, HStack, Spinner, Text } from "@chakra-ui/react";
-import { JsonViewer } from "~/components/ops/JsonViewer";
+import {
+  EventDetail,
+  hashEventTypeColor,
+  JsonViewer,
+  type EventResult,
+} from "@langwatch/ops-web";
 import { api } from "~/utils/api";
-import { EventDetail } from "./EventDetail";
-import { hashEventTypeColor } from "./fragment";
-import type { EventResult } from "./types";
 
 export function CenterPanel({
   currentEvent,

@@ -10,8 +10,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { RotateCcw, Skull, XCircle } from "lucide-react";
-import { JsonViewer } from "~/components/ops/JsonViewer";
-import { middleEllipsis } from "~/components/ops/queues/clusterGroups";
+import { JsonViewer } from "@langwatch/ops-web";
+import { middleEllipsis } from "@langwatch/ops-web";
 import { formatTimeAgo } from "@langwatch/ops-web";
 import { api } from "~/utils/api";
 

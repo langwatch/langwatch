@@ -1,7 +1,7 @@
 import { Badge, Box, Button, HStack, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight, Pause, Play } from "lucide-react";
-import type { PipelineNode } from "~/server/app-layer/ops/types";
-import { isNodeDirectlyPaused, isNodePaused } from "./pipelineUtils";
+import type { OpsPipelineNode } from "./queue.presentation";
+import { isNodeDirectlyPaused, isNodePaused } from "./queue.pipeline-utils";
 
 export function PipelineTreeNode({
   node,
@@ -13,9 +13,8 @@ export function PipelineTreeNode({
   onPause,
   onUnpause,
   hasAccess,
-  queueNames,
 }: {
-  node: PipelineNode;
+  node: OpsPipelineNode;
   parentPath: string;
   depth: number;
   pausedKeys: Set<string>;
@@ -24,7 +23,6 @@ export function PipelineTreeNode({
   onPause: (key: string) => void;
   onUnpause: (key: string) => void;
   hasAccess: boolean;
-  queueNames: string[];
 }) {
   const path = parentPath ? `${parentPath}/${node.name}` : node.name;
   const hasChildren = node.children.length > 0;
@@ -130,7 +128,6 @@ export function PipelineTreeNode({
             onPause={onPause}
             onUnpause={onUnpause}
             hasAccess={hasAccess}
-            queueNames={queueNames}
           />
         ))}
     </>
