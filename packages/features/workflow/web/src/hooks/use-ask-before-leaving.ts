@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { useWorkflowStore } from "./useWorkflowStore";
+import { useWorkflowStore } from "./use-workflow-store";
 
 export const useAskBeforeLeaving = () => {
   const { evaluationStatus, hasPendingChanges } = useWorkflowStore(

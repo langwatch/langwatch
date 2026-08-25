@@ -1,13 +1,13 @@
 import type { Node } from "@xyflow/react";
 import { useShallow } from "zustand/react/shallow";
 import { useDrawer } from "~/hooks/useDrawer";
-import { useWorkflowStore } from "../../hooks/useWorkflowStore";
+import { useWorkflowStore } from "@langwatch/workflow-web";
 import type {
   AgentComponent,
   Component,
   ComponentType,
   Evaluator,
-} from "../../types/dsl";
+} from "@langwatch/workflow-contract";
 import { AgentPropertiesPanel } from "../properties/AgentPropertiesPanel";
 import { CodePropertiesPanel } from "../properties/CodePropertiesPanel";
 import { CustomPropertiesPanel } from "../properties/CustomPropertiesPanel";

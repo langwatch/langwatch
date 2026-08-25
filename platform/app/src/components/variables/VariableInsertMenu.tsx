@@ -5,7 +5,7 @@ import {
   ColorfulBlockIcon,
   ComponentIcon,
 } from "~/optimization_studio/components/ColorfulBlockIcons";
-import type { ComponentType } from "~/optimization_studio/types/dsl";
+import type { ComponentType } from "@langwatch/workflow-contract";
 import {
   VariableTypeBadge,
   VariableTypeIcon,

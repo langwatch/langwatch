@@ -1,4 +1,4 @@
-import type { LLMConfig } from "~/optimization_studio/types/dsl";
+import type { LLMConfig } from "@langwatch/workflow-contract";
 import { normalizeReasoningFromProviderFields } from "@langwatch/prompt-contract";
 
 /**

@@ -4,7 +4,7 @@ import type { AgentService } from "@langwatch/agent-contract";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { JSONPath } from "jsonpath-plus";
-import type { HttpComponentConfig } from "~/optimization_studio/types/dsl";
+import type { HttpComponentConfig } from "@langwatch/workflow-contract";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import {
   buildTemplateContext,

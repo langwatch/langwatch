@@ -1,4 +1,4 @@
-import type { WorkflowField } from "./workflowFields";
+import type { WorkflowField } from "@langwatch/workflow-contract";
 
 /**
  * A base64 data-URL example for image inputs. Truncated for readability: it

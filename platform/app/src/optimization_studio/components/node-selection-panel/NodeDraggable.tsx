@@ -10,9 +10,9 @@ import { Tooltip } from "../../../components/ui/tooltip";
 import {
   updateCodeClassName,
   useWorkflowStore,
-} from "../../hooks/useWorkflowStore";
-import type { Component, ComponentType } from "../../types/dsl";
-import { findLowestAvailableName, nameToId } from "../../utils/nodeUtils";
+} from "@langwatch/workflow-web";
+import type { Component, ComponentType } from "@langwatch/workflow-contract";
+import { findLowestAvailableName, nameToId } from "@langwatch/workflow-contract";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 
 /**

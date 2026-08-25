@@ -13,7 +13,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
 import type { Trace } from "~/server/tracer/types";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type { Workflow } from "../../optimization_studio/types/dsl";
+import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
 import {
   SERVER_ONLY_THREAD_SOURCES,
@@ -153,8 +153,8 @@ export const ThreadMapping = ({
   dsl?: {
     sourceOptions: Record<string, { label: string; fields: string[] }>;
     targetId: string;
-    targetEdges: Workflow["edges"];
-    setTargetEdges?: (edges: Workflow["edges"]) => void;
+    targetEdges: StudioWorkflow["edges"];
+    setTargetEdges?: (edges: StudioWorkflow["edges"]) => void;
   };
   targetFields: string[];
   setDatasetEntries?: (entries: DatasetRecordEntry[]) => void;

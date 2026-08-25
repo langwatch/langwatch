@@ -36,7 +36,6 @@ function stripPrefix(
   if (!handle) return "";
   return handle.startsWith(prefix) ? handle.slice(prefix.length) : handle;
 }
-
 function intersect(sets: Set<Guard>[]): Set<Guard> {
   if (sets.length === 0) return new Set();
   let acc = new Set(sets[0]);

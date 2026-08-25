@@ -5,7 +5,7 @@ import type {
   HttpAuth,
   HttpHeader,
   HttpMethod,
-} from "../types/dsl";
+} from "@langwatch/workflow-contract";
 
 /**
  * Translation layer between an agent library record and the workflow

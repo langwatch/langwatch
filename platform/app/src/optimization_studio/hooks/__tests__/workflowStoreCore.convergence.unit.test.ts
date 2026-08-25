@@ -12,7 +12,7 @@ import { createStore, type StoreApi } from "zustand";
 import {
   store as storeCreator,
   type WorkflowStore,
-} from "../workflowStoreCore";
+} from "@langwatch/workflow-web";
 
 const node = (id: string, type: string): Node => ({
   id,

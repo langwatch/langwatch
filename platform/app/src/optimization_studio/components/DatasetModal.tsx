@@ -38,8 +38,8 @@ import { UploadCSVDrawer } from "~/components/datasets/UploadCSVDrawer";
 import { useDrawer } from "~/hooks/useDrawer";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
 import { Dialog } from "../../components/ui/dialog";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import type { Component, Entry } from "../types/dsl";
+import { useWorkflowStore } from "@langwatch/workflow-web";
+import type { Component, Entry } from "@langwatch/workflow-contract";
 import {
   datasetColumnsToFields,
   inMemoryDatasetToNodeDataset,

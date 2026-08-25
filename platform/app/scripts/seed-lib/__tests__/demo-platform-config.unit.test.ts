@@ -3,7 +3,7 @@ import {
   DEMO_HTTP_AGENT_CONFIG,
   DEMO_PROMPT_CONFIG_DATA,
 } from "../../../prisma/demo-platform-ids";
-import { httpComponentSchema } from "../../../src/optimization_studio/types/dsl";
+import { httpComponentSchema } from "@langwatch/workflow-contract";
 import { getLatestConfigVersionSchema } from "@langwatch/prompt-contract";
 
 // The demo platform seeds these configs as raw JSON, and the app re-validates

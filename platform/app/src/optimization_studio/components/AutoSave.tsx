@@ -7,8 +7,8 @@ import { useShallow } from "zustand/react/shallow";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { useLoadWorkflow } from "../hooks/useLoadWorkflow";
-import { serializeWorkflow, useWorkflowStore } from "../hooks/useWorkflowStore";
-import { hasDSLChanged } from "../utils/dslUtils";
+import { serializeWorkflow, useWorkflowStore } from "@langwatch/workflow-web";
+import { hasDSLChanged } from "@langwatch/workflow-contract";
 
 let saveTimeout: NodeJS.Timeout;
 

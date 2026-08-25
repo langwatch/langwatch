@@ -17,8 +17,8 @@ import {
 } from "@langwatch/evaluator-contract";
 import { getEvaluatorDefaultSettings } from "@langwatch/evaluator-contract";
 import { api } from "../../../utils/api";
-import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import type { Evaluator, Field } from "../../types/dsl";
+import { useWorkflowStore } from "@langwatch/workflow-web";
+import type { Evaluator, Field } from "@langwatch/workflow-contract";
 import {
   applyMappingChange,
   buildAvailableSources,

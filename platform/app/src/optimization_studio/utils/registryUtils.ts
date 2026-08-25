@@ -1,7 +1,7 @@
 import type { useAvailableEvaluators } from "../../hooks/useAvailableEvaluators";
 import { evaluatorDisplayName } from "@langwatch/evaluator-contract";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
-import type { Evaluator, Field } from "../types/dsl";
+import type { Evaluator, Field } from "@langwatch/workflow-contract";
 
 export { DEFAULT_MAX_TOKENS } from "~/utils/constants";
 

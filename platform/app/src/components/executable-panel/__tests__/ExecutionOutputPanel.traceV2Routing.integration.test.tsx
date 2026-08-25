@@ -26,7 +26,7 @@ vi.mock("~/utils/compat/next-router", () => {
   return { default: router, useRouter: () => router };
 });
 
-import type { ExecutionState } from "~/optimization_studio/types/dsl";
+import type { ExecutionState } from "@langwatch/workflow-contract";
 import { ExecutionOutputPanel } from "../ExecutionOutputPanel";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

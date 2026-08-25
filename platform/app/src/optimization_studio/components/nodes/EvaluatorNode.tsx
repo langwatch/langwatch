@@ -1,7 +1,7 @@
 import type { Node, NodeProps } from "@xyflow/react";
 import type { Ref } from "react";
 import { forwardRef } from "react";
-import type { Evaluator } from "../../types/dsl";
+import type { Evaluator } from "@langwatch/workflow-contract";
 import { ComponentNode } from "./Nodes";
 
 export const EvaluatorNode = forwardRef(function EvaluatorNode(

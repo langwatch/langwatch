@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Field, Workflow } from "../../types/dsl";
+import type { Field, StudioWorkflow } from "@langwatch/workflow-contract";
 import {
   applyEntryInputDefaults,
   entryInlineWithDefaults,
@@ -64,7 +64,7 @@ describe("entryInlineWithDefaults", () => {
 });
 
 describe("applyEntryInputDefaults", () => {
-  const workflowWithEntry = (entryData: Record<string, unknown>): Workflow =>
+  const workflowWithEntry = (entryData: Record<string, unknown>): StudioWorkflow =>
     ({
       nodes: [
         {
@@ -75,7 +75,7 @@ describe("applyEntryInputDefaults", () => {
         { id: "other", type: "code", data: {} },
       ],
       edges: [],
-    }) as unknown as Workflow;
+    }) as unknown as StudioWorkflow;
 
   describe("given an entry node with a defaulted input missing from the dataset", () => {
     it("backfills the entry's inline dataset with the default", () => {

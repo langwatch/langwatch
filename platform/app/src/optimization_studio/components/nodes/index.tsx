@@ -1,4 +1,4 @@
-import type { ComponentType } from "../../types/dsl";
+import type { ComponentType } from "@langwatch/workflow-contract";
 import { CustomNode } from "./CustomNode";
 import { EndNode } from "./EndNode";
 import { EntryNode } from "./EntryNode";

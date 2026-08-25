@@ -3,8 +3,8 @@ import { type Node, useUpdateNodeInternals } from "@xyflow/react";
 import { useCallback, useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { type Variable, VariablesSection } from "~/components/variables";
-import { useWorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
-import type { End, Field } from "../../types/dsl";
+import { useWorkflowStore } from "@langwatch/workflow-web";
+import type { End, Field } from "@langwatch/workflow-contract";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
 
 /**

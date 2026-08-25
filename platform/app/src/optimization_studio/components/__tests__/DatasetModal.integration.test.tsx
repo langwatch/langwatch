@@ -98,8 +98,8 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-import { _useWorkflowStore } from "../../hooks/useWorkflowStore";
-import type { Entry } from "../../types/dsl";
+import { _useWorkflowStore } from "@langwatch/workflow-web";
+import type { Entry } from "@langwatch/workflow-contract";
 import { DatasetModal } from "../DatasetModal";
 
 const ENTRY_NODE = {

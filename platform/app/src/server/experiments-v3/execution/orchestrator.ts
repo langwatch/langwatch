@@ -32,7 +32,7 @@ import { toComparisonConfig } from "~/experiments-v3/utils/normalizeComparison";
 import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
-import type { ExecutionState, Workflow } from "~/optimization_studio/types/dsl";
+import type { ExecutionState, StudioWorkflow } from "@langwatch/workflow-contract";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import { nodeErrorToDomainError } from "~/optimization_studio/utils/nodeErrorDomain";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
@@ -1031,7 +1031,7 @@ export const priceMetrics = async (
 type CellEvaluatorContext = {
   cell: ExecutionCell;
   projectId: string;
-  workflow: Workflow;
+  workflow: StudioWorkflow;
   targetOutput: Record<string, unknown>;
   traceId: string;
   targetNodes: Set<string>;
@@ -1383,7 +1383,7 @@ export async function* executeWorkflowCell({
 }: {
   cell: ExecutionCell;
   projectId: string;
-  workflowDsl: Workflow;
+  workflowDsl: StudioWorkflow;
   datasetColumns?: Array<{ id: string; name: string; type: string }>;
   loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
   resultMapperConfig?: ResultMapperConfig;

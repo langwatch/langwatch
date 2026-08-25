@@ -7,8 +7,8 @@ import {
 } from "@langwatch/evaluator-contract";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import type { NodeWithOptionalPosition } from "~/types";
-import type { Component, Field } from "../types/dsl";
-import { useWorkflowStore } from "./useWorkflowStore";
+import type { Component, Field } from "@langwatch/workflow-contract";
+import { useWorkflowStore } from "@langwatch/workflow-web";
 
 const FIELD_TYPE_MAP: Record<string, string> = {
   contexts: "list",

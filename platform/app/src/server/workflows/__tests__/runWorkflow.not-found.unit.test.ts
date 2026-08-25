@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Workflow } from "../../../optimization_studio/types/dsl";
+import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import {
   WorkflowNlpExecutor,
   type WorkflowExecutionRuntime,
 } from "../runWorkflow";
 
-const workflow: Workflow = {
+const workflow: StudioWorkflow = {
   spec_version: "1.5",
   workflow_id: "workflow_1",
   name: "Triage",

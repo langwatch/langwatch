@@ -1,6 +1,6 @@
 import { BaseEdge, type EdgeProps, getBezierPath } from "@xyflow/react";
 import { useColorModeValue } from "../../components/ui/color-mode";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import { useWorkflowStore } from "@langwatch/workflow-web";
 import { selectionColor } from "./nodes/Nodes";
 
 export default function DefaultEdge(props: EdgeProps) {

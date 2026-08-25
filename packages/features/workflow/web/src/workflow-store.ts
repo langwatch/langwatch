@@ -1,4 +1,3 @@
-import { createLogger } from "@langwatch/observability";
 import {
   addEdge,
   applyEdgeChanges,
@@ -10,42 +9,51 @@ import {
   type NodeChange,
 } from "@xyflow/react";
 import { nanoid } from "nanoid";
-import { LlmConfigInputTypes } from "../../types";
-import { snakeCaseToPascalCase } from "../../utils/stringCasing";
+import { LlmConfigInputTypes } from "@langwatch/workflow-contract";
+const snakeCaseToPascalCase = (value: string) =>
+  value
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part[0]!.toUpperCase() + part.slice(1))
+    .join("");
 import {
   type BaseComponent,
   type Component,
   type Entry,
   type Field,
   LATEST_SPEC_VERSION,
-  type Workflow,
-} from "../types/dsl";
-import { rewriteCodeSignature } from "../utils/codeSignature";
+  type StudioWorkflow,
+} from "@langwatch/workflow-contract";
+import { rewriteCodeSignature } from "./utils/code-signature";
 import {
   GATE_FIELD,
   GATE_HANDLE_ID,
   isBranchConnectionOrigin,
   nodeHasGateInput,
-} from "../utils/controlFlow";
-import { hasDSLChanged } from "../utils/dslUtils";
-import { canConvergeOnInput } from "../utils/edgeConvergence";
-import type { CodedExecutionFailure } from "../utils/executionStateError";
-import { findLowestAvailableName, nameToId } from "../utils/nodeUtils";
+} from "./utils/control-flow";
+import { hasDSLChanged } from "@langwatch/workflow-contract";
+import { canConvergeOnInput } from "./utils/edge-convergence";
+export type CodedExecutionFailure = { error_type?: string; upstream_status?: number; trace_id?: string; span_id?: string; error?: string };
+import { findLowestAvailableName, nameToId } from "@langwatch/workflow-contract";
 
-const logger = createLogger("langwatch:studio:workflowStore");
+const logger = {
+  warn: (...args: unknown[]) => console.warn(...args),
+  debug: (...args: unknown[]) => console.debug(...args),
+  info: (...args: unknown[]) => console.info(...args),
+};
 
 export type SocketStatus = "disconnected" | "connecting-python" | "connected";
 
-export type State = Workflow & {
+export type State = StudioWorkflow & {
   workflow_id?: string;
   hoveredNodeId?: string;
   socketStatus: SocketStatus;
   propertiesExpanded: boolean;
   triggerValidation: boolean;
   /** The workflow state as of the last autosave. Used as the baseline for hasPendingChanges(). */
-  autosavedWorkflow: Workflow | undefined;
+  autosavedWorkflow: StudioWorkflow | undefined;
   /** The workflow state as of the last manual commit (or version restore/load). Used as the baseline for checkCanCommitNewVersion(). */
-  lastCommittedWorkflow: Workflow | undefined;
+  lastCommittedWorkflow: StudioWorkflow | undefined;
   /** The DB id of the current workflow version. Updated on load, autosave, commit, and restore. */
   currentVersionId: string | undefined;
   openResultsPanelRequest:
@@ -65,18 +73,18 @@ export type State = Workflow & {
 
 export type WorkflowStore = State & {
   reset: () => void;
-  getWorkflow: () => Workflow;
-  getAutosavedWorkflow: () => Workflow | undefined;
+  getWorkflow: () => StudioWorkflow;
+  getAutosavedWorkflow: () => StudioWorkflow | undefined;
   hasPendingChanges: () => boolean;
   setWorkflow: (
     workflow:
-      | (Partial<Workflow> & { workflow_id?: string })
-      | ((current: Workflow) => Partial<Workflow> & { workflow_id?: string }),
+      | (Partial<StudioWorkflow> & { workflow_id?: string })
+      | ((current: StudioWorkflow) => Partial<StudioWorkflow> & { workflow_id?: string }),
   ) => void;
   /** Update the autosave baseline. Called after each autosave completes. */
-  setAutosavedWorkflow: (workflow: Workflow | undefined) => void;
+  setAutosavedWorkflow: (workflow: StudioWorkflow | undefined) => void;
   /** Update the committed baseline. Called on load, manual commit, and version restore. */
-  setLastCommittedWorkflow: (workflow: Workflow | undefined) => void;
+  setLastCommittedWorkflow: (workflow: StudioWorkflow | undefined) => void;
   /** Update the current version ID. Called on load, autosave, manual commit, and version restore. */
   setCurrentVersionId: (id: string | undefined) => void;
   /** Returns true if the current workflow differs from the last committed version. Synchronous — no DB query needed. */
@@ -125,13 +133,13 @@ export type WorkflowStore = State & {
     executionState: BaseComponent["execution_state"],
   ) => void;
   setWorkflowExecutionState: (
-    executionState: Partial<Workflow["state"]["execution"]>,
+    executionState: Partial<NonNullable<StudioWorkflow["state"]["execution"]>>,
   ) => void;
   setEvaluationState: (
-    evaluationState: Partial<Workflow["state"]["evaluation"]>,
+    evaluationState: Partial<StudioWorkflow["state"]["evaluation"]>,
   ) => void;
   setOptimizationState: (
-    optimizationState: Partial<Workflow["state"]["optimization"]>,
+    optimizationState: Partial<StudioWorkflow["state"]["optimization"]>,
   ) => void;
   setHoveredNodeId: (nodeId: string | undefined) => void;
   /**
@@ -160,7 +168,7 @@ export type WorkflowStore = State & {
   checkIfUnreachableErrorMessage: (message: string | undefined) => void;
 };
 
-export const initialDSL: Workflow = {
+export const initialDSL: StudioWorkflow = {
   workflow_id: undefined,
   spec_version: LATEST_SPEC_VERSION,
   name: "Loading...",
@@ -194,7 +202,7 @@ export const initialState: State = {
 };
 
 export const getWorkflow = (state: State) => {
-  // Keep only the keys present on Workflow type
+  // Keep only the keys present on StudioWorkflow type
   return {
     workflow_id: state.workflow_id,
     experiment_id: state.experiment_id,
@@ -223,15 +231,15 @@ export const serializeWorkflow = <T extends { nodes: Node[]; edges: Edge[] }>(
   return {
     ...workflow,
     nodes: workflow.nodes.map((node) => {
-      const { selected, dragging, ...rest } = node;
-      const { execution_state, ...dataRest } = rest.data as Record<
+      const { selected: _selected, dragging: _dragging, ...rest } = node;
+      const { execution_state: _executionState, ...dataRest } = rest.data as Record<
         string,
         unknown
       >;
       return { ...rest, data: dataRest };
     }) as T["nodes"],
     edges: workflow.edges.map((edge) => {
-      const { selected, ...rest } = edge;
+      const { selected: _selected, ...rest } = edge;
       return rest;
     }) as T["edges"],
   };
@@ -426,7 +434,7 @@ export const store = (
     return hasDSLChanged(autosavedWorkflow, currentWorkflow, true);
   },
   setWorkflow: (
-    workflow: Partial<Workflow> | ((current: Workflow) => Partial<Workflow>),
+    workflow: Partial<StudioWorkflow> | ((current: StudioWorkflow) => Partial<StudioWorkflow>),
   ) => {
     const resolved =
       typeof workflow === "function" ? workflow(get().getWorkflow()) : workflow;
@@ -466,10 +474,10 @@ export const store = (
     }
     set(resolved);
   },
-  setAutosavedWorkflow: (workflow: Workflow | undefined) => {
+  setAutosavedWorkflow: (workflow: StudioWorkflow | undefined) => {
     set({ autosavedWorkflow: workflow });
   },
-  setLastCommittedWorkflow: (workflow: Workflow | undefined) => {
+  setLastCommittedWorkflow: (workflow: StudioWorkflow | undefined) => {
     set({ lastCommittedWorkflow: workflow });
   },
   setCurrentVersionId: (id: string | undefined) => {
@@ -941,23 +949,26 @@ export const store = (
     });
   },
   setWorkflowExecutionState: (
-    executionState: Partial<Workflow["state"]["execution"]>,
+    executionState: Partial<NonNullable<StudioWorkflow["state"]["execution"]>>,
   ) => {
+    const currentExecution = get().state.execution;
+    const execution = {
+      status: executionState.status ?? currentExecution?.status ?? "idle",
+      ...currentExecution,
+      ...executionState,
+      ...(executionState.error
+        ? { error: executionState.error.slice(0, 140) }
+        : {}),
+    };
     set({
       state: {
         ...get().state,
-        execution: {
-          ...(get().state.execution ?? {}),
-          ...executionState,
-          ...(executionState?.error
-            ? { error: executionState.error.slice(0, 140) }
-            : {}),
-        } as Workflow["state"]["execution"],
+        execution,
       },
     });
   },
   setEvaluationState: (
-    evaluationState: Partial<Workflow["state"]["evaluation"]>,
+    evaluationState: Partial<StudioWorkflow["state"]["evaluation"]>,
   ) => {
     set({
       state: {
@@ -973,7 +984,7 @@ export const store = (
     });
   },
   setOptimizationState: (
-    optimizationState: Partial<Workflow["state"]["optimization"]>,
+    optimizationState: Partial<StudioWorkflow["state"]["optimization"]>,
   ) => {
     set({
       state: {

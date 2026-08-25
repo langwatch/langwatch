@@ -4,7 +4,7 @@ import { isEqual } from "lodash-es";
 import type {
   LlmPromptConfigComponent,
   NodeDataset,
-} from "~/optimization_studio/types/dsl";
+} from "@langwatch/workflow-contract";
 
 /**
  * Checks if a demonstrations dataset has any records.

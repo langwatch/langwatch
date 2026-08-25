@@ -6,7 +6,7 @@ import { useRouter } from "~/utils/compat/next-router";
 import { FullLogo } from "../../../components/icons/FullLogo";
 import { LoadingScreen } from "../../../components/LoadingScreen";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import type { Workflow } from "../../../optimization_studio/types/dsl";
+import { parseStudioWorkflow } from "@langwatch/workflow-contract";
 import { api } from "../../../utils/api";
 
 const ChatBox = dynamic(
@@ -57,11 +57,11 @@ function ChatContent() {
             useApi={true}
             workflowId={workflowId}
             nodes={
-              (publishedWorkflow.data.dsl as unknown as Workflow)
+              parseStudioWorkflow(publishedWorkflow.data.dsl)
                 ?.nodes as unknown as Node[]
             }
             edges={
-              (publishedWorkflow.data.dsl as unknown as Workflow)
+              parseStudioWorkflow(publishedWorkflow.data.dsl)
                 ?.edges as unknown as Edge[]
             }
           />

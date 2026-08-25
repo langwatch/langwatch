@@ -1,10 +1,10 @@
-import type { Node } from "@xyflow/react";
 import isDeepEqual from "fast-deep-equal";
 import debounce from "lodash-es/debounce";
 import { temporal } from "zundo";
 import { create } from "zustand";
 
-// Re-export everything from workflowStoreCore so existing imports keep working
+// Keep the public hook and its pure state helpers on one browser package
+// surface; app transport code composes around this hook.
 export {
   getWorkflow,
   initialDSL,
@@ -19,16 +19,16 @@ export {
   updateInputFields,
   updateOutputFields,
   type WorkflowStore,
-} from "./workflowStoreCore";
+} from "../workflow-store";
 
-import { store, type WorkflowStore } from "./workflowStoreCore";
+import { store, type WorkflowStore } from "../workflow-store";
 
 export const _useWorkflowStore = create<WorkflowStore>()(
   temporal(store, {
     handleSet: (handleSet) => {
       return debounce<typeof handleSet>(
-        (pastState) => {
-          if ((pastState as any).nodes?.some((node: Node) => node.dragging)) {
+        (pastState: WorkflowStore) => {
+          if (pastState.nodes.some((node) => node.dragging)) {
             return;
           }
           handleSet(pastState);

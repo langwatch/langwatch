@@ -1,6 +1,6 @@
 import { nanoid } from "nanoid";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
-import type { ExecutionStatus } from "~/optimization_studio/types/dsl";
+import type { ExecutionStatus } from "@langwatch/workflow-contract";
 import type { StudioClientEvent } from "~/optimization_studio/types/events";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
 import { nlpgoFetch } from "~/server/nlpgo/nlpgoFetch";

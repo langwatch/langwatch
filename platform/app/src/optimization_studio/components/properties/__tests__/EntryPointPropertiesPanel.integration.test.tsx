@@ -42,9 +42,9 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 const mockSetNode = vi.fn();
 const mockSetSelectedNode = vi.fn();
 
-vi.mock("../../../hooks/useWorkflowStore", async (importOriginal) => {
+vi.mock("@langwatch/workflow-web", async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import("../../../hooks/useWorkflowStore")>();
+    await importOriginal<typeof import("@langwatch/workflow-web")>();
   return {
     ...actual,
     useWorkflowStore: (selector: (state: unknown) => unknown) =>
@@ -89,7 +89,7 @@ vi.mock("../BasePropertiesPanel", async (importOriginal) => {
   };
 });
 
-import type { Entry } from "../../../types/dsl";
+import type { Entry } from "@langwatch/workflow-contract";
 import { EntryPointPropertiesPanel } from "../EntryPointPropertiesPanel";
 
 const createEntryNode = (overrides: Partial<Entry> = {}): Node<Entry> => ({

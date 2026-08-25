@@ -26,7 +26,6 @@ function stripPrefix(
   if (!handle) return "";
   return handle.startsWith(prefix) ? handle.slice(prefix.length) : handle;
 }
-
 type FieldLike = { identifier: string; type?: string };
 
 function nodeInputs(node: Node | undefined): FieldLike[] {

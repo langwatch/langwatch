@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Workflow } from "../../../optimization_studio/types/dsl";
+import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import {
   WorkflowNlpExecutor,
   migrateWorkflowDslForExecution,
   type WorkflowExecutionRuntime,
 } from "../runWorkflow";
 
-const migratedLegacyWorkflow: Workflow = {
+const migratedLegacyWorkflow: StudioWorkflow = {
   spec_version: "1.5",
   workflow_id: "workflow_1",
   name: "Legacy published workflow",

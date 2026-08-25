@@ -5,8 +5,8 @@ import {
   type ExecutionState,
   LATEST_SPEC_VERSION,
   type LlmPromptConfigComponent,
-  type Workflow,
-} from "~/optimization_studio/types/dsl";
+  type StudioWorkflow,
+} from "@langwatch/workflow-contract";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import { LlmSignatureNodeFactory } from "~/optimization_studio/utils/llmSignatureNodeFactory";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
@@ -37,7 +37,7 @@ export async function invokeLLM({
     const workflowId = `prompt_execution_${nanoid(6)}`;
 
     // Create minimal workflow with signature node
-    const workflow: Workflow = createWorkflow(workflowId, nodeId, data);
+    const workflow: StudioWorkflow = createWorkflow(workflowId, nodeId, data);
 
     // Extract input values from the data
     const inputs = extractInputs(data);
@@ -125,7 +125,7 @@ function createWorkflow(
   workflowId: string,
   nodeId: string,
   data: Node<Omit<LlmPromptConfigComponent, "configId" | "name">>["data"],
-): Workflow {
+): StudioWorkflow {
   return {
     spec_version: LATEST_SPEC_VERSION,
     workflow_id: workflowId,
@@ -171,7 +171,7 @@ function extractInputs(
  */
 function createEventPayload(
   traceId: string,
-  workflow: Workflow,
+  workflow: StudioWorkflow,
   nodeId: string,
   inputs: Record<string, string>,
 ) {

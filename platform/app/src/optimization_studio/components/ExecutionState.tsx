@@ -1,6 +1,6 @@
 import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
 import { useWorkflowExecution } from "../hooks/useWorkflowExecution";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import { useWorkflowStore } from "@langwatch/workflow-web";
 
 export function RunningStatus({ isLoading }: { isLoading?: boolean }) {
   const { executionState } = useWorkflowStore(({ state }) => ({

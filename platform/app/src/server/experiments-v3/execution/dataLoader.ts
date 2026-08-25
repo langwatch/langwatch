@@ -11,7 +11,10 @@ import type {
   Evaluator,
   EvaluatorService,
 } from "@langwatch/evaluator-contract";
-import type { Workflow } from "~/optimization_studio/types/dsl";
+import {
+  parseStudioWorkflow,
+  type StudioWorkflow,
+} from "@langwatch/workflow-contract";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
 import { AgentsFeature } from "~/runtime/app/features/agents";
 import { getApp } from "~/server/app-layer/app";
@@ -263,7 +266,7 @@ export type LoadedWorkflow = {
   id: string;
   name: string;
   versionId: string;
-  dsl: Workflow;
+  dsl: StudioWorkflow;
 };
 
 /**
@@ -482,7 +485,7 @@ export const loadExecutionData = async (
       id: workflow.id,
       name: workflow.name,
       versionId,
-      dsl: version.dsl as unknown as Workflow,
+      dsl: parseStudioWorkflow(version.dsl),
     };
   };
 

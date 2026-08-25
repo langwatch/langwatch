@@ -37,13 +37,16 @@ import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import type { Workflow } from "../types/dsl";
+import { useWorkflowStore } from "@langwatch/workflow-web";
+import {
+  parseStudioWorkflow,
+  type StudioWorkflow,
+} from "@langwatch/workflow-contract";
 import {
   datasetDatabaseRecordsToInMemoryDataset,
   inMemoryDatasetToNodeDataset,
 } from "../utils/datasetUtils";
-import { getEntryInputs } from "../utils/nodeUtils";
+import { getEntryInputs } from "@langwatch/workflow-contract";
 import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useVersionState } from "./History";
 import { VersionToBeUsed } from "./VersionToBeUsed";
@@ -174,7 +177,7 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
  */
 
 const exportWorkflow = async (
-  publishedWorkflow: Workflow,
+  publishedWorkflow: StudioWorkflow,
   datasetData?: Dataset & { datasetRecords: DatasetRecord[] },
 ) => {
   const dsl = { ...publishedWorkflow };
@@ -247,7 +250,7 @@ function PublishMenu({
   );
 
   const workflow = publishedWorkflow.data
-    ? (publishedWorkflow.data.dsl as unknown as Workflow)
+    ? parseStudioWorkflow(publishedWorkflow.data.dsl)
     : getWorkflow();
 
   // Add dataset fetching hooks here
@@ -695,10 +698,8 @@ export const ApiModalContent = () => {
     return;
   }
 
-  const entryInputs = getEntryInputs(
-    (publishedWorkflow.data?.dsl as unknown as Workflow)?.edges,
-    (publishedWorkflow.data?.dsl as unknown as Workflow)?.nodes,
-  );
+  const workflow = parseStudioWorkflow(publishedWorkflow.data.dsl);
+  const entryInputs = getEntryInputs(workflow.edges, workflow.nodes);
 
   const message = JSON.stringify(
     entryInputs.reduce(

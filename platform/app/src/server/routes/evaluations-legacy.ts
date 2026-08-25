@@ -30,9 +30,9 @@ import {
   CostType,
   ExperimentType,
 } from "~/generated/prisma/client";
-import type { Workflow } from "~/optimization_studio/types/dsl";
-import { getInputsOutputs } from "~/optimization_studio/utils/nodeUtils";
-import { getWorkflowEntryOutputs } from "~/optimization_studio/utils/workflowFields";
+import type { StudioWorkflow } from "@langwatch/workflow-contract";
+import { getInputsOutputs } from "@langwatch/workflow-contract";
+import { getWorkflowEntryOutputs } from "@langwatch/workflow-contract";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
 import type { Permission } from "~/server/api/rbac";
 import { getCustomEvaluators } from "~/server/api/routers/evaluations";
@@ -1145,7 +1145,7 @@ async function handleEvaluatorCall(
           );
         }
         const dsl = workflow.currentVersion?.dsl as unknown as
-          | Workflow
+          | StudioWorkflow
           | undefined;
         const entryOutputs = dsl ? getWorkflowEntryOutputs(dsl) : [];
         workflowEvaluatorDef = {

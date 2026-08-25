@@ -4,8 +4,11 @@
 
 import type { Edge, Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
-import type { Field } from "../../types/dsl";
-import { getInputsOutputs, getMappingSurfaceInputs } from "../nodeUtils";
+import type { Field } from "@langwatch/workflow-contract";
+import {
+  getInputsOutputs,
+  getMappingSurfaceInputs,
+} from "@langwatch/workflow-contract";
 
 // ---------------------------------------------------------------------------
 // Helpers

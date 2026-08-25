@@ -17,7 +17,7 @@ const fakeStoreState = {
   getWorkflow: () => ({ nodes: [], edges: [] }),
 };
 
-vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
+vi.mock("@langwatch/workflow-web", () => ({
   useWorkflowStore: (selector: (s: typeof fakeStoreState) => unknown) =>
     selector(fakeStoreState),
 }));

@@ -10,8 +10,8 @@ import { useLoadWorkflow } from "../../../optimization_studio/hooks/useLoadWorkf
 import {
   _useWorkflowStore,
   useWorkflowStore,
-} from "../../../optimization_studio/hooks/useWorkflowStore";
-import type { Workflow } from "../../../optimization_studio/types/dsl";
+} from "@langwatch/workflow-web";
+import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { api } from "../../../utils/api";
 
 export default function Studio() {
@@ -53,7 +53,7 @@ export default function Studio() {
 
   useEffect(() => {
     const dsl = workflow.data?.currentVersion?.dsl as unknown as
-      | Workflow
+      | StudioWorkflow
       | undefined;
     if (dsl) {
       // Prevent autosave from triggering after load

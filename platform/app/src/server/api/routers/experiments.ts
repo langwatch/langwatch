@@ -16,11 +16,12 @@ import { probeProjectPermission } from "~/server/app-layer/permissions/imperativ
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { persistedEvaluationsV3StateSchema } from "../../../experiments-v3/types/persistence";
 import {
+  parseStudioWorkflow,
   type Entry,
   type Evaluator,
-  type Workflow,
-  workflowJsonSchema,
-} from "../../../optimization_studio/types/dsl";
+  type StudioWorkflow,
+  studioWorkflowSchema,
+} from "@langwatch/workflow-contract";
 import { slugify } from "../../../utils/slugify";
 import { prisma } from "../../db";
 import type {
@@ -62,7 +63,7 @@ export const experimentsRouter = createTRPCRouter({
         projectId: z.string(),
         experimentId: z.string().optional(),
         workbenchState: workbenchStateSchema,
-        dsl: workflowJsonSchema,
+        dsl: studioWorkflowSchema,
         commitMessage: z.string().optional(),
       }),
     )
@@ -269,7 +270,7 @@ export const experimentsRouter = createTRPCRouter({
         | WizardState
         | undefined;
       const dsl = workflow?.currentVersion?.dsl as
-        | Workflow
+        | StudioWorkflow
         | undefined;
       const evaluator = dsl?.nodes.find((node) => node.type === "evaluator") as
         | Node<Evaluator>
@@ -381,7 +382,9 @@ export const experimentsRouter = createTRPCRouter({
       return {
         ...experiment,
         workbenchState: experiment.workbenchState as WizardState | undefined,
-        dsl: workflow?.currentVersion?.dsl as Workflow | undefined,
+        dsl: workflow?.currentVersion?.dsl
+          ? parseStudioWorkflow(workflow.currentVersion.dsl)
+          : undefined,
       };
     }),
 
@@ -443,7 +446,7 @@ export const experimentsRouter = createTRPCRouter({
       );
 
       const getDatasetId = (dsl: unknown) => {
-        const parsed = workflowJsonSchema.safeParse(dsl);
+        const parsed = studioWorkflowSchema.safeParse(dsl);
         if (!parsed.success) return undefined;
         return (
           parsed.data.nodes.find((node) => node.type === "entry") as Node<Entry>

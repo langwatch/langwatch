@@ -4,7 +4,7 @@ import { useUpdateNodeInternals } from "@xyflow/react";
 import type { Ref } from "react";
 import { forwardRef, useEffect } from "react";
 import { useComponentVersion } from "../../hooks/useComponentVersion";
-import type { Custom } from "../../types/dsl";
+import type { Custom } from "@langwatch/workflow-contract";
 import { ComponentNode } from "./Nodes";
 
 export const CustomNode = forwardRef(function CustomNode(

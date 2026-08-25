@@ -1,9 +1,9 @@
 import { Button, Text, VStack } from "@chakra-ui/react";
 import { useCallback } from "react";
 import { toaster } from "../../components/ui/toaster";
-import type { BaseComponent } from "../types/dsl";
+import type { BaseComponent } from "@langwatch/workflow-contract";
 import { explainExecutionStateError } from "../utils/executionStateError";
-import { useWorkflowStore } from "./useWorkflowStore";
+import { useWorkflowStore } from "@langwatch/workflow-web";
 
 export const useAlertOnComponent = () => {
   const {

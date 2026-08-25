@@ -15,7 +15,7 @@ import {
   type schemaValidators,
 } from "@langwatch/prompt-contract";
 
-import type { NodeDataset } from "../optimization_studio/types/dsl";
+import type { NodeDataset } from "@langwatch/workflow-contract";
 
 /**
  * Factory for creating LlmPromptConfig objects for testing purposes.

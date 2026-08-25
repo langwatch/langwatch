@@ -1,7 +1,7 @@
 import { Button, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Plus, X } from "lucide-react";
 import { Tooltip } from "~/components/ui/tooltip";
-import type { HttpHeader } from "~/optimization_studio/types/dsl";
+import type { HttpHeader } from "@langwatch/workflow-contract";
 
 export type HeadersConfigSectionProps = {
   value: HttpHeader[];

@@ -14,8 +14,8 @@ import {
   LATEST_SPEC_VERSION,
   type LlmPromptConfigComponent,
   type Signature,
-  type Workflow,
-} from "~/optimization_studio/types/dsl";
+  type StudioWorkflow,
+} from "@langwatch/workflow-contract";
 
 /**
  * HTTP node data structure - uses parameters like other nodes.
@@ -104,7 +104,7 @@ export const buildCellWorkflow = (
     datasetColumns,
   );
 
-  const workflow: Workflow = {
+  const workflow: StudioWorkflow = {
     spec_version: LATEST_SPEC_VERSION,
     workflow_id: workflowId,
     name: `Evaluation V3 - Row ${rowIndex}`,
@@ -113,7 +113,7 @@ export const buildCellWorkflow = (
     version: "1.0",
     template_adapter: "default",
     enable_tracing: true,
-    nodes: [entryNode, targetNode, ...evaluatorNodes] as Workflow["nodes"],
+    nodes: [entryNode, targetNode, ...evaluatorNodes] as StudioWorkflow["nodes"],
     edges,
     state: {},
   };
@@ -219,7 +219,7 @@ export const buildEvaluatorCellWorkflow = ({
       version: "1.0",
       template_adapter: "default",
       enable_tracing: true,
-      nodes: [entryNode, ...evaluatorNodes] as Workflow["nodes"],
+      nodes: [entryNode, ...evaluatorNodes] as StudioWorkflow["nodes"],
       edges,
       state: {},
     },
@@ -555,7 +555,7 @@ export const buildSignatureNodeFromPrompt = ({
 /**
  * Builds the prompt-identity fields (configId / handle / versionMetadata)
  * that nlpgo reads to emit PromptApiService.get + Prompt.compile spans.
- * Mirrors signatureComponentSchema in optimization_studio/types/dsl.ts and
+ * Mirrors signatureComponentSchema in @langwatch/workflow-contract and
  * the Go-side dsl.Component (PromptConfigID / PromptHandle / VersionMetadata).
  *
  * Returns an empty object when there is no configId, so non-prompt targets

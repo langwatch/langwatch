@@ -14,8 +14,8 @@ import {
   type Entry,
   type Field,
   LATEST_SPEC_VERSION,
-  type Workflow,
-} from "~/optimization_studio/types/dsl";
+  type StudioWorkflow,
+} from "@langwatch/workflow-contract";
 
 /**
  * Code evaluators: custom Python evaluation logic stored directly on the
@@ -66,7 +66,7 @@ export const buildCodeEvaluatorDsl = ({
 }: {
   name: string;
   config: CodeEvaluatorConfig;
-}): Workflow => {
+}): StudioWorkflow => {
   const entryNode: {
     id: string;
     type: string;
@@ -137,7 +137,7 @@ export const buildCodeEvaluatorDsl = ({
     version: "1.0",
     template_adapter: "default",
     enable_tracing: true,
-    nodes: [entryNode, codeNode, endNode] as Workflow["nodes"],
+    nodes: [entryNode, codeNode, endNode] as StudioWorkflow["nodes"],
     edges: [
       ...config.inputs.map(({ identifier }) => ({
         id: `entry_to_code_${identifier}`,

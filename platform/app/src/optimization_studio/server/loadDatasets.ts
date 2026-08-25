@@ -1,6 +1,10 @@
 import type { Node } from "@xyflow/react";
 import { getApp } from "../../server/app-layer/app";
-import type { Component, Workflow } from "../types/dsl";
+import {
+  parseStudioWorkflow,
+  type Component,
+  type StudioWorkflow,
+} from "@langwatch/workflow-contract";
 import type { StudioClientEvent } from "../types/events";
 import {
   datasetDatabaseRecordsToInMemoryDataset,
@@ -118,8 +122,8 @@ export const loadDatasets = async (
     }),
   );
 
-  const workflow: Workflow = applyEntryInputDefaults({
-    ...(event.payload.workflow as Workflow),
+  const workflow: StudioWorkflow = applyEntryInputDefaults({
+    ...parseStudioWorkflow(event.payload.workflow),
     nodes,
   });
 

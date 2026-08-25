@@ -17,8 +17,8 @@ import {
   buildEvaluateParameters,
   exampleParameterValue,
   PLACEHOLDER_PARAMETERS,
-} from "~/optimization_studio/utils/evaluateApiSnippet";
-import type { WorkflowField } from "~/optimization_studio/utils/workflowFields";
+} from "@langwatch/workflow-web";
+import type { WorkflowField } from "@langwatch/workflow-contract";
 
 export type RunSnippetLang = "python" | "typescript" | "shell";
 export type RunSnippetDataSource = "attached" | "inline" | "dataset_id";

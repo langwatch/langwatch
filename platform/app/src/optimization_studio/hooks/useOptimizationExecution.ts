@@ -2,10 +2,10 @@ import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import type { StudioClientEvent } from "../types/events";
-import type { OPTIMIZERS } from "../types/optimizers";
+import type { OPTIMIZERS } from "@langwatch/workflow-web";
 import { mergeLocalConfigsIntoDsl } from "../utils/mergeLocalConfigs";
 import { usePostEvent } from "./usePostEvent";
-import { useWorkflowStore } from "./useWorkflowStore";
+import { useWorkflowStore } from "@langwatch/workflow-web";
 
 export const useOptimizationExecution = () => {
   const { postEvent, socketStatus } = usePostEvent();

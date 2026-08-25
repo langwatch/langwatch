@@ -26,9 +26,12 @@ import { WorkflowCardDisplay } from "~/optimization_studio/components/workflow/W
 import type {
   CustomComponentConfig,
   Field as DSLField,
-  Workflow,
-} from "~/optimization_studio/types/dsl";
-import { getMappingSurfaceInputs } from "~/optimization_studio/utils/nodeUtils";
+  StudioWorkflow,
+} from "@langwatch/workflow-contract";
+import {
+  getMappingSurfaceInputs,
+  parseStudioWorkflow,
+} from "@langwatch/workflow-contract";
 import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
 import {
   type AgentWithFields,
@@ -61,7 +64,7 @@ function getWorkflowConfig(
  * `Variable` (the shape expected by `ScenarioInputMappingSection`), coercing
  * unknown field types to `"str"`.
  */
-function extractVariables(dsl: Workflow | undefined): {
+function extractVariables(dsl: StudioWorkflow | undefined): {
   inputs: Variable[];
   outputs: Variable[];
 } {
@@ -141,7 +144,9 @@ export function AgentWorkflowEditorDrawer(
   const { inputs: workflowInputs, outputs: workflowOutputs } = useMemo(
     () =>
       extractVariables(
-        (workflowQuery.data?.currentVersion?.dsl as Workflow | undefined) ??
+        (workflowQuery.data?.currentVersion?.dsl
+          ? parseStudioWorkflow(workflowQuery.data.currentVersion.dsl)
+          : undefined) ??
           undefined,
       ),
     [workflowQuery.data],

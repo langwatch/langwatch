@@ -2,8 +2,8 @@ import { Box } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { useShallow } from "zustand/react/shallow";
 import { ExecutionOutputPanel } from "~/components/executable-panel/ExecutionOutputPanel";
-import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import type { Component } from "../../types/dsl";
+import { useWorkflowStore } from "@langwatch/workflow-web";
+import type { Component } from "@langwatch/workflow-contract";
 
 export const OutputPanel = ({ node }: { node: Node<Component> }) => {
   const { enableTracing } = useWorkflowStore(

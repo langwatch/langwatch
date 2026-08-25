@@ -25,7 +25,7 @@ vi.mock("~/hooks/useFieldRedaction", () => ({
   useFieldRedaction: () => ({ isRedacted: false, isLoading: false }),
 }));
 
-import type { ExecutionState } from "~/optimization_studio/types/dsl";
+import type { ExecutionState } from "@langwatch/workflow-contract";
 import { ExecutionOutputPanel } from "../ExecutionOutputPanel";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

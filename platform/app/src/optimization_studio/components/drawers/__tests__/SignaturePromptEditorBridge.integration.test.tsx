@@ -5,7 +5,7 @@ import { render } from "@testing-library/react";
 import type { Node } from "@xyflow/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocalPromptConfig } from "~/experiments-v3/types";
-import type { Component, Signature } from "../../../types/dsl";
+import type { Component, Signature } from "@langwatch/workflow-contract";
 
 // ---- Mocks ----
 
@@ -25,7 +25,7 @@ vi.mock("~/components/prompts/PromptEditorDrawer", () => ({
   },
 }));
 
-vi.mock("../../../hooks/useSmartSetNode", () => ({
+vi.mock("@langwatch/workflow-web", () => ({
   useSmartSetNode: () => mockSetNode,
 }));
 
@@ -33,7 +33,7 @@ vi.mock("@xyflow/react", () => ({
   useUpdateNodeInternals: () => mockUpdateNodeInternals,
 }));
 
-vi.mock("../../../hooks/useWorkflowStore", () => ({
+vi.mock("@langwatch/workflow-web", () => ({
   useWorkflowStore: (selector: any) =>
     selector({
       getWorkflow: () => ({ nodes: [], edges: mockEdges }),

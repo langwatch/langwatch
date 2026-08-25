@@ -4,7 +4,7 @@
 
 import type { Edge } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
-import type { Field } from "../../types/dsl";
+import type { Field } from "@langwatch/workflow-contract";
 import { applyMappingChange, buildInputMappings } from "../edgeMappingUtils";
 
 const createEdge = ({

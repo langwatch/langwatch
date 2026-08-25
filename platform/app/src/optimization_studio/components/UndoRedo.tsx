@@ -2,7 +2,7 @@ import { Button } from "@chakra-ui/react";
 import { useEffect } from "react";
 import { RotateCcw, RotateCw } from "react-feather";
 import { useLoadWorkflow } from "../hooks/useLoadWorkflow";
-import { _useWorkflowStore } from "../hooks/useWorkflowStore";
+import { _useWorkflowStore } from "@langwatch/workflow-web";
 
 export function UndoRedo() {
   const { undo, redo, pastStates, futureStates, clear, pause, resume } =

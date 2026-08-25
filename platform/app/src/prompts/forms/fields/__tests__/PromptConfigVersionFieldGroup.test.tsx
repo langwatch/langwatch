@@ -15,7 +15,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PromptConfigFormValues } from "~/prompts";
 
 // Mock the optimization studio hooks that have complex dependencies
-vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
+vi.mock("@langwatch/workflow-web", () => ({
   useWorkflowStore: () => ({}),
 }));
 

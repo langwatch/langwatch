@@ -8,11 +8,11 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { api } from "../../utils/api";
 import { useVersionState } from "../components/History";
 import type { StudioClientEvent } from "../types/events";
-import { hasDSLChanged } from "../utils/dslUtils";
+import { hasDSLChanged } from "@langwatch/workflow-contract";
 import { mergeLocalConfigsIntoDsl } from "../utils/mergeLocalConfigs";
 import { usePostEvent } from "./usePostEvent";
 
-import { serializeWorkflow, useWorkflowStore } from "./useWorkflowStore";
+import { serializeWorkflow, useWorkflowStore } from "@langwatch/workflow-web";
 
 const logger = createLogger("langwatch:studio:evaluation");
 

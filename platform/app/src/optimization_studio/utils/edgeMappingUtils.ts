@@ -1,6 +1,6 @@
 import type { Edge, Node } from "@xyflow/react";
 import type { AvailableSource, FieldMapping } from "~/components/variables";
-import type { Component, Field } from "../types/dsl";
+import type { Component, Field } from "@langwatch/workflow-contract";
 
 /**
  * Builds available sources for variable mapping from the workflow graph.

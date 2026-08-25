@@ -7,7 +7,7 @@ import type {
   DatasetRecordEntry,
   DatasetRecordInput,
 } from "@langwatch/dataset-contract";
-import type { Field, NodeDataset } from "../types/dsl";
+import type { Field, NodeDataset } from "@langwatch/workflow-contract";
 
 export function transposeColumnsFirstToRowsFirstWithId(
   data: Record<string, string[]>,

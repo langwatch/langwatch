@@ -8,8 +8,8 @@ import type { Node, NodeProps } from "@xyflow/react";
 import { useEffect, useRef, useState } from "react";
 import { DatasetEditorTable } from "~/components/datasets/editor/DatasetEditorTable";
 import { Dialog } from "../../components/ui/dialog";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import type { Component, NodeDataset, Signature } from "../types/dsl";
+import { useWorkflowStore } from "@langwatch/workflow-web";
+import type { Component, NodeDataset, Signature } from "@langwatch/workflow-contract";
 import {
   fieldsToDatasetColumns,
   inMemoryDatasetToNodeDataset,

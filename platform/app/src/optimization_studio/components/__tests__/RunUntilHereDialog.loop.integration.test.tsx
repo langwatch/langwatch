@@ -23,12 +23,12 @@ const entryNode = {
   },
 };
 
-vi.mock("~/optimization_studio/hooks/useRunUntilHereDialogStore", () => ({
+vi.mock("@langwatch/workflow-web", () => ({
   useRunUntilHereDialogStore: (selector: (s: unknown) => unknown) =>
     selector({ untilNodeId: "agent-1", close: vi.fn() }),
 }));
 
-vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
+vi.mock("@langwatch/workflow-web", () => ({
   useWorkflowStore: (selector: (s: unknown) => unknown) =>
     selector({
       nodes: [entryNode],

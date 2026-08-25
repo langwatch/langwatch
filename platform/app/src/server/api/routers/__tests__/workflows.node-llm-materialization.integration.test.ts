@@ -32,8 +32,8 @@ import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { blankTemplate } from "../../../../optimization_studio/templates/blank";
 import type {
   LLMConfig,
-  Workflow,
-} from "../../../../optimization_studio/types/dsl";
+  StudioWorkflow,
+} from "@langwatch/workflow-contract";
 import { DEFAULT_MODEL } from "../../../../utils/constants";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
@@ -58,7 +58,7 @@ describe("workflow.create node LLM materialization", () => {
       where: { id: workflowId, projectId },
       include: { latestVersion: true },
     });
-    const dsl = workflow.latestVersion?.dsl as unknown as Workflow;
+    const dsl = workflow.latestVersion?.dsl as unknown as StudioWorkflow;
     const signature = dsl.nodes.find((n) => n.type === "signature");
     return signature?.data.parameters?.find((p) => p.type === "llm")?.value as
       | LLMConfig

@@ -22,7 +22,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
 }));
 
-vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
+vi.mock("@langwatch/workflow-web", () => ({
   useWorkflowStore: (selector: (state: unknown) => unknown) =>
     selector({
       checkCanCommitNewVersion: () => true,

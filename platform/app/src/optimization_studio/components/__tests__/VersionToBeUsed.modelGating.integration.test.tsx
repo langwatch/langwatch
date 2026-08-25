@@ -54,7 +54,7 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-vi.mock("../../hooks/useWorkflowStore", () => ({
+vi.mock("@langwatch/workflow-web", () => ({
   useWorkflowStore: (selector: (s: unknown) => unknown) =>
     selector({
       checkCanCommitNewVersion: () => true,

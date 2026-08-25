@@ -14,14 +14,14 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Node } from "@xyflow/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Component } from "../../../types/dsl";
+import type { Component } from "@langwatch/workflow-contract";
 
 const mockDuplicateNode = vi.fn();
 const mockDeleteNode = vi.fn();
 const mockDeselectAllNodes = vi.fn();
 const mockSetPropertiesExpanded = vi.fn();
 
-vi.mock("../../../hooks/useWorkflowStore", () => ({
+vi.mock("@langwatch/workflow-web", () => ({
   useWorkflowStore: (selector: (state: unknown) => unknown) =>
     selector({
       deselectAllNodes: mockDeselectAllNodes,

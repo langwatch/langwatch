@@ -37,7 +37,7 @@ import {
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useRunScenario } from "../../hooks/useRunScenario";
 import { useScenarioTarget } from "../../hooks/useScenarioTarget";
-import type { CustomComponentConfig } from "../../optimization_studio/types/dsl";
+import type { CustomComponentConfig } from "@langwatch/workflow-contract";
 import type { AgentWithFields as TypedAgent } from "@langwatch/agent-contract";
 import { parseScenarioParameterDefinitions } from "@langwatch/scenario-contract";
 import { api } from "../../utils/api";

@@ -9,7 +9,7 @@ import type {
   DatasetRecordEntry,
 } from "@langwatch/dataset-contract";
 import { api } from "../../utils/api";
-import type { Entry } from "../types/dsl";
+import type { Entry } from "@langwatch/workflow-contract";
 import {
   datasetDatabaseRecordsToInMemoryDataset,
   transposeColumnsFirstToRowsFirstWithId,

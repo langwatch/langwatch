@@ -7,7 +7,7 @@ import type {
   Evaluator,
   LlmPromptConfigComponent,
   Signature,
-} from "../../types/dsl";
+} from "@langwatch/workflow-contract";
 import { mergeLocalConfigsIntoDsl } from "../mergeLocalConfigs";
 
 describe("mergeLocalConfigsIntoDsl()", () => {

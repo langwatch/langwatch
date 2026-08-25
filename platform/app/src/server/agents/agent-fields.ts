@@ -5,9 +5,9 @@ import {
   type AgentType,
   type AgentWithFields as ContractAgentWithFields,
 } from "@langwatch/agent-contract";
-import type { Field, Workflow } from "~/optimization_studio/types/dsl";
-import { getMappingSurfaceInputs } from "~/optimization_studio/utils/nodeUtils";
-import { getWorkflowEndInputs } from "~/optimization_studio/utils/workflowFields";
+import type { Field, StudioWorkflow } from "@langwatch/workflow-contract";
+import { getMappingSurfaceInputs } from "@langwatch/workflow-contract";
+import { getWorkflowEndInputs } from "@langwatch/workflow-contract";
 
 /**
  * The fields an agent reads and produces, whatever kind of agent it is.
@@ -44,7 +44,7 @@ export const linkedWorkflowId = getLinkedWorkflowId;
  * shape the workflow no longer has.
  */
 export const workflowAgentFields = (
-  dsl: Workflow | undefined | null,
+  dsl: StudioWorkflow | undefined | null,
 ): AgentFields => {
   if (!dsl?.nodes) {
     return { inputFields: [], outputFields: [], fieldsResolved: false };
@@ -86,7 +86,7 @@ export const resolveAgentFields = ({
 }: {
   type: AgentType;
   config: AgentComponentConfig;
-  dsl?: Workflow | null;
+  dsl?: StudioWorkflow | null;
 }): AgentFields => {
   if (type === "workflow") return workflowAgentFields(dsl);
 

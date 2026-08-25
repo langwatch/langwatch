@@ -11,8 +11,8 @@ import {
   httpAuthSchema,
   httpHeaderSchema,
   LATEST_SPEC_VERSION,
-  type Workflow,
-} from "~/optimization_studio/types/dsl";
+  type StudioWorkflow,
+} from "@langwatch/workflow-contract";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import { buildHttpNodeParameters } from "~/server/agents/http-node";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -156,7 +156,7 @@ const buildAgentTestWorkflow = ({
   nodeId: string;
   parameters: ReturnType<typeof buildHttpNodeParameters>;
   variables: Record<string, unknown>;
-}): Workflow => ({
+}): StudioWorkflow => ({
   spec_version: LATEST_SPEC_VERSION,
   workflow_id: `agent_test_${nanoid(8)}`,
   name: "Agent test",
@@ -182,7 +182,7 @@ const buildAgentTestWorkflow = ({
         parameters,
       },
     },
-  ] as Workflow["nodes"],
+  ] as StudioWorkflow["nodes"],
   edges: [],
   state: {},
 });
@@ -212,7 +212,7 @@ const runNode = async ({
 }: {
   projectId: string;
   nodeId: string;
-  workflow: Workflow;
+  workflow: StudioWorkflow;
   traceId: string;
   inputs: Record<string, unknown>;
 }): Promise<NonNullable<BaseComponent["execution_state"]>> => {

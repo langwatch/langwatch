@@ -13,7 +13,7 @@ import {
   ColorfulBlockIcon,
   ComponentIcon,
 } from "~/optimization_studio/components/ColorfulBlockIcons";
-import type { ComponentType, Field } from "~/optimization_studio/types/dsl";
+import type { ComponentType, Field } from "@langwatch/workflow-contract";
 import {
   VariableTypeBadge,
   VariableTypeIcon,

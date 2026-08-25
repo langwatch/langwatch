@@ -15,7 +15,7 @@ import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { SpanKind } from "@opentelemetry/api";
 import { randomBytes } from "crypto";
 import { getLangWatchTracer } from "langwatch";
-import { LATEST_SPEC_VERSION } from "../../../../optimization_studio/types/dsl";
+import { LATEST_SPEC_VERSION } from "@langwatch/workflow-contract";
 import type { RunParameterValues } from "../../parameters";
 import { resolveFieldMappings } from "../resolve-field-mappings";
 import type { CodeAgentData } from "../types";

@@ -26,7 +26,7 @@ import { env } from "~/env.mjs";
 import { normalizeToSnakeCase } from "~/optimization_studio/components/properties/llm-configs/normalizeToSnakeCase";
 import type { App } from "~/server/app-layer/app";
 import { DEFAULT_MODEL } from "~/utils/constants";
-import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
+import { getInputsOutputs } from "@langwatch/workflow-contract";
 import { resolveModelForFeature } from "../../modelProviders/resolveModelForFeature";
 import { extractSuiteId } from "../../suites/suite-set-id";
 import { parseSuiteTargets } from "../../suites/types";

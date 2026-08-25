@@ -1,7 +1,7 @@
 import type {
   LLMConfig,
   LlmPromptConfigComponent,
-} from "~/optimization_studio/types/dsl";
+} from "@langwatch/workflow-contract";
 
 export function setDefaultLlmConfigToParameters(
   parameters: LlmPromptConfigComponent["parameters"],

@@ -10,13 +10,14 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { LLMConfig, Workflow } from "../dsl";
-import { migrateDSLVersion } from "../migrate";
+import type { LLMConfig, StudioWorkflow } from "../src/studio-workflow";
+import type { WorkflowDsl } from "../src/workflow";
+import { migrateDSLVersion } from "../src/workflow-dsl-migration";
 
 const legacyWorkflow = (overrides: {
-  default_llm?: Partial<LLMConfig>;
+  default_llm?: Record<string, unknown>;
   llmParamValue?: unknown;
-}): Workflow =>
+}): StudioWorkflow =>
   ({
     spec_version: "1.4",
     name: "Legacy",
@@ -44,9 +45,9 @@ const legacyWorkflow = (overrides: {
         },
       },
     ],
-  }) as unknown as Workflow;
+  });
 
-const llmValueOf = (dsl: Workflow): LLMConfig | undefined =>
+const llmValueOf = (dsl: StudioWorkflow): LLMConfig | undefined =>
   dsl.nodes[0]!.data.parameters?.find((p) => p.type === "llm")?.value as
     | LLMConfig
     | undefined;
@@ -117,14 +118,86 @@ describe("migrateDSLVersion 1.4 → 1.5 (default_llm fold)", () => {
     const legacy = legacyWorkflow({
       default_llm: { model: "openai/gpt-5-mini" },
       llmParamValue: undefined,
-    }) as unknown as { spec_version: string; template_adapter?: string };
+    });
     legacy.spec_version = "1.3";
     delete legacy.template_adapter;
 
-    const migrated = migrateDSLVersion(legacy as unknown as Workflow);
+    const migrated = migrateDSLVersion(legacy);
 
     expect(migrated.spec_version).toBe("1.5");
     expect(migrated.template_adapter).toBe("dspy_chat_adapter");
     expect(llmValueOf(migrated)?.model).toBe("openai/gpt-5-mini");
+  });
+
+  it("keeps the legacy null defaultValue behaviour", () => {
+    const legacy = {
+      ...legacyWorkflow({}),
+      spec_version: "1.1",
+      nodes: [
+        {
+          id: "code",
+          type: "code",
+          position: { x: 0, y: 0 },
+          data: {
+            parameters: [
+              { identifier: "instructions", type: "str", defaultValue: null },
+            ],
+          },
+        },
+      ],
+    } satisfies WorkflowDsl;
+
+    const migrated = migrateDSLVersion(legacy);
+
+    expect(migrated.nodes[0]!.data.parameters?.[0]?.value).toBeUndefined();
+  });
+
+  it("preserves unknown persisted values while it migrates", () => {
+    const legacyWithUnknowns = legacyWorkflow({
+      default_llm: {
+        model: "openai/gpt-5-mini",
+        legacy_sampling_mode: "experimental",
+      },
+      llmParamValue: { temperature: 0.3, legacy_node_setting: true },
+    });
+    const legacy = {
+      ...legacyWithUnknowns,
+      nodes: [
+        {
+          ...legacyWithUnknowns.nodes[0]!,
+          future_node_key: "kept",
+        },
+      ],
+      edges: [
+        {
+          id: "legacy-edge",
+          source: "entry",
+          target: "llm_call",
+          future_edge_key: "kept",
+        },
+      ],
+      state: {
+        execution: {
+          status: "idle",
+          future_execution_key: "kept",
+          timestamps: { future_timestamp_key: "kept" },
+        },
+        future_state_key: "kept",
+      },
+    } satisfies WorkflowDsl;
+
+    const migrated = migrateDSLVersion(legacy);
+
+    expect(llmValueOf(migrated)).toMatchObject({
+      legacy_sampling_mode: "experimental",
+      legacy_node_setting: true,
+    });
+    expect(migrated.nodes[0]!.future_node_key).toBe("kept");
+    expect(migrated.edges[0]!.future_edge_key).toBe("kept");
+    expect(migrated.state.future_state_key).toBe("kept");
+    expect(migrated.state.execution?.future_execution_key).toBe("kept");
+    expect(migrated.state.execution?.timestamps?.future_timestamp_key).toBe(
+      "kept",
+    );
   });
 });

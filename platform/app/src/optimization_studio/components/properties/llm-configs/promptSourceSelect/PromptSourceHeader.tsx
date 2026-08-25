@@ -7,7 +7,7 @@ import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton"
 import { toaster } from "~/components/ui/toaster";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
+import type { LlmPromptConfigComponent } from "@langwatch/workflow-contract";
 import type { PromptConfigFormValues } from "~/prompts";
 import { GeneratePromptApiSnippetDialog } from "~/prompts/components/GeneratePromptApiSnippetDialog";
 import { EditablePromptHandleField } from "~/prompts/forms/fields/EditablePromptHandleField";

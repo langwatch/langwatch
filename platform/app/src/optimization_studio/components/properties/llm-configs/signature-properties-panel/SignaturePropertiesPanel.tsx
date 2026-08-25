@@ -5,7 +5,7 @@ import { PromptConfigProvider } from "~/prompts/providers/PromptConfigProvider";
 import type {
   LlmPromptConfigComponent,
   Signature,
-} from "../../../../types/dsl";
+} from "@langwatch/workflow-contract";
 import { BasePropertiesPanel } from "../../BasePropertiesPanel";
 
 import { SignaturePropertiesPanelForm } from "./SignaturePropertiesPanelForm";

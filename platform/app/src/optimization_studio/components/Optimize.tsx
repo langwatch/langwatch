@@ -35,11 +35,11 @@ import { trackEvent } from "../../utils/tracking";
 import { useGetDatasetData } from "../hooks/useGetDatasetData";
 import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
 import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import type { Entry } from "../types/dsl";
-import { OPTIMIZERS } from "../types/optimizers";
+import { useWorkflowStore } from "@langwatch/workflow-web";
+import type { Entry } from "@langwatch/workflow-contract";
+import { OPTIMIZERS } from "@langwatch/workflow-web";
 import { trainTestSplit } from "../utils/datasetUtils";
-import { checkIsEvaluator } from "../utils/nodeUtils";
+import { checkIsEvaluator } from "@langwatch/workflow-contract";
 
 import { AddModelProviderKey } from "./AddModelProviderKey";
 import { useVersionState } from "./History";

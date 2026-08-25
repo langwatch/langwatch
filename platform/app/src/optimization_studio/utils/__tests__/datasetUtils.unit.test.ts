@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Field } from "../../types/dsl";
+import type { Field } from "@langwatch/workflow-contract";
 import {
   datasetColumnTypeToFieldType,
   fieldsToDatasetColumns,

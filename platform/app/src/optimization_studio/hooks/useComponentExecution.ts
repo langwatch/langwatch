@@ -3,12 +3,12 @@ import type { Node } from "@xyflow/react";
 import { useCallback, useEffect, useState } from "react";
 import { toaster } from "../../components/ui/toaster";
 import { generateOtelTraceId } from "../../utils/trace";
-import type { BaseComponent, Component, Field } from "../types/dsl";
+import type { BaseComponent, Component, Field } from "@langwatch/workflow-contract";
 import type { StudioClientEvent } from "../types/events";
 import { mergeLocalConfigsIntoDsl } from "../utils/mergeLocalConfigs";
 import { useAlertOnComponent } from "./useAlertOnComponent";
 import { usePostEvent } from "./usePostEvent";
-import { useWorkflowStore } from "./useWorkflowStore";
+import { useWorkflowStore } from "@langwatch/workflow-web";
 
 const logger = createLogger("langwatch:studio:componentExecution");
 

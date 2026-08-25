@@ -1,4 +1,4 @@
-import type { Field } from "../types/dsl";
+import type { Field } from "@langwatch/workflow-contract";
 
 /** Maps a studio field type to the Python annotation used in a code signature. */
 const typesMap: Record<Field["type"], string> = {

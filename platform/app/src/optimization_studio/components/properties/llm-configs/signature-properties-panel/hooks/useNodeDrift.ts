@@ -2,7 +2,7 @@ import type { Node } from "@xyflow/react";
 import { useMemo } from "react";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
+import type { LlmPromptConfigComponent } from "@langwatch/workflow-contract";
 import {
   isNodeDataEqual,
   versionedPromptToOptimizationStudioNodeData,

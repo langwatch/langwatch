@@ -1,6 +1,6 @@
 import type { Node, NodeProps } from "@xyflow/react";
 import { forwardRef, type Ref } from "react";
-import type { Signature } from "../../types/dsl";
+import type { Signature } from "@langwatch/workflow-contract";
 import { ComponentNode } from "./Nodes";
 import {
   PromptingTechniqueDropArea,

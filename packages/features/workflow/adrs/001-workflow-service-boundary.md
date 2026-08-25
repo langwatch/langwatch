@@ -24,6 +24,10 @@ The contract uses Zod 4 schemas for portable definitions and versions. The
 graph envelope is validated while node values remain open for execution-engine
 compatibility.
 
+`@langwatch/workflow-contract` owns the canonical wire `WorkflowDsl` and the
+typed `StudioWorkflow` refinement. Both server and browser use its migration;
+there is no second persisted schema or legacy editor `Workflow` alias.
+
 ## Persistence
 
 The service receives its private Workflow repository and the canonical Dataset
@@ -43,6 +47,11 @@ dependencies are not part of the constructor.
 Existing tRPC names and REST paths remain compatibility transports. The
 `/workflows/:id/evaluate` route remains an app-owned composition over Workflow
 version selection and Evaluation execution.
+
+The browser surface is `@langwatch/workflow-web`. It owns graph utilities, the
+workflow Zustand store, and small browser hooks. App page shells, query/event
+transport composition, Monaco/editor chrome, and Lambda/worker infrastructure
+remain application responsibilities.
 
 ## Runtime and registration
 

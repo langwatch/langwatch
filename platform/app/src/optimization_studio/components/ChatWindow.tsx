@@ -17,8 +17,8 @@ import { InputGroup } from "~/components/ui/input-group";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useWorkflowExecution } from "../hooks/useWorkflowExecution";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import { getEntryInputs } from "../utils/nodeUtils";
+import { useWorkflowStore } from "@langwatch/workflow-web";
+import { getEntryInputs } from "@langwatch/workflow-contract";
 import { RunningStatus } from "./ExecutionState";
 
 interface ChatWindowProps {

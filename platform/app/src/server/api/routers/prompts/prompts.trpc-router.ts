@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { afterPromptCreated } from "~/server/app-layer/billing/nurturing/promptCreation";
 import { PromptScope } from "~/generated/prisma/client";
-import { nodeDatasetSchema } from "~/optimization_studio/types/dsl";
+import { nodeDatasetSchema } from "@langwatch/workflow-contract";
 import {
   handleSchema,
   inputsSchema,

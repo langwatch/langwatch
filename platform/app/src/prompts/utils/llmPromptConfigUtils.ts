@@ -9,7 +9,7 @@ import type {
   LlmPromptConfigComponent,
   NodeDataset,
   Signature,
-} from "~/optimization_studio/types/dsl";
+} from "@langwatch/workflow-contract";
 import {
   formSchema,
   handleSchema,

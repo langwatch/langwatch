@@ -13,13 +13,13 @@ import userEvent from "@testing-library/user-event";
 import type { Node } from "@xyflow/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { Component } from "../../../types/dsl";
+import type { Component } from "@langwatch/workflow-contract";
 
 const mockSetNode = vi.fn();
 
-vi.mock("../../../hooks/useWorkflowStore", async (importOriginal) => {
+vi.mock("@langwatch/workflow-web", async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import("../../../hooks/useWorkflowStore")>();
+    await importOriginal<typeof import("@langwatch/workflow-web")>();
   return {
     ...actual,
     useWorkflowStore: (selector: (state: unknown) => unknown) =>

@@ -5,8 +5,8 @@ import { useEffect, useRef } from "react";
 import { useWindowSize } from "usehooks-ts";
 import { useShallow } from "zustand/react/shallow";
 
-import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import type { Component, ComponentType } from "../../types/dsl";
+import { useWorkflowStore } from "@langwatch/workflow-web";
+import type { Component, ComponentType } from "@langwatch/workflow-contract";
 import { InputPanel } from "../component_execution/InputPanel";
 import { OutputPanel } from "../component_execution/OutputPanel";
 import { AgentPropertiesPanel } from "./AgentPropertiesPanel";

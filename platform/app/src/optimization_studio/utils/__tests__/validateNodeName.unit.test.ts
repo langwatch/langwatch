@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateNodeName } from "../nodeUtils";
+import { validateNodeName } from "@langwatch/workflow-contract";
 
 describe("validateNodeName", () => {
   const defaultArgs = {

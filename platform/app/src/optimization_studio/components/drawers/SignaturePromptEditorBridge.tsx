@@ -7,14 +7,14 @@ import { PromptEditorDrawer } from "~/components/prompts/PromptEditorDrawer";
 import type { FieldMapping } from "~/components/variables";
 import type { LocalPromptConfig } from "~/experiments-v3/types";
 import { nodeDataToLocalPromptConfig } from "~/prompts/utils/llmPromptConfigUtils";
-import { useSmartSetNode } from "../../hooks/useSmartSetNode";
-import { useWorkflowStore } from "../../hooks/useWorkflowStore";
+import { useSmartSetNode } from "@langwatch/workflow-web";
+import { useWorkflowStore } from "@langwatch/workflow-web";
 import {
   type Component,
   type Field,
   fieldSchema,
   type Signature,
-} from "../../types/dsl";
+} from "@langwatch/workflow-contract";
 import {
   applyMappingChange,
   buildAvailableSources,

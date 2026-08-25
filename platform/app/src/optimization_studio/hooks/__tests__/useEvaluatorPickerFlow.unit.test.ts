@@ -14,13 +14,13 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NodeWithOptionalPosition } from "~/types";
-import type { Component } from "../../types/dsl";
+import type { Component } from "@langwatch/workflow-contract";
 
 // Mock useWorkflowStore
 const mockSetNode = vi.fn();
 const mockDeleteNode = vi.fn();
 const mockSetSelectedNode = vi.fn();
-vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
+vi.mock("@langwatch/workflow-web", () => ({
   store: vi.fn(() => ({})),
   initialState: {},
   useWorkflowStore: vi.fn((selector: any) =>

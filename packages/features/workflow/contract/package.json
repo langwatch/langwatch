@@ -14,6 +14,11 @@
     "test": "vitest run",
     "test:unit": "vitest run"
   },
-  "dependencies": { "zod": "^4.4.3" },
+  "dependencies": {
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
+    "zod": "^4.4.3"
+  },
   "devDependencies": { "typescript": "^7.0.2", "vitest": "^4.1.9" }
 }

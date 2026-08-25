@@ -13,10 +13,10 @@ import { useShallow } from "zustand/react/shallow";
 import { DatasetPreviewTable } from "../../components/datasets/editor/DatasetPreviewTable";
 import { Dialog } from "../../components/ui/dialog";
 import { useGetDatasetData } from "../hooks/useGetDatasetData";
-import { useRunUntilHereDialogStore } from "../hooks/useRunUntilHereDialogStore";
+import { useRunUntilHereDialogStore } from "@langwatch/workflow-web";
 import { useWorkflowExecution } from "../hooks/useWorkflowExecution";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import type { Entry } from "../types/dsl";
+import { useWorkflowStore } from "@langwatch/workflow-web";
+import type { Entry } from "@langwatch/workflow-contract";
 import { getNodeDisplayName } from "./nodes/Nodes";
 
 const stringifyValue = (value: unknown): string => {

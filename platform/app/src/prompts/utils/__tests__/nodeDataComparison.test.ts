@@ -1,7 +1,7 @@
 import type { Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
 
-import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
+import type { LlmPromptConfigComponent } from "@langwatch/workflow-contract";
 
 import { isNodeDataEqual } from "../nodeDataComparison";
 

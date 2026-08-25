@@ -8,7 +8,7 @@ import type {
   Field,
   PromptingTechnique,
   Signature,
-} from "./types/dsl";
+} from "@langwatch/workflow-contract";
 import { convertEvaluators } from "./utils/registryUtils";
 
 // Get defaults from the single source of truth

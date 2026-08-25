@@ -54,7 +54,7 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-vi.mock("../../../hooks/useWorkflowStore", () => ({
+vi.mock("@langwatch/workflow-web", () => ({
   useWorkflowStore: (selector: (state: unknown) => unknown) =>
     selector({
       setNode: mockSetNode,
@@ -116,7 +116,7 @@ vi.mock("../../drawers/useInsideDrawer", () => ({
 
 const { AgentPropertiesPanel } = await import("../AgentPropertiesPanel");
 
-import type { AgentComponent } from "../../../types/dsl";
+import type { AgentComponent } from "@langwatch/workflow-contract";
 
 const agentRecord = (code: string, name = "custom code agent") => ({
   id: "agent-1",

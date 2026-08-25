@@ -33,7 +33,7 @@ import type {
   HttpComponentConfig,
   HttpHeader,
   HttpMethod,
-} from "~/optimization_studio/types/dsl";
+} from "@langwatch/workflow-contract";
 import {
   buildCodeConfig,
   DEFAULT_CODE,
@@ -41,8 +41,8 @@ import {
 } from "~/optimization_studio/utils/codeAgentConfig";
 import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
 import { api } from "~/utils/api";
-import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import type { AgentComponent, Field as DslField } from "../../types/dsl";
+import { useWorkflowStore } from "@langwatch/workflow-web";
+import type { AgentComponent, Field as DslField } from "@langwatch/workflow-contract";
 import {
   buildAgentNodeData,
   nodeMatchesAgent,

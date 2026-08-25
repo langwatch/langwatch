@@ -14,7 +14,7 @@ import { RenderInputOutput } from "~/components/traces/RenderInputOutput";
 import { SpanDuration } from "~/components/traces/SpanDetails";
 import { RedactedField } from "~/components/ui/RedactedField";
 import { useDrawer } from "~/hooks/useDrawer";
-import type { ExecutionState } from "~/optimization_studio/types/dsl";
+import type { ExecutionState } from "@langwatch/workflow-contract";
 
 interface OutputPanelProps {
   executionState?: ExecutionState;

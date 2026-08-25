@@ -1,7 +1,7 @@
 import type { Node } from "@xyflow/react";
 import { useFormContext } from "react-hook-form";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
+import type { LlmPromptConfigComponent } from "@langwatch/workflow-contract";
 import type { PromptConfigFormValues } from "~/prompts";
 import { api } from "~/utils/api";
 

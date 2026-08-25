@@ -22,15 +22,27 @@ import {
   type WorkflowAgentConfig,
   workflowAgentConfigSchema,
 } from "@langwatch/agent-contract";
-import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 
-import type { LocalPromptConfig } from "~/experiments-v3/types";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
-import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
+import { workflowDslSchema, type WorkflowDsl } from "./workflow";
 
 import { datasetColumnTypeSchema } from "@langwatch/dataset-contract";
-import type { ChatMessage } from "../../server/tracer/types";
+
+export const LlmConfigInputTypes = [
+  "str", "float", "bool", "image", "list", "list[str]", "list[float]",
+  "list[int]", "list[bool]", "dict", "chat_messages",
+] as const;
+export type LlmConfigInputType = (typeof LlmConfigInputTypes)[number];
+export const LlmConfigOutputTypes = ["str", "float", "bool", "json_schema"] as const;
+export type LlmConfigOutputType = (typeof LlmConfigOutputTypes)[number];
+export type ChatMessage = { role?: "system" | "user" | "assistant"; content?: string };
+export type LocalPromptConfig = {
+  llm: LLMConfig & { maxTokens?: number };
+  messages: ChatMessage[];
+  inputs: Array<{ identifier: string; type: LlmConfigInputType }>;
+  outputs: Array<{ identifier: string; type: LlmConfigOutputType }>;
+};
 
 export const FIELD_TYPES = AGENT_FIELD_TYPES;
 export type Field = AgentField;
@@ -311,14 +323,107 @@ export type Component =
   | End
   | Custom;
 
-type _Flow = {
-  nodes: Node<Component>[];
-  edges: Edge[];
+/**
+ * Portable graph values. The contract deliberately describes the persisted
+ * JSON rather than importing React Flow: the executor runs without a browser
+ * graph runtime and the web package may adapt these to its own graph types.
+ */
+export type StudioPosition = { x: number; y: number };
+
+export type StudioNode<T extends Component = Component> = {
+  id: string;
+  type?: string;
+  position: StudioPosition;
+  data: T;
+  selected?: boolean;
+  dragging?: boolean;
+  measured?: { width?: number; height?: number };
+  [key: string]: unknown;
 };
 
-// TODO: make this a complete replacement for Workflow below
-export const workflowJsonSchema = z
-  .object({
+export type StudioEdge = {
+  id: string;
+  source: string;
+  target: string;
+  sourceHandle?: string | null;
+  targetHandle?: string | null;
+  selected?: boolean;
+  [key: string]: unknown;
+};
+
+const studioPositionSchema = z.looseObject({
+  x: z.number(),
+  y: z.number(),
+});
+
+const executionStateSchema = z.looseObject({
+  status: z.enum(["idle", "waiting", "running", "success", "error", "skipped"]),
+  trace_id: z.string().optional(),
+  span_id: z.string().optional(),
+  error: z.string().optional(),
+  error_type: z.string().optional(),
+  upstream_status: z.number().optional(),
+  parameters: z.record(z.string(), z.unknown()).optional(),
+  inputs: z.record(z.string(), z.unknown()).optional(),
+  outputs: z.record(z.string(), z.unknown()).optional(),
+  cost: z.number().optional(),
+  metrics: z
+    .looseObject({
+      prompt_tokens: z.number().optional(),
+      completion_tokens: z.number().optional(),
+      total_tokens: z.number().optional(),
+      reasoning_tokens: z.number().optional(),
+      model: z.string().optional(),
+    })
+    .optional(),
+  timestamps: z
+    .looseObject({ started_at: z.number().optional(), finished_at: z.number().optional() })
+    .optional(),
+});
+
+const studioComponentSchema = z.looseObject({
+  _library_ref: z.string().optional(),
+  id: z.string().optional(),
+  name: z.string().optional(),
+  description: z.string().optional(),
+  cls: z.string().optional(),
+  parameters: z.array(agentFieldSchema).optional(),
+  inputs: z.array(agentFieldSchema).optional(),
+  outputs: z.array(agentFieldSchema).optional(),
+  isCustom: z.boolean().optional(),
+  behave_as: z.literal("evaluator").optional(),
+  execution_state: executionStateSchema.optional(),
+});
+
+const studioNodeSchema = z.looseObject({
+  id: z.string(),
+  type: z.string().optional(),
+  position: studioPositionSchema,
+  data: studioComponentSchema,
+  selected: z.boolean().optional(),
+  dragging: z.boolean().optional(),
+  measured: z
+    .object({ width: z.number().optional(), height: z.number().optional() })
+    .optional(),
+});
+
+const studioEdgeSchema = z.looseObject({
+  id: z.string(),
+  source: z.string(),
+  target: z.string(),
+  sourceHandle: z.string().nullable().optional(),
+  targetHandle: z.string().nullable().optional(),
+  selected: z.boolean().optional(),
+});
+
+/**
+ * `WorkflowDsl` is the canonical open wire envelope owned by Workflow
+ * contract. Studio needs a typed editor refinement for its known node data;
+ * this schema keeps the same permissive node/edge payload while requiring the
+ * fields the canvas materialises. It is not a second persisted wire format.
+ */
+const studioWorkflowWireSchema = workflowDslSchema
+  .extend({
     workflow_id: z.string().optional(),
     experiment_id: z.string().optional(),
     spec_version: z.string(),
@@ -331,72 +436,140 @@ export const workflowJsonSchema = z
         /^\d+(\.\d+)?$/,
         "Version must be in the format 'number.number' (e.g. 1.0)",
       ),
-    nodes: z.array(z.any()),
-    edges: z.array(z.any()),
+    nodes: z.array(studioNodeSchema),
+    edges: z.array(studioEdgeSchema),
     // Legacy field from spec_version <= 1.4: every LLM node now owns its
     // config. Still accepted on input for old clients and old persisted
     // versions; migrateDSLVersion folds it into node llm parameters and
     // drops it. Never read at execution time.
-    default_llm: llmConfigSchema.nullish(),
+    default_llm: llmConfigSchema.partial().nullish(),
     workflow_type: z.enum(WORKFLOW_TYPES).optional(),
+    template_adapter: z.enum(["default", "dspy_chat_adapter"]).optional(),
+    enable_tracing: z.boolean().optional(),
+    state: z
+      .looseObject({
+        execution: z
+          .looseObject({
+            status: z.enum(["idle", "waiting", "running", "success", "error", "skipped"]),
+            trace_id: z.string().optional(),
+            until_node_id: z.string().optional(),
+            error: z.string().optional(),
+            error_type: z.string().optional(),
+            upstream_status: z.number().optional(),
+            result: z.record(z.string(), z.unknown()).optional(),
+            timestamps: z
+              .looseObject({ started_at: z.number().optional(), finished_at: z.number().optional() })
+              .optional(),
+          })
+          .optional(),
+        evaluation: z
+          .looseObject({
+            run_id: z.string().optional(),
+            status: z.enum(["idle", "waiting", "running", "success", "error", "skipped"]).optional(),
+            error: z.string().optional(),
+            error_type: z.string().optional(),
+            upstream_status: z.number().optional(),
+            progress: z.number().optional(),
+            total: z.number().optional(),
+            timestamps: z
+              .looseObject({
+                started_at: z.number().optional(),
+                finished_at: z.number().optional(),
+                stopped_at: z.number().optional(),
+              })
+              .optional(),
+          })
+          .optional(),
+        optimization: z
+          .looseObject({
+            run_id: z.string().optional(),
+            status: z.enum(["idle", "waiting", "running", "success", "error", "skipped"]).optional(),
+            stdout: z.string().optional(),
+            error: z.string().optional(),
+            timestamps: z
+              .looseObject({
+                started_at: z.number().optional(),
+                finished_at: z.number().optional(),
+                stopped_at: z.number().optional(),
+              })
+              .optional(),
+          })
+          .optional(),
+      })
+      .passthrough(),
   })
   .passthrough();
 
 export const LATEST_SPEC_VERSION = "1.5" as const;
 
-export type Workflow = {
-  spec_version: typeof LATEST_SPEC_VERSION;
+export type StudioWorkflow = Omit<
+  WorkflowDsl,
+  | "spec_version"
+  | "workflow_id"
+  | "name"
+  | "icon"
+  | "description"
+  | "version"
+  | "nodes"
+  | "edges"
+  | "state"
+  | "workflow_type"
+  | "template_adapter"
+> & {
+  spec_version: string;
   workflow_id?: string;
   experiment_id?: string;
   name: string;
   icon: string;
   description: string;
   version: string;
-  nodes: Node<Component>[];
-  edges: Edge[];
+  nodes: StudioNode<Component>[];
+  edges: StudioEdge[];
   data?: Record<string, any>;
-  template_adapter: "default" | "dspy_chat_adapter";
-  enable_tracing: boolean;
+  template_adapter?: "default" | "dspy_chat_adapter";
+  enable_tracing?: boolean;
   workflow_type?: WorkflowTypes;
-
   state: {
+    [key: string]: unknown;
     execution?: {
+      [key: string]: unknown;
       status: ExecutionStatus;
       trace_id?: string;
       until_node_id?: string;
       error?: string;
-      /** Stable failure code — mirrors `ExecutionState.error_type`. */
       error_type?: string;
-      /** Upstream HTTP status, when an HTTP node got a non-2xx. */
       upstream_status?: number;
       result?: Record<string, any>;
       timestamps?: {
+        [key: string]: unknown;
         started_at?: number;
         finished_at?: number;
       };
     };
     evaluation?: {
+      [key: string]: unknown;
       run_id?: string;
       status?: ExecutionStatus;
       error?: string;
-      /** Stable failure code — mirrors `ExecutionState.error_type`. */
       error_type?: string;
-      /** Upstream HTTP status, when an HTTP node got a non-2xx. */
       upstream_status?: number;
       progress?: number;
       total?: number;
       timestamps?: {
+        [key: string]: unknown;
         started_at?: number;
         finished_at?: number;
         stopped_at?: number;
       };
     };
     optimization?: {
+      [key: string]: unknown;
       run_id?: string;
       status?: ExecutionStatus;
       stdout?: string;
       error?: string;
       timestamps?: {
+        [key: string]: unknown;
         started_at?: number;
         finished_at?: number;
         stopped_at?: number;
@@ -405,7 +578,44 @@ export type Workflow = {
   };
 };
 
-export type ServerWorkflow = Omit<Workflow, "workflow_id"> & {
+type StudioWorkflowWire = z.infer<typeof studioWorkflowWireSchema>;
+type StudioWorkflowWireNode = StudioWorkflowWire["nodes"][number];
+type StudioWorkflowWireEdge = StudioWorkflowWire["edges"][number];
+
+const toStudioNode = (node: StudioWorkflowWireNode): StudioNode<Component> => ({
+  ...node,
+  position: { x: node.position.x, y: node.position.y },
+  data: {
+    ...node.data,
+    execution_state: node.data.execution_state,
+  },
+});
+
+const toStudioEdge = (edge: StudioWorkflowWireEdge): StudioEdge => ({ ...edge });
+
+const toStudioState = (
+  state: StudioWorkflowWire["state"],
+): StudioWorkflow["state"] => ({
+  ...state,
+  execution: state.execution,
+  evaluation: state.evaluation,
+  optimization: state.optimization,
+});
+
+export const studioWorkflowSchema = studioWorkflowWireSchema.transform<StudioWorkflow>(
+  (workflow) => ({
+    ...workflow,
+    nodes: workflow.nodes.map(toStudioNode),
+    edges: workflow.edges.map(toStudioEdge),
+    state: toStudioState(workflow.state),
+  }),
+);
+
+/** Parses untrusted persisted/API DSL into the typed Studio refinement. */
+export const parseStudioWorkflow = (value: unknown): StudioWorkflow =>
+  studioWorkflowSchema.parse(value);
+
+export type ServerWorkflow = Omit<StudioWorkflow, "workflow_id"> & {
   api_key: string;
   workflow_id: string;
   project_id: string;

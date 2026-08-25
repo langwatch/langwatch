@@ -2,8 +2,8 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
-import type { Component, Evaluator, Signature } from "../../../types/dsl";
-import { hasUnsavedChanges } from "../../../utils/unsavedChanges";
+import type { Component, Evaluator, Signature } from "@langwatch/workflow-contract";
+import { hasUnsavedChanges } from "@langwatch/workflow-web";
 
 describe("hasUnsavedChanges", () => {
   describe("when node data has no local changes", () => {

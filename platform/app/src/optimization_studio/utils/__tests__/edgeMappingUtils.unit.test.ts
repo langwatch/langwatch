@@ -4,7 +4,7 @@
 
 import type { Edge, Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
-import type { Component } from "../../types/dsl";
+import type { Component } from "@langwatch/workflow-contract";
 import {
   applyMappingChangeToEdges,
   buildAvailableSources,

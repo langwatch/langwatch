@@ -1,6 +1,10 @@
 import { z } from "zod";
-import { type BaseComponent, type Workflow, workflowJsonSchema } from "./dsl";
-import { OPTIMIZERS, optimizerParamsSchema } from "./optimizers";
+import {
+  type BaseComponent,
+  type StudioWorkflow,
+  studioWorkflowSchema,
+} from "@langwatch/workflow-contract";
+import { OPTIMIZERS, optimizerParamsSchema } from "@langwatch/workflow-web";
 
 export const studioClientEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("is_alive"), payload: z.record(z.string(), z.never()) }),
@@ -9,7 +13,7 @@ export const studioClientEventSchema = z.discriminatedUnion("type", [
     payload: z.object({
       trace_id: z.string(),
       thread_id: z.string().optional(),
-      workflow: workflowJsonSchema,
+      workflow: studioWorkflowSchema,
       node_id: z.string(),
       inputs: z.record(z.string(), z.any()),
       origin: z.string().optional(),
@@ -26,7 +30,7 @@ export const studioClientEventSchema = z.discriminatedUnion("type", [
     type: z.literal("execute_flow"),
     payload: z.object({
       trace_id: z.string(),
-      workflow: workflowJsonSchema,
+      workflow: studioWorkflowSchema,
       until_node_id: z.string().optional(),
       inputs: z.array(z.record(z.string(), z.any())).optional(),
       manual_execution_mode: z.boolean().optional(),
@@ -39,7 +43,7 @@ export const studioClientEventSchema = z.discriminatedUnion("type", [
     type: z.literal("execute_evaluation"),
     payload: z.object({
       run_id: z.string(),
-      workflow: workflowJsonSchema,
+      workflow: studioWorkflowSchema,
       workflow_version_id: z.string(),
       evaluate_on: z.enum(["full", "test", "train", "specific"]),
       dataset_entry: z.number().optional(),
@@ -50,7 +54,7 @@ export const studioClientEventSchema = z.discriminatedUnion("type", [
     type: z.literal("execute_optimization"),
     payload: z.object({
       run_id: z.string(),
-      workflow: workflowJsonSchema,
+      workflow: studioWorkflowSchema,
       workflow_version_id: z.string(),
       optimizer: z.enum(Object.keys(OPTIMIZERS) as [keyof typeof OPTIMIZERS]),
       params: optimizerParamsSchema,
@@ -59,14 +63,14 @@ export const studioClientEventSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("stop_evaluation_execution"),
     payload: z.object({
-      workflow: workflowJsonSchema,
+      workflow: studioWorkflowSchema,
       run_id: z.string(),
     }),
   }),
   z.object({
     type: z.literal("stop_optimization_execution"),
     payload: z.object({
-      workflow: workflowJsonSchema,
+      workflow: studioWorkflowSchema,
       run_id: z.string(),
     }),
   }),
@@ -88,25 +92,25 @@ export type StudioServerEvent =
   | {
       type: "execution_state_change";
       payload: {
-        execution_state: Workflow["state"]["execution"];
+        execution_state: StudioWorkflow["state"]["execution"];
       };
     }
   | {
       type: "evaluation_run_change";
       payload: {
-        evaluation_run: Workflow["state"]["evaluation"];
+        evaluation_run: StudioWorkflow["state"]["evaluation"];
       };
     }
   | {
       type: "evaluation_state_change";
       payload: {
-        evaluation_state: Workflow["state"]["evaluation"];
+        evaluation_state: StudioWorkflow["state"]["evaluation"];
       };
     }
   | {
       type: "optimization_state_change";
       payload: {
-        optimization_state: Workflow["state"]["optimization"];
+        optimization_state: StudioWorkflow["state"]["optimization"];
       };
     }
   | {

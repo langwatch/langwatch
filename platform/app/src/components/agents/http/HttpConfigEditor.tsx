@@ -13,7 +13,7 @@ import type {
   HttpAuth,
   HttpHeader,
   HttpMethod,
-} from "~/optimization_studio/types/dsl";
+} from "@langwatch/workflow-contract";
 import { AuthConfigSection } from "./AuthConfigSection";
 import { BodyTemplateEditor } from "./BodyTemplateEditor";
 import { HeadersConfigSection } from "./HeadersConfigSection";

@@ -26,15 +26,15 @@ import { toaster } from "../../../components/ui/toaster";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { DEFAULT_MODEL } from "../../../utils/constants";
 import { camelCaseToTitleCase } from "../../../utils/stringCasing";
-import { useWorkflowStore } from "../../hooks/useWorkflowStore";
+import { useWorkflowStore } from "@langwatch/workflow-web";
 import type {
   Component,
   ComponentType,
   Field as FieldType,
   LLMConfig,
-  Workflow,
-} from "../../types/dsl";
-import { nameToId, validateNodeName } from "../../utils/nodeUtils";
+  StudioWorkflow,
+} from "@langwatch/workflow-contract";
+import { nameToId, validateNodeName } from "@langwatch/workflow-contract";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 import { useInsideDrawer } from "../drawers/useInsideDrawer";
 import {
@@ -485,7 +485,7 @@ export function BasePropertiesPanel({
   hideHeader,
   ...props
 }: {
-  node: Node<Component> | Workflow;
+  node: Node<Component> | StudioWorkflow;
   header?: React.ReactNode;
   children?: React.ReactNode;
   fieldsAfter?: React.ReactNode;
@@ -521,7 +521,7 @@ export function BasePropertiesPanel({
   const [isEditingName, setIsEditingName] = useState(false);
   const [name, setName] = useState<string | undefined>(undefined);
 
-  const isWorkflow = (node: Node<Component> | Workflow): node is Workflow =>
+  const isWorkflow = (node: Node<Component> | StudioWorkflow): node is StudioWorkflow =>
     !("data" in node);
 
   const handleNameChange = (value: string, id: string) => {

@@ -29,7 +29,7 @@ import {
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { CodeEditor } from "~/optimization_studio/components/code/CodeEditorModal";
-import { rewriteCodeSignature } from "~/optimization_studio/utils/codeSignature";
+import { rewriteCodeSignature } from "@langwatch/workflow-web";
 import {
   type CodeEvaluatorConfig,
   codeEvaluatorOutputFields,

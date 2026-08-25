@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_MODEL } from "~/utils/constants";
-import type { LLMConfig } from "../../../../types/dsl";
+import type { LLMConfig } from "@langwatch/workflow-contract";
 import { normalizeToSnakeCase } from "../normalizeToSnakeCase";
 
 const BASE_CONFIG = { model: DEFAULT_MODEL };

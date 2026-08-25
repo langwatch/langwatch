@@ -1,4 +1,4 @@
-import type { Entry, Field, NodeDataset, Workflow } from "../types/dsl";
+import type { Entry, Field, NodeDataset, StudioWorkflow } from "@langwatch/workflow-contract";
 
 type Inline = NonNullable<NodeDataset["inline"]>;
 
@@ -54,7 +54,7 @@ export function entryInlineWithDefaults(
  * entry field carries a default. Run after the inline dataset is materialized
  * (loadDatasets) and after API parameters are injected.
  */
-export function applyEntryInputDefaults(workflow: Workflow): Workflow {
+export function applyEntryInputDefaults(workflow: StudioWorkflow): StudioWorkflow {
   let changed = false;
   const nodes = workflow.nodes.map((node) => {
     if (node.type !== "entry") return node;

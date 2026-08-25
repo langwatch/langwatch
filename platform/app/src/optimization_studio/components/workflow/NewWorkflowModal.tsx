@@ -4,15 +4,15 @@ import { ChevronLeft, File, Upload } from "react-feather";
 import { Dialog } from "../../../components/ui/dialog";
 import { toaster } from "../../../components/ui/toaster";
 import { TEMPLATES } from "../../templates/registry";
-import type { Workflow } from "../../types/dsl";
-import { workflowJsonSchema } from "../../types/dsl";
+import type { StudioWorkflow } from "@langwatch/workflow-contract";
+import { studioWorkflowSchema } from "@langwatch/workflow-contract";
 import { NewWorkflowForm } from "./NewWorkflowForm";
 import { WorkflowCard } from "./WorkflowCard";
 
 /** Maximum allowed file size for workflow imports (5MB) */
 const MAX_WORKFLOW_FILE_SIZE = 5 * 1024 * 1024;
 
-type Step = { step: "select" } | { step: "create"; template: Workflow };
+type Step = { step: "select" } | { step: "create"; template: StudioWorkflow };
 
 /**
  * Hook for handling file drag and drop functionality
@@ -95,7 +95,7 @@ export const NewWorkflowModal = ({
       reader.onload = (e) => {
         try {
           const content = e.target?.result as string;
-          const result = workflowJsonSchema.safeParse(JSON.parse(content));
+          const result = studioWorkflowSchema.safeParse(JSON.parse(content));
 
           if (!result.success) {
             // Schema complaints about the file the user picked, not a server
@@ -111,7 +111,7 @@ export const NewWorkflowModal = ({
             return;
           }
 
-          setStep({ step: "create", template: result.data as Workflow });
+          setStep({ step: "create", template: result.data });
         } catch (readFailure) {
           // Local handling of the file the user picked — nothing crossed the
           // wire, so the detail is what tells them what to fix. The `catch`

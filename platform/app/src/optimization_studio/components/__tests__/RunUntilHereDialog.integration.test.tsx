@@ -32,7 +32,7 @@ const { mockNodes, mockSetNode, mockStartWorkflowExecution, mockDatasetData } =
     },
   }));
 
-vi.mock("../../hooks/useWorkflowStore", () => ({
+vi.mock("@langwatch/workflow-web", () => ({
   useWorkflowStore: (selector: (s: unknown) => unknown) =>
     selector({
       nodes: mockNodes.current,
@@ -64,7 +64,7 @@ vi.mock("../nodes/Nodes", () => ({
 
 const { RunUntilHereDialog } = await import("../RunUntilHereDialog");
 const { useRunUntilHereDialogStore } = await import(
-  "../../hooks/useRunUntilHereDialogStore"
+  "@langwatch/workflow-web"
 );
 
 const entryNode = (data?: Record<string, unknown>) => ({

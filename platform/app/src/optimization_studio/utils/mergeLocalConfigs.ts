@@ -9,8 +9,8 @@ import type {
   Field,
   LlmPromptConfigComponent,
   Signature,
-} from "../types/dsl";
-import { fieldSchema } from "../types/dsl";
+} from "@langwatch/workflow-contract";
+import { fieldSchema } from "@langwatch/workflow-contract";
 
 /**
  * Merges unsaved local configs into DSL nodes before sending to the Python executor.

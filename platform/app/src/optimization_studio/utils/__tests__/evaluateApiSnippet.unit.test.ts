@@ -4,7 +4,7 @@ import {
   buildEvaluateParameters,
   evaluateCurlSnippet,
   exampleParameterValue,
-} from "../evaluateApiSnippet";
+} from "@langwatch/workflow-web";
 
 describe("buildEvaluateParameters", () => {
   describe("given entry fields with and without matching dataset columns", () => {

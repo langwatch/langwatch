@@ -1,4 +1,4 @@
-import type { LLMConfig } from "../../../types/dsl";
+import type { LLMConfig } from "@langwatch/workflow-contract";
 
 /**
  * camelCase → snake_case mapping for LLM config parameters.

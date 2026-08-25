@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { LLMConfig } from "~/optimization_studio/types/dsl";
+import type { LLMConfig } from "@langwatch/workflow-contract";
 import {
   type FormLLMConfig,
   LLMConfigFormatUtils,

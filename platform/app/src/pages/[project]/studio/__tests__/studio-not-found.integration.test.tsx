@@ -49,7 +49,7 @@ vi.mock(
   }),
 );
 
-vi.mock("../../../../optimization_studio/hooks/useWorkflowStore", () => ({
+vi.mock("@langwatch/workflow-web", () => ({
   useWorkflowStore: () => ({
     reset: vi.fn(),
     setWorkflow: vi.fn(),

@@ -11,7 +11,7 @@ import {
   isConnectionAllowed,
   nodeHasGateInput,
   showsTemporaryGate,
-} from "../controlFlow";
+} from "@langwatch/workflow-web";
 
 const node = (
   id: string,

@@ -1,5 +1,5 @@
 import { NativeSelect } from "@chakra-ui/react";
-import { HTTP_METHODS, type HttpMethod } from "~/optimization_studio/types/dsl";
+import { HTTP_METHODS, type HttpMethod } from "@langwatch/workflow-contract";
 
 export type HttpMethodSelectorProps = {
   value: HttpMethod;

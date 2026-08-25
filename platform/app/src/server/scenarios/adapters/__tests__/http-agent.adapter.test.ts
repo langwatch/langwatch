@@ -5,7 +5,7 @@ import type {
 } from "@langwatch/agent-contract";
 import { Response } from "undici";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { HttpComponentConfig } from "~/optimization_studio/types/dsl";
+import type { HttpComponentConfig } from "@langwatch/workflow-contract";
 import { TemplateRenderError } from "../../execution/http-template-engine";
 import { HttpAgentAdapter } from "../http-agent.adapter";
 

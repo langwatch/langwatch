@@ -19,7 +19,7 @@ import { Dialog } from "../../../components/ui/dialog";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
 import { trackEvent } from "../../../utils/tracking";
-import type { Workflow } from "../../types/dsl";
+import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { EmojiPickerModal } from "../properties/modals/EmojiPickerModal";
 
 type FormData = {
@@ -157,7 +157,7 @@ export const NewWorkflowForm = ({
   template,
   onClose,
 }: {
-  template: Workflow;
+  template: StudioWorkflow;
   onClose: () => void;
 }) => {
   const { project } = useOrganizationTeamProject();
@@ -192,7 +192,7 @@ export const NewWorkflowForm = ({
 
     // LLM nodes without a model are materialized server-side at creation
     // from the project's resolved default, so the template goes as-is.
-    const newWorkflow: Workflow = {
+    const newWorkflow: StudioWorkflow = {
       ...template,
       version: "1",
       name: data.name,
@@ -293,7 +293,7 @@ export const NewWorkflowForm = ({
               void handleSubmit(onSubmit)();
             }}
           >
-            Create Workflow
+            Create StudioWorkflow
           </Button>
         </Dialog.Footer>
       </form>

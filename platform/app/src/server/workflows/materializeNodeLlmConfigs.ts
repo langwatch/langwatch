@@ -1,6 +1,6 @@
 import type { PrismaClient } from "~/generated/prisma/client";
 
-import type { LLMConfig } from "../../optimization_studio/types/dsl";
+import type { LLMConfig } from "@langwatch/workflow-contract";
 import { DEFAULT_MODEL } from "../../utils/constants";
 import { ModelNotConfiguredError } from "../modelProviders/modelNotConfiguredError";
 import { resolveModelForFeature } from "../modelProviders/resolveModelForFeature";

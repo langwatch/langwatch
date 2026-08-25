@@ -12,7 +12,7 @@ import {
 } from "~/components/run-via-api/runSnippets";
 import { useRunViaApiTabs } from "~/components/run-via-api/useRunViaApiTabs";
 
-import type { WorkflowField } from "../utils/workflowFields";
+import type { WorkflowField } from "@langwatch/workflow-contract";
 
 /**
  * Shows how to trigger this workflow's evaluation from CI or scripts: the same

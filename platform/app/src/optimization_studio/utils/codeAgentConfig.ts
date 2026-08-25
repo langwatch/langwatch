@@ -1,7 +1,7 @@
 import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
 import type { FieldMapping } from "~/components/variables";
 
-import type { CodeComponentConfig, Field } from "../types/dsl";
+import type { CodeComponentConfig, Field } from "@langwatch/workflow-contract";
 
 /** Default Python source shown when a new code agent is created. */
 export const DEFAULT_CODE = `class Code:

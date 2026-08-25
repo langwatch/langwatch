@@ -9,7 +9,7 @@ import {
 import { EvaluationProgressBar } from "../../components/experiments/BatchEvaluationV2/EvaluationProgressBar";
 import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
 import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import { useWorkflowStore } from "@langwatch/workflow-web";
 
 export function ProgressToast() {
   return (

@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { Workflow } from "~/optimization_studio/types/dsl";
+import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
 import { linkedWorkflowId, resolveAgentFields } from "../agent-fields";
 
 const dsl = (
   endInputs: Array<{ identifier: string; type: string }>,
-): Workflow =>
+): StudioWorkflow =>
   ({
     nodes: [
       {
@@ -19,7 +19,7 @@ const dsl = (
     edges: [
       { source: "entry", sourceHandle: "outputs.question", target: "code" },
     ],
-  }) as unknown as Workflow;
+  }) as unknown as StudioWorkflow;
 
 describe("resolveAgentFields", () => {
   describe("given a workflow agent", () => {
@@ -119,7 +119,7 @@ describe("resolveAgentFields", () => {
               { id: "end", type: "end", data: { inputs: [] } },
             ],
             edges: [],
-          } as unknown as Workflow,
+          } as unknown as StudioWorkflow,
         });
 
         expect(fields.outputFields).toEqual([]);

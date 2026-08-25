@@ -10,8 +10,8 @@ import {
   getInputsForExecution,
   useComponentExecution,
 } from "../../hooks/useComponentExecution";
-import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import type { Component } from "../../types/dsl";
+import { useWorkflowStore } from "@langwatch/workflow-web";
+import type { Component } from "@langwatch/workflow-contract";
 
 /**
  * InputPanel component that handles the display and execution of component inputs

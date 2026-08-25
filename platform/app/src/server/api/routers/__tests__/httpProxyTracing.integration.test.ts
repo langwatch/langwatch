@@ -6,7 +6,7 @@
  * capturing request/response details with sanitized auth credentials.
  */
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import type { Field } from "~/optimization_studio/types/dsl";
+import type { Field } from "@langwatch/workflow-contract";
 import type { StudioClientEvent } from "~/optimization_studio/types/events";
 import { getTestUser } from "../../../../utils/testUtils";
 import { appRouter } from "../../root";

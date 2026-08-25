@@ -23,7 +23,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 // Avoid the optimization_studio circular-dep pulled in transitively by the
 // evaluator-editor module graph (mirrors EvaluatorMappings.integration.test).
-vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
+vi.mock("@langwatch/workflow-web", () => ({
   store: vi.fn(() => ({})),
   initialState: {},
   useWorkflowStore: vi.fn(() => ({})),

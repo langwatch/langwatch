@@ -4,12 +4,12 @@
 
 import type { Edge, Node } from "@xyflow/react";
 import { describe, expect, it } from "vitest";
-import type { Component, Workflow } from "../../types/dsl";
+import type { Component, StudioWorkflow } from "@langwatch/workflow-contract";
 import {
   canAutoMapAllFields,
   getWorkflowEntryOutputs,
   isOutputConnectedToNonEvaluator,
-} from "../workflowFields";
+} from "@langwatch/workflow-contract";
 
 describe("workflowFields", () => {
   describe("isOutputConnectedToNonEvaluator", () => {
@@ -135,7 +135,7 @@ describe("workflowFields", () => {
 
   describe("getWorkflowEntryOutputs", () => {
     it("extracts outputs from workflow entry node when connected to non-evaluators", () => {
-      const workflow: Partial<Workflow> = {
+      const workflow: Partial<StudioWorkflow> = {
         nodes: [
           {
             id: "entry",
@@ -179,7 +179,7 @@ describe("workflowFields", () => {
         ],
       };
 
-      const outputs = getWorkflowEntryOutputs(workflow as Workflow);
+      const outputs = getWorkflowEntryOutputs(workflow as StudioWorkflow);
 
       expect(outputs).toEqual([
         { identifier: "input", type: "str" },
@@ -189,7 +189,7 @@ describe("workflowFields", () => {
     });
 
     it("filters out outputs with no connections (unused outputs)", () => {
-      const workflow: Partial<Workflow> = {
+      const workflow: Partial<StudioWorkflow> = {
         nodes: [
           {
             id: "entry",
@@ -221,7 +221,7 @@ describe("workflowFields", () => {
         ],
       };
 
-      const outputs = getWorkflowEntryOutputs(workflow as Workflow);
+      const outputs = getWorkflowEntryOutputs(workflow as StudioWorkflow);
 
       // Only "input" should be returned - "unused_field" is not connected
       expect(outputs).toEqual([{ identifier: "input", type: "str" }]);
@@ -236,15 +236,15 @@ describe("workflowFields", () => {
     });
 
     it("returns empty array when workflow has no nodes", () => {
-      const workflow: Partial<Workflow> = {
+      const workflow: Partial<StudioWorkflow> = {
         nodes: [],
       };
 
-      expect(getWorkflowEntryOutputs(workflow as Workflow)).toEqual([]);
+      expect(getWorkflowEntryOutputs(workflow as StudioWorkflow)).toEqual([]);
     });
 
     it("returns empty array when no entry node exists", () => {
-      const workflow: Partial<Workflow> = {
+      const workflow: Partial<StudioWorkflow> = {
         nodes: [
           {
             id: "end",
@@ -255,11 +255,11 @@ describe("workflowFields", () => {
         ],
       };
 
-      expect(getWorkflowEntryOutputs(workflow as Workflow)).toEqual([]);
+      expect(getWorkflowEntryOutputs(workflow as StudioWorkflow)).toEqual([]);
     });
 
     it("returns empty array when entry node has no outputs", () => {
-      const workflow: Partial<Workflow> = {
+      const workflow: Partial<StudioWorkflow> = {
         nodes: [
           {
             id: "entry",
@@ -273,11 +273,11 @@ describe("workflowFields", () => {
         ],
       };
 
-      expect(getWorkflowEntryOutputs(workflow as Workflow)).toEqual([]);
+      expect(getWorkflowEntryOutputs(workflow as StudioWorkflow)).toEqual([]);
     });
 
     it("returns all outputs when workflow has no edges (legacy workflow)", () => {
-      const workflow: Partial<Workflow> = {
+      const workflow: Partial<StudioWorkflow> = {
         nodes: [
           {
             id: "entry",
@@ -295,7 +295,7 @@ describe("workflowFields", () => {
         edges: [], // No edges at all
       };
 
-      const outputs = getWorkflowEntryOutputs(workflow as Workflow);
+      const outputs = getWorkflowEntryOutputs(workflow as StudioWorkflow);
 
       // Should return all outputs when there are no edges (legacy fallback)
       expect(outputs).toEqual([
@@ -305,7 +305,7 @@ describe("workflowFields", () => {
     });
 
     it("handles workflow with multiple nodes correctly", () => {
-      const workflow: Partial<Workflow> = {
+      const workflow: Partial<StudioWorkflow> = {
         nodes: [
           {
             id: "entry",
@@ -344,14 +344,14 @@ describe("workflowFields", () => {
         ],
       };
 
-      const outputs = getWorkflowEntryOutputs(workflow as Workflow);
+      const outputs = getWorkflowEntryOutputs(workflow as StudioWorkflow);
 
       // Should only return entry node outputs that are connected to non-evaluators
       expect(outputs).toEqual([{ identifier: "question", type: "str" }]);
     });
 
     it("filters out outputs that only connect to evaluators", () => {
-      const workflow: Partial<Workflow> = {
+      const workflow: Partial<StudioWorkflow> = {
         nodes: [
           {
             id: "entry",
@@ -401,14 +401,14 @@ describe("workflowFields", () => {
         ],
       };
 
-      const outputs = getWorkflowEntryOutputs(workflow as Workflow);
+      const outputs = getWorkflowEntryOutputs(workflow as StudioWorkflow);
 
       // Only "input" should be returned - expected_output and unbiased only connect to evaluator
       expect(outputs).toEqual([{ identifier: "input", type: "str" }]);
     });
 
     it("keeps outputs connected to both evaluator and non-evaluator", () => {
-      const workflow: Partial<Workflow> = {
+      const workflow: Partial<StudioWorkflow> = {
         nodes: [
           {
             id: "entry",
@@ -457,7 +457,7 @@ describe("workflowFields", () => {
         ],
       };
 
-      const outputs = getWorkflowEntryOutputs(workflow as Workflow);
+      const outputs = getWorkflowEntryOutputs(workflow as StudioWorkflow);
 
       // Both should be kept since expected_output also connects to sig1
       expect(outputs).toEqual([
@@ -467,7 +467,7 @@ describe("workflowFields", () => {
     });
 
     it("handles nodes with behave_as evaluator", () => {
-      const workflow: Partial<Workflow> = {
+      const workflow: Partial<StudioWorkflow> = {
         nodes: [
           {
             id: "entry",
@@ -510,7 +510,7 @@ describe("workflowFields", () => {
         ],
       };
 
-      const outputs = getWorkflowEntryOutputs(workflow as Workflow);
+      const outputs = getWorkflowEntryOutputs(workflow as StudioWorkflow);
 
       // bias_category should be filtered out (connects only to custom with behave_as evaluator)
       expect(outputs).toEqual([{ identifier: "input", type: "str" }]);
@@ -522,7 +522,7 @@ describe("workflowFields", () => {
       // - answer: connected to llm_call (signature, non-evaluator)
       // - unbiased: connected only to exact_match (evaluator)
       // - bias_category: not connected
-      const workflow: Partial<Workflow> = {
+      const workflow: Partial<StudioWorkflow> = {
         nodes: [
           {
             id: "entry",
@@ -588,7 +588,7 @@ describe("workflowFields", () => {
         ],
       };
 
-      const outputs = getWorkflowEntryOutputs(workflow as Workflow);
+      const outputs = getWorkflowEntryOutputs(workflow as StudioWorkflow);
 
       // Only "answer" should be returned:
       // - question: not connected → filtered out

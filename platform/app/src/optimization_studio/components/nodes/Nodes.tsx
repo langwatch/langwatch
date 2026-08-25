@@ -39,17 +39,17 @@ import { useColorModeValue } from "../../../components/ui/color-mode";
 import { Menu } from "../../../components/ui/menu";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { useComponentExecution } from "../../hooks/useComponentExecution";
-import { useRunUntilHereDialogStore } from "../../hooks/useRunUntilHereDialogStore";
-import { useWorkflowStore } from "../../hooks/useWorkflowStore";
+import { useRunUntilHereDialogStore } from "@langwatch/workflow-web";
+import { useWorkflowStore } from "@langwatch/workflow-web";
 import type {
   Component,
   ComponentType,
   Field,
   LLMConfig,
-} from "../../types/dsl";
-import { GATE_FIELD, showsTemporaryGate } from "../../utils/controlFlow";
-import { checkIsEvaluator } from "../../utils/nodeUtils";
-import { hasUnsavedChanges } from "../../utils/unsavedChanges";
+} from "@langwatch/workflow-contract";
+import { GATE_FIELD, showsTemporaryGate } from "@langwatch/workflow-web";
+import { checkIsEvaluator } from "@langwatch/workflow-contract";
+import { hasUnsavedChanges } from "@langwatch/workflow-web";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 
 export function getNodeDisplayName(node: { id: string; data: Component }) {

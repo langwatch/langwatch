@@ -1,5 +1,5 @@
 import type { Node, XYPosition } from "@xyflow/react";
-import type { Component } from "~/optimization_studio/types/dsl";
+import type { Component } from "@langwatch/workflow-contract";
 
 export type NodeWithOptionalPosition<T extends Component> = Omit<
   Node<T>,

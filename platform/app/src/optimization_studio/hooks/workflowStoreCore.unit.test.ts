@@ -6,7 +6,7 @@ import {
   store as storeCreator,
   updateInputFields,
   type WorkflowStore,
-} from "./workflowStoreCore";
+} from "@langwatch/workflow-web";
 
 /**
  * Helper to build a minimal Node with inputs/outputs fields.

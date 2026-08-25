@@ -28,7 +28,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { EmojiPickerModal } from "~/optimization_studio/components/properties/modals/EmojiPickerModal";
 import { getRandomWorkflowIcon } from "~/optimization_studio/components/workflow/NewWorkflowForm";
 import { customEvaluatorTemplate } from "~/optimization_studio/templates/custom_evaluator";
-import type { Workflow } from "~/optimization_studio/types/dsl";
+import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { trackEvent } from "~/utils/tracking";
@@ -124,7 +124,7 @@ export function WorkflowSelectorForEvaluatorDrawer(
         // a model are materialized server-side from the project's resolved
         // default.
         const template = customEvaluatorTemplate;
-        const newWorkflow: Workflow = {
+        const newWorkflow: StudioWorkflow = {
           ...template,
           name: data.name,
           description: data.description,

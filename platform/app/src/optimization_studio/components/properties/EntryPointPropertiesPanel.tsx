@@ -13,8 +13,8 @@ import { useShallow } from "zustand/react/shallow";
 import { type Variable, VariablesSection } from "~/components/variables";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { useGetDatasetData } from "../../hooks/useGetDatasetData";
-import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import type { Entry, Field } from "../../types/dsl";
+import { useWorkflowStore } from "@langwatch/workflow-web";
+import type { Entry, Field } from "@langwatch/workflow-contract";
 import { DatasetModal } from "../DatasetModal";
 import {
   BasePropertiesPanel,

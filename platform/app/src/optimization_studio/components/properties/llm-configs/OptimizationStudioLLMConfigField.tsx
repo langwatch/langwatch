@@ -6,8 +6,8 @@ import {
   useModelSelectionOptions,
 } from "../../../../components/ModelSelector";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
-import { useWorkflowStore } from "../../../hooks/useWorkflowStore";
-import type { LLMConfig } from "../../../types/dsl";
+import { useWorkflowStore } from "@langwatch/workflow-web";
+import type { LLMConfig } from "@langwatch/workflow-contract";
 import { normalizeToSnakeCase } from "./normalizeToSnakeCase";
 
 type OptimizationStudioLLMConfigFieldProps = {

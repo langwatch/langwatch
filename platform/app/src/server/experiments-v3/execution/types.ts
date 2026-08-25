@@ -7,7 +7,7 @@ import {
   type TargetConfig,
   targetConfigSchema,
 } from "~/experiments-v3/types";
-import type { Workflow } from "~/optimization_studio/types/dsl";
+import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 
 // ============================================================================
@@ -350,7 +350,7 @@ export type WorkflowBuilderInput = {
  * Output from the workflow builder.
  */
 export type WorkflowBuilderOutput = {
-  workflow: Workflow;
+  workflow: StudioWorkflow;
   /** Node ID for the target so we can map results back */
   targetNodeId: string;
   /** Map of evaluator IDs to their node IDs */

@@ -7,8 +7,8 @@ import { CodeBlockEditor } from "~/components/blocks/CodeBlockEditor";
 import { Switch } from "~/components/ui/switch";
 import type { FieldMapping } from "~/components/variables";
 import { type Variable, VariablesSection } from "~/components/variables";
-import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import type { Component, Field } from "../../types/dsl";
+import { useWorkflowStore } from "@langwatch/workflow-web";
+import type { Component, Field } from "@langwatch/workflow-contract";
 import {
   applyMappingChange,
   buildAvailableSources,

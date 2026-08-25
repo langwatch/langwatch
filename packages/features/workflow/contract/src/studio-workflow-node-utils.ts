@@ -1,6 +1,18 @@
-import type { Edge, Node } from "@xyflow/react";
-import { camelCaseToSnakeCase } from "../../utils/stringCasing";
-import type { Field } from "../types/dsl";
+import type {
+  Component,
+  Field,
+  StudioEdge,
+  StudioNode,
+  StudioPosition,
+} from "./studio-workflow";
+
+const camelCaseToSnakeCase = (value: string) =>
+  value.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+
+export type NodeWithOptionalPosition<T extends Component = Component> = Omit<
+  StudioNode<T>,
+  "position"
+> & { position?: StudioPosition };
 
 /**
  * Validates a node name for rename operations.
@@ -36,7 +48,7 @@ export const validateNodeName = ({
 
 export const nameToId = (name: string) => {
   return camelCaseToSnakeCase(name)
-    .replace(/[\(\)]/g, "")
+    .replace(/[()]/g, "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "") // Remove combining diacritical marks
     .replace(/[^a-zA-Z0-9_]/g, "_");
@@ -64,20 +76,20 @@ export const findLowestAvailableName = (nodesIds: string[], prefix: string) => {
 };
 
 export const getEntryInputs = (
-  edges: Edge[],
-  nodes: Node[],
-): (Edge & { optional?: boolean })[] => {
-  const entryEdges = edges.filter((edge: Edge) => edge.source === "entry");
+  edges: StudioEdge[],
+  nodes: StudioNode[],
+): (StudioEdge & { optional?: boolean })[] => {
+  const entryEdges = edges.filter((edge) => edge.source === "entry");
   const evaluators = nodes.filter(checkIsEvaluator);
 
   const entryInputs = entryEdges
     .filter(
-      (edge: Edge, index, self) =>
+      (edge, index, self) =>
         self.findIndex((e) => e.sourceHandle === edge.sourceHandle) === index,
     )
-    .map((edge: Edge) => {
+    .map((edge) => {
       if (
-        !evaluators?.some((evaluator: Node) => evaluator.id === edge.target)
+        !evaluators?.some((evaluator) => evaluator.id === edge.target)
       ) {
         return edge;
       }
@@ -105,11 +117,15 @@ export const getEntryInputs = (
  * unreachable for current schemas.
  */
 export const getMappingSurfaceInputs = (
-  edges: Edge[],
-  nodes: Node[],
-): Array<Pick<Field, "identifier" | "type" | "optional">> => {
+  edges: StudioEdge[],
+  nodes: StudioNode[],
+): Array<{
+  identifier: string;
+  type: Field["type"];
+  optional?: boolean;
+}> => {
   const entryNode = nodes.find(
-    (node: Node) => node.type === "entry" || node.id === "entry",
+    (node) => node.type === "entry" || node.id === "entry",
   );
   const declaredOutputs: Array<Pick<Field, "identifier" | "type">> =
     Array.isArray(entryNode?.data?.outputs) ? entryNode.data.outputs : [];
@@ -124,18 +140,18 @@ export const getMappingSurfaceInputs = (
   }
 
   const evaluators = nodes.filter(checkIsEvaluator);
-  const evaluatorIds = new Set(evaluators.map((e: Node) => e.id));
+  const evaluatorIds = new Set(evaluators.map((e) => e.id));
 
   return declaredOutputs.map(({ identifier, type }) => {
     const fieldEdges = edges.filter(
-      (edge: Edge) =>
+      (edge) =>
         edge.source === "entry" &&
         edge.sourceHandle === `outputs.${identifier}`,
     );
 
-    const hasNonEvaluatorTarget =
-      fieldEdges.length > 0 &&
-      fieldEdges.some((edge: Edge) => !evaluatorIds.has(edge.target));
+    const hasNonEvaluatorTarget = fieldEdges.some(
+      (edge) => !evaluatorIds.has(edge.target),
+    );
 
     const evaluatorOnly = fieldEdges.length > 0 && !hasNonEvaluatorTarget;
 
@@ -147,7 +163,7 @@ export const getMappingSurfaceInputs = (
   });
 };
 
-export const getInputsOutputs = (edges: Edge[], nodes: Node[]) => {
+export const getInputsOutputs = (edges: StudioEdge[], nodes: StudioNode[]) => {
   const entryInputs = getEntryInputs(edges, nodes);
 
   const inputs = entryInputs.map((edge) => ({
@@ -157,12 +173,12 @@ export const getInputsOutputs = (edges: Edge[], nodes: Node[]) => {
   }));
 
   const outputs = nodes.find(
-    (node: Node) => node.type === "end" || node.id === "end",
+    (node) => node.type === "end" || node.id === "end",
   )?.data.inputs;
 
   return { inputs, outputs };
 };
 
-export const checkIsEvaluator = (node: Node) => {
+export const checkIsEvaluator = (node: StudioNode) => {
   return node.type === "evaluator" || node.data.behave_as === "evaluator";
 };

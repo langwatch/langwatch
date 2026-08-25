@@ -7,14 +7,14 @@ import type {
 import type { WorkflowExecutionPort } from "@langwatch/workflow-server";
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
-import { z } from "zod/v4";
+import { z } from "zod";
 import type {
   ExecutionStatus,
-  Workflow,
-} from "../../optimization_studio/types/dsl";
+  StudioWorkflow,
+} from "@langwatch/workflow-contract";
 import type { StudioClientEvent } from "../../optimization_studio/types/events";
-import { migrateDSLVersion } from "../../optimization_studio/types/migrate";
-import { getEntryInputs } from "../../optimization_studio/utils/nodeUtils";
+import { migrateDSLVersion } from "@langwatch/workflow-contract";
+import { getEntryInputs } from "@langwatch/workflow-contract";
 import {
   singleEvaluationResultSchema,
   type SingleEvaluationResult,
@@ -39,7 +39,7 @@ type WorkflowExecutionResponse = z.infer<typeof workflowExecutionResponseSchema>
  * consulted by the execution implementation.
  */
 export type WorkflowExecutionRuntime = {
-  migrateDsl(dsl: WorkflowDsl): Workflow;
+  migrateDsl(dsl: WorkflowDsl): StudioWorkflow;
   getProjectModelProviders(
     projectId: string,
   ): Promise<
@@ -50,7 +50,7 @@ export type WorkflowExecutionRuntime = {
   >;
   stripUnsupportedParams(input: {
     projectId: string;
-    workflow: Workflow;
+    workflow: StudioWorkflow;
   }): Promise<void>;
   addEnvs(event: StudioClientEvent, projectId: string): Promise<StudioClientEvent>;
   dispatchNlp(input: {
@@ -68,7 +68,7 @@ export type WorkflowExecutionRuntime = {
   createTraceId(): string;
 };
 
-const getWorkflowPayload = (state: Workflow) => ({
+const getWorkflowPayload = (state: StudioWorkflow) => ({
   workflow_id: state.workflow_id,
   spec_version: state.spec_version,
   name: state.name,
@@ -84,7 +84,7 @@ const getWorkflowPayload = (state: Workflow) => ({
 });
 
 const assertRequiredInputs = (
-  workflow: Workflow,
+  workflow: StudioWorkflow,
   inputs: Record<string, unknown>,
 ): void => {
   const inputNames = new Set(Object.keys(inputs));
@@ -101,7 +101,7 @@ const assertRequiredInputs = (
 };
 
 const assertRequiredModelKeys = (
-  workflow: Workflow,
+  workflow: StudioWorkflow,
   providers: Record<
     string,
     { provider: string; customKeys: Record<string, unknown> | null }
@@ -332,6 +332,6 @@ export function createWorkflowTraceId(): string {
  * input is the portable Workflow schema because persisted versions may predate
  * the Studio-only `Workflow` TypeScript shape.
  */
-export function migrateWorkflowDslForExecution(dsl: WorkflowDsl): Workflow {
+export function migrateWorkflowDslForExecution(dsl: WorkflowDsl): StudioWorkflow {
   return migrateDSLVersion(dsl);
 }

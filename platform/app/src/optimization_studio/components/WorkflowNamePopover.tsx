@@ -12,7 +12,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { Popover } from "../../components/ui/popover";
 import { Tooltip } from "../../components/ui/tooltip";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import { useWorkflowStore } from "@langwatch/workflow-web";
 import { WorkflowIcon } from "./ColorfulBlockIcons";
 import { EmojiPickerModal } from "./properties/modals/EmojiPickerModal";
 

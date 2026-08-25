@@ -2,9 +2,12 @@ import { useMemo } from "react";
 import type { Variable } from "~/components/variables";
 import type {
   Field as DSLField,
-  Workflow,
-} from "~/optimization_studio/types/dsl";
-import { getMappingSurfaceInputs } from "~/optimization_studio/utils/nodeUtils";
+  StudioWorkflow,
+} from "@langwatch/workflow-contract";
+import {
+  getMappingSurfaceInputs,
+  parseStudioWorkflow,
+} from "@langwatch/workflow-contract";
 import { linkedWorkflowId } from "~/server/agents/agent-fields";
 import { api } from "~/utils/api";
 
@@ -13,7 +16,7 @@ import { api } from "~/utils/api";
  * entry node, the same extraction AgentWorkflowEditorDrawer uses for
  * scenario mapping.
  */
-function extractWorkflowInputs(dsl: Workflow | undefined): Variable[] {
+function extractWorkflowInputs(dsl: StudioWorkflow | undefined): Variable[] {
   if (!dsl) return [];
   const rawInputs = getMappingSurfaceInputs(dsl.edges, dsl.nodes);
   return rawInputs.flatMap((i) =>
@@ -62,7 +65,9 @@ export function useWorkflowTargetAgentData({
   const workflowInputs = useMemo(
     () =>
       extractWorkflowInputs(
-        workflowQuery.data?.currentVersion?.dsl as Workflow | undefined,
+        workflowQuery.data?.currentVersion?.dsl
+          ? parseStudioWorkflow(workflowQuery.data.currentVersion.dsl)
+          : undefined,
       ),
     [workflowQuery.data],
   );

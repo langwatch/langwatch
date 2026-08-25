@@ -20,9 +20,11 @@ import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { serializeWorkflow, useWorkflowStore } from "../hooks/useWorkflowStore";
-import type { Workflow } from "../types/dsl";
-import { hasDSLChanged } from "../utils/dslUtils";
+import { serializeWorkflow, useWorkflowStore } from "@langwatch/workflow-web";
+import {
+  hasDSLChanged,
+  parseStudioWorkflow,
+} from "@langwatch/workflow-contract";
 import { NewVersionFields } from "./VersionToBeUsed";
 
 export function History() {
@@ -148,7 +150,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
 
       // Prevent autosave from triggering after restore
       setAutosavedWorkflow(undefined);
-      const dsl = version.dsl as unknown as Workflow;
+      const dsl = parseStudioWorkflow(version.dsl);
       setLastCommittedWorkflow(dsl);
       setCurrentVersionId(version.id);
       setWorkflow({

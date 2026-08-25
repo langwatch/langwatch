@@ -1,7 +1,7 @@
 import type { JsonArray } from "@prisma/client/runtime/client";
 import type { Edge, Node } from "@xyflow/react";
 import { useMemo } from "react";
-import { getInputsOutputs } from "../optimization_studio/utils/nodeUtils";
+import { getInputsOutputs } from "@langwatch/workflow-contract";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorDefinition,

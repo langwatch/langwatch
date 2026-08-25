@@ -13,7 +13,7 @@
  * - Any other execution entry points
  */
 
-import type { LLMConfig } from "~/optimization_studio/types/dsl";
+import type { LLMConfig } from "@langwatch/workflow-contract";
 import type { SupportedParameter } from "~/server/modelProviders/customModel.schema";
 import { filterUnsupportedSamplingParams } from "~/server/modelProviders/resolveSupportedParameters";
 import { mapReasoningToProvider } from "@langwatch/prompt-contract";

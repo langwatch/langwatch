@@ -70,7 +70,7 @@ const storeState = {
   }),
 };
 
-vi.mock("../useWorkflowStore", () => ({
+vi.mock("@langwatch/workflow-web", () => ({
   useWorkflowStore: (selector: (s: unknown) => unknown) => selector(storeState),
   serializeWorkflow: (workflow: unknown) => workflow,
 }));

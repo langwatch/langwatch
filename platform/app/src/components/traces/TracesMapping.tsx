@@ -16,7 +16,7 @@ import { useAnnotationsByTraceIds } from "../../hooks/useAnnotationsByTraceIds";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useProjectEventTypes } from "../../hooks/useProjectEventTypes";
 import { useProjectSpanNames } from "../../hooks/useProjectSpanNames";
-import type { Workflow } from "../../optimization_studio/types/dsl";
+import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
 import {
   type AllTraceMappingSources,
@@ -212,8 +212,8 @@ export const TracesMapping = ({
   dsl?: {
     sourceOptions: Record<string, { label: string; fields: string[] }>;
     targetId: string;
-    targetEdges: Workflow["edges"];
-    setTargetEdges?: (edges: Workflow["edges"]) => void;
+    targetEdges: StudioWorkflow["edges"];
+    setTargetEdges?: (edges: StudioWorkflow["edges"]) => void;
   };
   targetFields: string[];
   setDatasetEntries?: (entries: DatasetRecordEntry[]) => void;
@@ -564,7 +564,7 @@ export const TracesMapping = ({
             return;
           }
 
-          const edge: Workflow["edges"][number] = {
+          const edge: StudioWorkflow["edges"][number] = {
             id: `${Date.now()}-${targetField}`,
             source: inferredSource.source,
             sourceHandle: inferredSource.sourceHandle,
@@ -575,7 +575,7 @@ export const TracesMapping = ({
 
           return edge;
         })
-        .filter((x) => x) as Workflow["edges"]),
+        .filter((x) => x) as StudioWorkflow["edges"]),
     ];
 
     if (!skipSettingDefaultEdges) {

@@ -19,14 +19,15 @@ import {
 } from "@langwatch/workflow-contract";
 import { captureException } from "~/utils/posthogErrorCapture";
 import {
-  type Workflow,
-  workflowJsonSchema,
-} from "../../../optimization_studio/types/dsl";
-import { migrateDSLVersion } from "../../../optimization_studio/types/migrate";
+  parseStudioWorkflow,
+  type StudioWorkflow,
+  studioWorkflowSchema,
+} from "@langwatch/workflow-contract";
+import { migrateDSLVersion } from "@langwatch/workflow-contract";
 import {
   clearDsl,
   recursiveAlphabeticallySortedKeys,
-} from "../../../optimization_studio/utils/dslUtils";
+} from "@langwatch/workflow-contract";
 import { mergeLocalConfigsIntoDsl } from "../../../optimization_studio/utils/mergeLocalConfigs";
 import { wrapAiCall } from "../../modelProviders/aiCallFailedError";
 import { featureByKey } from "../../modelProviders/featureRegistry";
@@ -58,7 +59,7 @@ export const workflowRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-        dsl: workflowJsonSchema,
+        dsl: studioWorkflowSchema,
         commitMessage: z.string(),
         publish: z.boolean().optional(), // Auto-publish the first version (useful for evaluator workflows)
       }),
@@ -375,9 +376,7 @@ export const workflowRouter = createTRPCRouter({
       // told how to fix — offered them an error id for a workflow that had
       // simply been deleted.
       if (workflow.currentVersion) {
-        workflow.currentVersion.dsl = migrateDSLVersion(
-          workflow.currentVersion.dsl as unknown as Workflow,
-        ) as any;
+        workflow.currentVersion.dsl = migrateDSLVersion(workflow.currentVersion.dsl);
       }
 
       return workflow;
@@ -446,7 +445,7 @@ export const workflowRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         workflowId: z.string(),
-        dsl: workflowJsonSchema,
+        dsl: studioWorkflowSchema,
         setAsLatestVersion: z.boolean(),
       }),
     )
@@ -469,7 +468,7 @@ export const workflowRouter = createTRPCRouter({
         projectId: z.string(),
         workflowId: z.string(),
         commitMessage: z.string(),
-        dsl: workflowJsonSchema,
+        dsl: studioWorkflowSchema,
       }),
     )
     .permission("workflows:update")
@@ -590,9 +589,9 @@ export const workflowRouter = createTRPCRouter({
       const nextVersion = `${parseInt(versionMajor ?? "0") + 1}`;
 
       // Deep clone DSL to ensure mutability
-      const dsl = JSON.parse(
-        JSON.stringify(sourceWorkflow.latestVersion.dsl),
-      ) as Workflow;
+      const dsl = parseStudioWorkflow(
+        JSON.parse(JSON.stringify(sourceWorkflow.latestVersion.dsl)),
+      );
 
       // Update the workflow_id to match the copied workflow
       dsl.workflow_id = workflow.id;
@@ -681,9 +680,9 @@ export const workflowRouter = createTRPCRouter({
       }
 
       // Deep clone DSL to ensure mutability
-      const dsl = JSON.parse(
-        JSON.stringify(workflow.latestVersion.dsl),
-      ) as Workflow;
+      const dsl = parseStudioWorkflow(
+        JSON.parse(JSON.stringify(workflow.latestVersion.dsl)),
+      );
 
       const results = [];
 
@@ -723,7 +722,7 @@ export const workflowRouter = createTRPCRouter({
         const nextVersion = `${parseInt(versionMajor ?? "0") + 1}`;
 
         // Update the workflow_id to match the copy
-        const copyDsl = JSON.parse(JSON.stringify(dsl)) as Workflow;
+        const copyDsl = parseStudioWorkflow(JSON.parse(JSON.stringify(dsl)));
         copyDsl.workflow_id = copy.id;
 
         // Create a new version in the copy with the source's latest DSL
@@ -901,8 +900,8 @@ export const workflowRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-        prevDsl: workflowJsonSchema,
-        newDsl: workflowJsonSchema,
+        prevDsl: studioWorkflowSchema,
+        newDsl: studioWorkflowSchema,
       }),
     )
     .permission("workflows:update")
@@ -1024,7 +1023,7 @@ export const copyWorkflowWithDatasets = async ({
   sourceProjectId: string;
   copyDatasets?: boolean;
   copiedFromWorkflowId?: string;
-}): Promise<{ workflowId: string; dsl: Workflow }> => {
+}): Promise<{ workflowId: string; dsl: StudioWorkflow }> => {
   if (!workflow.latestVersion?.dsl) {
     throw new TRPCError({
       code: "NOT_FOUND",
@@ -1033,9 +1032,9 @@ export const copyWorkflowWithDatasets = async ({
   }
 
   // Deep clone DSL to ensure mutability
-  const dsl = JSON.parse(
-    JSON.stringify(workflow.latestVersion.dsl),
-  ) as Workflow;
+  const dsl = parseStudioWorkflow(
+    JSON.parse(JSON.stringify(workflow.latestVersion.dsl)),
+  );
   const datasetIdMap = new Map<string, { id: string; name: string }>();
 
   if (copyDatasets) {
@@ -1141,7 +1140,7 @@ export const saveOrCommitWorkflowVersion = async ({
   input: {
     projectId: string;
     workflowId: string;
-    dsl: z.infer<typeof workflowJsonSchema>;
+    dsl: z.infer<typeof studioWorkflowSchema>;
   };
   autoSaved: boolean;
   commitMessage: string;
@@ -1188,8 +1187,8 @@ async function prepareWorkflowDsl({
 }: {
   prisma: PrismaClient;
   projectId: string;
-  dsl: z.infer<typeof workflowJsonSchema>;
-}): Promise<z.infer<typeof workflowJsonSchema>> {
+  dsl: z.infer<typeof studioWorkflowSchema>;
+}): Promise<z.infer<typeof studioWorkflowSchema>> {
   // Cast required: input.dsl.nodes is z.array(z.any()) from the Zod schema,
   // while mergeLocalConfigsIntoDsl expects Node<Component>[]. The Zod schema
   // uses z.any() for nodes because the DSL node types are too polymorphic

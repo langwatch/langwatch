@@ -18,7 +18,7 @@ import { Dialog } from "~/components/ui/dialog";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { CodeEditor } from "~/optimization_studio/components/code/CodeEditorModal";
-import type { Field } from "~/optimization_studio/types/dsl";
+import type { Field } from "@langwatch/workflow-contract";
 import { FieldTypeSelect } from "@langwatch/prompt-web";
 import {
   TYPE_LABELS,

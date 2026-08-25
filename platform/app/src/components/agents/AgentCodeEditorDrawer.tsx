@@ -41,7 +41,7 @@ import { CodeEditorModal } from "~/optimization_studio/components/code/CodeEdito
 import type {
   CodeComponentConfig,
   Field as DSLField,
-} from "~/optimization_studio/types/dsl";
+} from "@langwatch/workflow-contract";
 import {
   buildCodeConfig,
   DEFAULT_CODE,

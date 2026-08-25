@@ -10,7 +10,10 @@ import {
   type AgentsWorkflowPort,
 } from "@langwatch/agent-server";
 import type { PrismaClient } from "~/generated/prisma/client";
-import type { Workflow } from "~/optimization_studio/types/dsl";
+import {
+  parseStudioWorkflow,
+  type StudioWorkflow,
+} from "@langwatch/workflow-contract";
 import { workflowAgentFields } from "~/server/agents/agent-fields";
 import type { Session } from "~/server/auth";
 import type { WorkflowService } from "@langwatch/workflow-contract";
@@ -50,7 +53,9 @@ export class AgentsFeature {
           workflows.map((workflow) => [
             workflow.id,
             workflowAgentFields(
-              workflow.currentVersion?.dsl as Workflow | undefined,
+              workflow.currentVersion?.dsl
+                ? parseStudioWorkflow(workflow.currentVersion.dsl)
+                : undefined,
             ),
           ]),
         );

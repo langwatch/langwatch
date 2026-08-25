@@ -20,8 +20,8 @@ import { SmallLabel } from "../../components/SmallLabel";
 import { InputGroup } from "../../components/ui/input-group";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import type { Workflow } from "../types/dsl";
+import { useWorkflowStore } from "@langwatch/workflow-web";
+import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { useVersionState } from "./History";
 
 export const VersionToBeUsed = () => {
@@ -117,7 +117,7 @@ export function NewVersionFields({
   > | null>(null);
 
   const generateCommitMessageCallback = useCallback(
-    (prevDsl: Workflow, newDsl: Workflow, options?: { force?: boolean }) => {
+    (prevDsl: StudioWorkflow, newDsl: StudioWorkflow, options?: { force?: boolean }) => {
       // The explicit sparkles click forces through: failing there is
       // user-initiated, and the missing-model toast is the answer.
       if (!isModelConfigured && !options?.force) {
@@ -148,7 +148,7 @@ export function NewVersionFields({
   );
 
   const debouncedGenerateCommitMessage = useDebounceCallback(
-    (prevDsl: Workflow, newDsl: Workflow) => {
+    (prevDsl: StudioWorkflow, newDsl: StudioWorkflow) => {
       generateCommitMessageCallback(prevDsl, newDsl);
     },
     500,

@@ -1,4 +1,4 @@
-import type { Component, Evaluator, Signature } from "../types/dsl";
+import type { Component, Evaluator, Signature } from "@langwatch/workflow-contract";
 
 /** Checks whether a node has unsaved local changes (localConfig for evaluators, localPromptConfig for signatures). */
 export function hasUnsavedChanges(data: Component): boolean {

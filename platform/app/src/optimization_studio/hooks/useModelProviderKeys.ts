@@ -1,12 +1,12 @@
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
-import type { Component, LLMConfig, Signature, Workflow } from "../types/dsl";
+import type { Component, LLMConfig, Signature, StudioWorkflow } from "@langwatch/workflow-contract";
 
 export const useModelProviderKeys = ({
   workflow,
   extra_llms,
 }: {
-  workflow: Workflow;
+  workflow: StudioWorkflow;
   extra_llms?: LLMConfig[];
 }) => {
   const { modelProviders } = useOrganizationTeamProject();

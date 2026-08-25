@@ -4,7 +4,7 @@ import type {
   HttpAuth,
   HttpHeader,
   HttpMethod,
-} from "~/optimization_studio/types/dsl";
+} from "@langwatch/workflow-contract";
 import { api } from "~/utils/api";
 import type { HttpTestResult } from "./HttpTestPanel";
 

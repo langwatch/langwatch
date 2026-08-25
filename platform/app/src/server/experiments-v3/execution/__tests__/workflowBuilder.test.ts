@@ -8,7 +8,7 @@ import type {
   HttpComponentConfig,
   LlmPromptConfigComponent,
   SignatureComponentConfig,
-} from "~/optimization_studio/types/dsl";
+} from "@langwatch/workflow-contract";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import type { ExecutionCell } from "../types";

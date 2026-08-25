@@ -5,7 +5,7 @@ import {
   canConvergeOnInput,
   computeNodeGuards,
   guardsAreMutuallyExclusive,
-} from "../edgeConvergence";
+} from "@langwatch/workflow-web";
 
 const node = (id: string, type: string): Node => ({
   id,

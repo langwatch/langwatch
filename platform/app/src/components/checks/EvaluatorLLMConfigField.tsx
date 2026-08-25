@@ -11,7 +11,7 @@ import {
 } from "~/components/ModelSelector";
 import { NoModelsConfiguredCallout } from "~/components/NoModelsConfiguredCallout";
 import { Popover } from "~/components/ui/popover";
-import type { LLMConfig } from "~/optimization_studio/types/dsl";
+import type { LLMConfig } from "@langwatch/workflow-contract";
 
 /**
  * LLM config parameter keys that the popover can read/write.

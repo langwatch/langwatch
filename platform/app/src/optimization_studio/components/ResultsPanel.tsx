@@ -25,9 +25,9 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { api } from "../../utils/api";
 import { slugify } from "../../utils/slugify";
 import { useRunEvalution } from "../hooks/useRunEvalution";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import type { Entry, Workflow } from "../types/dsl";
-import { getWorkflowEntryOutputs } from "../utils/workflowFields";
+import { useWorkflowStore } from "@langwatch/workflow-web";
+import type { Entry, StudioWorkflow } from "@langwatch/workflow-contract";
+import { getWorkflowEntryOutputs } from "@langwatch/workflow-contract";
 import { isExperimentQueryEnabled } from "./evaluationQueryEnabled";
 import { OpenFullResultsButton } from "./OpenFullResultsButton";
 import { RunViaApiButton } from "./RunViaApiButton";
@@ -108,7 +108,7 @@ export function EvaluationResults({
 }: {
   workflowId?: string;
   experimentId?: string;
-  evaluationState: Workflow["state"]["evaluation"];
+  evaluationState: StudioWorkflow["state"]["evaluation"];
   sidebarProps?: StackProps;
 }) {
   const { project } = useOrganizationTeamProject();

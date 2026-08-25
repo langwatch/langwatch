@@ -22,11 +22,11 @@ let mockEdges: Array<{
 let mockWorkflowType = "workflow";
 
 vi.mock(
-  "~/optimization_studio/hooks/useWorkflowStore",
+  "@langwatch/workflow-web",
   async (importOriginal) => {
     const actual =
       await importOriginal<
-        typeof import("~/optimization_studio/hooks/useWorkflowStore")
+        typeof import("@langwatch/workflow-web")
       >();
     return {
       ...actual,
@@ -58,7 +58,7 @@ vi.mock("../BasePropertiesPanel", async (importOriginal) => {
   };
 });
 
-import type { End } from "../../../types/dsl";
+import type { End } from "@langwatch/workflow-contract";
 import {
   EndPropertiesPanel,
   EVALUATOR_RESULT_FIELDS,

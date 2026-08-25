@@ -31,7 +31,7 @@ vi.mock("~/optimization_studio/hooks/usePostEvent", () => ({
   }),
 }));
 
-vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
+vi.mock("@langwatch/workflow-web", () => ({
   useWorkflowStore: (selector: any) =>
     selector({
       getWorkflow: mockGetWorkflow,

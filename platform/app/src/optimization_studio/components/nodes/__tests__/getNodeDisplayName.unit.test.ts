@@ -25,13 +25,13 @@ vi.mock("../../../hooks/useComponentExecution", () => ({
 vi.mock("../../../hooks/useWorkflowExecution", () => ({
   useWorkflowExecution: () => ({}),
 }));
-vi.mock("../../../hooks/useWorkflowStore", () => ({
+vi.mock("@langwatch/workflow-web", () => ({
   useWorkflowStore: () => ({}),
 }));
-vi.mock("../../../utils/nodeUtils", () => ({
+vi.mock("@langwatch/workflow-contract", () => ({
   checkIsEvaluator: () => false,
 }));
-vi.mock("../../../utils/unsavedChanges", () => ({
+vi.mock("@langwatch/workflow-web", () => ({
   hasUnsavedChanges: () => false,
 }));
 vi.mock("../../ColorfulBlockIcons", () => ({

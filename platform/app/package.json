@@ -121,6 +121,7 @@
     "@langwatch/dataset-server": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@langwatch/workflow-server": "workspace:*",
+    "@langwatch/workflow-web": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/entitlement-server": "workspace:*",

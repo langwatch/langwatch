@@ -1,9 +1,7 @@
-import type { Node } from "@xyflow/react";
-import type { z } from "zod";
-import type { workflowJsonSchema } from "../types/dsl";
+import type { StudioNode, StudioWorkflow } from "./studio-workflow";
 
 export const clearDsl = (
-  dsl: z.infer<typeof workflowJsonSchema>,
+  dsl: StudioWorkflow,
   includeExecutionStates = false,
 ) => {
   return {
@@ -15,7 +13,7 @@ export const clearDsl = (
       delete edge_.selected;
       return edge_;
     }),
-    nodes: dsl.nodes.map((node: Node) => {
+    nodes: dsl.nodes.map((node: StudioNode) => {
       const node_ = {
         ...node,
         data: { ...node.data },
@@ -37,8 +35,8 @@ export const clearDsl = (
 };
 
 export const hasDSLChanged = (
-  dslCurrent: z.infer<typeof workflowJsonSchema>,
-  dslPrevious: z.infer<typeof workflowJsonSchema>,
+  dslCurrent: StudioWorkflow,
+  dslPrevious: StudioWorkflow,
   includeExecutionStates: boolean,
 ) => {
   return (

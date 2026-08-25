@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { type LLMConfig, llmConfigSchema } from "./dsl";
+import { type LLMConfig, llmConfigSchema } from "@langwatch/workflow-contract";
 
 export const optimizerParamsSchema = z.object({
   llm: llmConfigSchema.optional().nullable(),

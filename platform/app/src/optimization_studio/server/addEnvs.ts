@@ -7,7 +7,11 @@ import { prisma } from "../../server/db";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
 import { decrypt } from "../../utils/encryption";
 import { normalizeToSnakeCase } from "../components/properties/llm-configs/normalizeToSnakeCase";
-import type { LLMConfig, ServerWorkflow, Workflow } from "../types/dsl";
+import {
+  parseStudioWorkflow,
+  type LLMConfig,
+  type ServerWorkflow,
+} from "@langwatch/workflow-contract";
 import type { StudioClientEvent } from "../types/events";
 
 /**
@@ -59,24 +63,25 @@ export const addEnvs = async (
     secrets[secret.name] = decrypt(secret.encryptedValue);
   }
 
-  const workflow_id = event.payload.workflow.workflow_id;
+  const studioWorkflow = parseStudioWorkflow(event.payload.workflow);
+  const workflow_id = studioWorkflow.workflow_id;
   if (!workflow_id) {
     throw new Error("Workflow ID is required");
   }
 
   const onlyCustomKeys =
-    event.payload.workflow.nodes.some((node) => node.type === "code") ||
+    studioWorkflow.nodes.some((node) => node.type === "code") ||
     event.type === "execute_optimization" ||
     event.type === "execute_evaluation";
 
   const workflow: ServerWorkflow = {
-    ...(event.payload.workflow as Workflow),
+    ...studioWorkflow,
     workflow_id,
     api_key: apiKey,
     project_id: projectId,
     secrets,
     nodes: await Promise.all(
-      (event.payload.workflow.nodes as Workflow["nodes"]).map(async (node) => {
+      studioWorkflow.nodes.map(async (node) => {
         const parameters = await Promise.all(
           node.data.parameters?.map(async (p) => {
             if (p.type === "llm") {

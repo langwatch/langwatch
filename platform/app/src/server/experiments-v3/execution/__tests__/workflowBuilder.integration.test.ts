@@ -7,7 +7,7 @@ import type {
 import {
   LATEST_SPEC_VERSION,
   type LlmPromptConfigComponent,
-} from "~/optimization_studio/types/dsl";
+} from "@langwatch/workflow-contract";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import type { ExecutionCell, WorkflowBuilderInput } from "../types";

@@ -97,7 +97,7 @@ vi.mock("~/utils/api", () => {
   };
 });
 
-vi.mock("../../hooks/useWorkflowStore", () => ({
+vi.mock("@langwatch/workflow-web", () => ({
   useWorkflowStore: (selector: (s: any) => any) =>
     selector({
       workflow_id: "wf-1",

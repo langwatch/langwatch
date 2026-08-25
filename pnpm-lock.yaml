@@ -2658,6 +2658,15 @@ importers:
 
   packages/features/workflow/contract:
     dependencies:
+      '@langwatch/agent-contract':
+        specifier: workspace:*
+        version: link:../../agent/contract
+      '@langwatch/dataset-contract':
+        specifier: workspace:*
+        version: link:../../dataset/contract
+      '@langwatch/evaluator-contract':
+        specifier: workspace:*
+        version: link:../../evaluator/contract
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -2684,6 +2693,61 @@ importers:
         specifier: ^5.1.5
         version: 5.1.16
     devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/features/workflow/web:
+    dependencies:
+      '@langwatch/agent-contract':
+        specifier: workspace:*
+        version: link:../../agent/contract
+      '@langwatch/dataset-contract':
+        specifier: workspace:*
+        version: link:../../dataset/contract
+      '@langwatch/evaluator-contract':
+        specifier: workspace:*
+        version: link:../../evaluator/contract
+      '@langwatch/workflow-contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@xyflow/react':
+        specifier: ^12.11.1
+        version: 12.11.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(immer@11.1.8)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      fast-deep-equal:
+        specifier: ^3.1.3
+        version: 3.1.3
+      lodash-es:
+        specifier: ^4.17.21
+        version: 4.18.1
+      nanoid:
+        specifier: ^5.1.5
+        version: 5.1.16
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+      zundo:
+        specifier: ^2.3.0
+        version: 2.3.0(zustand@4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8))
+      zustand:
+        specifier: ^4.5.7
+        version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
+    devDependencies:
+      '@types/react':
+        specifier: ^19.2.14
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.4(@types/react@19.2.18)
+      react:
+        specifier: ^19.2.7
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.8(react@19.2.8)
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -3264,6 +3328,9 @@ importers:
       '@langwatch/workflow-server':
         specifier: workspace:*
         version: link:../../packages/features/workflow/server
+      '@langwatch/workflow-web':
+        specifier: workspace:*
+        version: link:../../packages/features/workflow/web
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)

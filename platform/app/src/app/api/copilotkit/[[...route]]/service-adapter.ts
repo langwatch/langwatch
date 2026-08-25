@@ -11,8 +11,8 @@ import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import {
   LATEST_SPEC_VERSION,
   type LlmPromptConfigComponent,
-  type Workflow,
-} from "~/optimization_studio/types/dsl";
+  type StudioWorkflow,
+} from "@langwatch/workflow-contract";
 import type {
   StudioClientEvent,
   StudioServerEvent,
@@ -374,7 +374,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     nodeId: string;
     formValues: PromptConfigFormValues;
     messagesHistory: ChatMessage[];
-  }): Workflow {
+  }): StudioWorkflow {
     const { workflowId, nodeId, formValues, messagesHistory } = params;
     const nodeData = this.buildNodeData({
       formValues,

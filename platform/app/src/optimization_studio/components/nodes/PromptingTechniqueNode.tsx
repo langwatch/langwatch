@@ -6,8 +6,8 @@ import { useDrop } from "react-dnd";
 import { MoreHorizontal, Trash2 } from "react-feather";
 import { useColorModeValue } from "../../../components/ui/color-mode";
 import { Menu } from "../../../components/ui/menu";
-import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import type { ComponentType, PromptingTechnique } from "../../types/dsl";
+import { useWorkflowStore } from "@langwatch/workflow-web";
+import type { ComponentType, PromptingTechnique } from "@langwatch/workflow-contract";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 import { ComponentNode, selectionColor } from "./Nodes";
 

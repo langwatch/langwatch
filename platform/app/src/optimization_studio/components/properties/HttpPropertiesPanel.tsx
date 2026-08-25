@@ -17,9 +17,9 @@ import type {
   HttpAuth,
   HttpHeader,
   HttpMethod,
-} from "~/optimization_studio/types/dsl";
-import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import type { Component, Field as DslField } from "../../types/dsl";
+} from "@langwatch/workflow-contract";
+import { useWorkflowStore } from "@langwatch/workflow-web";
+import type { Component, Field as DslField } from "@langwatch/workflow-contract";
 import {
   applyMappingChange,
   buildAvailableSources,

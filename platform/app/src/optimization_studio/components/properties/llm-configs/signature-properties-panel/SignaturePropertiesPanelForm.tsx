@@ -13,7 +13,7 @@ import {
   type PromptTextAreaOnAddMention,
 } from "~/components/variables";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useSmartSetNode } from "~/optimization_studio/hooks/useSmartSetNode";
+import { useSmartSetNode } from "@langwatch/workflow-web";
 import { type PromptConfigFormValues, usePromptConfigForm } from "~/prompts";
 import { DemonstrationsField } from "~/prompts/forms/fields/DemonstrationsField";
 import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
@@ -23,8 +23,8 @@ import {
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "~/prompts/utils/llmPromptConfigUtils";
 import { api } from "~/utils/api";
-import { useWorkflowStore } from "../../../../hooks/useWorkflowStore";
-import type { LlmPromptConfigComponent } from "../../../../types/dsl";
+import { useWorkflowStore } from "@langwatch/workflow-web";
+import type { LlmPromptConfigComponent } from "@langwatch/workflow-contract";
 import { buildAvailableSources } from "../../../../utils/edgeMappingUtils";
 import { PromptSourceHeader } from "../promptSourceSelect/PromptSourceHeader";
 import { WrappedOptimizationStudioLLMConfigField } from "../WrappedOptimizationStudioLLMConfigField";

@@ -6,7 +6,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EvaluatorConfig } from "~/experiments-v3/types";
-import type { Workflow } from "~/optimization_studio/types/dsl";
+import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 
 // vi.mock is hoisted above declarations, so the scripted events live in a
@@ -57,7 +57,7 @@ const workflowDsl = {
     { id: "end", type: "end", data: {} },
   ],
   edges: [],
-} as unknown as Workflow;
+} as unknown as StudioWorkflow;
 
 const makeCell = (overrides?: Partial<ExecutionCell>): ExecutionCell => ({
   rowIndex: 0,

@@ -17,7 +17,7 @@ import type { HttpConfig, TargetConfig } from "~/experiments-v3/types";
 import type { Project } from "~/generated/prisma/client";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
-import type { HttpComponentConfig } from "~/optimization_studio/types/dsl";
+import type { HttpComponentConfig } from "@langwatch/workflow-contract";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import { getTestProject } from "~/utils/testUtils";
 import type { ExecutionCell } from "../types";

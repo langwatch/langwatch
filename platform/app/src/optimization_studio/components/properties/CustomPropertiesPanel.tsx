@@ -8,9 +8,12 @@ import { Link } from "../../../components/ui/link";
 import { toaster } from "../../../components/ui/toaster";
 import { formatTimeAgo } from "../../../utils/formatTimeAgo";
 import { useComponentVersion } from "../../hooks/useComponentVersion";
-import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import type { Custom, Workflow } from "../../types/dsl";
-import { getInputsOutputs } from "../../utils/nodeUtils";
+import { useWorkflowStore } from "@langwatch/workflow-web";
+import {
+  getInputsOutputs,
+  parseStudioWorkflow,
+  type Custom,
+} from "@langwatch/workflow-contract";
 import { VersionBox } from "../History";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
 
@@ -39,10 +42,9 @@ const CustomComponentInfo = ({ node }: { node: Node<Custom> }) => {
   const updateNodeInternals = useUpdateNodeInternals();
 
   const updateToLatestVersion = () => {
-    const { inputs, outputs } = getInputsOutputs(
-      (publishedVersion?.dsl as unknown as Workflow).edges,
-      (publishedVersion?.dsl as unknown as Workflow).nodes,
-    );
+    if (!publishedVersion?.dsl) return;
+    const workflow = parseStudioWorkflow(publishedVersion.dsl);
+    const { inputs, outputs } = getInputsOutputs(workflow.edges, workflow.nodes);
 
     setNode({
       id: node.id,

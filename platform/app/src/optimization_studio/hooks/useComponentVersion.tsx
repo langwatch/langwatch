@@ -2,7 +2,7 @@ import type { Node, NodeProps } from "@xyflow/react";
 
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import type { Custom } from "../types/dsl";
+import type { Custom } from "@langwatch/workflow-contract";
 
 export const useComponentVersion = (
   node: NodeProps<Node<Custom>> | Node<Custom>,

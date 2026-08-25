@@ -5,8 +5,8 @@ import {
   type Entry,
   LATEST_SPEC_VERSION,
   type Signature,
-  type Workflow,
-} from "../types/dsl";
+  type StudioWorkflow,
+} from "@langwatch/workflow-contract";
 
 export const entryNode = () => ({
   id: "entry",
@@ -35,7 +35,7 @@ export const entryNode = () => ({
   } satisfies Entry,
 });
 
-export const blankTemplate: Workflow = {
+export const blankTemplate: StudioWorkflow = {
   spec_version: LATEST_SPEC_VERSION,
   name: "Blank Template",
   icon: "🧩",
@@ -104,7 +104,7 @@ export const blankTemplate: Workflow = {
         inputs: [{ identifier: "output", type: "str" }],
       } satisfies End,
     },
-  ] satisfies Workflow["nodes"],
+  ] satisfies StudioWorkflow["nodes"],
   edges: [
     {
       id: "e0-1",

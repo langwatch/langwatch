@@ -11,8 +11,8 @@ import type { ExperimentService } from "@langwatch/experiment-contract";
 import type {
   Entry,
   Field,
-  Workflow as WorkflowDSL,
-} from "~/optimization_studio/types/dsl";
+  StudioWorkflow as WorkflowDSL,
+} from "@langwatch/workflow-contract";
 import { loadExecutionData } from "~/server/experiments-v3/execution/dataLoader";
 import { startPollingRun } from "~/server/experiments-v3/execution/experimentRunner";
 

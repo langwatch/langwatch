@@ -3,7 +3,7 @@ import type { Node, NodeProps } from "@xyflow/react";
 import { forwardRef, type Ref } from "react";
 import { Database } from "react-feather";
 import { useGetDatasetData } from "../../hooks/useGetDatasetData";
-import type { Component, Entry } from "../../types/dsl";
+import type { Component, Entry } from "@langwatch/workflow-contract";
 import { ComponentNode, NodeSectionTitle } from "./Nodes";
 
 /**

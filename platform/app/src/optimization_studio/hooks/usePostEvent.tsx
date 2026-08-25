@@ -6,13 +6,13 @@ import { fetchSSE } from "~/utils/sse/fetchSSE";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type { BaseComponent } from "../types/dsl";
+import type { BaseComponent } from "@langwatch/workflow-contract";
 import type { StudioClientEvent, StudioServerEvent } from "../types/events";
 import {
   type CodedExecutionFailure,
   explainExecutionStateError,
 } from "../utils/executionStateError";
-import { useWorkflowStore, type WorkflowStore } from "./useWorkflowStore";
+import { useWorkflowStore, type WorkflowStore } from "@langwatch/workflow-web";
 
 const logger = createLogger("langwatch:wizard:usePostEvent");
 let pythonDisconnectedTimeout: NodeJS.Timeout | null = null;

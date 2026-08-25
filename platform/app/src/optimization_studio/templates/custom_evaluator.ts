@@ -3,8 +3,8 @@ import {
   type Entry,
   LATEST_SPEC_VERSION,
   type Signature,
-  type Workflow,
-} from "../types/dsl";
+  type StudioWorkflow,
+} from "@langwatch/workflow-contract";
 
 export const entryNode = () => ({
   id: "entry",
@@ -27,7 +27,7 @@ export const entryNode = () => ({
   } satisfies Entry,
 });
 
-export const customEvaluatorTemplate: Workflow = {
+export const customEvaluatorTemplate: StudioWorkflow = {
   spec_version: LATEST_SPEC_VERSION,
   name: "Custom Evaluator",
   icon: "✅",
@@ -131,7 +131,7 @@ Return your judgment as either TRUE (no significant cognitive biases) or FALSE (
         ],
       } satisfies End,
     },
-  ] satisfies Workflow["nodes"],
+  ] satisfies StudioWorkflow["nodes"],
   edges: [
     {
       id: "e-entry-input",

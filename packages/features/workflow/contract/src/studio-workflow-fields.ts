@@ -1,14 +1,12 @@
-import type { Edge, Node } from "@xyflow/react";
-import type { Component, Entry, Workflow } from "../types/dsl";
-import { checkIsEvaluator } from "./nodeUtils";
-
-/**
- * Field definition extracted from a workflow entry node
- */
-export interface WorkflowField {
-  identifier: string;
-  type: string;
-}
+import type {
+  Component,
+  Entry,
+  StudioEdge,
+  StudioNode,
+  StudioWorkflow,
+} from "./studio-workflow";
+import { checkIsEvaluator } from "./studio-workflow-node-utils";
+import type { WorkflowField } from "./workflow";
 
 /**
  * Check if an entry output is connected to at least one non-evaluator node.
@@ -27,8 +25,8 @@ export interface WorkflowField {
  */
 export function isOutputConnectedToNonEvaluator(
   outputIdentifier: string,
-  edges: Edge[],
-  nodes: Node<Component>[],
+  edges: StudioEdge[],
+  nodes: StudioNode<Component>[],
 ): boolean {
   // Find all edges that come from this entry output
   // Entry output handles follow the pattern "outputs.{identifier}"
@@ -62,7 +60,7 @@ export function isOutputConnectedToNonEvaluator(
  * @returns Array of field definitions from the entry node outputs
  */
 export function getWorkflowEntryOutputs(
-  workflow: Workflow | null | undefined,
+  workflow: StudioWorkflow | null | undefined,
 ): WorkflowField[] {
   if (!workflow?.nodes) {
     return [];
@@ -131,7 +129,7 @@ export function canAutoMapAllFields(fields: WorkflowField[]): boolean {
  * @returns Array of field definitions from the end node inputs
  */
 export function getWorkflowEndInputs(
-  workflow: Workflow | null | undefined,
+  workflow: StudioWorkflow | null | undefined,
 ): WorkflowField[] {
   if (!workflow?.nodes) {
     return [];

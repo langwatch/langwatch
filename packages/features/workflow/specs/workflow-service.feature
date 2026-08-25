@@ -24,6 +24,12 @@ Feature: Workflow service boundary
     Then it migrates the graph through the application port
     And updates the current pointer and display metadata together
 
+  Scenario: Studio and execution share graph migration
+    Given a persisted workflow version uses an older graph shape
+    When Studio or execution materialises that version
+    Then it uses the Workflow contract migration
+    And both paths produce the same current DSL shape
+
   Scenario: Copying referenced datasets uses the Dataset service
     Given a workflow copy includes referenced datasets
     When Workflow copies the definition into another project

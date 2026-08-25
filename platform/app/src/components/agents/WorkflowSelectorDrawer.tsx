@@ -28,7 +28,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { EmojiPickerModal } from "~/optimization_studio/components/properties/modals/EmojiPickerModal";
 import { getRandomWorkflowIcon } from "~/optimization_studio/components/workflow/NewWorkflowForm";
 import { blankTemplate } from "~/optimization_studio/templates/blank";
-import type { Workflow } from "~/optimization_studio/types/dsl";
+import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import type { AgentWithFields } from "~/server/agents/agent-fields";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
@@ -114,7 +114,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
         // Create workflow from blank template. LLM nodes without a model
         // are materialized server-side from the project's resolved default.
         const template = blankTemplate;
-        const newWorkflow: Workflow = {
+        const newWorkflow: StudioWorkflow = {
           ...template,
           name: data.name,
           description: data.description,
