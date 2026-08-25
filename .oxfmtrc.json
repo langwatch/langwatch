@@ -18,6 +18,7 @@
     "**/fixtures/**",
     "**/__fixtures__/**",
     "charts/**/templates/**",
+    "docs/docs.json",
     "specs/langy/langy-keys-plan.md",
     "specs/langy/langy-pr4-plan.md",
     "**/vendor/**",

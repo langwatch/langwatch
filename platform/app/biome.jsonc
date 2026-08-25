@@ -101,10 +101,7 @@
       "!!**/node_modules/langwatch/dist/*.d.ts",
     ],
   },
-  "formatter": {
-    "enabled": true,
-    "indentStyle": "tab",
-  },
+  "formatter": { "enabled": false },
   "linter": {
     "enabled": true,
     "rules": {
@@ -190,19 +187,6 @@
         "useGoogleFontDisplay": "warn",
         "useNamespaceKeyword": "error",
       },
-    },
-  },
-  "javascript": {
-    "formatter": {
-      "arrowParentheses": "always",
-      "indentStyle": "space",
-      "indentWidth": 2,
-      "bracketSameLine": false,
-      "bracketSpacing": true,
-      "jsxQuoteStyle": "double",
-      "quoteProperties": "asNeeded",
-      "semicolons": "always",
-      "trailingCommas": "all",
     },
   },
   "overrides": [

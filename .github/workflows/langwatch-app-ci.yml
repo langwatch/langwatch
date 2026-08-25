@@ -950,6 +950,9 @@ jobs:
           pnpm install --frozen-lockfile --filter "@langwatch/server..."
           pnpm --filter @langwatch/server run test:invariants
 
+      - name: Oxfmt (blocking)
+        run: pnpm format:check
+
       # THE GATE. Everything below this step is annotation, not enforcement.
       #
       # reviewdog-action-biome runs with fail_on_error: false and pipes Biome's
@@ -1051,7 +1054,7 @@ jobs:
 
           # Biome exits non-zero whenever it reports anything; the gate is the
           # script's decision, not this line's, so don't abort here.
-          pnpm --dir platform/app exec biome check --reporter=rdjson \
+          pnpm --dir platform/app exec biome lint --reporter=rdjson \
             "${BIOME_PATHS[@]}" > biome.raw.json || true
           echo "diagnostics: $(jq '.diagnostics | length' biome.raw.json)"
 

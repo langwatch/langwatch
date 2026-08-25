@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Fail when a PR ADDS Biome violations, measured against a format-normalized
+# Fail when a PR ADDS Biome violations, measured against an Oxfmt-normalized
 # merge base.
 #
 # WHY NOT reviewdog's `filter-mode=added`, which is the obvious answer.
@@ -19,7 +19,7 @@
 # worse than it found it?" -- by counting violations per (file, rule) on both
 # sides and failing only on an increase.
 #
-# The base is FORMATTED FIRST, with the head's own config. Without that step the
+# The base is FORMATTED FIRST, with the head's Oxfmt config. Without that step the
 # comparison is not like-for-like for a rule that counts lines: a 58-line
 # function whose signature the formatter rewraps onto four lines becomes a
 # 61-line function and trips a 60-line limit that nobody's edit went near. On
@@ -67,9 +67,14 @@ app_dir() {
 HEAD_APP="$(app_dir "$REPO_ROOT")"
 
 BIOME="$REPO_ROOT/$HEAD_APP/node_modules/.bin/biome"
+OXFMT="$REPO_ROOT/node_modules/.bin/oxfmt"
 
 if [ ! -x "$BIOME" ]; then
   echo "biome not found at $BIOME -- run pnpm install at the repo root first (single workspace, ADR-076)" >&2
+  exit 2
+fi
+if [ ! -x "$OXFMT" ]; then
+  echo "oxfmt not found at $OXFMT -- run pnpm install at the repo root first" >&2
   exit 2
 fi
 
@@ -110,6 +115,7 @@ fi
 
 rm -f "$BASE_TREE"/biome.json "$BASE_TREE"/biome.jsonc
 cp "$REPO_ROOT/biome.jsonc" "$BASE_TREE/biome.jsonc"
+cp "$REPO_ROOT/.oxfmtrc.json" "$BASE_TREE/.oxfmtrc.json"
 
 # Both sides must resolve the same dependencies or the type-aware rules
 # (noFloatingPromises, noMisusedPromises) disagree for reasons that have nothing
@@ -119,14 +125,13 @@ if [ -d "$REPO_ROOT/node_modules" ]; then
   ln -sfn "$REPO_ROOT/node_modules" "$BASE_TREE/node_modules"
 fi
 
-# Normalize the base's formatting. --linter-enabled=false so this only rewrites
-# layout: it must not fix a lint violation, or the base would look better than
-# it is and the PR would inherit the difference as a regression.
-(cd "$BASE_TREE/$BASE_APP" && "$BIOME" check --write --linter-enabled=false "${PATHS[@]}" >/dev/null 2>&1) || true
+# Normalize the base with the repository formatter. It must not fix lint, or the
+# base would look better than it is and the PR would inherit the difference.
+(cd "$BASE_TREE/$BASE_APP" && "$OXFMT" --write --config "$BASE_TREE/.oxfmtrc.json" --disable-nested-config "${PATHS[@]}" >/dev/null 2>&1) || true
 
 BASE_RDJSON="$BASE_TREE/base.rdjson"
 # Biome exits non-zero whenever it reports anything, which is the normal case.
-(cd "$BASE_TREE/$BASE_APP" && "$BIOME" check --reporter=rdjson "${PATHS[@]}" > "$BASE_RDJSON" 2>/dev/null) || true
+(cd "$BASE_TREE/$BASE_APP" && "$BIOME" lint --reporter=rdjson "${PATHS[@]}" > "$BASE_RDJSON" 2>/dev/null) || true
 
 # An unreadable or empty base would make every head diagnostic look new. That
 # fails loudly rather than quietly, but the message would be nonsense, so say

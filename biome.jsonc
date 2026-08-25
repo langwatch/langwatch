@@ -12,7 +12,7 @@
   //     configuration.
   //
   // It prints that and exits before checking a single file. Every scripted run
-  // (`pnpm lint`, `lint:fix`, `lint:plugins`, `format`, and the CI gate in
+  // (`pnpm lint`, `lint:fix`, `lint:plugins`, and the CI gate in
   // ./.github/scripts/biome-new-violations.sh) invokes Biome from platform/app,
   // so none of them ever hit it. An editor, an agent, or anyone running
   // `biome check` from the repo root hit it every time.
@@ -24,9 +24,8 @@
   // Without this the rest of the repo -- packages/, sdks/, services/, mcp/,
   // tests/ -- would be pulled in under the DEFAULT ruleset, since none of it
   // has a config of its own: 58 diagnostics in packages/api/src alone, mostly
-  // formatting. That is noise on `check` and damage on `check --write`, which
-  // would reformat packages/ (tabs) to the default style (spaces) in a tree no
-  // CI job gates.
+  // formatting. Oxfmt owns formatting for the whole repository; this config
+  // only keeps the remaining Biome lint rules scoped to the App.
   //
   // Adding a second config below this one means adding its directory here too.
   "files": {
