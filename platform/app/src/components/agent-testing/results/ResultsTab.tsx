@@ -14,6 +14,7 @@ import { useCallback } from "react";
 import { usePeriodSelector } from "~/components/PeriodSelector";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { PLAN_EDITOR_DRAWER } from "../plan/usePlanEditor";
 import { useAgentTestingRouting } from "../useAgentTestingRouting";
 import { RunPlanDetail } from "./RunPlanDetail";
 import { RunPlansTable } from "./RunPlansTable";
@@ -47,7 +48,7 @@ export function ResultsTab({ isSseConnected }: ResultsTabProps) {
 
   const handleEditPlan = useCallback(
     (suiteId: string) => {
-      openDrawer("suiteEditor", { urlParams: { suiteId } });
+      openDrawer(PLAN_EDITOR_DRAWER, { urlParams: { suiteId } });
     },
     [openDrawer],
   );

@@ -244,6 +244,10 @@ const SuiteFormDrawer = lazyDefault({
   factory: () => import("./suites/SuiteFormDrawer"),
   key: "SuiteFormDrawer",
 });
+const AgentTestingPlanModal = lazyDefault({
+  factory: () => import("./agent-testing/plan/PlanModal"),
+  key: "PlanModal",
+});
 const TargetTypeSelectorDrawer = lazyDefault({
   factory: () => import("./targets/TargetTypeSelectorDrawer"),
   key: "TargetTypeSelectorDrawer",
@@ -324,6 +328,8 @@ export const drawers = {
   scenarioVersionHistory: ScenarioVersionHistoryDrawer,
   // Suites
   suiteEditor: SuiteFormDrawer,
+  // Agent Testing v2 draws the same run plan in a dialog of its own.
+  agentTestingPlanEditor: AgentTestingPlanModal,
   // Data privacy
   dataPrivacyRule: DataPrivacyRuleDrawer,
   // AI governance

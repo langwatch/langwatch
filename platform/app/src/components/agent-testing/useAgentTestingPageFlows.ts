@@ -13,6 +13,7 @@ import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { useOpenLiveRun } from "./cases/useOpenLiveRun";
+import { PLAN_EDITOR_DRAWER } from "./plan/usePlanEditor";
 import type { AgentTestingSelection } from "./useAgentTestingRouting";
 import { useAgentTestingStore } from "./useAgentTestingStore";
 
@@ -62,8 +63,8 @@ export function useNewRunPlanFlow(
   );
 
   return useCallback(() => {
-    setFlowCallbacks("suiteEditor", { onSaved: handleSuiteSaved });
-    openDrawer("suiteEditor");
+    setFlowCallbacks(PLAN_EDITOR_DRAWER, { onSaved: handleSuiteSaved });
+    openDrawer(PLAN_EDITOR_DRAWER);
   }, [openDrawer, setFlowCallbacks, handleSuiteSaved]);
 }
 

@@ -43,7 +43,7 @@ export function AgentTestingPage() {
   const { project } = useOrganizationTeamProject();
   // The rows open a run's detail and the header opens the run plan editor,
   // two separate downloads. Fetch them while the person reads the page.
-  usePreloadDrawer("scenarioRunDetail", "suiteEditor");
+  usePreloadDrawer("scenarioRunDetail", "agentTestingPlanEditor");
 
   const routing = useAgentTestingRouting();
   useHydrateViewFromUrl();
