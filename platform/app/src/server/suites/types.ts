@@ -7,7 +7,11 @@
 
 import { z } from "zod";
 import { FieldMappingSchema } from "../scenarios/field-mapping";
-import { runParameterValuesSchema } from "../scenarios/parameters";
+import {
+  MAX_PARAMETER_NAME_LENGTH,
+  MAX_RUN_PARAMETER_KEYS,
+  runParameterValuesSchema,
+} from "../scenarios/parameters";
 
 /**
  * The kinds of SimulationSuite.
@@ -45,6 +49,17 @@ const suiteTargetFields = z.object({
    * run and travel with the run alone.
    */
   runParameters: runParameterValuesSchema.optional(),
+  /**
+   * The names of the parameters the last run marked secret.
+   *
+   * The value of a secret is never written down. The name is, so the next run
+   * dialog shows the row again with an empty field and asks for the value
+   * instead of losing the row.
+   */
+  runSecretParameterNames: z
+    .array(z.string().max(MAX_PARAMETER_NAME_LENGTH))
+    .max(MAX_RUN_PARAMETER_KEYS)
+    .optional(),
 });
 
 /**

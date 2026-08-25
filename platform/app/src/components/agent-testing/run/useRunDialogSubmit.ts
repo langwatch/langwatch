@@ -25,10 +25,13 @@ type RunParameters = ReturnType<typeof toLineRunParameters>;
 function toSuiteTargets({
   target,
   runParameters,
+  secretParameterNames,
   persistedTarget,
 }: {
   target: TargetValue;
   runParameters: RunParameters;
+  /** The keys of the secret rows; their values are never written down. */
+  secretParameterNames: string[] | undefined;
   persistedTarget?: SuiteTarget | null;
 }): SuiteTarget[] | undefined {
   if (!target) return undefined;
@@ -46,6 +49,9 @@ function toSuiteTargets({
         ? { scenarioMappings: persistedTarget.scenarioMappings }
         : {}),
       ...(runParameters ? { runParameters } : {}),
+      ...(secretParameterNames
+        ? { runSecretParameterNames: secretParameterNames }
+        : {}),
     },
   ];
 }
@@ -65,6 +71,8 @@ export type RunDialogSubmitInput = {
   runParameters: RunParameters;
   /** The overrides the suite may remember: everything but the secrets. */
   storableRunParameters: RunParameters;
+  /** The keys of the secret rows, which is all the suite may remember of them. */
+  storableSecretNames: string[] | undefined;
   onRunStarted: (info: RunStartedInfo) => void;
   onCaseRunSettled?: (scenarioId: string) => void;
   onClose: () => void;
@@ -188,6 +196,7 @@ export function useRunDialogSubmit(input: RunDialogSubmitInput) {
   const suiteTargets = toSuiteTargets({
     target: input.target,
     runParameters: input.storableRunParameters,
+    secretParameterNames: input.storableSecretNames,
     persistedTarget:
       input.subject?.kind === "suite" ? input.subject.persistedTarget : null,
   });

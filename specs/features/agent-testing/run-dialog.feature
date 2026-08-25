@@ -16,7 +16,9 @@ Feature: The run dialog
     The run options of a test suite are written onto the suite itself, so the
     next run dialog of that suite opens on them for everybody on the team: the
     target, the parameter overrides, and a prompt in place of an agent. The
-    note is the one field that never comes back.
+    note is the one field that never comes back. A secret value never joins
+    them either: a secret row is written down by its key alone, so the next
+    dialog shows the row and asks for the value again.
 
   # --- The agent section ---
 
@@ -84,13 +86,54 @@ Feature: The run dialog
     And the values declared on the cases are already filled in
     And a name written on that line is sent as the run parameter of that name
 
+  # --- The parameter block ---
+
   @integration
-  Scenario: A secret parameter keeps a masked field of its own
+  Scenario: The parameter block offers a secret parameters toggle
+    Given the run dialog with parameter overrides added
+    When the top line of the block is read
+    Then a "Secret parameters" toggle sits next to the remove control
+    And the toggle is off, so the block holds one input line
+
+  @integration
+  Scenario: Turning the toggle on converts the line into key and value rows
+    Given the run dialog with the parameter line "model=gpt-5, locale=de"
+    When "Secret parameters" is turned on
+    Then the block holds one row per pair, each with a key and a value
+    And the row of "model" holds the value "gpt-5"
+    And no value written on the line is lost
+
+  @integration
+  Scenario: Turning the toggle off writes the rows back onto the line
+    Given the run dialog in rows mode with two plain rows
+    When "Secret parameters" is turned off
+    Then the block holds the single input line again
+    And the line reads the rows back in the order they were shown
+
+  @integration
+  Scenario: A row can be added and a row can be taken away
+    Given the run dialog in rows mode with one row
+    When a row is added and a key and a value are typed into it
+    Then the run carries both values
+    And taking a row away drops its value from the run
+
+  @integration
+  Scenario: A row marked secret is masked and holds the block in rows mode
+    Given the run dialog in rows mode with a plain row and a second row
+    When the second row is marked secret
+    Then its value field hides what is typed
+    And the "Secret parameters" toggle can no longer be turned off
+    And the toggle says a secret value cannot be written on one line
+
+  @integration
+  Scenario: A declared secret parameter is a locked row of the same list
     Given a test suite whose cases declare a secret parameter
     When "Override parameters" is chosen
-    Then the secret is not on the input line, which would show what it holds
-    And it has a masked field under the line
-    And the run waits until the secret holds a value
+    Then the block opens in rows mode, with no separate secret section
+    And the declared secret is a row with its lock on and its key fixed
+    And its value starts empty, hides what is typed, and is required
+    And the plain parameters are rows of the same list
+    And the run waits until the declared secret holds a value
 
   @integration
   Scenario: The prompt chip is the last chip of the row
@@ -162,8 +205,17 @@ Feature: The run dialog
     Given a test suite whose cases declare a secret parameter
     And a run of that suite with the secret filled in
     When the run dialog for that suite is opened again
-    Then the masked field is empty
+    Then the locked row is empty
     And the run waits until the secret holds a value again
+
+  @integration
+  Scenario: A secret row is remembered by its key alone
+    Given a run of a suite with a plain row and a secret row filled in
+    When the run dialog for that suite is opened again
+    Then the block opens in rows mode
+    And the plain row holds the key and the value of the last run
+    And the secret row holds its key with an empty value the run waits for
+    And no secret value was written onto the suite
 
   @integration
   Scenario: The dialog closes and the person stays where they were

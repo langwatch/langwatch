@@ -17,6 +17,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
+import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 import { api } from "~/utils/api";
 import type { CustomizeChip } from "../shared/CustomizeChips";
 import type { PromptEntry } from "./PromptPicker";
@@ -25,6 +26,16 @@ import {
   formatStoredParameterLine,
   toLineRunParameters,
 } from "./parameter-line";
+import {
+  canCollapseRows,
+  lineFromRows,
+  missingSecretRowNames,
+  type ParameterRow,
+  rowsFromLine,
+  storableSecretRowNames,
+  toRowsRunParameters,
+  toStorableRowParameters,
+} from "./parameter-rows";
 import type { RunDialogMode, RunDialogSubject } from "./run-dialog-types";
 
 /** One key per subject the dialog can be open on, "closed" when it is not. */
@@ -57,6 +68,20 @@ function rememberedParameterLine(subject: RunDialogSubject | null): string {
   return formatStoredParameterLine(values);
 }
 
+/**
+ * The secret rows the subject remembers, by name and with no value.
+ *
+ * A run never writes a secret value down, so the row comes back empty and the
+ * next run asks for the value again.
+ */
+function rememberedSecretRows(
+  subject: RunDialogSubject | null,
+): ParameterRow[] {
+  if (subject?.kind !== "suite") return [];
+  const names = subject.persistedTarget?.runSecretParameterNames ?? [];
+  return names.map((name) => ({ name, value: "", secret: true }));
+}
+
 /** The fields of the dialog, reset whenever it opens on a new subject. */
 function useRunDialogFields(subject: RunDialogSubject | null) {
   const [target, setTarget] = useState<TargetValue>(null);
@@ -65,6 +90,12 @@ function useRunDialogFields(subject: RunDialogSubject | null) {
   const [note, setNote] = useState("");
   const [showParams, setShowParams] = useState(false);
   const [parameterLine, setParameterLine] = useState("");
+  // Null while the line is what the block holds: the rows are read off the
+  // line until something is typed into one of them.
+  const [parameterRows, setParameterRows] = useState<ParameterRow[] | null>(
+    null,
+  );
+  const [rowsRequested, setRowsRequested] = useState(false);
   const [secretValues, setSecretValues] = useState<Record<string, string>>({});
   const [inlineError, setInlineError] = useState<unknown>(null);
   const [missingProvider, setMissingProvider] = useState(false);
@@ -73,6 +104,7 @@ function useRunDialogFields(subject: RunDialogSubject | null) {
   const subjectKey = subjectKeyOf(subject);
   const initialTarget = subject?.initialTarget ?? null;
   const initialParameterLine = rememberedParameterLine(subject);
+  const initialSecretRows = rememberedSecretRows(subject);
   useEffect(() => {
     setTarget(initialTarget);
     setMode(initialTarget?.type === "prompt" ? "prompts" : "agents");
@@ -80,8 +112,14 @@ function useRunDialogFields(subject: RunDialogSubject | null) {
     // is for, so it starts empty every time.
     setShowNote(false);
     setNote("");
-    setShowParams(initialParameterLine !== "");
+    setShowParams(initialParameterLine !== "" || initialSecretRows.length > 0);
     setParameterLine(initialParameterLine);
+    setRowsRequested(initialSecretRows.length > 0);
+    setParameterRows(
+      initialSecretRows.length > 0
+        ? [...rowsFromLine(initialParameterLine), ...initialSecretRows]
+        : null,
+    );
     setSecretValues({});
     setInlineError(null);
     setMissingProvider(false);
@@ -103,6 +141,10 @@ function useRunDialogFields(subject: RunDialogSubject | null) {
     setShowParams,
     parameterLine,
     setParameterLine,
+    parameterRows,
+    setParameterRows,
+    rowsRequested,
+    setRowsRequested,
     secretValues,
     setSecretValues,
     inlineError,
@@ -157,7 +199,7 @@ function useRunDialogParameters({
   allScenarios: readonly { id: string; parameters: unknown }[] | undefined;
   fields: RunDialogFields;
 }) {
-  const { showParams, setShowParams, parameterLine, setParameterLine } = fields;
+  const { showParams, parameterLine } = fields;
   const { secretValues, setSecretValues } = fields;
 
   const parameterDefinitions = useMemo(
@@ -176,17 +218,22 @@ function useRunDialogParameters({
     [parameterDefinitions],
   );
 
-  /** Opens the overrides on the values the cases declare. */
-  const showParameters = useCallback(() => {
-    setParameterLine(formatParameterLine(parameterDefinitions));
-    setShowParams(true);
-  }, [parameterDefinitions, setParameterLine, setShowParams]);
+  // A declared secret cannot ride on the line, so the block that holds one
+  // opens on its rows and stays there.
+  const hasDeclaredSecrets = secretDefinitions.length > 0;
+  const showParameterRows = fields.rowsRequested || hasDeclaredSecrets;
 
-  const hideParameters = useCallback(() => {
-    setShowParams(false);
-    setParameterLine("");
-    setSecretValues({});
-  }, [setShowParams, setParameterLine, setSecretValues]);
+  // The line is what the block holds until a row is touched; after that the
+  // rows are, and the line is written back from them.
+  const parameterRows = useMemo(
+    () => fields.parameterRows ?? rowsFromLine(parameterLine),
+    [fields.parameterRows, parameterLine],
+  );
+
+  const { showParameters, hideParameters } = useParameterBlockToggle({
+    fields,
+    parameterDefinitions,
+  });
 
   const setSecretValue = useCallback(
     (name: string, value: string) => {
@@ -195,31 +242,185 @@ function useRunDialogParameters({
     [setSecretValues],
   );
 
-  const runParameters = showParams
-    ? toLineRunParameters({ line: parameterLine, secretValues })
-    : undefined;
+  const rowActions = useParameterRowActions({ fields, rows: parameterRows });
 
-  // What the suite is allowed to remember: the line alone. A secret is typed
-  // for one run and never written down.
-  const storableRunParameters = showParams
-    ? toLineRunParameters({ line: parameterLine, secretValues: {} })
-    : undefined;
+  /** Whether the block may fold back into the single line it started on. */
+  const canLeaveParameterRows =
+    !hasDeclaredSecrets && canCollapseRows(parameterRows);
+
+  const values = resolveParameterValues({
+    showParams,
+    showParameterRows,
+    rows: parameterRows,
+    line: parameterLine,
+    secretValues,
+  });
 
   const hasMissingSecrets =
     showParams &&
-    secretDefinitions.some(
+    (secretDefinitions.some(
       (definition) => (secretValues[definition.name] ?? "") === "",
-    );
+    ) ||
+      (showParameterRows && missingSecretRowNames(parameterRows).length > 0));
 
   return {
     parameterDefinitions,
     secretDefinitions,
+    parameterRows,
+    showParameterRows,
+    canLeaveParameterRows,
+    ...rowActions,
     showParameters,
     hideParameters,
     setSecretValue,
-    runParameters,
-    storableRunParameters,
+    ...values,
     hasMissingSecrets,
+  };
+}
+
+/** The chip that opens the parameter block, and the x that takes it away. */
+function useParameterBlockToggle({
+  fields,
+  parameterDefinitions,
+}: {
+  fields: RunDialogFields;
+  parameterDefinitions: ScenarioParameterDefinition[];
+}) {
+  const { setShowParams, setParameterLine } = fields;
+  const { setParameterRows, setRowsRequested, setSecretValues } = fields;
+
+  /** Opens the overrides on the values the cases declare. */
+  const showParameters = useCallback(() => {
+    setParameterLine(formatParameterLine(parameterDefinitions));
+    setParameterRows(null);
+    setRowsRequested(false);
+    setShowParams(true);
+  }, [
+    parameterDefinitions,
+    setParameterLine,
+    setParameterRows,
+    setRowsRequested,
+    setShowParams,
+  ]);
+
+  const hideParameters = useCallback(() => {
+    setShowParams(false);
+    setParameterLine("");
+    setParameterRows(null);
+    setRowsRequested(false);
+    setSecretValues({});
+  }, [
+    setShowParams,
+    setParameterLine,
+    setParameterRows,
+    setRowsRequested,
+    setSecretValues,
+  ]);
+
+  return { showParameters, hideParameters };
+}
+
+/** Writing on the line, moving between the two modes, and editing the rows. */
+function useParameterRowActions({
+  fields,
+  rows,
+}: {
+  fields: RunDialogFields;
+  rows: ParameterRow[];
+}) {
+  const { setParameterLine, setParameterRows, setRowsRequested } = fields;
+
+  /** Typing on the line makes the line what the rows are read from again. */
+  const editParameterLine = useCallback(
+    (line: string) => {
+      setParameterLine(line);
+      setParameterRows(null);
+    },
+    [setParameterLine, setParameterRows],
+  );
+
+  const setParameterRowsMode = useCallback(
+    (wanted: boolean) => {
+      if (wanted) {
+        setParameterRows(rows);
+        setRowsRequested(true);
+        return;
+      }
+      setParameterLine(lineFromRows(rows));
+      setParameterRows(null);
+      setRowsRequested(false);
+    },
+    [rows, setParameterLine, setParameterRows, setRowsRequested],
+  );
+
+  const updateParameterRow = useCallback(
+    (index: number, patch: Partial<ParameterRow>) => {
+      setParameterRows(
+        rows.map((row, at) => (at === index ? { ...row, ...patch } : row)),
+      );
+    },
+    [rows, setParameterRows],
+  );
+
+  const addParameterRow = useCallback(() => {
+    setParameterRows([...rows, { name: "", value: "", secret: false }]);
+  }, [rows, setParameterRows]);
+
+  const removeParameterRow = useCallback(
+    (index: number) => {
+      setParameterRows(rows.filter((_, at) => at !== index));
+    },
+    [rows, setParameterRows],
+  );
+
+  return {
+    editParameterLine,
+    setParameterRowsMode,
+    updateParameterRow,
+    addParameterRow,
+    removeParameterRow,
+  };
+}
+
+/**
+ * What the run carries, and the part of it the suite may remember.
+ *
+ * A secret value goes to the run alone. A secret row leaves its key behind, so
+ * the next dialog shows the row again and asks for the value.
+ */
+function resolveParameterValues({
+  showParams,
+  showParameterRows,
+  rows,
+  line,
+  secretValues,
+}: {
+  showParams: boolean;
+  showParameterRows: boolean;
+  rows: ParameterRow[];
+  line: string;
+  secretValues: Record<string, string>;
+}) {
+  if (!showParams) {
+    return {
+      runParameters: undefined,
+      storableRunParameters: undefined,
+      storableSecretNames: undefined,
+    };
+  }
+
+  if (!showParameterRows) {
+    return {
+      runParameters: toLineRunParameters({ line, secretValues }),
+      storableRunParameters: toLineRunParameters({ line, secretValues: {} }),
+      storableSecretNames: undefined,
+    };
+  }
+
+  return {
+    runParameters: toRowsRunParameters({ rows, secretValues }),
+    storableRunParameters: toStorableRowParameters(rows),
+    storableSecretNames: storableSecretRowNames(rows),
   };
 }
 

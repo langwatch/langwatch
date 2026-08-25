@@ -3,8 +3,9 @@
  *
  * The line reads `name=value, name=value`. It is what a person writes fastest
  * when they only want to change one value, and it is what the run dialog
- * offers. A secret cannot ride on it, because the line shows what it holds, so
- * secrets keep their own masked field.
+ * offers first. A secret cannot ride on it, because the line shows what it
+ * holds, so a block with a secret in it turns into rows instead
+ * (`parameter-rows.ts`).
  *
  * Everything here is pure, so the line rules can be read and tested on their
  * own.

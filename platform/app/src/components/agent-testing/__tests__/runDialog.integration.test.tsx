@@ -22,6 +22,7 @@ import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TestCasesTab } from "../cases/TestCasesTab";
 import { RunDialog, type RunDialogSubject } from "../run/RunDialog";
+import { LOCKED_IN_ROWS_MESSAGE } from "../run/RunParametersSection";
 import { useAgentTestingStore } from "../useAgentTestingStore";
 
 const mockSuitesRun = vi.hoisted(() => vi.fn());
@@ -385,7 +386,10 @@ describe("<RunDialog/>", () => {
     await user.click(screen.getByTestId("customize-chip-params"));
 
     const block = screen.getByTestId("run-dialog-parameters");
-    expect(block.querySelectorAll("input")).toHaveLength(1);
+    // One value field; the checkbox is the secret parameters toggle.
+    expect(block.querySelectorAll('input:not([type="checkbox"])')).toHaveLength(
+      1,
+    );
 
     const line = screen.getByTestId("run-dialog-parameter-line");
     expect(line).toHaveValue("model=gpt-5-mini, locale=de");
@@ -423,36 +427,187 @@ describe("<RunDialog/>", () => {
     });
   });
 
-  /** @scenario "A secret parameter keeps a masked field of its own" */
-  it("keeps a secret off the line and waits for its masked field", async () => {
+  // --- The parameter block ---
+
+  /** @scenario "The parameter block offers a secret parameters toggle" */
+  it("offers a secret parameters toggle that starts off, next to the remove x", async () => {
     const user = userEvent.setup();
-    mockScenariosGetAll.mockReturnValue({
-      data: [
-        {
-          id: "case_1",
-          name: "Double charge",
-          labels: [],
-          folderId: "suite_refunds",
-          parameters: [
-            { name: "model", defaultValue: "gpt-5-mini" },
-            { name: "api_key", secret: true },
-          ],
-          createdAt: new Date("2026-07-06T12:00:00.000Z"),
-          lastUpdatedById: null,
-          version: 1,
-        },
-      ],
-      isLoading: false,
-    });
+    mockScenariosGetAll.mockReturnValue(
+      casesDeclaring([{ name: "model", defaultValue: "gpt-5-mini" }]),
+    );
     renderDialog(suiteSubject());
 
     await user.click(screen.getByTestId("customize-chip-params"));
 
+    const toggle = screen.getByTestId("run-dialog-secret-parameters");
+    expect(toggle).not.toBeChecked();
+    expect(screen.getByTestId("run-dialog-parameter-line")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("run-dialog-parameter-rows"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Remove the parameter overrides"),
+    ).toBeInTheDocument();
+  });
+
+  /** @scenario "Turning the toggle on converts the line into key and value rows" */
+  it("keeps every pair of the line when the toggle turns the block into rows", async () => {
+    const user = userEvent.setup();
+    mockScenariosGetAll.mockReturnValue(
+      casesDeclaring([
+        { name: "model", defaultValue: "gpt-5" },
+        { name: "locale", defaultValue: "de" },
+      ]),
+    );
+    renderDialog(suiteSubject());
+
+    await user.click(screen.getByTestId("customize-chip-params"));
+    await user.click(screen.getByTestId("run-dialog-secret-parameters"));
+
+    expect(screen.getByTestId("run-dialog-parameter-rows")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("run-dialog-parameter-line"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("run-dialog-parameter-name-0")).toHaveValue(
+      "model",
+    );
+    expect(screen.getByTestId("run-dialog-parameter-value-0")).toHaveValue(
+      "gpt-5",
+    );
+    expect(screen.getByTestId("run-dialog-parameter-name-1")).toHaveValue(
+      "locale",
+    );
+    expect(screen.getByTestId("run-dialog-parameter-value-1")).toHaveValue(
+      "de",
+    );
+  });
+
+  /** @scenario "Turning the toggle off writes the rows back onto the line" */
+  it("writes the rows back onto the line when the toggle goes off again", async () => {
+    const user = userEvent.setup();
+    mockScenariosGetAll.mockReturnValue(
+      casesDeclaring([{ name: "model", defaultValue: "gpt-5" }]),
+    );
+    renderDialog(suiteSubject());
+
+    await user.click(screen.getByTestId("customize-chip-params"));
+    await user.click(screen.getByTestId("run-dialog-secret-parameters"));
+    await user.type(
+      screen.getByTestId("run-dialog-parameter-value-0"),
+      "-mini",
+    );
+    await user.click(screen.getByTestId("run-dialog-secret-parameters"));
+
     expect(screen.getByTestId("run-dialog-parameter-line")).toHaveValue(
       "model=gpt-5-mini",
     );
-    const secret = screen.getByTestId("suite-run-parameter-api_key");
+  });
+
+  /** @scenario "A row can be added and a row can be taken away" */
+  it("adds a row, sends both values, and drops the value of a removed row", async () => {
+    const user = userEvent.setup();
+    mockScenariosGetAll.mockReturnValue(
+      casesDeclaring([{ name: "model", defaultValue: "gpt-5" }]),
+    );
+    renderDialog(suiteSubject());
+
+    await user.click(screen.getByTestId("customize-chip-params"));
+    await user.click(screen.getByTestId("run-dialog-secret-parameters"));
+    await user.click(screen.getByTestId("run-dialog-parameter-add-row"));
+    await user.type(
+      screen.getByTestId("run-dialog-parameter-name-1"),
+      "locale",
+    );
+    await user.type(screen.getByTestId("run-dialog-parameter-value-1"), "de");
+
+    await user.click(screen.getByTestId("run-dialog-run"));
+    await waitFor(() => expect(mockSuitesRun).toHaveBeenCalled());
+    expect(mockSuitesRun.mock.calls[0]![0]).toMatchObject({
+      parameters: { model: "gpt-5", locale: "de" },
+    });
+
+    await user.click(screen.getByTestId("run-dialog-parameter-remove-1"));
+    await user.click(screen.getByTestId("run-dialog-run"));
+    await waitFor(() => expect(mockSuitesRun).toHaveBeenCalledTimes(2));
+    expect(mockSuitesRun.mock.calls[1]![0]).toMatchObject({
+      parameters: { model: "gpt-5" },
+    });
+  });
+
+  /** @scenario "A row marked secret is masked and holds the block in rows mode" */
+  it("masks a row marked secret and refuses to fold the block back to one line", async () => {
+    const user = userEvent.setup();
+    mockScenariosGetAll.mockReturnValue(
+      casesDeclaring([{ name: "model", defaultValue: "gpt-5" }]),
+    );
+    renderDialog(suiteSubject());
+
+    await user.click(screen.getByTestId("customize-chip-params"));
+    await user.click(screen.getByTestId("run-dialog-secret-parameters"));
+    await user.click(screen.getByTestId("run-dialog-parameter-add-row"));
+    await user.type(
+      screen.getByTestId("run-dialog-parameter-name-1"),
+      "api_token",
+    );
+    await user.click(screen.getByTestId("run-dialog-parameter-lock-1"));
+
+    const value = screen.getByTestId("run-dialog-parameter-value-1");
+    expect(value).toHaveAttribute("type", "password");
+    expect(screen.getByTestId("run-dialog-secret-parameters")).toBeDisabled();
+    expect(
+      screen.getByTestId("run-dialog-secret-parameters-toggle"),
+    ).toHaveAttribute("title", LOCKED_IN_ROWS_MESSAGE);
+    // The run waits for the value the locked row now demands.
+    expect(screen.getByTestId("run-dialog-run")).toBeDisabled();
+
+    await user.type(value, "tok-1");
+    expect(screen.getByTestId("run-dialog-run")).toBeEnabled();
+
+    await user.click(screen.getByTestId("run-dialog-run"));
+    await waitFor(() => expect(mockSuitesRun).toHaveBeenCalled());
+    expect(mockSuitesRun.mock.calls[0]![0]).toMatchObject({
+      parameters: { model: "gpt-5", api_token: "tok-1" },
+    });
+  });
+
+  /** @scenario "A declared secret parameter is a locked row of the same list" */
+  it("shows a declared secret as a locked row of the list and waits for it", async () => {
+    const user = userEvent.setup();
+    mockScenariosGetAll.mockReturnValue(
+      casesDeclaring([
+        { name: "model", defaultValue: "gpt-5-mini" },
+        { name: "api_token", secret: true },
+      ]),
+    );
+    renderDialog(suiteSubject());
+
+    await user.click(screen.getByTestId("customize-chip-params"));
+
+    // The block opens on its rows, and the standalone secret section is gone.
+    expect(screen.getByTestId("run-dialog-parameter-rows")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("run-dialog-parameter-line"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("suite-run-parameters"),
+    ).not.toBeInTheDocument();
+
+    // The plain parameter is a row of the same list.
+    expect(screen.getByTestId("run-dialog-parameter-name-0")).toHaveValue(
+      "model",
+    );
+
+    const toggle = screen.getByTestId("run-dialog-secret-parameters");
+    expect(toggle).toBeChecked();
+    expect(toggle).toBeDisabled();
+
+    const secret = screen.getByTestId("run-dialog-parameter-value-api_token");
     expect(secret).toHaveAttribute("type", "password");
+    expect(secret).toHaveValue("");
+    expect(secret).toBeRequired();
+    expect(
+      screen.getByTestId("run-dialog-parameter-lock-api_token"),
+    ).toBeDisabled();
     expect(screen.getByTestId("run-dialog-run")).toBeDisabled();
 
     await user.type(secret, "sk-live-1");
@@ -461,7 +616,7 @@ describe("<RunDialog/>", () => {
     await user.click(screen.getByTestId("run-dialog-run"));
     await waitFor(() => expect(mockSuitesRun).toHaveBeenCalled());
     expect(mockSuitesRun.mock.calls[0]![0]).toMatchObject({
-      parameters: { model: "gpt-5-mini", api_key: "sk-live-1" },
+      parameters: { model: "gpt-5-mini", api_token: "sk-live-1" },
     });
   });
 
@@ -667,13 +822,13 @@ describe("<RunDialog/>", () => {
     await user.click(screen.getByTestId("run-dialog-agent-agent_1"));
     await user.click(screen.getByTestId("customize-chip-params"));
     await user.type(
-      screen.getByTestId("suite-run-parameter-api_key"),
+      screen.getByTestId("run-dialog-parameter-value-api_key"),
       "sk-live-1",
     );
     await user.click(screen.getByTestId("run-dialog-run"));
 
     await waitFor(() => expect(mockSuitesRun).toHaveBeenCalled());
-    // The run carries the secret; the suite is only told the line.
+    // The run carries the secret; the suite is only told the plain rows.
     expect(mockSuitesRun.mock.calls[0]![0]).toMatchObject({
       parameters: { api_key: "sk-live-1" },
     });
@@ -688,6 +843,83 @@ describe("<RunDialog/>", () => {
         },
       ],
     });
+  });
+
+  /** @scenario "A secret row is remembered by its key alone" */
+  it("remembers a secret row by its key and never its value", async () => {
+    const user = userEvent.setup();
+    mockScenariosGetAll.mockReturnValue(
+      casesDeclaring([{ name: "model", defaultValue: "gpt-5" }]),
+    );
+    renderDialog(suiteSubject());
+
+    await user.click(screen.getByTestId("run-dialog-agent-agent_1"));
+    await user.click(screen.getByTestId("customize-chip-params"));
+    await user.click(screen.getByTestId("run-dialog-secret-parameters"));
+    await user.click(screen.getByTestId("run-dialog-parameter-add-row"));
+    await user.type(
+      screen.getByTestId("run-dialog-parameter-name-1"),
+      "api_token",
+    );
+    await user.click(screen.getByTestId("run-dialog-parameter-lock-1"));
+    await user.type(
+      screen.getByTestId("run-dialog-parameter-value-1"),
+      "tok-1",
+    );
+    await user.click(screen.getByTestId("run-dialog-run"));
+
+    await waitFor(() => expect(mockSuitesRun).toHaveBeenCalled());
+    expect(mockSuitesUpdate).toHaveBeenCalledWith({
+      projectId: "proj_1",
+      id: "suite_refunds",
+      targets: [
+        {
+          type: "http",
+          referenceId: "agent_1",
+          runParameters: { model: "gpt-5" },
+          runSecretParameterNames: ["api_token"],
+        },
+      ],
+    });
+    expect(JSON.stringify(mockSuitesUpdate.mock.calls[0]![0])).not.toContain(
+      "tok-1",
+    );
+  });
+
+  /** @scenario "A secret row is remembered by its key alone" */
+  it("opens the remembered secret row empty, in rows mode, and waits for it", () => {
+    mockScenariosGetAll.mockReturnValue(
+      casesDeclaring([
+        { name: "model", defaultValue: "gpt-5" },
+        { name: "api_token" },
+      ]),
+    );
+    renderDialog(
+      suiteSubject({
+        initialTarget: { type: "http", id: "agent_1" },
+        persistedTarget: {
+          type: "http",
+          referenceId: "agent_1",
+          runParameters: { model: "gpt-5" },
+          runSecretParameterNames: ["api_token"],
+        },
+      }),
+    );
+
+    expect(screen.getByTestId("run-dialog-parameter-rows")).toBeInTheDocument();
+    expect(screen.getByTestId("run-dialog-parameter-name-0")).toHaveValue(
+      "model",
+    );
+    expect(screen.getByTestId("run-dialog-parameter-value-0")).toHaveValue(
+      "gpt-5",
+    );
+    expect(screen.getByTestId("run-dialog-parameter-name-1")).toHaveValue(
+      "api_token",
+    );
+    const secret = screen.getByTestId("run-dialog-parameter-value-1");
+    expect(secret).toHaveValue("");
+    expect(secret).toHaveAttribute("type", "password");
+    expect(screen.getByTestId("run-dialog-run")).toBeDisabled();
   });
 
   /** @scenario "The dialog closes and the person stays where they were" */

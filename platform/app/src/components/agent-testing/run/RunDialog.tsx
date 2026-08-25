@@ -70,6 +70,7 @@ export function RunDialog({
     note: form.note,
     runParameters: form.runParameters,
     storableRunParameters: form.storableRunParameters,
+    storableSecretNames: form.storableSecretNames,
     onRunStarted,
     onCaseRunSettled,
     onClose,
