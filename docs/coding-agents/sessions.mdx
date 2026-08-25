@@ -20,7 +20,7 @@ One row per session, over the last 90 days. Every column sorts; a third click on
 | **Agent** | Which assistant ran it: Claude Code, Codex, Copilot, Gemini CLI, opencode. |
 | **Last update** | When the session last did anything. |
 | **Context** | Peak context: the most tokens the session carried into a single model call. |
-| **Compactions** | How many times the agent compacted its conversation to fit the context window. |
+| **Compactions** | How many times the agent compacted its conversation to fit the context window, and under it, how many times it rebuilt the prompt cache. |
 | **Active and waiting** | How long the agent worked, next to how long it sat waiting for you. |
 | **Token cost** | What the session cost, cache-aware: tokens read from cache are priced as cache reads, not as fresh input. |
 | **Pull requests** | The pull requests the session's branches map to. |
