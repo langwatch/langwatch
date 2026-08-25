@@ -12,7 +12,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Controller, type UseFormReturn, useForm } from "react-hook-form";
 import { scenarioParameterDefinitionsSchema } from "@langwatch/scenario-contract";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { CriteriaInput } from "./ui/CriteriaInput";
 import { SectionHeader } from "./ui/SectionHeader";
 

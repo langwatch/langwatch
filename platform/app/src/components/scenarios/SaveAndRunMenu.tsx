@@ -1,4 +1,5 @@
 import { Box, Button, HStack, Input, Portal, Text } from "@chakra-ui/react";
+import { agentHasDevTunnel } from "@langwatch/agent-web";
 import { BookText, ChevronDown, Code, Globe, Play, Plus, Save } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -58,7 +59,18 @@ export function SaveAndRunMenu({
     );
   }, [prompts, searchValue]);
 
-  const filteredAgents = useFilteredAgents(agents, searchValue);
+  const scenarioAgents = useMemo(
+    () =>
+      agents?.map((agent) => ({
+        id: agent.id,
+        name: agent.name,
+        type: agent.type,
+        updatedAt: agent.updatedAt,
+        hasDevTunnel: agentHasDevTunnel(agent),
+      })),
+    [agents],
+  );
+  const filteredAgents = useFilteredAgents(scenarioAgents, searchValue);
 
   const handleSelectAndRun = (target: TargetValue) => {
     onTargetChange(target);
