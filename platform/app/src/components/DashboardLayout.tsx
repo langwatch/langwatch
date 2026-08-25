@@ -16,7 +16,7 @@ import {
   LANGY_DOCK_GAP,
   LANGY_DOCKED_OFFSET,
   LANGY_TRANSITION,
-} from "~/features/langy/logic/langyPanelLayout";
+} from "@langwatch/langy-web";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import {
   type Organization,

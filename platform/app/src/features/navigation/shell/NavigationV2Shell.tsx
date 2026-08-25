@@ -7,7 +7,7 @@ import { NotFoundScene } from "~/components/NotFoundScene";
 import {
   APP_HEADER_HEIGHT,
   LANGY_TRANSITION,
-} from "~/features/langy/logic/langyPanelLayout";
+} from "@langwatch/langy-web";
 import Head from "~/utils/compat/next-head";
 import { ICON_RAIL_WIDTH, IconRail } from "./IconRail";
 import { MobileShell } from "./MobileShell";

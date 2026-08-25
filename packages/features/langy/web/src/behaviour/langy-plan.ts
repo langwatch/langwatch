@@ -18,6 +18,8 @@
  * narration" precedent as `githubProgressFromToolParts`; degrades gracefully.
  */
 
+import { z } from "zod";
+
 /** A plan item's lifecycle, mirroring opencode's todo statuses. */
 export type LangyPlanItemStatus = "pending" | "in_progress" | "completed" | "cancelled";
 
@@ -45,12 +47,28 @@ export interface LangyPlan {
   preamble: unknown[];
 }
 
-const PLAN_STATUSES = new Set<LangyPlanItemStatus>([
-  "pending",
-  "in_progress",
-  "completed",
-  "cancelled",
+const planStatusSchema = z.enum(["pending", "in_progress", "completed", "cancelled"]);
+const toolPartSchema = z
+  .object({
+    type: z.string(),
+    toolName: z.string().optional(),
+    input: z.unknown().optional(),
+  })
+  .loose();
+const inputPartSchema = z.object({ input: z.unknown().optional() }).loose();
+const todoContainerSchema = z.union([
+  z.array(z.unknown()),
+  z
+    .object({ todos: z.array(z.unknown()) })
+    .loose()
+    .transform(({ todos }) => todos),
 ]);
+const todoItemSchema = z
+  .object({
+    content: z.string(),
+    status: z.unknown().optional(),
+  })
+  .loose();
 
 /** The tool names that ARE the plan channel — never rendered as activity. */
 const PLAN_TOOL_NAMES = new Set(["todowrite", "todoread"]);
@@ -71,28 +89,30 @@ export function cleanPlanContent(content: string): string {
 }
 
 /** The raw tool name a part carries, or undefined for a non-tool part. */
-function rawToolName(part: unknown): string | undefined {
-  if (!part || typeof part !== "object") return undefined;
-  const p = part as { type?: unknown; toolName?: unknown };
-  const type = typeof p.type === "string" ? p.type : undefined;
-  if (!type) return undefined;
+function tryReadToolName(part: unknown): string | undefined {
+  const parsed = toolPartSchema.safeParse(part);
+  if (!parsed.success) return void 0;
+
+  const { type, toolName } = parsed.data;
   if (type === "dynamic-tool") {
-    return typeof p.toolName === "string" ? p.toolName : undefined;
+    return toolName;
   }
   if (type.startsWith("tool-")) return type.slice("tool-".length);
-  return undefined;
+  return void 0;
 }
 
 /** True when a part is the plan tool (`todowrite`/`todoread`). */
 export function isPlanToolPart(part: unknown): boolean {
-  const name = rawToolName(part);
-  return name !== undefined && PLAN_TOOL_NAMES.has(name.toLowerCase());
+  const name = tryReadToolName(part);
+  return name !== void 0 && PLAN_TOOL_NAMES.has(name.toLowerCase());
 }
 
 /** A part's `input`, JSON-decoded when it arrived as a string. */
-function partInput(part: unknown): unknown {
-  if (!part || typeof part !== "object") return undefined;
-  const raw = (part as { input?: unknown }).input;
+function tryReadPartInput(part: unknown): unknown {
+  const parsed = inputPartSchema.safeParse(part);
+  if (!parsed.success) return void 0;
+
+  const raw = parsed.data.input;
   if (typeof raw !== "string") return raw;
   try {
     return JSON.parse(raw);
@@ -109,23 +129,18 @@ function partInput(part: unknown): unknown {
  * null when there is nothing list-shaped to read.
  */
 export function parseTodoList(input: unknown): LangyPlanItem[] | null {
-  const raw = Array.isArray(input)
-    ? input
-    : input && typeof input === "object"
-      ? (input as { todos?: unknown }).todos
-      : undefined;
-  if (!Array.isArray(raw)) return null;
+  const parsedContainer = todoContainerSchema.safeParse(input);
+  if (!parsedContainer.success) return null;
 
   const items: LangyPlanItem[] = [];
-  for (const entry of raw) {
-    if (!entry || typeof entry !== "object") continue;
-    const e = entry as { content?: unknown; status?: unknown };
-    const content = typeof e.content === "string" ? cleanPlanContent(e.content) : "";
+  for (const entry of parsedContainer.data) {
+    const parsedItem = todoItemSchema.safeParse(entry);
+    if (!parsedItem.success) continue;
+
+    const content = cleanPlanContent(parsedItem.data.content);
     if (!content) continue;
-    const status =
-      typeof e.status === "string" && PLAN_STATUSES.has(e.status as LangyPlanItemStatus)
-        ? (e.status as LangyPlanItemStatus)
-        : "pending";
+    const parsedStatus = planStatusSchema.safeParse(parsedItem.data.status);
+    const status = parsedStatus.success ? parsedStatus.data : "pending";
     items.push({ content, status });
   }
   return items;
@@ -138,9 +153,8 @@ function inProgressIndex(items: LangyPlanItem[]): number {
 
 /** Normalise a wire item (permissive `status` string) into a plan item. */
 function normaliseItem(item: { content: string; status: string }): LangyPlanItem {
-  const status = PLAN_STATUSES.has(item.status as LangyPlanItemStatus)
-    ? (item.status as LangyPlanItemStatus)
-    : "pending";
+  const parsedStatus = planStatusSchema.safeParse(item.status);
+  const status = parsedStatus.success ? parsedStatus.data : "pending";
   return { content: cleanPlanContent(item.content), status };
 }
 
@@ -175,7 +189,7 @@ export function langyPlan(
   let derived: LangyPlanItem[] | null = null;
   for (const part of parts) {
     if (!isPlanToolPart(part)) continue;
-    const parsed = parseTodoList(partInput(part));
+    const parsed = parseTodoList(tryReadPartInput(part));
     if (parsed && parsed.length > 0) derived = parsed;
   }
 
@@ -194,20 +208,30 @@ export function langyPlan(
   let currentItemIndex = -1;
   for (const part of parts) {
     if (isPlanToolPart(part)) {
-      const snapshot = parseTodoList(partInput(part));
+      const snapshot = parseTodoList(tryReadPartInput(part));
       if (!snapshot) continue;
       const ip = inProgressIndex(snapshot);
       if (ip !== -1) {
         // Map the snapshot's in-progress item onto the latest list by content:
         // a call made while step 2 ran belongs to step 2 even now that it reads
         // "completed". An item whose text has since changed falls to preamble.
-        currentItemIndex = items.findIndex((it) => it.content === snapshot[ip]!.content);
+        const currentItem = snapshot[ip];
+        if (currentItem) {
+          currentItemIndex = items.findIndex(
+            (item) => item.content === currentItem.content,
+          );
+        }
       }
       continue;
     }
-    if (rawToolName(part) === undefined) continue; // not a tool call
-    if (currentItemIndex >= 0) itemParts[currentItemIndex]!.push(part);
-    else preamble.push(part);
+    if (tryReadToolName(part) === void 0) continue; // not a tool call
+
+    const item = itemParts[currentItemIndex];
+    if (currentItemIndex >= 0 && item) {
+      item.push(part);
+    } else {
+      preamble.push(part);
+    }
   }
 
   const completedCount = items.filter((it) => it.status === "completed").length;

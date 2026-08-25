@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { foldReasoningTitles, stripReasoningTitles } from "../logic/langyReasoningTitles";
+import {
+  foldReasoningTitles,
+  stripReasoningTitles,
+} from "../../src/behaviour/langy-reasoning-titles";
 
 /**
  * The reasoning-summary fold (see logic/langyReasoningTitles.ts): a codex

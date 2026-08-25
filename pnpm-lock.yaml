@@ -2076,6 +2076,9 @@ importers:
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../contract
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       typescript:
         specifier: ^7.0.2
@@ -3561,6 +3564,9 @@ importers:
       '@langwatch/langy-server':
         specifier: workspace:*
         version: link:../../packages/features/langy/server
+      '@langwatch/langy-web':
+        specifier: workspace:*
+        version: link:../../packages/features/langy/web
       '@langwatch/mcp-server':
         specifier: workspace:*
         version: link:../../mcp/typescript

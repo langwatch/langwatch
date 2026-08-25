@@ -5,7 +5,7 @@ import { LogoIcon } from "~/components/icons/LogoIcon";
 import { DevBadge } from "~/components/ui/DevBadge";
 import { Link } from "~/components/ui/link";
 import { CommandBarTrigger } from "~/features/command-bar";
-import { APP_HEADER_HEIGHT } from "~/features/langy/logic/langyPanelLayout";
+import { APP_HEADER_HEIGHT } from "@langwatch/langy-web";
 import { ImpersonationBanner } from "@langwatch/ops-web";
 import type { ProductId } from "../products";
 import { OrganizationSelect } from "./OrganizationSelect";

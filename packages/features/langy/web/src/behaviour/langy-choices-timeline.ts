@@ -13,13 +13,12 @@
  *   - any other message contributes one `message` entry.
  */
 import {
-  LANGY_CHOICE_SELECTION_PART_TYPE,
   type LangyChoicesTimelineEntry,
   parseLangyCardPart,
   parseLangyChoiceSelectionPart,
 } from "@langwatch/langy-contract";
 
-import { isQuestionToolPart, questionToolCardParts } from "./langyQuestionTool";
+import { isQuestionToolPart, questionToolCardParts } from "./langy-question-tool";
 
 interface MessageLike {
   role: string;
@@ -61,18 +60,13 @@ export function langyChoicesTimeline(
     if (message.role === "user") {
       let sawSelection = false;
       for (const part of parts) {
-        if ((part as { type?: string }).type !== LANGY_CHOICE_SELECTION_PART_TYPE) {
-          continue;
-        }
         const selection = parseLangyChoiceSelectionPart(part);
         if (!selection) continue;
         timeline.push({
           kind: "selection",
           blockId: selection.blockId,
           optionIds: selection.optionIds,
-          ...(selection.otherText !== undefined
-            ? { otherText: selection.otherText }
-            : {}),
+          ...(selection.otherText !== void 0 ? { otherText: selection.otherText } : {}),
         });
         sawSelection = true;
       }

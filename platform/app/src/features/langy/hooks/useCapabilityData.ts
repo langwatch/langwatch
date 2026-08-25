@@ -32,7 +32,7 @@ import {
   CAPABILITY_HYDRATORS,
   type CapabilityHydratedRow,
 } from "../components/capabilities/capabilityHydrators";
-import type { CapabilityCommand } from "../logic/langyCapabilityDigest";
+import type { CapabilityCommand } from "@langwatch/langy-web";
 
 /** How many rows a card draws, and therefore how many this hook hydrates. */
 const DEFAULT_MAX_ROWS = 5;

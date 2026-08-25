@@ -18,7 +18,7 @@ import { act, renderHook } from "@testing-library/react";
 import { createRef } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { COMPOSER_ANCHOR_ATTR } from "../../components/Composer";
-import { PANEL_ROOT_ATTR } from "../../logic/composerMorphGeometry";
+import { PANEL_ROOT_ATTR } from "@langwatch/langy-web";
 import { useLangyStore } from "../../stores/langyStore";
 import { useComposerMorph } from "../useComposerMorph";
 

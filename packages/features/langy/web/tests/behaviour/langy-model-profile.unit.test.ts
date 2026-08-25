@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { profileLangyModel } from "../logic/langyModelProfile";
+import { profileLangyModel } from "../../src/behaviour/langy-model-profile";
 
 describe("profileLangyModel", () => {
   it("classifies explicitly compact models as quick", () => {

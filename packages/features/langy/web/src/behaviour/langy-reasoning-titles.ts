@@ -1,55 +1,25 @@
 /**
- * Fold a settled turn's reasoning-summary titles out of the transcript.
- *
- * ── WHAT THESE LINES ARE ───────────────────────────────────────────────────
- *
- * Reasoning-capable models (codex gpt-5.x via the Responses API) emit short
- * reasoning-summary headlines between tool calls — "Planning task execution
- * strategy", "Summarizing recent trace counts". Reasoning is meant to be a
- * live-edge signal only (the relay never persists it as a message part), but
- * the agent manager's upstream stream carries reasoning deltas on the same
- * `field:"text"` channel as answer tokens, so the headlines leak into the
- * durable answer text as `**Title**` markdown paragraphs. A finished turn
- * then reads as a stack of loose bold lines above the actual reply — and the
- * LAST headline glues straight onto the reply's first word when no tool call
- * ran between them ("…trace countsMostly Langy conversations…").
- *
- * This module is the presentation-side fold: peel the leading headline
- * paragraphs off the settled text and hand them to the completed-actions
- * receipt, where the rest of the turn's process record already collapses.
- * The reply below stays prose only, and the glued headline is severed so the
- * answer starts as its own block.
- *
- * A message may also carry real `reasoning`-typed parts (never rendered as
- * prose). Their headlines feed the same fold, so the receipt accounts for
- * them wherever the titles happen to live.
- *
- * ── CONSERVATIVE BY CONSTRUCTION ───────────────────────────────────────────
- *
- * Same stance as `stripToolNarration`:
- *   - LEADING paragraphs only; bold inside the answer is the model's own
- *     emphasis and is never touched.
- *   - Only when the turn HAS activity — the receipt must exist for the
- *     titles to fold into; with none, the text is returned untouched.
- *   - A headline must LOOK like one: a single short line of at least two
- *     words with no sentence punctuation. "**Note:** do X" and a deliberate
- *     bold opening sentence stay in the answer.
- *   - A glued headline (`**Title**Answer…`) is only trusted after at least
- *     one standalone headline was peeled — one bold run at the start of an
- *     answer is ambiguous, five bold paragraphs then a sixth are not.
- *   - Never empties the answer: if peeling would leave nothing, the
- *     original text is returned untouched.
+ * Moves leading reasoning headlines into the completed-actions receipt.
+ * Only short leading bold paragraphs are eligible, and only when the turn has
+ * activity. Ordinary emphasis stays untouched. A glued headline needs an
+ * earlier standalone headline as evidence, and the fold never empties the
+ * answer. Recorded `reasoning` parts contribute through the same path.
  */
+
+import { z } from "zod";
 
 const MAX_TITLE_CHARS = 80;
 
 /** A single-line bold run at the head of the remaining text. */
 const LEADING_BOLD = /^\*\*([^*\n]+)\*\*/;
 
-interface PartLike {
-  type?: string;
-  text?: string;
-}
+const reasoningPartSchema = z
+  .object({
+    type: z.string().optional(),
+    text: z.string().optional(),
+  })
+  .loose();
+type ReasoningPart = z.infer<typeof reasoningPartSchema>;
 
 export interface ReasoningTitleFold {
   /** The folded headlines, in stream order, for the completed receipt. */
@@ -73,14 +43,15 @@ function looksLikeReasoningTitle(candidate: string): boolean {
 }
 
 /** The headline of a `reasoning` part: its first non-empty line, unbolded. */
-function titleOfReasoningPart(part: PartLike): string | null {
+function titleOfReasoningPart(part: ReasoningPart): string | null {
   const firstLine = (part.text ?? "")
     .split("\n")
     .map((line) => line.trim())
     .find((line) => line.length > 0);
   if (!firstLine) return null;
   const bold = LEADING_BOLD.exec(firstLine);
-  return (bold ? bold[1]! : firstLine).trim() || null;
+  const title = bold?.[1] ?? firstLine;
+  return title.trim() || null;
 }
 
 /**
@@ -100,16 +71,18 @@ function peelLeadingTitles(text: string): { titles: string[]; text: string } {
   for (;;) {
     const lead = rest.replace(/^\s+/, "");
     const bold = LEADING_BOLD.exec(lead);
-    if (!bold || !looksLikeReasoningTitle(bold[1]!)) break;
+    const title = bold?.[1];
+    if (!bold || !title || !looksLikeReasoningTitle(title)) break;
     const after = lead.slice(bold[0].length);
     const standalone = after === "" || after.startsWith("\n");
     const nextBold = LEADING_BOLD.exec(after);
+    const nextTitle = nextBold?.[1];
     const gluedToAnotherTitle =
-      nextBold !== null && looksLikeReasoningTitle(nextBold[1]!);
+      nextTitle !== void 0 && looksLikeReasoningTitle(nextTitle);
     // A lone bold run glued to plain prose is the model's own emphasis
     // ("**Very important** never…") — leave it be.
     if (!standalone && titles.length === 0 && !gluedToAnotherTitle) break;
-    titles.push(bold[1]!.trim());
+    titles.push(title.trim());
     rest = after;
   }
 
@@ -139,9 +112,10 @@ export function foldReasoningTitles({
   hasActivity: boolean;
 }): ReasoningTitleFold {
   const partTitles = parts.flatMap((rawPart) => {
-    const part = rawPart as PartLike;
-    if (part.type !== "reasoning") return [];
-    const title = titleOfReasoningPart(part);
+    const parsed = reasoningPartSchema.safeParse(rawPart);
+    if (!parsed.success || parsed.data.type !== "reasoning") return [];
+
+    const title = titleOfReasoningPart(parsed.data);
     return title ? [title] : [];
   });
 

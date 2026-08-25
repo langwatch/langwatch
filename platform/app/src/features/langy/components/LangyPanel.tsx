@@ -77,14 +77,13 @@ import { useLangyWarmWorker } from "../hooks/useLangyWarmWorker";
 import { useLingeringDodge } from "../hooks/useLingeringDodge";
 import { useScrolledFromTop } from "../hooks/useScrolledFromTop";
 import { syncLangyAfterDefaultModelWrite } from "../logic/codingDefaultSync";
-import { PANEL_ROOT_ATTR } from "../logic/composerMorphGeometry";
-import { shouldRehydrateEngineFromDurable } from "../logic/foreignTurnRehydration";
+import { PANEL_ROOT_ATTR, shouldRehydrateEngineFromDurable } from "@langwatch/langy-web";
 import { resolveLangyActivityOwnership } from "../logic/langyActivityOwnership";
 import {
   createLangyChatTransport,
   type LangyTurnRequestContext,
 } from "../logic/langyChatTransport";
-import { langyChoicesTimeline } from "../logic/langyChoicesTimeline";
+import { langyChoicesTimeline } from "@langwatch/langy-web";
 import { mergeContextChips } from "../logic/langyContextChips";
 import { catchUpConversationFold } from "../logic/langyDurableCatchUp";
 import {
@@ -102,7 +101,7 @@ import {
   type MakeDefaultWritePlan,
   makeDefaultOffer,
 } from "../logic/langyMakeDefaultOffer";
-import { navigateDedupKey, reserveNavigate } from "../logic/langyNavigateDedup";
+import { navigateDedupKey, reserveNavigate } from "@langwatch/langy-web";
 import {
   APP_HEADER_HEIGHT,
   FLOATING_PANEL_CSS_WIDTH,
@@ -113,14 +112,14 @@ import {
   PANEL_LAYOUT_TRANSITION,
   resolveFloatingPanelWidth,
   SIDEBAR_PANEL_WIDTH,
-} from "../logic/langyPanelLayout";
+} from "@langwatch/langy-web";
 import {
   FLOATING_PEEK_NEAR_PX,
   type LangyPeekPhase,
   resolvePeekTranslate,
   SIDEBAR_PEEK_NEAR_PX,
-} from "../logic/langyPeekDock";
-import { resolveLangyStopTarget } from "../logic/langyStopTarget";
+} from "@langwatch/langy-web";
+import { resolveLangyStopTarget } from "@langwatch/langy-web";
 import {
   currentTurnAssistant,
   hasTokens,

@@ -24,9 +24,13 @@ export function formatLangyConversationDate(
   if (dayDifference === 0) return "Today";
   if (dayDifference === 1) return "Yesterday";
 
-  return new Intl.DateTimeFormat(undefined, {
+  const options: Intl.DateTimeFormatOptions = {
     month: "short",
     day: "numeric",
-    ...(date.getFullYear() === now.getFullYear() ? {} : { year: "numeric" as const }),
-  }).format(date);
+  };
+  if (date.getFullYear() !== now.getFullYear()) {
+    options.year = "numeric";
+  }
+
+  return new Intl.DateTimeFormat(void 0, options).format(date);
 }

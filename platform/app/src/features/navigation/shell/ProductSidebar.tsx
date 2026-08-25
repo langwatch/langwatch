@@ -12,7 +12,7 @@ import { UsageIndicator } from "~/components/sidebar/UsageIndicator";
 import { useMenuScrollPosition } from "~/components/sidebar/useMenuScrollPosition";
 import { useCommandBar } from "~/features/command-bar";
 import { getCommandBarShortcut } from "~/features/command-bar/utils/platform";
-import { APP_HEADER_HEIGHT } from "~/features/langy/logic/langyPanelLayout";
+import { APP_HEADER_HEIGHT } from "@langwatch/langy-web";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePathname } from "~/utils/compat/next-navigation";
 import { featureIcons } from "~/utils/featureIcons";

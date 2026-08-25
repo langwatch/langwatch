@@ -26,7 +26,7 @@ import {
   formatLangyPreviewCount,
   formatLangyProgressCount,
 } from "../../logic/langyActivityOwnership";
-import type { CapabilityCommand } from "../../logic/langyCapabilityDigest";
+import type { CapabilityCommand } from "@langwatch/langy-web";
 import type { LangyProgressSample } from "../../stores/langyStore";
 import { LangyInterruptedNote } from "../LangyInterruptedNote";
 import { langyThinkingShimmerStyles } from "../langyShimmer";

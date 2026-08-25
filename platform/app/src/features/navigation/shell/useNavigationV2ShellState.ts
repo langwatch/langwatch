@@ -3,7 +3,7 @@ import { useLayoutEffect } from "react";
 import {
   LANGY_DOCK_GAP,
   LANGY_DOCKED_OFFSET,
-} from "~/features/langy/logic/langyPanelLayout";
+} from "@langwatch/langy-web";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useOrgQueryParamSelection } from "~/hooks/useOrgQueryParamSelection";

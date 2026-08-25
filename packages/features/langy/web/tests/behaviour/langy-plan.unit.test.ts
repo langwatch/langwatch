@@ -6,7 +6,11 @@
  * when each one appeared. Pure; no rendering here (see LangyPlanCard tests).
  */
 import { describe, expect, it } from "vitest";
-import { cleanPlanContent, langyPlan, parseTodoList } from "../logic/langyPlan";
+import {
+  cleanPlanContent,
+  langyPlan,
+  parseTodoList,
+} from "../../src/behaviour/langy-plan";
 
 /** A `todowrite` snapshot part carrying a whole-list rewrite. */
 function todo(todos: Array<{ content: string; status: string }>): {

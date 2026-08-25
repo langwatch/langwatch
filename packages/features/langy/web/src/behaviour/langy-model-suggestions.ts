@@ -1,37 +1,11 @@
-import type { LangyModelGroup } from "./langyModelProfile";
+import type { LangyModelGroup } from "./langy-model-profile";
 
 /**
- * Which models the picker offers up front, and which it keeps behind "More".
- *
- * ── THE PROBLEM ────────────────────────────────────────────────────────────
- *
- * The picker lists every model the project's providers expose, grouped by
- * capability. That is the right CATALOGUE and the wrong FRONT DOOR: on a
- * project with several providers enabled it is a scrolling wall of near-
- * identical names, presented as if choosing between them were a decision the
- * user is equipped to make. Almost nobody wants to choose a model. They want
- * the one that works, and occasionally they want a specific other one.
- *
- * So the list splits: a short shortlist you can read at a glance, and the full
- * grouped catalogue one click away.
- *
- * ── WHAT MAKES A MODEL "SUGGESTED" ─────────────────────────────────────────
- *
- * Nothing is hardcoded by name — a curated list of model ids would be stale
- * within a release and wrong for any project with its own providers. The
- * shortlist is DERIVED, in this order:
- *
- *   1. The Langy default. Whatever the project's routing resolves to is what
- *      you get by not choosing, so it must be the first thing you see.
- *   2. The current selection. If you have already picked something, the picker
- *      must show it without making you open "More" to find your own choice.
- *   3. One representative from each primary capability group, in the order a
- *      person actually reasons about the trade-off: something fast, something
- *      general, something that thinks harder.
- *
- * Deduped, capped, order preserved. Multimodal and custom models are
- * deliberately NOT auto-suggested: both are specific asks, and a user who wants
- * one goes looking for it.
+ * Splits the model catalogue into a short front door and the complete list.
+ * The shortlist contains the resolved default, the current selection, then
+ * one quick, balanced and reasoning model. It is deduplicated, capped and
+ * ordered. Names are never hard-coded because provider catalogues vary by
+ * project. Multimodal and custom models remain deliberate choices in “More”.
  */
 
 /** The shortlist stays scannable. Past this it is a list again, not a shortlist. */

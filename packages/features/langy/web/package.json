@@ -21,7 +21,8 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@langwatch/langy-contract": "workspace:*"
+    "@langwatch/langy-contract": "workspace:*",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

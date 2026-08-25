@@ -24,15 +24,22 @@
  * them as questions so the lock state derives correctly, and
  * `LangyToolActivity` excludes the tool part from the activity spine.
  */
-import { type LangyCardPart, parseLangyCardPart } from "@langwatch/langy-contract";
+import {
+  type LangyCardPart,
+  type LangyDerivedChoicesCard,
+  parseLangyCardPart,
+} from "@langwatch/langy-contract";
+import { z } from "zod";
 
-interface QuestionToolPartLike {
-  type?: string;
-  toolName?: string;
-  state?: string;
-  toolCallId?: string;
-  input?: unknown;
-}
+const questionToolPartSchema = z
+  .object({
+    type: z.string(),
+    toolName: z.string().optional(),
+    state: z.string().optional(),
+    toolCallId: z.string().optional(),
+    input: z.unknown().optional(),
+  })
+  .loose();
 
 /**
  * States whose `input` is COMPLETE. While the call is still streaming its
@@ -47,22 +54,45 @@ const COMPLETE_INPUT_STATES = new Set([
 
 /** Is this part the agent's `question` tool call? */
 export function isQuestionToolPart(part: unknown): boolean {
-  const p = part as QuestionToolPartLike;
-  if (p?.type === "tool-question") return true;
-  return p?.type === "dynamic-tool" && p.toolName === "question";
+  const parsed = questionToolPartSchema.safeParse(part);
+  if (!parsed.success) return false;
+
+  if (parsed.data.type === "tool-question") return true;
+  return parsed.data.type === "dynamic-tool" && parsed.data.toolName === "question";
 }
 
-interface RawQuestionOption {
-  label?: unknown;
-  description?: unknown;
-}
+const rawQuestionOptionSchema = z
+  .object({
+    label: z.unknown().optional(),
+    description: z.unknown().optional(),
+  })
+  .loose();
+const rawQuestionSchema = z
+  .object({
+    question: z.unknown().optional(),
+    header: z.unknown().optional(),
+    options: z.unknown().optional(),
+    multiple: z.unknown().optional(),
+    custom: z.unknown().optional(),
+  })
+  .loose();
+const questionListSchema = z
+  .object({ questions: z.array(z.unknown()) })
+  .loose()
+  .transform(({ questions }) => questions);
+const singleQuestionSchema = z
+  .object({ question: z.unknown() })
+  .loose()
+  .transform((question) => [question]);
 
-interface RawQuestion {
-  question?: unknown;
-  header?: unknown;
-  options?: unknown;
-  multiple?: unknown;
-  custom?: unknown;
+function parseQuestions(input: unknown) {
+  const list = questionListSchema.safeParse(input);
+  const single = singleQuestionSchema.safeParse(input);
+  const candidates = list.success ? list.data : single.success ? single.data : [];
+  return candidates.flatMap((candidate) => {
+    const parsed = rawQuestionSchema.safeParse(candidate);
+    return parsed.success ? [parsed.data] : [];
+  });
 }
 
 /**
@@ -73,17 +103,13 @@ interface RawQuestion {
  * where a broken payload belongs).
  */
 export function questionToolCardParts(part: unknown): LangyCardPart[] {
-  const p = part as QuestionToolPartLike;
-  if (!isQuestionToolPart(part)) return [];
-  if (!COMPLETE_INPUT_STATES.has(p.state ?? "")) return [];
+  const parsedPart = questionToolPartSchema.safeParse(part);
+  if (!parsedPart.success || !isQuestionToolPart(parsedPart.data)) return [];
 
-  const input = p.input as { questions?: unknown } | undefined;
-  const rawQuestions: RawQuestion[] = Array.isArray(input?.questions)
-    ? (input.questions as RawQuestion[])
-    : // A single bare `{ question, options }` payload, tolerated.
-      input && typeof input === "object" && "question" in input
-      ? [input as RawQuestion]
-      : [];
+  const toolPart = parsedPart.data;
+  if (!COMPLETE_INPUT_STATES.has(toolPart.state ?? "")) return [];
+
+  const rawQuestions = parseQuestions(toolPart.input);
 
   const cards: LangyCardPart[] = [];
   rawQuestions.forEach((raw, index) => {
@@ -98,14 +124,14 @@ export function questionToolCardParts(part: unknown): LangyCardPart[] {
           : null;
     if (!question) return;
 
-    const rawOptions: RawQuestionOption[] = Array.isArray(raw.options)
-      ? (raw.options as RawQuestionOption[])
-      : [];
-    const options = rawOptions
-      .filter(
-        (option): option is { label: string; description?: string } =>
-          typeof option?.label === "string" && option.label.trim() !== "",
-      )
+    const parsedOptions = z.array(rawQuestionOptionSchema).safeParse(raw.options);
+    const options = (parsedOptions.success ? parsedOptions.data : [])
+      .flatMap((option) => {
+        if (typeof option.label !== "string" || option.label.trim() === "") {
+          return [];
+        }
+        return [{ label: option.label, description: option.description }];
+      })
       .map((option, optionIndex) => ({
         id: `opt-${optionIndex + 1}`,
         label: option.label,
@@ -117,9 +143,9 @@ export function questionToolCardParts(part: unknown): LangyCardPart[] {
 
     // Stable across renders and rehydration: the recorded selection binds by
     // this id, so it must derive from the part's own durable identity.
-    const blockId = `question:${p.toolCallId ?? question}:${index}`;
-    const card = {
-      kind: "choices" as const,
+    const blockId = `question:${toolPart.toolCallId ?? question}:${index}`;
+    const card: LangyDerivedChoicesCard = {
+      kind: "choices",
       blockId,
       question,
       options,

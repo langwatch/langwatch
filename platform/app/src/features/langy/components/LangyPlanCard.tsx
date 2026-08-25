@@ -25,7 +25,7 @@ import { Check, ChevronRight, Square, SquareCheck } from "lucide-react";
 import { useState } from "react";
 import { LangyCard } from "~/features/asaplangy";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
-import type { LangyPlan, LangyPlanItem, LangyPlanItemStatus } from "../logic/langyPlan";
+import type { LangyPlan, LangyPlanItem, LangyPlanItemStatus } from "@langwatch/langy-web";
 import { LangyActivityParts } from "./LangyToolActivity";
 import { langyThinkingShimmerStyles } from "./langyShimmer";
 

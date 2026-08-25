@@ -43,7 +43,7 @@ function normalizeSentiment(raw: string | undefined): LangyFeedbackSentiment | u
     case "neutral":
       return "neutral";
     default:
-      return undefined;
+      return void 0;
   }
 }
 

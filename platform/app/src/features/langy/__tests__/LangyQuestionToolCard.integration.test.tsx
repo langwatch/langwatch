@@ -33,8 +33,7 @@ vi.mock("~/utils/api", () => ({
 }));
 
 import { MessageContent } from "../components/MessageContent";
-import { langyChoicesTimeline } from "../logic/langyChoicesTimeline";
-import { questionToolCardParts } from "../logic/langyQuestionTool";
+import { langyChoicesTimeline, questionToolCardParts } from "@langwatch/langy-web";
 
 afterEach(cleanup);
 

@@ -5,7 +5,10 @@
  * shared extractor otherwise (live frames, old turns).
  */
 import { describe, expect, it } from "vitest";
-import { commandOfToolCall, digestOfToolCall } from "../logic/langyCapabilityDigest";
+import {
+  commandOfToolCall,
+  digestOfToolCall,
+} from "../../src/behaviour/langy-capability-digest";
 
 describe("commandOfToolCall", () => {
   describe("given a shell call carrying a LangWatch command (start frame)", () => {

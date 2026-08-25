@@ -54,7 +54,7 @@ import {
   INSPECTOR_TUCK,
   INSPECTOR_WIDTH,
   resolveInspectorFrame,
-} from "../logic/langyPanelLayout";
+} from "@langwatch/langy-web";
 import {
   DEV_LOG_CAPACITY,
   type DevToolCall,

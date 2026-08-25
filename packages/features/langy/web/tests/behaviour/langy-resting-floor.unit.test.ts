@@ -5,7 +5,7 @@ import {
   LANGY_FLOATING_FLOOR_THREAD_PX,
   LANGY_FLOATING_FLOOR_TURN_PX,
   langyRestingFloorPx,
-} from "../logic/langyPanelLayout";
+} from "../../src/behaviour/langy-panel-layout";
 
 /**
  * The floating card's resting floor. The interesting case is the one the panel

@@ -24,19 +24,22 @@ import {
   extractDigest,
   parseLangwatchCommand,
 } from "@langwatch/langy-contract";
+import { z } from "zod";
 
 /** The typed tool name the CLI envelope records calls under. */
 const CLI_TOOL_NAME = /^langwatch\.([a-z][a-z0-9-]*)\.([a-z][a-z0-9-]*)$/;
 
 /** Keys a shell tool may pass its command under (mirrors the server envelope). */
 const COMMAND_KEYS = ["command", "cmd", "script"];
+const unknownRecordSchema = z.record(z.string(), z.unknown());
 
 function readCommandString(input: unknown): string | null {
   if (typeof input === "string") return input.trim() ? input : null;
-  if (!input || typeof input !== "object") return null;
-  const record = input as Record<string, unknown>;
+  const parsed = unknownRecordSchema.safeParse(input);
+  if (!parsed.success) return null;
+
   for (const key of COMMAND_KEYS) {
-    const value = record[key];
+    const value = parsed.data[key];
     if (typeof value === "string" && value.trim()) return value;
   }
   return null;
@@ -79,11 +82,13 @@ export function commandOfToolCall({
 
   const typed = CLI_TOOL_NAME.exec(name);
   if (!typed) return null;
-  const structured =
-    input && typeof input === "object" && !Array.isArray(input)
-      ? (input as Record<string, unknown>)
-      : {};
-  return { resource: typed[1]!, verb: typed[2]!, query: structured };
+  const resource = typed[1];
+  const verb = typed[2];
+  if (!resource || !verb) return null;
+
+  const parsedInput = unknownRecordSchema.safeParse(input);
+  const structured = parsedInput.success ? parsedInput.data : {};
+  return { resource, verb, query: structured };
 }
 
 /**

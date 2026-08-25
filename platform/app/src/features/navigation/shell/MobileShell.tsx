@@ -5,7 +5,7 @@ import { AppHeaderUserMenu } from "~/components/AppHeaderUserMenu";
 import { LogoIcon } from "~/components/icons/LogoIcon";
 import { SideMenuDensityProvider } from "~/components/sidebar/sideMenuDensity";
 import { Link } from "~/components/ui/link";
-import { APP_HEADER_HEIGHT } from "~/features/langy/logic/langyPanelLayout";
+import { APP_HEADER_HEIGHT } from "@langwatch/langy-web";
 import { usePathname } from "~/utils/compat/next-navigation";
 import type { ProductId } from "../products";
 import { OrganizationSelect } from "./OrganizationSelect";

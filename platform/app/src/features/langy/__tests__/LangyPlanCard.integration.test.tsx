@@ -20,7 +20,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 
 import { LangyPlanCard } from "../components/LangyPlanCard";
 import { LangyToolActivity } from "../components/LangyToolActivity";
-import type { LangyPlan } from "../logic/langyPlan";
+import type { LangyPlan } from "@langwatch/langy-web";
 
 function ui(node: React.ReactNode) {
   return render(<ChakraProvider value={defaultSystem}>{node}</ChakraProvider>);

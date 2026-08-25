@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shouldRehydrateEngineFromDurable } from "../foreignTurnRehydration";
+import { shouldRehydrateEngineFromDurable } from "../../src/behaviour/foreign-turn-rehydration";
 
 // A steady-state, idle, active conversation whose durable fold has grown past
 // the engine — the case that MUST re-hydrate. Each test overrides one field to

@@ -27,6 +27,12 @@ Feature: Langy service capability
     Then it calls the corresponding LangyService method directly
     And it does not reach through a subordinate capability property
 
+  Scenario: controlled browser behaviour is portable
+    Given the application renders a Langy conversation surface
+    When it derives card order, panel geometry, feedback directives, or turn controls
+    Then it uses the deterministic values from the Langy web package
+    And routes, transport hooks, and React composition remain in the application
+
   Scenario: feedback prompt keeps its existing cadence
     Given a process-owned LangyService with Redis available
     When feedback is checked after an assistant answer

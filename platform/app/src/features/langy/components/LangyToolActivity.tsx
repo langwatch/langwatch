@@ -39,12 +39,12 @@ import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useLangyDevMode } from "../hooks/useLangyDevMode";
+import { type CapabilityCommand, commandOfToolCall } from "@langwatch/langy-web";
 import {
-  type CapabilityCommand,
-  commandOfToolCall,
-} from "../logic/langyCapabilityDigest";
-import { isPlanToolPart } from "../logic/langyPlan";
-import { isQuestionToolPart, questionToolCardParts } from "../logic/langyQuestionTool";
+  isPlanToolPart,
+  isQuestionToolPart,
+  questionToolCardParts,
+} from "@langwatch/langy-web";
 import {
   type LangyToolErrorPresentation,
   presentLangyToolError,

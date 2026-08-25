@@ -275,7 +275,7 @@ import {
   FLOATING_PEEK_NEAR_PX,
   FLOATING_PEEK_REST_PX,
   resolvePeekTranslate,
-} from "../logic/langyPeekDock";
+} from "@langwatch/langy-web";
 import { useLangyStore } from "../stores/langyStore";
 
 // ---------------------------------------------------------------------------

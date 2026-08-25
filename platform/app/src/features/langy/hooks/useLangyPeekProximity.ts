@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { resolvePeekProximity } from "../logic/langyPeekDock";
+import { resolvePeekProximity } from "@langwatch/langy-web";
 
 /**
  * Does the pointer stand near the minimised peek's edge region?

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FLOATING_PANEL_INSET } from "../logic/langyPanelLayout";
+import { FLOATING_PANEL_INSET } from "../../src/behaviour/langy-panel-layout";
 import {
   FLOATING_PEEK_REST_PX,
   PEEK_PROXIMITY_ENTER_PX,
@@ -9,7 +9,7 @@ import {
   resolvePeekVisiblePx,
   SIDEBAR_PEEK_NEAR_PX,
   SIDEBAR_PEEK_REST_PX,
-} from "../logic/langyPeekDock";
+} from "../../src/behaviour/langy-peek-dock";
 
 /**
  * The minimised peek's pure maths: how much sliver each phase shows, the

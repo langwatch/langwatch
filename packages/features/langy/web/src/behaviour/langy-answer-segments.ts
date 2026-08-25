@@ -23,21 +23,27 @@ import {
   parseLangyCardFailedPart,
   parseLangyCardPart,
 } from "@langwatch/langy-contract";
+import { z } from "zod";
 
 export type LangyAnswerSegment =
   | { type: "text"; text: string }
   | { type: "card"; part: LangyCardPart }
   | { type: "failed"; part: LangyCardFailedPart };
 
-interface PartLike {
-  type?: string;
-  text?: string;
-}
+const answerPartSchema = z
+  .object({
+    type: z.string().optional(),
+    text: z.string().optional(),
+  })
+  .loose();
 
 /** True when any part is a block part — the gate for segment rendering. */
 export function hasLangyBlockParts(parts: readonly unknown[]): boolean {
   return parts.some((part) => {
-    const type = (part as PartLike).type;
+    const parsed = answerPartSchema.safeParse(part);
+    if (!parsed.success) return false;
+
+    const { type } = parsed.data;
     return type === LANGY_CARD_PART_TYPE || type === LANGY_CARD_FAILED_PART_TYPE;
   });
 }
@@ -61,7 +67,10 @@ export function langyAnswerSegments(parts: readonly unknown[]): LangyAnswerSegme
   };
 
   for (const rawPart of parts) {
-    const part = rawPart as PartLike;
+    const parsedPart = answerPartSchema.safeParse(rawPart);
+    if (!parsedPart.success) continue;
+
+    const part = parsedPart.data;
     if (part.type === "text") {
       if ((part.text ?? "").length > 0) textBuffer.push(part.text ?? "");
       continue;

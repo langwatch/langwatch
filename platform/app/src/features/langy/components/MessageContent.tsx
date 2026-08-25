@@ -19,15 +19,18 @@ import {
   hasLangyBlockParts,
   type LangyAnswerSegment,
   langyAnswerSegments,
-} from "../logic/langyAnswerSegments";
+} from "@langwatch/langy-web";
 import {
   isSubstantiveLangyAnswer,
   parseLangyFeedbackDirective,
-} from "../logic/langyFeedbackDirective";
-import { langyPlan } from "../logic/langyPlan";
-import { questionToolCardParts } from "../logic/langyQuestionTool";
-import { foldReasoningTitles, stripReasoningTitles } from "../logic/langyReasoningTitles";
-import { stripToolNarration } from "../logic/langyToolNarration";
+} from "@langwatch/langy-web";
+import {
+  foldReasoningTitles,
+  langyPlan,
+  questionToolCardParts,
+  stripReasoningTitles,
+  stripToolNarration,
+} from "@langwatch/langy-web";
 import { useSpaLinkClick } from "../logic/spaLink";
 import { useLangyStore } from "../stores/langyStore";
 import { LangyDerivedCardView } from "./derived-cards/LangyDerivedCardView";

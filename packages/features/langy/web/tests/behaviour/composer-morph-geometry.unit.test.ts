@@ -15,7 +15,7 @@ import {
   midpointRect,
   PANEL_ROOT_ATTR,
   readRectAtRest,
-} from "../logic/composerMorphGeometry";
+} from "../../src/behaviour/composer-morph-geometry";
 
 const ORIGIN: MorphRect = { top: 100, left: 40, width: 720, height: 46 };
 const DESTINATION: MorphRect = { top: 700, left: 1040, width: 364, height: 40 };

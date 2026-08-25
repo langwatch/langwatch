@@ -24,9 +24,11 @@ answers, a three-day quiet period, a long-conversation exception, and a
 30-day Redis TTL.
 
 The contract and server package do not import application aliases, Hono,
-React, or global Prisma. Configuration and technology adapters are supplied at
-the process boundary. No request constructs a service or resolves one through
-`getApp`.
+React, or global Prisma. The web package contains deterministic browser
+behaviour with controlled values only; routes, React composition, and transport
+hooks stay in the application. Configuration and technology adapters are
+supplied at the process boundary. No request constructs a service or resolves
+one through `getApp`.
 
 ## Compatibility
 

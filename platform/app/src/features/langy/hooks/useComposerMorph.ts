@@ -8,7 +8,7 @@ import {
   midpointRect,
   readRect,
   readRectAtRest,
-} from "../logic/composerMorphGeometry";
+} from "@langwatch/langy-web";
 import { useLangyStore } from "../stores/langyStore";
 
 /**

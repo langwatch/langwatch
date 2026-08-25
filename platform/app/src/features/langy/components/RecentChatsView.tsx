@@ -60,7 +60,7 @@ import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { LangyConversationListItemDto } from "../data/langy.dtos";
 import { useLangyConversationListQuery } from "../data/useLangyConversationListQuery";
-import { formatLangyConversationDate } from "../logic/langyConversationDate";
+import { formatLangyConversationDate } from "@langwatch/langy-web";
 
 /** A conversation whose title subscriber hasn't landed yet still needs a name. */
 const UNTITLED = "Untitled chat";

@@ -19,7 +19,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { cloneElement, type ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { langyChoicesTimeline } from "../logic/langyChoicesTimeline";
+import { langyChoicesTimeline } from "@langwatch/langy-web";
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({ push: vi.fn() }),

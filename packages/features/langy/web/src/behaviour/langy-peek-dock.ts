@@ -1,41 +1,15 @@
-import { FLOATING_PANEL_INSET, resolveFloatingPanelWidth } from "./langyPanelLayout";
+import { FLOATING_PANEL_INSET, resolveFloatingPanelWidth } from "./langy-panel-layout";
 
 /**
- * The minimised peek — the PANEL ITSELF, slid down (or right) until only a
- * sliver of its own header shows.
- *
- * There is no separate peek element, and there was never a good reason for
- * one: the panel already stays mounted while closed (unmounting would tear
- * down an in-flight stream), so minimising is a change of TRANSFORM on the one
- * node, not a swap between two. A swap is exactly what read as "popping in and
- * out" — two elements trading places can never look like one object moving.
- * What you see peeking is literally the top of the panel: its own header, its
- * own surface, its own hairline and rounded corners.
- *
- * Three positions on one continuous axis:
- *
- *   rest   — the panel is down, leaving a thin sliver of its header lip.
- *            Deliberately subtler than a title bar: present enough to find,
- *            quiet enough to forget.
- *   near   — the pointer is approaching (or the peek holds keyboard focus):
- *            the SAME element rises a little further, enough to read the
- *            header line. An invitation, not an opening.
- *   open   — the translate resolves to nothing and the panel is simply itself.
- *
- * Driven through the CSS `translate` property rather than `transform`, for one
- * specific reason: `transform` on this node is already owned by framer (the
- * layout morph between dock and floating card, plus the open/close variant).
- * `translate` is a separate, independently-animatable property that composes
- * with it instead of fighting it — and, unlike framer's numeric values, it
- * takes `calc(100% - Npx)` natively, so the sliver is exact without anyone
- * having to measure the panel's height.
- *
- * Spec: specs/langy/langy-peek-dock.feature
+ * Keeps the mounted panel itself visible as a small rest or near sliver.
+ * Unmounting would lose an in-flight stream, while a separate peek element
+ * would make the transition a swap rather than one continuous movement.
+ * CSS `translate` is used because Framer already owns `transform`; the two
+ * properties compose without measuring the panel or fighting animations.
  */
 
 export type LangyPeekPhase = "rest" | "near";
 
-// ── How much of the panel stays visible, per mode and phase ────────────────
 /**
  * Floating: px of the panel's own header visible above the bottom viewport
  * edge. The card is bottom-anchored on `FLOATING_PANEL_INSET`, so that inset

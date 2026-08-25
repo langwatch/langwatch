@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveLangyStopTarget } from "../langyStopTarget";
+import { resolveLangyStopTarget } from "../../src/behaviour/langy-stop-target";
 
 const base = {
   projectId: "proj-1",
@@ -107,7 +107,7 @@ describe("resolveLangyStopTarget", () => {
       expect(
         resolveLangyStopTarget({
           ...base,
-          projectId: undefined,
+          projectId: void 0,
           durableTurnId: "turn-1",
         }),
       ).toEqual({ kind: "unavailable", reason: "no-conversation" });
