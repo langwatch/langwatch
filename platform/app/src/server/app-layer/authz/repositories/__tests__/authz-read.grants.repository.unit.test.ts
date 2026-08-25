@@ -248,12 +248,13 @@ describe("GrantsAuthzReadRepository", () => {
         organizationId: "org-1",
       });
 
-      // Live memberships only. Without `removedAt: null` a group alice left
-      // still hands her every grant that group holds.
+      // Live memberships of live groups only. Without `removedAt: null` a
+      // group alice left still hands her every grant that group holds; without
+      // `deletedAt: null` a group that was DELETED does the same.
       expect(groupFindMany).toHaveBeenCalledWith({
         where: {
           userId: "alice",
-          group: { organizationId: "org-1" },
+          group: { organizationId: "org-1", deletedAt: null },
           removedAt: null,
         },
         select: { groupId: true },

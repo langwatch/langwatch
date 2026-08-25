@@ -6,7 +6,11 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
-import { liveGroupMemberships } from "~/server/app-layer/authz/repositories/live-rows";
+import {
+  LIVE_GROUP,
+  liveGroupMemberships,
+  liveGroups,
+} from "~/server/app-layer/authz/repositories/live-rows";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { VisibilityWindowService } from "~/server/app-layer/traces/visibility-window.service";
 import type { Session } from "~/server/auth";
@@ -177,7 +181,7 @@ async function resolveAudienceNames(
   if (!organizationId || groupIds.length === 0) {
     return { groups: {} };
   }
-  const groupRows = await prisma.group.findMany({
+  const groupRows = await liveGroups(prisma).findMany({
     where: { id: { in: groupIds }, organizationId },
     select: { id: true, name: true },
   });
@@ -373,7 +377,7 @@ export async function getUserProtectionsForProject(
     organizationId = team?.organizationId ?? null;
     if (organizationId) {
       const memberships = await liveGroupMemberships(ctx.prisma).findMany({
-        where: { userId, group: { organizationId } },
+        where: { userId, group: { organizationId, ...LIVE_GROUP } },
         select: { groupId: true },
       });
       groupIds = memberships.map((m) => m.groupId);

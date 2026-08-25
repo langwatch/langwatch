@@ -1,5 +1,6 @@
 import type { PrismaClient } from "~/generated/prisma/client";
 import { batchScopePermissions } from "~/server/api/rbac";
+import { liveGroups } from "~/server/app-layer/authz/repositories/live-rows";
 import {
   probeOrganizationPermission,
   probeProjectPermission,
@@ -147,7 +148,7 @@ export async function getDataPrivacySnapshot(
         select: { id: true, name: true, teamId: true },
         orderBy: { name: "asc" },
       }),
-      ctx.prisma.group.findMany({
+      liveGroups(ctx.prisma).findMany({
         where: { organizationId },
         select: { id: true, name: true },
         orderBy: { name: "asc" },

@@ -22,7 +22,7 @@ import type {
 } from "@langwatch/authz-server";
 import type { Prisma } from "~/generated/prisma/client";
 import { CUSTOM_ROLE_KIND } from "../../../role/role-kind";
-import { LIVE_MEMBERSHIP } from "./live-rows";
+import { LIVE_GROUP, LIVE_MEMBERSHIP } from "./live-rows";
 
 export class PrismaAuthzReadRepository implements AuthzReadRepository {
   constructor(private readonly prisma: Prisma.TransactionClient) {}
@@ -98,6 +98,11 @@ export class PrismaAuthzReadRepository implements AuthzReadRepository {
       where: {
         organizationId,
         group: {
+          // The THIRD half of the same gate. A deleted group is still a row —
+          // it has to be, so the marked memberships it held survive with it —
+          // and without LIVE_GROUP every binding hanging off it keeps
+          // selecting here, which is a deleted group still granting.
+          ...LIVE_GROUP,
           members: {
             some: {
               userId,

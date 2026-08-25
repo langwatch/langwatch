@@ -36,6 +36,10 @@ import {
 import { apiKeyPermission, createProjectApp } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";
 import { getApp } from "~/server/app-layer/app";
+import {
+  LIVE_MEMBERSHIP,
+  liveGroups,
+} from "~/server/app-layer/authz/repositories/live-rows";
 import { prisma } from "~/server/db";
 import { toBudgetDto } from "~/server/gateway/budget.dto";
 import {
@@ -2328,9 +2332,14 @@ async function groupMemberCounts(
     ),
   );
   if (groupIds.length === 0) return new Map();
-  const groups = await prisma.group.findMany({
+  const groups = await liveGroups(prisma).findMany({
     where: { id: { in: groupIds } },
-    select: { id: true, _count: { select: { members: true } } },
+    // LIVE members: the wire figure says how many people the allowance covers
+    // now, which people who left the group are not.
+    select: {
+      id: true,
+      _count: { select: { members: { where: LIVE_MEMBERSHIP } } },
+    },
   });
   return new Map(groups.map((g) => [g.id, g._count.members]));
 }

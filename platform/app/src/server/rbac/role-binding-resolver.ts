@@ -17,7 +17,10 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { LIVE_MEMBERSHIP } from "~/server/app-layer/authz/repositories/live-rows";
+import {
+  LIVE_GROUP,
+  LIVE_MEMBERSHIP,
+} from "~/server/app-layer/authz/repositories/live-rows";
 import {
   bindingScopeCanGrant,
   EXTERNAL_MEMBER_PERMISSIONS,
@@ -174,6 +177,10 @@ async function collectBindingsForUser({
       where: {
         organizationId,
         group: {
+          // And the group itself must still exist. A deleted group is kept as
+          // a row so its memberships survive, so without LIVE_GROUP its
+          // bindings keep resolving here.
+          ...LIVE_GROUP,
           members: {
             some: {
               userId,
@@ -541,7 +548,10 @@ export async function resolveLegacyCeiling({
         // group, so a membership that ended must not feed it: it would
         // suppress the fallback on the strength of access the user no longer
         // has.
-        where: { group: { organizationId }, ...LIVE_MEMBERSHIP },
+        where: {
+          group: { organizationId, ...LIVE_GROUP },
+          ...LIVE_MEMBERSHIP,
+        },
         select: { groupId: true },
       },
     },

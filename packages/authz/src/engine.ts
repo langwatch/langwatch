@@ -84,13 +84,23 @@ export class AuthzEngine {
     };
 
     // The order IS the contract — each step answers or defers to the next.
+    //
+    // The resource tier sits above the binding steps for one reason: it can
+    // only answer when the caller PRESENTED a token (the collector reads no
+    // row otherwise), so for every other request it defers and the order is
+    // unobservable. For a request that did present one, the tier is the step
+    // that was asked: leaving it last let an ordinary binding on the
+    // resource's lineage answer first, which told the caller "granted, via a
+    // binding" about a question they asked with a token — and a share seam
+    // that must not honour a binding as the redemption of a token then had to
+    // refuse a member holding a perfectly live link.
     return (
       demoProjectStep(context) ??
       organizationMembershipGateStep(context) ??
       organizationRoleFloorStep(context) ??
+      resourceGrantStep(context) ??
       bindingsStep(context) ??
       legacyTeamFallbackStep(context) ??
-      resourceGrantStep(context) ??
       denyStep(context)
     );
   }

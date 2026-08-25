@@ -1891,6 +1891,13 @@ export class GrantsLedgerWriter {
         "removeGroupMembersWhere refused a filter naming neither a group nor a user: it would end every membership in the organization",
       );
     }
+    // Deliberately NOT fenced on `Group.deletedAt`, unlike every READ of live
+    // access. This is the write that ENDS memberships, and one of its two
+    // callers is a group deletion: the memberships are ended first and the
+    // group marked afterwards, so fencing here would be a no-op today and a
+    // silent one the moment that order changed — the removals would match
+    // nothing and everybody would keep the group's access with no membership
+    // to end. The tenancy bound is what this filter is for.
     const live = await liveGroupMemberships(this.prisma).findMany({
       where: {
         ...(where.groupId ? { groupId: where.groupId } : {}),

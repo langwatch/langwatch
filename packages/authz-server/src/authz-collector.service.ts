@@ -473,13 +473,18 @@ function kindForResourceType(
  * The ADR-057 visibility a link was created with, as the ADR-092 audience
  * it means.
  *
- * KNOWN NARROWING (C5): the PROJECT audience resolves through
- * project-scoped bindings only (see audienceMatches in the engine), while
- * legacy's project-visibility check probes actual project membership - so a
- * caller who reaches the project through a team or organization binding
- * matches legacy and not this. The membership probe lands with the C5
- * storage pass; until then this is narrower than legacy, which fails
- * closed.
+ * Each of these names a membership set, and the engine resolves it as the
+ * REACHABILITY question it is (`audienceMatches`): a PROJECT audience
+ * includes everyone who can reach the project - through a binding on it, on
+ * the team that owns it, or on the organization above it - and an
+ * ORGANIZATION audience includes every member of the organization. That is
+ * the same set legacy's visibility checks probed, so a caller whose project
+ * access arrives as a TEAM binding (which is how it nearly always arrives)
+ * matches here exactly as they did there.
+ *
+ * The lineage those sets are read from is the SCOPE's, which this collector
+ * resolved off the project row - never off the request - so an audience can
+ * only ever name the project and organization the row itself sits in.
  */
 function audienceForVisibility({
   visibility,

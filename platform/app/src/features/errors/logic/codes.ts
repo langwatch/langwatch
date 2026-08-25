@@ -112,6 +112,7 @@ export const APP_ERROR_CODES = [
   "grant_expiry_in_past",
   "grant_expiry_not_supported",
   "grant_validation_failed",
+  "group_already_deleted",
   "group_member_already_added",
   "group_member_not_in_group",
   "group_not_found",

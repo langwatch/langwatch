@@ -60,7 +60,10 @@ export class PrismaAuthzRevocationRepository {
 
     // The organization bounds the write through the group, which is what
     // carries the tenancy — a membership row has no organization column of
-    // its own, and a bare id list would be a cross-tenant write.
+    // its own, and a bare id list would be a cross-tenant write. Deliberately
+    // NOT fenced on `Group.deletedAt`: this is a deny, and a deny must never
+    // be refused on the grounds that the group it belongs to is on its way
+    // out. It can only ever deny earlier, never grant.
     await this.prisma.groupMembership.updateMany({
       where: {
         id: { in: membershipIds },

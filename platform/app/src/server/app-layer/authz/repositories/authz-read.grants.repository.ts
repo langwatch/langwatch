@@ -35,7 +35,12 @@ import {
 } from "@langwatch/authz-server";
 import type { Prisma } from "~/generated/prisma/client";
 import { CUSTOM_ROLE_KIND } from "../../../role/role-kind";
-import { liveGrants, liveGroupMemberships, liveRoles } from "./live-rows";
+import {
+  LIVE_GROUP,
+  liveGrants,
+  liveGroupMemberships,
+  liveRoles,
+} from "./live-rows";
 
 /** The three scope tiers a `CollectedBinding` can carry. RESOURCE rows are
  *  the share tier (findShareLinks) and PLATFORM rows are dormant facts that
@@ -113,7 +118,12 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
     // still holds.
     if (!(await this.isCurrentMember({ userId, organizationId }))) return [];
     const memberships = await liveGroupMemberships(this.prisma).findMany({
-      where: { userId, group: { organizationId } },
+      // LIVE_GROUP as well as the live membership: deleting a group ends its
+      // memberships first, so this would normally return nothing for one — but
+      // the fence must not depend on that ordering holding, because a group
+      // that outlives its own deletion here hands the user everything it
+      // grants.
+      where: { userId, group: { organizationId, ...LIVE_GROUP } },
       select: { groupId: true },
     });
     if (memberships.length === 0) return [];

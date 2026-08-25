@@ -282,6 +282,14 @@ const registry = {
     ],
     docsPath: "/platform/rbac",
   },
+  group_already_deleted: {
+    tips: [
+      "The group was already deleted; a deleted group is kept as a record and cannot be deleted twice",
+      "List the organization's groups to see which ones are live, and treat this as already done if you meant to delete it",
+      "To use the name again, create a new group with it — deleting frees the name for re-use",
+    ],
+    docsPath: "/platform/rbac",
+  },
   group_member_not_in_group: {
     tips: [
       "The user holds no LIVE membership of this group; a membership that ended is kept as a record and cannot be ended twice",

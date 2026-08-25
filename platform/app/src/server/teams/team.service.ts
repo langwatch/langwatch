@@ -19,7 +19,10 @@ import {
   ACCESS_LISTING_USER_SELECT,
   type AccessListingRepository,
 } from "~/server/app-layer/authz/repositories/access-listing.repository";
-import { liveGroupMemberships } from "~/server/app-layer/authz/repositories/live-rows";
+import {
+  LIVE_GROUP,
+  liveGroupMemberships,
+} from "~/server/app-layer/authz/repositories/live-rows";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import type {
   RoleBindingRepository,
@@ -467,7 +470,7 @@ export class TeamService {
             ? await liveGroupMemberships(this.prisma).findMany({
                 where: {
                   groupId: { in: allGroupIds },
-                  group: { organizationId },
+                  group: { organizationId, ...LIVE_GROUP },
                   user: { orgMemberships: { some: { organizationId } } },
                 },
                 include: { user: { select: ACCESS_LISTING_USER_SELECT } },

@@ -154,11 +154,15 @@ describe("PrismaAuthzReadRepository", () => {
       // GroupMembership row outlives removal from the organization, so
       // without it an offboarded user keeps what their groups granted. It
       // outlives the MEMBERSHIP too now — a removal marks the row — so
-      // `removedAt: null` is the second half of the same gate.
+      // `removedAt: null` is the second half of the same gate — and
+      // `deletedAt: null` on the GROUP is the third: a deleted group is kept
+      // as a row so its memberships survive it, so without that clause every
+      // binding it carries still selects here.
       expect(findMany).toHaveBeenCalledWith({
         where: {
           organizationId: "org-1",
           group: {
+            deletedAt: null,
             members: {
               some: {
                 userId: "alice",

@@ -74,17 +74,23 @@ function makeReader(
  */
 function readerWithLinks(rows: ShareLinkRow[]): AuthzReadRepository {
   return makeReader({
-    findShareLinks: vi.fn(async ({ projectId, tokens, links }) =>
-      rows.filter(
-        (row) =>
-          row.projectId === projectId &&
-          tokens.includes(TOKEN) &&
-          links.some(
-            (link) =>
-              link.id === row.resourceId &&
-              link.kind === (row.resourceType === "TRACE" ? "trace" : "thread"),
-          ),
-      ),
+    findShareLinks: vi.fn(
+      async ({
+        projectId,
+        tokens,
+        links,
+      }: Parameters<AuthzReadRepository["findShareLinks"]>[0]) =>
+        rows.filter(
+          (row) =>
+            row.projectId === projectId &&
+            tokens.includes(TOKEN) &&
+            links.some(
+              (link) =>
+                link.id === row.resourceId &&
+                link.kind ===
+                  (row.resourceType === "TRACE" ? "trace" : "thread"),
+            ),
+        ),
     ),
   });
 }
@@ -208,10 +214,12 @@ describe("engineShareAccessDecider", () => {
 
   describe("given a project member who did not present a live link", () => {
     /**
-     * The walk reaches the resource tier LAST, so an ordinary binding on the
-     * resource's lineage answers a resource-scope check before the token is
-     * ever consulted. Honouring that would hand a member a link its own expiry
-     * had killed, and would spend a view against a token that granted nothing.
+     * The collector filters a dead link out before the walk sees it, so the
+     * resource tier has nothing to answer with and the member's own binding on
+     * the resource's lineage answers instead — `via: "binding"`. Honouring
+     * that here would hand a member a link its own expiry had killed, and
+     * would spend a view against a token that granted nothing. Only the tier
+     * redeems a token; a binding never does.
      */
     /** @scenario A member's own access never redeems a dead share link */
     it("refuses: a binding is not the redemption of a token", async () => {
@@ -266,37 +274,74 @@ describe("engineShareAccessDecider", () => {
 
       expect(outcome.allowed).toBe(false);
     });
+
+    /**
+     * Membership, not a binding: an organization audience is every member of
+     * it, which is the floor legacy applied at organization scope. Someone
+     * signed in elsewhere holds no membership here and so is in no audience,
+     * whatever bindings the snapshot found.
+     */
+    /** @scenario An organization audience is every member and nobody else */
+    it("refuses a signed-in member of another organization", async () => {
+      const reader = readerWithLinks([
+        buildLink({ visibility: "ORGANIZATION" }),
+      ]);
+      vi.mocked(reader.findOrganizationMembership).mockResolvedValue(null);
+
+      const outcome = await presentToken(deciderOver(reader), {
+        principal: { type: "user", id: "user_1" },
+      });
+
+      expect(outcome.allowed).toBe(false);
+    });
+
+    /** @scenario An organization audience is every member and nobody else */
+    it("grants a member holding no binding anywhere", async () => {
+      const reader = readerWithLinks([
+        buildLink({ visibility: "ORGANIZATION" }),
+      ]);
+      vi.mocked(reader.findOrganizationMembership).mockResolvedValue({
+        role: "MEMBER",
+        disabled: false,
+      });
+      vi.mocked(reader.findUserBindings).mockResolvedValue([]);
+
+      const outcome = await presentToken(deciderOver(reader), {
+        principal: { type: "user", id: "user_1" },
+      });
+
+      expect(outcome).toEqual({ allowed: true, via: "resource-grant" });
+    });
   });
 
   describe("given a project-visibility link", () => {
     /**
-     * The collector's KNOWN NARROWING (C5): the engine's `project` audience
-     * resolves through PROJECT-scoped bindings alone, and almost nobody has
-     * one — project access arrives as a TEAM binding. So the seam asks the
-     * SAME engine the project-tier question the path it replaces asked, which
-     * is what keeps a "Members of this project" link working.
+     * A member of a project holds, in practice, a binding somewhere on its
+     * lineage — usually the TEAM that owns it, rarely the project itself,
+     * sometimes the organization above. The audience is that whole chain, so
+     * all three open the link, and all three do it through the resource tier:
+     * there is no second question asked behind the engine's answer any more.
      */
-    /** @scenario A project link requires a member of the same project */
-    it("grants a member who reaches the project through their team", async () => {
+    /** @scenario A project audience reaches everyone who reaches the project */
+    it.each([
+      ["the project itself", "PROJECT" as const, PROJECT_ID],
+      ["the team that owns it", "TEAM" as const, TEAM_ID],
+      ["the organization above it", "ORGANIZATION" as const, ORG_ID],
+    ])("grants a member bound at %s", async (_label, scopeType, scopeId) => {
       const reader = readerWithLinks([buildLink({ visibility: "PROJECT" })]);
       vi.mocked(reader.findOrganizationMembership).mockResolvedValue({
         role: "MEMBER",
         disabled: false,
       });
       vi.mocked(reader.findUserBindings).mockResolvedValue([
-        {
-          role: "MEMBER",
-          customRoleId: null,
-          scopeType: "TEAM",
-          scopeId: TEAM_ID,
-        },
+        { role: "MEMBER", customRoleId: null, scopeType, scopeId },
       ]);
 
       const outcome = await presentToken(deciderOver(reader), {
         principal: { type: "user", id: "user_1" },
       });
 
-      expect(outcome).toEqual({ allowed: true, via: "project-audience" });
+      expect(outcome).toEqual({ allowed: true, via: "resource-grant" });
     });
 
     it("refuses someone outside the project", async () => {
@@ -314,9 +359,65 @@ describe("engineShareAccessDecider", () => {
     });
 
     /**
-     * The compensation widens the AUDIENCE and nothing else: it runs only
-     * behind a live grant the collector still returns, so a project member
-     * cannot read past a link's own expiry.
+     * The widening the reachability chain does is bounded by the chain: a
+     * sibling team in the same organization is not on the shared project's
+     * lineage, so its members are not in the audience — which is the whole
+     * point of resolving the audience rather than settling for "an org
+     * member is near enough".
+     */
+    /** @scenario A project audience stops at the project's own lineage */
+    it("refuses a member of a different project in the same organization", async () => {
+      const reader = readerWithLinks([buildLink({ visibility: "PROJECT" })]);
+      vi.mocked(reader.findOrganizationMembership).mockResolvedValue({
+        role: "ADMIN",
+        disabled: false,
+      });
+      vi.mocked(reader.findUserBindings).mockResolvedValue([
+        {
+          role: "ADMIN",
+          customRoleId: null,
+          scopeType: "TEAM",
+          scopeId: "team_2",
+        },
+      ]);
+
+      const outcome = await presentToken(deciderOver(reader), {
+        principal: { type: "user", id: "user_1" },
+      });
+
+      expect(outcome.allowed).toBe(false);
+    });
+
+    /**
+     * The membership lookup is fenced to the resource's organization, so
+     * somebody else's admin arrives here holding nothing at all. The leftover
+     * binding is belt and braces: an audience is a membership set, and a
+     * caller with no live membership is in none of them.
+     */
+    /** @scenario A project audience stops at the project's own lineage */
+    it("refuses a member of a different organization entirely", async () => {
+      const reader = readerWithLinks([buildLink({ visibility: "PROJECT" })]);
+      vi.mocked(reader.findOrganizationMembership).mockResolvedValue(null);
+      vi.mocked(reader.findUserBindings).mockResolvedValue([
+        {
+          role: "ADMIN",
+          customRoleId: null,
+          scopeType: "TEAM",
+          scopeId: TEAM_ID,
+        },
+      ]);
+
+      const outcome = await presentToken(deciderOver(reader), {
+        principal: { type: "user", id: "user_1" },
+      });
+
+      expect(outcome.allowed).toBe(false);
+    });
+
+    /**
+     * Reachability decides the AUDIENCE and nothing else. Every other gate is
+     * still the collector's and the engine's, so a member on the chain cannot
+     * read past the link's own expiry.
      */
     /** @scenario A member's own access never redeems a dead share link */
     it("refuses a member once the project link itself expired", async () => {

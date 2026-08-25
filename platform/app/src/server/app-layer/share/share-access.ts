@@ -24,14 +24,12 @@
  *     where it is: view CONSUMPTION has a different writer (`GrantUsage`) and
  *     stays in `ShareService`.
  */
-import {
-  type AuthzDecision,
-  type AuthzPermission,
-  type AuthzPrincipalRef,
-  type AuthzScopeRef,
-  permissionSatisfiedBy,
-  type ResourceGrant,
-  type ShareableResourceKind,
+import type {
+  AuthzDecision,
+  AuthzPermission,
+  AuthzPrincipalRef,
+  AuthzScopeRef,
+  ShareableResourceKind,
 } from "@langwatch/authz";
 import { RESOURCE_KIND_TO_DB } from "@langwatch/authz-server";
 import type { ShareResourceType } from "./repositories/share.repository";
@@ -55,7 +53,12 @@ export interface ShareAccessAuthzPort {
   }): Promise<AuthzDecision>;
 }
 
-/** The collecting half: scope resolution and the resource tier's own rows. */
+/**
+ * The collecting half, and all this seam needs of it: where the resource
+ * sits. The rows themselves are the engine's to collect — this module reads
+ * none of them, which is what leaves the audience entirely to
+ * `matchResourceGrant`.
+ */
 export interface ShareAccessScopePort {
   resolveResourceScopeRef(args: {
     projectId: string;
@@ -64,18 +67,16 @@ export interface ShareAccessScopePort {
     parentThreadId?: string;
     shareTokens?: readonly string[];
   }): Promise<AuthzScopeRef | null>;
-  collectResourceGrants(args: {
-    scope: AuthzScopeRef;
-  }): Promise<ResourceGrant[]>;
 }
 
 /**
  * How the allow was reached. Never copy for a caller — a refusal says nothing
  * about which leg denied it — but the tier IS the contract, so tests and logs
  * can tell "the engine's resource tier granted this" from "an ordinary project
- * binding would have".
+ * binding would have". There is one value because there is one path: a
+ * presented token is redeemed by the resource tier or by nothing.
  */
-export type ShareAccessVia = "resource-grant" | "project-audience";
+export type ShareAccessVia = "resource-grant";
 
 export type ShareAccessOutcome = {
   allowed: boolean;
@@ -110,61 +111,6 @@ export function engineShareAccessDecider({
   authz: ShareAccessAuthzPort;
   scopes: ShareAccessScopePort;
 }): ShareAccessDecider {
-  /**
-   * The one place this seam widens on the engine's own answer, and it is a
-   * PARITY compensation, not a policy of its own.
-   *
-   * `audienceMatches` resolves a PROJECT audience through PROJECT-scoped
-   * bindings alone — the collector calls this its KNOWN NARROWING (C5) — while
-   * the path this replaces asked whether the viewer holds the permission ON
-   * the project. Almost nobody reaches a project through a PROJECT-scoped
-   * binding (membership arrives as a TEAM binding), so taking the narrow
-   * answer would silently kill every "Members of this project" link. Until C5
-   * stores membership audiences, the project-tier question is asked of the
-   * SAME engine, which is what keeps the two answers identical.
-   *
-   * It widens the AUDIENCE and nothing else: the fallback only runs when a
-   * live, possessed grant carrying the requested permission names a project
-   * audience, so possession, expiry, the view budget, the project anchor and
-   * the link's own permission all remain the collector's and the engine's.
-   */
-  const projectAudience = async ({
-    principal,
-    permission,
-    scope,
-  }: {
-    principal: AuthzPrincipalRef;
-    permission: AuthzPermission;
-    scope: Extract<AuthzScopeRef, { type: "resource" }>;
-  }): Promise<ShareAccessOutcome> => {
-    const grants = await scopes.collectResourceGrants({ scope });
-    const projectAudienced = grants.some(
-      (grant) =>
-        grant.audience.kind === "project" &&
-        grant.audience.id === scope.projectId &&
-        grant.projectId === scope.projectId &&
-        permissionSatisfiedBy({
-          granted: new Set([grant.permission]),
-          requested: permission,
-        }),
-    );
-    if (!projectAudienced) return DENIED;
-
-    const decision = await authz.check({
-      principal,
-      permission,
-      scope: {
-        type: "project",
-        id: scope.projectId,
-        teamId: scope.teamId,
-        organizationId: scope.organizationId,
-      },
-    });
-    return decision.allowed
-      ? { allowed: true, via: "project-audience" }
-      : DENIED;
-  };
-
   return {
     async decide({
       principal,
@@ -185,18 +131,23 @@ export function engineShareAccessDecider({
       if (scope?.type !== "resource") return DENIED;
 
       const decision = await authz.check({ principal, permission, scope });
-      // The RESOURCE TIER, and only it, answers for a share link. The engine's
-      // walk reaches `resourceGrantStep` last, so a project member holding an
-      // ordinary binding on the resource's lineage is allowed at a resource
-      // scope by `bindingsStep` — before the token is ever consulted. Honouring
-      // that here would hand a member a link its own expiry had killed, and
-      // would consume a view against a token that granted nothing. Their
-      // in-app read is a different question, asked at the project scope.
+      // The RESOURCE TIER, and only it, answers for a share link.
+      //
+      // The tier runs before the binding steps precisely so that a caller who
+      // asked WITH a token is answered by the token: a member whose live link
+      // covers them is granted through the tier, not through the binding they
+      // happen to hold. What still reaches `bindingsStep` at a resource scope
+      // is a request whose link the collector dropped — expired, spent, not
+      // presented — and that answer must not pass here: honouring it would
+      // hand a member a link its own expiry had killed, and would consume a
+      // view against a token that granted nothing. Their in-app read is a
+      // different question, asked at the project scope, where no resource
+      // grant is collected at all.
       if (decision.allowed && decision.via === "resource-grant") {
         return { allowed: true, via: "resource-grant" };
       }
 
-      return await projectAudience({ principal, permission, scope });
+      return DENIED;
     },
   };
 }

@@ -2946,6 +2946,72 @@ model InvoiceItem {
 // Scoped RBAC - Groups, GroupMembership, RoleBinding
 // ============================================================================
 
+// A group is deleted by MARKING it, for the reason a membership is
+// (`GroupMembership` below) and one more that only applies here.
+//
+// The membership row was made to survive its own removal so that "who could
+// reach this in June" stays answerable. Then deleting the GROUP hard-deleted
+// the row and cascaded every one of those marked memberships away - the
+// ledger kept the facts, but the projection lost exactly the history the
+// membership change existed to preserve. The group commit named this as
+// deferred; this closes it. `deletedAt` is the mark, and every read of a live
+// group fences on it through `liveGroups` / `LIVE_GROUP` in
+// `app-layer/authz/repositories/live-rows.ts` - a missed fence means a
+// deleted group keeps granting, so it fails OPEN and the fence is a wrapper
+// rather than a clause each query remembers.
+//
+// IDENTITY: re-creating a deleted group's name makes a NEW group with a new
+// id, never a revival. Same decision the membership row makes about a re-add,
+// for the same reason: the second `sec-eng` has its own beginning, its own
+// members and its own grants, and folding it onto the first would inherit
+// access nobody granted it and make the record read as one unbroken group
+// that never went away.
+//
+// UNIQUENESS is therefore over LIVE rows only. Both `@@unique`s that used to
+// stand here - `([organizationId, slug])` and `([organizationId, externalId])`
+// - are now PARTIAL unique indexes carrying `WHERE "deletedAt" IS NULL`
+// (`Group_organizationId_slug_live_key`,
+// `Group_organizationId_externalId_live_key`, migration
+// 20260825140000_group_deletion_keeps_its_history), and are deliberately NOT
+// declared here: Prisma has no partial indexes, so an `@@unique` in this file
+// would make the next `prisma migrate dev` drop the WHERE clause and rebuild
+// it across every deleted row - which would refuse the two things the clause
+// exists to allow, re-using a deleted group's name and a SCIM directory group
+// that disappears and comes back with the same externalId. The same
+// convention RoleBinding's six partial uniques and the membership live-key
+// already follow.
+//
+// NOT a ledger fact. A group's existence, name and slug are not access - the
+// GRANTS it carries are, and those are already facts (`grant_attached` /
+// `grant_revoked`), as is every membership (`group_member_added` /
+// `group_member_removed`). Creation is a plain row write with no event behind
+// it, so a `group_deleted` event would be half a projection: a fold able to
+// delete a group it could never create, which on replay from an empty
+// projection would have nothing to mark. Deletion therefore ends the grants
+// and the memberships through the ledger FIRST - each one its own fact, with
+// its own synchronous deny - and only then marks this row. The mark still
+// bumps the organization's authz epoch, because the L1 decision cache would
+// otherwise keep answering from before it for up to thirty seconds.
+//
+// CASCADES, and what was chosen:
+//   * `organization` keeps `onDelete: Cascade`. A tenant purge is a deliberate
+//     erasure of everything the organization ever held; there is no history to
+//     protect once the tenant itself is going.
+//   * `members` is `onDelete: Restrict` on the membership side. Under a mark
+//     the group row is never row-deleted in normal operation, so the only
+//     thing left that COULD fire the old cascade is a purge - and a purge
+//     should have to say so. Restrict turns "a stray `group.delete()` silently
+//     erased an audit trail" into a loud refusal.
+//     `deleteProvisionedOrganization` deletes the memberships explicitly for
+//     exactly that reason. This datasource is `relationMode = "prisma"`, so
+//     there are no foreign keys in the database and the action is emulated by
+//     the client: it governs the deletes Prisma itself issues, which is every
+//     delete the application makes, and it needs no DDL to take effect.
+//   * `roleBindings` keeps `onDelete: Cascade`. RoleBinding is the compat head,
+//     not a record: a revoke DELETES it, and the history of a binding lives on
+//     the `Grant` row (marked `revokedAt`) and the events behind it, neither of
+//     which relates to this table at all. A cascade there erases nothing that
+//     is kept on purpose.
 model Group {
   id               String            @id @default(nanoid())
   organizationId   String
@@ -2962,15 +3028,22 @@ model Group {
   roleBindings     RoleBinding[]     @relation("GroupBindings")
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @default(now()) @updatedAt
+  /// When the group was deleted. Null is live; every read of live access
+  /// fences on it, and leaving that clause out fails OPEN.
+  deletedAt        DateTime?
+  deletedReason    String?
 
-  @@unique([organizationId, slug])
-  @@unique([organizationId, externalId])
-  /// D08: a directory's identifier for a group is its CONNECTION's, so two
-  /// connections in one organization each carry their own "engineering". The
-  /// organization-scoped uniqueness above stays as the legacy safety net for
-  /// the rows that carry no connection.
-  @@unique([scimConnectionId, externalId])
+  // Uniqueness is enforced by three partial unique indexes over LIVE rows,
+  // defined in migrations 20260825140000_group_deletion_keeps_its_history and
+  // 20260825150000_scim_connection_group_unique_is_live:
+  //   • ([organizationId, slug])         - Group_organizationId_slug_live_key
+  //   • ([organizationId, externalId])   - Group_organizationId_externalId_live_key
+  //   • ([scimConnectionId, externalId]) - Group_scimConnectionId_externalId_live_key
+  // Prisma does not support partial indexes natively, so none of them is in
+  // schema.prisma — see the note above this model for what re-declaring one
+  // would break.
   @@index([organizationId])
+  @@index([organizationId, deletedAt])
   @@index([scimConnectionId])
 }
 
@@ -3011,23 +3084,26 @@ model Group {
 //     where erasing the person's memberships along with the person is the
 //     intent. Restricting it would block an erasure we want and protect
 //     nothing the application can reach.
-//   * `group` keeps `onDelete: Cascade` too, and that is a KNOWN limit rather
-//     than an endorsement: deleting a group still erases its membership rows
-//     from this projection. What it cannot erase is the FACT - the group's
-//     memberships are ended through the ledger before the group row goes, so
-//     `authz.grants.group_member_removed` rows and the events behind them
-//     name the user, the group and the moment. Making the row itself survive
-//     needs either a soft-deleted `Group` or `groupId`/`userId` as plain fact
-//     columns the way `Grant.principalId` is; both are a wider change than
-//     this one and neither is done here. The projection's insert is guarded
-//     on the group and user rows existing, so a replay after a group deletion
-//     converges instead of failing on the foreign key.
+//   * `group` is `onDelete: Restrict`, and that is what closed this comment's
+//     former known limit. Deleting a group used to cascade these marked rows
+//     away, so the projection lost the very history the mark exists to keep.
+//     A group is soft-deleted now (`Group.deletedAt`), which means the row is
+//     never row-deleted in normal operation and the cascade only ever fired
+//     under a deliberate purge - so Restrict costs nothing an application path
+//     can reach, and it turns a stray `group.delete()` from a silent erasure
+//     of an audit trail into a loud refusal (emulated by the client, since
+//     `relationMode = "prisma"` means this database has no foreign keys - it
+//     governs the deletes Prisma issues, which is every delete we make).
+//     `deleteProvisionedOrganization` deletes these rows explicitly, because a
+//     tenant purge IS that deliberate erasure and should have to say so.
+//     The projection's insert is still guarded on the group and user rows
+//     existing, so a replay converges instead of writing an orphan.
 model GroupMembership {
   id            String    @id @default(nanoid())
   userId        String
   groupId       String
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  group         Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  group         Group     @relation(fields: [groupId], references: [id], onDelete: Restrict)
   createdAt     DateTime  @default(now())
   /// Business time of the membership fact, and the projection's write guard:
   /// a redelivered older event loses to the newer state already in the row.

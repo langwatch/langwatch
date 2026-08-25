@@ -1365,6 +1365,13 @@ const presentations = {
     describe: () =>
       "It may have been deleted, or the id may belong to another organization.",
   },
+  group_already_deleted: {
+    // A deleted group is still in the record, so "not found" would be wrong
+    // twice over: the row is there, and it is there on purpose.
+    title: "That group is already deleted",
+    describe: () =>
+      "It stopped granting access when it was deleted. Its record still shows who was in it and when their membership ended.",
+  },
   group_member_already_added: {
     title: "They're already in this group",
     describe: () => "Nothing to do: the group already grants them its access.",

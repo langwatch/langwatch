@@ -6,7 +6,10 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { LIVE_MEMBERSHIP } from "~/server/app-layer/authz/repositories/live-rows";
+import {
+  LIVE_MEMBERSHIP,
+  liveGroups,
+} from "~/server/app-layer/authz/repositories/live-rows";
 import { GroupRestService } from "~/server/app-layer/groups/group.service";
 import { PrismaGroupRepository } from "~/server/app-layer/groups/repositories/group.prisma.repository";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
@@ -35,6 +38,9 @@ const ledgerActor = (userId: string): LedgerActor => ({
   id: userId,
 });
 
+// Live groups only, for the reason the repository's own copy of this states:
+// a deleted group's slug is free again — the uniqueness index is partial over
+// live rows — so suffixing around one hands back a name nothing is using.
 async function findUniqueGroupSlug(
   prisma: Pick<PrismaClient, "group">,
   organizationId: string,
@@ -50,7 +56,7 @@ async function findUniqueGroupSlug(
   let candidate = baseSlug;
   let suffix = 2;
   while (true) {
-    const exists = await prisma.group.findFirst({
+    const exists = await liveGroups(prisma).findFirst({
       where: {
         organizationId,
         slug: candidate,
@@ -123,7 +129,7 @@ export const groupRouter = createTRPCRouter({
         errorMessage: ENTERPRISE_FEATURE_ERRORS.SCIM,
       });
 
-      const groups = await ctx.prisma.group.findMany({
+      const groups = await liveGroups(ctx.prisma).findMany({
         where: { organizationId: input.organizationId },
         include: {
           roleBindings: {
@@ -186,7 +192,7 @@ export const groupRouter = createTRPCRouter({
     // organization:manage; group.getById should match.
     .permission("organization:manage")
     .query(async ({ ctx, input }) => {
-      const group = await ctx.prisma.group.findFirst({
+      const group = await liveGroups(ctx.prisma).findFirst({
         where: { id: input.groupId, organizationId: input.organizationId },
         include: {
           roleBindings: {
@@ -388,7 +394,7 @@ export const groupRouter = createTRPCRouter({
     )
     .permission("organization:manage")
     .mutation(async ({ ctx, input }) => {
-      const group = await ctx.prisma.group.findFirst({
+      const group = await liveGroups(ctx.prisma).findFirst({
         where: { id: input.groupId, organizationId: input.organizationId },
       });
       if (!group) {
@@ -430,7 +436,7 @@ export const groupRouter = createTRPCRouter({
     // organization that never had groups simply gets an empty list.
     .permission("organization:manage")
     .query(async ({ ctx, input }) => {
-      const groups = await ctx.prisma.group.findMany({
+      const groups = await liveGroups(ctx.prisma).findMany({
         where: {
           organizationId: input.organizationId,
           members: { some: { userId: input.userId, ...LIVE_MEMBERSHIP } },

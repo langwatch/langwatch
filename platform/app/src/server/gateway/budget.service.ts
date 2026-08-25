@@ -16,6 +16,7 @@ import type {
   PrismaClient,
 } from "~/generated/prisma/client";
 import { Prisma } from "~/generated/prisma/client";
+import { liveGroups } from "~/server/app-layer/authz/repositories/live-rows";
 import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
 import type {
@@ -875,7 +876,7 @@ export class GatewayBudgetService {
       // Cross-org guard, mirroring the TEAM / PROJECT / PRINCIPAL guards:
       // the scope id is request-supplied, so without this a caller could
       // put a per-member budget on another tenant's group.
-      const group = await this.prisma.group.findFirst({
+      const group = await liveGroups(this.prisma).findFirst({
         where: {
           id: input.scope.groupId,
           organizationId: input.organizationId,
