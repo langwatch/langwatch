@@ -6,7 +6,6 @@ import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";
 import { createServiceApp, internalSecret } from "~/server/api/security";
-import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { USAGE_UNKNOWN } from "~/server/traces/usage-count";
 import cleanupOldLambdas from "~/tasks/cleanupOldLambdas";
@@ -89,11 +88,11 @@ secured.access(cronPolicy()).get("/cron/trace_analytics", async (c) => {
         select: { id: true },
       });
 
-      const usageService = getApp().usage;
+      const usageService = c.app.usage;
 
       for (const org of organizations) {
         try {
-          const projectIds = await getApp().organizations.getProjectIds(org.id);
+          const projectIds = await c.app.organizations.getProjectIds(org.id);
           if (projectIds.length === 0) {
             logger.debug(
               { organizationId: org.id },
@@ -127,7 +126,7 @@ secured.access(cronPolicy()).get("/cron/trace_analytics", async (c) => {
             continue;
           }
 
-          const activePlan = await getApp().planProvider.getActivePlan({
+          const activePlan = await c.app.planProvider.getActivePlan({
             organizationId: org.id,
           });
 
@@ -162,7 +161,7 @@ secured.access(cronPolicy()).get("/cron/trace_analytics", async (c) => {
             );
           }
 
-          await getApp().usageLimits.checkAndSendWarning({
+          await c.app.usageLimits.checkAndSendWarning({
             organizationId: org.id,
             currentMonthMessagesCount: currentMonthCount,
             maxMonthlyUsageLimit: maxMessagesPerMonth,
