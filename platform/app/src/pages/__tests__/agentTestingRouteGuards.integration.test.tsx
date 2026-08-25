@@ -74,12 +74,38 @@ vi.mock("~/utils/api", () => ({
   api: {
     useUtils: () => ({
       suites: { getSummaries: { invalidate: vi.fn() } },
-      scenarios: { getExternalSetSummaries: { invalidate: vi.fn() } },
+      scenarios: {
+        getExternalSetSummaries: { invalidate: vi.fn() },
+        getAll: { invalidate: vi.fn() },
+        getById: { invalidate: vi.fn(), setData: vi.fn() },
+      },
     }),
     suites: {
+      // Left unread, so the tab strip carries no count and the guard is the
+      // only thing this file is checking.
+      getAll: { useQuery: () => ({ data: undefined, isLoading: false }) },
       folders: {
         getAll: { useQuery: () => ({ data: [], isLoading: false }) },
       },
+      update: { useMutation: () => ({ mutateAsync: vi.fn() }) },
+      run: { useMutation: () => ({ mutateAsync: vi.fn() }) },
+      runAll: { useMutation: () => ({ mutateAsync: vi.fn() }) },
+    },
+    agents: { getAll: { useQuery: () => ({ data: [] }) } },
+    prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
+    modelProvider: {
+      listAllForProjectForFrontend: {
+        useQuery: () => ({ data: undefined, isLoading: false }),
+      },
+      getResolvedDefault: {
+        useQuery: () => ({ data: undefined, isLoading: false }),
+      },
+    },
+    scenarios: {
+      getAll: { useQuery: () => ({ data: undefined, isLoading: false }) },
+      getById: { useQuery: () => ({ data: undefined, isLoading: false }) },
+      create: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      update: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
     },
   },
 }));
@@ -91,6 +117,14 @@ vi.mock("~/components/agent-testing/cases/TestCasesTab", () => ({
 }));
 vi.mock("~/components/agent-testing/results/ResultsTab", () => ({
   ResultsTab: () => <div data-testid="results-tab-stub" />,
+}));
+
+vi.mock("~/hooks/useRunScenario", () => ({
+  useRunScenario: () => ({ runScenario: vi.fn(), isRunning: false }),
+}));
+
+vi.mock("~/hooks/useModelProvidersSettings", () => ({
+  useModelProvidersSettings: () => ({ hasEnabledProviders: true }),
 }));
 
 vi.mock("~/utils/compat/next-router", () => ({
