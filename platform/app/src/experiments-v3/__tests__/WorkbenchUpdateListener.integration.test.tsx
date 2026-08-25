@@ -171,6 +171,49 @@ describe("useWorkbenchUpdateListener", () => {
     });
   });
 
+  describe("when a second version lands while the first reload is still running", () => {
+    /** @scenario A burst of backend saves leaves the page on the newest one */
+    it("reloads again for the version it could not serve", async () => {
+      // One agent turn that duplicates a target, writes its prompt and runs it
+      // is three saves in a row, so the second and third signals arrive while
+      // the reload for the first is still fetching.
+      let releaseFirstReload: (() => void) | undefined;
+      let reloads = 0;
+      const reloadFromServer = vi.fn(async () => {
+        reloads += 1;
+        if (reloads > 1) {
+          useEvaluationsV3Store.getState().setWorkbenchVersion(6);
+          return;
+        }
+        await new Promise<void>((resolve) => {
+          releaseFirstReload = resolve;
+        });
+        // The fetch left the server before version 6 was written, so it can
+        // only bring back 5. The new target lives in 6.
+        useEvaluationsV3Store.getState().setWorkbenchVersion(5);
+      });
+
+      renderHook(() =>
+        useWorkbenchUpdateListener({
+          projectId: "project-1",
+          experimentSlug: "my-exp",
+          isDirty: false,
+          reloadFromServer,
+        }),
+      );
+
+      emitSignal(5);
+      await waitFor(() => expect(reloadFromServer).toHaveBeenCalledTimes(1));
+
+      emitSignal(6);
+      act(() => releaseFirstReload?.());
+
+      await waitFor(() => expect(reloadFromServer).toHaveBeenCalledTimes(2));
+      expect(useEvaluationsV3Store.getState().workbenchVersion).toBe(6);
+      expect(useEvaluationsV3Store.getState().staleWorkbench).toBeUndefined();
+    });
+  });
+
   describe("when the signal is not newer or not this experiment", () => {
     it("changes nothing", async () => {
       const reloadFromServer = vi.fn(async () => undefined);
