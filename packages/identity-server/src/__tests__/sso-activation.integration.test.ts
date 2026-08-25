@@ -201,6 +201,7 @@ beforeEach(async () => {
     reads: connections,
     context,
     proofs,
+    files: { fetchVerificationFile: async () => ({ outcome: "absent" }) },
     license: new StubLicenseProof(),
     credentials: new StubCredentials(),
     discovery: new StubDiscovery(),

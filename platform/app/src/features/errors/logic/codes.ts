@@ -362,6 +362,8 @@ export const APP_ERROR_CODES = [
   "sso_credentials_required",
   "sso_domain_claim_pending",
   "sso_domain_claim_throttled",
+  "sso_domain_fetch_failed",
+  "sso_domain_file_not_found",
   "sso_domain_lookup_failed",
   "sso_domain_not_eligible",
   "sso_domain_proof_expired",

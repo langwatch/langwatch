@@ -178,6 +178,20 @@ export const ssoSetupRouter = createTRPCRouter({
       return ssoSelfServe().checkDomainRecord({ ...input, actor });
     }),
 
+  /** The same ceremony's other channel: the well-known file the domain can
+   *  serve instead of publishing the record. One token satisfies either. */
+  checkDomainFile: protectedProcedure
+    .input(domainInput)
+    .permission("sso:manage")
+    .mutation(async ({ ctx, input }) => {
+      const actor = await audited({
+        ctx,
+        action: "checkDomainFile",
+        args: input,
+      });
+      return ssoSelfServe().checkDomainFile({ ...input, actor });
+    }),
+
   /**
    * Turn the connection on.
    *

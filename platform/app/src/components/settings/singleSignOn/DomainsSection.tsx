@@ -48,7 +48,6 @@ export function DomainsSection({
 }) {
   const [domain, setDomain] = useState("");
   const claim = api.ssoSetup.claimDomain.useMutation();
-  const prove = api.ssoSetup.proveDomain.useMutation();
   const utils = api.useUtils();
 
   const proved = new Set(connection.verifiedDomains);
@@ -81,81 +80,19 @@ export function DomainsSection({
             </Table.Row>
           </Table.Header>
           <Table.Body>
-            {domains.map((entry) => {
-              const claimed = claims.find(
-                (candidate) => candidate.domain === entry,
-              );
-              const chip = domainProofChipFor({
-                proved: proved.has(entry),
-                proofState: proofByDomain.get(entry)?.proofState ?? "VERIFIED",
-                graceEndsAtMs: proofByDomain.get(entry)?.graceEndsAtMs ?? null,
-                claim: claimed,
-              });
-              return (
-                <Table.Row key={entry}>
-                  <Table.Cell>{entry}</Table.Cell>
-                  <Table.Cell>
-                    <VStack align="start" gap={1}>
-                      <IdentityChip
-                        label={chip.label}
-                        tone={chip.tone}
-                        title={chip.title}
-                      />
-                      {/* The reviewer's own words, read back so a second
-                          attempt starts from what a human already said. */}
-                      {claimed?.note && (
-                        <Text fontSize="sm" color="fg.muted">
-                          {claimed.note}
-                        </Text>
-                      )}
-                    </VStack>
-                  </Table.Cell>
-                  <Table.Cell>
-                    {canManage && claimed?.state === "APPROVED" && (
-                      <Button
-                        size="xs"
-                        loading={prove.isPending}
-                        onClick={() =>
-                          prove.mutate(
-                            { organizationId, connectionId, domain: entry },
-                            {
-                              onSuccess: () =>
-                                void utils.ssoSetup.getSetup.invalidate(),
-                              onError: reportRefusal,
-                            },
-                          )
-                        }
-                      >
-                        {provesWithLicense
-                          ? "Prove with our licence"
-                          : "Get the record to publish"}
-                      </Button>
-                    )}
-                    {/* A rejected claim can be made again, without
-                        registering a second connection. */}
-                    {canManage && claimed?.state === "REJECTED" && (
-                      <Button
-                        size="xs"
-                        variant="outline"
-                        loading={claim.isPending}
-                        onClick={() =>
-                          claim.mutate(
-                            { organizationId, connectionId, domain: entry },
-                            {
-                              onSuccess: () =>
-                                void utils.ssoSetup.getSetup.invalidate(),
-                              onError: reportRefusal,
-                            },
-                          )
-                        }
-                      >
-                        Claim it again
-                      </Button>
-                    )}
-                  </Table.Cell>
-                </Table.Row>
-              );
-            })}
+            {domains.map((entry) => (
+              <DomainRow
+                key={entry}
+                domain={entry}
+                claimed={claims.find((candidate) => candidate.domain === entry)}
+                proved={proved.has(entry)}
+                proof={proofByDomain.get(entry)}
+                canManage={canManage}
+                organizationId={organizationId}
+                connectionId={connectionId}
+                provesWithLicense={provesWithLicense}
+              />
+            ))}
           </Table.Body>
         </Table.Root>
       )}
@@ -199,6 +136,101 @@ export function DomainsSection({
   );
 }
 
+function DomainRow({
+  domain,
+  claimed,
+  proved,
+  proof,
+  canManage,
+  organizationId,
+  connectionId,
+  provesWithLicense,
+}: {
+  domain: string;
+  claimed: SelfServeDomainClaimView | undefined;
+  proved: boolean;
+  proof:
+    | NonNullable<SelfServeSetupView["connection"]>["domainProofs"][number]
+    | undefined;
+  canManage: boolean;
+  organizationId: string;
+  connectionId: string;
+  provesWithLicense: boolean;
+}) {
+  const claim = api.ssoSetup.claimDomain.useMutation();
+  const prove = api.ssoSetup.proveDomain.useMutation();
+  const utils = api.useUtils();
+  const chip = domainProofChipFor({
+    proved,
+    proofState: proof?.proofState ?? "VERIFIED",
+    graceEndsAtMs: proof?.graceEndsAtMs ?? null,
+    claim: claimed,
+  });
+
+  return (
+    <Table.Row>
+      <Table.Cell>{domain}</Table.Cell>
+      <Table.Cell>
+        <VStack align="start" gap={1}>
+          <IdentityChip
+            label={chip.label}
+            tone={chip.tone}
+            title={chip.title}
+          />
+          {/* The reviewer's own words, read back so a second attempt starts
+              from what a human already said. */}
+          {claimed?.note && (
+            <Text fontSize="sm" color="fg.muted">
+              {claimed.note}
+            </Text>
+          )}
+        </VStack>
+      </Table.Cell>
+      <Table.Cell>
+        {canManage && claimed?.state === "APPROVED" && (
+          <Button
+            size="xs"
+            loading={prove.isPending}
+            onClick={() =>
+              prove.mutate(
+                { organizationId, connectionId, domain },
+                {
+                  onSuccess: () => void utils.ssoSetup.getSetup.invalidate(),
+                  onError: reportRefusal,
+                },
+              )
+            }
+          >
+            {provesWithLicense
+              ? "Prove with our licence"
+              : "Get the record to publish"}
+          </Button>
+        )}
+        {/* A rejected claim can be made again, without registering a second
+            connection. */}
+        {canManage && claimed?.state === "REJECTED" && (
+          <Button
+            size="xs"
+            variant="outline"
+            loading={claim.isPending}
+            onClick={() =>
+              claim.mutate(
+                { organizationId, connectionId, domain },
+                {
+                  onSuccess: () => void utils.ssoSetup.getSetup.invalidate(),
+                  onError: reportRefusal,
+                },
+              )
+            }
+          >
+            Claim it again
+          </Button>
+        )}
+      </Table.Cell>
+    </Table.Row>
+  );
+}
+
 function PublishedRecord({
   record,
   canManage,
@@ -211,17 +243,27 @@ function PublishedRecord({
   connectionId: string;
 }) {
   const check = api.ssoSetup.checkDomainRecord.useMutation();
+  const checkFile = api.ssoSetup.checkDomainFile.useMutation();
   const prove = api.ssoSetup.proveDomain.useMutation();
   const utils = api.useUtils();
+
+  const target = { organizationId, connectionId, domain: record.domain };
+  const settle = {
+    onSuccess: () => void utils.ssoSetup.getSetup.invalidate(),
+    onError: reportRefusal,
+  };
 
   return (
     <VStack align="stretch" gap={3} paddingTop={2}>
       <VStack align="stretch" gap={1}>
-        <Heading size="xs">Publish this record on {record.domain}</Heading>
+        <Heading size="xs">
+          Prove {record.domain} with a record, or with a file
+        </Heading>
         <Text color="fg.muted" fontSize="sm">
-          Add it wherever you manage DNS for {record.domain}. Some providers ask
-          for the whole name and some ask for the part before your domain, so
-          both are here.
+          One value, two ways to hand it back: publish it wherever you manage
+          DNS for {record.domain} — some providers ask for the whole name and
+          some for the part before your domain, so both are here — or serve it
+          as a file on your website.
         </Text>
       </VStack>
       <CopyValueRows
@@ -248,6 +290,20 @@ function PublishedRecord({
               ]),
         ]}
       />
+      <Text color="fg.muted" fontSize="sm">
+        No DNS access, or a ticket away? Serve the record value as the entire
+        body of a plain-text file at this address instead — either one proves
+        the domain.
+      </Text>
+      <CopyValueRows
+        rows={[
+          {
+            label: "File address",
+            hint: "Served over https, holding the record value and nothing else",
+            value: record.file.url,
+          },
+        ]}
+      />
       {/* The value is shown once, when it is issued. What is kept is its
           hash, so a reload shows the record rather than the secret. */}
       {record.value === null && (
@@ -269,35 +325,26 @@ function PublishedRecord({
         </Alert.Root>
       )}
       {canManage && (
-        <HStack>
+        <HStack flexWrap="wrap">
           <Button
             loading={check.isPending}
-            onClick={() =>
-              check.mutate(
-                { organizationId, connectionId, domain: record.domain },
-                {
-                  onSuccess: () => void utils.ssoSetup.getSetup.invalidate(),
-                  onError: reportRefusal,
-                },
-              )
-            }
+            onClick={() => check.mutate(target, settle)}
           >
-            Check for it now
+            Check for the record
           </Button>
           <Button
             variant="outline"
-            loading={prove.isPending}
-            onClick={() =>
-              prove.mutate(
-                { organizationId, connectionId, domain: record.domain },
-                {
-                  onSuccess: () => void utils.ssoSetup.getSetup.invalidate(),
-                  onError: reportRefusal,
-                },
-              )
-            }
+            loading={checkFile.isPending}
+            onClick={() => checkFile.mutate(target, settle)}
           >
-            Give me a fresh record
+            Check for the file
+          </Button>
+          <Button
+            variant="ghost"
+            loading={prove.isPending}
+            onClick={() => prove.mutate(target, settle)}
+          >
+            Give me a fresh value
           </Button>
         </HStack>
       )}

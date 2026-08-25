@@ -19,6 +19,8 @@ import {
   type SsoDomainReproofTargetRepository,
 } from "../sso-domain-reproof.service";
 import type {
+  SsoDomainFileFetch,
+  SsoDomainFileLookup,
   SsoDomainProofLookup,
   SsoDomainTxtLookup,
 } from "../sso-self-serve.service";
@@ -66,11 +68,28 @@ class StubTargets implements SsoDomainReproofTargetRepository {
       organizationId: ORG,
       domain: "acme.com",
       tokenHash: TOKEN_HASH,
+      method: "dns-txt",
     },
   ];
 
   async findDomainsProvedByRecord(): Promise<SsoDomainReproofTarget[]> {
     return this.targets;
+  }
+}
+
+/** The file channel's re-read seam, for a domain the file proved. */
+class StubFileReads implements SsoDomainFileLookup {
+  answer: SsoDomainFileFetch = { outcome: "served", values: [TOKEN] };
+  asked: string[] = [];
+
+  async fetchVerificationFile({
+    url,
+  }: {
+    domain: string;
+    url: string;
+  }): Promise<SsoDomainFileFetch> {
+    this.asked.push(url);
+    return this.answer;
   }
 }
 
@@ -94,6 +113,7 @@ class StubNotifier implements SsoDomainReproofNotifier {
 
 let connections: InMemoryConnections;
 let proofs: StubProofs;
+let fileReads: StubFileReads;
 let targets: StubTargets;
 let notifier: StubNotifier;
 let committed: {
@@ -134,6 +154,7 @@ function seedProvedConnection(): void {
 beforeEach(() => {
   connections = new InMemoryConnections();
   proofs = new StubProofs();
+  fileReads = new StubFileReads();
   targets = new StubTargets();
   notifier = new StubNotifier();
   committed = [];
@@ -166,6 +187,7 @@ beforeEach(() => {
     connections: () => connectionService,
     targets,
     proofs,
+    files: fileReads,
     notifier,
     now: () => clock,
   });
@@ -429,6 +451,74 @@ describe("re-reading the record that proves a domain", () => {
     });
   });
 
+  describe("given the file proved the domain", () => {
+    beforeEach(() => {
+      connections.seed({
+        ...emptySsoConnection({ connectionId: CONNECTION }),
+        organizationId: ORG,
+        state: "ACTIVE",
+        verifiedDomains: ["acme.com"],
+        domainVerifications: [
+          {
+            domain: "acme.com",
+            method: "https-file",
+            actorId: ANA.id,
+            verifiedAtMs: T0,
+            proofState: "VERIFIED",
+            firstAbsentAtMs: null,
+            graceEndsAtMs: null,
+            tokenHash: TOKEN_HASH,
+          },
+        ],
+        testLoginAccountId: "acc_test",
+        createdBy: ANA.id,
+        createdAtMs: T0,
+        updatedAtMs: T0,
+      });
+      targets.targets = [
+        {
+          connectionId: CONNECTION,
+          organizationId: ORG,
+          domain: "acme.com",
+          tokenHash: TOKEN_HASH,
+          method: "https-file",
+        },
+      ];
+    });
+
+    /** @scenario "A domain the file proved is re-read at its file, not at DNS" */
+    it("fetches the well-known address, never asks DNS, and records nothing while the file is served", async () => {
+      await reproof.sweep();
+
+      expect(fileReads.asked).toEqual([
+        "https://acme.com/.well-known/langwatch-verification.txt",
+      ]);
+      expect(proofs.asked).toEqual([]);
+      expect(recorded()).toEqual([]);
+    });
+
+    /** @scenario "A file that has gone missing starts the same clock a missing record does" */
+    it("wavers the proof with the same deadline when the file answers without our token", async () => {
+      fileReads.answer = { outcome: "absent" };
+
+      await reproof.sweep();
+
+      expect(recorded()).toEqual(["domain_proof_wavered"]);
+      expect(notifier.waverings).toEqual([
+        { domain: "acme.com", graceEndsAtMs: T0 + SSO_DNS_REPROOF_GRACE_MS },
+      ]);
+    });
+
+    it("treats an unreachable origin as no answer at all", async () => {
+      fileReads.answer = { outcome: "unreachable", reason: "timeout" };
+
+      const outcome = await reproof.sweep();
+
+      expect(outcome.unreachable).toBe(1);
+      expect(recorded()).toEqual([]);
+    });
+  });
+
   describe("given one domain's re-read fails outright", () => {
     it("carries the failure out and re-reads every other domain anyway", async () => {
       targets.targets = [
@@ -437,6 +527,7 @@ describe("re-reading the record that proves a domain", () => {
           organizationId: "org_gone",
           domain: "gone.example",
           tokenHash: TOKEN_HASH,
+          method: "dns-txt",
         },
         ...targets.targets,
       ];

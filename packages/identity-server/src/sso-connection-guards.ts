@@ -552,6 +552,16 @@ export class SsoConnectionGuards {
       domain,
       connectionId: data.connectionId,
     });
+    // Which channel the caller's check actually read the token from. Only a
+    // published-proof ceremony has channels — one minted token, satisfiable
+    // as a TXT record or as the well-known file — so naming one against a
+    // licence ceremony is a caller confused about what it checked.
+    if (data.channel !== undefined && pending.method !== "dns-txt") {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${data.connectionId}: a ${pending.method} ceremony has no published channel to have read ${domain}'s proof from`,
+      );
+    }
+    const method = data.channel ?? pending.method;
     const undecided = state.claimedDomains.includes(domain);
     if (undecided && pending.method !== "dns-txt") {
       throw new SsoConnectionInvalidTransitionError(
@@ -578,7 +588,11 @@ export class SsoConnectionGuards {
         data: {
           connectionId: data.connectionId,
           domain,
-          method: pending.method,
+          // The channel that actually proved it, where the caller named one:
+          // the re-proof sweep re-reads the evidence where the fact says it
+          // lives, so a file-proved domain must never be recorded as a TXT
+          // record somebody will later find absent.
+          method,
           actor: data.actor,
           source: data.source,
         },
@@ -703,9 +717,9 @@ export class SsoConnectionGuards {
         `connection ${state.connectionId}: ${domain} has no proof to re-check`,
       );
     }
-    if (proof.method !== "dns-txt") {
+    if (proof.method !== "dns-txt" && proof.method !== "https-file") {
       throw new SsoConnectionInvalidTransitionError(
-        `connection ${state.connectionId}: ${domain} was proved by ${proof.method}, which no published record can speak for`,
+        `connection ${state.connectionId}: ${domain} was proved by ${proof.method}, which no published proof can speak for`,
       );
     }
     return proof;
