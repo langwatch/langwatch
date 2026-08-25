@@ -134,6 +134,44 @@ describe("native skill generation", () => {
     });
   });
 
+  // A skill body reaches the customer: the agent reads it as tool output, and
+  // the reader sees that output in the tool card. So anything in a skill that
+  // describes OUR machine rather than THEIR product is a leak. One shipped:
+  // an answer about where scenario results live carried a bare
+  // `LANGWATCH_ENDPOINT` placeholder, which tells the reader how the product is
+  // wired and nothing about their question.
+  describe("given a skill body a customer can end up reading", () => {
+    // The skill whose whole subject is environment configuration. It has to
+    // name the variables to be worth reading, and it is invoked by someone who
+    // asked how to set them.
+    const NAMES_ENV_VARS_ON_PURPOSE = new Set(["setup-lw"]);
+
+    // A home directory or a machine-local root. No skill has a reason to name
+    // one: the agent's own workspace path means nothing to the reader.
+    const HOST_PATH =
+      /(\/Users\/[a-z0-9._-]+|\/home\/[a-z0-9._-]+|\/root\/|\/private\/tmp\/|\/var\/folders\/)/i;
+
+    /** @scenario "A skill never hands the customer a path from the machine it runs on" */
+    it("names no path from the machine the agent runs on", () => {
+      for (const skill of skills) {
+        const body = renderSkill(skill);
+        const found = body.match(HOST_PATH);
+        expect(found?.[0], `${skill.slug}: names a host path`).toBeUndefined();
+      }
+    });
+
+    /** @scenario "A skill answers about the product without naming an environment variable" */
+    it("names no endpoint environment variable outside the setup skill", () => {
+      for (const skill of skills) {
+        if (NAMES_ENV_VARS_ON_PURPOSE.has(skill.slug)) continue;
+        expect(
+          renderSkill(skill),
+          `${skill.slug}: names LANGWATCH_ENDPOINT, which the CLI resolves on its own`,
+        ).not.toContain("LANGWATCH_ENDPOINT");
+      }
+    });
+  });
+
   // AGENTS.md tells Langy which skill to invoke per user intent. A row naming
   // a skill that isn't in the shipped image teaches the model to hallucinate.
   // The image's skill set is the root-compiled native set Docker overlays into

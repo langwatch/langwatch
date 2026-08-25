@@ -68,3 +68,26 @@ Feature: Langy loads its skills from the canonical skill directory
     When a Langy conversation starts
     Then that skill is available to the assistant
     And it is offered the same way as the canonical skills
+
+  # ---------------------------------------------------------------------------
+  # A skill body is read by the customer, not only by the agent
+  # ---------------------------------------------------------------------------
+
+  # The agent reads a skill as tool output, and the reader sees that output in
+  # the tool card. So anything in a skill that describes our machine rather than
+  # their product reaches them. One answer about where scenario results live
+  # carried a bare environment variable name, which says how the product is
+  # wired and nothing about the question that was asked.
+
+  @unit
+  Scenario: A skill never hands the customer a path from the machine it runs on
+    Given the set of skills Langy ships with
+    When each one is rendered
+    Then none of them names a home directory or a machine-local path
+
+  @unit
+  Scenario: A skill answers about the product without naming an environment variable
+    Given a skill whose subject is not environment setup
+    When it is rendered
+    Then it does not name the endpoint environment variable
+    And the skill about environment setup is free to name it, because that is what it is for

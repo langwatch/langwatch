@@ -34994,7 +34994,7 @@ Connect my agent to LangWatch simulations
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Connect Your Agent to LangWatch Simulations
@@ -35033,7 +35033,14 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
+
+**What you read is not what you say.** These skills are working notes for you, not
+copy for the reader. Never quote a filesystem path from the machine you run on,
+and never name an environment variable when you answer a question about the
+product. Those tell the reader how the work is done rather than what was done,
+and a path from your own host means nothing to them. Say what you did and where
+to find it in LangWatch.
 
 ## Step 2: Locate the agent's HTTP endpoint
 
@@ -35151,7 +35158,7 @@ langwatch suite run <suite-id> --wait
 
 Report to the user:
 
-- The simulations page URL of their LangWatch project (`https://app.langwatch.ai/<project-slug>/simulations`, or the `LANGWATCH_ENDPOINT` host when self-hosted).
+- The simulations page URL of their LangWatch project (`https://app.langwatch.ai/<project-slug>/simulations`, or the same path on their own instance when self-hosted).
 - What changed in the codebase: the endpoint, the authentication path, the trace adoption.
 - The result of the first run.
 
@@ -35167,7 +35174,7 @@ How to handle:
 
 - Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
-- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings if `LANGWATCH_ENDPOINT` is set (self-hosted).
+- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings on a self-hosted instance.
 - Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
 ## Common Failures
@@ -49734,7 +49741,7 @@ Instrument my code with LangWatch
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Add LangWatch Tracing to Your Code
@@ -49785,7 +49792,14 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
+
+**What you read is not what you say.** These skills are working notes for you, not
+copy for the reader. Never quote a filesystem path from the machine you run on,
+and never name an environment variable when you answer a question about the
+product. Those tell the reader how the work is done rather than what was done,
+and a path from your own host means nothing to them. Say what you did and where
+to find it in LangWatch.
 
 Then fetch the integration guide for this project's framework:
 
@@ -49898,7 +49912,7 @@ Set up experiments for my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Run Experiments for Your Agent
@@ -49943,7 +49957,7 @@ How to handle:
 
 - Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
-- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings if `LANGWATCH_ENDPOINT` is set (self-hosted).
+- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings on a self-hosted instance.
 - Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
 ## Prerequisites
@@ -49976,7 +49990,14 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
+
+**What you read is not what you say.** These skills are working notes for you, not
+copy for the reader. Never quote a filesystem path from the machine you run on,
+and never name an environment variable when you answer a question about the
+product. Those tell the reader how the work is done rather than what was done,
+and a path from your own host means nothing to them. Say what you did and where
+to find it in LangWatch.
 
 Read the experiment documentation before writing code:
 
@@ -50187,7 +50208,7 @@ Set up online evaluations for my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Set Up Online Evaluations and Guardrails
@@ -50225,7 +50246,7 @@ How to handle:
 
 - Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
-- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings if `LANGWATCH_ENDPOINT` is set (self-hosted).
+- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings on a self-hosted instance.
 - Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
 ## Prerequisites
@@ -50258,7 +50279,14 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
+
+**What you read is not what you say.** These skills are working notes for you, not
+copy for the reader. Never quote a filesystem path from the machine you run on,
+and never name an environment variable when you answer a question about the
+product. Those tell the reader how the work is done rather than what was done,
+and a path from your own host means nothing to them. Say what you did and where
+to find it in LangWatch.
 
 Read the relevant documentation before changing configuration or code:
 
@@ -50415,7 +50443,7 @@ Help me evaluate my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Route an Evaluation Request
@@ -50522,7 +50550,7 @@ Add scenario tests for my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Test Your Agent with Scenarios
@@ -50587,7 +50615,7 @@ How to handle:
 
 - Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
-- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings if `LANGWATCH_ENDPOINT` is set (self-hosted).
+- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings on a self-hosted instance.
 - Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
 ---
@@ -50624,7 +50652,14 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
+
+**What you read is not what you say.** These skills are working notes for you, not
+copy for the reader. Never quote a filesystem path from the machine you run on,
+and never name an environment variable when you answer a question about the
+product. Those tell the reader how the work is done rather than what was done,
+and a path from your own host means nothing to them. Say what you did and where
+to find it in LangWatch.
 
 Then read the Scenario-specific pages:
 
@@ -50749,7 +50784,7 @@ For Python, scenario tracing is configured via `scenario.configure(...)` combine
 
 For framework-specific instrumentation (OpenAI/LangGraph/Vercel/Mastra/Agno), use the `tracing` skill. Do not hand-roll. The `tracing` skill prompt is: "Instrument my code with LangWatch".
 
-**Prerequisite:** Traces only reach LangWatch if `LANGWATCH_API_KEY` is set in the environment (plus `LANGWATCH_ENDPOINT` for self-hosted). If setup runs but no traces appear in the LangWatch UI, the key is missing.
+**Prerequisite:** Traces only reach LangWatch if the project's API key is set in the environment, and a self-hosted instance also needs its endpoint set. The `setup-lw` recipe covers both. If setup runs but no traces appear in the LangWatch UI, the key is missing.
 
 **VERIFY after the run:** confirm traces were emitted: the scenario run prints a LangWatch trace URL, or the LangWatch UI shows ≥1 trace for the run. A green test with zero traces means instrumentation was skipped.
 
@@ -51504,7 +51539,7 @@ Connect my agent to LangWatch simulations
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Connect Your Agent to LangWatch Simulations
@@ -51543,7 +51578,14 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
+
+**What you read is not what you say.** These skills are working notes for you, not
+copy for the reader. Never quote a filesystem path from the machine you run on,
+and never name an environment variable when you answer a question about the
+product. Those tell the reader how the work is done rather than what was done,
+and a path from your own host means nothing to them. Say what you did and where
+to find it in LangWatch.
 
 ## Step 2: Locate the agent's HTTP endpoint
 
@@ -51661,7 +51703,7 @@ langwatch suite run <suite-id> --wait
 
 Report to the user:
 
-- The simulations page URL of their LangWatch project (`https://app.langwatch.ai/<project-slug>/simulations`, or the `LANGWATCH_ENDPOINT` host when self-hosted).
+- The simulations page URL of their LangWatch project (`https://app.langwatch.ai/<project-slug>/simulations`, or the same path on their own instance when self-hosted).
 - What changed in the codebase: the endpoint, the authentication path, the trace adoption.
 - The result of the first run.
 
@@ -51677,7 +51719,7 @@ How to handle:
 
 - Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
-- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings if `LANGWATCH_ENDPOINT` is set (self-hosted).
+- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings on a self-hosted instance.
 - Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
 ## Common Failures
@@ -51754,7 +51796,7 @@ Version my prompts with LangWatch
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Version Your Prompts with LangWatch Prompts CLI
@@ -51782,7 +51824,7 @@ How to handle:
 
 - Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
-- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings if `LANGWATCH_ENDPOINT` is set (self-hosted).
+- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings on a self-hosted instance.
 - Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
 ## Step 1: Read the Prompts CLI Docs
@@ -51815,7 +51857,14 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
+
+**What you read is not what you say.** These skills are working notes for you, not
+copy for the reader. Never quote a filesystem path from the machine you run on,
+and never name an environment variable when you answer a question about the
+product. Those tell the reader how the work is done rather than what was done,
+and a path from your own host means nothing to them. Say what you did and where
+to find it in LangWatch.
 
 Then specifically read the Prompts CLI guide:
 
@@ -51991,7 +52040,7 @@ Run `langwatch prompt list` to confirm everything synced, or open the Prompts se
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Generate Evaluation Datasets
@@ -52476,7 +52525,7 @@ Take my agent to the next level
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Add LangWatch Tracing to Your Code
@@ -52527,7 +52576,14 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
+
+**What you read is not what you say.** These skills are working notes for you, not
+copy for the reader. Never quote a filesystem path from the machine you run on,
+and never name an environment variable when you answer a question about the
+product. Those tell the reader how the work is done rather than what was done,
+and a path from your own host means nothing to them. Say what you did and where
+to find it in LangWatch.
 
 Then fetch the integration guide for this project's framework:
 
@@ -52614,7 +52670,7 @@ How to handle:
 
 - Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
-- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings if `LANGWATCH_ENDPOINT` is set (self-hosted).
+- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings on a self-hosted instance.
 - Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
 ## Step 1: Read the Prompts CLI Docs
@@ -53282,7 +53338,7 @@ For Python, scenario tracing is configured via `scenario.configure(...)` combine
 
 For framework-specific instrumentation (OpenAI/LangGraph/Vercel/Mastra/Agno), use the `tracing` skill. Do not hand-roll. The `tracing` skill prompt is: "Instrument my code with LangWatch".
 
-**Prerequisite:** Traces only reach LangWatch if `LANGWATCH_API_KEY` is set in the environment (plus `LANGWATCH_ENDPOINT` for self-hosted). If setup runs but no traces appear in the LangWatch UI, the key is missing.
+**Prerequisite:** Traces only reach LangWatch if the project's API key is set in the environment, and a self-hosted instance also needs its endpoint set. The `setup-lw` recipe covers both. If setup runs but no traces appear in the LangWatch UI, the key is missing.
 
 **VERIFY after the run:** confirm traces were emitted: the scenario run prints a LangWatch trace URL, or the LangWatch UI shows ≥1 trace for the run. A green test with zero traces means instrumentation was skipped.
 
@@ -54050,7 +54106,7 @@ What should I do next to improve my agent?
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Improve Your Agent, Hypothesis by Hypothesis
@@ -54087,7 +54143,14 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
+
+**What you read is not what you say.** These skills are working notes for you, not
+copy for the reader. Never quote a filesystem path from the machine you run on,
+and never name an environment variable when you answer a question about the
+product. Those tell the reader how the work is done rather than what was done,
+and a path from your own host means nothing to them. Say what you did and where
+to find it in LangWatch.
 
 ## Step 2: Gather Evidence Before Proposing Anything
 
@@ -54172,7 +54235,7 @@ How to handle:
 
 - Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
-- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings if `LANGWATCH_ENDPOINT` is set (self-hosted).
+- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings on a self-hosted instance.
 - Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
 ## Step 5: Close the Loop
@@ -54248,7 +54311,7 @@ How is my agent performing?
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Diagnose Your Agent's Production Behavior
@@ -54285,7 +54348,14 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
+
+**What you read is not what you say.** These skills are working notes for you, not
+copy for the reader. Never quote a filesystem path from the machine you run on,
+and never name an environment variable when you answer a question about the
+product. Those tell the reader how the work is done rather than what was done,
+and a path from your own host means nothing to them. Say what you did and where
+to find it in LangWatch.
 
 ## Step 2: Baseline the Vital Signs
 
@@ -54423,7 +54493,7 @@ Where can I improve our agent development best practices?
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Improve Your Agent Development Best Practices
@@ -54559,7 +54629,7 @@ After each improvement:
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Debug Your LangWatch Instrumentation
@@ -54711,7 +54781,7 @@ langwatch trace export --format jsonl --limit 50 -o traces.jsonl
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Debug Production Issues with LangWatch
@@ -54867,7 +54937,7 @@ Pass `--agent` to any command for compact single-line JSON with colour and spinn
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Triage Failing Experiments and Evaluations
@@ -55000,7 +55070,7 @@ langwatch experiment status <slug> -o json
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Evaluate Your Multimodal Agent
@@ -55167,7 +55237,7 @@ Run the evaluation, review results, fix issues, re-run until quality is acceptab
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Generate a RAG Evaluation Dataset
@@ -55336,7 +55406,7 @@ Before using the dataset:
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Set Up the LangWatch CLI
@@ -55345,7 +55415,7 @@ Get the CLI authenticated and talking to the right LangWatch project, then verif
 
 ## Step 1: Credentials
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 
 For CI and agents, configure non-interactively, and never block on a browser. Have the runner inject the key from your secret store into `LANGWATCH_API_KEY`, which is what the CLI reads:
 
@@ -55467,7 +55537,7 @@ If anything fails or confuses you while following this skill (broken commands, d
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Test Your Agent's Compliance Boundaries
@@ -55684,7 +55754,7 @@ Your harness, codebase and model decide which levers exist. Full guide: [Improvi
 ````text
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Test Your CLI's Agent Usability
@@ -55841,7 +55911,7 @@ Build a chart from a question and put it on my dashboard
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Author a Chart and Place It on a Dashboard
@@ -56011,7 +56081,7 @@ How is my agent performing?
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Diagnose Your Agent's Production Behavior
@@ -56048,7 +56118,14 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
+
+**What you read is not what you say.** These skills are working notes for you, not
+copy for the reader. Never quote a filesystem path from the machine you run on,
+and never name an environment variable when you answer a question about the
+product. Those tell the reader how the work is done rather than what was done,
+and a path from your own host means nothing to them. Say what you did and where
+to find it in LangWatch.
 
 ## Step 2: Baseline the Vital Signs
 
@@ -56161,7 +56238,7 @@ Add scenario tests for my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Test Your Agent with Scenarios
@@ -56226,7 +56303,7 @@ How to handle:
 
 - Work within the limits. If 3 resources of the relevant type are allowed, create 3 meaningful ones, not 10.
 - Make every creation count: each one should demonstrate clear value.
-- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings if `LANGWATCH_ENDPOINT` is set (self-hosted).
+- Show what works FIRST. If you hit a limit, summarize what was accomplished and note that upgrading the plan raises it. Point to the subscription settings on the platform, or to the license settings on a self-hosted instance.
 - Do NOT delete existing resources to make room or repurpose an existing resource to evade the limit.
 
 ---
@@ -56263,7 +56340,14 @@ And two ways to authenticate:
 - **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
 - **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
 
-So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, the user is self-hosted: use that endpoint instead of app.langwatch.ai.
+So for anything in these skills that reads or writes a project: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. Check whether the variable is already set there before you ask for a new key, and let the CLI read the value: never print, copy or send it. Do NOT run `langwatch login` to pick a project, and never default to a personal project. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
+
+**What you read is not what you say.** These skills are working notes for you, not
+copy for the reader. Never quote a filesystem path from the machine you run on,
+and never name an environment variable when you answer a question about the
+product. Those tell the reader how the work is done rather than what was done,
+and a path from your own host means nothing to them. Say what you did and where
+to find it in LangWatch.
 
 Then read the Scenario-specific pages:
 
@@ -56388,7 +56472,7 @@ For Python, scenario tracing is configured via `scenario.configure(...)` combine
 
 For framework-specific instrumentation (OpenAI/LangGraph/Vercel/Mastra/Agno), use the `tracing` skill. Do not hand-roll. The `tracing` skill prompt is: "Instrument my code with LangWatch".
 
-**Prerequisite:** Traces only reach LangWatch if `LANGWATCH_API_KEY` is set in the environment (plus `LANGWATCH_ENDPOINT` for self-hosted). If setup runs but no traces appear in the LangWatch UI, the key is missing.
+**Prerequisite:** Traces only reach LangWatch if the project's API key is set in the environment, and a self-hosted instance also needs its endpoint set. The `setup-lw` recipe covers both. If setup runs but no traces appear in the LangWatch UI, the key is missing.
 
 **VERIFY after the run:** confirm traces were emitted: the scenario run prints a LangWatch trace URL, or the LangWatch UI shows ≥1 trace for the run. A green test with zero traces means instrumentation was skipped.
 
@@ -57118,7 +57202,7 @@ Help me evaluate my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
 
-IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance, so use that endpoint instead of app.langwatch.ai.
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. Use that key instead of asking for a new one. If the project is set up against a self-hosted LangWatch instance, work against that instance instead of app.langwatch.ai. The CLI resolves which one from the project's own configuration.
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with `npm install -g langwatch` (or run any command via `npx langwatch`).
 
 # Route an Evaluation Request
