@@ -461,7 +461,7 @@ describe.skipIf(!hasTestcontainers)(
               groupId: "group-a",
               value: "after-close",
             }),
-          ).rejects.toThrow(/shutdown/i);
+          ).rejects.toThrow(/drain has finished/i);
         });
       });
     });

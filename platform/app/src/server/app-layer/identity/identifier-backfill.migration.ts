@@ -35,6 +35,11 @@ export class IdentityIdentifierBackfillMigration implements SystemMigration {
   // Ships inert on self-hosted until a release flips this after the cloud
   // rollout has soaked (the in-place doctrine's release act).
   readonly runsAutomaticallyOnSelfHosted = false;
+  // Still soaking on cloud: the identity rollout is paced by enrollment, so
+  // deploying this changes nothing until an operator enrolls an
+  // organization. Flip it only once the rollout is finished and the
+  // remaining question is reaching tenants created since.
+  readonly enrolledAutomatically = false;
 
   constructor(
     private readonly backfill: Pick<IdentityBackfillService, "migrateUser">,

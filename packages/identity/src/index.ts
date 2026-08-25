@@ -128,6 +128,7 @@ export {
   CannotImpersonateWithoutSecondFactorError,
   IdentityCommandRefusedError,
   IdentityDetachStrandsUserError,
+  IdentityEmailInUseError,
   IdentityIdentifierNotFoundError,
   IdentityIdentifierNotVerifiableError,
   IdentityMfaBackupCodesExhaustedError,

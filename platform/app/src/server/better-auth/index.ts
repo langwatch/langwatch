@@ -23,7 +23,11 @@ import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { env } from "~/env.mjs";
 import { tryGetApp } from "~/server/app-layer/app";
-import { identityCeremonies } from "~/server/app-layer/identity/runtime";
+import {
+  identityBridgeCeremonies,
+  identityCeremonies,
+  identityStorageAdapter,
+} from "~/server/app-layer/identity/runtime";
 import {
   deploymentIsFederationCapable,
   resolveSignInMethodPolicy,
@@ -317,15 +321,20 @@ export const auth = betterAuth({
       ],
   secret: isBuildTime ? "build-time-only" : env.NEXTAUTH_SECRET,
   /**
-   * The stock adapter — ADR-116's bridge phase. `Account` is a PROJECTION
-   * of the identity event log: better-auth reads and writes it exactly as
-   * it always has, and the fold maintains its linkage columns. Wrapping
-   * this adapter can never intercept a model — the factory's own traffic
-   * (its join emulation, its transactions) runs below a wrapper — which is
-   * why ADR-116's identity storage adapter takes over AT the factory in
-   * its later phases, not in front of this one.
+   * The identity storage adapter (ADR-116 §1) — one `database:` entry,
+   * forever. It IS the implementation `createAdapterFactory` is built
+   * around, which is what puts better-auth's own traffic (its join
+   * emulation, its transactions) on it rather than below it, and inside it
+   * a per-user gate routes between the stock Prisma behaviour and
+   * event-sourced storage.
+   *
+   * The gate ships CLOSED, so every user takes the legacy branch — the
+   * stock engine, byte for byte — until an operator enrols one and their
+   * identifier backfill finalizes. Deploying this changes nothing on its
+   * own; `identity-storage-adapter-legacy.unit.test.ts` is the proof,
+   * walking the whole flow over both engines and comparing transcripts.
    */
-  database: prismaAdapter(prisma, { provider: "postgresql" }),
+  database: identityStorageAdapter(),
 
   /**
    * Tell BetterAuth's rate limiter (and session IP tracking) which
@@ -592,7 +601,12 @@ export const auth = betterAuth({
           // ADR-101 §2: the account row is an identifier attach. Returning
           // the row data pins its id, which is what makes the live
           // identifier id and the backfill's derived id the same id.
-          return identityCeremonies().beforeAccountCreate(account);
+          //
+          // The BRIDGE ceremonies, not the bare ones (ADR-116 §5): the
+          // storage adapter states this fact itself for every user it routes
+          // to the identity branch, and a hook that stated it too would
+          // append the event twice whenever the first fold had not landed.
+          return identityBridgeCeremonies().beforeAccountCreate(account);
         },
         after: async (account) => {
           if (!account.userId || !account.providerId || !account.accountId)
@@ -625,9 +639,10 @@ export const auth = betterAuth({
         },
       },
       delete: {
-        /** ADR-101 §2: an account row removed is an identifier detach. */
+        /** ADR-101 §2: an account row removed is an identifier detach — and
+         *  the adapter's own, for anyone it routes to the identity branch. */
         before: async (account) => {
-          await identityCeremonies().beforeAccountDelete(account);
+          await identityBridgeCeremonies().beforeAccountDelete(account);
         },
       },
     },

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -14,6 +15,7 @@ import (
 	"github.com/tidwall/gjson"
 
 	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/services/aigateway/app/pipeline"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -292,20 +294,21 @@ func TestCodex_NonStreamingAggregatesTheSSE(t *testing.T) {
 
 // @scenario "A codex request carries only what its backend accepts"
 func TestCodexRequestBody_PinsInvariantsAndKeepsOnlyAcceptedFields(t *testing.T) {
-	// A caller's body carrying every field the live backend refuses, plus the
-	// ones it accepts: rewrite the model to bare, force stream on / store off,
-	// drop the refused fields, and leave the accepted ones untouched.
+	// A caller's body carrying every tuning field the live backend refuses,
+	// plus the ones it accepts: rewrite the model to bare, force stream on /
+	// store off, drop the refused fields, and leave the accepted ones
+	// untouched.
 	raw := []byte(`{"model":"openai_codex/gpt-5.6-terra","temperature":0.2,"top_p":0.9,` +
 		`"prompt_cache_retention":"24h","prompt_cache_options":{"mode":"explicit"},` +
-		`"max_output_tokens":16384,"max_tool_calls":5,"truncation":"auto",` +
-		`"metadata":{"a":"b"},"service_tier":"auto","background":false,"user":"u",` +
-		`"safety_identifier":"s","top_logprobs":0,"previous_response_id":"resp_1",` +
+		`"max_output_tokens":16384,"truncation":"auto",` +
+		`"metadata":{"a":"b"},"service_tier":"auto","user":"u",` +
+		`"safety_identifier":"s",` +
 		`"prompt_cache_key":"session-1","instructions":"be brief",` +
 		`"tools":[{"type":"function","name":"t"}],"tool_choice":"auto",` +
 		`"parallel_tool_calls":true,"reasoning":{"effort":"medium","summary":"auto"},` +
 		`"text":{"verbosity":"medium"},"stream_options":{"include_obfuscation":false},` +
 		`"input":[{"role":"user"}],"include":["reasoning.encrypted_content"]}`)
-	body, err := codexRequestBody(raw, "openai_codex/gpt-5.6-terra")
+	body, dropped, err := codexRequestBody(raw, "openai_codex/gpt-5.6-terra")
 	if err != nil {
 		t.Fatalf("codexRequestBody: %v", err)
 	}
@@ -321,15 +324,20 @@ func TestCodexRequestBody_PinsInvariantsAndKeepsOnlyAcceptedFields(t *testing.T)
 	// Every one of these answers 400 "Unsupported parameter" from the live
 	// backend, before a token is generated. max_output_tokens is the one pi
 	// sends on every turn, from its own 16384 default.
-	for _, field := range []string{
+	refusedUpstream := []string{
 		"temperature", "top_p", "prompt_cache_retention", "prompt_cache_options",
-		"max_output_tokens", "max_tool_calls", "truncation", "metadata",
-		"service_tier", "background", "user", "safety_identifier",
-		"top_logprobs", "previous_response_id",
-	} {
+		"max_output_tokens", "truncation", "metadata",
+		"service_tier", "user", "safety_identifier",
+	}
+	for _, field := range refusedUpstream {
 		if gjson.GetBytes(body, field).Exists() {
 			t.Errorf("%s must be dropped (the codex backend 400s on it): %s", field, body)
 		}
+	}
+	// The drop list feeds the response-side signals (params_dropped header
+	// and span), sorted so the signal is stable.
+	if got, want := strings.Join(dropped, ","), strings.Join(slices.Sorted(slices.Values(refusedUpstream)), ","); got != want {
+		t.Errorf("dropped list must name every removed field, got %q want %q", got, want)
 	}
 	// What the backend accepts must survive: prompt_cache_key keeps the
 	// session's cache routing, and the rest is the turn itself.
@@ -352,6 +360,76 @@ func TestCodexRequestBody_PinsInvariantsAndKeepsOnlyAcceptedFields(t *testing.T)
 	}
 }
 
+// @scenario "A tuning option the codex backend refuses is dropped with a signal"
+func TestCodexRequestBody_ReportsDropsForTheResponseSignals(t *testing.T) {
+	raw := []byte(`{"model":"openai_codex/gpt-5.6-terra","input":[{"role":"user"}],` +
+		`"max_output_tokens":16384,"temperature":0.2}`)
+	_, dropped, err := codexRequestBody(raw, "openai_codex/gpt-5.6-terra")
+	if err != nil {
+		t.Fatalf("codexRequestBody: %v", err)
+	}
+	if got := strings.Join(dropped, ","); got != "max_output_tokens,temperature" {
+		t.Fatalf("dropped list: got %q", got)
+	}
+	// The recording puts the list on the response-header seam (the dispatch
+	// meta accumulator setMetaHeaders reads) so X-LangWatch-Params-Dropped
+	// carries it, same as the chat lanes.
+	ctx := pipeline.NewMetaContext(context.Background())
+	recordParamsDropped(ctx, dropped)
+	snapshot := pipeline.MetaFromContext(ctx).Snapshot()
+	if got := strings.Join(snapshot.ParamsDropped, ","); got != "max_output_tokens,temperature" {
+		t.Fatalf("meta accumulator: got %q", got)
+	}
+}
+
+// @scenario "An option a codex answer would silently betray is refused by name"
+func TestCodexRequestBody_RefusesFunctionalFieldsByName(t *testing.T) {
+	// The gateway pins store false, so a previous_response_id chain cannot
+	// continue; background promises an id to poll; top_logprobs promises data
+	// in the answer; max_tool_calls is a cap the model would exceed. Dropping
+	// any of them returns an answer that is not what was asked for.
+	for _, field := range []string{
+		"previous_response_id", "background", "top_logprobs", "max_tool_calls",
+	} {
+		t.Run(field, func(t *testing.T) {
+			raw := []byte(fmt.Sprintf(
+				`{"model":"openai_codex/gpt-5.6-terra","input":[{"role":"user"}],%q:1}`, field))
+			_, _, err := codexRequestBody(raw, "openai_codex/gpt-5.6-terra")
+			var refusal *paramRefusalError
+			if !errors.As(err, &refusal) {
+				t.Fatalf("a functional field must refuse the request, got err=%v", err)
+			}
+			if !strings.Contains(refusal.Error(), field) {
+				t.Errorf("the refusal must name the field: %q", refusal.Error())
+			}
+		})
+	}
+}
+
+// @scenario "Strict mode refuses codex tuning options instead of dropping them"
+func TestCodexRequestBody_StrictModeRefusesTuningOptions(t *testing.T) {
+	raw := []byte(`{"model":"openai_codex/gpt-5.6-terra","input":[{"role":"user"}],` +
+		`"temperature":0.2,"drop_tuning_params":false}`)
+	_, _, err := codexRequestBody(raw, "openai_codex/gpt-5.6-terra")
+	var refusal *paramRefusalError
+	if !errors.As(err, &refusal) {
+		t.Fatalf("strict mode must refuse a droppable option, got err=%v", err)
+	}
+	if !strings.Contains(refusal.Error(), "temperature") || !strings.Contains(refusal.Error(), "drop_tuning_params") {
+		t.Errorf("the refusal must name the option and the lever: %q", refusal.Error())
+	}
+	// The directive itself is the gateway's and never reaches the backend.
+	body, _, err := codexRequestBody(
+		[]byte(`{"model":"openai_codex/gpt-5.6-terra","input":[],"drop_tuning_params":true}`),
+		"openai_codex/gpt-5.6-terra")
+	if err != nil {
+		t.Fatalf("codexRequestBody: %v", err)
+	}
+	if gjson.GetBytes(body, "drop_tuning_params").Exists() {
+		t.Errorf("drop_tuning_params must be consumed, not forwarded: %s", body)
+	}
+}
+
 func TestCodexRequestBody_DropsAKeyThatLooksLikeAPath(t *testing.T) {
 	// A field name used to become an sjson path, and three classes of name
 	// broke the call they rode on: "." "*" "?" and ":" select something else,
@@ -363,7 +441,7 @@ func TestCodexRequestBody_DropsAKeyThatLooksLikeAPath(t *testing.T) {
 	raw := []byte(`{"model":"openai_codex/gpt-5.6-terra","a.b":1,"c*d":2,"e?f":3,` +
 		`":input":4,"g|h":5,"i#j":6,"k@l":7,"":8,"café":9,` +
 		`"reasoning":{"effort":"medium"},"input":[{"role":"user"}]}`)
-	body, err := codexRequestBody(raw, "openai_codex/gpt-5.6-terra")
+	body, _, err := codexRequestBody(raw, "openai_codex/gpt-5.6-terra")
 	if err != nil {
 		t.Fatalf("codexRequestBody: %v", err)
 	}
@@ -388,7 +466,7 @@ func TestCodexRequestBody_DropsAKeyThatLooksLikeAPath(t *testing.T) {
 }
 
 func TestCodexRequestBody_EmptyBodyStillCarriesTheInvariants(t *testing.T) {
-	body, err := codexRequestBody(nil, "openai_codex/gpt-5.6-terra")
+	body, _, err := codexRequestBody(nil, "openai_codex/gpt-5.6-terra")
 	if err != nil {
 		t.Fatalf("codexRequestBody: %v", err)
 	}
@@ -416,7 +494,7 @@ func TestCodexRequestBody_RejectsABodyThatIsNotAnObject(t *testing.T) {
 		"not json at all",
 	} {
 		t.Run(raw, func(t *testing.T) {
-			body, err := codexRequestBody([]byte(raw), "openai_codex/gpt-5.6-terra")
+			body, _, err := codexRequestBody([]byte(raw), "openai_codex/gpt-5.6-terra")
 			if err == nil {
 				t.Errorf("a body that is not an object must be refused, got %s", body)
 			}

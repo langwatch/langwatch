@@ -47,6 +47,14 @@ const GLOBAL_MODELS = [
   // `User` by email above.
   "Identifier",
   "IdentityProjectionCursor",
+  // The credential half of the old `Account` row (ADR-116) - the same posture
+  // as `Account` above, which it replaces: per-user, keyed by the pinned
+  // account id, and read on the sign-in path before any tenant is known.
+  "AccountCredential",
+  // The address lock (ADR-116 §6): keyed by a normalized identifier value
+  // and claimed BEFORE any user is known to hold it, which is the whole
+  // point - it is what decides who gets to.
+  "IdentifierReservation",
   // Credential tables, per-user in exactly the sense `Account` is. A passkey
   // and a TOTP enrollment belong to a person, not to a project — and the
   // ceremonies that read them are keyed by credential id BEFORE any user is

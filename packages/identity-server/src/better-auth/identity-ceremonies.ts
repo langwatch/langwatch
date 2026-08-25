@@ -5,18 +5,56 @@ import type { IdentityHeadsRepository } from "../identity-heads.repository";
 import type { IdentityUsersRepository } from "../identity-users.repository";
 import type { IdentityUserGate } from "../identity-user-gate";
 import type { IdentityCeremonyWrites } from "../identity-writes";
-import type { IdentityCeremonyClock } from "./ceremony-types";
+import type {
+  CeremonyAccountRow,
+  IdentityAccountCeremonies,
+  IdentityCeremonyClock,
+} from "./ceremony-types";
 
 const logger = createLogger("langwatch:better-auth:identity-ceremonies");
 
-/** The `Account` fields a ceremony reads. Structural on purpose: this
- *  package should not track better-auth's row type version to version. */
-interface AccountRow {
-  id?: unknown;
-  userId?: unknown;
-  providerId?: unknown;
-  accountId?: unknown;
-  createdAt?: unknown;
+/**
+ * The account ceremonies as better-auth's `databaseHooks` bind them once the
+ * identity storage adapter is live (ADR-116 §5).
+ *
+ * There are two callers of the same two ceremonies in one request, and only
+ * one of them may state the fact. better-auth runs `account.create.before`
+ * and THEN `adapter.create`, so for a user the adapter routes to the identity
+ * branch both would attach the same identifier — and the second one appends
+ * again whenever the first fold has not landed, because the guard reads the
+ * heads off the projection the fold writes.
+ *
+ * The adapter owns it, per §5: the storage-level veto replaces the hook-level
+ * one, and the adapter needs the ceremony anyway to pin the account id its
+ * credential row is keyed by. So the hook defers for exactly the population
+ * the adapter serves, and remains the bridge for everyone else — where it goes
+ * on doing nothing, because their gate is shut.
+ *
+ * The predicate is the adapter's own routing question, handed in rather than
+ * re-derived: two collaborators forking on one question must ask it once.
+ */
+export function bridgeAccountCeremonies({
+  ceremonies,
+  routesToIdentity,
+}: {
+  ceremonies: IdentityAccountCeremonies;
+  routesToIdentity: IdentityUserGate;
+}): Pick<
+  IdentityAccountCeremonies,
+  "beforeAccountCreate" | "beforeAccountDelete"
+> {
+  const deferred = async (userId: unknown): Promise<boolean> =>
+    typeof userId === "string" && (await routesToIdentity({ userId }));
+  return {
+    async beforeAccountCreate(account) {
+      if (await deferred(account.userId)) return;
+      return ceremonies.beforeAccountCreate(account);
+    },
+    async beforeAccountDelete(account) {
+      if (await deferred(account.userId)) return;
+      await ceremonies.beforeAccountDelete(account);
+    },
+  };
 }
 
 /** The `User` fields a ceremony reads. */
@@ -68,7 +106,7 @@ interface UserRow {
  * rejected was *endpoint* hooks firing AFTER the row write; the database
  * hooks used here fire before it and can refuse.
  */
-export class IdentityCeremonies {
+export class IdentityCeremonies implements IdentityAccountCeremonies {
   constructor(
     private readonly heads: IdentityHeadsRepository,
     private readonly users: IdentityUsersRepository,
@@ -83,7 +121,7 @@ export class IdentityCeremonies {
    * with the id this ceremony pinned — or nothing, when no ceremony ran.
    */
   async beforeAccountCreate(
-    account: AccountRow,
+    account: CeremonyAccountRow,
   ): Promise<{ data: { id: string } } | undefined> {
     const { userId, providerId } = account;
     if (typeof userId !== "string" || typeof providerId !== "string") return;
@@ -108,6 +146,9 @@ export class IdentityCeremonies {
       commandId: this.clock.newCommandId(),
       accountId: accountRowId,
       provider: identifierProviderFor(providerId),
+      // better-auth's own id, unfolded: the projected `Account` row is keyed
+      // by it, and `provider` above cannot answer for it.
+      providerId,
       providerAccountId:
         typeof account.accountId === "string" ? account.accountId : null,
       value,
@@ -121,8 +162,45 @@ export class IdentityCeremonies {
     return { data: { id: accountRowId } };
   }
 
+  /**
+   * A latched user's email is being changed: state it, never write it.
+   *
+   * The address arrives as an ATTACHED identifier — unverified, and
+   * therefore not yet `User.email`, which is the honest answer: nobody has
+   * proved this mailbox. Verification promotes it, and a primary switch is
+   * what finally moves the column, through the fold. Both of those already
+   * exist, and both run the guards, so this method's whole job is to put the
+   * address into the state machine rather than past it.
+   *
+   * No `Account` row backs it, so `accountId` and `providerAccountId` are
+   * null — an identifier without a protocol row is precisely what `Account`
+   * could never model and `Identifier` can.
+   */
+  async beforeEmailChange({
+    userId,
+    email,
+  }: {
+    userId: string;
+    email: string;
+  }): Promise<void> {
+    if (!(await this.isLatched({ userId }))) return;
+    await this.identity.attachIdentifier({
+      tenantId: userId,
+      userId,
+      commandId: this.clock.newCommandId(),
+      accountId: null,
+      provider: "email",
+      providerId: null,
+      providerAccountId: null,
+      value: email,
+      occurredAtMs: this.clock.now(),
+      ceremony: { flow: "better-auth" },
+      actor: { type: "user", id: userId },
+    });
+  }
+
   /** An `Account` row is about to be deleted: detach what it mirrors. */
-  async beforeAccountDelete(account: AccountRow): Promise<void> {
+  async beforeAccountDelete(account: CeremonyAccountRow): Promise<void> {
     const { id, userId, providerId } = account;
     if (
       typeof id !== "string" ||
@@ -135,7 +213,9 @@ export class IdentityCeremonies {
     const identifierId = await this.heads.findIdentifierIdForAccount({
       userId,
       accountId: id,
-      provider: identifierProviderFor(providerId),
+      // better-auth's own id, verbatim: the fallback inside must not match
+      // across two enterprise IdPs that fold to one vocabulary.
+      providerId,
     });
     if (identifierId === null) {
       // Nothing in the projection mirrors this row (adopted before the

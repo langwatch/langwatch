@@ -19,6 +19,8 @@ import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/
 import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/webhookDelivery.process";
 import type {
   IdentityHeadsRepository,
+  IdentityReservationRepository,
+  IdentityUsersRepository,
   JoinRequestReadRepository,
   MfaEnrollmentRepository,
   ScimSyncReadRepository,
@@ -384,6 +386,19 @@ export interface PipelineRepositories {
   identityProjection: StateProjectionStore<IdentityFoldState>;
   /** Postgres reads the identity guards run against (ADR-101 §2). */
   identityHeads: IdentityHeadsRepository;
+  /**
+   * The `User` reads the same guards run against. The staged re-run has to
+   * ask the cross-population collision question the calling path asked
+   * (ADR-116 §6) — a guard that could only see the projection here would let
+   * the queue state a fact the caller was refused.
+   */
+  identityUsers: IdentityUsersRepository;
+  /**
+   * The address lock the same guards claim before stating a fact (ADR-116
+   * §6). The staged re-run arrives with the caller's own command id, so its
+   * claim is the same claim rather than a second one.
+   */
+  identityReservations: IdentityReservationRepository;
   /** The two-step verification pipeline's `MfaEnrollment` head + cursor (D06). */
   mfaProjection: StateProjectionStore<MfaFoldState>;
   /** Postgres reads the two-step verification guards run against (D06). */
@@ -715,6 +730,8 @@ export class PipelineRegistry {
         identityProjectionStore: this.deps.repositories.identityProjection,
         identityGuards: new IdentityGuards(
           this.deps.repositories.identityHeads,
+          this.deps.repositories.identityUsers,
+          this.deps.repositories.identityReservations,
         ),
         // Two-step verification rides this same aggregate (D06), so its
         // commands share the per-person lane rather than racing it. Ships

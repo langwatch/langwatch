@@ -103,6 +103,23 @@ export function identifierProviderFor(providerId: string): IdentifierProvider {
  * the list for a SQL `IN`, everything else needs the predicate, and two
  * hand-maintained copies would eventually disagree about whether a tombstone
  * can sign someone in.
+ *
+ * ADDING A STATE HERE IS NOT ENOUGH. Migration
+ * `20260824120004_identifier_provider_subject_unique` puts a PARTIAL UNIQUE
+ * INDEX on `Identifier(providerId, providerAccountId)` whose predicate
+ * enumerates these three states as SQL literals. A migration is immutable
+ * history and cannot import this constant, so it does not follow a change
+ * made here — while `isLiveIdentifierState` and every repository `IN` clause
+ * do, because they all read this array.
+ *
+ * A fourth live state added here therefore falls OUTSIDE the uniqueness
+ * guarantee: a row in it could duplicate a provider subject another live row
+ * already holds, with nothing to stop it, and the lookups would resolve one
+ * enterprise IdP's subject to another IdP's user — the cross-tenant sign-in
+ * that index exists to close. So adding a live state REQUIRES a new migration
+ * that drops and recreates
+ * `Identifier_providerId_providerAccountId_live_key` with the new state in
+ * its predicate, in the same change.
  */
 export const LIVE_IDENTIFIER_STATES = [
   "ATTACHED",

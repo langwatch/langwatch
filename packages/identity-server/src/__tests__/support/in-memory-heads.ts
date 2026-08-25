@@ -1,7 +1,6 @@
 import {
   emptyIdentityHeads,
   type IdentifierFact,
-  type IdentifierProvider,
   type IdentityFact,
   type IdentityFactInput,
   type IdentityHeads,
@@ -65,17 +64,17 @@ export class InMemoryHeads implements IdentityHeadsRepository {
   async findIdentifierIdForAccount({
     userId,
     accountId,
-    provider,
+    providerId,
   }: {
     userId: string;
     accountId: string;
-    provider: IdentifierProvider;
+    providerId: string;
   }): Promise<string | null> {
     const heads = Object.values(this.heads.get(userId)?.identifiers ?? {});
     const byAccount = heads.find((head) => head.accountId === accountId);
     if (byAccount) return byAccount.identifierId;
     const byProvider = heads.filter(
-      (head) => head.provider === provider && head.detachedAtMs === null,
+      (head) => head.providerId === providerId && head.detachedAtMs === null,
     );
     return byProvider.length === 1 ? (byProvider[0]?.identifierId ?? null) : null;
   }
@@ -103,6 +102,7 @@ export function fact(overrides?: Partial<IdentifierFact>): IdentifierFact {
     domain: "acme.com",
     identifierHash: "hmac:abc",
     accountId: null,
+    providerId: null,
     providerAccountId: null,
     connectionId: null,
     state: "VERIFIED",
@@ -127,6 +127,7 @@ export function attachData(overrides?: Record<string, unknown>) {
     commandId: "idcmd_1",
     accountId: "acc_1",
     provider: "google" as const,
+    providerId: "google",
     providerAccountId: "gid_123",
     // Mixed case AND a plus tag, because normalization treats them
     // differently and both halves are worth pinning: the case is folded, the

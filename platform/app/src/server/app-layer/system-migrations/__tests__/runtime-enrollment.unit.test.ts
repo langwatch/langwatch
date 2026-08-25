@@ -1,9 +1,10 @@
 /**
- * The enrollment wiring in runtime.ts, on a CLOUD installation: the pass's
- * cohort is read from `SystemMigrationEnrollment` fresh at the start of every
- * pass, the cutover's own stage is a separate per-call read, and the retired
- * environment knobs change nothing except a warning. Storage and the
- * event-sourcing stack are stubbed - the composition is what is under test.
+ * The cohort wiring in runtime.ts, on a CLOUD installation: a migration
+ * enrollment still paces reads `SystemMigrationEnrollment` fresh at the start
+ * of every pass, a migration declaring `enrolledAutomatically` skips that
+ * read and admits every organization, and the retired environment knobs
+ * change nothing except a warning. Storage and the event-sourcing stack are
+ * stubbed - the composition is what is under test.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -94,6 +95,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
   };
 });
 
+import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../authz/migration-name";
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../identity/migration-name";
 import {
   migrationPassCohort,
@@ -165,6 +167,49 @@ describe("migrationPassCohort on cloud", () => {
           migrationName: "authz-grants-cutover",
         }),
       ).toBe(false);
+    });
+  });
+
+  describe("when the migration declares itself enrolled automatically", () => {
+    /** @scenario "An organization nobody enrolled migrates for an automatically enrolled migration" */
+    it("admits an organization no enrollment row names", async () => {
+      stubs.enrollmentFindMany.mockResolvedValueOnce([]);
+
+      const cohort = await migrationPassCohort();
+
+      // The registered authorization-engine migration is the one that
+      // declares it; a name nothing registered answers to stays paced.
+      expect(
+        cohort({
+          tenantId: "org_born_later",
+          migrationName: AUTHZ_ENGINE_MIGRATION_NAME,
+        }),
+      ).toBe(true);
+      expect(
+        cohort({
+          tenantId: "org_born_later",
+          migrationName: "authz-team-user-backfill",
+        }),
+      ).toBe(false);
+    });
+
+    /** @scenario "An automatic cohort includes a private-dataplane organization" */
+    it("admits the organizations the private ClickHouse routing table names", async () => {
+      // The routing table is mocked with "org_private" above. An
+      // organization-rooted append is placed on that organization's own
+      // instance, so there is nothing to keep out of the shared log - and
+      // keeping it out would strand that customer on the legacy
+      // authorization path forever.
+      stubs.enrollmentFindMany.mockResolvedValueOnce([]);
+
+      const cohort = await migrationPassCohort();
+
+      expect(
+        cohort({
+          tenantId: "org_private",
+          migrationName: AUTHZ_ENGINE_MIGRATION_NAME,
+        }),
+      ).toBe(true);
     });
   });
 

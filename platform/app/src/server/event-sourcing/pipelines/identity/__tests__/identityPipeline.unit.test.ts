@@ -4,8 +4,11 @@ import {
   type IdentityHeadsRepository,
 } from "@langwatch/identity-server";
 import { describe, expect, it } from "vitest";
+import {
+  inMemoryIdentityReservations,
+  inMemoryIdentityUsers,
+} from "~/server/app-layer/identity/__tests__/support/identity-test-doubles";
 import { createTenantId } from "../../..";
-import type { AggregateType } from "../../../domain/aggregateType";
 import { EventSourcing } from "../../../eventSourcing";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import type {
@@ -14,6 +17,7 @@ import type {
 } from "../../../projections/stateProjection.types";
 import { createIdentityPipeline } from "../pipeline";
 import type { IdentityFoldState } from "../projections/identityState.foldProjection";
+import { USER_IDENTITY_AGGREGATE_TYPE } from "../schemas/constants";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };
@@ -97,7 +101,11 @@ describe("identity pipeline", () => {
       const pipeline = eventSourcing.register(
         createIdentityPipeline({
           identityProjectionStore: store,
-          identityGuards: new IdentityGuards(new ProjectionHeads(store)),
+          identityGuards: new IdentityGuards(
+            new ProjectionHeads(store),
+            inMemoryIdentityUsers(),
+            inMemoryIdentityReservations(),
+          ),
           // Two-step verification rides this same pipeline (D06); this test
           // exercises the identifier half, so its store is never reached.
           mfaProjectionStore: new InMemoryStateStore() as never,
@@ -112,6 +120,7 @@ describe("identity pipeline", () => {
           commandId: "idcmd_rt1",
           accountId: "acc_1",
           provider: "google",
+          providerId: "google",
           providerAccountId: "gid_123",
           value: "Sam.J+x@Acme.com",
           occurredAtMs: T0,
@@ -134,7 +143,7 @@ describe("identity pipeline", () => {
         const appended = await eventStore!.getEvents(
           USER,
           { tenantId: createTenantId(USER) },
-          "user_identity" as AggregateType,
+          USER_IDENTITY_AGGREGATE_TYPE,
         );
         expect(appended).toHaveLength(1);
         expect(String(appended[0]!.tenantId)).toBe(USER);

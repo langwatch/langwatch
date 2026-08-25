@@ -10,8 +10,11 @@ organization, `aggregateId = organizationId` — is replaced by
 each their own aggregate. The organization is the tenant of every event and the
 aggregate of nothing; there is no cutover flag (ADR-110 deletes it and the
 `AuthzCutoverProjection` table), and rollout state moves off the authorization
-aggregates entirely onto `SystemMigrationTenantState`. Everything else here
-stands.
+aggregates entirely onto `SystemMigrationTenantState`. The widening cohort
+this ADR plans is also finished: the migration now declares itself enrolled
+automatically, so every cloud organization is in its cohort with no operator
+action, and an organization created since is adopted by the next pass rather
+than waiting to be enrolled. Everything else here stands.
 
 ## Decision, in one paragraph
 

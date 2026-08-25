@@ -133,6 +133,99 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       And a cron that can never run shows a plain-language message next
         to the input, and the create button refuses until it is fixed
 
+  Rule: A conversation source names the project its conversations land in
+
+    Some sources pull conversations, not counts. Those conversations can
+    be read in the trace explorer, but only once an admin says which
+    project they land in — the source ships with no destination and
+    routes nothing until then.
+
+    The choice carries three consequences the admin cannot discover any
+    other way, so the drawer states all three where the choice is made:
+    the destination project's own redaction policy governs what is
+    stored; only conversations from the last 31 days arrive, so a thread
+    that started earlier shows only its recent turns; and a destination
+    that is later archived or deleted stops receiving conversations
+    instead of failing the source or landing them elsewhere.
+
+    Sources that pull counts rather than conversations are offered no
+    destination at all — a control that changed nothing would be worse
+    than its absence.
+
+    @integration
+    Scenario: The composer of a conversation source offers a destination
+      When the admin picks "Databricks AI/BI Genie" from the Add source menu
+      Then the composer offers a picker for the project its conversations
+        land in, listing only projects of this organization
+      And the picker starts empty, because where another team's
+        conversations become readable is never a default
+
+    @integration
+    Scenario: The destination states its three consequences where it is picked
+      Given the admin is composing a "Databricks AI/BI Genie" source
+      When they pick a destination project
+      Then the drawer says the destination project's data-privacy policy
+        governs what is stored
+      And it says conversations from the last 31 days arrive, and that a
+        conversation that started earlier shows only its recent turns
+      And it says a destination that is archived or deleted stops
+        receiving conversations
+
+    @integration
+    Scenario: A source created without a destination routes nothing
+      When the admin creates a "Databricks AI/BI Genie" source without
+        picking a destination
+      Then the source is created
+      And the drawer said, before saving, that its conversations would
+        not be readable in the explorer until a destination is set
+
+    @integration
+    Scenario: The edit drawer changes a destination and says history stays
+      Given a "Databricks AI/BI Genie" source already lands in "Analytics"
+      When the admin opens the source for editing
+      Then the destination picker shows "Analytics"
+      And the drawer says conversations already routed stay where they are
+      When they change it to "Support" and save
+      Then the update carries "Support" as the destination
+
+    @integration
+    Scenario: A source that pulls counts is offered no destination
+      When the admin composes an "Anthropic Admin API (usage & cost)" source,
+        which pulls usage totals rather than conversations
+      Then no destination picker appears in the drawer
+      And the same is true when editing it
+
+    @integration
+    Scenario: An archived destination is named as archived, not as absent
+      Given a "Databricks AI/BI Genie" source lands in a project that has
+        since been archived
+      When the admin opens the source for editing
+      Then the drawer says that destination is archived and that
+        conversations are no longer being routed there
+      And it still offers the picker, so the admin can repoint the source
+        rather than being told routing stopped and given no way to restart it
+      And the picker being empty does not read as "never configured",
+        because the archived destination is named right above it
+      When they pick "Support" as the replacement destination
+      Then the picker shows "Support"
+      And the archived warning is gone, because it described the destination
+        they have just replaced rather than the one now on screen
+
+    @integration
+    Scenario: A destination the admin cannot see is not called archived
+      Given a "Databricks AI/BI Genie" source lands in a live project that
+        belongs to a team this admin is not on
+      When the admin opens the source for editing
+      Then the drawer does not say that destination is archived, so nobody
+        is sent to restore a project that was never gone
+
+    @unit
+    Scenario: The picker cannot offer a project of another organization
+      When the admin opens the destination picker
+      Then it lists only live projects of this organization
+      And a destination outside it, reaching the API by any other route,
+        is refused at write time with the destination named as the reason
+
   @unit
   Scenario: The configured-source list groups under the same two headings
     Given configured sources of push, pull, and s3 modes exist

@@ -88,6 +88,7 @@
     "lint:fix": "pnpm --filter @langwatch/web lint:fix",
     "format": "pnpm --filter @langwatch/web format",
     "prepare:files": "pnpm --filter @langwatch/web start:prepare:files",
+    "start:prepare:files": "pnpm --filter @langwatch/web start:prepare:files",
     "prisma:migrate": "pnpm --filter @langwatch/web prisma:migrate",
     "prisma:seed": "pnpm --filter @langwatch/web prisma:seed",
     "pack:npm": "bash dev/scripts/pack-npm.sh",
