@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 
 export const EVALUATOR_FEATURE_ID = "evaluator" as const;
 export const evaluatorTypeSchema = z.enum(["evaluator", "code", "workflow"]);

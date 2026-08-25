@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 
 export const API_KEYS_AND_SECRETS_DETECTION =
   "langwatch/api_keys_and_secrets_detection" as const;

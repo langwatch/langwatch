@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 import { simulationMessageSchema } from "./simulation";
 
 const simulationRunIdentitySchema = z.object({

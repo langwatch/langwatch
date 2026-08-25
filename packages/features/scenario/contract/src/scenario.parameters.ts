@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 
 export const MAX_SCENARIO_PARAMETER_DEFINITIONS = 20;
 export const MAX_RUN_PARAMETER_KEYS = 50;

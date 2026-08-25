@@ -1,5 +1,5 @@
 import { evaluatorSchema } from "@langwatch/evaluator-contract";
-import { z } from "zod/v4";
+import { z } from "zod";
 
 export const monitorExecutionModeSchema = z.enum([
   "ON_MESSAGE",

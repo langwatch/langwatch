@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 
 /**
  * The Studio graph is deliberately open-ended: new node kinds are shipped by

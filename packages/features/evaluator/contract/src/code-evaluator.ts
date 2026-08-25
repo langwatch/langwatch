@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 
 export const codeEvaluatorFieldSchema = z.object({
   identifier: z.string().min(1),

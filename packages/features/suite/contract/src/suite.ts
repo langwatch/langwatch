@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 
 export const suiteTargetTypeSchema = z.enum(["prompt", "http", "code", "workflow"]);
 export type SuiteTargetType = z.infer<typeof suiteTargetTypeSchema>;

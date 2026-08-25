@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 import { workflowDslSchema, workflowRunOriginSchema } from "./workflow";
 
 export const createWorkflowCommandSchema = z.object({

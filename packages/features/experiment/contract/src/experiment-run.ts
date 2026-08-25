@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 
 const jsonRecordSchema = z.record(z.string(), z.unknown());
 
