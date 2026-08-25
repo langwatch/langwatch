@@ -14,7 +14,8 @@
 import { expect } from "vitest";
 import type { EvaluationV3Event } from "~/server/experiments-v3/execution/types";
 import { PROJECT_ID } from "./config";
-import type { FakeTabRun, FakeWorkbenchTab } from "./fake-workbench-tab";
+import type { FakeTabRun } from "./fake-tab-run";
+import type { FakeWorkbenchTab } from "./fake-workbench-tab";
 import {
   getWorkbenchState,
   listExperimentRuns,
@@ -232,7 +233,9 @@ export function expectComparisonScored({
 
   const decided = verdicts.filter(
     ({ result }) =>
-      typeof result.label === "string" ||
+      // An empty label is the shape of a verdict with none of its content, the
+      // same degenerate case `expectRunHasRealScores` rejects.
+      (typeof result.label === "string" && result.label !== "") ||
       typeof result.score === "number" ||
       typeof result.passed === "boolean",
   );

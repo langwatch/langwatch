@@ -282,6 +282,67 @@ const comparisonConfig = () => ({
 });
 
 /**
+ * The saved evaluator a column-style comparison needs behind it: the
+ * orchestrator skips any column-target with no `targetEvaluatorId`.
+ *
+ * Created the way the workbench's own "New Comparison" flow creates it: the
+ * `evaluators.create` mutation, as the signed-in user. The REST create is a
+ * different door: it resolves the project's embeddings model on the way in,
+ * for a topic-clustering feature this judge never touches, and refuses on a
+ * project that has no embeddings model configured.
+ */
+async function createSavedComparisonJudge({
+  stampedName,
+}: {
+  stampedName: string;
+}): Promise<string> {
+  const saved = await trpcMutate<{ id: string }>({
+    cookie: await getSessionCookie(),
+    path: "evaluators.create",
+    input: {
+      projectId: PROJECT_ID,
+      name: `${stampedName} comparison`,
+      type: "evaluator",
+      config: {
+        evaluatorType: COMPARISON_EVALUATOR_TYPE,
+        settings: { has_golden_answer: true },
+      },
+    },
+  });
+  return saved.id;
+}
+
+/** The comparison as a column-target of its own. */
+function buildComparisonTarget({ judgeId }: { judgeId: string }) {
+  return {
+    id: COMPARISON_TARGET_ID,
+    type: "evaluator",
+    targetEvaluatorId: judgeId,
+    inputs: COMPARISON_INPUTS,
+    outputs: COMPARISON_OUTPUTS,
+    comparison: comparisonConfig(),
+    mappings: {
+      [DATASET_ID]: {
+        input: datasetField("input"),
+        golden: datasetField("expected_output"),
+      },
+    },
+  };
+}
+
+/** The same comparison as a chip attached to the board. */
+function buildComparisonEvaluator({ judgeId }: { judgeId: string }) {
+  return {
+    id: COMPARISON_EVALUATOR_ID,
+    evaluatorType: COMPARISON_EVALUATOR_TYPE,
+    dbEvaluatorId: judgeId,
+    inputs: COMPARISON_INPUTS,
+    mappings: {},
+    comparison: comparisonConfig(),
+  };
+}
+
+/**
  * A workbench holding two prompt columns and one comparison over them.
  *
  * The carrier decides which shape holds the comparison: a column-target of its
@@ -313,51 +374,7 @@ export async function seedComparisonWorkbench({
     id: CANDIDATE_TARGET_ID,
   };
 
-  // A column-style comparison needs a saved evaluator behind it: the
-  // orchestrator skips any column-target with no `targetEvaluatorId`.
-  //
-  // Created the way the workbench's own "New Comparison" flow creates it: the
-  // `evaluators.create` mutation, as the signed-in user. The REST create is a
-  // different door: it resolves the project's embeddings model on the way in,
-  // for a topic-clustering feature this judge never touches, and refuses on a
-  // project that has no embeddings model configured.
-  const savedJudge = await trpcMutate<{ id: string }>({
-    cookie: await getSessionCookie(),
-    path: "evaluators.create",
-    input: {
-      projectId: PROJECT_ID,
-      name: `${stampedName} comparison`,
-      type: "evaluator",
-      config: {
-        evaluatorType: COMPARISON_EVALUATOR_TYPE,
-        settings: { has_golden_answer: true },
-      },
-    },
-  });
-
-  const comparisonTarget = {
-    id: COMPARISON_TARGET_ID,
-    type: "evaluator",
-    targetEvaluatorId: savedJudge.id,
-    inputs: COMPARISON_INPUTS,
-    outputs: COMPARISON_OUTPUTS,
-    comparison: comparisonConfig(),
-    mappings: {
-      [DATASET_ID]: {
-        input: datasetField("input"),
-        golden: datasetField("expected_output"),
-      },
-    },
-  };
-
-  const comparisonEvaluator = {
-    id: COMPARISON_EVALUATOR_ID,
-    evaluatorType: COMPARISON_EVALUATOR_TYPE,
-    dbEvaluatorId: savedJudge.id,
-    inputs: COMPARISON_INPUTS,
-    mappings: {},
-    comparison: comparisonConfig(),
-  };
+  const savedJudgeId = await createSavedComparisonJudge({ stampedName });
 
   const isColumn = carrier === "column-target";
   const state = {
@@ -371,11 +388,13 @@ export async function seedComparisonWorkbench({
       }),
     ],
     activeDatasetId: DATASET_ID,
-    evaluators: isColumn ? [] : [comparisonEvaluator],
+    evaluators: isColumn
+      ? []
+      : [buildComparisonEvaluator({ judgeId: savedJudgeId })],
     targets: [
       buildBaselineTarget({ promptId }),
       candidateTarget,
-      ...(isColumn ? [comparisonTarget] : []),
+      ...(isColumn ? [buildComparisonTarget({ judgeId: savedJudgeId })] : []),
     ],
   };
 

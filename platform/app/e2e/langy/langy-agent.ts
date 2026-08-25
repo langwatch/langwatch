@@ -248,7 +248,7 @@ interface TurnText {
    * the same distinction `orderedParts` draws server-side when it assembles the
    * durable parts (`langy-final-parts.ts`).
    */
-  endedOnText: boolean;
+  hasEndedOnText: boolean;
 }
 
 /** Reads the onTurnStream SSE frames until the server closes the response. */
@@ -437,13 +437,13 @@ async function streamTurnText({
   if (sawTool && textAfterLastTool.trim() !== "") {
     return {
       text: textAfterLastTool.replace(/^[\s]+/, ""),
-      endedOnText: true,
+      hasEndedOnText: true,
     };
   }
   // Whitespace is truthy, so a turn whose only deltas were blank lines would
   // otherwise be handed to the judge as a reply the user cannot see.
   if (assistantText.trim())
-    return { text: assistantText, endedOnText: !sawTool };
+    return { text: assistantText, hasEndedOnText: !sawTool };
 
   // No text. WHICH no-text this is decides whether a judge should ever see it,
   // and the two used to be indistinguishable behind a literal "(no response)"
@@ -494,11 +494,11 @@ type TurnSegment =
 function turnMessages({
   segments,
   text,
-  endedOnText,
+  hasEndedOnText,
 }: {
   segments: TurnSegment[];
   text: string;
-  endedOnText: boolean;
+  hasEndedOnText: boolean;
 }): ModelMessage[] {
   const messages: ModelMessage[] = [];
   let narration: string[] = [];
@@ -555,7 +555,7 @@ function turnMessages({
   // A turn that ran tools and then went quiet has no reply of its own: `text`
   // is the narration already recorded above, and appending it would say every
   // passage twice.
-  if (endedOnText || messages.length === 0) {
+  if (hasEndedOnText || messages.length === 0) {
     messages.push({ role: "assistant", content: text });
   }
   return messages;
@@ -639,7 +639,7 @@ export function makeLangyAdapter(
 
       const segments: TurnSegment[] = [];
       const settledTools: SettledToolCall[] = [];
-      const { text, endedOnText } = await streamTurnText({
+      const { text, hasEndedOnText } = await streamTurnText({
         cookie,
         params: { projectId: PROJECT_ID, conversationId, turnId },
         onNavigate: (href) => state.navigateHrefs.push(href),
@@ -661,7 +661,7 @@ export function makeLangyAdapter(
       if (settledTools.length === 0) {
         return { role: "assistant", content: text };
       }
-      return turnMessages({ segments, text, endedOnText });
+      return turnMessages({ segments, text, hasEndedOnText });
     },
   };
   const adapterWithState: LangyAdapter = Object.assign(adapter, {
