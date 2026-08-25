@@ -1,8 +1,8 @@
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import {
+  EvaluatorAuditLogPort,
   PostgresEvaluatorAdapter,
-  type EvaluatorAuditLogPort,
 } from "@langwatch/evaluator-server";
 import type { PrismaClient } from "~/generated/prisma/client";
 
