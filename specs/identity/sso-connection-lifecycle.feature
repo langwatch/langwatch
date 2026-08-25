@@ -212,6 +212,20 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     Then the connection becomes TORN_DOWN through the process manager's wake
     And its domains route nowhere
 
+  @integration
+  Scenario: An administrator removes their own connection that never went live
+    Given "acme" registered a connection that is not yet ACTIVE
+    When "ana" removes it from the setup page
+    Then the connection is discarded and the journey opens on the register step again
+    And nothing about anybody's sign-in changed, and the history keeps what was tried
+
+  @integration
+  Scenario: An administrator removes their own live connection on teardown's terms
+    Given "acme"'s connection is ACTIVE and nobody would be stranded
+    When "ana" removes it from the setup page
+    Then the removal is scheduled with teardown's own grace, not completed at once
+    And another organization's administrator naming the connection is answered as if it did not exist
+
   @unit
   Scenario: The projection replays whole-row like every identity projection
     Given a connection with a full lifecycle of events

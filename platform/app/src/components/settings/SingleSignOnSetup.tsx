@@ -1,6 +1,7 @@
 import {
   Alert,
   Box,
+  Button,
   Card,
   Heading,
   HStack,
@@ -12,6 +13,7 @@ import type {
   SelfServeGoLiveView,
   SelfServeSetupView,
 } from "@langwatch/identity-server";
+import { useState } from "react";
 import {
   connectionProtocolName,
   connectionStatusChipFor,
@@ -26,6 +28,7 @@ import { RegisterConnection } from "./singleSignOn/RegisterConnection";
 import {
   AvailabilityRefusalNotice,
   LoadFailure,
+  reportRefusal,
 } from "./singleSignOn/refusals";
 import { ServiceProviderDetails } from "./singleSignOn/ServiceProviderDetails";
 import { SetupStep } from "./singleSignOn/SetupStep";
@@ -85,7 +88,7 @@ export function SingleSignOnSetup({
   }
   if (!setup.data) return <Text>Single sign-on setup is unavailable.</Text>;
 
-  const { availability, connection, claims, record, serviceProvider, goLive } =
+  const { availability, connection, serviceProvider } =
     setup.data as SelfServeSetupView;
 
   // The refusal itself is the Authentication page's to place, above the
@@ -113,6 +116,30 @@ export function SingleSignOnSetup({
       </VStack>
     );
   }
+
+  return (
+    <ConnectedJourney
+      organizationId={organizationId}
+      canManage={canManage}
+      view={setup.data as SelfServeSetupView}
+      connection={connection}
+    />
+  );
+}
+
+/** The five steps once a connection exists, and the way back out below them. */
+function ConnectedJourney({
+  organizationId,
+  canManage,
+  view,
+  connection,
+}: {
+  organizationId: string;
+  canManage: boolean;
+  view: SelfServeSetupView;
+  connection: NonNullable<SelfServeSetupView["connection"]>;
+}) {
+  const { availability, claims, record, serviceProvider, goLive } = view;
 
   return (
     <VStack align="stretch" gap={6} width="full">
@@ -178,6 +205,108 @@ export function SingleSignOnSetup({
           goLive={goLive}
         />
       </SetupStep>
+
+      {canManage && (
+        <RemoveConnectionSection
+          organizationId={organizationId}
+          connectionId={connection.connectionId}
+          providerName={connection.providerId}
+          activated={goLive?.activated ?? false}
+        />
+      )}
+    </VStack>
+  );
+}
+
+/**
+ * The way back out, at the bottom where every settings surface keeps its
+ * regrets. Two different acts behind one section, and the copy says which
+ * one this press is:
+ *
+ *   - a connection that never went live is DISCARDED — the journey opens
+ *     back on the register step, immediately, and the history keeps what
+ *     was tried;
+ *   - a live connection is REMOVED on teardown's terms — scheduled, with a
+ *     seven-day grace in which sign-in keeps working and the removal can
+ *     be called off, and refused outright while anybody would be left with
+ *     no other way in.
+ */
+function RemoveConnectionSection({
+  organizationId,
+  connectionId,
+  providerName,
+  activated,
+}: {
+  organizationId: string;
+  connectionId: string;
+  providerName: string;
+  activated: boolean;
+}) {
+  const discard = api.ssoSetup.discardConnection.useMutation();
+  const remove = api.ssoSetup.removeConnection.useMutation();
+  const utils = api.useUtils();
+  const [confirming, setConfirming] = useState(false);
+  const pending = discard.isPending || remove.isPending;
+
+  const settle = {
+    onSuccess: () => {
+      setConfirming(false);
+      void utils.ssoSetup.getSetup.invalidate();
+    },
+    onError: reportRefusal,
+  };
+
+  return (
+    <VStack
+      align="stretch"
+      gap={2}
+      borderTopWidth="1px"
+      borderColor="border.muted"
+      paddingTop={4}
+    >
+      <Text fontSize="sm" color="fg.muted">
+        {activated
+          ? `Removing ${providerName} schedules it: sign-in keeps working for seven days, the removal can be called off in that time, and it is refused while anybody would have no other way in.`
+          : `Removing ${providerName} takes you back to the start. Nothing about anybody's sign-in changes, and you can register a connection again at any time.`}
+      </Text>
+      {confirming ? (
+        <HStack gap={2}>
+          <Button
+            size="sm"
+            colorPalette="red"
+            variant="solid"
+            loading={pending}
+            onClick={() =>
+              activated
+                ? remove.mutate(
+                    { organizationId, connectionId, reason: null },
+                    settle,
+                  )
+                : discard.mutate({ organizationId, connectionId }, settle)
+            }
+          >
+            {activated ? "Yes, schedule the removal" : "Yes, remove it"}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={pending}
+            onClick={() => setConfirming(false)}
+          >
+            Keep it
+          </Button>
+        </HStack>
+      ) : (
+        <Button
+          size="sm"
+          variant="outline"
+          colorPalette="red"
+          alignSelf="start"
+          onClick={() => setConfirming(true)}
+        >
+          Remove this connection
+        </Button>
+      )}
     </VStack>
   );
 }

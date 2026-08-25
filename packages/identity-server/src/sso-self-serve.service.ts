@@ -1138,6 +1138,73 @@ export class SsoSelfServeService {
     return owner !== null && owner.organizationId !== organizationId;
   }
 
+  /**
+   * Undo a registration that never went live: back to the empty journey,
+   * with the history keeping what was tried. The guards refuse this for an
+   * ACTIVE connection — a connection deciding sign-in is removed through
+   * {@link removeConnection}, which is graced and reversible, never through
+   * a discard.
+   */
+  async discardConnection({
+    organizationId,
+    connectionId,
+    actor,
+  }: {
+    organizationId: string;
+    connectionId: string;
+    actor: SelfServeActor;
+  }): Promise<void> {
+    await this.requireOrganizationConnection({ organizationId, connectionId });
+    await this.deps
+      .connections()
+      .discardConnection(this.command({ organizationId, connectionId, actor }));
+  }
+
+  /**
+   * Remove a live connection, with the grace teardown always has: sign-in
+   * keeps working while the removal is scheduled, and the schedule is
+   * visible and reversible until it completes. The guards refuse it while
+   * anybody would be stranded without another way in.
+   */
+  async removeConnection({
+    organizationId,
+    connectionId,
+    actor,
+    reason,
+    graceMs,
+  }: {
+    organizationId: string;
+    connectionId: string;
+    actor: SelfServeActor;
+    reason: string | null;
+    graceMs: number;
+  }): Promise<void> {
+    await this.requireOrganizationConnection({ organizationId, connectionId });
+    await this.deps.connections().requestTeardown({
+      ...this.command({ organizationId, connectionId, actor }),
+      reason,
+      graceMs,
+    });
+  }
+
+  /** The connection, and proof it is this organization's: a caller naming
+   *  another tenant's connection reads the same not-found every miss does. */
+  private async requireOrganizationConnection({
+    organizationId,
+    connectionId,
+  }: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<SsoConnectionState> {
+    const state = await this.requireConnection({ connectionId });
+    if (state.organizationId !== organizationId) {
+      throw new SsoDomainProofNotFoundError(
+        `connection ${connectionId} does not exist`,
+      );
+    }
+    return state;
+  }
+
   private async requireConnection({
     connectionId,
   }: {

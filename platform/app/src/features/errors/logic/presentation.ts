@@ -2030,6 +2030,11 @@ const presentations = {
     describe: () =>
       "Going live rests on a sign-in that actually worked. Use the test sign-in to go to your identity provider and come back, then try again.",
   },
+  sso_break_glass_last_way_in: {
+    title: "That grant is the only way back in",
+    describe: () =>
+      "While single sign-on decides who gets in, someone has to be able to sign in without it. Grant another person a way in first, or remove the connection itself.",
+  },
   sso_activation_break_glass_missing: {
     title: "Name someone who can still get in",
     describe: () =>

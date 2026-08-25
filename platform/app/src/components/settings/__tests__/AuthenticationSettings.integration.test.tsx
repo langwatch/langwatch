@@ -52,6 +52,10 @@ const apiDouble = {
       activate: mutationDouble(),
       grantBreakGlass: mutationDouble(),
       renewBreakGlass: mutationDouble(),
+      revokeBreakGlass: mutationDouble(),
+      checkDomainFile: mutationDouble(),
+      discardConnection: mutationDouble(),
+      removeConnection: mutationDouble(),
       breakGlassBindings: {
         useQuery: () => ({ data: [], isLoading: false, error: null }),
       },
@@ -434,9 +438,7 @@ describe("the organization's authentication page", () => {
       });
       await open();
 
-      expect(
-        screen.getByText(/connect your identity provider/i),
-      ).toBeTruthy();
+      expect(screen.getByText(/connect your identity provider/i)).toBeTruthy();
       expect(screen.queryByTestId("single-sign-on-card")).toBeNull();
       expect(screen.queryByTestId("directory-card")).toBeNull();
     });

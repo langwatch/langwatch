@@ -224,6 +224,7 @@ export {
   MfaCommandRefusedError,
   PasskeyCommandRefusedError,
   SsoActivationBreakGlassMissingError,
+  SsoBreakGlassLastWayInError,
   SsoActivationDomainUnprovedError,
   SsoActivationPreconditionError,
   SsoActivationTestSignInMissingError,

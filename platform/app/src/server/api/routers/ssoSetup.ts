@@ -296,4 +296,69 @@ export const ssoSetupRouter = createTRPCRouter({
         expiresAtMs: input.expiresAtMs,
       });
     }),
+
+  /**
+   * End a grant now, on purpose. Refused while it is a live connection's
+   * only way back in — the lever exists precisely for the moment the
+   * identity provider fails.
+   */
+  revokeBreakGlass: protectedProcedure
+    .input(orgInput.extend({ bindingId: z.string().min(1) }))
+    .permission("sso:manage")
+    .mutation(async ({ ctx, input }) => {
+      await audited({ ctx, action: "revokeBreakGlass", args: input });
+      return ssoBreakGlass().revoke({
+        bindingId: input.bindingId,
+        organizationId: input.organizationId,
+      });
+    }),
+
+  /**
+   * Undo a registration that never went live: the journey opens back on the
+   * register step, and the history keeps what was tried.
+   */
+  discardConnection: protectedProcedure
+    .input(connectionInput)
+    .permission("sso:manage")
+    .mutation(async ({ ctx, input }) => {
+      const actor = await audited({
+        ctx,
+        action: "discardConnection",
+        args: input,
+      });
+      await ssoSelfServe().discardConnection({ ...input, actor });
+    }),
+
+  /**
+   * Remove a live connection, on teardown's own terms: scheduled, graced
+   * and reversible until it completes, and refused while anybody would be
+   * left with no other way in.
+   */
+  removeConnection: protectedProcedure
+    .input(
+      connectionInput.extend({
+        reason: z.string().min(1).max(1000).nullable().default(null),
+      }),
+    )
+    .permission("sso:manage")
+    .mutation(async ({ ctx, input }) => {
+      const actor = await audited({
+        ctx,
+        action: "removeConnection",
+        args: input,
+      });
+      await ssoSelfServe().removeConnection({
+        ...input,
+        actor,
+        graceMs: SELF_SERVE_TEARDOWN_GRACE_MS,
+      });
+    }),
 });
+
+/**
+ * How long a removal stays reversible before the process manager completes
+ * it — the same seven days the operator surface gives, because "how long do
+ * I have to change my mind" must not depend on which door the removal went
+ * through.
+ */
+const SELF_SERVE_TEARDOWN_GRACE_MS = 7 * 24 * 60 * 60 * 1000;

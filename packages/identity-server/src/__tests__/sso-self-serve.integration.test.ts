@@ -1245,6 +1245,90 @@ async function claimAndProve(domain: string): Promise<void> {
   });
 }
 
+describe("removing a connection from the setup page", () => {
+  /** @scenario "An administrator removes their own connection that never went live" */
+  it("discards a registration that never went live, and the journey starts over", async () => {
+    await register();
+
+    await selfServe.discardConnection({
+      organizationId: ORG,
+      connectionId: CONNECTION,
+      actor: ANA,
+    });
+
+    expect((await held())?.state).toBe("DISCARDED");
+    // The journey re-opens on the register step: the discarded connection is
+    // no longer what the setup page renders.
+    const setup = await selfServe.getSetup({ organizationId: ORG });
+    expect(setup.connection).toBeNull();
+  });
+
+  /** @scenario "An administrator removes their own live connection on teardown's terms" */
+  it("schedules a live connection's removal with teardown's grace, and answers another organization as if it did not exist", async () => {
+    const graceMs = 7 * 24 * 60 * 60 * 1000;
+    seedOwnActiveConnection();
+
+    await selfServe.removeConnection({
+      organizationId: ORG,
+      connectionId: CONNECTION,
+      actor: ANA,
+      reason: null,
+      graceMs,
+    });
+
+    // Scheduled, not completed: sign-in keeps working through the grace.
+    const scheduled = await held();
+    expect(scheduled?.state).toBe("TEARDOWN_PENDING");
+    expect(scheduled?.tearDownAfterMs).toBe(clock + graceMs);
+
+    await selfServe
+      .removeConnection({
+        organizationId: OTHER_ORG,
+        connectionId: CONNECTION,
+        actor: ANA,
+        reason: null,
+        graceMs,
+      })
+      .then(refused, (error) =>
+        expect((error as { code: string }).code).toBe(
+          "sso_domain_proof_not_found",
+        ),
+      );
+  });
+});
+
+/** This organization's own connection, already ACTIVE — seeded rather than
+ *  walked through activation, because these tests are about leaving. */
+function seedOwnActiveConnection(): void {
+  connections.seed({
+    connectionId: CONNECTION,
+    organizationId: ORG,
+    type: "oidc",
+    state: "ACTIVE",
+    claimedDomains: [],
+    domainClaims: [],
+    approvedDomains: [],
+    verifiedDomains: [],
+    domainVerifications: [],
+    pendingVerification: null,
+    idpMetadata: {
+      issuer: null,
+      providerId: "okta",
+      clientIdRef: null,
+      secretRef: null,
+      certRefs: [],
+    },
+    allowsJit: false,
+    source: "self-serve",
+    testLoginAccountId: "acc_acme",
+    rejection: null,
+    createdBy: ANA.userId,
+    createdAtMs: T0,
+    updatedAtMs: T0,
+    tearDownAfterMs: null,
+  });
+}
+
 /** Another organization's connection, already live on a domain. What makes a
  *  claim on that domain a dispute rather than something a record settles. */
 function seedOtherOrganizationOn(domain: string): void {

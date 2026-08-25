@@ -40,7 +40,6 @@ export function BreakGlassSection({
     { enabled: canManage },
   );
   const grant = api.ssoSetup.grantBreakGlass.useMutation();
-  const renew = api.ssoSetup.renewBreakGlass.useMutation();
   const utils = api.useUtils();
 
   const [userId, setUserId] = useState("");
@@ -81,49 +80,14 @@ export function BreakGlassSection({
           </Table.Header>
           <Table.Body>
             {live.map((binding) => (
-              <Table.Row key={binding.bindingId}>
-                <Table.Cell>
-                  <VStack align="start" gap={0}>
-                    <Text>{nameOf(binding)}</Text>
-                    {binding.grantedByName && (
-                      <Text fontSize="sm" color="fg.muted">
-                        Granted by {binding.grantedByName}
-                      </Text>
-                    )}
-                  </VStack>
-                </Table.Cell>
-                <Table.Cell>
-                  <VStack align="start" gap={0}>
-                    <Text>
-                      {new Date(binding.expiresAtMs).toLocaleDateString()}
-                    </Text>
-                    <Text fontSize="sm" color="fg.muted">
-                      {binding.daysRemaining} days left
-                    </Text>
-                  </VStack>
-                </Table.Cell>
-                <Table.Cell>
-                  {canManage && (
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      loading={renew.isPending}
-                      onClick={() =>
-                        renew.mutate(
-                          {
-                            organizationId,
-                            bindingId: binding.bindingId,
-                            expiresAtMs: endOfDay(endsOn),
-                          },
-                          { onSuccess: refresh, onError: reportRefusal },
-                        )
-                      }
-                    >
-                      Extend to the date below
-                    </Button>
-                  )}
-                </Table.Cell>
-              </Table.Row>
+              <GrantRow
+                key={binding.bindingId}
+                binding={binding}
+                organizationId={organizationId}
+                canManage={canManage}
+                endsOn={endsOn}
+                onSettled={refresh}
+              />
             ))}
           </Table.Body>
         </Table.Root>
@@ -137,47 +101,26 @@ export function BreakGlassSection({
           />
         ) : (
           <VStack align="stretch" gap={2}>
-            <HStack>
-              <NativeSelect.Root>
-                <NativeSelect.Field
-                  value={userId}
-                  onChange={(event) => setUserId(event.target.value)}
-                  aria-label="Who can still get in"
-                >
-                  <option value="">Choose an administrator</option>
-                  {(candidates.data ?? []).map((person) => (
-                    <option key={person.userId} value={person.userId}>
-                      {person.name ?? person.email ?? person.userId}
-                    </option>
-                  ))}
-                </NativeSelect.Field>
-                <NativeSelect.Indicator />
-              </NativeSelect.Root>
-              <Input
-                type="date"
-                value={endsOn}
-                aria-label="Until"
-                onChange={(event) => setEndsOn(event.target.value)}
-              />
-              <Button
-                loading={grant.isPending}
-                disabled={!userId || !endsOn}
-                onClick={() =>
-                  grant.mutate(
-                    { organizationId, userId, expiresAtMs: endOfDay(endsOn) },
-                    {
-                      onSuccess: () => {
-                        setUserId("");
-                        refresh();
-                      },
-                      onError: reportRefusal,
+            <GrantForm
+              candidates={candidates.data ?? []}
+              userId={userId}
+              onUserIdChange={setUserId}
+              endsOn={endsOn}
+              onEndsOnChange={setEndsOn}
+              pending={grant.isPending}
+              onGrant={() =>
+                grant.mutate(
+                  { organizationId, userId, expiresAtMs: endOfDay(endsOn) },
+                  {
+                    onSuccess: () => {
+                      setUserId("");
+                      refresh();
                     },
-                  )
-                }
-              >
-                Grant a way back in
-              </Button>
-            </HStack>
+                    onError: reportRefusal,
+                  },
+                )
+              }
+            />
             <Text fontSize="sm" color="fg.muted">
               Every grant has an end date, so one that is no longer needed stops
               being a second way in on its own. We warn whoever can renew it
@@ -186,6 +129,142 @@ export function BreakGlassSection({
           </VStack>
         ))}
     </VStack>
+  );
+}
+
+/** The three fields a new grant takes: who, until when, and the button. */
+function GrantForm({
+  candidates,
+  userId,
+  onUserIdChange,
+  endsOn,
+  onEndsOnChange,
+  pending,
+  onGrant,
+}: {
+  candidates: Array<{
+    userId: string;
+    name: string | null;
+    email: string | null;
+  }>;
+  userId: string;
+  onUserIdChange: (next: string) => void;
+  endsOn: string;
+  onEndsOnChange: (next: string) => void;
+  pending: boolean;
+  onGrant: () => void;
+}) {
+  return (
+    <HStack>
+      <NativeSelect.Root>
+        <NativeSelect.Field
+          value={userId}
+          onChange={(event) => onUserIdChange(event.target.value)}
+          aria-label="Who can still get in"
+        >
+          <option value="">Choose an administrator</option>
+          {candidates.map((person) => (
+            <option key={person.userId} value={person.userId}>
+              {person.name ?? person.email ?? person.userId}
+            </option>
+          ))}
+        </NativeSelect.Field>
+        <NativeSelect.Indicator />
+      </NativeSelect.Root>
+      <Input
+        type="date"
+        value={endsOn}
+        aria-label="Until"
+        onChange={(event) => onEndsOnChange(event.target.value)}
+      />
+      <Button loading={pending} disabled={!userId || !endsOn} onClick={onGrant}>
+        Grant a way back in
+      </Button>
+    </HStack>
+  );
+}
+
+/** One live grant: who, until when, and the two things that can be done to
+ *  it — extended to the picked date, or ended now. */
+function GrantRow({
+  binding,
+  organizationId,
+  canManage,
+  endsOn,
+  onSettled,
+}: {
+  binding: SelfServeBreakGlassBindingView;
+  organizationId: string;
+  canManage: boolean;
+  endsOn: string;
+  onSettled: () => void;
+}) {
+  const renew = api.ssoSetup.renewBreakGlass.useMutation();
+  const revoke = api.ssoSetup.revokeBreakGlass.useMutation();
+
+  return (
+    <Table.Row>
+      <Table.Cell>
+        <VStack align="start" gap={0}>
+          <Text>{nameOf(binding)}</Text>
+          {binding.grantedByName && (
+            <Text fontSize="sm" color="fg.muted">
+              Granted by {binding.grantedByName}
+            </Text>
+          )}
+        </VStack>
+      </Table.Cell>
+      <Table.Cell>
+        <VStack align="start" gap={0}>
+          <Text>{new Date(binding.expiresAtMs).toLocaleDateString()}</Text>
+          <Text fontSize="sm" color="fg.muted">
+            {binding.daysRemaining} days left
+          </Text>
+        </VStack>
+      </Table.Cell>
+      <Table.Cell>
+        {canManage && (
+          <HStack gap={2} justify="end">
+            <Button
+              size="xs"
+              variant="outline"
+              loading={renew.isPending}
+              onClick={() =>
+                renew.mutate(
+                  {
+                    organizationId,
+                    bindingId: binding.bindingId,
+                    expiresAtMs: endOfDay(endsOn),
+                  },
+                  { onSuccess: onSettled, onError: reportRefusal },
+                )
+              }
+            >
+              Extend to the date below
+            </Button>
+            {/* Refused server-side while it is a live connection's only way
+                back in, with copy saying what to do — which is why this
+                needs no confirm step of its own: the dangerous case cannot
+                go through. */}
+            <Button
+              size="xs"
+              variant="ghost"
+              color="fg.muted"
+              _hover={{ color: "red.solid" }}
+              loading={revoke.isPending}
+              onClick={() =>
+                revoke.mutate(
+                  { organizationId, bindingId: binding.bindingId },
+                  { onSuccess: onSettled, onError: reportRefusal },
+                )
+              }
+            >
+              End now
+            </Button>
+          </HStack>
+        )}
+      </Table.Cell>
+    </Table.Row>
   );
 }
 

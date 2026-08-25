@@ -4,6 +4,7 @@ import {
   breakGlassDaysRemaining,
   breakGlassIsLive,
   breakGlassWarningsDue,
+  SsoBreakGlassLastWayInError,
 } from "@langwatch/identity";
 import type { SsoBreakGlassBindingRepository } from "./sso-connection.repository";
 import type {
@@ -38,6 +39,17 @@ export interface SsoBreakGlassServiceDeps {
   bindings: SsoBreakGlassRepository;
   notifier: SsoBreakGlassWarningNotifier;
   newBindingId: () => string;
+  /**
+   * Whether this organization's sign-in is currently decided by an ACTIVE
+   * connection. Revoking the last live way back in is refused exactly while
+   * this answers true: the one lever that exists for the identity provider
+   * failing must not be removable while the identity provider is in charge.
+   * A closure over the connection projection, answered by the composition
+   * root — this service never reads connections itself.
+   */
+  organizationHasActiveConnection: (args: {
+    organizationId: string;
+  }) => Promise<boolean>;
   now?: () => number;
 }
 
@@ -127,6 +139,58 @@ export class SsoBreakGlassService implements SsoBreakGlassBindingRepository {
       supersededAtMs: now,
     });
     return { renewed, replaced };
+  }
+
+  /**
+   * End a grant now, on purpose. The row survives with its end written on
+   * it — a revocation is auditable for the same reason a renewal is, so this
+   * reuses the one mutation rows allow (`supersededAt`) rather than a
+   * delete.
+   *
+   * Refused when it would leave an ACTIVE connection with no live way back
+   * in: that grant is the lockout lever, and the moment the identity
+   * provider decides sign-in is exactly the moment the lever must exist.
+   * Grant somebody else first, or remove the connection itself.
+   */
+  async revoke({
+    bindingId,
+    organizationId,
+  }: {
+    bindingId: string;
+    organizationId: string;
+  }): Promise<BreakGlassBinding> {
+    const binding = await this.deps.bindings.findById({ bindingId });
+    if (!binding || binding.organizationId !== organizationId) {
+      // Not a handled refusal: a revocation names a binding the surface just
+      // listed, so a miss is a caller defect or a race, and neither is
+      // something the reader can act on.
+      throw new Error(
+        `break-glass binding ${bindingId} is not one of organization ${organizationId}'s`,
+      );
+    }
+    const nowMs = this.now();
+    // Already ended — by expiry, renewal or an earlier revocation. Ending it
+    // again changes nothing, so it answers as if it just had.
+    if (!breakGlassIsLive({ binding, nowMs })) return binding;
+
+    if (
+      await this.deps.organizationHasActiveConnection({ organizationId })
+    ) {
+      const otherWaysIn = (await this.live({ organizationId })).filter(
+        (candidate) => candidate.bindingId !== bindingId,
+      );
+      if (otherWaysIn.length === 0) {
+        throw new SsoBreakGlassLastWayInError(
+          `binding ${bindingId} is organization ${organizationId}'s only live way back in while a connection is ACTIVE`,
+        );
+      }
+    }
+
+    await this.deps.bindings.markSuperseded({
+      bindingId,
+      supersededAtMs: nowMs,
+    });
+    return { ...binding, supersededAtMs: nowMs };
   }
 
   /** Every binding an organization has held, so the history reads whole. */

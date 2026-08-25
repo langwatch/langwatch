@@ -278,6 +278,23 @@ export class SsoActivationBreakGlassMissingError extends SsoActivationPreconditi
 }
 
 /**
+ * Revoking this grant would leave a live connection with no way back in.
+ * The one lever that exists for the identity provider failing must not be
+ * removable while the identity provider is what decides sign-in — grant
+ * somebody else the way in first, or remove the connection itself.
+ */
+export class SsoBreakGlassLastWayInError extends SsoConnectionCommandRefusedError {
+  constructor(detail: string) {
+    super("sso_break_glass_last_way_in", "sso_break_glass_last_way_in", {
+      httpStatus: 409,
+      fault: "customer",
+      reasons: [new Error(detail)],
+    });
+    this.name = "SsoBreakGlassLastWayInError";
+  }
+}
+
+/**
  * Teardown would leave people with no way in. The detail carries how many
  * users for the log; the copy tells the operator what to do about it, which
  * is give those people another verified method first.

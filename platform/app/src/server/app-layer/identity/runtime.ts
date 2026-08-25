@@ -538,6 +538,12 @@ export function ssoBreakGlass(): SsoBreakGlassService {
     bindings: new PrismaSsoBreakGlassRepository(prisma),
     notifier: new LoggingBreakGlassWarningNotifier(),
     newBindingId: newSsoBreakGlassBindingId,
+    // The revoke guard's one outside fact: whether an ACTIVE connection is
+    // deciding this organization's sign-in right now.
+    organizationHasActiveConnection: async ({ organizationId }) =>
+      (await prisma.ssoConnection.count({
+        where: { organizationId, state: "ACTIVE" },
+      })) > 0,
   });
 }
 

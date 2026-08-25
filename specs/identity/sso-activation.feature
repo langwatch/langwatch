@@ -122,6 +122,20 @@ Feature: Going live with your own identity provider, without asking us
     Then the new end date is shown
     And the date it previously ended is still readable
 
+  @unit
+  Scenario: A way back in can be ended on purpose
+    Given somebody holds a way back in
+    When the administrator ends it
+    Then it stops being a way in immediately
+    And the grant, its end and who ended it are still readable afterwards
+
+  @unit
+  Scenario: The last way back in cannot be ended while the connection decides sign-in
+    Given the connection is ACTIVE and exactly one person holds a way back in
+    When the administrator tries to end that grant
+    Then it is refused with the code "sso_break_glass_last_way_in"
+    And the refusal says to grant somebody else a way in first, or remove the connection itself
+
   @integration
   Scenario: A way back in is not offered in our words
     When the administrator opens single sign-on setup

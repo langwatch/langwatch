@@ -23,16 +23,20 @@ let notifier: CollectingBreakGlassNotifier;
 let clock: number;
 let minted: number;
 let service: SsoBreakGlassService;
+/** What the revoke guard's one outside fact answers, per test. */
+let connectionActive = false;
 
 beforeEach(() => {
   bindings = new InMemoryBreakGlassBindings();
   notifier = new CollectingBreakGlassNotifier();
   clock = T0;
   minted = 0;
+  connectionActive = false;
   service = new SsoBreakGlassService({
     bindings,
     notifier,
     newBindingId: () => `ssobg_${++minted}`,
+    organizationHasActiveConnection: async () => connectionActive,
     now: () => clock,
   });
 });
@@ -105,5 +109,77 @@ describe("a way back in that ends in fourteen days", () => {
       ]);
       expect(bindings.rows.get(granted.bindingId)?.warnedDays).toEqual([14, 7]);
     });
+  });
+});
+
+describe("ending a way back in on purpose", () => {
+  /** @scenario "A way back in can be ended on purpose" */
+  it("stops it immediately and keeps the grant readable afterwards", async () => {
+    const granted = await service.grant({
+      organizationId: ORG,
+      userId: "user_sam",
+      grantedByUserId: "user_ana",
+      expiresAtMs: T0 + 14 * DAY_MS,
+    });
+
+    const ended = await service.revoke({
+      bindingId: granted.bindingId,
+      organizationId: ORG,
+    });
+
+    expect(ended.supersededAtMs).toBe(clock);
+    expect(await service.hasLiveBinding({ organizationId: ORG })).toBe(false);
+    // The history keeps the whole grant: who, until when, and that it ended.
+    const history = await service.history({ organizationId: ORG });
+    expect(history.map((binding) => binding.bindingId)).toContain(
+      granted.bindingId,
+    );
+  });
+
+  it("answers an already-ended grant as if it just had, changing nothing", async () => {
+    const granted = await service.grant({
+      organizationId: ORG,
+      userId: "user_sam",
+      grantedByUserId: "user_ana",
+      expiresAtMs: T0 + 14 * DAY_MS,
+    });
+    clock = granted.expiresAtMs + DAY_MS;
+
+    const ended = await service.revoke({
+      bindingId: granted.bindingId,
+      organizationId: ORG,
+    });
+
+    // Expired already; nothing was written on the row over it.
+    expect(ended.supersededAtMs).toBeNull();
+  });
+
+  /** @scenario "The last way back in cannot be ended while the connection decides sign-in" */
+  it("refuses to end the only live way in while a connection is ACTIVE", async () => {
+    connectionActive = true;
+    const granted = await service.grant({
+      organizationId: ORG,
+      userId: "user_sam",
+      grantedByUserId: "user_ana",
+      expiresAtMs: T0 + 14 * DAY_MS,
+    });
+
+    await expect(
+      service.revoke({ bindingId: granted.bindingId, organizationId: ORG }),
+    ).rejects.toMatchObject({ code: "sso_break_glass_last_way_in" });
+    expect(await service.hasLiveBinding({ organizationId: ORG })).toBe(true);
+
+    // A second live grant is exactly what unblocks it.
+    await service.grant({
+      organizationId: ORG,
+      userId: "user_ana",
+      grantedByUserId: "user_ana",
+      expiresAtMs: T0 + 14 * DAY_MS,
+    });
+    const ended = await service.revoke({
+      bindingId: granted.bindingId,
+      organizationId: ORG,
+    });
+    expect(ended.supersededAtMs).toBe(clock);
   });
 });

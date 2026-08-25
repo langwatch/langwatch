@@ -71,6 +71,9 @@ beforeEach(async () => {
     bindings,
     notifier: new CollectingBreakGlassNotifier(),
     newBindingId: () => `ssobg_${++minted}`,
+    // This suite is about activation reading bindings, never about revoking
+    // them, so the revoke guard's one outside fact answers quietly.
+    organizationHasActiveConnection: async () => false,
     now: () => clock,
   });
   const ledger: SsoConnectionLedger = {

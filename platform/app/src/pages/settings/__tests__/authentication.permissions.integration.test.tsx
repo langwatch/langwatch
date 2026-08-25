@@ -41,6 +41,10 @@ const apiDouble = {
       activate: mutationDouble(),
       grantBreakGlass: mutationDouble(),
       renewBreakGlass: mutationDouble(),
+      revokeBreakGlass: mutationDouble(),
+      checkDomainFile: mutationDouble(),
+      discardConnection: mutationDouble(),
+      removeConnection: mutationDouble(),
       breakGlassBindings: {
         useQuery: () => ({ data: [], isLoading: false, error: null }),
       },

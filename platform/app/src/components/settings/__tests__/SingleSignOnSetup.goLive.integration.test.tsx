@@ -68,10 +68,14 @@ vi.mock("../../../utils/api", () => {
         register: idle(),
         proveDomain: idle(),
         checkDomainRecord: idle(),
+        checkDomainFile: idle(),
         claimDomain: idle(),
         activate: mutation(activateMock),
         grantBreakGlass: mutation(grantMock),
         renewBreakGlass: mutation(renewMock),
+        revokeBreakGlass: idle(),
+        discardConnection: idle(),
+        removeConnection: idle(),
         breakGlassBindings: {
           useQuery: () => ({
             data: bindingsRef.current,
