@@ -6,17 +6,18 @@
  *   2. CLI prints: "Open https://app.langwatch.com/cli/auth?user_code=WDJB-MJHT"
  *   3. User clicks → lands here. If unauthenticated, gets bounced through SSO.
  *   4. Page calls GET /api/auth/cli/lookup to verify the code is still pending.
- *   5. User picks an organization (if they're in multiple), reviews what the
+ *   5. User confirms the code matches the one in their terminal.
+ *   6. User picks an organization (if they're in multiple), reviews what the
  *      CLI key will be able to access (scopes + permissions, preselected to
  *      the widest access they hold minus organization management), and clicks
  *      "Approve".
- *   6. Page calls POST /api/auth/cli/approve which:
+ *   7. Page calls POST /api/auth/cli/approve which:
  *        a. Mints (or returns existing) personal VK
  *        b. Flips the device-code record to `approved` with the VK secret and
  *           the reviewed `key_selection` (scopes + permissions); the exchange
  *           endpoint mints the user-scoped CLI key from it
- *   7. CLI's polling /exchange returns 200 with the secret on its next poll.
- *   8. Done, user closes the browser tab.
+ *   8. CLI's polling /exchange returns 200 with the secret on its next poll.
+ *   9. Done, user closes the browser tab.
  *
  * Mirrors the screens-1-thru-4 storyboard in gateway.md.
  */
@@ -208,8 +209,20 @@ export default function CliAuthPage() {
   // Step one of the screen: the code check. The organization picker, the
   // access selection and the approve action only appear once the user
   // confirms the code matches their terminal, so the phishing check is not
-  // one card among many but the gate to the rest of the page.
-  const [isCodeConfirmed, setIsCodeConfirmed] = useState(false);
+  // one card among many but the gate to the rest of the page. Confirmed as a
+  // value rather than a flag: step two only opens when the confirmed code is
+  // still the code being looked at.
+  const [confirmedUserCode, setConfirmedUserCode] = useState<string | null>(
+    null,
+  );
+
+  // A second login opened in this tab replaces the whole flow: any finished
+  // approve/deny outcome and the previous lookup belong to the old code.
+  useEffect(() => {
+    setConfirmedUserCode(null);
+    setAction({ kind: "idle" });
+    setLookup({ kind: "loading" });
+  }, [userCode]);
 
   // Auto-pick the first org if there's only one. The chooser is only
   // necessary when the user is in 2+.
@@ -316,9 +329,6 @@ export default function CliAuthPage() {
   // Look up the device code once we have a session.
   useEffect(() => {
     if (!session || !userCode) return;
-    // A fresh code always starts at the confirmation step, even when the
-    // page is reused for a second login in the same tab.
-    setIsCodeConfirmed(false);
     let cancelled = false;
     void (async () => {
       try {
@@ -624,6 +634,8 @@ export default function CliAuthPage() {
     lookup.kind === "ready" &&
     action.kind !== "success" &&
     action.kind !== "denied";
+  const isCodeConfirmed =
+    lookup.kind === "ready" && confirmedUserCode === lookup.userCode;
 
   if (sessionStatus === "loading" || (!session && userCode)) {
     return <FullPageSpinner />;
@@ -725,7 +737,11 @@ export default function CliAuthPage() {
                 <Button
                   colorPalette="orange"
                   flex={1}
-                  onClick={() => setIsCodeConfirmed(true)}
+                  onClick={() => {
+                    if (lookup.kind === "ready") {
+                      setConfirmedUserCode(lookup.userCode);
+                    }
+                  }}
                 >
                   Confirm
                 </Button>
