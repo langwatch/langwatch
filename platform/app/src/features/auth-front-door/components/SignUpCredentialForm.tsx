@@ -10,7 +10,7 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
 import {
   applyHandledErrorToForm,
@@ -143,105 +143,176 @@ export function SignUpCredentialForm({
           autoComplete="username"
           readOnly
         />
-        <FrontDoorField label="Name" error={form.formState.errors.name}>
-          {(id) => (
-            <Input
-              id={id}
-              autoComplete="name"
-              borderRadius={SHAPE.field}
-              fontSize={{ base: "16px", md: "14px" }}
-              minHeight="44px"
-              {...FIELD_SURFACE}
-              _focusVisible={FIELD_FOCUS}
-              {...form.register("name")}
-            />
-          )}
-        </FrontDoorField>
-        <FrontDoorField
-          label="Password"
-          labelEnd={
-            <Text fontSize="12px" color="fg.muted">
-              At least {MINIMUM_PASSWORD_LENGTH} characters
-            </Text>
-          }
-          error={form.formState.errors.password}
-        >
-          {(id) => (
-            <HStack width="full" gap={2}>
-              <Input
-                id={id}
-                type={isRevealed ? "text" : "password"}
-                fontSize={{ base: "16px", md: "14px" }}
-                minHeight="44px"
-                borderRadius={SHAPE.field}
-                autoComplete="new-password"
-                {...FIELD_SURFACE}
-                _focusVisible={FIELD_FOCUS}
-                {...form.register("password")}
-              />
-              <IconButton
-                variant="ghost"
-                size="sm"
-                aria-label={isRevealed ? "Hide password" : "Show password"}
-                onClick={() => setIsRevealed((revealed) => !revealed)}
-              >
-                {isRevealed ? <EyeOff size={16} /> : <Eye size={16} />}
-              </IconButton>
-            </HStack>
-          )}
-        </FrontDoorField>
-        <FrontDoorField
-          label="Confirm password"
-          error={form.formState.errors.confirmPassword}
-        >
-          {(id) => (
-            <Input
-              id={id}
-              type="password"
-              fontSize={{ base: "16px", md: "14px" }}
-              minHeight="44px"
-              borderRadius={SHAPE.field}
-              autoComplete="new-password"
-              {...FIELD_SURFACE}
-              _focusVisible={FIELD_FOCUS}
-              {...form.register("confirmPassword")}
-            />
-          )}
-        </FrontDoorField>
+        <NameField form={form} />
+        <NewPasswordField
+          form={form}
+          isRevealed={isRevealed}
+          onToggleReveal={() => setIsRevealed((revealed) => !revealed)}
+        />
+        <ConfirmPasswordField form={form} />
         <FormServerError form={form} />
-        {submitError ? (
-          <Alert.Root
-            status="error"
-            borderStartWidth="4px"
-            borderStartColor={BRAND.danger}
-            color={BRAND.danger}
-          >
-            <Alert.Content>
-              <Alert.Description>{submitError}</Alert.Description>
-            </Alert.Content>
-          </Alert.Root>
-        ) : register.error && !serverErrorIsOnTheForm ? (
-          <HandledErrorAlert
-            error={register.error}
-            fallbackTitle="Couldn't create your account"
-          />
-        ) : null}
-        <Button
-          className="lw-front-door-primary"
-          type="submit"
-          width="full"
-          minHeight="44px"
-          marginTop={2}
-          fontWeight={600}
-          borderRadius={SHAPE.action}
-          backgroundColor={BRAND.action}
-          color={BRAND.onAction}
-          _hover={{ backgroundColor: BRAND.actionHover }}
-          loading={register.isPending || isSigningIn}
-        >
-          Create account
-        </Button>
+        <SignUpFailureAlert
+          message={submitError}
+          serverError={register.error}
+          serverErrorIsOnTheForm={serverErrorIsOnTheForm}
+        />
+        <CreateAccountButton isPending={register.isPending || isSigningIn} />
       </VStack>
     </form>
+  );
+}
+
+/** The name to call somebody by: the one thing asked that is not a password. */
+function NameField({ form }: { form: UseFormReturn<SignUpValues> }) {
+  return (
+    <FrontDoorField label="Name" error={form.formState.errors.name}>
+      {(id) => (
+        <Input
+          id={id}
+          autoComplete="name"
+          borderRadius={SHAPE.field}
+          fontSize={{ base: "16px", md: "14px" }}
+          minHeight="44px"
+          {...FIELD_SURFACE}
+          _focusVisible={FIELD_FOCUS}
+          {...form.register("name")}
+        />
+      )}
+    </FrontDoorField>
+  );
+}
+
+/**
+ * The password being set, with the strength rule said on the label line in the
+ * same number the schema holds, and the reveal toggle beside the field.
+ */
+function NewPasswordField({
+  form,
+  isRevealed,
+  onToggleReveal,
+}: {
+  form: UseFormReturn<SignUpValues>;
+  isRevealed: boolean;
+  onToggleReveal: () => void;
+}) {
+  return (
+    <FrontDoorField
+      label="Password"
+      labelEnd={
+        <Text fontSize="12px" color="fg.muted">
+          At least {MINIMUM_PASSWORD_LENGTH} characters
+        </Text>
+      }
+      error={form.formState.errors.password}
+    >
+      {(id) => (
+        <HStack width="full" gap={2}>
+          <Input
+            id={id}
+            type={isRevealed ? "text" : "password"}
+            fontSize={{ base: "16px", md: "14px" }}
+            minHeight="44px"
+            borderRadius={SHAPE.field}
+            autoComplete="new-password"
+            {...FIELD_SURFACE}
+            _focusVisible={FIELD_FOCUS}
+            {...form.register("password")}
+          />
+          <IconButton
+            variant="ghost"
+            size="sm"
+            aria-label={isRevealed ? "Hide password" : "Show password"}
+            onClick={onToggleReveal}
+          >
+            {isRevealed ? <EyeOff size={16} /> : <Eye size={16} />}
+          </IconButton>
+        </HStack>
+      )}
+    </FrontDoorField>
+  );
+}
+
+/** The same password again, never revealed: typing it twice is the check. */
+function ConfirmPasswordField({ form }: { form: UseFormReturn<SignUpValues> }) {
+  return (
+    <FrontDoorField
+      label="Confirm password"
+      error={form.formState.errors.confirmPassword}
+    >
+      {(id) => (
+        <Input
+          id={id}
+          type="password"
+          fontSize={{ base: "16px", md: "14px" }}
+          minHeight="44px"
+          borderRadius={SHAPE.field}
+          autoComplete="new-password"
+          {...FIELD_SURFACE}
+          _focusVisible={FIELD_FOCUS}
+          {...form.register("confirmPassword")}
+        />
+      )}
+    </FrontDoorField>
+  );
+}
+
+/**
+ * What went wrong once the form was accepted: a message the sign-in leg wrote,
+ * or a refusal from the server that no field of this form owns.
+ */
+function SignUpFailureAlert({
+  message,
+  serverError,
+  serverErrorIsOnTheForm,
+}: {
+  message: string | null;
+  serverError: unknown;
+  serverErrorIsOnTheForm: boolean;
+}) {
+  if (message) {
+    return (
+      <Alert.Root
+        status="error"
+        borderStartWidth="4px"
+        borderStartColor={BRAND.danger}
+        color={BRAND.danger}
+      >
+        <Alert.Content>
+          <Alert.Description>{message}</Alert.Description>
+        </Alert.Content>
+      </Alert.Root>
+    );
+  }
+
+  if (serverError && !serverErrorIsOnTheForm) {
+    return (
+      <HandledErrorAlert
+        error={serverError}
+        fallbackTitle="Couldn't create your account"
+      />
+    );
+  }
+
+  return null;
+}
+
+/** The one action the screen offers, held down while either leg is running. */
+function CreateAccountButton({ isPending }: { isPending: boolean }) {
+  return (
+    <Button
+      className="lw-front-door-primary"
+      type="submit"
+      width="full"
+      minHeight="44px"
+      marginTop={2}
+      fontWeight={600}
+      borderRadius={SHAPE.action}
+      backgroundColor={BRAND.action}
+      color={BRAND.onAction}
+      _hover={{ backgroundColor: BRAND.actionHover }}
+      loading={isPending}
+    >
+      Create account
+    </Button>
   );
 }

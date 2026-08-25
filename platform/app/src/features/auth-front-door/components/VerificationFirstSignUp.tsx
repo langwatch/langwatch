@@ -4,18 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import { AuthCard } from "~/components/auth/AuthCard";
 import { HandledErrorAlert, readHandledError } from "~/features/errors";
 import { api } from "~/utils/api";
-import { signIn } from "~/utils/auth-client";
 import Link from "~/utils/compat/next-link";
 import { useSearchParams } from "~/utils/compat/next-navigation";
 import { hardRedirect } from "~/utils/hardRedirect";
+import { useFrontDoorMethods } from "../hooks/useFrontDoorMethods";
 import { useSignInRouting } from "../hooks/useSignInRouting";
-import {
-  readLastUsedMethodId,
-  rememberLastUsedMethod,
-} from "../logic/lastUsedMethod";
 import { CredentialSignInForm } from "./CredentialSignInForm";
 import { FrontDoorFinePrint } from "./FrontDoorFinePrint";
-import { IdentifierStepForm } from "./IdentifierStepForm";
+import {
+  IdentifierStepForm,
+  type IdentifierStepValues,
+} from "./IdentifierStepForm";
 import {
   AlternativeMethods,
   hasAlternativeMethods,
@@ -49,24 +48,119 @@ export function VerificationFirstSignUp() {
   const callbackUrl = query?.get("callbackUrl") ?? undefined;
   const verifyToken = query?.get("verify");
   const carriedEmail = query?.get("email") ?? undefined;
+  // Where sign-up lands once a method is held.
+  const returnTo = callbackUrl ?? JOIN_BEFORE_CREATE_PATH;
 
+  const routing = useSignInRouting();
+  const { decide } = routing;
+  const signUp = useSignUpVerification({ verifyToken, decide });
+
+  // What this instance offers with no address in hand, so the same social
+  // buttons the log-in screen shows are available here from the first step.
+  const { instanceMethods, lastUsedMethodId, dialFederated } =
+    useFrontDoorMethods({ decide, callbackUrl: returnTo, skip: verifyToken });
+
+  if (signUp.welcomeBackEmail) {
+    return (
+      <WelcomeBack
+        email={signUp.welcomeBackEmail}
+        decision={routing.decision}
+        lastUsedMethodId={lastUsedMethodId}
+        callbackUrl={callbackUrl}
+        onFederatedMethodChosen={dialFederated}
+        onUseDifferentEmail={signUp.chooseDifferentEmail}
+      />
+    );
+  }
+
+  if (signUp.verifiedEmail && signUp.accountIsReady) {
+    return (
+      <AccountIsReady email={signUp.verifiedEmail} callbackUrl={returnTo} />
+    );
+  }
+
+  if (signUp.verifiedEmail) {
+    return (
+      <MethodChoice
+        verifiedEmail={signUp.verifiedEmail}
+        decision={routing.decision}
+        lastUsedMethodId={lastUsedMethodId}
+        callbackUrl={returnTo}
+        onFederatedMethodChosen={dialFederated}
+      />
+    );
+  }
+
+  if (verifyToken && signUp.linkError) {
+    return (
+      <LinkNoLongerWorks
+        error={signUp.linkError}
+        isSending={signUp.isSending}
+        onResend={signUp.sendTo}
+      />
+    );
+  }
+
+  if (signUp.sentTo) return <LinkIsOnItsWay email={signUp.sentTo} />;
+
+  return (
+    <AddressStep
+      carriedEmail={carriedEmail}
+      callbackUrl={callbackUrl}
+      sendError={signUp.sendError}
+      isSending={signUp.isSending}
+      onSubmit={({ email }) => signUp.sendTo(email)}
+      instanceMethods={instanceMethods}
+      lastUsedMethodId={lastUsedMethodId}
+      onFederatedMethodChosen={dialFederated}
+    />
+  );
+}
+
+/**
+ * The state a confirmed address costs, and nothing else: a link asked for, a
+ * link spent exactly once, and what came back out of it.
+ *
+ * It holds no opinion about what the screen draws. The address a link
+ * confirmed and the address that turned out to have an account already are two
+ * separate fields, and the screen is what decides that the second one means
+ * somebody came in by the wrong door.
+ */
+function useSignUpVerification({
+  verifyToken,
+  decide,
+}: {
+  /** The token the emailed link carried, absent on the first step. */
+  verifyToken: string | null | undefined;
+  decide: (input: { identifier: string | null }) => Promise<unknown>;
+}): {
+  /** The address a confirmation link has just gone out to. */
+  sentTo: string | null;
+  /** The address the link confirmed. */
+  verifiedEmail: string | null;
+  /** True when confirming the link also finished creating the account. */
+  accountIsReady: boolean;
+  /** The address that turned out to have an account already. */
+  welcomeBackEmail: string | null;
+  isSending: boolean;
+  /** Why a link could not be asked for. */
+  sendError: unknown;
+  /** Why the link that arrived could not be spent. */
+  linkError: unknown;
+  sendTo: (email: string) => Promise<void>;
+  /** Back to the address step, keeping nothing. */
+  chooseDifferentEmail: () => void;
+} {
   const requestVerification =
     api.frontDoor.requestSignUpVerification.useMutation();
   const completeVerification =
     api.frontDoor.completeSignUpVerification.useMutation();
-  const routing = useSignInRouting();
-  const { decide } = routing;
 
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null);
   const [accountIsReady, setAccountIsReady] = useState(false);
   const [welcomeBackEmail, setWelcomeBackEmail] = useState<string | null>(null);
-  const [instanceMethods, setInstanceMethods] = useState<
-    readonly SignInMethod[]
-  >([]);
-  const [lastUsedMethodId] = useState(() => readLastUsedMethodId());
   const spent = useRef(false);
-  const askedOnMount = useRef(false);
 
   // The emailed link is spent once, on arrival. Guarded by a ref rather than
   // by mutation state because the token is single-use: a second attempt would
@@ -82,28 +176,10 @@ export function VerificationFirstSignUp() {
         await decide({ identifier: email });
       })
       .catch(() => {
-        // Rendered from the mutation's error below, through the registry.
+        // Rendered from the mutation's error by the screen, through the
+        // registry.
       });
   }, [verifyToken, completeVerification, decide]);
-
-  // What this instance offers with no address in hand, so the same social
-  // buttons the log-in screen shows are available here from the first step.
-  useEffect(() => {
-    if (askedOnMount.current || verifyToken) return;
-    askedOnMount.current = true;
-    void decide({ identifier: null }).then((decision) => {
-      if (decision?.outcome === "method_picker") {
-        setInstanceMethods(decision.methodSet);
-      }
-    });
-  }, [decide, verifyToken]);
-
-  const dialFederated = (method: SignInMethod) => {
-    rememberLastUsedMethod(method);
-    void signIn(method.id, {
-      callbackUrl: callbackUrl ?? JOIN_BEFORE_CREATE_PATH,
-    });
-  };
 
   const sendTo = async (email: string) => {
     try {
@@ -122,69 +198,60 @@ export function VerificationFirstSignUp() {
     }
   };
 
-  if (welcomeBackEmail) {
-    return (
-      <WelcomeBack
-        email={welcomeBackEmail}
-        decision={routing.decision}
-        lastUsedMethodId={lastUsedMethodId}
-        callbackUrl={callbackUrl}
-        onFederatedMethodChosen={dialFederated}
-        onUseDifferentEmail={() => setWelcomeBackEmail(null)}
-      />
-    );
-  }
+  return {
+    sentTo,
+    verifiedEmail,
+    accountIsReady,
+    welcomeBackEmail,
+    isSending: requestVerification.isPending,
+    sendError: requestVerification.error,
+    linkError: completeVerification.error,
+    sendTo,
+    chooseDifferentEmail: () => setWelcomeBackEmail(null),
+  };
+}
 
-  if (verifiedEmail && accountIsReady) {
-    return (
-      <AccountIsReady
-        email={verifiedEmail}
-        callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH}
-      />
-    );
-  }
-
-  if (verifiedEmail) {
-    return (
-      <MethodChoice
-        verifiedEmail={verifiedEmail}
-        decision={routing.decision}
-        lastUsedMethodId={lastUsedMethodId}
-        callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH}
-        onFederatedMethodChosen={dialFederated}
-      />
-    );
-  }
-
-  if (verifyToken && completeVerification.error) {
-    return (
-      <LinkNoLongerWorks
-        error={completeVerification.error}
-        isSending={requestVerification.isPending}
-        onResend={sendTo}
-      />
-    );
-  }
-
-  if (sentTo) return <LinkIsOnItsWay email={sentTo} />;
-
+/**
+ * The first step: the address, and whatever else this instance offers beside
+ * it.
+ */
+function AddressStep({
+  carriedEmail,
+  callbackUrl,
+  sendError,
+  isSending,
+  onSubmit,
+  instanceMethods,
+  lastUsedMethodId,
+  onFederatedMethodChosen,
+}: {
+  /** An address carried in from the log-in screen, so nobody types one twice. */
+  carriedEmail: string | undefined;
+  callbackUrl: string | undefined;
+  sendError: unknown;
+  isSending: boolean;
+  onSubmit: (values: IdentifierStepValues) => void | Promise<unknown>;
+  instanceMethods: readonly SignInMethod[];
+  lastUsedMethodId: string | null;
+  onFederatedMethodChosen: (method: SignInMethod) => void;
+}) {
   return (
     <AuthCard
       title="Create your LangWatch account"
       intro="We will confirm your email address before anything else."
       finePrint={<FrontDoorFinePrint />}
     >
-      {requestVerification.error ? (
+      {sendError ? (
         <HandledErrorAlert
-          error={requestVerification.error}
+          error={sendError}
           fallbackTitle="Couldn't start your sign-up"
         />
       ) : null}
       <IdentifierStepForm
         submitLabel="Continue"
-        isSubmitting={requestVerification.isPending}
+        isSubmitting={isSending}
         defaultEmail={carriedEmail}
-        onSubmit={({ email }) => sendTo(email)}
+        onSubmit={onSubmit}
         footer={
           <LogInLink
             callbackUrl={callbackUrl}
@@ -196,7 +263,7 @@ export function VerificationFirstSignUp() {
             <AlternativeMethods
               methodSet={instanceMethods}
               lastUsedMethodId={lastUsedMethodId}
-              onFederatedMethodChosen={dialFederated}
+              onFederatedMethodChosen={onFederatedMethodChosen}
             />
           ) : null
         }

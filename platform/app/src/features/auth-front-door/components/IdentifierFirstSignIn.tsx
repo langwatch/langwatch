@@ -8,11 +8,8 @@ import { safeRedirectTarget, signIn, useSession } from "~/utils/auth-client";
 import { replaceLocation } from "~/utils/browserNavigation";
 import Link from "~/utils/compat/next-link";
 import { useSearchParams } from "~/utils/compat/next-navigation";
+import { useFrontDoorMethods } from "../hooks/useFrontDoorMethods";
 import { useSignInRouting } from "../hooks/useSignInRouting";
-import {
-  readLastUsedMethodId,
-  rememberLastUsedMethod,
-} from "../logic/lastUsedMethod";
 import {
   signInMethodActionLabel,
   signInMethodLabel,
@@ -20,7 +17,10 @@ import {
 import { CheckYourEmail } from "./CheckYourEmail";
 import { CredentialSignInForm } from "./CredentialSignInForm";
 import { FrontDoorFinePrint } from "./FrontDoorFinePrint";
-import { IdentifierStepForm } from "./IdentifierStepForm";
+import {
+  IdentifierStepForm,
+  type IdentifierStepValues,
+} from "./IdentifierStepForm";
 import {
   AlternativeMethods,
   hasAlternativeMethods,
@@ -59,11 +59,6 @@ export function IdentifierFirstSignIn() {
   const { data: session } = useSession();
   const routing = useSignInRouting();
   const { decide } = routing;
-  const askedOnMount = useRef(false);
-  const [instanceMethods, setInstanceMethods] = useState<
-    readonly SignInMethod[]
-  >([]);
-  const [lastUsedMethodId] = useState(() => readLastUsedMethodId());
   const [signingUp, setSigningUp] = useState<string | null>(null);
 
   useEffect(() => {
@@ -74,20 +69,8 @@ export function IdentifierFirstSignIn() {
   // an address is even the next question, and what the instance offers beside
   // it. A deployment that routes without one never shows the address step,
   // which is how a single-connection install keeps behaving as it does today.
-  useEffect(() => {
-    if (askedOnMount.current || session) return;
-    askedOnMount.current = true;
-    void decide({ identifier: null, breakGlass }).then((decision) => {
-      if (decision?.outcome === "method_picker") {
-        setInstanceMethods(decision.methodSet);
-      }
-    });
-  }, [decide, breakGlass, session]);
-
-  const dialFederated = (method: SignInMethod) => {
-    rememberLastUsedMethod(method);
-    void signIn(method.id, { callbackUrl });
-  };
+  const { instanceMethods, lastUsedMethodId, dialFederated } =
+    useFrontDoorMethods({ decide, callbackUrl, skip: session, breakGlass });
 
   if (signingUp) {
     return (
@@ -110,13 +93,7 @@ export function IdentifierFirstSignIn() {
 
   if (routing.error) {
     return (
-      <AuthCard title="Log in to LangWatch">
-        <HandledErrorAlert
-          error={routing.error}
-          fallbackTitle="Could not start log-in"
-        />
-        <SignUpLink callbackUrl={callbackUrl} label="Create your account" />
-      </AuthCard>
+      <LogInCouldNotStart error={routing.error} callbackUrl={callbackUrl} />
     );
   }
 
@@ -134,43 +111,127 @@ export function IdentifierFirstSignIn() {
 
   if (showPicker) {
     return (
-      <AuthCard title="Log in to LangWatch">
-        <SignInMethodPicker
-          methodSet={decision.methodSet}
-          reasonCode={decision.reasonCode}
-          lastUsedMethodId={lastUsedMethodId}
-          onFederatedMethodChosen={dialFederated}
-          renderLocalMethod={(method) =>
-            method.kind === "password" ? (
-              <CredentialSignInForm
-                key={method.id}
-                email={submittedIdentifier ?? ""}
-                callbackUrl={callbackUrl}
-                onUseDifferentEmail={routing.clear}
-                onSignUpStarted={setSigningUp}
-              />
-            ) : null
-          }
-        />
-        {/* The switch link is always here, carrying the address already
-            typed: somebody who meant to sign up gets there in one click, and
-            somebody who submits a password for an address with no account is
-            already carried into sign-up by the form above. */}
-        <SignUpLink
-          callbackUrl={callbackUrl}
-          email={submittedIdentifier}
-          label="Don't have an account? Sign up"
-        />
-      </AuthCard>
+      <MethodStep
+        decision={decision}
+        submittedIdentifier={submittedIdentifier}
+        lastUsedMethodId={lastUsedMethodId}
+        callbackUrl={callbackUrl}
+        onFederatedMethodChosen={dialFederated}
+        onUseDifferentEmail={routing.clear}
+        onSignUpStarted={setSigningUp}
+      />
     );
   }
 
   return (
+    <AddressStep
+      callbackUrl={callbackUrl}
+      isSubmitting={routing.isDeciding}
+      onSubmit={({ email }) => decide({ identifier: email, breakGlass })}
+      instanceMethods={instanceMethods}
+      lastUsedMethodId={lastUsedMethodId}
+      onFederatedMethodChosen={dialFederated}
+    />
+  );
+}
+
+/**
+ * The router could not be asked at all, so the screen says so and leaves the
+ * one door open that never needed an answer from it.
+ */
+function LogInCouldNotStart({
+  error,
+  callbackUrl,
+}: {
+  error: unknown;
+  callbackUrl?: string;
+}) {
+  return (
+    <AuthCard title="Log in to LangWatch">
+      <HandledErrorAlert error={error} fallbackTitle="Could not start log-in" />
+      <SignUpLink callbackUrl={callbackUrl} label="Create your account" />
+    </AuthCard>
+  );
+}
+
+/**
+ * The decision named the methods this address signs in with, so the screen is
+ * the choice between them and nothing else.
+ */
+function MethodStep({
+  decision,
+  submittedIdentifier,
+  lastUsedMethodId,
+  callbackUrl,
+  onFederatedMethodChosen,
+  onUseDifferentEmail,
+  onSignUpStarted,
+}: {
+  decision: RoutingDecision;
+  /** The address the decision was made for, carried into every form below. */
+  submittedIdentifier: string | null;
+  lastUsedMethodId: string | null;
+  callbackUrl?: string;
+  onFederatedMethodChosen: (method: SignInMethod) => void;
+  onUseDifferentEmail: () => void;
+  onSignUpStarted: (email: string) => void;
+}) {
+  return (
+    <AuthCard title="Log in to LangWatch">
+      <SignInMethodPicker
+        methodSet={decision.methodSet}
+        reasonCode={decision.reasonCode}
+        lastUsedMethodId={lastUsedMethodId}
+        onFederatedMethodChosen={onFederatedMethodChosen}
+        renderLocalMethod={(method) =>
+          method.kind === "password" ? (
+            <CredentialSignInForm
+              key={method.id}
+              email={submittedIdentifier ?? ""}
+              callbackUrl={callbackUrl}
+              onUseDifferentEmail={onUseDifferentEmail}
+              onSignUpStarted={onSignUpStarted}
+            />
+          ) : null
+        }
+      />
+      {/* The switch link is always here, carrying the address already
+          typed: somebody who meant to sign up gets there in one click, and
+          somebody who submits a password for an address with no account is
+          already carried into sign-up by the form above. */}
+      <SignUpLink
+        callbackUrl={callbackUrl}
+        email={submittedIdentifier}
+        label="Don't have an account? Sign up"
+      />
+    </AuthCard>
+  );
+}
+
+/**
+ * The address step, and whatever else this instance offers beside it.
+ */
+function AddressStep({
+  callbackUrl,
+  isSubmitting,
+  onSubmit,
+  instanceMethods,
+  lastUsedMethodId,
+  onFederatedMethodChosen,
+}: {
+  callbackUrl?: string;
+  isSubmitting: boolean;
+  onSubmit: (values: IdentifierStepValues) => void | Promise<unknown>;
+  instanceMethods: readonly SignInMethod[];
+  lastUsedMethodId: string | null;
+  onFederatedMethodChosen: (method: SignInMethod) => void;
+}) {
+  return (
     <AuthCard title="Log in to LangWatch" finePrint={<FrontDoorFinePrint />}>
       <IdentifierStepForm
         submitLabel="Continue"
-        isSubmitting={routing.isDeciding}
-        onSubmit={({ email }) => decide({ identifier: email, breakGlass })}
+        isSubmitting={isSubmitting}
+        onSubmit={onSubmit}
         footer={
           <SignUpLink
             callbackUrl={callbackUrl}
@@ -182,7 +243,7 @@ export function IdentifierFirstSignIn() {
             <AlternativeMethods
               methodSet={instanceMethods}
               lastUsedMethodId={lastUsedMethodId}
-              onFederatedMethodChosen={dialFederated}
+              onFederatedMethodChosen={onFederatedMethodChosen}
             />
           ) : null
         }
