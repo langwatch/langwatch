@@ -1,5 +1,6 @@
 import {
   DataRetentionService as DataRetentionServiceContract,
+  ScopeTargetNotFoundError,
   platformDefaultRetentionDaysSchema,
   resolveRetention,
   resolveScopeChain,
@@ -8,10 +9,23 @@ import {
   type RetentionCategory,
   type RetentionPolicy,
   type ScopeAssignment,
+  type PinnedTrace,
+  type PinTraceInput,
+  pinTraceInputSchema,
+  type UnpinTraceInput,
+  unpinTraceInputSchema,
 } from "@langwatch/data-retention-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
+import {
+  TeamNotFoundError,
+  type OrganizationService,
+  type OrganizationTeam,
+} from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import { DataRetentionRepository } from "../repositories/data-retention.repository";
+import { PinnedTraceRepository } from "../repositories/pinned-trace.repository";
+import type { DataRetentionCache } from "../cache/data-retention.cache";
+
+export { ScopeTargetNotFoundError } from "@langwatch/data-retention-contract";
 
 export class DataRetentionService extends DataRetentionServiceContract {
   static create(options: {
@@ -19,12 +33,16 @@ export class DataRetentionService extends DataRetentionServiceContract {
     projects: ProjectService;
     organizations: OrganizationService;
     defaultRetentionDays: number;
+    pinRepository: PinnedTraceRepository;
+    cache?: DataRetentionCache;
   }): DataRetentionService {
     return new DataRetentionService(
       options.repository,
       options.projects,
       options.organizations,
       platformDefaultRetentionDaysSchema.parse(options.defaultRetentionDays),
+      options.pinRepository,
+      options.cache,
     );
   }
 
@@ -33,40 +51,66 @@ export class DataRetentionService extends DataRetentionServiceContract {
     private readonly projects: ProjectService,
     private readonly organizations: OrganizationService,
     private readonly defaultRetentionDays: number,
+    private readonly pinRepository: PinnedTraceRepository,
+    private readonly cache?: DataRetentionCache,
   ) {
     super();
   }
 
+  async resolve(projectId: string): Promise<ResolvedRetention | null> {
+    const cached = await this.cache?.get(projectId);
+    if (cached !== void 0) {
+      return cached;
+    }
+
+    const project = await this.projects.tryGetWithTeam(projectId);
+    const context = project
+      ? {
+          organizationId: project.team.organizationId,
+          teamId: project.teamId,
+          projectId: project.id,
+        }
+      : null;
+    const resolved = context
+      ? resolveRetention({
+          rows: await this.repository.findForProjectChain({
+            organizationId: context.organizationId,
+            scopes: resolveScopeChain(context),
+          }),
+          chain: resolveScopeChain(context),
+          defaultRetentionDays: this.defaultRetentionDays,
+        })
+      : null;
+    await this.cache?.set(projectId, resolved);
+    return resolved;
+  }
+
   async getResolvedForProject(input: { projectId: string }): Promise<ResolvedRetention> {
-    const project = await this.projects.getWithTeam(input.projectId);
-    const chain = resolveScopeChain({
-      projectId: project.id,
-      teamId: project.teamId,
-      organizationId: project.team.organizationId,
-    });
-    return resolveRetention({
-      rows: await this.repository.findForScopes({
-        organizationId: project.team.organizationId,
-        scopes: chain,
-      }),
-      chain,
-      defaultRetentionDays: this.defaultRetentionDays,
-    });
+    return (
+      (await this.resolve(input.projectId)) ?? {
+        traces: this.defaultRetentionDays,
+        scenarios: this.defaultRetentionDays,
+        experiments: this.defaultRetentionDays,
+      }
+    );
   }
 
   async getRetentionDays(input: {
     projectId: string;
     category: RetentionCategory;
   }): Promise<number> {
-    return (await this.getResolvedForProject({ projectId: input.projectId }))[
-      input.category
-    ];
+    const retention = await this.getResolvedForProject({ projectId: input.projectId });
+    return retention[input.category];
   }
 
   async previewScopeRemoval(input: {
     scope: ScopeAssignment;
   }): Promise<ResolvedRetention> {
-    const resolvedScope = await this.resolveScope(input.scope);
+    const resolvedScope = await this.tryResolveScope(input.scope);
+    if (!resolvedScope) {
+      return this.defaultRetention();
+    }
+
     const rows = await this.repository.findAllInOrganization({
       organizationId: resolvedScope.organizationId,
     });
@@ -95,12 +139,17 @@ export class DataRetentionService extends DataRetentionServiceContract {
     retentionDays: number;
   }): Promise<RetentionPolicy> {
     const retentionDays = retentionDaysInputSchema.parse(input.retentionDays);
-    const resolvedScope = await this.resolveScope(input.scope);
+    const resolvedScope = await this.tryResolveScope(input.scope);
+    if (!resolvedScope) {
+      throw new ScopeTargetNotFoundError("Scope target not found.");
+    }
+
     const row = await this.repository.upsertForScope({
       ...input,
       retentionDays,
       organizationId: resolvedScope.organizationId,
     });
+    await this.invalidateForScope(input.scope);
     return row;
   }
 
@@ -109,23 +158,91 @@ export class DataRetentionService extends DataRetentionServiceContract {
     category: RetentionCategory;
   }): Promise<void> {
     await this.repository.deleteForScope(input);
+    await this.invalidateForScope(input.scope);
   }
 
-  private async resolveScope(scope: ScopeAssignment): Promise<{
+  async pin(input: PinTraceInput): Promise<PinnedTrace> {
+    const parsed = pinTraceInputSchema.parse(input);
+    return this.pinRepository.create({ ...parsed, source: "manual" });
+  }
+
+  async unpin(input: UnpinTraceInput): Promise<void> {
+    const parsed = unpinTraceInputSchema.parse(input);
+    await this.pinRepository.delete(parsed);
+  }
+
+  async autoPin(input: UnpinTraceInput): Promise<PinnedTrace> {
+    const parsed = unpinTraceInputSchema.parse(input);
+    return this.pinRepository.create({ ...parsed, source: "share" });
+  }
+
+  async autoUnpin(input: UnpinTraceInput): Promise<void> {
+    const parsed = unpinTraceInputSchema.parse(input);
+    if (await this.pinRepository.hasManualPin(parsed)) {
+      return;
+    }
+
+    await this.pinRepository.delete(parsed);
+  }
+
+  async isPinned(input: UnpinTraceInput): Promise<boolean> {
+    return (
+      (await this.pinRepository.tryFindByProjectAndTrace(
+        unpinTraceInputSchema.parse(input),
+      )) != null
+    );
+  }
+
+  async tryGetPin(input: UnpinTraceInput): Promise<PinnedTrace | null> {
+    return this.pinRepository.tryFindByProjectAndTrace(
+      unpinTraceInputSchema.parse(input),
+    );
+  }
+
+  listByProject(input: { projectId: string }): Promise<PinnedTrace[]> {
+    return this.pinRepository.findAllByProject(input);
+  }
+
+  getPinnedTraceIds(input: { projectId: string }): Promise<string[]> {
+    return this.pinRepository.findAllTraceIds(input);
+  }
+
+  private defaultRetention(): ResolvedRetention {
+    return {
+      traces: this.defaultRetentionDays,
+      scenarios: this.defaultRetentionDays,
+      experiments: this.defaultRetentionDays,
+    };
+  }
+
+  private async invalidateForScope(scope: ScopeAssignment): Promise<void> {
+    const projectIds = await this.findAffectedProjectIds(scope);
+    await Promise.all(projectIds.map((projectId) => this.cache?.delete(projectId)));
+  }
+
+  private async tryResolveScope(scope: ScopeAssignment): Promise<{
     organizationId: string;
     chain: ScopeAssignment[];
-  }> {
+  } | null> {
     if (scope.scopeType === "ORGANIZATION") {
       return { organizationId: scope.scopeId, chain: [scope] };
     }
     if (scope.scopeType === "TEAM") {
-      const team = await this.organizations.getTeamById({ teamId: scope.scopeId });
+      const team = await this.tryGetTeam(scope.scopeId);
+      if (!team) {
+        return null;
+      }
+
       return {
         organizationId: team.organizationId,
         chain: [scope, { scopeType: "ORGANIZATION", scopeId: team.organizationId }],
       };
     }
-    const project = await this.projects.getWithTeam(scope.scopeId);
+    const project = await this.projects.tryGetWithTeam(scope.scopeId);
+    if (!project) {
+      return null;
+    }
+
     return {
       organizationId: project.team.organizationId,
       chain: resolveScopeChain({
@@ -134,5 +251,42 @@ export class DataRetentionService extends DataRetentionServiceContract {
         organizationId: project.team.organizationId,
       }),
     };
+  }
+
+  private async findAffectedProjectIds(scope: ScopeAssignment): Promise<string[]> {
+    if (scope.scopeType === "PROJECT") {
+      return [scope.scopeId];
+    }
+
+    if (scope.scopeType === "TEAM") {
+      const team = await this.tryGetTeam(scope.scopeId);
+      if (!team) {
+        return [];
+      }
+
+      const projects = await this.projects.listByTeam({
+        organizationId: team.organizationId,
+        teamId: scope.scopeId,
+      });
+      return projects.map((project) => project.id);
+    }
+    const projects = await this.projects.listByOrganization({
+      organizationId: scope.scopeId,
+      page: 1,
+      limit: 10_000,
+    });
+    return projects.data.map((project) => project.id);
+  }
+
+  private async tryGetTeam(teamId: string): Promise<OrganizationTeam | null> {
+    try {
+      return await this.organizations.getTeamById({ teamId });
+    } catch (error) {
+      if (error instanceof TeamNotFoundError) {
+        return null;
+      }
+
+      throw error;
+    }
   }
 }

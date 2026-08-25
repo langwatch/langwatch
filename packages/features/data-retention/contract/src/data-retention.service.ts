@@ -1,11 +1,19 @@
 import type {
+  PinnedTrace,
+  PinTraceInput,
   ResolvedRetention,
   RetentionCategory,
   RetentionPolicy,
   ScopeAssignment,
+  UnpinTraceInput,
 } from "./data-retention";
 
+export class ScopeTargetNotFoundError extends Error {
+  readonly name = "ScopeTargetNotFoundError" as const;
+}
+
 export abstract class DataRetentionService {
+  abstract resolve(projectId: string): Promise<ResolvedRetention | null>;
   abstract getResolvedForProject(input: {
     projectId: string;
   }): Promise<ResolvedRetention>;
@@ -29,4 +37,12 @@ export abstract class DataRetentionService {
     scope: ScopeAssignment;
     category: RetentionCategory;
   }): Promise<void>;
+  abstract pin(input: PinTraceInput): Promise<PinnedTrace>;
+  abstract unpin(input: UnpinTraceInput): Promise<void>;
+  abstract autoPin(input: UnpinTraceInput): Promise<PinnedTrace>;
+  abstract autoUnpin(input: UnpinTraceInput): Promise<void>;
+  abstract isPinned(input: UnpinTraceInput): Promise<boolean>;
+  abstract tryGetPin(input: UnpinTraceInput): Promise<PinnedTrace | null>;
+  abstract listByProject(input: { projectId: string }): Promise<PinnedTrace[]>;
+  abstract getPinnedTraceIds(input: { projectId: string }): Promise<string[]>;
 }

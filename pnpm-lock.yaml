@@ -1212,9 +1212,6 @@ importers:
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract
-      '@langwatch/prisma-client':
-        specifier: workspace:*
-        version: link:../../../prisma-client
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract

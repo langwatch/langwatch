@@ -6,7 +6,7 @@ import type {
 } from "@langwatch/data-retention-contract";
 
 export abstract class DataRetentionRepository {
-  abstract findForScopes(input: {
+  abstract findForProjectChain(input: {
     organizationId: string;
     scopes: ScopeAssignment[];
   }): Promise<RetentionRow[]>;

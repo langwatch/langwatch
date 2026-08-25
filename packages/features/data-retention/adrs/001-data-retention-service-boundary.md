@@ -1,18 +1,22 @@
 # Data Retention service boundary
 
-Data Retention owns retention policy vocabulary, scope resolution and policy
-persistence. Its contract is portable Zod 4 data and one abstract
-`DataRetentionService`. The server package keeps Prisma persistence private and
-exports only the Prisma composition adapter. Existing pinning, metering and
-retroactive ClickHouse work remain compatibility seams until they can be moved
-behind this service without duplicating lifecycle ownership.
+Data Retention owns the portable Zod 4 retention and trace-pin vocabulary,
+policy cascade, policy persistence, and pin lifecycle. The contract has one
+abstract `DataRetentionService`; the server keeps Prisma repositories and
+service implementations private and exposes only its composition adapter.
 
-The service throws for invalid or missing scope targets. The only nullable
-lookup is named `tryGetPolicyById`; repositories use the corresponding `try*`
-names. Project → team → organization resolution is most-specific-first and
-falls back to the platform default.
+Policy resolution is project → team → organization, most-specific-first, with
+an injected platform default. An injected 60-second cache is invalidated for
+every affected project after writes. Missing project/scope context preserves
+the legacy platform-default result for reads/previews; writes raise the
+portable `ScopeTargetNotFoundError`. Invalid values are rejected at the
+service boundary. The only nullable policy lookups are named `try*`.
 
-The retention repository owns only retention-policy rows. Scope lineage comes
-from the canonical `ProjectService` and `OrganizationService`; Data Retention
-does not read their tables. Boot validates and injects the platform default, so
-the portable contract never reads environment state during module import.
+Policy persistence is isolated to retention-policy rows; scope lineage is
+resolved through canonical project and organization collaborators. Pinning is
+an annotation capability: it never changes retention stamps or ClickHouse TTLs.
+Share owns the cross-feature rule that rejects manual unpinning while a link is
+active, then delegates the pin removal here. This keeps both services acyclic.
+
+Boot validates and injects the platform default, so the portable contract never
+reads environment state during module import.

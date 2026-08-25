@@ -16,6 +16,41 @@ export const retentionCategories = ["traces", "scenarios", "experiments"] as con
 export const retentionCategorySchema = z.enum(retentionCategories);
 export type RetentionCategory = z.infer<typeof retentionCategorySchema>;
 
+export const pinSources = ["manual", "share"] as const;
+export const pinSourceSchema = z.enum(pinSources);
+export type PinSource = z.infer<typeof pinSourceSchema>;
+
+export const pinnedTraceSchema = z
+  .object({
+    id: z.string().min(1),
+    projectId: z.string().min(1),
+    traceId: z.string().min(1),
+    userId: z.string().min(1).nullable(),
+    source: pinSourceSchema,
+    reason: z.string().nullable(),
+    createdAt: z.date(),
+  })
+  .strict();
+export type PinnedTrace = z.infer<typeof pinnedTraceSchema>;
+
+export const pinTraceInputSchema = z
+  .object({
+    projectId: z.string().min(1),
+    traceId: z.string().min(1),
+    userId: z.string().min(1).nullable().optional(),
+    reason: z.string().nullable().optional(),
+  })
+  .strict();
+export type PinTraceInput = z.infer<typeof pinTraceInputSchema>;
+
+export const unpinTraceInputSchema = z
+  .object({
+    projectId: z.string().min(1),
+    traceId: z.string().min(1),
+  })
+  .strict();
+export type UnpinTraceInput = z.infer<typeof unpinTraceInputSchema>;
+
 export const RETENTION_WEEK_DAYS = 7;
 export const MIN_RETENTION_DAYS = 35;
 export const ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS = 49;
@@ -130,8 +165,11 @@ export function resolveRetention(input: {
             row.category === category,
         ),
       )
-      .find((row) => row !== undefined);
-    if (match) resolved[category] = match.retentionDays;
+      .find((row) => row !== void 0);
+
+    if (match) {
+      resolved[category] = match.retentionDays;
+    }
   }
   return resolved;
 }

@@ -25,3 +25,13 @@ Feature: Data Retention service boundary
     When it composes the Data Retention service
     Then it injects the platform default explicitly
     And importing the contract does not read environment state
+
+  Scenario: Pinning a trace does not change retention
+    When a trace is pinned
+    Then a PinnedTrace annotation is persisted
+    And no ClickHouse retention command is issued
+
+  Scenario: Manual pins survive share removal
+    Given an auto-share pin was promoted to a manual pin
+    When the share is removed
+    Then the pin annotation remains

@@ -23,7 +23,6 @@
   "dependencies": {
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
-    "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*"
   },
   "devDependencies": {
