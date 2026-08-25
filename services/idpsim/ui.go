@@ -13,8 +13,24 @@ import (
 // that merely looks right.
 const verificationLabel = "_langwatch-verification"
 
-func verificationRecordName(domain string) string {
-	return verificationLabel + "." + normalizeDomain(domain)
+/**
+ * The record name and the bare domain, from whichever of the two was typed.
+ *
+ * LangWatch's panel shows the NAME — `_langwatch-verification.acme.test` —
+ * and a person filling this in copies that row. A registrar's own console
+ * usually wants the bare domain instead, which is what somebody who knows
+ * DNS will reach for. Both are the same record, so both are accepted rather
+ * than one of them being a mistake the form refuses to understand.
+ */
+func verificationTarget(typed string) (name, domain string) {
+	normalized := normalizeDomain(typed)
+	if normalized == "" {
+		return "", ""
+	}
+	if after, found := strings.CutPrefix(normalized, verificationLabel+"."); found {
+		return normalized, after
+	}
+	return verificationLabel + "." + normalized, normalized
 }
 
 // pageCSS is the whole stylesheet. idpsim serves its own pages from the
@@ -272,30 +288,46 @@ save, so the address has to be reachable from wherever the app is running.</p>
 
 <section class="panel">
 <h2>DNS registry</h2>
-<p class="hint">This machine's DNS, for domains that have none. A real verification asks
-the domain's registrar for a TXT record; nothing on the internet answers for a reserved
-name like <code>acme.test</code>, so this stands in for the registrar and answers
-{{if .DNSAddr}}on <code>{{.DNSAddr}}</code>{{else}}over UDP{{end}}. Publishing here is
-the same act as adding the record in Cloudflare or Route 53.</p>
-<p class="hint">LangWatch mints the value and shows it once. Paste it below and it is
-published on both channels at once — the TXT record <em>and</em> the well-known file —
-so whichever one the check asks for, it finds it.</p>
+<p class="hint">Paste the value LangWatch showed you and it is published where the
+check will look{{if .DNSAddr}} — this machine answers DNS on <code>{{.DNSAddr}}</code>{{end}}.</p>
+<details>
+  <summary class="hint">Why this exists, and what publishing actually does</summary>
+  <p class="hint">Proving a domain is the one step that happens somewhere else: you leave
+  LangWatch, sign in to whoever administers the domain, add a record, and come back.
+  A reserved name like <code>acme.test</code> has no registrar and nothing on the
+  internet answers for it, so this stands in — publishing here is the same act as
+  adding the record in Cloudflare or Route 53.</p>
+  <p class="hint">One press publishes both channels: the TXT record at
+  <code>_langwatch-verification.&lt;domain&gt;</code> <em>and</em> the same value as the
+  well-known file, so whichever one the check asks for, it finds it. The value is
+  LangWatch's — it mints it and shows it once — so this takes it rather than inventing
+  one, which would prove the domain against a token the product never issued.</p>
+</details>
+{{/* The fields are LangWatch's own, in LangWatch's order and under
+     LangWatch's words, because this form is filled in by copying that panel
+     row by row. Asking for a "domain" when the panel opposite says "name"
+     made the reader translate between two vocabularies for one string, and
+     the translation they reached for was pasting the name into the value. */}}
 <form method="post" action="{{.Tenant.BaseURL}}/dns">
-  <label>Domain
-    <input name="domain" placeholder="acme1.test" value="{{.Tenant.Domain}}" required>
+  <label>Name
+    <input name="domain" placeholder="_langwatch-verification.{{.Tenant.Domain}}" required>
   </label>
-  <label>Verification value
-    <input name="value" placeholder="the value LangWatch showed you" required autocomplete="off">
+  <label>Value
+    <input name="value" placeholder="the value LangWatch showed you once" required autocomplete="off">
   </label>
+  <p class="hint" style="margin-top:.6rem">Copy the two rows LangWatch shows under
+  <em>Publish this on {{.Tenant.Domain}}</em>. The type is always TXT, so there is no
+  field for it — and a bare domain works too, we add the label.</p>
   <p style="margin-top:1.1rem"><button class="primary" type="submit">Publish the record</button></p>
 </form>
 {{if .Records}}
 <table>
-<tr><th>TXT record</th><th>Value</th><th></th></tr>
+<tr><th>TXT record</th><th>Value</th><th>Answers</th><th></th></tr>
 {{range .Records}}
 <tr>
   <td class="mono">{{.Name}}</td>
   <td><span class="copy"><span class="val" title="{{.Value}}">{{.Value}}</span><button data-copy="{{.Value}}">copy</button></span></td>
+  <td>{{if .Verifies}}<span class="pill ok">a LangWatch check</span>{{else}}<span class="hint">nothing yet — seeded at the bare domain</span>{{end}}</td>
   <td><form method="post" action="{{$.Tenant.BaseURL}}/dns/delete" style="margin:0">
     <input type="hidden" name="name" value="{{.Name}}">
     <button type="submit">remove</button>
@@ -306,7 +338,7 @@ so whichever one the check asks for, it finds it.</p>
 <p class="hint">Removing a record is how you watch a proof lapse: the checker stops
 finding it, exactly as it would if somebody deleted it at the registrar.</p>
 {{else}}
-<p class="hint">Nothing is published yet.</p>
+<p class="hint">Nothing is published for <code>{{.Tenant.Domain}}</code> yet.</p>
 {{end}}
 </section>
 
@@ -414,17 +446,36 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 type publishedRecord struct {
 	Name  string
 	Value string
+	// Verifies is true when this record sits at the name a LangWatch check
+	// actually asks for. The seeded records do NOT: they sit at the bare
+	// domain, which no verifier queries, and a table that drew the two the
+	// same way told a reader their domain was already published when the
+	// check would find nothing.
+	Verifies bool
 }
 
-// publishedRecords lists what the registry is answering, name-ordered so the
-// table does not reshuffle itself between two loads of the same page.
-func (s *Server) publishedRecords() []publishedRecord {
+/**
+ * What the registry is answering FOR THIS TENANT.
+ *
+ * Scoped to the tenant's own domain because the store is machine-wide: three
+ * tenants' seeded records on one tenant's page are three rows of somebody
+ * else's business, and the reader has to work out which one is theirs before
+ * they can read the one that is.
+ *
+ * Name-ordered, so the table does not reshuffle between two loads.
+ */
+func (s *Server) publishedRecords(domain string) []publishedRecord {
 	txt, _ := s.verification.Snapshot()
+	zone := normalizeDomain(domain)
 	records := make([]publishedRecord, 0, len(txt))
 	for name, values := range txt {
+		if name != zone && !strings.HasSuffix(name, "."+zone) {
+			continue
+		}
 		records = append(records, publishedRecord{
-			Name:  name,
-			Value: strings.Join(values, " "),
+			Name:     name,
+			Value:    strings.Join(values, " "),
+			Verifies: strings.HasPrefix(name, verificationLabel+"."),
 		})
 	}
 	sort.Slice(records, func(i, j int) bool { return records[i].Name < records[j].Name })
@@ -451,19 +502,30 @@ func (s *Server) handlePublishVerification(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "unparseable form", http.StatusBadRequest)
 		return
 	}
-	domain := normalizeDomain(r.PostForm.Get("domain"))
+	name, domain := verificationTarget(r.PostForm.Get("domain"))
 	value := strings.TrimSpace(r.PostForm.Get("value"))
-	if domain == "" || value == "" {
+	if name == "" || value == "" {
 		s.refusalPage(w, t, refusalNotice{
 			Status: http.StatusBadRequest,
-			Title:  "A record needs a domain and a value",
+			Title:  "A record needs a name and a value",
 			Detail: "Publishing puts one value where a verifier will look for it, so it needs to know both.",
-			Hint:   "The value is the one LangWatch showed you when you asked to prove the domain — it is shown once.",
+			Hint:   "Both are on the LangWatch screen that asked you to prove the domain — the value is shown once, when it is issued.",
+		})
+		return
+	}
+	// The name and the value are different strings, and the one thing a
+	// reader can do by accident is paste the name into both — so say so,
+	// rather than publishing a record that proves itself.
+	if normalizeDomain(value) == name {
+		s.refusalPage(w, t, refusalNotice{
+			Status: http.StatusBadRequest,
+			Title:  "That is the record's name, not its value",
+			Detail: "The name says where the record goes; the value is the secret LangWatch minted to put there.",
+			Hint:   "On the LangWatch screen the value is the row under the name, shown once when the record is issued.",
 		})
 		return
 	}
 
-	name := verificationRecordName(domain)
 	s.verification.SetTXT(name, []string{value})
 	s.verification.SetToken(domain, value)
 	s.record(t, Event{
@@ -516,7 +578,7 @@ func (s *Server) handleTenantPage(w http.ResponseWriter, r *http.Request) {
 	data := map[string]any{
 		"Tenant": viewOf(t),
 		"Root":   s.cfg.BaseURL, "DNSAddr": s.DNSAddr(),
-		"Records": s.publishedRecords(),
+		"Records": s.publishedRecords(t.Domain),
 	}
 	// ?registered=<client id> is where the registration POST lands, so the
 	// credentials are shown once, at the top, right after they are minted.

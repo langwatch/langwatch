@@ -88,6 +88,45 @@ func TestDNSRegistryRefusesAnIncompleteRecord(t *testing.T) {
 }
 
 // @scenario "A domain proof can be published from the simulator's own page"
+func TestDNSRegistryTakesTheNameLangWatchShows(t *testing.T) {
+	s := newTestServer(t, 1)
+
+	// LangWatch's panel shows the NAME, and a person filling this in copies
+	// that row. Refusing it would make the form reject its own instructions.
+	t.Run("given the full record name is pasted", func(t *testing.T) {
+		res := publish(s, "_langwatch-verification.acme1.test", "lw-verify-xyz")
+		require.Equal(t, http.StatusSeeOther, res.StatusCode)
+
+		t.Run("does not label an already-labelled name twice", func(t *testing.T) {
+			_, doubled := s.verification.TXT(
+				"_langwatch-verification._langwatch-verification.acme1.test")
+			assert.False(t, doubled, "the label was applied to a name that had it")
+			values, ok := s.verification.TXT("_langwatch-verification.acme1.test")
+			require.True(t, ok)
+			assert.Equal(t, []string{"lw-verify-xyz"}, values)
+		})
+
+		t.Run("still serves the well-known token at the bare domain", func(t *testing.T) {
+			token, ok := s.verification.Token("acme1.test")
+			require.True(t, ok, "the label was not stripped for the token")
+			assert.Equal(t, "lw-verify-xyz", token)
+		})
+	})
+
+	// The one thing a reader can do by accident, having two similar strings
+	// in front of them, is paste the same one into both boxes.
+	t.Run("given the name is pasted into the value as well", func(t *testing.T) {
+		res := publish(s, "acme2.test", "_langwatch-verification.acme2.test")
+
+		t.Run("says which of the two it is rather than publishing it", func(t *testing.T) {
+			assert.Equal(t, http.StatusBadRequest, res.StatusCode)
+			_, ok := s.verification.TXT("_langwatch-verification.acme2.test")
+			assert.False(t, ok, "a record that proves itself was published")
+		})
+	})
+}
+
+// @scenario "A domain proof can be published from the simulator's own page"
 func TestDNSRegistryNormalizesTheDomain(t *testing.T) {
 	s := newTestServer(t, 1)
 
