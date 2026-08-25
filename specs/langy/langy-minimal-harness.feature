@@ -40,6 +40,17 @@ Feature: Langy minimal harness
     When the prompt asset is checked
     Then its size is under the enforced byte ceiling
 
+  # The prompt used to name the worker's own endpoint as an EXAMPLE of an
+  # address never to give the user, and the manager fills that placeholder in
+  # per worker at spawn. So the one paragraph forbidding internal addresses
+  # arrived carrying a real one, in the reply the user reads. The rule stays,
+  # the example goes.
+  @unit
+  Scenario: The system prompt names no address the user cannot reach
+    When the prompt asset is checked
+    Then it names no host that only the worker can reach
+    And it names no environment variable standing in for one
+
   @unit
   Scenario: Every skill the prompt routes to is one the worker has
     Given the skills named in the prompt's routing table
