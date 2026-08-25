@@ -465,7 +465,7 @@ describe("InviteService.createInvites", () => {
   });
 
   describe("when revoking an invite by id", () => {
-    it("deletes a pending invite and answers not found for an unknown id", async () => {
+    it("keeps the row as a visible REVOKED state and answers not found for an unknown id", async () => {
       const created = await service.createInvites({
         organizationId,
         invites: [
@@ -481,10 +481,13 @@ describe("InviteService.createInvites", () => {
 
       await service.revokeInvite({ organizationId, inviteId });
 
+      // D11: revocation is a state the row keeps, not a deletion — the
+      // members page shows it, and a revoked row can never be claimed.
       const remaining = await prisma.organizationInvite.findMany({
         where: { organizationId },
       });
-      expect(remaining).toHaveLength(0);
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0]!.status).toBe("REVOKED");
 
       await expect(
         service.revokeInvite({ organizationId, inviteId }),

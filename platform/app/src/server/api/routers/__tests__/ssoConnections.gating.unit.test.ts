@@ -36,9 +36,10 @@ const { mockService, mockAuditLog, mockSsoConnections } = vi.hoisted(() => ({
 vi.mock(
   "~/server/app-layer/identity/sso-connection-backoffice.service",
   async (importOriginal) => {
-    const actual = await importOriginal<
-      typeof import("~/server/app-layer/identity/sso-connection-backoffice.service")
-    >();
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/identity/sso-connection-backoffice.service")
+      >();
     return {
       ...actual,
       SsoConnectionBackofficeService: class {
@@ -124,7 +125,11 @@ describe("the back-office single sign-on surface", () => {
         .attestDomain({ ...TARGET, domain: "acme.com" })
         .catch(
           (error: unknown) =>
-            error as { code: string; message: string; cause?: { code: string } },
+            error as {
+              code: string;
+              message: string;
+              cause?: { code: string };
+            },
         );
       expect(denial.code).toBe("NOT_FOUND");
       expect(denial.cause?.code).toBe("not_found");

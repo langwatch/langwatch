@@ -781,8 +781,8 @@ describe("Feature: Organization members and invites REST API", () => {
       ).toBe(0);
     });
 
-    /** @scenario Revoking a pending invite deletes it */
-    it("revokes an invite, removes it from the list, and 404s a second revoke", async () => {
+    /** @scenario Revoking a pending invite keeps it as a visible revoked state */
+    it("revokes an invite, shows it as revoked in the list, and 404s a second revoke", async () => {
       const email = `invitee-revoke-${ns}@example.com`;
       const create = await app.request("/api/organization/invites", {
         method: "POST",
@@ -806,14 +806,14 @@ describe("Feature: Organization members and invites REST API", () => {
       );
       expect(revoke.status).toBe(200);
 
+      // D11: revocation is a state the list shows, not a deletion.
       const list = await app.request("/api/organization/invites", {
         headers: authHeaders(),
       });
-      expect(
-        (await list.json()).invites.find(
-          (entry: { id: string }) => entry.id === inviteId,
-        ),
-      ).toBeUndefined();
+      const revoked = (await list.json()).invites.find(
+        (entry: { id: string }) => entry.id === inviteId,
+      );
+      expect(revoked?.status).toBe("REVOKED");
 
       const again = await app.request(`/api/organization/invites/${inviteId}`, {
         method: "DELETE",

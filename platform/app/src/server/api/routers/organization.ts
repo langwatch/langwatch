@@ -29,12 +29,10 @@ import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
 import { decrypt } from "~/utils/encryption";
 import {
   isTeamRoleAllowedForOrganizationRole,
-  ORGANIZATION_TO_TEAM_ROLE_MAP,
   type TeamRoleValue,
 } from "~/utils/memberRoleConstraints";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
-  DuplicateInviteError,
   INVITE_ALREADY_ACCEPTED_MESSAGE,
   INVITE_NOT_READY_MESSAGE,
   InviteExpiredError,

@@ -150,9 +150,9 @@ Feature: Organization members and invites REST API
     And no invite is created
 
   @integration
-  Scenario: Revoking a pending invite deletes it
+  Scenario: Revoking a pending invite keeps it as a visible revoked state
     Given the organization has a pending invite
     When I revoke that invite
     Then the response status is 200
-    And it no longer appears in the invite list
+    And the invite list shows it as revoked
     And revoking it again is refused with code invite_not_found and status 404

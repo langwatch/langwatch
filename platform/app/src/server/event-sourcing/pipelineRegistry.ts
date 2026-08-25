@@ -19,9 +19,9 @@ import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/
 import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/webhookDelivery.process";
 import type {
   IdentityHeadsRepository,
-  ScimSyncReadRepository,
   JoinRequestReadRepository,
   MfaEnrollmentRepository,
+  ScimSyncReadRepository,
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
@@ -29,9 +29,9 @@ import type {
 } from "@langwatch/identity-server";
 import {
   IdentityGuards,
-  ScimSyncGuards,
   JoinRequestGuards,
   MfaGuards,
+  ScimSyncGuards,
   SsoConnectionGuards,
 } from "@langwatch/identity-server";
 import type {
@@ -168,6 +168,9 @@ import { createGovernanceEventsPipeline } from "./pipelines/governance-events/pi
 import { createIdentityPipeline } from "./pipelines/identity/pipeline";
 import type { IdentityFoldState } from "./pipelines/identity/projections/identityState.foldProjection";
 import type { MfaFoldState } from "./pipelines/identity/projections/mfaEnrollmentState.foldProjection";
+import { createJoinRequestPipeline } from "./pipelines/join-requests/pipeline";
+import type { JoinRequestLifecyclePort } from "./pipelines/join-requests/process-manager/joinRequestLifecycle.process";
+import type { JoinRequestFoldState } from "./pipelines/join-requests/projections/joinRequestState.foldProjection";
 import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
 import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
 import { createLangyMaintenancePipeline } from "./pipelines/langy-maintenance/pipeline";
@@ -182,6 +185,8 @@ import {
   MetricTimeRollupAppendStore,
 } from "./pipelines/metric-processing/projections/stores";
 import { createProcessManagerMaintenancePipeline } from "./pipelines/process-manager-maintenance/pipeline";
+import { createScimSyncPipeline } from "./pipelines/scim-sync/pipeline";
+import type { ScimSyncFoldState } from "./pipelines/scim-sync/projections/scimSyncState.foldProjection";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
@@ -195,12 +200,7 @@ import type { SimulationRunStateRepository } from "./pipelines/simulation-proces
 import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
 import type { SimulationProcessingEvent } from "./pipelines/simulation-processing/schemas/events";
-import { createScimSyncPipeline } from "./pipelines/scim-sync/pipeline";
-import type { ScimSyncFoldState } from "./pipelines/scim-sync/projections/scimSyncState.foldProjection";
-import { createJoinRequestPipeline } from "./pipelines/join-requests/pipeline";
 import { createSsoConnectionPipeline } from "./pipelines/sso-connections/pipeline";
-import type { JoinRequestLifecyclePort } from "./pipelines/join-requests/process-manager/joinRequestLifecycle.process";
-import type { JoinRequestFoldState } from "./pipelines/join-requests/projections/joinRequestState.foldProjection";
 import type { ConnectionTeardownPort } from "./pipelines/sso-connections/process-manager/connectionTeardown.process";
 import type { SsoConnectionFoldState } from "./pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
@@ -766,7 +766,8 @@ export class PipelineRegistry {
     // own, and rollback is the flag.
     this.deps.eventSourcing.register(
       createJoinRequestPipeline({
-        joinRequestProjectionStore: this.deps.repositories.joinRequestProjection,
+        joinRequestProjectionStore:
+          this.deps.repositories.joinRequestProjection,
         joinRequestGuards: new JoinRequestGuards({
           requests: this.deps.repositories.joinRequestReads,
         }),

@@ -129,6 +129,9 @@ describe("identifier write gate", () => {
         }),
         upsertRecord: vi.fn(async () => undefined),
         upsertRecordUnlessRolledBack: vi.fn(async () => true),
+        // Open the anyone-gate so the failure under test — the per-user read
+        // throwing — is actually reached.
+        hasFinalizedTenant: vi.fn(async () => true),
       };
       await expect(
         isUserOnIdentityWrites({ userId: USER, state }),

@@ -676,65 +676,6 @@ describe("enterprise feature guards", () => {
     });
   });
 
-  // --- createInviteRequest conditional guard ---
-
-  describe("organization.createInviteRequest", () => {
-    describe("when invites include custom role on non-enterprise plan", () => {
-      /** @scenario Non-enterprise org cannot create invite requests with custom roles */
-      it("rejects with FORBIDDEN", async () => {
-        mockGetActivePlan.mockResolvedValue(freePlan);
-        const caller = createCaller();
-
-        await expect(
-          caller.organization.createInviteRequest({
-            organizationId,
-            invites: [
-              {
-                email: `invite-req-${nanoid(4)}@example.com`,
-                role: "MEMBER",
-                teams: [
-                  {
-                    teamId,
-                    role: `custom:${customRoleId}`,
-                    customRoleId,
-                  },
-                ],
-              },
-            ],
-          }),
-        ).rejects.toMatchObject({
-          code: "FORBIDDEN",
-          message: ENTERPRISE_FEATURE_ERRORS.RBAC,
-        });
-      });
-    });
-
-    describe("when invites use only built-in roles on non-enterprise plan", () => {
-      it("allows creation", async () => {
-        mockGetActivePlan.mockResolvedValue(freePlan);
-        const caller = createCaller();
-
-        const result = await caller.organization.createInviteRequest({
-          organizationId,
-          invites: [
-            {
-              email: `invite-req-builtin-${nanoid(4)}@example.com`,
-              role: "MEMBER",
-              teams: [
-                {
-                  teamId,
-                  role: TeamUserRole.MEMBER,
-                },
-              ],
-            },
-          ],
-        });
-
-        expect(result).toBeDefined();
-      });
-    });
-  });
-
   // --- Fail closed behavior ---
 
   describe("when plan provider fails", () => {

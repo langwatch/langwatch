@@ -104,7 +104,7 @@ function foldInto(store: InMemoryStateStore, events: IdentityEvent[]): void {
     occurredAt: events[events.length - 1]?.occurredAt ?? T0,
     createdAt: previous?.createdAt ?? T0,
     updatedAt: T0,
-    version: 1,
+    version: "1",
   });
 }
 

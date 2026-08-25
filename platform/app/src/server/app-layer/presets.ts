@@ -230,11 +230,11 @@ import {
 import { AdminEmailPlatformOperators } from "./identity/platform-operators";
 import { PrismaIdentityHeadsRepository } from "./identity/repositories/identity-heads.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./identity/repositories/identity-projection.prisma.repository";
-import { PrismaScimSyncProjectionRepository } from "./identity/repositories/scim-sync-projection.prisma.repository";
 import { PrismaJoinRequestReadRepository } from "./identity/repositories/join-request.prisma.repository";
 import { PrismaJoinRequestProjectionRepository } from "./identity/repositories/join-request-projection.prisma.repository";
 import { PrismaMfaEnrollmentRepository } from "./identity/repositories/mfa-enrollment.prisma.repository";
 import { PrismaMfaEnrollmentProjectionRepository } from "./identity/repositories/mfa-enrollment-projection.prisma.repository";
+import { PrismaScimSyncProjectionRepository } from "./identity/repositories/scim-sync-projection.prisma.repository";
 import { PrismaSsoConnectionProjectionRepository } from "./identity/repositories/sso-connection-projection.prisma.repository";
 import {
   PrismaSsoConnectionReadRepository,
