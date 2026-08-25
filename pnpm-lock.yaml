@@ -1454,6 +1454,9 @@ importers:
       '@langwatch/automation-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../observability
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract

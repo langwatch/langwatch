@@ -25,7 +25,12 @@ Graph-trigger evaluation, heartbeat candidate selection, and runaway containment
 are operations on the same concrete `AutomationService`. Construction receives
 canonical Analytics/Project services plus explicit notifier, ClickHouse,
 provider, claim, and telemetry ports; Eventing supplies only trigger id/reason
-and heartbeat time.
+and heartbeat time. The server package also owns the shared per-trigger hourly
+and per-project daily email-cap policy, with its Redis connection passed
+explicitly and a documented per-worker in-memory fallback. `AutomationEmailCapService`
+is separate because its lifetime follows the process-owned Redis connection and
+fallback counters, rather than the persisted trigger service. It is composed
+once and shared by both dispatch paths; callers cannot select its store.
 Graph incident persistence is a private Automation repository.
 
 ## Context
@@ -81,7 +86,9 @@ Runaway containment preserves the existing UTC-day cap, 60-second evaluation
 and pause claims, 90%/100-trace misconfiguration threshold, suppression-aware
 recipient selection, and failure containment. The app supplies Redis,
 ClickHouse, Prisma, mail, and metrics capabilities without moving those
-process-specific dependencies into the feature.
+process-specific dependencies into the feature. Email delivery caps preserve
+their idempotency keys across outbox retries, so a retry re-reads a cap instead
+of consuming another slot.
 
 The graph evaluator preserves row-ceiling isolation, threshold/no-data
 semantics, source-aware heartbeat batching, open-incident claiming,

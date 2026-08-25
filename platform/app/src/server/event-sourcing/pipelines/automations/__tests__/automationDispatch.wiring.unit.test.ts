@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { AutomationEmailCapService } from "@langwatch/automation-server";
 import { buildAutomationDispatchPorts } from "../automationDispatch.wiring";
 
 const {
@@ -37,11 +38,6 @@ vi.mock("~/server/api/utils", () => ({
   getProtectionsForProject: vi.fn().mockResolvedValue({}),
 }));
 
-vi.mock("~/server/app-layer/automations/dispatch/emailCaps", () => ({
-  consumeEmailCapSlot: vi.fn().mockResolvedValue({ allowed: true, count: 1 }),
-  consumeTenantEmailCapSlot: vi.fn().mockResolvedValue({ allowed: true, count: 1 }),
-}));
-
 describe("automation dispatch wiring smoke", () => {
   describe("when the composition root builds worker ports", () => {
     it("connects settlement delivery and graph-sweep entry points", async () => {
@@ -58,8 +54,11 @@ describe("automation dispatch wiring smoke", () => {
       const ports = buildAutomationDispatchPorts({
         prisma: prisma as never,
         redis: null,
+        emailCaps: AutomationEmailCapService.create({ store: null }),
         automation: {
           ...triggers,
+          evaluateGraphTrigger: evaluateGraphTriggerMock,
+          decideGraphTriggerHeartbeat: decideGraphTriggerHeartbeatMock,
           filterSuppressed: filterSuppressedMock,
           recordWebhookDelivery: vi.fn().mockResolvedValue(undefined),
           pruneWebhookDeliveries: pruneExpiredMock,
@@ -103,22 +102,15 @@ describe("automation dispatch wiring smoke", () => {
         projectId: "project-1",
         reason: "heartbeat-absence",
       });
-      expect(evaluateGraphTriggerMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          triggerId: "trigger-1",
-          projectId: "project-1",
-          reason: "heartbeat-absence",
-          deps: expect.any(Object),
-        }),
-      );
+      expect(evaluateGraphTriggerMock).toHaveBeenCalledWith({
+        triggerId: "trigger-1",
+        projectId: "project-1",
+        reason: "heartbeat-absence",
+      });
 
       const now = new Date("2026-07-18T12:00:00.000Z");
       await ports.decideSweepCandidates({ now });
-      expect(decideGraphTriggerHeartbeatMock).toHaveBeenCalledWith({
-        deps: { deps: true },
-        sources: { sources: true },
-        now,
-      });
+      expect(decideGraphTriggerHeartbeatMock).toHaveBeenCalledWith({ now });
 
       await expect(ports.pruneWebhookDeliveries()).resolves.toBe(7);
       expect(pruneExpiredMock).toHaveBeenCalledTimes(1);

@@ -52,6 +52,7 @@ import { AppApiKeyDiagnostics, AppApiKeyRuntime } from "~/runtime/app/features/a
 import {
   AppAutomationClock,
   AppAutomationRuntime,
+  createAppAutomationEmailCaps,
 } from "~/runtime/app/features/automation";
 import { AppGovernanceRuntime } from "~/runtime/app/features/governance";
 import { AgentsFeature } from "~/runtime/app/features/agents";
@@ -992,9 +993,11 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     database: prisma,
     clock: automationClock,
   });
+  const automationEmailCaps = createAppAutomationEmailCaps(redis);
   const graphPorts = createAutomationGraphPorts({
     database: prisma,
     redis: redis ?? null,
+    emailCaps: automationEmailCaps,
     delivery: automationDelivery,
     projects,
     analytics: analyticsService,
@@ -1343,6 +1346,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     prisma,
     redis: redis ?? null,
     automation,
+    emailCaps: automationEmailCaps,
     projects,
     evaluations: evaluationService,
     traces: { spans: spanStorage },

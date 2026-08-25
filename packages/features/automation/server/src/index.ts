@@ -1,6 +1,12 @@
 export { PostgresAutomationAdapter } from "./adapters/postgres.automation.adapter";
 export { PostgresAutomationGraphDeliveryAdapter } from "./adapters/postgres.automation-graph-delivery.adapter";
 export {
+  AutomationEmailCapService,
+  type ConsumeDailyEmailCapInput,
+  type ConsumeHourlyEmailCapInput,
+} from "./services/email-cap.service";
+export { AutomationEmailCapStorePort } from "./ports/email-cap.port";
+export {
   AutomationGraphNotifierPort,
   AutomationGraphTelemetryPort,
   AutomationHeartbeatPort,

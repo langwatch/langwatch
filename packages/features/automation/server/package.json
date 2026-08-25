@@ -25,6 +25,7 @@
   "dependencies": {
     "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "croner": "^10.0.1"
   },

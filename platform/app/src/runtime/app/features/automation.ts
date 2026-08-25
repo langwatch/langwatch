@@ -1,6 +1,8 @@
 import type { AutomationService } from "@langwatch/automation-contract";
 import {
   AutomationClock,
+  AutomationEmailCapService,
+  AutomationEmailCapStorePort,
   PostgresAutomationAdapter,
   SchedulerWake,
   UnsubscribeTokenVerifier,
@@ -14,6 +16,45 @@ import { verifyUnsubscribeToken } from "~/server/mailer/unsubscribeToken";
 import type { AppAutomationGraphPorts } from "./automation-graph-ports";
 
 type SchedulerRedis = Redis | Cluster | null | undefined;
+
+class AppAutomationEmailCapStore extends AutomationEmailCapStorePort {
+  constructor(private readonly connection: Redis | Cluster) {
+    super();
+  }
+
+  trySet(
+    key: string,
+    value: string,
+    expiry: "EX",
+    seconds: number,
+    condition: "NX",
+  ): Promise<string | null> {
+    return this.connection.set(key, value, expiry, seconds, condition);
+  }
+
+  tryGet(key: string): Promise<string | null> {
+    return this.connection.get(key);
+  }
+
+  incr(key: string): Promise<number> {
+    return this.connection.incr(key);
+  }
+
+  incrby(key: string, increment: number): Promise<number> {
+    return this.connection.incrby(key, increment);
+  }
+
+  eval(script: string, keyCount: number, key: string, seconds: string): Promise<unknown> {
+    return this.connection.eval(script, keyCount, key, seconds);
+  }
+}
+
+export function createAppAutomationEmailCaps(
+  redis: SchedulerRedis,
+): AutomationEmailCapService {
+  const store = redis ? new AppAutomationEmailCapStore(redis) : null;
+  return AutomationEmailCapService.create({ store });
+}
 
 export class AppAutomationClock extends AutomationClock {
   now(): Date {

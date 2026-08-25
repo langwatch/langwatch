@@ -643,11 +643,6 @@
     },
     {
       "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/dispatch/emailCaps.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
       "file": "platform/app/src/server/app-layer/automations/dispatch/graphAlertActionDispatch.ts",
       "kind": "legacy-implementation"
     },

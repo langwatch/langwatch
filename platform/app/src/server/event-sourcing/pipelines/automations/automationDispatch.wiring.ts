@@ -8,10 +8,7 @@ import type { DatasetService } from "@langwatch/dataset-contract";
 import type { AnnotationService } from "@langwatch/annotation-contract";
 import { getProtectionsForProject } from "~/server/api/utils";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
-import {
-  consumeEmailCapSlot,
-  consumeTenantEmailCapSlot,
-} from "~/server/app-layer/automations/dispatch/emailCaps";
+import type { AutomationEmailCapService } from "@langwatch/automation-server";
 import {
   consumePersistCapSlot,
   resolvePersistDailyCap,
@@ -56,6 +53,7 @@ export function buildAutomationDispatchPorts({
   prisma,
   redis,
   automation,
+  emailCaps,
   projects,
   evaluations,
   traces,
@@ -63,10 +61,12 @@ export function buildAutomationDispatchPorts({
   analytics: _analytics,
   resolveClickHouseClient: _resolveClickHouseClient,
   dataset,
+  annotations,
 }: {
   prisma: PrismaClient;
   redis: Redis | Cluster | null;
   automation: AutomationService;
+  emailCaps: AutomationEmailCapService;
   projects: ProjectService;
   evaluations: EvaluationService;
   traces: { spans: SpanStorageService };
@@ -149,23 +149,21 @@ export function buildAutomationDispatchPorts({
     deriveEvents: (params) => traceReadDerivation.deriveEvents(params),
     emailHourlyCap: env.TRIGGER_EMAIL_HOURLY_CAP,
     consumeEmailCapSlot: ({ projectId, triggerId, now, dedupKey }) =>
-      consumeEmailCapSlot({
+      emailCaps.consumeHourly({
         projectId,
         triggerId,
         now,
         cap: env.TRIGGER_EMAIL_HOURLY_CAP,
         dedupKey,
-        redis,
       }),
     tenantDailyCap: env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
     consumeTenantEmailCapSlot: ({ projectId, now, cap, recipientCount, dedupKey }) =>
-      consumeTenantEmailCapSlot({
+      emailCaps.consumeDaily({
         projectId,
         now,
         cap,
         recipientCount,
         dedupKey,
-        redis,
       }),
     filterSuppressedEmails: ({ projectId, triggerId, emails }) =>
       automation.filterSuppressed({ projectId, triggerId, emails }),

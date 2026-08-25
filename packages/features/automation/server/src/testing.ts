@@ -1,5 +1,6 @@
 import {
   AutomationDispatchErrorPort,
+  AutomationEmailCapService,
   AutomationGraphNotifierPort,
   AutomationGraphTelemetryPort,
   AutomationHeartbeatPort,
@@ -70,6 +71,7 @@ class TestRunaway extends AutomationRunawayPort {
  * exercise analytics/provider delivery. */
 export function createAutomationTestRuntime() {
   return {
+    emailCaps: AutomationEmailCapService.create({ store: null }),
     projects: {} as never,
     analytics: {} as never,
     notifier: new TestNotifier(),

@@ -16,6 +16,12 @@ Feature: Automation ownership
     When recipients are filtered for a trigger in that project
     Then the suppressed address is removed regardless of casing
 
+  Scenario: Email delivery caps are idempotent across retries
+    Given a logical automation email dispatch has consumed a cap slot
+    When its outbox delivery retries with the same deduplication key
+    Then Automation re-reads the cap without consuming another slot
+    And the per-project daily cap counts recipients rather than dispatches
+
   Scenario: Missing report schedules are repaired without resuming paused reports
     Given an active report trigger without a scheduler row
     And another report trigger with a paused scheduler row

@@ -1,20 +1,48 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  _resetMemoryEmailCapStore,
-  consumeEmailCapSlot,
-  consumeTenantEmailCapSlot,
-} from "../emailCaps";
+  AutomationEmailCapService,
+  type ConsumeDailyEmailCapInput,
+  type ConsumeHourlyEmailCapInput,
+} from "../src/services/email-cap.service";
+import type { AutomationEmailCapStorePort } from "../src/ports/email-cap.port";
 
-// The cap functions read their connection off the App when the caller does not
-// pass one. Mocking `getApp` to read a mutable holder lets each test drive the
-// path it wants (undefined = in-memory, an object = Redis).
+// The package accepts the infrastructure connection explicitly. This holder
+// keeps the test's Redis-vs-memory choice local without a process-global App.
 const redisMock = vi.hoisted(() => ({
-  connection: undefined as unknown,
+  connection: undefined as AutomationEmailCapStorePort | undefined,
 }));
-vi.mock("~/server/app-layer/app", () => ({
-  getApp: () => ({ redis: redisMock.connection ?? null }),
-  tryGetApp: () => ({ redis: redisMock.connection ?? null }),
-}));
+
+function makeStore(
+  overrides: Partial<AutomationEmailCapStorePort>,
+): AutomationEmailCapStorePort {
+  return {
+    trySet: vi.fn().mockResolvedValue("OK"),
+    tryGet: vi.fn().mockResolvedValue(null),
+    incr: vi.fn().mockResolvedValue(1),
+    incrby: vi.fn().mockResolvedValue(1),
+    eval: vi.fn().mockResolvedValue(null),
+    ...overrides,
+  };
+}
+
+let service = AutomationEmailCapService.create({ store: null });
+let serviceStore: AutomationEmailCapStorePort | null = null;
+
+function emailCapService(): AutomationEmailCapService {
+  const store = redisMock.connection ?? null;
+  if (store !== serviceStore) {
+    service = AutomationEmailCapService.create({ store });
+    serviceStore = store;
+  }
+
+  return service;
+}
+
+const consumeEmailCapSlot = (input: ConsumeHourlyEmailCapInput) =>
+  emailCapService().consumeHourly(input);
+
+const consumeTenantEmailCapSlot = (input: ConsumeDailyEmailCapInput) =>
+  emailCapService().consumeDaily(input);
 
 // Stable singleton logger so a test can spy the SAME `error` fn the module
 // captured at import time (`const logger = createLogger(...)` runs once).
@@ -34,11 +62,13 @@ vi.mock("@langwatch/observability", () => ({
 const PROJECT_ID = "proj-1";
 const TRIGGER_ID = "trig-1";
 
-describe("consumeEmailCapSlot in-memory fallback", () => {
-  beforeEach(() => {
-    _resetMemoryEmailCapStore();
-  });
+beforeEach(() => {
+  redisMock.connection = undefined;
+  serviceStore = null;
+  service = AutomationEmailCapService.create({ store: null });
+});
 
+describe("consumeEmailCapSlot in-memory fallback", () => {
   describe("given Redis is connected but errors mid-call", () => {
     afterEach(() => {
       redisMock.connection = undefined;
@@ -46,12 +76,12 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
 
     describe("when incr throws", () => {
       it("falls back to the in-memory counter and still returns a sane slot", async () => {
-        redisMock.connection = {
-          set: vi.fn().mockResolvedValue("OK"),
-          get: vi.fn(),
+        redisMock.connection = makeStore({
+          trySet: vi.fn().mockResolvedValue("OK"),
+          tryGet: vi.fn(),
           incr: vi.fn().mockRejectedValue(new Error("READONLY blip")),
           eval: vi.fn(),
-        };
+        });
 
         const now = new Date("2026-06-11T10:15:00Z");
         const result = await consumeEmailCapSlot({
@@ -74,12 +104,12 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
         // counter and lands in the in-memory fallback. A unique dedupKey per
         // call ensures each fallback consumption wins its claim (no retry
         // collapse) — we are proving the counter accumulates, not the claim.
-        redisMock.connection = {
-          set: vi.fn().mockRejectedValue(new Error("connection refused")),
-          get: vi.fn().mockRejectedValue(new Error("connection refused")),
+        redisMock.connection = makeStore({
+          trySet: vi.fn().mockRejectedValue(new Error("connection refused")),
+          tryGet: vi.fn().mockRejectedValue(new Error("connection refused")),
           incr: vi.fn().mockRejectedValue(new Error("connection refused")),
           eval: vi.fn().mockRejectedValue(new Error("connection refused")),
-        };
+        });
 
         const now = new Date("2026-06-11T10:15:00Z");
         const cap = 3;
@@ -115,13 +145,13 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
       it("re-attempts the TTL on every hit, through one single-key script", async () => {
         const evalFn = vi.fn().mockResolvedValue(null);
         let counter = 0;
-        redisMock.connection = {
+        redisMock.connection = makeStore({
           // Distinct dedupKeys → both claims win → both reach INCR + expire.
-          set: vi.fn().mockResolvedValue("OK"),
-          get: vi.fn().mockResolvedValue(null),
+          trySet: vi.fn().mockResolvedValue("OK"),
+          tryGet: vi.fn().mockResolvedValue(null),
           incr: vi.fn().mockImplementation(async () => ++counter),
           eval: evalFn,
-        };
+        });
 
         const now = new Date("2026-06-11T10:15:00Z");
         await consumeEmailCapSlot({
@@ -162,12 +192,12 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
         // SET NX: first call wins ("OK"), retry loses (null). The retry must
         // GET the current count instead of INCR-ing it again.
         const set = vi.fn().mockResolvedValueOnce("OK").mockResolvedValueOnce(null);
-        redisMock.connection = {
-          set,
-          get: vi.fn().mockResolvedValue("1"),
+        redisMock.connection = makeStore({
+          trySet: set,
+          tryGet: vi.fn().mockResolvedValue("1"),
           incr,
           eval: vi.fn().mockResolvedValue(null),
-        };
+        });
 
         const now = new Date("2026-06-11T10:15:00Z");
         const args = {
@@ -351,10 +381,6 @@ describe("consumeEmailCapSlot in-memory fallback", () => {
 // advances by recipientCount (INCRBY). Same claim-gate idempotency + in-memory
 // fallback as the hourly cap, but degradation logs at WARN not ERROR.
 describe("consumeTenantEmailCapSlot in-memory fallback", () => {
-  beforeEach(() => {
-    _resetMemoryEmailCapStore();
-  });
-
   describe("given a fresh day bucket", () => {
     describe("when dispatches accumulate recipients up to the cap then over it", () => {
       it("allows the dispatch that lands at the cap and drops the one that exceeds it", async () => {
@@ -450,13 +476,13 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
     describe("when a dispatch wins its claim", () => {
       it("advances the counter via INCRBY recipientCount, not a plain INCR", async () => {
         const incrby = vi.fn().mockResolvedValue(8);
-        redisMock.connection = {
-          set: vi.fn().mockResolvedValue("OK"),
-          get: vi.fn().mockResolvedValue(null),
+        redisMock.connection = makeStore({
+          trySet: vi.fn().mockResolvedValue("OK"),
+          tryGet: vi.fn().mockResolvedValue(null),
           incr: vi.fn(),
           incrby,
           eval: vi.fn().mockResolvedValue(null),
-        };
+        });
 
         const now = new Date("2026-06-11T10:15:00Z");
         const result = await consumeTenantEmailCapSlot({
@@ -473,19 +499,39 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
         expect(incrby.mock.calls[0]![1]).toBe(8);
         expect(result).toEqual({ allowed: true, count: 8 });
       });
+
+      it("keeps INCRBY when the dispatch has one recipient", async () => {
+        const incr = vi.fn().mockResolvedValue(1);
+        const incrby = vi.fn().mockResolvedValue(1);
+        redisMock.connection = makeStore({ incr, incrby });
+
+        await consumeTenantEmailCapSlot({
+          projectId: PROJECT_ID,
+          now: new Date("2026-06-11T10:15:00Z"),
+          cap: 100,
+          recipientCount: 1,
+          dedupKey: "proj-1:tenant:single-recipient",
+        });
+
+        expect(incr).not.toHaveBeenCalled();
+        expect(incrby).toHaveBeenCalledWith(
+          expect.stringMatching(/^trigger-email-tenant-cap:/),
+          1,
+        );
+      });
     });
 
     describe("when the SAME dispatch is retried (claim already won)", () => {
       it("re-reads the counter via GET without a second INCRBY", async () => {
         const incrby = vi.fn().mockResolvedValue(4);
         const set = vi.fn().mockResolvedValueOnce("OK").mockResolvedValueOnce(null);
-        redisMock.connection = {
-          set,
-          get: vi.fn().mockResolvedValue("4"),
+        redisMock.connection = makeStore({
+          trySet: set,
+          tryGet: vi.fn().mockResolvedValue("4"),
           incr: vi.fn(),
           incrby,
           eval: vi.fn().mockResolvedValue(null),
-        };
+        });
 
         const now = new Date("2026-06-11T10:15:00Z");
         const args = {
@@ -514,13 +560,13 @@ describe("consumeTenantEmailCapSlot in-memory fallback", () => {
       it("accumulates in the in-memory counter and logs the degradation at WARN", async () => {
         loggerMock.warn.mockClear();
         loggerMock.error.mockClear();
-        redisMock.connection = {
-          set: vi.fn().mockRejectedValue(new Error("connection refused")),
-          get: vi.fn().mockRejectedValue(new Error("connection refused")),
+        redisMock.connection = makeStore({
+          trySet: vi.fn().mockRejectedValue(new Error("connection refused")),
+          tryGet: vi.fn().mockRejectedValue(new Error("connection refused")),
           incr: vi.fn(),
           incrby: vi.fn().mockRejectedValue(new Error("connection refused")),
           eval: vi.fn().mockRejectedValue(new Error("connection refused")),
-        };
+        });
 
         const now = new Date("2026-06-11T10:15:00Z");
         const first = await consumeTenantEmailCapSlot({

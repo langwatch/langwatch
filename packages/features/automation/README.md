@@ -7,7 +7,8 @@ history, report schedules, delivery policy, and project email suppression.
   templating, report and graph-alert policy, and the abstract `AutomationService`.
 - `server/` owns the concrete service, private repositories, schedule ports,
   and webhook delivery records. It also owns the reusable persist-cap runaway
-  containment policy; the host injects claims, ClickHouse counting,
+  containment policy and retry-idempotent hourly/daily email caps; the host
+  injects Redis, claims, ClickHouse counting,
   notifications, and telemetry at the app boundary.
 - The concrete service also owns graph-trigger evaluation and heartbeat
   candidate decisions. It receives analytics, ClickHouse, provider, and source
@@ -29,9 +30,12 @@ The application retains transport and composition code where it requires
 Prisma, tRPC, page/routing composition, mail/Slack credentials, or Eventing
 wiring: `platform/app/src/features/automations/`,
 `platform/app/src/components/automations/`, and the app-layer delivery
-adapters.
+adapters. The remaining app-layer delivery slice is provider-secret handling,
+mail/Slack/webhook transports, and persist-cap plan resolution; it does not
+introduce another AutomationService.
 
-The app constructs one AutomationService once. Eventing calls its graph
+The app constructs one `AutomationService` and one process-lifetime
+`AutomationEmailCapService`. Eventing calls the canonical service's graph
 methods; delivery, Redis claims, ClickHouse counting, recipient auth, and
 limit mail are injected host capabilities. Graph candidate/source and incident
 persistence stay behind Automation's private repositories.

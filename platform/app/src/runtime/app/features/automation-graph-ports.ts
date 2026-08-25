@@ -9,7 +9,10 @@ import {
   AutomationRunawayPort,
   AutomationSlackBotTokenDecryptorPort,
 } from "@langwatch/automation-server";
-import type { GraphAlertDispatchInput } from "@langwatch/automation-server";
+import type {
+  AutomationEmailCapService,
+  GraphAlertDispatchInput,
+} from "@langwatch/automation-server";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -26,10 +29,6 @@ import { sendAutomationLimitEmail } from "~/server/mailer/automationLimitEmail";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { sendWebhook } from "~/server/webhooks/sendWebhook";
-import {
-  consumeEmailCapSlot,
-  consumeTenantEmailCapSlot,
-} from "~/server/app-layer/automations/dispatch/emailCaps";
 import { dispatchGraphAlertAction } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
@@ -37,6 +36,7 @@ import { decryptSlackBotToken } from "~/server/app-layer/automations/providers/s
 
 /** Named host capabilities supplied to the one process-owned AutomationService. */
 export type AppAutomationGraphPorts = {
+  emailCaps: AutomationEmailCapService;
   projects: ProjectService;
   analytics: AnalyticsService;
   notifier: AutomationGraphNotifierPort;
@@ -163,7 +163,7 @@ class AppAutomationGraphNotifierAdapter extends AutomationGraphNotifierPort {
   constructor(
     private readonly input: {
       delivery: AutomationGraphDeliveryPort;
-      redis: Redis | Cluster | null;
+      emailCaps: AutomationEmailCapService;
       emailHourlyCap: number;
       tenantDailyCap: number;
     },
@@ -183,23 +183,21 @@ class AppAutomationGraphNotifierAdapter extends AutomationGraphNotifierPort {
         filterSuppressedRecipients: (value) =>
           this.input.delivery.filterSuppressed(value),
         consumeEmailCapSlot: ({ projectId, triggerId, now, dedupKey }) =>
-          consumeEmailCapSlot({
+          this.input.emailCaps.consumeHourly({
             projectId,
             triggerId,
             now,
             cap: this.input.emailHourlyCap,
             dedupKey,
-            redis: this.input.redis,
           }),
         emailHourlyCap: this.input.emailHourlyCap,
         consumeTenantEmailCapSlot: ({ projectId, now, cap, recipientCount, dedupKey }) =>
-          consumeTenantEmailCapSlot({
+          this.input.emailCaps.consumeDaily({
             projectId,
             now,
             cap,
             recipientCount,
             dedupKey,
-            redis: this.input.redis,
           }),
         tenantDailyCap: this.input.tenantDailyCap,
         isRecipientSent: (value) => this.input.delivery.isSendClaimed(value),
@@ -216,6 +214,7 @@ class AppAutomationGraphNotifierAdapter extends AutomationGraphNotifierPort {
 export function createAutomationGraphPorts(input: {
   database: PrismaClient;
   redis: Redis | Cluster | null;
+  emailCaps: AutomationEmailCapService;
   delivery: AutomationGraphDeliveryPort;
   projects: ProjectService;
   analytics: AnalyticsService;
@@ -228,11 +227,12 @@ export function createAutomationGraphPorts(input: {
   const telemetry = new AppAutomationTelemetryAdapter(graphLogger);
 
   return {
+    emailCaps: input.emailCaps,
     projects: input.projects,
     analytics: input.analytics,
     notifier: new AppAutomationGraphNotifierAdapter({
       delivery: input.delivery,
-      redis: input.redis,
+      emailCaps: input.emailCaps,
       emailHourlyCap: input.emailHourlyCap,
       tenantDailyCap: input.tenantDailyCap,
     }),

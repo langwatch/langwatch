@@ -197,25 +197,19 @@ describe("Redis ownership", () => {
 
     /** @scenario A consumer degrades when the application has no Redis */
     it("lets a consumer take its documented fallback rather than throwing", async () => {
-      const previous = globalForApp.__langwatch_app;
-      globalForApp.__langwatch_app = createTestApp();
-      try {
-        const { consumeEmailCapSlot } = await import("../automations/dispatch/emailCaps");
+      const { AutomationEmailCapService } =
+        await import("@langwatch/automation-server");
+      const emailCaps = AutomationEmailCapService.create({ store: null });
 
-        // The hourly cap's fallback is a per-worker in-memory counter: the
-        // dispatch is still decided, it is just no longer decided fleet-wide.
-        const decision = await consumeEmailCapSlot({
-          projectId: `proj-${Math.random().toString(36).slice(2)}`,
-          triggerId: "trigger-1",
-          now: new Date("2026-08-10T12:00:00.000Z"),
-          cap: 5,
-          dedupKey: `dedup-${Math.random().toString(36).slice(2)}`,
-        });
+      const decision = await emailCaps.consumeHourly({
+        projectId: "project-1",
+        triggerId: "trigger-1",
+        now: new Date("2026-08-10T12:00:00.000Z"),
+        cap: 5,
+        dedupKey: "dispatch-1",
+      });
 
-        expect(decision).toMatchObject({ allowed: true, count: 1 });
-      } finally {
-        globalForApp.__langwatch_app = previous;
-      }
+      expect(decision).toMatchObject({ allowed: true, count: 1 });
     });
   });
 
