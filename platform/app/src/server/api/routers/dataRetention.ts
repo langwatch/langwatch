@@ -1,7 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
 import { resolveScopeStorageUsage } from "~/server/data-retention/metering/storageMeter.read";
 import {
@@ -112,7 +111,7 @@ export const dataRetentionRouter = createTRPCRouter({
         assertCanDisableRetention({ prisma: ctx.prisma, session: ctx.session });
       }
       try {
-        return await getApp().dataRetention.policy.setForScope({
+        return await ctx.app.dataRetention.policy.setForScope({
           scope: input.scope,
           category: input.category as RetentionCategory,
           retentionDays: input.retentionDays,
@@ -146,7 +145,7 @@ export const dataRetentionRouter = createTRPCRouter({
         { prisma: ctx.prisma, session: ctx.session },
         input.scope,
       );
-      return getApp().dataRetention.policy.previewScopeRemoval(input.scope);
+      return ctx.app.dataRetention.policy.previewScopeRemoval(input.scope);
     }),
 
   /** Remove one category's override at one scope; the next tier then applies. */
@@ -173,7 +172,7 @@ export const dataRetentionRouter = createTRPCRouter({
         { prisma: ctx.prisma, session: ctx.session },
         input.scope,
       );
-      await getApp().dataRetention.policy.removeForScope({
+      await ctx.app.dataRetention.policy.removeForScope({
         scope: input.scope,
         category: input.category as RetentionCategory,
       });
@@ -201,7 +200,7 @@ export const dataRetentionRouter = createTRPCRouter({
       // the truth (the dialog previously named the form value, which
       // could differ silently from what got applied).
       const effective =
-        await getApp().dataRetention.policy.getResolvedForProject(
+        await ctx.app.dataRetention.policy.getResolvedForProject(
           input.projectId,
         );
       const category = input.category as RetentionCategory;
@@ -212,7 +211,7 @@ export const dataRetentionRouter = createTRPCRouter({
           message: `No effective retention is resolvable for category ${category}.`,
         });
       }
-      const result = await getApp().dataRetention.retroactive.triggerUpdate({
+      const result = await ctx.app.dataRetention.retroactive.triggerUpdate({
         projectId: input.projectId,
         category,
         newRetentionDays,
@@ -223,8 +222,8 @@ export const dataRetentionRouter = createTRPCRouter({
   getMutationProgress: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .permission("traces:view")
-    .query(async ({ input }) => {
-      return getApp().dataRetention.retroactive.getMutationProgress({
+    .query(async ({ input, ctx }) => {
+      return ctx.app.dataRetention.retroactive.getMutationProgress({
         projectId: input.projectId,
       });
     }),
@@ -239,7 +238,7 @@ export const dataRetentionRouter = createTRPCRouter({
     .permission("project:update")
     .mutation(async ({ input, ctx }) => {
       await assertRetentionPlanForProject(ctx, input.projectId);
-      await getApp().dataRetention.retroactive.killMutation({
+      await ctx.app.dataRetention.retroactive.killMutation({
         projectId: input.projectId,
         mutationId: input.mutationId,
       });
