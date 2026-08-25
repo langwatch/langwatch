@@ -544,6 +544,19 @@ const LEGACY_INERT: string[] = [
   "specs/python-sdk/async-experiment-parallelism.feature",
   "specs/python-sdk/experiment-print-summary.feature",
   "specs/rbac/fetch-org-role-permission-resolution.feature",
+  // The three below are NOT migration debt, and they shrink by a different
+  // motion than the rest of this list. Each is the spec of an ACCEPTED-shape
+  // proposal whose implementation has not started - ADR-123 (agent
+  // principals), ADR-124 (signed passports) and ADR-125 (access reviews),
+  // written together in PR #7532 against ADR-092's deferred list. Every
+  // scenario is @unimplemented because every scenario describes code that
+  // does not exist; binding one today would mean writing a test that asserts
+  // nothing, which is the exact lie this gate exists to catch. The entry
+  // leaves this list in the PR that implements its ADR, at the moment its
+  // scenarios gain real bindings - not by anyone tidying the list.
+  "specs/rbac/access-reviews.feature",
+  "specs/rbac/agent-principals.feature",
+  "specs/rbac/authz-passports.feature",
   "specs/scenarios/ai-create-modal.feature",
   "specs/scenarios/internal-scenario-namespace.feature",
   "specs/scenarios/internal-set-namespace.feature",
