@@ -32,6 +32,7 @@ function fact(overrides: Partial<IdentifierFact>): IdentifierFact {
     domain: "acme.com",
     identifierHash: null,
     accountId: null,
+    providerAccountId: null,
     connectionId: null,
     state: "VERIFIED",
     verifiedAtMs: T0,

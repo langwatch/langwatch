@@ -781,8 +781,8 @@ describe("Feature: Organization members and invites REST API", () => {
       ).toBe(0);
     });
 
-    /** @scenario Revoking a pending invite keeps it as a visible revoked state */
-    it("revokes an invite, shows it as revoked in the list, and 404s a second revoke", async () => {
+    /** @scenario Revoking a pending invite marks it REVOKED */
+    it("revokes an invite, keeps it listed as REVOKED, and 404s a second revoke", async () => {
       const email = `invitee-revoke-${ns}@example.com`;
       const create = await app.request("/api/organization/invites", {
         method: "POST",
@@ -806,14 +806,17 @@ describe("Feature: Organization members and invites REST API", () => {
       );
       expect(revoke.status).toBe(200);
 
-      // D11: revocation is a state the list shows, not a deletion.
+      // D11: the row stays and stays listed, now reading REVOKED — an admin
+      // can see what they revoked. Disappearing from the list was the old
+      // hard-delete behaviour.
       const list = await app.request("/api/organization/invites", {
         headers: authHeaders(),
       });
-      const revoked = (await list.json()).invites.find(
-        (entry: { id: string }) => entry.id === inviteId,
-      );
-      expect(revoked?.status).toBe("REVOKED");
+      expect(
+        (await list.json()).invites.find(
+          (entry: { id: string }) => entry.id === inviteId,
+        ),
+      ).toMatchObject({ id: inviteId, status: "REVOKED" });
 
       const again = await app.request(`/api/organization/invites/${inviteId}`, {
         method: "DELETE",

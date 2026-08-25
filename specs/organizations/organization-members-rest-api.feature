@@ -150,9 +150,13 @@ Feature: Organization members and invites REST API
     And no invite is created
 
   @integration
-  Scenario: Revoking a pending invite keeps it as a visible revoked state
+  # Revocation is a state, not a delete (D11 — see
+  # specs/identity/resilient-invitations.feature): the row stays so an admin
+  # can still see what they revoked, and the code on it stops opening
+  # anything.
+  Scenario: Revoking a pending invite marks it REVOKED
     Given the organization has a pending invite
     When I revoke that invite
     Then the response status is 200
-    And the invite list shows it as revoked
+    And it still appears in the invite list with status REVOKED
     And revoking it again is refused with code invite_not_found and status 404
