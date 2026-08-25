@@ -6,7 +6,7 @@ description: What each pull request cost in coding-agent usage, across every ses
 
 Use this view to price a change instead of a session. Open **Pull requests** at [/me/pull-requests](https://app.langwatch.ai/me/pull-requests), or in the sidebar of a project that receives coding-agent telemetry.
 
-<Frame caption="The pull requests list. Status is read live from GitHub; Token cost sums every session that drove the branch.">
+<Frame caption="The pull requests list. Status is read live from GitHub, and Token cost sums every session that drove the branch. A branch with no pull request yet keeps its row so the work still has a price.">
   ![Pull requests list](/images/coding-agents/pull-requests-list.png)
 </Frame>
 
@@ -39,7 +39,7 @@ Click a row for the breakdown:
 - **Models**: the token and cost split per model.
 - **Sessions**: every session that drove the branch, each opening into its [terminal replay](/coding-agents/sessions#terminal-replay).
 
-<Frame caption="Pull request detail: per-contributor cost, per-model split, and the sessions behind them.">
+<Frame caption="Pull request detail: per-contributor cost, the split per model, and the sessions behind them. Open on GitHub takes you to the pull request itself.">
   ![Pull request detail](/images/coding-agents/pull-request-detail.png)
 </Frame>
 

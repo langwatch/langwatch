@@ -21150,7 +21150,7 @@ description: What each pull request cost in coding-agent usage, across every ses
 
 Use this view to price a change instead of a session. Open **Pull requests** at [/me/pull-requests](https://app.langwatch.ai/me/pull-requests), or in the sidebar of a project that receives coding-agent telemetry.
 
-<Frame caption="The pull requests list. Status is read live from GitHub; Token cost sums every session that drove the branch.">
+<Frame caption="The pull requests list. Status is read live from GitHub, and Token cost sums every session that drove the branch. A branch with no pull request yet keeps its row so the work still has a price.">
   ![Pull requests list](/images/coding-agents/pull-requests-list.png)
 </Frame>
 
@@ -21183,7 +21183,7 @@ Click a row for the breakdown:
 - **Models**: the token and cost split per model.
 - **Sessions**: every session that drove the branch, each opening into its [terminal replay](/coding-agents/sessions#terminal-replay).
 
-<Frame caption="Pull request detail: per-contributor cost, per-model split, and the sessions behind them.">
+<Frame caption="Pull request detail: per-contributor cost, the split per model, and the sessions behind them. Open on GitHub takes you to the pull request itself.">
   ![Pull request detail](/images/coding-agents/pull-request-detail.png)
 </Frame>
 
@@ -21380,7 +21380,7 @@ description: Every coding-agent session on one list, with the context it carried
 
 A session is one run of a coding agent: everything between starting Claude Code, Codex or another assistant and closing it, folded into one row. Open **Sessions** on your personal page at [/me/sessions](https://app.langwatch.ai/me/sessions), or in the sidebar of any project that receives coding-agent telemetry.
 
-<Frame caption="The sessions list. The Context and Compactions columns show which sessions ran heavy; the Pull requests column shows what each session shipped.">
+<Frame caption="The sessions list. The Context and Compactions columns show which sessions ran heavy; the Pull requests column shows what each session shipped, and a dash means the branch has no pull request yet.">
   ![Sessions list](/images/coding-agents/sessions-list.png)
 </Frame>
 
@@ -21403,7 +21403,7 @@ Search matches session titles. The period selector starts unset and reads **All 
 
 ## Session detail
 
-Click a row to open the session. The header states cost, model calls, tools run, sub-agents, files touched, commits and pull requests, followed by a token timeline of the whole session.
+Click a row to open the session. The **Usage** tab opens on the totals: cost, model calls, tools run and files touched. Under them sit the signals worth knowing before you read any number, for example that the conversation was compacted, that an action was declined, or that the approval mode changed part way through.
 
 The **Cache health** section is where the money goes:
 
@@ -21416,8 +21416,16 @@ The **Cache health** section is where the money goes:
 
 The detail also shows the biggest single rebuild: how many tokens one model call re-sent instead of reusing from cache.
 
-<Frame caption="Session detail with the Cache health section. This session compacted twice, missed its cache 3 times, and re-sent 73k tokens on its biggest rebuild.">
+<Frame caption="Session detail with the Cache health section. This session compacted once, missed its cache twice, and re-sent 22k tokens on its biggest rebuild.">
   ![Session detail](/images/coding-agents/session-detail.png)
+</Frame>
+
+Below Cache health, **Where the tokens went** plots one bar per model call, split into the part served from cache and the part paid fresh. A session that caches well shows a thin dark band on each bar after the first. A tall dark band part way through the run is the call that threw the cache away, and the bar number tells you which call to look at in the replay.
+
+The same tab also reports what the session reached for, what it did as an ordered chain of tools, where the time went between thinking, running tools and waiting on you, and what came out of it in lines changed and edits kept.
+
+<Frame caption="The token composition of one session. Call 1 pays for the whole context; every call after it reads most of the context back from cache.">
+  ![Session token usage](/images/coding-agents/session-usage.png)
 </Frame>
 
 To turn these numbers into a decision, run the [context sweet spot investigation](/coding-agents/find-your-context-sweet-spot) on your own sessions.
@@ -21426,7 +21434,7 @@ To turn these numbers into a decision, run the [context sweet spot investigation
 
 The **Terminal** tab replays the session moment by moment, the way it looked in the terminal: your prompts, the agent's replies, every tool run with its output, and file changes as syntax-highlighted diffs.
 
-<Frame caption="The terminal replay. Tool runs collapse to their command line; file edits render as diffs.">
+<Frame caption="The terminal replay. Each tool run carries the time it took, and a file edit renders as the diff the agent applied.">
   ![Terminal replay](/images/coding-agents/terminal-replay.png)
 </Frame>
 
@@ -21846,10 +21854,6 @@ Usage rolls up everything your sessions spent. Read your own numbers at [/me](ht
 The personal page opens on this month: what you spent, how many requests you made, and the model you used most, with spend over time and a breakdown by tool underneath.
 
 The **coding-agent usage** card summarizes the last 30 days across your assistants: cost, tokens, active time, and how many sessions you ran. Sessions that reported only metrics still count, so the card is complete even for tools set up with usage-only telemetry.
-
-<Frame caption="The personal usage page. The coding-agent card shows the last 30 days; the by-tool breakdown shows where the spend comes from.">
-  ![Personal usage page](/images/coding-agents/me-usage-home.png)
-</Frame>
 
 ## Query it from the command line
 
