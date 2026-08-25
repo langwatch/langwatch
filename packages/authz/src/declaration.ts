@@ -233,7 +233,6 @@ export type DeclaredScopeResolution =
   | { resolved: true; scope: DeclaredScopeId }
   | { resolved: false; unresolved: UnresolvedDeclaredScope };
 
-/** A usable scope id is a string with something in it. */
 const usableId = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0;
 
@@ -268,8 +267,17 @@ export function resolveDeclaredScope({
     ? [via]
     : permissionGrantTiers(permission).map((tier) => SCOPE_TIER_FIELDS[tier]);
 
+  // Normalized once, before anything reads a field off it. `namesField` below
+  // already survives a non-object input, but the walk runs first and
+  // `input[field]` throws on `null` — so the promise that docblock makes was
+  // only half kept. A bypassed type layer handing us `null` is the same class
+  // of thing as the blank id this module exists for: the types said it could
+  // not happen, and it did.
+  const named: Partial<Record<ScopeTierField, unknown>> =
+    typeof input === "object" && input !== null ? input : {};
+
   for (const field of fields) {
-    const id = input[field];
+    const id = named[field];
     if (usableId(id)) {
       return { resolved: true, scope: { tier: SCOPE_TIER_BY_FIELD[field], id } };
     }
@@ -278,7 +286,7 @@ export function resolveDeclaredScope({
   // Named the field and left no usable id in it: the caller's mistake, not
   // ours. The narrowest such field is the one to name back, matching the tier
   // order the resolution walk itself prefers.
-  const blank = fields.find((field) => namesField(input, field));
+  const blank = fields.find((field) => namesField(named, field));
   return {
     resolved: false,
     unresolved: blank ? { reason: "blank", field: blank } : { reason: "absent" },

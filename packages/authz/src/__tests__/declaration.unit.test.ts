@@ -208,6 +208,33 @@ describe("resolveDeclaredScope", () => {
     });
 
     /**
+     * The input itself is not an object. `namesField` was written to survive
+     * exactly this, but the resolution walk read a field off the input BEFORE
+     * reaching it, so `null` threw where it should have answered. Which is
+     * this change's own lesson said twice: the signature says
+     * `Partial<Record<...>>`, and the signature is not what arrives.
+     *
+     * @scenario "An input carrying no scope id at all is still a wiring bug"
+     */
+    it.each([
+      ["null", null],
+      ["undefined", undefined],
+      ["a primitive", 42],
+      ["a string", "org_1"],
+    ])(
+      "answers absent rather than throwing when the input is %s",
+      (_label, input) => {
+        expect(
+          resolveDeclaredScope({
+            permission: "traces:view",
+            // The bypassed type layer this path exists to survive.
+            input: input as never,
+          }),
+        ).toEqual({ resolved: false, unresolved: { reason: "absent" } });
+      },
+    );
+
+    /**
      * A tier the permission cannot be granted at is not a field the caller
      * was asked to fill, so filling it badly is still our wiring, not theirs.
      *
