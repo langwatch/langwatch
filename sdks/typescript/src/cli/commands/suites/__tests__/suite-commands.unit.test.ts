@@ -196,12 +196,14 @@ describe("getSuiteCommand()", () => {
 
 describe("createSuiteCommand()", () => {
   let mockCreate: ReturnType<typeof vi.fn>;
+  let mockGetAll: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockCreate = vi.fn();
+    mockGetAll = vi.fn(async () => []);
     vi.mocked(SuitesApiService).mockImplementation(function () { return ({
-      getAll: vi.fn(),
+      getAll: mockGetAll,
       get: vi.fn(),
       create: mockCreate,
       update: vi.fn(),
@@ -239,6 +241,75 @@ describe("createSuiteCommand()", () => {
       await expect(
         createSuiteCommand("Test Suite", { targets: ["http:agent_xyz"] }),
       ).rejects.toThrow(ProcessExitError);
+    });
+  });
+
+  describe("when the plan is given a scope", () => {
+    /** @scenario "A plan scoped to all test cases runs every active case" */
+    it("creates it with no test case named", async () => {
+      mockCreate.mockResolvedValue(makeSuite({ scope: { mode: "all" } }));
+
+      await createSuiteCommand("Everything", {
+        targets: ["http:agent_xyz"],
+        scopeAll: true,
+      });
+
+      expect(mockCreate).toHaveBeenCalledWith({
+        name: "Everything",
+        description: undefined,
+        scenarioIds: [],
+        scope: { mode: "all" },
+        targets: [{ type: "http", referenceId: "agent_xyz" }],
+        repeatCount: 1,
+        labels: [],
+      });
+    });
+
+    /** @scenario "A plan scoped to labels runs the cases carrying them" */
+    it("carries every repeated label", async () => {
+      mockCreate.mockResolvedValue(makeSuite());
+
+      await createSuiteCommand("Checkout", {
+        targets: ["http:agent_xyz"],
+        scopeLabel: ["checkout", "refunds"],
+      });
+
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scope: { mode: "labels", labels: ["checkout", "refunds"] },
+        }),
+      );
+    });
+
+    /** @scenario "A plan scoped to test suites runs the cases filed in them" */
+    it("resolves a test suite named by name into its id", async () => {
+      mockGetAll.mockResolvedValue([
+        { id: "suite_folder_1", name: "Refunds", kind: "folder" },
+      ]);
+      mockCreate.mockResolvedValue(makeSuite());
+
+      await createSuiteCommand("Refund plan", {
+        targets: ["http:agent_xyz"],
+        scopeFolder: ["Refunds"],
+      });
+
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scope: { mode: "folders", folderIds: ["suite_folder_1"] },
+        }),
+      );
+    });
+
+    /** @scenario "The stored shape of every mode is known" */
+    it("exits when two scopes are given at once", async () => {
+      await expect(
+        createSuiteCommand("Confused", {
+          targets: ["http:agent_xyz"],
+          scopeAll: true,
+          scopeLabel: ["checkout"],
+        }),
+      ).rejects.toThrow(ProcessExitError);
+      expect(mockCreate).not.toHaveBeenCalled();
     });
   });
 

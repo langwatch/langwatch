@@ -2701,10 +2701,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description List the organization's SCIM bearer tokens: id, description, creation time and last use. Token values and hashes are never returned; the value exists only in the create response, once. */
+        /** @description List the organization's SCIM bearer tokens: id, description, the connection each one manages, creation time and last use. Token values and hashes are never returned; the value exists only in the create response, once. */
         get: operations["listScimTokens"];
         put?: never;
-        /** @description Mint a SCIM bearer token for this organization's /api/scim/v2 endpoints. The token value is returned once, here, and never again; store it in the identity provider immediately. */
+        /** @description Mint a SCIM bearer token for one of this organization's single sign-on connections, for use against /api/scim/v2. The token only manages the people that connection provisioned. The token value is returned once, here, and never again; store it in the identity provider immediately. */
         post: operations["createScimToken"];
         delete?: never;
         options?: never;
@@ -20225,6 +20225,7 @@ export interface operations {
                         tokens: {
                             id: string;
                             description: string | null;
+                            connectionId: string | null;
                             createdAt: string;
                             lastUsedAt: string | null;
                         }[];
@@ -20244,6 +20245,7 @@ export interface operations {
             content: {
                 "application/json": {
                     description?: string;
+                    connectionId?: string;
                 };
             };
         };
@@ -20257,6 +20259,7 @@ export interface operations {
                     "application/json": {
                         id: string;
                         token: string;
+                        connectionId: string;
                         description: string | null;
                     };
                 };
@@ -22249,9 +22252,7 @@ export interface operations {
                         parameters: {
                             name: string;
                             description?: string;
-                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                             defaultValue?: string | number | boolean;
-                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                             secret?: boolean;
                         }[];
                         /** @description The test suite (folder) this scenario is filed in, or null when unfiled. */
@@ -22331,9 +22332,7 @@ export interface operations {
                     parameters?: {
                         name: string;
                         description?: string;
-                        /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                         defaultValue?: string | number | boolean;
-                        /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                         secret?: boolean;
                     }[];
                     /** @description The test suite (folder) to file this scenario in. It must name a non-archived folder of the same project. null unfiles the scenario. */
@@ -22357,9 +22356,7 @@ export interface operations {
                         parameters: {
                             name: string;
                             description?: string;
-                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                             defaultValue?: string | number | boolean;
-                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                             secret?: boolean;
                         }[];
                         /** @description The test suite (folder) this scenario is filed in, or null when unfiled. */
@@ -22445,9 +22442,7 @@ export interface operations {
                         parameters: {
                             name: string;
                             description?: string;
-                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                             defaultValue?: string | number | boolean;
-                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                             secret?: boolean;
                         }[];
                         /** @description The test suite (folder) this scenario is filed in, or null when unfiled. */
@@ -22539,9 +22534,7 @@ export interface operations {
                     parameters?: {
                         name: string;
                         description?: string;
-                        /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                         defaultValue?: string | number | boolean;
-                        /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                         secret?: boolean;
                     }[];
                     /** @description The test suite (folder) to file this scenario in. It must name a non-archived folder of the same project. null unfiles the scenario. */
@@ -22565,9 +22558,7 @@ export interface operations {
                         parameters: {
                             name: string;
                             description?: string;
-                            /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                             defaultValue?: string | number | boolean;
-                            /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                             secret?: boolean;
                         }[];
                         /** @description The test suite (folder) this scenario is filed in, or null when unfiled. */
@@ -22871,9 +22862,7 @@ export interface operations {
                             parameters: {
                                 name: string;
                                 description?: string;
-                                /** @description The value the run uses when it supplies none. A secret parameter cannot carry one. */
                                 defaultValue?: string | number | boolean;
-                                /** @description Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue. */
                                 secret?: boolean;
                             }[];
                             simulatorModel: string | null;
@@ -24178,6 +24167,22 @@ export interface operations {
                         kind: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
+                        /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
+                        scope: {
+                            /** @constant */
+                            mode: "all";
+                        } | {
+                            /** @constant */
+                            mode: "folders";
+                            folderIds: string[];
+                        } | {
+                            /** @constant */
+                            mode: "labels";
+                            labels: string[];
+                        } | {
+                            /** @constant */
+                            mode: "cases";
+                        } | null;
                         targets: {
                             /** @enum {string} */
                             type: "prompt" | "http" | "code" | "workflow";
@@ -24262,6 +24267,22 @@ export interface operations {
                     description?: string;
                     /** @default [] */
                     scenarioIds?: string[];
+                    /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
+                    scope?: {
+                        /** @constant */
+                        mode: "all";
+                    } | {
+                        /** @constant */
+                        mode: "folders";
+                        folderIds: string[];
+                    } | {
+                        /** @constant */
+                        mode: "labels";
+                        labels: string[];
+                    } | {
+                        /** @constant */
+                        mode: "cases";
+                    };
                     /** @default [] */
                     targets?: {
                         /** @enum {string} */
@@ -24293,6 +24314,22 @@ export interface operations {
                         kind: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
+                        /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
+                        scope: {
+                            /** @constant */
+                            mode: "all";
+                        } | {
+                            /** @constant */
+                            mode: "folders";
+                            folderIds: string[];
+                        } | {
+                            /** @constant */
+                            mode: "labels";
+                            labels: string[];
+                        } | {
+                            /** @constant */
+                            mode: "cases";
+                        } | null;
                         targets: {
                             /** @enum {string} */
                             type: "prompt" | "http" | "code" | "workflow";
@@ -24385,6 +24422,22 @@ export interface operations {
                         kind: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
+                        /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
+                        scope: {
+                            /** @constant */
+                            mode: "all";
+                        } | {
+                            /** @constant */
+                            mode: "folders";
+                            folderIds: string[];
+                        } | {
+                            /** @constant */
+                            mode: "labels";
+                            labels: string[];
+                        } | {
+                            /** @constant */
+                            mode: "cases";
+                        } | null;
                         targets: {
                             /** @enum {string} */
                             type: "prompt" | "http" | "code" | "workflow";
@@ -24560,6 +24613,22 @@ export interface operations {
                 "application/json": {
                     name?: string;
                     description?: string | null;
+                    /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
+                    scope?: {
+                        /** @constant */
+                        mode: "all";
+                    } | {
+                        /** @constant */
+                        mode: "folders";
+                        folderIds: string[];
+                    } | {
+                        /** @constant */
+                        mode: "labels";
+                        labels: string[];
+                    } | {
+                        /** @constant */
+                        mode: "cases";
+                    };
                     scenarioIds?: string[];
                     targets?: {
                         /** @enum {string} */
@@ -24589,6 +24658,22 @@ export interface operations {
                         kind: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
+                        /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
+                        scope: {
+                            /** @constant */
+                            mode: "all";
+                        } | {
+                            /** @constant */
+                            mode: "folders";
+                            folderIds: string[];
+                        } | {
+                            /** @constant */
+                            mode: "labels";
+                            labels: string[];
+                        } | {
+                            /** @constant */
+                            mode: "cases";
+                        } | null;
                         targets: {
                             /** @enum {string} */
                             type: "prompt" | "http" | "code" | "workflow";
@@ -24693,6 +24778,22 @@ export interface operations {
                         kind: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
+                        /** @description What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan. */
+                        scope: {
+                            /** @constant */
+                            mode: "all";
+                        } | {
+                            /** @constant */
+                            mode: "folders";
+                            folderIds: string[];
+                        } | {
+                            /** @constant */
+                            mode: "labels";
+                            labels: string[];
+                        } | {
+                            /** @constant */
+                            mode: "cases";
+                        } | null;
                         targets: {
                             /** @enum {string} */
                             type: "prompt" | "http" | "code" | "workflow";

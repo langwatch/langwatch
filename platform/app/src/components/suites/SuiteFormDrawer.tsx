@@ -66,6 +66,9 @@ function buildMutationPayload(data: SuiteFormData, projectId: string) {
     name: data.name.trim(),
     description: data.description.trim() || undefined,
     scenarioIds: data.selectedScenarioIds,
+    // This drawer only ever picks a list, so it says so: a plan saved here
+    // covers the cases it names and nothing else.
+    scope: data.scope,
     targets: data.selectedTargets,
     repeatCount: data.repeatCount,
     labels: data.labels,

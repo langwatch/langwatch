@@ -63,13 +63,9 @@ export function PlanModalTabs({
 export function PlanModalBody({
   editor,
   tab,
-  onNewTestCase,
-  onAddTarget,
 }: {
   editor: PlanEditorState;
   tab: PlanTab;
-  onNewTestCase: () => void;
-  onAddTarget: () => void;
 }) {
   if (editor.isLoading) return <PlanModalSkeleton />;
 
@@ -84,13 +80,9 @@ export function PlanModalBody({
   return (
     <VStack align="stretch" gap={4}>
       <FormServerError form={editor.suiteForm.form} />
-      {tab === "general" && (
-        <PlanGeneralTab editor={editor} onNewTestCase={onNewTestCase} />
-      )}
+      {tab === "general" && <PlanGeneralTab editor={editor} />}
       {tab === "models" && <PlanModelsTab editor={editor} />}
-      {tab === "execution" && (
-        <PlanExecutionTab editor={editor} onAddTarget={onAddTarget} />
-      )}
+      {tab === "execution" && <PlanExecutionTab editor={editor} />}
     </VStack>
   );
 }

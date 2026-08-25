@@ -10,8 +10,6 @@
  */
 
 import { useEffect, useState } from "react";
-import { AgentHttpEditorDrawer } from "~/components/agents/AgentHttpEditorDrawer";
-import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
 import { Dialog } from "~/components/ui/dialog";
 import type { SimulationSuite } from "~/generated/prisma/client";
 import {
@@ -40,8 +38,6 @@ function planModalTitle(editor: ReturnType<typeof usePlanEditor>): string {
 export function PlanModal(_props: PlanModalProps) {
   const editor = usePlanEditor();
   const [tab, setTab] = useState<PlanTab>("general");
-  const [isCaseEditorOpen, setCaseEditorOpen] = useState(false);
-  const [isAgentEditorOpen, setAgentEditorOpen] = useState(false);
 
   // Every open starts on the first question, whichever tab the last edit left.
   useEffect(() => {
@@ -49,57 +45,42 @@ export function PlanModal(_props: PlanModalProps) {
   }, [editor.isOpen]);
 
   return (
-    <>
-      <Dialog.Root
-        open={editor.isOpen}
-        onOpenChange={({ open }) => {
-          if (!open) editor.close();
-        }}
-        placement="center"
-      >
-        <Dialog.Content bg="bg.panel" maxWidth="580px" data-testid="plan-modal">
-          <Dialog.Header
-            borderBottomWidth="1px"
-            borderColor="border"
-            paddingX={5}
-            paddingY={3.5}
-            display="block"
-          >
-            <Dialog.Title fontSize="14px" fontWeight="semibold">
-              {planModalTitle(editor)}
-            </Dialog.Title>
-            <Dialog.CloseTrigger />
-          </Dialog.Header>
+    <Dialog.Root
+      open={editor.isOpen}
+      onOpenChange={({ open }) => {
+        if (!open) editor.close();
+      }}
+      placement="center"
+    >
+      <Dialog.Content bg="bg.panel" maxWidth="580px" data-testid="plan-modal">
+        <Dialog.Header
+          borderBottomWidth="1px"
+          borderColor="border"
+          paddingX={5}
+          paddingY={3.5}
+          display="block"
+        >
+          <Dialog.Title fontSize="14px" fontWeight="semibold">
+            {planModalTitle(editor)}
+          </Dialog.Title>
+          <Dialog.CloseTrigger />
+        </Dialog.Header>
 
-          <PlanModalTabs tab={tab} onTabChange={setTab} />
+        <PlanModalTabs tab={tab} onTabChange={setTab} />
 
-          <Dialog.Body
-            paddingX={5}
-            paddingY={4}
-            minHeight="268px"
-            maxHeight="54vh"
-            overflowY="auto"
-          >
-            <PlanModalBody
-              editor={editor}
-              tab={tab}
-              onNewTestCase={() => setCaseEditorOpen(true)}
-              onAddTarget={() => setAgentEditorOpen(true)}
-            />
-          </Dialog.Body>
+        <Dialog.Body
+          paddingX={5}
+          paddingY={4}
+          minHeight="268px"
+          maxHeight="54vh"
+          overflowY="auto"
+        >
+          <PlanModalBody editor={editor} tab={tab} />
+        </Dialog.Body>
 
-          <PlanModalFooter editor={editor} />
-        </Dialog.Content>
-      </Dialog.Root>
-
-      {/* Both are only mounted once asked for: each carries its own form. */}
-      {isCaseEditorOpen && (
-        <ScenarioFormDrawer open onClose={() => setCaseEditorOpen(false)} />
-      )}
-      {isAgentEditorOpen && (
-        <AgentHttpEditorDrawer open onClose={() => setAgentEditorOpen(false)} />
-      )}
-    </>
+        <PlanModalFooter editor={editor} />
+      </Dialog.Content>
+    </Dialog.Root>
   );
 }
 

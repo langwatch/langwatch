@@ -3,64 +3,22 @@
  * for, and what runs when it runs.
  *
  * A test suite runs the cases filed under it, so its scope is one fixed line
- * rather than a picker. A run plan is hand assembled, so its scope is the list
- * of test cases it holds.
+ * rather than a picker. A run plan says what it covers as a rule, which is
+ * resolved again at every run.
  *
  * @see specs/features/agent-testing/run-plan-editor.feature
  */
 
 import { Box, HStack, Input, Text, Textarea, VStack } from "@chakra-ui/react";
 import { Folder } from "lucide-react";
-import { ScenarioPicker } from "~/components/suites/ScenarioPicker";
 import {
   DIALOG_FIELD_STYLE,
   FieldError,
   FieldLabel,
 } from "../shared/DialogFields";
 import { FG_MUTED } from "../shared/design";
+import { PlanScopeField } from "./PlanScopeField";
 import type { PlanEditorState } from "./usePlanEditor";
-
-/** The list of test cases a hand-assembled run plan holds. */
-function ScenarioScopeField({
-  editor,
-  onNewTestCase,
-}: {
-  editor: PlanEditorState;
-  onNewTestCase: () => void;
-}) {
-  const { suiteForm } = editor;
-  const errors = suiteForm.form.formState.errors;
-  const count = suiteForm.selectedScenarioIds.length;
-
-  return (
-    <>
-      <ScenarioPicker
-        scenarios={suiteForm.filteredScenarios}
-        selectedIds={suiteForm.selectedScenarioIds}
-        totalCount={suiteForm.totalScenarioCount}
-        onToggle={suiteForm.toggleScenario}
-        onSelectAll={suiteForm.selectAllScenarios}
-        onClear={suiteForm.clearScenarios}
-        searchQuery={suiteForm.scenarioSearch}
-        onSearchChange={suiteForm.setScenarioSearch}
-        allLabels={suiteForm.allLabels}
-        activeLabelFilter={suiteForm.activeLabelFilter}
-        onLabelFilterChange={suiteForm.setActiveLabelFilter}
-        onCreateNew={onNewTestCase}
-        hasError={!!errors.selectedScenarioIds}
-        archivedIds={editor.archivedScenariosWithNames}
-        onRemoveArchived={suiteForm.removeArchivedScenario}
-        folders={editor.folders}
-      />
-      <Text marginTop={1} fontSize="11px" color={FG_MUTED}>
-        {count === 1
-          ? "1 test case will run."
-          : `${count} test cases will run.`}
-      </Text>
-      <FieldError message={errors.selectedScenarioIds?.message} />
-    </>
-  );
-}
 
 /** What the plan is called and what it is for. */
 function NameAndDescriptionFields({
@@ -102,14 +60,9 @@ function NameAndDescriptionFields({
   );
 }
 
-export function PlanGeneralTab({
-  editor,
-  onNewTestCase,
-}: {
-  editor: PlanEditorState;
-  onNewTestCase: () => void;
-}) {
+export function PlanGeneralTab({ editor }: { editor: PlanEditorState }) {
   const { suiteForm } = editor;
+  const scopeError = suiteForm.form.formState.errors.scope;
 
   return (
     <VStack align="stretch" gap={4}>
@@ -123,7 +76,10 @@ export function PlanGeneralTab({
             caseCount={suiteForm.selectedScenarioIds.length}
           />
         ) : (
-          <ScenarioScopeField editor={editor} onNewTestCase={onNewTestCase} />
+          <>
+            <PlanScopeField editor={editor} hasError={!!scopeError} />
+            <FieldError message={scopeError?.message} />
+          </>
         )}
       </Box>
     </VStack>

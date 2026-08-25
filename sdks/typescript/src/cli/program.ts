@@ -68,6 +68,19 @@ const FOLDER_FLAG_HELP =
   "The test suite folder to file this test case in, named by ID or by name.";
 
 /**
+ * Help for the three scope flags of the suite write commands. They answer one
+ * question, so only one of them may be given.
+ */
+const SCOPE_ALL_FLAG_HELP =
+  "Cover every active test case of the project. The set is read again at each run, so a test case written later runs too.";
+
+const SCOPE_FOLDER_FLAG_HELP =
+  "Cover the test cases filed in this test suite, named by ID or by name. Repeat the flag for more than one.";
+
+const SCOPE_LABEL_FLAG_HELP =
+  "Cover the test cases carrying this label. Repeat the flag for more than one.";
+
+/**
  * Reads the `--folder` / `--no-folder` pair.
  *
  * Commander gives both flags ONE attribute, so whichever comes last on the
@@ -2913,13 +2926,16 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     suiteCmd
       .command("create <name>")
       .description("Create a new suite (run plan)")
-      .requiredOption("--scenarios <ids>", "Comma-separated scenario IDs")
+      .option("--scenarios <ids>", "Comma-separated scenario IDs. Not needed when the plan is given a scope")
+      .option("--scope-all", SCOPE_ALL_FLAG_HELP)
+      .option("--scope-folder <name-or-id>", SCOPE_FOLDER_FLAG_HELP, collectParam)
+      .option("--scope-label <label>", SCOPE_LABEL_FLAG_HELP, collectParam)
       .requiredOption("--targets <targets...>", "Targets as <type>:<referenceId> (e.g., http:agent_abc)")
       .option("--repeat-count <n>", "Number of times to repeat each scenario-target pair", "1")
       .option("--labels <labels>", "Comma-separated labels")
       .option("--description <desc>", "Suite description")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (name: string, options: { scenarios?: string; targets?: string[]; repeatCount?: string; labels?: string; description?: string }) => {
+    async (name: string, options: { scenarios?: string; scopeAll?: boolean; scopeFolder?: string[]; scopeLabel?: string[]; targets?: string[]; repeatCount?: string; labels?: string; description?: string }) => {
       const { createSuiteCommand: impl } = await import("./commands/suites/create.js");
       return impl(name, options);
     },
@@ -2931,12 +2947,15 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .description("Update a suite (run plan)")
       .option("--name <name>", "New suite name")
       .option("--scenarios <ids>", "New comma-separated scenario IDs")
+      .option("--scope-all", SCOPE_ALL_FLAG_HELP)
+      .option("--scope-folder <name-or-id>", SCOPE_FOLDER_FLAG_HELP, collectParam)
+      .option("--scope-label <label>", SCOPE_LABEL_FLAG_HELP, collectParam)
       .option("--targets <targets...>", "New targets as <type>:<referenceId>")
       .option("--repeat-count <n>", "New repeat count")
       .option("--labels <labels>", "New comma-separated labels")
       .option("--description <desc>", "New description")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string, options: { name?: string; scenarios?: string; targets?: string[]; repeatCount?: string; labels?: string; description?: string }) => {
+    async (id: string, options: { name?: string; scenarios?: string; scopeAll?: boolean; scopeFolder?: string[]; scopeLabel?: string[]; targets?: string[]; repeatCount?: string; labels?: string; description?: string }) => {
       const { updateSuiteCommand: impl } = await import("./commands/suites/update.js");
       return impl(id, options);
     },

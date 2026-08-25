@@ -19,6 +19,17 @@ const AGENT_ICONS = {
   workflow: Workflow,
 } as const;
 
+/**
+ * What an agent card stands at: its icon row, its name and the line under it.
+ *
+ * Stated rather than left to the content so the "Setup agent" box, which holds
+ * different words, is exactly one card and not a taller one.
+ */
+const AGENT_CARD_HEIGHT = "95px";
+
+/** The three-across grid the agent cards and the setup box both sit in. */
+const AGENT_GRID_COLUMNS = "repeat(3, 1fr)";
+
 /** An agent the run dialog can offer: one of the scenario target kinds. */
 export type RunDialogAgent = {
   id: string;
@@ -39,7 +50,7 @@ export function AgentBlocks({
 }) {
   return (
     <Grid
-      templateColumns="repeat(3, 1fr)"
+      templateColumns={AGENT_GRID_COLUMNS}
       gap={2}
       data-testid="run-dialog-agents"
     >
@@ -80,6 +91,7 @@ function AgentBlock({
       borderRadius="xl"
       paddingX={3}
       paddingY={2.5}
+      height={AGENT_CARD_HEIGHT}
       onClick={() => onSelect({ type: agent.type, id: agent.id })}
       data-testid={`run-dialog-agent-${agent.id}`}
       aria-pressed={isActive}
@@ -125,31 +137,39 @@ function AgentBlock({
   );
 }
 
-/** The dotted box a project with nothing to test shows in place of the list. */
+/**
+ * The dotted box a project with nothing to test shows in place of the list.
+ *
+ * It takes one cell of the same grid the agent cards sit in, so it reads as
+ * the first card of a list that is still empty rather than as a banner.
+ */
 export function SetupAgentBox({ onSetup }: { onSetup: () => void }) {
   return (
-    <VStack
-      as="button"
-      cursor="pointer"
-      width="full"
-      gap={1}
-      borderWidth="1px"
-      borderStyle="dashed"
-      borderColor="border.emphasized"
-      borderRadius="xl"
-      paddingX={4}
-      paddingY={6}
-      _hover={{ background: "bg.muted/50" }}
-      onClick={onSetup}
-      data-testid="run-dialog-setup-agent"
-    >
-      <Plug size={16} color="var(--chakra-colors-fg-muted)" />
-      <Text fontSize="12.5px" fontWeight="medium">
-        Setup agent
-      </Text>
-      <Text fontSize="11.5px" color={FG_MUTED}>
-        Connect the agent you want to test
-      </Text>
-    </VStack>
+    <Grid templateColumns={AGENT_GRID_COLUMNS} gap={2}>
+      <VStack
+        as="button"
+        cursor="pointer"
+        justify="center"
+        gap={1}
+        height={AGENT_CARD_HEIGHT}
+        borderWidth="1px"
+        borderStyle="dashed"
+        borderColor="border.emphasized"
+        borderRadius="xl"
+        paddingX={3}
+        textAlign="center"
+        _hover={{ background: "bg.muted/50" }}
+        onClick={onSetup}
+        data-testid="run-dialog-setup-agent"
+      >
+        <Plug size={16} color="var(--chakra-colors-fg-muted)" />
+        <Text fontSize="12.5px" fontWeight="medium">
+          Setup agent
+        </Text>
+        <Text fontSize="11px" color={FG_MUTED} lineHeight="1.25">
+          Connect the agent you want to test
+        </Text>
+      </VStack>
+    </Grid>
   );
 }

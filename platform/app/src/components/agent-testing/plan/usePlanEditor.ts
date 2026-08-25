@@ -92,6 +92,10 @@ export function usePlanEditor() {
     scenarios: choices.scenarios,
     agents: choices.agents,
     prompts: choices.prompts,
+    // The run dialog chooses the agent or prompt, and a new plan covers the
+    // whole project until it is narrowed.
+    picksTargets: false,
+    defaultScope: { mode: "all" },
   });
 
   const { archivedScenariosWithNames, archivedTargetsWithNames } =

@@ -352,6 +352,8 @@ export const APP_ERROR_CODES = [
   "suite_invalid_target_references",
   "suite_name_taken",
   "suite_not_found",
+  "suite_scope_empty",
+  "suite_scope_not_allowed",
   "suite_targets_required",
   "system_prompt_conflict",
   "system_prompt_required",

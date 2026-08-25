@@ -79,7 +79,13 @@ vi.mock("~/utils/api", () => ({
     }),
     suites: {
       getById: { useQuery: mockSuiteGetById },
-      folders: { getAll: { useQuery: () => ({ data: [] }) } },
+      folders: {
+        getAll: {
+          useQuery: () => ({
+            data: [{ id: "folder_1", name: "Checkout" }],
+          }),
+        },
+      },
       create: { useMutation: mutationOf(mockCreate) },
       update: { useMutation: mutationOf(mockUpdate, mockUpdateOptions) },
       run: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
@@ -89,8 +95,18 @@ vi.mock("~/utils/api", () => ({
       getAll: {
         useQuery: () => ({
           data: [
-            { id: "scen_1", name: "Angry refund request", labels: [] },
-            { id: "scen_2", name: "Edge: empty cart", labels: [] },
+            {
+              id: "scen_1",
+              name: "Angry refund request",
+              labels: ["refunds"],
+              folderId: "folder_1",
+            },
+            {
+              id: "scen_2",
+              name: "Edge: empty cart",
+              labels: [],
+              folderId: null,
+            },
           ],
         }),
       },
@@ -188,10 +204,77 @@ describe("the run plan dialog", () => {
       expect(screen.getByText("Judge")).toBeInTheDocument();
 
       await user.click(screen.getByTestId("plan-modal-tab-execution"));
-      expect(
-        screen.getByText("Agents and prompts to be tested"),
-      ).toBeInTheDocument();
       expect(screen.getByText("Repeat count")).toBeInTheDocument();
+      // The run dialog chooses what to run against, so the editor does not.
+      expect(screen.queryByTestId("target-picker")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Agents and prompts to be tested"),
+      ).not.toBeInTheDocument();
+    });
+
+    /** @scenario "A new run plan covers every test case" */
+    it("offers the four scopes and starts on all test cases", () => {
+      render(<PlanModal />, { wrapper: Wrapper });
+
+      for (const mode of ["all", "folders", "labels", "cases"]) {
+        expect(screen.getByTestId(`plan-scope-${mode}`)).toBeInTheDocument();
+      }
+      expect(screen.getByTestId("plan-scope-all")).toBeChecked();
+      expect(screen.getByText("2 test cases will run.")).toBeInTheDocument();
+    });
+
+    /** @scenario "A plan can be scoped to chosen test suites" */
+    it("counts the cases of the test suites that are ticked", async () => {
+      const user = userEvent.setup();
+      render(<PlanModal />, { wrapper: Wrapper });
+
+      await user.click(screen.getByTestId("plan-scope-folders"));
+      expect(screen.getByText("Checkout")).toBeInTheDocument();
+      expect(screen.getByText("0 test cases will run.")).toBeInTheDocument();
+
+      await user.click(screen.getByTestId("plan-scope-folder-folder_1"));
+      expect(screen.getByText("1 test case will run.")).toBeInTheDocument();
+    });
+
+    /** @scenario "A plan can be scoped to chosen labels" */
+    it("counts the cases carrying the labels that are on", async () => {
+      const user = userEvent.setup();
+      render(<PlanModal />, { wrapper: Wrapper });
+
+      await user.click(screen.getByTestId("plan-scope-labels"));
+      expect(screen.getByText("0 test cases will run.")).toBeInTheDocument();
+
+      await user.click(screen.getByTestId("plan-scope-label-refunds"));
+      expect(screen.getByText("1 test case will run.")).toBeInTheDocument();
+    });
+
+    /** @scenario "A plan can hold a hand-picked list of test cases" */
+    it("reads the cases under their test suite and counts the ticked ones", async () => {
+      const user = userEvent.setup();
+      render(<PlanModal />, { wrapper: Wrapper });
+
+      await user.click(screen.getByTestId("plan-scope-cases"));
+      expect(screen.getByText("Checkout")).toBeInTheDocument();
+      expect(screen.getByText("Unfiled test cases")).toBeInTheDocument();
+      expect(screen.getByText("0 test cases will run.")).toBeInTheDocument();
+
+      await user.click(screen.getByTestId("plan-scope-case-scen_1"));
+      expect(screen.getByText("1 test case will run.")).toBeInTheDocument();
+    });
+
+    /** @scenario "A new run plan covers every test case" */
+    it("carries the scope into the write", async () => {
+      const user = userEvent.setup();
+      render(<PlanModal />, { wrapper: Wrapper });
+
+      await user.type(screen.getByLabelText("Name"), "Everything");
+      await user.click(screen.getByTestId("plan-modal-save"));
+
+      await waitFor(() => expect(mockCreate).toHaveBeenCalled());
+      expect(mockCreate.mock.calls[0]![0]).toMatchObject({
+        name: "Everything",
+        scope: { mode: "all" },
+      });
     });
   });
 

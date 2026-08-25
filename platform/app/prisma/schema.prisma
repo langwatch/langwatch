@@ -2920,6 +2920,13 @@ model SimulationSuite {
   // is a hand-assembled run plan. String rather than a Prisma enum so a new
   // kind needs no database migration.
   kind            String     @default("custom")
+  // What the plan covers, as { mode } plus the mode's own field: "all",
+  // "folders" with folderIds, "labels" with labels, or "cases", which runs the
+  // stored scenarioIds. Null reads as "cases", so a plan written before scopes
+  // keeps the list it already held. A folder carries none: its members come
+  // from Scenario.folderId. See server/suites/scope.ts and
+  // specs/suites/run-plan-dynamic-scopes.feature.
+  scope           Json?
   folderScenarios Scenario[] @relation("FolderScenarios")
   archivedAt     DateTime?
   createdAt      DateTime  @default(now())

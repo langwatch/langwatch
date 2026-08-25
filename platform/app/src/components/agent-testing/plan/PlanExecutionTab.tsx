@@ -1,17 +1,14 @@
 /**
- * The Execution tab of the run plan editor: what the plan runs against, how
- * a prompt target reads its inputs, and how many times each pair runs.
+ * The Execution tab of the run plan editor: how many times each pair runs.
  *
- * The prototype has no place for targets, and a run plan cannot run without
- * one, so they read here, beside the other thing that decides how much work a
- * run is.
+ * What the plan runs against is not asked here. The run dialog chooses the
+ * agent or the prompt for each run and remembers the choice on the plan, so
+ * asking twice would give two answers to one question.
  *
  * @see specs/features/agent-testing/run-plan-editor.feature
  */
 
 import { Box, HStack, Input, Text, VStack } from "@chakra-ui/react";
-import { PromptTargetMappingSection } from "~/components/suites/PromptTargetMappingSection";
-import { TargetPicker } from "~/components/suites/TargetPicker";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
 import {
   DIALOG_FIELD_STYLE,
@@ -62,60 +59,17 @@ function RepeatCountField({
   );
 }
 
-/** The agents and prompts the plan runs against. */
-function TargetsField({
-  editor,
-  onAddTarget,
-}: {
-  editor: PlanEditorState;
-  onAddTarget: () => void;
-}) {
-  const { suiteForm } = editor;
-  const errors = suiteForm.form.formState.errors;
-
-  return (
-    <Box>
-      <FieldLabel>Agents and prompts to be tested</FieldLabel>
-      <TargetPicker
-        targets={suiteForm.filteredTargets}
-        selectedTargets={suiteForm.selectedTargets}
-        totalCount={suiteForm.availableTargets.length}
-        isTargetSelected={suiteForm.isTargetSelected}
-        onToggle={suiteForm.toggleTarget}
-        onSelectAll={suiteForm.selectAllTargets}
-        onClear={suiteForm.clearTargets}
-        searchQuery={suiteForm.targetSearch}
-        onSearchChange={suiteForm.setTargetSearch}
-        onAddTarget={onAddTarget}
-        hasError={!!errors.selectedTargets}
-        archivedTargets={editor.archivedTargetsWithNames}
-        onRemoveArchived={suiteForm.removeArchivedTarget}
-      />
-      <FieldError message={errors.selectedTargets?.message} />
-    </Box>
-  );
-}
-
-export function PlanExecutionTab({
-  editor,
-  onAddTarget,
-}: {
-  editor: PlanEditorState;
-  onAddTarget: () => void;
-}) {
-  const { suiteForm } = editor;
-
+export function PlanExecutionTab({ editor }: { editor: PlanEditorState }) {
   return (
     <VStack align="stretch" gap={4}>
-      <TargetsField editor={editor} onAddTarget={onAddTarget} />
-
-      <PromptTargetMappingSection
-        selectedTargets={suiteForm.selectedTargets}
-        prompts={editor.prompts}
-        onMappingChange={suiteForm.setTargetMapping}
-      />
-
-      <RepeatCountField form={suiteForm.form} />
+      <RepeatCountField form={editor.suiteForm.form} />
+      <Box>
+        <FieldLabel>Agents and prompts</FieldLabel>
+        <Text fontSize="11.5px" color={FG_MUTED}>
+          Chosen when the run starts. The last choice is offered again next
+          time.
+        </Text>
+      </Box>
     </VStack>
   );
 }

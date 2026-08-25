@@ -39,7 +39,37 @@ Feature: The run plan editor
     Given the run plan editor is open
     When the Simulation models tab is chosen
     Then the user simulator and the judge read there
-    And the Execution tab holds the targets and the repeat count
+    And the Execution tab holds the repeat count
+    And no agent or prompt is picked in the editor
+
+  @integration
+  Scenario: A new run plan covers every test case
+    Given no run plan is being edited
+    When the run plan editor is opened
+    Then the What runs block offers all four scopes
+    And "All test cases" is the one chosen
+    And it says how many test cases will run
+
+  @integration
+  Scenario: A plan can be scoped to chosen test suites
+    Given the run plan editor is open
+    When "Selected test suites" is chosen
+    Then the test suites of the project read as check boxes
+    And the count follows the suites that are ticked
+
+  @integration
+  Scenario: A plan can be scoped to chosen labels
+    Given the run plan editor is open
+    When "Selected labels" is chosen
+    Then every label used by a test case reads as a chip
+    And the count follows the chips that are on
+
+  @integration
+  Scenario: A plan can hold a hand-picked list of test cases
+    Given the run plan editor is open
+    When "Specific test cases" is chosen
+    Then the test cases read under the name of the test suite they are filed in
+    And the count follows the cases that are ticked
 
   @integration
   Scenario: Saving a run plan writes it and closes the dialog

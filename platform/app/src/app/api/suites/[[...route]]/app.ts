@@ -12,6 +12,7 @@ import { ProjectRepository } from "~/server/projects/project.repository";
 import { runParameterValuesSchema } from "~/server/scenarios/parameters";
 import { runNoteSchema } from "~/server/scenarios/run-note";
 import { SuiteDomainError } from "~/server/suites/errors";
+import { parseSuiteScope, suiteScopeSchema } from "~/server/suites/scope";
 import { SuiteService } from "~/server/suites/suite.service";
 import { isSuiteKind } from "~/server/suites/types";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
@@ -27,6 +28,14 @@ const suiteTargetSchema = z.object({
   referenceId: z.string(),
 });
 
+/**
+ * What a run plan covers. Absent on a plan that runs the list it holds, and on
+ * a test suite, whose cases are the ones filed into it.
+ */
+const scopeSchema = suiteScopeSchema.describe(
+  "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan.",
+);
+
 const suiteResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -38,6 +47,7 @@ const suiteResponseSchema = z.object({
     ),
   description: z.string().nullable(),
   scenarioIds: z.array(z.string()),
+  scope: scopeSchema.nullable(),
   targets: z.array(suiteTargetSchema),
   repeatCount: z.number(),
   labels: z.array(z.string()),
@@ -49,11 +59,72 @@ const suiteResponseWithPlatformUrlSchema = suiteResponseSchema.extend({
   platformUrl: z.string().url(),
 });
 
+/** What a create body carries, before either kind's guards are applied. */
+type CreateSuiteBody = {
+  kind: "custom" | "folder";
+  scope?: { mode: string };
+  scenarioIds: string[];
+  targets: unknown[];
+};
+
+/**
+ * A folder is created empty by definition, so a scope, a member list and a
+ * target list are refused rather than silently dropped.
+ */
+function refuseFolderExtras(body: CreateSuiteBody, ctx: z.RefinementCtx): void {
+  if (body.scope) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["scope"],
+      message:
+        "A test suite runs the test cases filed in it, so it takes no scope",
+    });
+  }
+  if (body.scenarioIds.length > 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["scenarioIds"],
+      message:
+        "A folder is created empty; file scenarios into it after creating it",
+    });
+  }
+  if (body.targets.length > 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["targets"],
+      message: "A folder gets its targets when a run is started",
+    });
+  }
+}
+
+/**
+ * A run plan states what it runs and what it runs against.
+ *
+ * A plan that covers a rule resolves its own list at run time, so only a plan
+ * that runs a hand-picked list has to name one here.
+ */
+function refusePlanGaps(body: CreateSuiteBody, ctx: z.RefinementCtx): void {
+  const picksCases = !body.scope || body.scope.mode === "cases";
+  if (picksCases && body.scenarioIds.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["scenarioIds"],
+      message: "At least one scenario is required",
+    });
+  }
+  if (body.targets.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["targets"],
+      message: "At least one target is required",
+    });
+  }
+}
+
 /**
  * One create schema for both kinds, with the guards conditional on kind: a
  * body naming no kind is a custom run plan and keeps the historical
- * at-least-one guards; a folder is created empty by definition, so member
- * and target lists are refused rather than silently dropped.
+ * at-least-one guards.
  */
 const createSuiteInputSchema = z
   .object({
@@ -66,43 +137,17 @@ const createSuiteInputSchema = z
       ),
     description: z.string().optional(),
     scenarioIds: z.array(z.string()).default([]),
+    scope: scopeSchema.optional(),
     targets: z.array(suiteTargetSchema).default([]),
     repeatCount: z.number().int().min(1).max(100).default(1),
     labels: z.array(z.string()).default([]),
   })
   .superRefine((body, ctx) => {
     if (body.kind === "folder") {
-      if (body.scenarioIds.length > 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["scenarioIds"],
-          message:
-            "A folder is created empty; file scenarios into it after creating it",
-        });
-      }
-      if (body.targets.length > 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["targets"],
-          message: "A folder gets its targets when a run is started",
-        });
-      }
+      refuseFolderExtras(body, ctx);
       return;
     }
-    if (body.scenarioIds.length === 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["scenarioIds"],
-        message: "At least one scenario is required",
-      });
-    }
-    if (body.targets.length === 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["targets"],
-        message: "At least one target is required",
-      });
-    }
+    refusePlanGaps(body, ctx);
   });
 
 const listSuitesQuerySchema = z.object({
@@ -117,6 +162,7 @@ const listSuitesQuerySchema = z.object({
 const updateSuiteInputSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().nullable().optional(),
+  scope: scopeSchema.optional(),
   scenarioIds: z.array(z.string()).min(1).optional(),
   targets: z.array(suiteTargetSchema).min(1).optional(),
   repeatCount: z.number().int().min(1).max(100).optional(),
@@ -168,6 +214,7 @@ function toSuiteResponse(suite: SimulationSuite) {
     kind: isSuiteKind(suite.kind) ? suite.kind : "custom",
     description: suite.description,
     scenarioIds: suite.scenarioIds,
+    scope: suite.scope === null ? null : parseSuiteScope(suite.scope),
     targets,
     repeatCount: suite.repeatCount,
     labels: suite.labels,
@@ -313,6 +360,7 @@ secured.access(requires("scenarios:create")).post(
               name: body.name,
               description: body.description,
               scenarioIds: body.scenarioIds,
+              ...(body.scope && { scope: body.scope }),
               targets: body.targets,
               repeatCount: body.repeatCount,
               labels: body.labels,

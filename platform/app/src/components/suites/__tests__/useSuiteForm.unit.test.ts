@@ -363,6 +363,8 @@ describe("useSuiteForm()", () => {
         expect(data).toEqual({
           name: "  My Suite  ",
           description: "  Suite description  ",
+          // This drawer picks a list, so that is what its plan covers.
+          scope: { mode: "cases" },
           selectedScenarioIds: ["scen_1"],
           selectedTargets: [{ type: "http", referenceId: "agent_1" }],
           repeatCount: 1,

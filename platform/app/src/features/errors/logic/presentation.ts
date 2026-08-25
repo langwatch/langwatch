@@ -2085,6 +2085,16 @@ const presentations = {
     title: "This run plan points at targets that no longer exist",
     describe: () => "Edit the plan to remove them.",
   },
+  suite_scope_empty: {
+    title: "This run plan covers no test case",
+    describe: () =>
+      "Its scope matches nothing right now. Widen it in the plan, then run again.",
+  },
+  suite_scope_not_allowed: {
+    title: "A test suite takes no scope",
+    describe: () =>
+      "It runs the test cases filed in it. File cases into it to change what it covers.",
+  },
   suite_targets_required: {
     title: "Choose an agent to run against",
     describe: () =>

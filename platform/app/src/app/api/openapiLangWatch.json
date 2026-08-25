@@ -43087,6 +43087,12 @@
                               "null"
                             ]
                           },
+                          "connectionId": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "createdAt": {
                             "type": "string"
                           },
@@ -43100,6 +43106,7 @@
                         "required": [
                           "id",
                           "description",
+                          "connectionId",
                           "createdAt",
                           "lastUsedAt"
                         ]
@@ -43114,7 +43121,7 @@
             }
           }
         },
-        "description": "List the organization's SCIM bearer tokens: id, description, creation time and last use. Token values and hashes are never returned; the value exists only in the create response, once.",
+        "description": "List the organization's SCIM bearer tokens: id, description, the connection each one manages, creation time and last use. Token values and hashes are never returned; the value exists only in the create response, once.",
         "tags": [
           "SCIM Tokens"
         ],
@@ -43140,6 +43147,9 @@
                     "token": {
                       "type": "string"
                     },
+                    "connectionId": {
+                      "type": "string"
+                    },
                     "description": {
                       "type": [
                         "string",
@@ -43150,6 +43160,7 @@
                   "required": [
                     "id",
                     "token",
+                    "connectionId",
                     "description"
                   ]
                 }
@@ -43157,7 +43168,7 @@
             }
           }
         },
-        "description": "Mint a SCIM bearer token for this organization's /api/scim/v2 endpoints. The token value is returned once, here, and never again; store it in the identity provider immediately.",
+        "description": "Mint a SCIM bearer token for one of this organization's single sign-on connections, for use against /api/scim/v2. The token only manages the people that connection provisioned. The token value is returned once, here, and never again; store it in the identity provider immediately.",
         "tags": [
           "SCIM Tokens"
         ],
@@ -43172,6 +43183,10 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 255
+                  },
+                  "connectionId": {
+                    "type": "string",
+                    "minLength": 1
                   }
                 }
               }
@@ -47845,12 +47860,10 @@
                                 {
                                   "type": "boolean"
                                 }
-                              ],
-                              "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
+                              ]
                             },
                             "secret": {
-                              "type": "boolean",
-                              "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
+                              "type": "boolean"
                             }
                           },
                           "required": [
@@ -48035,12 +48048,10 @@
                               {
                                 "type": "boolean"
                               }
-                            ],
-                            "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
+                            ]
                           },
                           "secret": {
-                            "type": "boolean",
-                            "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
+                            "type": "boolean"
                           }
                         },
                         "required": [
@@ -48214,12 +48225,10 @@
                             {
                               "type": "boolean"
                             }
-                          ],
-                          "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
+                          ]
                         },
                         "secret": {
-                          "type": "boolean",
-                          "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
+                          "type": "boolean"
                         }
                       },
                       "required": [
@@ -48312,12 +48321,10 @@
                               {
                                 "type": "boolean"
                               }
-                            ],
-                            "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
+                            ]
                           },
                           "secret": {
-                            "type": "boolean",
-                            "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
+                            "type": "boolean"
                           }
                         },
                         "required": [
@@ -48532,12 +48539,10 @@
                               {
                                 "type": "boolean"
                               }
-                            ],
-                            "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
+                            ]
                           },
                           "secret": {
-                            "type": "boolean",
-                            "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
+                            "type": "boolean"
                           }
                         },
                         "required": [
@@ -48730,12 +48735,10 @@
                             {
                               "type": "boolean"
                             }
-                          ],
-                          "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
+                          ]
                         },
                         "secret": {
-                          "type": "boolean",
-                          "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
+                          "type": "boolean"
                         }
                       },
                       "required": [
@@ -49250,12 +49253,10 @@
                                   {
                                     "type": "boolean"
                                   }
-                                ],
-                                "description": "The value the run uses when it supplies none. A secret parameter cannot carry one."
+                                ]
                               },
                               "secret": {
-                                "type": "boolean",
-                                "description": "Whether the value is a credential, supplied when the run starts and delivered to the target as secrets.NAME. A secret parameter is rejected when it also carries defaultValue."
+                                "type": "boolean"
                               }
                             },
                             "required": [
@@ -51704,6 +51705,76 @@
                           "type": "string"
                         }
                       },
+                      "scope": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "mode": {
+                                "type": "string",
+                                "const": "all"
+                              }
+                            },
+                            "required": [
+                              "mode"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "mode": {
+                                "type": "string",
+                                "const": "folders"
+                              },
+                              "folderIds": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "mode",
+                              "folderIds"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "mode": {
+                                "type": "string",
+                                "const": "labels"
+                              },
+                              "labels": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "mode",
+                              "labels"
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "mode": {
+                                "type": "string",
+                                "const": "cases"
+                              }
+                            },
+                            "required": [
+                              "mode"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
+                      },
                       "targets": {
                         "type": "array",
                         "items": {
@@ -51755,6 +51826,7 @@
                       "kind",
                       "description",
                       "scenarioIds",
+                      "scope",
                       "targets",
                       "repeatCount",
                       "labels",
@@ -51913,6 +51985,76 @@
                         "type": "string"
                       }
                     },
+                    "scope": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "all"
+                            }
+                          },
+                          "required": [
+                            "mode"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "folders"
+                            },
+                            "folderIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "mode",
+                            "folderIds"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "labels"
+                            },
+                            "labels": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "mode",
+                            "labels"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "cases"
+                            }
+                          },
+                          "required": [
+                            "mode"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
+                    },
                     "targets": {
                       "type": "array",
                       "items": {
@@ -51964,6 +52106,7 @@
                     "kind",
                     "description",
                     "scenarioIds",
+                    "scope",
                     "targets",
                     "repeatCount",
                     "labels",
@@ -52090,6 +52233,73 @@
                     },
                     "default": []
                   },
+                  "scope": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "const": "all"
+                          }
+                        },
+                        "required": [
+                          "mode"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "const": "folders"
+                          },
+                          "folderIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "mode",
+                          "folderIds"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "const": "labels"
+                          },
+                          "labels": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "mode",
+                          "labels"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "const": "cases"
+                          }
+                        },
+                        "required": [
+                          "mode"
+                        ]
+                      }
+                    ],
+                    "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
+                  },
                   "targets": {
                     "type": "array",
                     "items": {
@@ -52184,6 +52394,76 @@
                         "type": "string"
                       }
                     },
+                    "scope": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "all"
+                            }
+                          },
+                          "required": [
+                            "mode"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "folders"
+                            },
+                            "folderIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "mode",
+                            "folderIds"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "labels"
+                            },
+                            "labels": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "mode",
+                            "labels"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "cases"
+                            }
+                          },
+                          "required": [
+                            "mode"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
+                    },
                     "targets": {
                       "type": "array",
                       "items": {
@@ -52235,6 +52515,7 @@
                     "kind",
                     "description",
                     "scenarioIds",
+                    "scope",
                     "targets",
                     "repeatCount",
                     "labels",
@@ -52408,6 +52689,76 @@
                         "type": "string"
                       }
                     },
+                    "scope": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "all"
+                            }
+                          },
+                          "required": [
+                            "mode"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "folders"
+                            },
+                            "folderIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "mode",
+                            "folderIds"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "labels"
+                            },
+                            "labels": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "mode",
+                            "labels"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "cases"
+                            }
+                          },
+                          "required": [
+                            "mode"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
+                    },
                     "targets": {
                       "type": "array",
                       "items": {
@@ -52459,6 +52810,7 @@
                     "kind",
                     "description",
                     "scenarioIds",
+                    "scope",
                     "targets",
                     "repeatCount",
                     "labels",
@@ -52592,6 +52944,73 @@
                       "string",
                       "null"
                     ]
+                  },
+                  "scope": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "const": "all"
+                          }
+                        },
+                        "required": [
+                          "mode"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "const": "folders"
+                          },
+                          "folderIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "mode",
+                          "folderIds"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "const": "labels"
+                          },
+                          "labels": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "mode",
+                          "labels"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "mode": {
+                            "type": "string",
+                            "const": "cases"
+                          }
+                        },
+                        "required": [
+                          "mode"
+                        ]
+                      }
+                    ],
+                    "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
                   },
                   "scenarioIds": {
                     "type": "array",
@@ -52847,6 +53266,76 @@
                         "type": "string"
                       }
                     },
+                    "scope": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "all"
+                            }
+                          },
+                          "required": [
+                            "mode"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "folders"
+                            },
+                            "folderIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "mode",
+                            "folderIds"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "labels"
+                            },
+                            "labels": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "mode",
+                            "labels"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "mode": {
+                              "type": "string",
+                              "const": "cases"
+                            }
+                          },
+                          "required": [
+                            "mode"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "What the run plan covers: all (every active test case), folders (the cases filed in the named test suites), labels (the cases carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a test case written later runs without editing the plan."
+                    },
                     "targets": {
                       "type": "array",
                       "items": {
@@ -52898,6 +53387,7 @@
                     "kind",
                     "description",
                     "scenarioIds",
+                    "scope",
                     "targets",
                     "repeatCount",
                     "labels",

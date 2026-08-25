@@ -24,13 +24,28 @@ import type { SimulationSuite } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { api } from "~/utils/api";
 
-/** What a run plan carries into the mutation, from the validated form. */
-function buildMutationPayload(data: SuiteFormData, projectId: string) {
+/**
+ * What a run plan carries into the mutation, from the validated form.
+ *
+ * A test suite carries neither a scope nor a case list: it runs the cases
+ * filed into it, and the server refuses a second answer to that question.
+ */
+function buildMutationPayload({
+  data,
+  projectId,
+  isFixedScope,
+}: {
+  data: SuiteFormData;
+  projectId: string;
+  isFixedScope: boolean;
+}) {
   return {
     projectId,
     name: data.name.trim(),
     description: data.description.trim() || undefined,
-    scenarioIds: data.selectedScenarioIds,
+    ...(isFixedScope
+      ? {}
+      : { scenarioIds: data.selectedScenarioIds, scope: data.scope }),
     targets: data.selectedTargets,
     repeatCount: data.repeatCount,
     labels: data.labels,
@@ -140,7 +155,11 @@ function useStorePlan({
       // An edit whose plan never arrived would otherwise fall through to the
       // create branch and store a second plan.
       if (isEditing && !suite) return;
-      const payload = buildMutationPayload(data, projectId);
+      const payload = buildMutationPayload({
+        data,
+        projectId,
+        isFixedScope: suite?.kind === "folder",
+      });
       if (suite) {
         updateMutation.mutate({ ...payload, id: suite.id }, options);
         return;

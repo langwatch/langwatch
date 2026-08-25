@@ -10,7 +10,11 @@ import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { nanoid } from "nanoid";
-import type { PrismaClient, SimulationSuite } from "~/generated/prisma/client";
+import type {
+  Prisma,
+  PrismaClient,
+  SimulationSuite,
+} from "~/generated/prisma/client";
 import type {
   SuiteRunResult,
   SuiteRunService,
@@ -37,8 +41,12 @@ import {
   InvalidTargetReferencesError,
   SuiteNameTakenError,
   SuiteNotFoundError,
+  SuiteScopeEmptyError,
+  SuiteScopeNotAllowedError,
   SuiteTargetsRequiredError,
 } from "./errors";
+import { isDynamicScope, parseSuiteScope } from "./scope";
+import { readScopeMembership } from "./scope-membership";
 import {
   type CreateSuiteInput,
   SuiteRepository,
@@ -110,6 +118,34 @@ async function resolveParameterMaps(params: {
         ]),
     ),
   };
+}
+
+/**
+ * The two things a test suite refuses in an update.
+ *
+ * Both are a second answer to what the suite runs, which its own filing
+ * already decides: a scope is a rule over the whole project, and a member list
+ * is derived from `Scenario.folderId` by reconcileFolderMembership and nothing
+ * else, so a direct write here would fork the two sides of that invariant.
+ */
+function assertFolderUpdate(data: UpdateSuiteInput): void {
+  if (data.scope !== undefined && data.scope !== null) {
+    throw new SuiteScopeNotAllowedError();
+  }
+  if (data.scenarioIds !== undefined) {
+    throw new ValidationError(
+      "A folder's scenarios are managed by filing scenarios into it",
+      {
+        meta: {
+          fieldErrors: {
+            scenarioIds: [
+              "A folder's scenarios are managed by filing scenarios into it",
+            ],
+          },
+        },
+      },
+    );
+  }
 }
 
 export class SuiteService {
@@ -411,23 +447,7 @@ export class SuiteService {
         }
         const data: UpdateSuiteInput = { ...params.data };
         if (existing.kind === "folder") {
-          // A folder's member list is derived from Scenario.folderId by
-          // reconcileFolderMembership and nothing else. A direct write here
-          // would fork the two sides of the membership invariant.
-          if (data.scenarioIds !== undefined) {
-            throw new ValidationError(
-              "A folder's scenarios are managed by filing scenarios into it",
-              {
-                meta: {
-                  fieldErrors: {
-                    scenarioIds: [
-                      "A folder's scenarios are managed by filing scenarios into it",
-                    ],
-                  },
-                },
-              },
-            );
-          }
+          assertFolderUpdate(data);
           // A folder rename keeps its slug (see renameFolder), so no re-slug.
         } else if (params.data.name) {
           const slug = slugify(params.data.name);
@@ -481,6 +501,10 @@ export class SuiteService {
           slug,
           description: original.description,
           scenarioIds: original.scenarioIds,
+          // A copy covers what the original covers, rule included.
+          ...(original.scope !== null && {
+            scope: original.scope as Prisma.InputJsonValue,
+          }),
           targets: parseSuiteTargets(original.targets),
           repeatCount: original.repeatCount,
           labels: original.labels,
@@ -611,21 +635,43 @@ export class SuiteService {
    *
    * A folder's membership is read from the scenarios that name it, archived
    * ones included: the folder's scenarioIds cache holds only active members,
-   * and the run reports the archived ones as skipped. Any other suite runs the
-   * scenarioIds it stores.
+   * and the run reports the archived ones as skipped.
+   *
+   * Any other suite covers what its scope says. A dynamic scope is resolved
+   * against the project as it is right now and written back onto the plan, so
+   * a case written after the plan runs without the plan being edited. A plan
+   * with no scope, or one of mode "cases", runs the scenarioIds it stores.
+   *
+   * @throws {SuiteScopeEmptyError} when a dynamic scope covers no case.
    */
   private async readRunMembership(params: {
     suite: SimulationSuite;
     projectId: string;
   }): Promise<string[]> {
-    if (params.suite.kind !== "folder") {
+    if (params.suite.kind === "folder") {
+      const members = await this.scenarioRepository.findManyByFolder({
+        projectId: params.projectId,
+        folderId: params.suite.id,
+      });
+      return members.map((member) => member.id);
+    }
+
+    const scope = parseSuiteScope(params.suite.scope);
+    if (!isDynamicScope(scope)) {
       return params.suite.scenarioIds;
     }
-    const members = await this.scenarioRepository.findManyByFolder({
+
+    const resolved = await readScopeMembership({
       projectId: params.projectId,
-      folderId: params.suite.id,
+      suiteId: params.suite.id,
+      scope,
+      storedScenarioIds: params.suite.scenarioIds,
+      prisma: this.prisma,
     });
-    return members.map((member) => member.id);
+    if (resolved.length === 0) {
+      throw new SuiteScopeEmptyError();
+    }
+    return resolved;
   }
 
   /**

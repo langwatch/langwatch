@@ -135,6 +135,42 @@ export class SuiteTargetsRequiredError extends SuiteDomainError {
   }
 }
 
+/**
+ * Thrown when a run plan's scope covers no test case at all.
+ *
+ * Distinct from {@link AllScenariosArchivedError}: that one says the cases the
+ * plan named are archived, this one says the rule the plan carries matches
+ * nothing right now, which a new label or an emptied test suite can cause
+ * without any case being archived.
+ */
+export class SuiteScopeEmptyError extends SuiteDomainError {
+  declare readonly code: "suite_scope_empty";
+
+  constructor() {
+    super("This run plan covers no test case. Widen its scope, then run.", {
+      code: "suite_scope_empty",
+      httpStatus: 422,
+    });
+    this.name = "SuiteScopeEmptyError";
+  }
+}
+
+/** Thrown when a scope is written on a suite whose membership is its filing. */
+export class SuiteScopeNotAllowedError extends SuiteDomainError {
+  declare readonly code: "suite_scope_not_allowed";
+
+  constructor() {
+    super(
+      "A test suite runs the test cases filed in it, so it takes no scope.",
+      {
+        code: "suite_scope_not_allowed",
+        httpStatus: 422,
+      },
+    );
+    this.name = "SuiteScopeNotAllowedError";
+  }
+}
+
 /** Thrown when a suite name is already in use within the project */
 export class SuiteNameTakenError extends SuiteDomainError {
   declare readonly code: "suite_name_taken";
