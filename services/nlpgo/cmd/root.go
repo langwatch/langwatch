@@ -75,6 +75,13 @@ func Root(ctx context.Context, _ []string) error {
 	httpExec := httpblock.New(httpblock.Options{SSRF: ssrfOpts})
 	codeExec, err := codeblock.New(codeblock.Options{
 		Python: cfg.Engine.SandboxPython,
+		// The instance a code node's LangWatch SDK calls. It is the same URL
+		// the evaluator blocks call back on, and it is injected only next to
+		// a run's own sandbox key.
+		SandboxEndpoint: resolveLangWatchBaseURL(
+			cfg.Engine.LangWatchBaseURL,
+			os.Getenv,
+		),
 	})
 	if err != nil {
 		return err

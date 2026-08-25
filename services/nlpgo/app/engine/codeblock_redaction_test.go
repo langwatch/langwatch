@@ -85,6 +85,41 @@ func TestRunCode_ScrubsSecretsFromStoredOutput(t *testing.T) {
 	assert.Contains(t, ns.Stdout, "region is eu-central")
 }
 
+// TestRunCode_ScrubsTheSandboxKeyFromStoredOutput pins the same rule for the
+// run's own LangWatch credential. It is the one thing the sandbox reads from
+// its environment, so `print(os.environ)` would otherwise write it into every
+// place a stored output travels.
+// @scenario "The sandbox key is scrubbed from stored code node stdout and stderr"
+func TestRunCode_ScrubsTheSandboxKeyFromStoredOutput(t *testing.T) {
+	requirePythonForRedaction(t)
+	codeExec, err := codeblock.New(codeblock.Options{
+		SandboxEndpoint: "https://app.langwatch.test",
+	})
+	require.NoError(t, err)
+	eng := New(Options{Code: codeExec})
+
+	code := "import os\n" +
+		"import sys\n" +
+		"\n" +
+		"def execute():\n" +
+		"    print(os.environ)\n" +
+		"    print(os.environ.get('LANGWATCH_API_KEY'), file=sys.stderr)\n" +
+		"    return {'ok': 'done'}\n"
+
+	ns := &NodeState{ID: "code-1"}
+	outputs, nodeErr := eng.runCode(context.Background(), codeNode("code-1", code, "ok"), nodeRun{
+		ns:            ns,
+		sandboxAPIKey: "sk-lw-run-scoped-value",
+	})
+	require.Nil(t, nodeErr, "expected the node to succeed, got %+v", nodeErr)
+	assert.Equal(t, "done", outputs["ok"])
+
+	assert.NotContains(t, ns.Stdout, "sk-lw-run-scoped-value")
+	assert.Contains(t, ns.Stdout, "[redacted]")
+	assert.NotContains(t, ns.Stderr, "sk-lw-run-scoped-value")
+	assert.Contains(t, ns.Stderr, "[redacted]")
+}
+
 // TestRunIfElsePython_ScrubsSecretsFromStoredOutput pins the same rule on the
 // other sandbox-backed node: a python condition prints through the identical
 // runner, so its stored output is exposed identically.
