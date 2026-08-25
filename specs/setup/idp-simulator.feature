@@ -1,0 +1,143 @@
+Feature: Local IdP simulator (idpsim)
+  A local Go service that plays the customer's identity provider so OIDC
+  login, SAML login, SCIM provisioning and domain verification can be
+  exercised end-to-end on a laptop, with no external IdP account. One
+  process serves a range of independent tenants so many organizations'
+  identity setups can be tested at once. haven runs it as an opt-in lane
+  and routes it at idp.<slug>.langwatch.localhost.
+
+  Background:
+    Given the idpsim service is running with a range of tenants
+
+  # --- OIDC -------------------------------------------------------------
+
+  @unit
+  Scenario: Each tenant publishes its own OIDC discovery document
+    When a client fetches a tenant's OpenID configuration
+    Then the issuer is that tenant's own base URL
+    And the authorization, token, userinfo and JWKS endpoints all live under that issuer
+
+  @unit
+  Scenario: The authorization code flow completes without a real user
+    Given a tenant with a seeded user
+    When a client is sent through authorize with a redirect URI and a login hint
+    And exchanges the returned code at the token endpoint
+    Then it receives an ID token signed by that tenant's key
+    And the ID token verifies against the tenant's published JWKS
+    And the ID token carries the seeded user's subject and email
+
+  @unit
+  Scenario: An authorize request without a login hint offers the tenant's users
+    When a client is sent through authorize with no login hint
+    Then the response is an account picker listing the tenant's seeded users
+
+  @unit
+  Scenario: PKCE is enforced once a challenge was presented
+    Given an authorization code minted with a PKCE challenge
+    When the code is exchanged without the matching verifier
+    Then the token endpoint refuses the exchange
+    And exchanging with the correct verifier succeeds
+
+  @unit
+  Scenario: An authorization code is single-use
+    Given a completed authorization
+    When the same code is exchanged a second time
+    Then the token endpoint refuses the exchange
+
+  @unit
+  Scenario: The userinfo endpoint returns the authenticated user's claims
+    Given an access token from a completed authorization
+    When the client calls userinfo with that token
+    Then the response carries the user's subject, email and name
+
+  @unit
+  Scenario: A tenant can mint Auth0-style SAML-brokered subjects
+    Given a tenant configured for SAML-brokered subjects
+    When a client completes the authorization code flow
+    Then the ID token's subject carries the samlp| prefix Auth0 uses for brokered SAML connections
+
+  # --- SAML -------------------------------------------------------------
+
+  @unit
+  Scenario: Each tenant publishes SAML IdP metadata with its signing certificate
+    When a client fetches a tenant's SAML metadata
+    Then it contains the tenant's entity ID, single sign-on URL and X.509 signing certificate
+
+  @unit
+  Scenario: A SAML authentication request produces a signed response for a seeded user
+    Given a tenant with a seeded user
+    When a service provider sends an authentication request to the tenant's SSO endpoint
+    Then the simulator returns an auto-submitting form posting a SAML response
+    And the response's assertion is signed by the tenant's certificate
+    And the assertion names the seeded user
+
+  # --- SCIM -------------------------------------------------------------
+
+  @unit
+  Scenario: SCIM requests without the tenant's bearer token are refused
+    When a SCIM request carries a missing or wrong bearer token
+    Then the simulator responds unauthorized
+
+  @unit
+  Scenario: Users can be provisioned and deprovisioned over SCIM
+    When a SCIM client creates a user, lists users filtered by user name, and deactivates the user
+    Then each operation succeeds with SCIM 2.0 response envelopes
+    And the deactivated user reads back as inactive
+
+  @unit
+  Scenario: Groups can be managed over SCIM
+    When a SCIM client creates a group and adds a provisioned user as a member
+    Then the group reads back with that member
+
+  @unit
+  Scenario: A tenant's directory can be pushed at a SCIM service provider
+    Given a tenant with seeded users
+    When the control API is asked to push the tenant's directory at a SCIM target with a bearer token
+    Then the target receives each user and group as SCIM 2.0 create requests carrying that token
+
+  # --- Domain verification ---------------------------------------------
+
+  @unit
+  Scenario: A configured TXT record is served over DNS for verification
+    Given a domain verification TXT record configured through the control API
+    When a DNS client queries TXT for that domain against the simulator's DNS server
+    Then the answer contains the configured verification value
+
+  @unit
+  Scenario: An unconfigured domain gets a name error over DNS
+    When a DNS client queries TXT for a domain nobody configured
+    Then the answer is a name error
+
+  @unit
+  Scenario: A verification token is served over HTTP for non-DNS verification
+    Given a well-known verification token configured through the control API
+    When a client fetches the well-known verification path for that domain
+    Then the response body is exactly the configured token
+
+  # --- Tenant range ------------------------------------------------------
+
+  @unit
+  Scenario: Tenants in the range are cryptographically isolated
+    Given two tenants from the range
+    Then their JWKS publish different keys
+    And an ID token minted by one tenant fails verification against the other's JWKS
+
+  @unit
+  Scenario: The control API resets a tenant to its seeded state
+    Given a tenant whose users were changed over SCIM
+    When the control API resets the tenant
+    Then the tenant reads back with only its seeded users
+
+  # --- haven integration -------------------------------------------------
+
+  @unit
+  Scenario: The idp lane is off by default and selectable per worktree
+    Given a fresh worktree
+    Then haven's default selection does not run the idp lane
+    And `haven up +idp` turns the lane on for that worktree
+
+  @unit
+  Scenario: A worktree running the idp lane routes it by hostname
+    Given a worktree with the idp lane selected
+    When the stack is planned
+    Then the idp service is planned with its own hostname under the worktree's slug

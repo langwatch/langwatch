@@ -21,6 +21,10 @@ type Selection struct {
 	// cap that most worktrees never exercise. The worktrees that need it say
 	// `haven up +langy` once.
 	Langy bool `json:"langy"`
+	// IDP is off by default: the identity-provider simulator (OIDC + SAML +
+	// SCIM + domain verification) only matters when working on enterprise
+	// identity flows. Those worktrees say `haven up +idp` once.
+	IDP bool `json:"idp"`
 }
 
 // DefaultSelection is a fresh worktree's lean default: app (workers
@@ -28,7 +32,7 @@ type Selection struct {
 func DefaultSelection() Selection { return Selection{Gateway: true, NLP: true} }
 
 // SelectableServices are the names ±deltas accept, in display order.
-var SelectableServices = []string{"workers", "gateway", "nlp", "langy"}
+var SelectableServices = []string{"workers", "gateway", "nlp", "langy", "idp"}
 
 // ApplySelectionDeltas folds `+svc` / `-svc` arguments into a selection.
 func ApplySelectionDeltas(sel Selection, deltas []string) (Selection, error) {
@@ -46,6 +50,8 @@ func ApplySelectionDeltas(sel Selection, deltas []string) (Selection, error) {
 			sel.NLP = on
 		case "langy":
 			sel.Langy = on
+		case "idp":
+			sel.IDP = on
 		default:
 			return sel, fmt.Errorf("unknown service %q — services: %s", d[1:], strings.Join(SelectableServices, ", "))
 		}
@@ -66,6 +72,8 @@ func SelectionFromStack(st Stack) Selection {
 			sel.NLP = local
 		case "langyagent":
 			sel.Langy = local
+		case "idp":
+			sel.IDP = local
 		}
 	}
 	return sel
@@ -100,6 +108,7 @@ func (s Selection) Describe() string {
 	add(s.Gateway, "gateway")
 	add(s.NLP, "nlp")
 	add(s.Langy, "langy")
+	add(s.IDP, "idp")
 	out := "services: " + strings.Join(on, " · ")
 	if len(off) > 0 {
 		out += "   off: " + strings.Join(off, " · ")

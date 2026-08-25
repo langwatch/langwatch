@@ -88,6 +88,11 @@ func (s Stack) OverlayEnv() []string {
 		// two-year, partition-aligned RetentionPolicy (the seed:retention step).
 		fmt.Sprintf("LANGWATCH_DEFAULT_RETENTION_DAYS=%d", DefaultRetentionDays),
 	}
+	// The IdP simulator is an opt-in lane; only a worktree actually running (or
+	// falling back to) one gets the pointer, so nothing reads a dead URL.
+	if idp := s.svc("idp"); idp.Port != 0 && idp.URL != "" {
+		env = append(env, "LANGWATCH_IDPSIM_URL="+idp.URL)
+	}
 	// A stable local API key so the seed always mints the same credential and any
 	// agent can authenticate without rediscovering it per worktree. Emitted as
 	// HAVEN_SEED_LANGWATCH_API_KEY, never LANGWATCH_API_KEY: the latter is the langwatch

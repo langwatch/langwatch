@@ -115,6 +115,7 @@ var PerWorktreeServices = []struct{ Name, Role string }{
 	{"gateway", "AI Gateway (Go)"},
 	{"nlp", "NLP engine (Go)"},
 	{"langyagent", "Langy agent manager (Go)"},
+	{"idp", "IdP simulator (Go)"},
 }
 
 // BaselinePort finds a live baseline stack that runs `service` locally (not itself

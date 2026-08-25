@@ -119,6 +119,10 @@ worktree (`.haven.json`), shown by `status`, remembered across terminals and
 reboots. A running stack reconciles: matching selection is a no-op, a changed
 one replaces the stack in place. langy is off by default (it costs a container
 image and a hard memory cap); the worktrees that need it say `+langy` once.
+idp — the identity-provider simulator (`services/idpsim`: a range of OIDC +
+SAML + SCIM tenants with DNS/HTTP domain verification, routed at
+`idp.<slug>.langwatch.localhost`) — is likewise off by default; enterprise
+identity work says `haven up +idp` once.
 
 **Automatic preparation.** `up` owns the whole path from a fresh machine to a
 running stack: portless install + CA trust, `pnpm install` when the lockfile

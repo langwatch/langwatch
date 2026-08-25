@@ -915,6 +915,8 @@ func runsLocally(name string, opts PlanOptions) bool {
 		return opts.Selection.NLP
 	case "langyagent":
 		return opts.Selection.Langy
+	case "idp":
+		return opts.Selection.IDP
 	default:
 		return true
 	}

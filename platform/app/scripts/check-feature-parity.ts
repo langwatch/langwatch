@@ -151,6 +151,10 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // this root those scenarios could only ever be @unimplemented or bound to a
   // TS stub that proves nothing.
   "services/langyagent",
+  // The IdP simulator. Its scenarios (OIDC/SAML/SCIM/domain verification,
+  // specs/setup/idp-simulator.feature) are satisfied by Go tests and by
+  // nothing else.
+  "services/idpsim",
   // The Go SDK. Its span-attribute scenarios (typed input/output envelopes,
   // binary content parts, metadata hoisting, data capture) are satisfied by Go
   // tests and by nothing else, so without this root those scenarios could only
