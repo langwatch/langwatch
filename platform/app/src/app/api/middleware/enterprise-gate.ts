@@ -5,7 +5,6 @@ import {
   EnterprisePlanRequiredError,
   isEnterpriseTier,
 } from "~/server/api/enterprise";
-import { getApp } from "~/server/app-layer/app";
 
 /**
  * Refuses the route with `enterprise_plan_required` (402) unless the caller's
@@ -35,7 +34,7 @@ export function requireEnterprisePlanRest(
       );
     }
 
-    const plan = await getApp().planProvider.getActivePlan({
+    const plan = await c.app.planProvider.getActivePlan({
       organizationId: organization.id,
     });
 
