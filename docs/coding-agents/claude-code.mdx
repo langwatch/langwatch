@@ -212,7 +212,58 @@ Claude Code reads the same variables from the `env` block of `~/.claude/settings
 }
 ```
 
-To wire a single repository instead of the whole machine, put the block in `.claude/settings.json` in the repository and keep the key and the content flags in a gitignored `.claude/settings.local.json`. See [Per-repository telemetry](/coding-agents/claude-code-usage#per-repo-telemetry-with-plain-claude-no-wrapper). To apply the block to every machine of a fleet through managed settings, see [Headless machines and CI](/coding-agents/headless-and-ci#roll-out-to-a-managed-fleet).
+To wire one repository instead of the whole machine, see [Per-repository telemetry](#per-repository-telemetry) below. To apply the block to every machine of a fleet through managed settings, see [Headless machines and CI](/coding-agents/headless-and-ci#roll-out-to-a-managed-fleet).
+
+### Per-repository telemetry
+
+Use this when work and personal repositories share a machine and you want telemetry on for some of them only. Claude Code walks up from the launch directory to find `.claude/settings.json`, so the wiring travels with the repository rather than with your account.
+
+Split it across two files. The committed one decides the shape of the export:
+
+**`.claude/settings.json`** (commit this):
+
+```json
+{
+  "env": {
+    "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA": "1",
+    "OTEL_TRACES_EXPORTER": "otlp",
+    "OTEL_LOGS_EXPORTER": "otlp",
+    "OTEL_METRICS_EXPORTER": "otlp",
+    "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "https://app.langwatch.ai/api/otel"
+  }
+}
+```
+
+**`.claude/settings.local.json`** (add it to `.gitignore`) holds the key, the enable flag and every content flag, so each person turns content on for themselves:
+
+```json
+{
+  "env": {
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+    "OTEL_LOG_USER_PROMPTS": "1",
+    "OTEL_LOG_TOOL_DETAILS": "1",
+    "OTEL_LOG_TOOL_CONTENT": "1",
+    "OTEL_LOG_RAW_API_BODIES": "1",
+    "OTEL_EXPORTER_OTLP_HEADERS": "Authorization=Bearer ik-lw-your-ingest-key",
+    "OTEL_RESOURCE_ATTRIBUTES": "service.name=claude-code,project.repo=my-repo,enduser.id=you@example.com"
+  }
+}
+```
+
+Telemetry stays off until `CLAUDE_CODE_ENABLE_TELEMETRY` is set, so a fresh clone that carries only the committed file sends nothing.
+
+<Warning>
+  `OTEL_RESOURCE_ATTRIBUTES` is the one key that does not merge across the two files. The local file replaces the committed value outright, so carry every attribute you want in the local file or the missing ones are dropped from every span.
+</Warning>
+
+Two things catch people out. Claude Code reads the `env` block at launch, so a session that was already running keeps sending nothing until you restart it. And a `.gitignore` that covers all of `.claude/` stops `git add` from staging the committed file, so your own telemetry works while your teammates inherit none of it. A bare `!.claude/settings.json` negation does not fix that, because git does not descend into an excluded directory:
+
+```gitignore
+.claude/
+!.claude/                       # un-ignore the directory
+.claude/settings.local.json     # re-ignore the file holding the key
+```
 
 ### Team attribution
 

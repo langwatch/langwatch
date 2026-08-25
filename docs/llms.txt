@@ -563,7 +563,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [Coding Agent Monitoring and Cost Tracking](https://langwatch.ai/docs/coding-agents/overview.md): Track what Claude Code, Codex, Copilot, Gemini CLI and opencode really do and cost, per session, per pull request and per team, with privacy controls built for tracking people's tools.
 - [Coding Agent Quickstart](https://langwatch.ai/docs/coding-agents/quickstart.md): Connect Claude Code, Codex, Copilot, Gemini CLI or opencode to LangWatch with one command.
-- [Track Your Claude Code Usage](https://langwatch.ai/docs/coding-agents/claude-code-usage.md): See Claude Code usage per session: what you spent, which models you hit, how many tokens came from cache, and the full prompt and response trail. Works on pay-per-token API keys and on Claude Max and Pro plans.
+- [Track Your Claude Code Usage](https://langwatch.ai/docs/coding-agents/claude-code-usage.md): See Claude Code usage per session: what you spent, which model took each turn, how much context came back from cache, and what the agent actually did. Works on Claude Max and Pro plans, and on pay-per-token API keys.
 
 ## Set Up Your Agent
 
