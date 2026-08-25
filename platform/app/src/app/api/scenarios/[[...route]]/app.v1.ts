@@ -60,7 +60,7 @@ const scenarioVersionSummarySchema = z.object({
     .array(z.string())
     .describe("The fields whose value this save changed."),
   createdAt: z.string().describe("When the version was written, in ISO 8601."),
-  synthesized: z
+  isSynthesized: z
     .boolean()
     .describe(
       "True on the Created entry a case saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back.",
@@ -519,7 +519,7 @@ function registerListScenarioVersionsRoute(
             changeDescription: version.changeDescription,
             changedFields: version.changedFields,
             createdAt: version.createdAt.toISOString(),
-            synthesized: version.synthesized,
+            isSynthesized: version.isSynthesized,
           })),
           nextCursor: page.nextCursor,
         });
@@ -591,7 +591,7 @@ function registerGetScenarioVersionRoute(
           changeDescription: detail.changeDescription,
           changedFields: detail.changedFields,
           createdAt: detail.createdAt.toISOString(),
-          synthesized: detail.synthesized,
+          isSynthesized: detail.isSynthesized,
           schemaVersion: detail.schemaVersion,
           snapshot: {
             name: detail.fields.name,

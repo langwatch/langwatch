@@ -43,7 +43,7 @@ export type RunPlansTableProps = {
   plans: RunPlan[];
   isLoading: boolean;
   /** False while the project has nothing that ever ran. */
-  hasAnyRuns: boolean;
+  hasAnyPlans: boolean;
   period: Period;
   periodMode: PeriodMode;
   setPeriod: (startDate: Date, endDate: Date) => void;
@@ -154,7 +154,7 @@ function PlanRowMenu({
 export function RunPlansTable({
   plans,
   isLoading,
-  hasAnyRuns,
+  hasAnyPlans,
   period,
   periodMode,
   setPeriod,
@@ -189,7 +189,7 @@ export function RunPlansTable({
           <Skeleton height="44px" />
           <Skeleton height="44px" />
         </VStack>
-      ) : !hasAnyRuns ? (
+      ) : !hasAnyPlans ? (
         <EmptyState.Root paddingY={12}>
           <EmptyState.Content>
             <EmptyState.Indicator>

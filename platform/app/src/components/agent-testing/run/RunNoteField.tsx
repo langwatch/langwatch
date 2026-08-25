@@ -23,7 +23,7 @@ export type RunNoteFieldProps = {
 };
 
 export function RunNoteField({ value, onChange, onRemove }: RunNoteFieldProps) {
-  const tooLong = isNoteTooLong(value);
+  const isTooLong = isNoteTooLong(value);
 
   return (
     <VStack align="stretch" gap={1} data-testid="run-note-field">
@@ -46,11 +46,11 @@ export function RunNoteField({ value, onChange, onRemove }: RunNoteFieldProps) {
         autoFocus
         value={value}
         aria-label="Note for the run"
-        aria-invalid={tooLong || undefined}
+        aria-invalid={isTooLong || undefined}
         placeholder="What changed, or the hypothesis: new system prompt, cheaper model..."
         onChange={(event) => onChange(event.target.value)}
       />
-      {tooLong && (
+      {isTooLong && (
         <Text fontSize="xs" color="fg.error" data-testid="run-note-too-long">
           The note is too long: it can hold {MAX_RUN_NOTE_LENGTH} characters.
         </Text>

@@ -87,7 +87,7 @@ describe("scenario versioning", () => {
         version: 1,
         changeDescription: "Created",
         changedFields: [],
-        synthesized: false,
+        isSynthesized: false,
       });
     });
 
@@ -303,7 +303,7 @@ describe("scenario versioning", () => {
         version: 1,
         changeDescription: "Created",
         changedFields: [],
-        synthesized: true,
+        isSynthesized: true,
         authorId: null,
         authorLabel: null,
       });
@@ -326,11 +326,11 @@ describe("scenario versioning", () => {
         scenarioId: scenario.id,
       });
       expect(versions.map((v) => v.version)).toEqual([2, 1]);
-      expect(versions[0]?.synthesized).toBe(false);
+      expect(versions[0]?.isSynthesized).toBe(false);
       expect(versions[1]).toMatchObject({
         version: 1,
         changeDescription: "Created",
-        synthesized: true,
+        isSynthesized: true,
       });
     });
   });
@@ -370,7 +370,7 @@ describe("scenario versioning", () => {
       expect(versions[0]).toMatchObject({
         version: 1,
         changeDescription: "Created",
-        synthesized: false,
+        isSynthesized: false,
       });
     });
   });

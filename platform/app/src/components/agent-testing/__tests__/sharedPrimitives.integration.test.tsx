@@ -154,4 +154,15 @@ describe("<FolderHeaderRow/>", () => {
 
     expect(onClick).toHaveBeenCalledOnce();
   });
+
+  it("opens the folder from the keyboard", async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    renderRow({ onClick });
+
+    await user.tab();
+    await user.keyboard("{Enter}");
+
+    expect(onClick).toHaveBeenCalledOnce();
+  });
 });

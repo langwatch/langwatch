@@ -48925,7 +48925,6 @@
     "/api/scenarios/{id}/versions": {
       "get": {
         "operationId": "getApiScenariosByIdVersions",
-        "summary": "List a scenario's versions",
         "description": "List the saved versions of a scenario, newest first. A scenario saved before versions were recorded closes its history with a synthesized Created entry.",
         "responses": {
           "200": {
@@ -48975,7 +48974,7 @@
                             "type": "string",
                             "description": "When the version was written, in ISO 8601."
                           },
-                          "synthesized": {
+                          "isSynthesized": {
                             "type": "boolean",
                             "description": "True on the Created entry a case saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back."
                           }
@@ -48987,7 +48986,7 @@
                           "changeDescription",
                           "changedFields",
                           "createdAt",
-                          "synthesized"
+                          "isSynthesized"
                         ]
                       }
                     },
@@ -49151,7 +49150,6 @@
     "/api/scenarios/{id}/versions/{version}": {
       "get": {
         "operationId": "getApiScenariosByIdVersionsByVersion",
-        "summary": "Read one scenario version",
         "description": "Get one saved version of a scenario, with the name, situation, criteria, labels and parameters as that version saved them.",
         "responses": {
           "200": {
@@ -49196,7 +49194,7 @@
                       "type": "string",
                       "description": "When the version was written, in ISO 8601."
                     },
-                    "synthesized": {
+                    "isSynthesized": {
                       "type": "boolean",
                       "description": "True on the Created entry a case saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back."
                     },
@@ -49311,7 +49309,7 @@
                     "changeDescription",
                     "changedFields",
                     "createdAt",
-                    "synthesized",
+                    "isSynthesized",
                     "schemaVersion",
                     "snapshot"
                   ]

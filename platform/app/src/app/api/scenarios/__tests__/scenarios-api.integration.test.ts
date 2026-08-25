@@ -569,7 +569,7 @@ describe("Scenarios API", () => {
         authorLabel: "api",
         authorId: null,
         changedFields: ["situation"],
-        synthesized: false,
+        isSynthesized: false,
       });
       expect(typeof body.versions[0].createdAt).toBe("string");
       expect(body.nextCursor).toBeNull();
@@ -628,7 +628,7 @@ describe("Scenarios API", () => {
         version: 1,
         authorLabel: "api",
         schemaVersion: 1,
-        synthesized: false,
+        isSynthesized: false,
       });
       expect(body.snapshot).toMatchObject({
         name: "Login Flow",

@@ -22759,7 +22759,7 @@ export interface operations {
                             /** @description When the version was written, in ISO 8601. */
                             createdAt: string;
                             /** @description True on the Created entry a case saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back. */
-                            synthesized: boolean;
+                            isSynthesized: boolean;
                         }[];
                         /** @description Pass as cursor to read the page below this one. Null on the last page. */
                         nextCursor: number | null;
@@ -22859,7 +22859,7 @@ export interface operations {
                         /** @description When the version was written, in ISO 8601. */
                         createdAt: string;
                         /** @description True on the Created entry a case saved before versions were recorded shows. It has no stored snapshot, so it cannot be read back. */
-                        synthesized: boolean;
+                        isSynthesized: boolean;
                         /** @description The shape the snapshot was written in. */
                         schemaVersion: number;
                         /** @description The editable content of the case as this version saved it. */

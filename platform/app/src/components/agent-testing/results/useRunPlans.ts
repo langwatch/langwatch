@@ -16,8 +16,12 @@ import { buildRunPlans, type RunPlan, type RunPlanLastRun } from "./run-plans";
 export type UseRunPlansResult = {
   plans: RunPlan[];
   isLoading: boolean;
-  /** False while the project has nothing that ever ran. */
-  hasAnyRuns: boolean;
+  /**
+   * False while the project holds no run plan at all: no suite, no external
+   * run set and no one-off run. The table shows its first-use empty state
+   * from this, not from whether a plan has ever run.
+   */
+  hasAnyPlans: boolean;
 };
 
 export function useRunPlans({ period }: { period: Period }): UseRunPlansResult {
@@ -82,7 +86,7 @@ export function useRunPlans({ period }: { period: Period }): UseRunPlansResult {
     [projectId, suites, suiteSummaries, externalSets, oneOffLastRun],
   );
 
-  const hasAnyRuns =
+  const hasAnyPlans =
     (suites?.length ?? 0) > 0 ||
     (externalSets?.length ?? 0) > 0 ||
     oneOffLastRun !== null;
@@ -90,6 +94,6 @@ export function useRunPlans({ period }: { period: Period }): UseRunPlansResult {
   return {
     plans,
     isLoading: isSuitesLoading || isExternalLoading || isOneOffLoading,
-    hasAnyRuns,
+    hasAnyPlans,
   };
 }

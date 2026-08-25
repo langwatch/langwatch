@@ -69,7 +69,7 @@ export type ScenarioVersionSummary = {
    * from the scenario's createdAt and has no stored snapshot to open or
    * restore.
    */
-  synthesized: boolean;
+  isSynthesized: boolean;
 };
 
 /** One full version, snapshot included. */
@@ -98,7 +98,7 @@ function toVersionSummary(row: ScenarioVersion): ScenarioVersionSummary {
     changeDescription: row.changeDescription,
     changedFields: envelope.changedFields,
     createdAt: row.createdAt,
-    synthesized: false,
+    isSynthesized: false,
   };
 }
 
@@ -433,7 +433,7 @@ export class ScenarioService {
             changeDescription: "Created",
             changedFields: [],
             createdAt: scenario.createdAt,
-            synthesized: true,
+            isSynthesized: true,
           });
         }
 

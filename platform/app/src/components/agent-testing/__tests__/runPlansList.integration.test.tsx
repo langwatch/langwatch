@@ -71,7 +71,7 @@ function renderPlans(
   const props: React.ComponentProps<typeof RunPlansTable> = {
     plans,
     isLoading: false,
-    hasAnyRuns: true,
+    hasAnyPlans: true,
     period,
     periodMode: "relative",
     setPeriod: vi.fn(),
@@ -347,7 +347,7 @@ describe("the Test Runs list", () => {
   });
 
   it("says a project with no run has none", () => {
-    renderPlans([], { hasAnyRuns: false });
+    renderPlans([], { hasAnyPlans: false });
 
     expect(screen.getByText("No runs yet")).toBeInTheDocument();
   });

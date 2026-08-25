@@ -60,7 +60,7 @@ const makeVersion = (overrides: Record<string, unknown> = {}) => ({
   changeDescription: null,
   changedFields: ["name"],
   createdAt: "2026-02-01T10:00:00.000Z",
-  synthesized: false,
+  isSynthesized: false,
   ...overrides,
 });
 
@@ -102,7 +102,7 @@ describe("the scenario version commands", () => {
             authorLabel: null,
             changeDescription: "Created",
             changedFields: [],
-            synthesized: true,
+            isSynthesized: true,
           }),
         ],
         nextCursor: null,

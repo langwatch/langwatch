@@ -36,7 +36,7 @@ type VersionEntry = {
   changeDescription: string | null;
   changedFields: string[];
   createdAt: Date | string;
-  synthesized: boolean;
+  isSynthesized: boolean;
 };
 
 /** Who saved a version, in the words the reader knows the writer by. */
@@ -182,7 +182,7 @@ function VersionList({
                 held === entry.version ? null : entry.version,
               )
             }
-            canRestore={can("scenarios:manage") && !entry.synthesized}
+            canRestore={can("scenarios:manage") && !entry.isSynthesized}
             isConfirming={confirmingVersion === entry.version}
             isRestoring={
               restoreMutation.isPending &&
@@ -319,7 +319,7 @@ function VersionRow({
         )}
       </HStack>
 
-      {isOpen && !entry.synthesized && (
+      {isOpen && !entry.isSynthesized && (
         <VersionContent scenarioId={scenarioId} version={entry.version} />
       )}
     </VStack>

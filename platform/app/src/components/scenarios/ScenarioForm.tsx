@@ -220,6 +220,7 @@ function useResetOnDefaultsChange({
           defaultValues.parameters,
           defaultValues.maxTurns,
           defaultValues.minTurns,
+          defaultValues.folderId,
         ])
       : null;
     if (currentDefaults !== prevDefaultsRef.current) {
@@ -231,6 +232,7 @@ function useResetOnDefaultsChange({
           criteria: [],
           labels: [],
           parameters: [],
+          folderId: null,
           ...defaultValues,
         });
       }

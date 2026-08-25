@@ -506,6 +506,40 @@ function MissingProviderNotice() {
  * The writes of the dialog: persist the target, then start the run through
  * the path the subject uses.
  */
+type RunAttempt = {
+  /** What the person is queueing: subject, targets, note and parameters. */
+  key: string;
+  idempotencyKey: string;
+  batchRunId: string;
+};
+
+/**
+ * Holds the identity of the run the person is trying to queue. A failed
+ * attempt keeps its identity, so a retry of the same request deduplicates on
+ * the server instead of queueing a second batch. A queued run drops it, so
+ * the next run is a new batch.
+ */
+function useRunAttempt() {
+  const attemptRef = useRef<RunAttempt | null>(null);
+
+  const takeRunAttempt = useCallback((key: string): RunAttempt => {
+    if (attemptRef.current?.key !== key) {
+      attemptRef.current = {
+        key,
+        idempotencyKey: crypto.randomUUID(),
+        batchRunId: generate(KSUID_RESOURCES.SCENARIO_BATCH).toString(),
+      };
+    }
+    return attemptRef.current;
+  }, []);
+
+  const clearRunAttempt = useCallback(() => {
+    attemptRef.current = null;
+  }, []);
+
+  return { takeRunAttempt, clearRunAttempt };
+}
+
 function useRunDialogSubmit({
   subject,
   target,
@@ -530,6 +564,7 @@ function useRunDialogSubmit({
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
   const utils = api.useUtils();
+  const { takeRunAttempt, clearRunAttempt } = useRunAttempt();
   const setLastRunTarget = useAgentTestingStore(
     (state) => state.setLastRunTarget,
   );
@@ -678,14 +713,21 @@ function useRunDialogSubmit({
       return;
     }
 
-    const batchRunId = generate(KSUID_RESOURCES.SCENARIO_BATCH).toString();
+    // One identity per attempt, not per click. The dialog stays open when the
+    // call fails, and a request that timed out may already be accepted, so a
+    // retry has to carry the same key or the server queues a second batch.
+    // Editing the note, the parameters or the targets starts a new attempt.
+    const attempt = takeRunAttempt(
+      JSON.stringify([subject, suiteTargets, noteInput, runParameters]),
+    );
+    const { batchRunId } = attempt;
     try {
       if (subject.kind === "suite") {
         await persistTargetChoice();
         const result = await runSuite.mutateAsync({
           projectId,
           id: subject.suiteId,
-          idempotencyKey: crypto.randomUUID(),
+          idempotencyKey: attempt.idempotencyKey,
           batchRunId,
           note: noteInput,
           parameters: runParameters,
@@ -698,7 +740,7 @@ function useRunDialogSubmit({
         if (target) setLastRunTarget(target);
         const result = await runAll.mutateAsync({
           projectId,
-          idempotencyKey: crypto.randomUUID(),
+          idempotencyKey: attempt.idempotencyKey,
           batchRunId,
           targets: suiteTargets,
           note: noteInput,
@@ -706,11 +748,14 @@ function useRunDialogSubmit({
         });
         onRunStarted({ batchRunId: result.batchRunId ?? batchRunId });
       }
+      clearRunAttempt();
       onClose();
     } catch (error) {
       surfaceError(error);
     }
   }, [
+    takeRunAttempt,
+    clearRunAttempt,
     subject,
     projectId,
     target,

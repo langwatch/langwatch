@@ -32,7 +32,7 @@ export function ResultsTab({ sseConnected }: ResultsTabProps) {
   const { planSlug, batchRunId, isReady, selectPlan, selectRun } =
     useAgentTestingRouting();
   const { period, mode, setPeriod, setRelativePeriod } = usePeriodSelector(30);
-  const { plans, isLoading, hasAnyRuns } = useRunPlans({ period });
+  const { plans, isLoading, hasAnyPlans } = useRunPlans({ period });
 
   const selectedPlan = planSlug
     ? resolveRunPlan({ plans, planSlug, projectId: project?.id ?? "" })
@@ -93,7 +93,7 @@ export function ResultsTab({ sseConnected }: ResultsTabProps) {
         <RunPlansTable
           plans={plans}
           isLoading={isLoading || (!!planSlug && !selectedPlan)}
-          hasAnyRuns={hasAnyRuns}
+          hasAnyPlans={hasAnyPlans}
           period={period}
           periodMode={mode}
           setPeriod={setPeriod}

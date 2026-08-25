@@ -53,7 +53,7 @@ export interface AgentTestingState {
   cancellingJobId: string | null;
 
   setViewMode: (value: AgentTestingViewMode) => void;
-  setRailCollapsed: (value: boolean) => void;
+  setRailCollapsed: (isCollapsed: boolean) => void;
   toggleRailCollapsed: () => void;
   setFolderExpanded: (folderId: string, expanded: boolean) => void;
   toggleFolder: (folderId: string) => void;
@@ -74,10 +74,10 @@ function readStoredRailCollapsed(): boolean {
   }
 }
 
-function storeRailCollapsed(value: boolean): void {
+function storeRailCollapsed(isCollapsed: boolean): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(AGENT_TESTING_RAIL_COLLAPSED_KEY, String(value));
+    localStorage.setItem(AGENT_TESTING_RAIL_COLLAPSED_KEY, String(isCollapsed));
   } catch {
     // localStorage unavailable
   }
@@ -118,9 +118,9 @@ export function createAgentTestingStore() {
 
     setViewMode: (value) => set({ viewMode: value }),
 
-    setRailCollapsed: (value) => {
-      storeRailCollapsed(value);
-      set({ railCollapsed: value });
+    setRailCollapsed: (isCollapsed) => {
+      storeRailCollapsed(isCollapsed);
+      set({ railCollapsed: isCollapsed });
     },
 
     toggleRailCollapsed: () => {

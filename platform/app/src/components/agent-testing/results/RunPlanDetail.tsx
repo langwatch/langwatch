@@ -132,14 +132,16 @@ export function RunPlanDetail({
     });
 
   // The run number counts the runs of the window, so the newest run of the
-  // window carries the count itself.
+  // window carries the count itself. No upper bound, for the same reason
+  // useRunHistoryPagination sends none: the pinned `period.endDate` would
+  // hold the count at page load while the list keeps growing, and the run
+  // numbers would stop matching the rows.
   const { data: batchCount } =
     api.scenarios.getScenarioSetBatchRunCount.useQuery(
       {
         projectId,
         scenarioSetId: plan.scenarioSetId,
         startDate: startDateMs,
-        endDate: endDateMs,
       },
       { enabled: !!project },
     );

@@ -9,7 +9,7 @@
  */
 
 import { Button, HStack, Input, VStack } from "@chakra-ui/react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePeriodSelector } from "~/components/PeriodSelector";
 import { ScenarioArchiveDialog } from "~/components/scenarios/ScenarioArchiveDialog";
 import { Dialog } from "~/components/ui/dialog";
@@ -458,7 +458,14 @@ function RenameSuiteDialog({
   onClose: () => void;
   onRename: (name: string) => void;
 }) {
-  const [name, setName] = useState("");
+  const [name, setName] = useState(suite?.name ?? "");
+
+  // The dialog root stays mounted, so the field has to follow the suite the
+  // menu opened. Without this a name typed for one suite is saved onto the
+  // next suite the person edits.
+  useEffect(() => {
+    setName(suite?.name ?? "");
+  }, [suite?.id, suite?.name]);
 
   return (
     <Dialog.Root
@@ -478,7 +485,7 @@ function RenameSuiteDialog({
             autoFocus
             size="sm"
             aria-label="Test suite name"
-            defaultValue={suite?.name ?? ""}
+            value={name}
             onChange={(event) => setName(event.target.value)}
           />
         </Dialog.Body>
@@ -490,7 +497,7 @@ function RenameSuiteDialog({
             colorPalette="blue"
             size="sm"
             loading={isLoading}
-            onClick={() => onRename((name || suite?.name) ?? "")}
+            onClick={() => onRename(name.trim() || (suite?.name ?? ""))}
           >
             Save
           </Button>
