@@ -10,6 +10,8 @@ import (
 	"os/exec"
 	"os/signal"
 	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -48,8 +50,10 @@ func runSlot(ctx context.Context, _ deps, inv invocation) error {
 	}
 	switch inv.raw[0] {
 	case "explain":
+		env := slotCheckEnv()
+		reportGateOffIgnored(env)
 		pressure := resolveSlotPressure()
-		slots, source := resolveSlotLimit(pressure)
+		slots, source := resolveSlotLimit(pressure, env)
 		fmt.Printf("slots=%d source=%s\n", slots, source)
 		fmt.Printf("pressure=%s\n", pressure)
 		fmt.Printf("gomemlimit=%s\n", domain.CheckGoMemLimit(system.New().TotalMemory(), os.Getenv("GOMEMLIMIT"), pressure))
@@ -62,6 +66,7 @@ func runSlot(ctx context.Context, _ deps, inv invocation) error {
 		if err != nil {
 			return err
 		}
+		reportGateOffIgnored(slotCheckEnv())
 		job := &slotJob{
 			sem:      semaphore.New(havenHome()),
 			label:    label,
@@ -78,15 +83,77 @@ func runSlot(ctx context.Context, _ deps, inv invocation) error {
 	}
 }
 
-func resolveSlotLimit(pressure domain.Pressure) (int, string) {
+func resolveSlotLimit(pressure domain.Pressure, env domain.CheckEnv) (int, string) {
 	return domain.ResolveCheckSlots(
 		domain.CheckMachine{
 			TotalRAMBytes: system.New().TotalMemory(),
 			NumCPU:        runtime.NumCPU(),
 			Pressure:      pressure,
 		},
-		domain.CheckEnv{CheckSlots: os.Getenv("CHECK_SLOTS"), CI: os.Getenv("CI")},
+		env,
 	)
+}
+
+// slotCheckEnv reads the environment the slot limit is resolved from. The
+// ancestry walk behind HeldByQueue runs only when the marker is present, which
+// is only on runs the queue itself spawned.
+func slotCheckEnv() domain.CheckEnv {
+	return domain.CheckEnv{
+		CheckSlots:  os.Getenv("CHECK_SLOTS"),
+		CI:          os.Getenv("CI"),
+		Claudecode:  os.Getenv("CLAUDECODE"),
+		HeldByQueue: heldByLiveAncestor(os.Getenv("CHECK_QUEUE_HELD")),
+	}
+}
+
+// reportGateOffIgnored says why the limit still applies when an agent shell
+// asked for the gate to be off. Silence here would read as a broken override.
+func reportGateOffIgnored(env domain.CheckEnv) {
+	if !domain.GateOffIgnored(env) {
+		return
+	}
+	fmt.Fprintf(os.Stderr,
+		"checks: CHECK_SLOTS=%s is ignored in an agent shell; the machine policy applies. Only a person may turn the queue off.\n",
+		strings.TrimSpace(env.CheckSlots))
+}
+
+// heldByLiveAncestor verifies a CHECK_QUEUE_HELD marker: the pid it names must
+// sit above this process in the live parent chain, so only a wrapper that
+// spawned this run — an ancestor by construction — can convince it. A chain
+// that cannot be read answers no: a marker that cannot be verified must gate
+// nothing off.
+func heldByLiveAncestor(raw string) bool {
+	candidate, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || candidate <= 1 {
+		return false
+	}
+	current := os.Getpid()
+	for hop := 0; hop < 64; hop++ {
+		parent := parentPid(current)
+		if parent <= 1 {
+			return false
+		}
+		if parent == candidate {
+			return true
+		}
+		current = parent
+	}
+	return false
+}
+
+// parentPid reads a process's parent through ps, which is what works for a pid
+// that is not our own. Zero means it could not be read.
+func parentPid(pid int) int {
+	cmd := exec.CommandContext(context.Background(), "ps", "-o", "ppid=", "-p", strconv.Itoa(pid)) //nolint:gosec // G204: fixed argv, the only variable is an integer
+	out, err := cmd.Output()
+	if err != nil {
+		return 0
+	}
+	parent, err := strconv.Atoi(strings.TrimSpace(string(out)))
+	if err != nil || parent < 0 {
+		return 0
+	}
+	return parent
 }
 
 // resolveSlotPressure measures once per invocation: the level shapes the
@@ -146,7 +213,7 @@ type slotJob struct {
 // a semaphore error and the maximum wait both degrade to running anyway, with
 // a line on stderr saying so.
 func (j *slotJob) run(ctx context.Context) int {
-	j.slots, _ = resolveSlotLimit(j.pressure)
+	j.slots, _ = resolveSlotLimit(j.pressure, slotCheckEnv())
 	if j.slots <= 0 {
 		return slotExec(ctx, j.argv, j.pressure)
 	}
@@ -215,8 +282,10 @@ func (j *slotJob) report(waited time.Duration) {
 	}
 }
 
-// slotExec runs argv with stdio inherited, CHECK_SLOTS=0 so nothing below the
-// slot queues behind it, and GOMEMLIMIT (unless the operator set one) so the
+// slotExec runs argv with stdio inherited, CHECK_SLOTS=0 with this pid in
+// CHECK_QUEUE_HELD so nothing below the slot queues behind it (the marker is
+// what agent shells honor, and it only convinces a descendant), and GOMEMLIMIT
+// (unless the operator set one) so the
 // Go-runtime tools this queue wraps degrade to slower instead of resident
 // (ADR-095); under memory pressure GOMAXPROCS is capped too, so the run leaves
 // cores for the person at the keyboard. Signals are forwarded so Ctrl-C
@@ -228,6 +297,7 @@ func slotExec(ctx context.Context, argv []string, pressure domain.Pressure) int 
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	cmd.Env = append(os.Environ(),
 		"CHECK_SLOTS=0",
+		"CHECK_QUEUE_HELD="+strconv.Itoa(os.Getpid()),
 		"GOMEMLIMIT="+domain.CheckGoMemLimit(system.New().TotalMemory(), os.Getenv("GOMEMLIMIT"), pressure),
 	)
 	if procs := domain.CheckGoMaxProcs(runtime.NumCPU(), os.Getenv("GOMAXPROCS"), pressure); procs != "" {

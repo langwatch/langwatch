@@ -21,9 +21,16 @@
  *
  * Environment:
  *   CHECK_SLOTS=N            How many checks may proceed at once. 0 (or "off")
- *                            disables the queue entirely. Unset derives a limit
- *                            from the machine, and is off under CI, where one
- *                            job runs one check.
+ *                            disables the queue entirely — from a person's
+ *                            shell. Agent shells carry CLAUDECODE, and there a
+ *                            gate-off is ignored: an agent may not remove the
+ *                            machine-wide serialization that exists because of
+ *                            agents. Unset derives a limit from the machine,
+ *                            and is off under CI, where one job runs one check.
+ *   CHECK_QUEUE_HELD=<pid>   Set by the queue itself on everything below a
+ *                            wrapper that already counted the run. Honored
+ *                            only when the pid is a live ancestor, so a copied
+ *                            value gates nothing off.
  *   CHECK_PRESSURE=<level>   Forces the memory-pressure level (green, amber or
  *                            red) instead of measuring it. Unset measures; a
  *                            misspelling measures too. Under amber or red the
@@ -45,7 +52,8 @@
  * the read-decide-write step between processes.
  *
  * `haven typecheck` (ADR-064) holds one of its own RAM slots and passes
- * CHECK_SLOTS=0 to the run it spawns, so a run is never counted twice.
+ * CHECK_SLOTS=0 with its pid in CHECK_QUEUE_HELD to the run it spawns, so a
+ * run is never counted twice.
  */
 
 import { spawn, spawnSync } from "node:child_process";
@@ -77,13 +85,13 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * The CI convention: the variable is set to something that is not one of the
- * values meaning "not CI". The slot limit and the pressure policy both ask
- * this, so they ask it in one place and cannot drift apart. Mirrors
- * isTruthyCI in tools/thuishaven/domain/checkslots.go.
+ * values meaning "no". CI and CLAUDECODE both follow it, so the slot limit and
+ * the pressure policy read them by one rule that cannot drift apart. Mirrors
+ * isTruthyEnv in tools/thuishaven/domain/checkslots.go.
  */
-function isTruthyCI(ci) {
-  const value = (ci ?? "").trim().toLowerCase();
-  return value !== "" && value !== "0" && value !== "false";
+function isTruthyEnv(value) {
+  const normalized = (value ?? "").trim().toLowerCase();
+  return normalized !== "" && normalized !== "0" && normalized !== "false";
 }
 
 /**
@@ -109,7 +117,7 @@ function resolvePressure(env) {
   if (forced === "green" || forced === "amber" || forced === "red") {
     return forced;
   }
-  if (isTruthyCI(env.CI)) return "green";
+  if (isTruthyEnv(env.CI)) return "green";
   if (process.platform !== "darwin") return "green";
 
   const probe = (command, args) => {
@@ -152,10 +160,46 @@ function resolvePressure(env) {
 }
 
 /**
+ * The parent of `pid`, read through ps because Node only knows its own parent,
+ * or null when it cannot be read.
+ */
+function parentOfPid(pid) {
+  try {
+    const result = spawnSync("ps", ["-o", "ppid=", "-p", String(pid)], {
+      encoding: "utf8",
+      timeout: 2000,
+    });
+    if (result.status !== 0) return null;
+    const parent = Number.parseInt((result.stdout ?? "").trim(), 10);
+    return Number.isInteger(parent) && parent > 0 ? parent : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether `candidate` sits above this process in the live parent chain. A
+ * chain that cannot be read answers no: a marker that cannot be verified must
+ * gate nothing off.
+ */
+function isLiveAncestor(candidate) {
+  let current = process.pid;
+  for (let hop = 0; hop < 64; hop++) {
+    const parent = parentOfPid(current);
+    if (parent === null || parent <= 1) return false;
+    if (parent === candidate) return true;
+    current = parent;
+  }
+  return false;
+}
+
+/**
  * Resolves how many checks may proceed at once.
  *
  * An explicit CHECK_SLOTS always wins, including under CI, which is what lets
- * the tests exercise the queue on a CI runner. Unset, CI gets no queue at all
+ * the tests exercise the queue on a CI runner. One exception: a gate-off value
+ * from an agent shell is ignored, see the comment at the check. Unset, CI gets
+ * no queue at all
  * (one job runs one check, so a gate could only add risk) and a developer
  * machine gets a limit bounded by both memory and cores: tsgo is memory-hungry
  * AND parallel, so the tighter of the two bounds is the honest one. Never below
@@ -170,11 +214,28 @@ function resolvePressure(env) {
 function resolveSlots(env, pressure = "green") {
   const raw = (env.CHECK_SLOTS ?? "").trim();
   if (raw !== "") {
-    if (/^(off|none|unlimited|false)$/i.test(raw)) {
-      return { slots: 0, source: "CHECK_SLOTS" };
-    }
     const parsed = Number.parseInt(raw, 10);
-    if (Number.isNaN(parsed) || parsed < 0) {
+    const gateOff = /^(off|none|unlimited|false)$/i.test(raw) || parsed === 0;
+    if (gateOff) {
+      // The gate-off is the operator's lever, and agents are who the queue
+      // exists to serialize, so from an agent shell (Claude Code sets
+      // CLAUDECODE in every shell it spawns) it is honored only when the queue
+      // itself asked for it: a wrapper that already counted the run puts its
+      // own pid in CHECK_QUEUE_HELD, and only a live ancestor counts, so a
+      // copied pid gates nothing off. Observed in the wild: an agent prefixed
+      // CHECK_SLOTS=0 onto a whole-tree typecheck to jump the queue, and the
+      // machine ran three checks at once, 14 GB into swap.
+      if (!isTruthyEnv(env.CLAUDECODE)) {
+        return { slots: 0, source: "CHECK_SLOTS" };
+      }
+      const held = Number.parseInt((env.CHECK_QUEUE_HELD ?? "").trim(), 10);
+      if (Number.isInteger(held) && held > 1 && isLiveAncestor(held)) {
+        return { slots: 0, source: "held" };
+      }
+      stderr(
+        `${PREFIX} CHECK_SLOTS=${raw} is ignored in an agent shell; the machine policy applies. Only a person may turn the queue off.\n`,
+      );
+    } else if (Number.isNaN(parsed) || parsed < 0) {
       stderr(
         `${PREFIX} ignoring CHECK_SLOTS=${raw}, expected a non-negative integer\n`,
       );
@@ -183,7 +244,7 @@ function resolveSlots(env, pressure = "green") {
     }
   }
 
-  if (isTruthyCI(env.CI)) {
+  if (isTruthyEnv(env.CI)) {
     return { slots: 0, source: "CI" };
   }
 
@@ -528,8 +589,12 @@ function runCommand(commandArgv, pressure = "green") {
       // We are the slot for everything below us. Without this, a run holding
       // the only slot queues behind itself the moment it reaches a bin shim
       // (`pnpm typecheck` spawns .bin/tsgo, which is one) or a nested package
-      // script, and waits out the whole maximum wait before starting.
+      // script, and waits out the whole maximum wait before starting. The pid
+      // marker is what keeps this working in agent shells, where a bare
+      // CHECK_SLOTS=0 is ignored; it only convinces a descendant, so an agent
+      // cannot borrow it.
       CHECK_SLOTS: "0",
+      CHECK_QUEUE_HELD: String(process.pid),
       GOMEMLIMIT: goMemLimit(pressure),
     };
     const procs = goMaxProcs(pressure);

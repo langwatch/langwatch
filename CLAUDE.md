@@ -208,9 +208,11 @@ delegates the run to `haven slot run`, which gates on the same flock semaphore
 haven (`CHECK_QUEUE_IMPL=js` forces it). With a slot free it prints nothing
 and is otherwise transparent (same stdio, same exit code). Queued, it says so on
 stderr, which is what tells you a slow run was waiting rather than hung.
-`CHECK_SLOTS=N` overrides the limit and `CHECK_SLOTS=0` turns the queue off;
-unset, the limit comes from the machine (one per 6 GiB of RAM, capped at one per
-4 cores) and CI does not queue at all. `node dev/scripts/check-queue.mjs
+`CHECK_SLOTS=N` overrides the limit, and `CHECK_SLOTS=0` turns the queue off
+from a person's shell only: agent shells carry `CLAUDECODE`, and a gate-off
+there is ignored with a note (never set `CHECK_SLOTS` yourself — the queue
+exists to serialize agents). Unset, the limit comes from the machine (one per
+6 GiB of RAM, capped at one per 4 cores) and CI does not queue at all. `node dev/scripts/check-queue.mjs
 --explain` shows the limit and who currently holds a slot. Don't cap the tools'
 own threads instead (`RAYON_NUM_THREADS` does work on biome): it spends the same
 CPU over 5x the wall clock. See `specs/setup/check-slots.feature`.
@@ -222,8 +224,9 @@ CPU over 5x the wall clock. See `specs/setup/check-slots.feature`.
 a slot too. Only whole-tree runs do: a `-p`/`--project`, a directory argument, or
 no path argument at all. Naming files (`tsc --noEmit src/foo.ts`) stays instant
 and unqueued, and `--watch` / `--lsp` never queue, since they would hold a slot
-for the session. A run that already holds a slot exports `CHECK_SLOTS=0` to
-everything it spawns, so it can't queue behind itself. The installer stands
+for the session. A run that already holds a slot exports `CHECK_SLOTS=0` with
+its pid in `CHECK_QUEUE_HELD` to everything it spawns, so it can't queue behind
+itself; the marker only convinces a descendant of that run. The installer stands
 down entirely when `NODE_ENV=production` or `CI` is set to anything but `0` or
 `false`, so an image build or a server install keeps pnpm's own bin entries.
 

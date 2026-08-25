@@ -319,6 +319,32 @@ func TestSlotRunQueuesAndSaysSo(t *testing.T) {
 }
 
 // @scenario "A signal delivered to the whole process group still counts as forwarded"
+// @scenario "A borrowed held-marker does not turn the queue off"
+func TestHeldByLiveAncestor(t *testing.T) {
+	if !heldByLiveAncestor(strconv.Itoa(os.Getppid())) {
+		t.Fatal("the test binary's own parent must count as a live ancestor")
+	}
+	for _, raw := range []string{"", "1", "0", "-4", "bananas"} {
+		if heldByLiveAncestor(raw) {
+			t.Fatalf("%q must not verify as a held marker", raw)
+		}
+	}
+
+	// A live process that is not above us: an agent copying a wrapper's pid
+	// into its own environment is exactly this shape.
+	bystander := exec.Command("sleep", "30")
+	if err := bystander.Start(); err != nil {
+		t.Fatalf("starting the bystander: %v", err)
+	}
+	defer func() {
+		_ = bystander.Process.Kill()
+		_ = bystander.Wait()
+	}()
+	if heldByLiveAncestor(strconv.Itoa(bystander.Process.Pid)) {
+		t.Fatal("a live process that is not an ancestor must not verify")
+	}
+}
+
 func TestSignalRelayRecordsAQueuedSignal(t *testing.T) {
 	child := exec.Command("sleep", "10")
 	if err := child.Start(); err != nil {
