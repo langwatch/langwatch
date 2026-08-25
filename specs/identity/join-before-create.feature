@@ -30,7 +30,9 @@ Feature: Join before create - the choice happens before an organization is minte
   # they found their real team. This is the step that stops the bleeding; the
   # ones already there are a separate question.
   #
-  # Ships behind JOIN_REQUESTS, rendered by screens behind IDENTITY_ROUTER_V2.
+  # On for everybody — the JOIN_REQUESTS flag is retired (see
+  # specs/identity/join-requests.feature) — rendered by screens behind
+  # IDENTITY_ROUTER_V2.
 
   Background:
     Given the first-party sign-up screens are enforced

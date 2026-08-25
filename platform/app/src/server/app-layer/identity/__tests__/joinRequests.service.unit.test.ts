@@ -67,7 +67,6 @@ function harness({
   lastRejectionAt = null,
   licensed = true,
   policyEntitled = true,
-  enabled = true,
   isMember = false,
   memberOf,
   dismissedDomains = [],
@@ -80,7 +79,6 @@ function harness({
   licensed?: boolean;
   /** Whether this organization's PLAN carries the who-can-join control. */
   policyEntitled?: boolean;
-  enabled?: boolean;
   isMember?: boolean;
   /** Membership per organization, for the cases where "already in one" and
    *  "not in the other" is the whole point. Overrides `isMember`. */
@@ -149,7 +147,6 @@ function harness({
     dismissals,
     autoJoinLicensed,
     joinPolicyEntitled,
-    enabled: async () => enabled,
     now: () => NOW,
   });
 
@@ -172,30 +169,6 @@ beforeEach(() => {
     allowed: true,
     remaining: 5,
     resetAt: NOW + 60_000,
-  });
-});
-
-describe("given the join-requests flag is off", () => {
-  describe("when somebody looks up or asks", () => {
-    /** @scenario With the flag off nothing here exists */
-    it("answers nothing and refuses the ask", async () => {
-      const { service, requests } = harness({ enabled: false });
-
-      expect(
-        await service.lookup({
-          userId: "user_sam",
-          verifiedEmail: "sam@acme.com",
-        }),
-      ).toEqual({ outcome: "none" });
-      await expect(
-        service.request({
-          userId: "user_sam",
-          verifiedEmail: "sam@acme.com",
-          organizationId: "org_acme",
-        }),
-      ).rejects.toMatchObject({ code: "join_not_available" });
-      expect(requests.requestJoin).not.toHaveBeenCalled();
-    });
   });
 });
 
@@ -927,25 +900,6 @@ describe("given an organization that admits its domain automatically", () => {
         verifiedEmail: "sam@acme.com",
       });
       expect(joined?.organization.organizationId).toBe("org_acme");
-    });
-  });
-
-  describe("when the join-requests flag is off", () => {
-    /** @scenario With the flag off nobody joins automatically */
-    it("joins nothing, whatever the organization's setting says", async () => {
-      const { service, requests, membership } = harness({
-        enabled: false,
-        candidates: [admitting],
-      });
-
-      expect(
-        await service.joinAutomaticallyIfAdmitted({
-          userId: "user_sam",
-          verifiedEmail: "sam@acme.com",
-        }),
-      ).toBeNull();
-      expect(requests.requestJoin).not.toHaveBeenCalled();
-      expect(membership.attachDefaultMembership).not.toHaveBeenCalled();
     });
   });
 

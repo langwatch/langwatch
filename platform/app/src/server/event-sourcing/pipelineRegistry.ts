@@ -794,10 +794,11 @@ export class PipelineRegistry {
       }),
     );
 
-    // The join-request pipeline (ADR-117, D12). Ships dark: `JOIN_REQUESTS`
-    // defaults off, so nothing dispatches a join command, no interstitial
-    // renders and no admin panel appears — a deploy changes nothing on its
-    // own, and rollback is the flag.
+    // The join-request pipeline (ADR-117, D12). The `JOIN_REQUESTS` flag that
+    // used to keep this dark is retired: nothing dispatches a join command
+    // unless an address is verified, its domain is a company one, and an
+    // organization opted in — which is the gate that was always doing the
+    // work. Rollback is the customer's own joining setting.
     this.deps.eventSourcing.register(
       createJoinRequestPipeline({
         joinRequestProjectionStore:

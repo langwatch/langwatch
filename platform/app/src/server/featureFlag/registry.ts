@@ -371,17 +371,12 @@ export const FEATURE_FLAGS = [
     description:
       "Minimising Langy sinks the panel to an edge peek of itself — a sliver of the card at the bottom edge (floating) or of the dock's spine at the right edge (sidebar) that rises on pointer proximity and opens on click (spec: specs/langy/langy-peek-dock.feature). Off = the classic corner launcher orb. Only the closed-state affordance changes; the panel and its Cmd/Ctrl+I activation are the same either way. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_langy_peek_dock_enabled.",
   },
-  {
-    // D12 (ADR-117). Named `join_requests` rather than the usual
-    // `release_...` prefix so its auto-derived env override is exactly
-    // `JOIN_REQUESTS`, which is the operator lever the epic names and the
-    // one thing rollback consists of.
-    key: "join_requests",
-    scope: "PRODUCT",
-    defaultValue: false,
-    description:
-      "Lets somebody with a verified company address find the organization their colleagues are already in and ask to join it, and lets an administrator turn that into automatic joining for a domain they name (spec: specs/identity/join-requests.feature, join-matching-and-privacy.feature, domain-auto-join.feature, join-before-create.feature). Off = the sign-up interstitial never renders, the members area shows no requests section, the lookup answers nothing to everyone, and no join command is ever dispatched. This is the whole of the rollback. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=join_requests, or set JOIN_REQUESTS=1 on a deployment.",
-  },
+  // `join_requests` (D12, ADR-117) was here and is retired. The feature is on
+  // for everybody: the lookup already answers the universal nothing to an
+  // unverified address, a consumer domain, an organization that turned joining
+  // off and one the caller is already in, so what the flag actually gated was
+  // an offer that had passed every one of those. It is not a rollback lever
+  // any more; the setting on the Access page is.
   {
     // D05 tier 3 (ADR-117). Named `self_serve_sso` rather than the usual
     // `release_...` prefix so its auto-derived env override is exactly

@@ -175,8 +175,6 @@ export interface JoinRequestsServiceDeps {
    * the composition root reads a subscription row or a license file.
    */
   joinPolicyEntitled: (args: { organizationId: string }) => Promise<boolean>;
-  /** Whether any of this exists at all. Flag off, nothing here runs. */
-  enabled: (args: { userId: string }) => Promise<boolean>;
   now?: () => number;
 }
 
@@ -219,7 +217,6 @@ export class JoinRequestsService {
     userId: string;
     verifiedEmail: string | null;
   }): Promise<JoinLookupDecision> {
-    if (!(await this.deps.enabled({ userId }))) return { outcome: "none" };
     if (!verifiedEmail) return { outcome: "none" };
 
     const domain = joinDomainOf(verifiedEmail);
@@ -326,9 +323,6 @@ export class JoinRequestsService {
     verifiedEmail: string | null;
     organizationId: string;
   }): Promise<{ joinRequestId: string; state: "PENDING" | "APPROVED" }> {
-    if (!(await this.deps.enabled({ userId }))) {
-      throw new JoinNotAvailableError("join requests are not enabled here");
-    }
     const domain = this.provenDomainOrRefuse({ verifiedEmail });
     const candidate = await this.deps.candidates.findCandidateOrganization({
       organizationId,

@@ -43,7 +43,8 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
   # deployments that have no other way out. So the gate holds automatic
   # joining and lets requests through.
   #
-  # Ships behind JOIN_REQUESTS.
+  # On for everybody: the JOIN_REQUESTS flag is retired (see
+  # specs/identity/join-requests.feature).
 
   Background:
     Given an organization "acme" with an administrator "ana"
@@ -182,9 +183,7 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
     Then "sam" is not a member of anything
     And verifying the address is what admits them
 
-  @unit
-  Scenario: With the flag off nobody joins automatically
-    Given the join-requests flag is off
-    And "acme" carries an automatic joining setting from a previous bake
-    When "sam" completes sign-up and verification
-    Then "sam" joins nothing and sign-up proceeds as it did before
+  # `JOIN_REQUESTS` is retired (see specs/identity/join-requests.feature).
+  # Automatic joining is still gated, and by the two things that actually
+  # decide it: the administrator's own setting with a domain named on it, and
+  # the licence. Neither of those is a bake flag.

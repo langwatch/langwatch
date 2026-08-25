@@ -50,7 +50,8 @@ Feature: Which organization takes my address - matching rules and what they reve
   # the deny-list has not heard of can receive mail on a domain, and only
   # whoever controls the domain can prove it.
   #
-  # Ships behind JOIN_REQUESTS.
+  # On for everybody: the JOIN_REQUESTS flag is retired (see
+  # specs/identity/join-requests.feature).
 
   Background:
     Given "sam" is signing up with "sam@acme.com"

@@ -679,8 +679,6 @@ export function joinRequestsService(): JoinRequestsService {
     joinPolicyEntitled: async ({ organizationId }) =>
       (await getApp().planProvider.getActivePlan({ organizationId })).type ===
       PlanTypes.ENTERPRISE,
-    enabled: ({ userId }) =>
-      featureFlagService.isEnabled("join_requests", { distinctId: userId }),
   });
 }
 
