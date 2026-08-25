@@ -1,5 +1,3 @@
-import { AiToolEntryService } from "@ee/governance/services/aiToolEntry.service";
-import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
@@ -8,7 +6,6 @@ import {
 } from "~/server/app-layer/billing/nurturing/productInterest";
 import { fireSignupNurturingCalls } from "~/server/app-layer/billing/nurturing/signupIdentification";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
 import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { organizationRouter } from "../organization";
@@ -72,7 +69,7 @@ export const onboardingRouter = createTRPCRouter({
         // organization they just created, and the aiTools.list read path
         // lazily provisions the same set on first portal load anyway.
         try {
-          await AiToolEntryService.create(ctx.prisma).ensureDefaultCatalog({
+          await ctx.app.governance.aiTools.ensureDefaultCatalog({
             organizationId: orgResult.organization.id,
           });
         } catch (error) {
@@ -95,10 +92,7 @@ export const onboardingRouter = createTRPCRouter({
         // `user.personalContext` backfills lazily on the next session.
         if (input.primaryIntent === "AGENT_GOVERNANCE") {
           try {
-            const personalWorkspaceService = new PersonalWorkspaceService(
-              ctx.prisma,
-            );
-            await personalWorkspaceService.ensure({
+            await ctx.app.organizations.ensurePersonalWorkspace({
               userId: ctx.session.user.id,
               organizationId: orgResult.organization.id,
               displayName: ctx.session.user.name,
@@ -147,11 +141,11 @@ export const onboardingRouter = createTRPCRouter({
           };
 
           await Promise.all([
-            getApp().notifications.sendSlackSignupEvent({
+            ctx.app.notifications.sendSlackSignupEvent({
               ...signupPayload,
               utmCampaign: input.signUpData?.utmCampaign,
             }),
-            getApp().notifications.sendHubspotSignupForm(signupPayload),
+            ctx.app.notifications.sendHubspotSignupForm(signupPayload),
           ]);
         } catch (error) {
           captureException(toError(error));
