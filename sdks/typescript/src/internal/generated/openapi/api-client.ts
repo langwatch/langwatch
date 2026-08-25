@@ -3083,6 +3083,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/secrets/by-name/{name}/value": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read a secret's value by name. Requires the secrets:manage grain, because a caller that can replace a secret can already choose its next value. */
+        get: operations["getApiSecretsByNameByNameValue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/secrets/{id}": {
         parameters: {
             query?: never;
@@ -23163,6 +23180,92 @@ export interface operations {
             };
             /** @description Secret with this name already exists */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiSecretsByNameByNameValue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        name: string;
+                        value: string;
+                        updatedAt: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Secret not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

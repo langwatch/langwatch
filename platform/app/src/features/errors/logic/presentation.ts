@@ -1640,6 +1640,21 @@ const presentations = {
     describe: () =>
       "Nothing was charged. Close this and open it again to see the current amount.",
   },
+  secret_not_found: {
+    // The caller supplied the name, so the answer is the name, not the store.
+    // Never says whether some other project holds it.
+    title: "No secret with that name",
+    describe: () =>
+      "This project holds no secret under that name. Check the spelling, or add it under Settings and Secrets.",
+  },
+  secret_value_unreadable: {
+    // fault: platform. The stored bytes no longer open. The customer did
+    // nothing wrong and cannot repair them, but writing the value again does
+    // fix it, so the copy leads with that instead of with an apology.
+    title: "This secret's value can't be read back",
+    describe: () =>
+      "Enter the value again to replace what is stored. Anything using this secret keeps failing until you do.",
+  },
   seat_billing_unavailable: {
     // fault: provider. The payment provider didn't answer. Nothing was
     // charged, and saying so is the first thing anyone wants to know.

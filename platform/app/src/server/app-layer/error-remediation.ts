@@ -313,6 +313,22 @@ const registry = {
     ],
   },
 
+  // ---- project secrets ----
+  // Reached by code agents and CLIs reading a value back, so the tips name the
+  // next call to make rather than a page to open.
+  secret_not_found: {
+    tips: [
+      "List the project's secrets to see the names it holds; the read is by name and the name is case sensitive",
+      "Store the secret first if this is the first run; a value read never creates one",
+    ],
+    docsPath: "/agent-simulations/authenticated-agents",
+  },
+  secret_value_unreadable: {
+    tips: [
+      "Store the secret again with its current value; the stored bytes cannot be recovered",
+    ],
+  },
+
   // ---- agent dev tunnel ----
   agent_dev_tunnel_unreachable: {
     tips: [

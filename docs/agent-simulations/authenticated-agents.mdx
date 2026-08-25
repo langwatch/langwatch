@@ -137,16 +137,14 @@ The rows of an experiment or a dataset run are isolated on purpose, so that they
 can run in parallel. Each row starts cold, and a login on every row is the
 default result. There is no per-batch cache and no shared-state hook.
 
-Use the project's own secret store as the shared store. The platform reads every
-project secret from the database when it prepares each row, so a row can read a
-session that an earlier row wrote. The REST secrets API accepts a project API
-key, which is how the agent writes it back.
+Use the project's own secret store as the shared store. The agent writes the
+session there after it logs in, and reads it back at the start of every row
+through the LangWatch Python SDK. The value is encrypted at rest, and only a
+caller that can manage secrets can read it, so this is the correct place for a
+session token. A dataset row is the alternative, and it is stored in clear and
+is readable in the UI, so it suits a fixture and not a credential.
 
-The value is encrypted at rest and no API returns it, so this is the correct
-place for a session token. A dataset row is the alternative and it is stored in
-clear and is readable in the UI, so it suits a fixture and not a credential.
-
-Add two more project secrets so the agent can write:
+Add two more project secrets so the agent can reach LangWatch:
 
 ```bash
 langwatch secret create LANGWATCH_ENDPOINT --value "https://app.langwatch.ai"
@@ -156,70 +154,161 @@ Create `LANGWATCH_API_KEY` through the **Settings → Secrets** UI, with your
 project API key as the value. That key holds project access, so the agent must
 send it to `LANGWATCH_ENDPOINT` and to no other address.
 
-The agent then reads the session, uses it when it is fresh, and logs in again
-when it is not. The full example, executed continuously against the real
-code-agent runtime, is
-[`shared_session_code_agent.py`](https://github.com/langwatch/langwatch/blob/main/services/nlpgo/app/engine/blocks/codeblock/examples/shared_session_code_agent.py).
-This is its center:
+The whole agent is below. It is executed on every commit against the real
+code-agent runtime, so this is working code and not a sketch.
 
-```python
-SESSION_SECRET_NAME = "ACME_SESSION"   # the project secret that holds the session
-SESSION_TTL_SECONDS = 15 * 60          # what the target system promises
-REFRESH_MARGIN_SECONDS = 60            # refresh this long before the end
+```python shared_session_code_agent.py
+# Log in once and share the session across the rows of a run.
+#
+# Rows are isolated, so each one starts cold and a login on every row is the
+# default result. This agent keeps one session in the project's encrypted
+# secret store and reads it back through the LangWatch SDK at the start of
+# every row, so only the rows that start at the same moment log in.
+#
+# The runner injects `secrets` as a namespace (not the stdlib module of that
+# name), the entry point is `class Code` with `__call__`, and every declared
+# output key must be returned.
+
+import json
+import sys
+import time
+
+import langwatch
+import requests
+
+SESSION_SECRET_NAME = "ACME_SESSION"  # the project secret that holds the session
+SESSION_TTL_SECONDS = 15 * 60  # what the target system promises
+REFRESH_MARGIN_SECONDS = 60  # refresh this early; keep it under the TTL
 
 
 class Code:
     def __call__(self, message: str):
-        session = get_session()  # the one line each row calls
-        ...
+        langwatch.setup(
+            api_key=secret("LANGWATCH_API_KEY"),
+            endpoint_url=secret("LANGWATCH_ENDPOINT"),
+            # The run already reports this row; a second exporter only adds
+            # work inside the runner's time budget.
+            skip_open_telemetry_setup=True,
+        )
+
+        response = requests.post(
+            secret("ACME_API_URL"),
+            json={"message": message},
+            headers={"Authorization": f"Bearer {get_session()}"},
+            timeout=30,
+        )
+        # raise_for_status names the URL and the status code and nothing else.
+        response.raise_for_status()
+
+        return {"output": response.json()["reply"]}
 
 
 def get_session():
-    cached = read_cached_session()
-    if cached is not None:
-        return cached
+    """Return a session token. This is the one line each row calls."""
+    stored = read_stored_session()
+    if stored is not None:
+        return stored
+
     session = login()
     store_session(session)
     return session
 
 
-def read_cached_session():
-    raw = optional_secret(SESSION_SECRET_NAME)
-    if raw is None:
+def read_stored_session():
+    """Return the stored session while it is fresh, else None."""
+    try:
+        entry = json.loads(langwatch.secrets.get_value(SESSION_SECRET_NAME))
+        issued_at = float(entry["issued_at"])
+        session = entry["session"]
+    except Exception as error:  # noqa: BLE001 - no session is a valid answer
+        report(error, "this row logs in")
         return None
-    entry = json.loads(raw)
-    if time.time() - entry["issued_at"] >= SESSION_TTL_SECONDS - REFRESH_MARGIN_SECONDS:
+
+    if time.time() - issued_at >= SESSION_TTL_SECONDS - REFRESH_MARGIN_SECONDS:
         return None
-    return entry["session"]
+    return session
+
+
+def login():
+    """Log in to the target system and return the session it gives back."""
+    response = requests.post(
+        secret("ACME_LOGIN_URL"),
+        json={
+            "username": secret("ACME_USERNAME"),
+            "password": secret("ACME_PASSWORD"),
+        },
+        timeout=10,
+        # A 307 or 308 redirect re-sends the POST body, password included.
+        allow_redirects=False,
+    )
+    response.raise_for_status()
+    return response.json()["session"]
+
+
+def store_session(session):
+    """Write the session back, with the time it was issued. A failure here does
+    not fail the row: the row holds a working session already, and the only
+    cost is that the next row logs in again."""
+    entry = json.dumps({"session": session, "issued_at": int(time.time())})
+    try:
+        langwatch.secrets.set(SESSION_SECRET_NAME, entry)
+    except Exception as error:  # noqa: BLE001 - the row must still answer
+        report(error, "the next row will log in again")
+
+
+def report(error, consequence):
+    """Name a failure on stderr by its type. An error message can quote the
+    credential that caused it, so the message is dropped."""
+    print(
+        f"{SESSION_SECRET_NAME}: {type(error).__name__}, {consequence}",
+        file=sys.stderr,
+    )
+
+
+def secret(name):
+    """Read a project secret, and name it when the project does not hold it."""
+    namespace = globals().get("secrets")
+    value = getattr(namespace, name, None) if namespace else None
+    if not value:
+        raise RuntimeError(
+            f"project secret {name} is missing. Add it in Settings -> Secrets."
+        )
+    return value
 ```
 
-Set `SESSION_TTL_SECONDS` to what the target system promises, and keep
-`REFRESH_MARGIN_SECONDS` larger than your slowest row. A session that is older
-than the window minus the margin counts as stale, so the agent refreshes it
-before it expires instead of after a call fails.
-
-### What this pattern does not do
-
-The `secrets` namespace a row reads is a snapshot taken when that row starts. A
-row cannot read it again later, and it cannot see a write made by a row that runs
-beside it. Three results follow:
-
-- The first parallel wave performs one login per row in the wave. The rows after
-  the wave reuse the session. No lock prevents this, because a row that waits
-  still holds the old snapshot. Keep the login idempotent on the target system,
-  or lower the run's parallelism when the target rate-limits the login.
-- A row that starts with a fresh session keeps it for the whole row. Give the
-  margin enough room for the longest call the row makes.
-- A failed write does not fail the row. The row already holds a working session,
-  and the only cost is that the next row logs in again. The example reports it
-  and continues.
-
 <Note>
-  On a version without the secrets REST API, keep the same shape and put the
-  session in a dataset row instead. A dataset row is stored in clear and is
-  readable by anyone with project access, so use it only for a short-lived
-  token, never for a password.
+  The `langwatch.secrets.set` and `langwatch.secrets.get_value` calls need
+  `langwatch` **1.3.0** or later. Pin it in the sandbox before you use this
+  agent.
 </Note>
+
+### Setting the two numbers
+
+`SESSION_TTL_SECONDS` is what the target system promises. `REFRESH_MARGIN_SECONDS`
+is how early the agent replaces the session, and it has to sit between the
+duration of your slowest row and `SESSION_TTL_SECONDS`. Below the slowest row, a
+session can expire in the middle of a call. At or above the TTL, every session
+reads as stale and every row logs in again.
+
+### What this pattern does and does not do
+
+The agent reads the store when the row runs, not when the row is prepared, so a
+row picks up whatever the newest session is at that moment. Three results
+follow:
+
+- A run over a dataset logs in once and every row after that reuses the session.
+- Rows that start at the same moment can each read an empty store, so each of
+  them logs in once. Both sessions are valid and the last write wins. No lock
+  prevents this. Keep the login idempotent on the target system, or lower the
+  run's parallelism when the target rate-limits the login.
+- A failed write does not fail the row. The row already holds a working session,
+  and the only cost is that the next row logs in again. The agent reports the
+  failure by its type, never by its message, because an error message can quote
+  the credential that caused it.
+
+The source of this file is
+[`shared_session_code_agent.py`](https://github.com/langwatch/langwatch/blob/main/services/nlpgo/app/engine/blocks/codeblock/examples/shared_session_code_agent.py).
+
 
 ## Troubleshooting
 
@@ -230,4 +319,5 @@ beside it. Three results follow:
 | Credential works locally but not on the platform | The secret name in `secrets.NAME` doesn't match a stored project secret, or the value was stored in a different project. |
 | Timeout | Token fetch + downstream call exceeded the 60s runner budget. Check both endpoints' latency. |
 | Every row logs in again | The session was not written back. Check the run output for the store failure, and check that `LANGWATCH_API_KEY` and `LANGWATCH_ENDPOINT` are project secrets. |
-| The first few rows log in, the rest do not | Expected. Rows that start together share one empty snapshot, so each one logs in. |
+| Rows that start together each log in, later rows do not | Expected. Each of them read an empty store, so each one logs in. The rows after them reuse the stored session. |
+| `No secret with that name` on the first row | Expected on the first row of a project: the value read runs before anything is stored. |

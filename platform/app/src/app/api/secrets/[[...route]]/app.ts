@@ -23,6 +23,12 @@ const secretResponseSchema = z.object({
   updatedAt: z.string(),
 });
 
+const secretValueResponseSchema = z.object({
+  name: z.string(),
+  value: z.string(),
+  updatedAt: z.string(),
+});
+
 const createSecretSchema = z.object({
   name: z
     .string()
@@ -70,6 +76,44 @@ secured.access(requires("secrets:view")).get(
 
     const secrets = await secretsService.getAll({ projectId: project.id });
     return c.json(secrets);
+  },
+);
+
+// Registered before "/:id" so the path reads as one route rather than as an id
+// that happens to be spelled "by-name".
+secured.access(requires("secrets:manage")).get(
+  "/by-name/:name/value",
+  describeRoute({
+    description:
+      "Read a secret's value by name. Requires the secrets:manage grain, because a caller that can replace a secret can already choose its next value.",
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Success",
+        content: {
+          "application/json": {
+            schema: resolver(secretValueResponseSchema),
+          },
+        },
+      },
+      404: {
+        description: "Secret not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const { name } = c.req.param();
+    logger.info({ projectId: project.id }, "Reading secret value");
+
+    const secret = await secretsService.getValueByName({
+      projectId: project.id,
+      name,
+    });
+    return c.json(secret);
   },
 );
 

@@ -58,6 +58,26 @@ export class SecretsRepository {
     });
   }
 
+  async findValueByNameInProject({
+    name,
+    projectId,
+  }: {
+    name: string;
+    projectId: string;
+  }) {
+    return this.prisma.projectSecret.findFirst({
+      where: { projectId, name },
+      select: {
+        id: true,
+        projectId: true,
+        name: true,
+        encryptedValue: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
   async countByProject({ projectId }: { projectId: string }) {
     return this.prisma.projectSecret.count({
       where: { projectId },
