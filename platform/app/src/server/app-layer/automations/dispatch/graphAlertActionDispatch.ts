@@ -26,44 +26,6 @@ import type { sendWebhook } from "~/server/webhooks/sendWebhook";
 
 const logger = createLogger("langwatch:graph-alert-action-dispatch");
 
-/**
- * The idempotency key prefix for ONE fire of ONE graph alert (ADR-031's
- * `rcpt:` convention, same shape the trace cadence dispatcher uses).
- *
- * A fire is delivered BEFORE its incident row is written, so a crash in
- * between makes the outbox retry the whole evaluation — and the retry finds no
- * open incident and dispatches again. Gating each send on this digest turns
- * that retry into a no-op for anyone already notified.
- *
- * `previousFireId` is the id of the alert's most recent incident row (open or
- * resolved), which is what makes the digest a per-FIRE identity rather than a
- * per-alert one:
- *
- *   - stable across retries of the same fire — no incident row is written
- *     until a send succeeds, so the "previous" id does not move; and
- *   - distinct for the next fire — the incident this fire opens becomes the
- *     next fire's `previousFireId`.
- *
- * Hashing the alert's identity alone would suppress every future fire to the
- * same recipients forever; hashing wall-clock would re-send whenever a retry
- * crossed a bucket boundary.
- */
-export function graphAlertFireDigest({
-  triggerId,
-  customGraphId,
-  previousFireId,
-}: {
-  triggerId: string;
-  customGraphId: string;
-  /** Null before the alert has ever fired. */
-  previousFireId: string | null;
-}): string {
-  return createHash("sha256")
-    .update(`${triggerId}:${customGraphId}:${previousFireId ?? "genesis"}`)
-    .digest("hex")
-    .slice(0, 16);
-}
-
 /** Short, privacy-preserving hash of one destination (an email address hash is
  *  produced by the mailer itself; this covers the Slack channel / webhook). */
 function destinationHash(destination: string): string {

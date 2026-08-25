@@ -2,8 +2,10 @@ import type { IntentSpec, WakeHandler } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
-import type { GraphTriggerEvaluationReason } from "../../../../app-layer/automations/graph-trigger-evaluation.service";
-import type { GraphTriggerSweepCandidate } from "../../../../app-layer/automations/graph-trigger-heartbeat";
+import type {
+  GraphTriggerEvaluationReason,
+  GraphTriggerSweepCandidate,
+} from "@langwatch/automation-contract";
 
 const logger = createLogger("langwatch:automation:graph-alert-sweep");
 

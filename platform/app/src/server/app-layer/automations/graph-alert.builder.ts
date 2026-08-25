@@ -1,4 +1,7 @@
-import { extractGraphAlertFromTriggerRow as extractPortableGraphAlert } from "@langwatch/automation-contract";
+import {
+  buildGraphAlertTriggerData as buildPortableGraphAlertTriggerData,
+  extractGraphAlertFromTriggerRow as extractPortableGraphAlert,
+} from "@langwatch/automation-contract";
 import type { GraphAlertActionParams } from "@langwatch/automation-contract";
 import type { AlertType, Prisma, TriggerAction } from "~/generated/prisma/client";
 
@@ -91,17 +94,20 @@ export function buildGraphAlertTriggerData({
   customGraphId,
   actionParams,
 }: BuildGraphAlertTriggerDataInput): GraphAlertTriggerData {
-  const trimmed = name.replace(/^\s*alert:\s*/i, "").trim();
-  return {
+  const built = buildPortableGraphAlertTriggerData({
     id,
-    name: trimmed,
+    name,
     projectId,
-    action,
-    actionParams: { ...actionParams } as Prisma.InputJsonValue,
-    filters: {} as Prisma.InputJsonValue,
-    alertType,
-    active: true,
+    action: action as "SEND_EMAIL" | "SEND_SLACK_MESSAGE" | "SEND_WEBHOOK",
+    alertType: alertType as "CRITICAL" | "WARNING" | "INFO",
     customGraphId,
+    actionParams,
+  });
+  return {
+    ...built,
+    action,
+    actionParams: built.actionParams as Prisma.InputJsonValue,
+    filters: {} as Prisma.InputJsonValue,
   };
 }
 

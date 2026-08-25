@@ -3,7 +3,10 @@ import {
   installEnterpriseWebhookAccess,
 } from "~/server/webhooks/enterpriseWebhookEndpointService";
 import { TupleParam, type ClickHouseClient } from "@clickhouse/client";
-import { REPORT_SCHEDULER_TARGET_TYPE } from "@langwatch/automation-contract";
+import {
+  REPORT_SCHEDULER_TARGET_TYPE,
+  type AutomationService,
+} from "@langwatch/automation-contract";
 import {
   BillingPriceCatalogue,
   getStripeEnvironmentFromNodeEnv,
@@ -46,7 +49,10 @@ import {
 } from "@langwatch/eventing";
 import { AppAuditLogRuntime } from "~/runtime/app/features/audit-log";
 import { AppApiKeyDiagnostics, AppApiKeyRuntime } from "~/runtime/app/features/api-key";
-import { AppAutomationRuntime } from "~/runtime/app/features/automation";
+import {
+  AppAutomationClock,
+  AppAutomationRuntime,
+} from "~/runtime/app/features/automation";
 import { AppGovernanceRuntime } from "~/runtime/app/features/governance";
 import { AgentsFeature } from "~/runtime/app/features/agents";
 import { AppModelProviderRuntime } from "~/runtime/app/features/model-provider";
@@ -198,6 +204,9 @@ import { DataRetentionPolicyService } from "../data-retention/policy/dataRetenti
 import { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
 import { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
 import { buildAutomationDispatchPorts } from "../event-sourcing/pipelines/automations/automationDispatch.wiring";
+import { PostgresAutomationGraphDeliveryAdapter } from "@langwatch/automation-server";
+import { createAutomationGraphPorts } from "~/runtime/app/features/automation-graph-ports";
+import { createAutomationTestRuntime } from "@langwatch/automation-server/testing";
 import { createExperimentRunItemAppendStore } from "../event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
 import {
   ExperimentIdLookupClickHouseRepository,
@@ -933,9 +942,27 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     }),
     "MonitorService",
   );
+  const automationClock = new AppAutomationClock();
+  const automationDelivery = PostgresAutomationGraphDeliveryAdapter.create({
+    database: prisma,
+    clock: automationClock,
+  });
+  const graphPorts = createAutomationGraphPorts({
+    database: prisma,
+    redis: redis ?? null,
+    delivery: automationDelivery,
+    projects,
+    analytics: analyticsService,
+    resolveClickHouseClient,
+    baseHost: config.baseHost ?? env.BASE_HOST,
+    emailHourlyCap: env.TRIGGER_EMAIL_HOURLY_CAP,
+    tenantDailyCap: env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
+  });
   const automation = AppAutomationRuntime.create({
     database: prisma,
     redis,
+    graph: graphPorts,
+    clock: automationClock,
   }).build();
   const triggerTemplateDeps = {
     baseHost: config.baseHost ?? env.BASE_HOST,
@@ -2490,6 +2517,7 @@ export function createTestApp(
     automation: AppAutomationRuntime.create({
       database: testPrisma,
       redis: null,
+      graph: createAutomationTestRuntime(),
     }).build(),
     triggerTemplates: (() => {
       const testDeps = {

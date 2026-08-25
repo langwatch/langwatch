@@ -7,32 +7,19 @@ import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import { getProtectionsForProject } from "~/server/api/utils";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
-import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
-import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import {
   consumeEmailCapSlot,
   consumeTenantEmailCapSlot,
 } from "~/server/app-layer/automations/dispatch/emailCaps";
-import { dispatchGraphAlertAction } from "~/server/app-layer/automations/dispatch/graphAlertActionDispatch";
 import {
   consumePersistCapSlot,
   resolvePersistDailyCap,
 } from "~/server/app-layer/automations/dispatch/persistCap";
-import {
-  evaluateGraphTrigger,
-  type GraphTriggerEvaluationDeps,
-  type GraphTriggerEvaluationReason,
-} from "~/server/app-layer/automations/graph-trigger-evaluation.service";
-import {
-  decideGraphTriggerHeartbeat,
-  defaultCandidateSources,
-  defaultGraphTriggerHeartbeatDeps,
-  type GraphTriggerSweepCandidate,
-} from "~/server/app-layer/automations/graph-trigger-heartbeat";
-import { PrismaGraphTriggerSentRepository } from "~/server/app-layer/automations/graph-trigger-sent.repository";
-import { defaultRunawayContainmentDeps } from "~/server/app-layer/automations/runaway-containment.deps";
-import { handlePersistCapBreach } from "~/server/app-layer/automations/runaway-containment.service";
-import type { AutomationService } from "@langwatch/automation-contract";
+import type {
+  AutomationService,
+  GraphTriggerEvaluationReason,
+  GraphTriggerSweepCandidate,
+} from "@langwatch/automation-contract";
 import type { EvaluationService } from "@langwatch/evaluation-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { TraceSummaryRepository } from "~/server/app-layer/traces/repositories/trace-summary.repository";
@@ -41,9 +28,7 @@ import { TraceReadDerivationService } from "~/server/app-layer/traces/trace-read
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { TraceSummaryStore } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummary.store";
-import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { TraceService } from "~/server/traces/trace.service";
-import { sendWebhook } from "~/server/webhooks/sendWebhook";
 import type { TriggerSettlementDispatchDeps } from "../../../event-sourcing/pipelines/automations/process-manager/triggerSettlementIntentHandlers";
 
 /**
@@ -74,8 +59,8 @@ export function buildAutomationDispatchPorts({
   evaluations,
   traces,
   traceSummaryRepository,
-  analytics,
-  resolveClickHouseClient,
+  analytics: _analytics,
+  resolveClickHouseClient: _resolveClickHouseClient,
   dataset,
 }: {
   prisma: PrismaClient;
@@ -133,104 +118,18 @@ export function buildAutomationDispatchPorts({
     return promise;
   };
 
-  // ADR-034 Phase 5/8.1: shared evaluator deps. The notifier dispatches via
-  // the Liquid pipeline (`dispatchGraphAlertAction`) so per-trigger custom
-  // templates and the alert-default Liquid templates both apply. The
-  // TriggerSent repo mirrors the legacy dedup pattern exactly.
-  const graphTriggerSentRepo = new PrismaGraphTriggerSentRepository(prisma);
   // ADR-040 §6: one delivery-log writer shared by the digest dispatch and
   // the graph-alert path.
   const recordWebhookDelivery = (
     input: Parameters<AutomationService["recordWebhookDelivery"]>[0],
   ) => automation.recordWebhookDelivery(input);
-  // Graph-config loads go through the process-owned automation service.
-  const graphTriggerEvalDeps: GraphTriggerEvaluationDeps = {
-    loadTrigger: async ({ triggerId, projectId }) =>
-      automation.tryGetById({ triggerId, projectId }),
-    loadCustomGraph: async ({ customGraphId, projectId }) =>
-      automation.tryGetCustomGraph({ customGraphId, projectId }),
-    loadProject: async (projectId) => projects.tryGetById(projectId),
-    getTimeseries: (input, options) => analytics.getTimeseries(input, options),
-    triggerSent: graphTriggerSentRepo,
-    updateLastRunAt: async ({ triggerId, projectId }) =>
-      automation.updateLastRunAt({ triggerId, projectId }),
-    notifier: {
-      dispatch: async (input) =>
-        dispatchGraphAlertAction({
-          deps: {
-            sendEmail: sendRenderedTriggerEmail,
-            sendSlack: sendRenderedSlackMessage,
-            sendSlackBot: postSlackChatMessage,
-            sendWebhook,
-            recordWebhookDelivery,
-            // ADR-031: honour the same suppression list + hard caps the
-            // digest path consumes; claims keyed on the fire digest so a
-            // retry re-reads the count instead of burning a second slot.
-            filterSuppressedRecipients: ({ projectId, triggerId, emails }) =>
-              automation.filterSuppressed({
-                projectId,
-                triggerId,
-                emails,
-              }),
-            consumeEmailCapSlot: ({ projectId, triggerId, now, dedupKey }) =>
-              consumeEmailCapSlot({
-                projectId,
-                triggerId,
-                now,
-                cap: env.TRIGGER_EMAIL_HOURLY_CAP,
-                dedupKey,
-                redis,
-              }),
-            emailHourlyCap: env.TRIGGER_EMAIL_HOURLY_CAP,
-            consumeTenantEmailCapSlot: ({
-              projectId,
-              now,
-              cap,
-              recipientCount,
-              dedupKey,
-            }) =>
-              consumeTenantEmailCapSlot({
-                projectId,
-                now,
-                cap,
-                recipientCount,
-                dedupKey,
-                redis,
-              }),
-            tenantDailyCap: env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
-            // ADR-031 per-recipient at-most-once ledger — the SAME
-            // TriggerSent claim store the digest dispatch threads in.
-            isRecipientSent: (params) => automation.isSendClaimed(params),
-            recordRecipientSent: async (params) => {
-              await automation.claimSend(params);
-            },
-          },
-          input,
-        }),
-    },
-    baseHost,
-    now: () => new Date(),
-  };
-
   const boundEvaluateGraphTrigger = async (params: {
     triggerId: string;
     projectId: string;
     reason: GraphTriggerEvaluationReason;
   }) => {
-    await evaluateGraphTrigger({
-      deps: graphTriggerEvalDeps,
-      triggerId: params.triggerId,
-      projectId: params.projectId,
-      reason: params.reason,
-    });
+    await automation.evaluateGraphTrigger(params);
   };
-
-  const heartbeatDeps = defaultGraphTriggerHeartbeatDeps({
-    automation,
-    prisma,
-    resolveClickHouseClient,
-  });
-  const heartbeatSources = defaultCandidateSources(prisma);
 
   const settlementDeps: TriggerSettlementDispatchDeps = {
     automation,
@@ -281,29 +180,13 @@ export function buildAutomationDispatchPorts({
     recordWebhookDelivery,
     resolvePersistDailyCap: (projectId) => resolvePersistDailyCap(projectId),
     consumePersistCapSlot: (params) => consumePersistCapSlot({ ...params, redis }),
-    handlePersistCapBreach: (breach) =>
-      handlePersistCapBreach(
-        defaultRunawayContainmentDeps({
-          prisma,
-          automation,
-          projects,
-          baseHost,
-          resolveClickHouseClient,
-          redis,
-        }),
-        breach,
-      ),
+    handlePersistCapBreach: (breach) => automation.handlePersistCapBreach(breach),
   };
 
   return {
     settlementDeps,
     evaluateGraphTrigger: boundEvaluateGraphTrigger,
-    decideSweepCandidates: ({ now }) =>
-      decideGraphTriggerHeartbeat({
-        deps: heartbeatDeps,
-        sources: heartbeatSources,
-        now,
-      }),
+    decideSweepCandidates: ({ now }) => automation.decideGraphTriggerHeartbeat({ now }),
     pruneWebhookDeliveries: () => automation.pruneWebhookDeliveries(),
   };
 }

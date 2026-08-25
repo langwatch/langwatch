@@ -21,16 +21,6 @@ vi.mock("~/env.mjs", () => ({
   },
 }));
 
-vi.mock("~/server/app-layer/automations/graph-trigger-evaluation.service", () => ({
-  evaluateGraphTrigger: evaluateGraphTriggerMock,
-}));
-
-vi.mock("~/server/app-layer/automations/graph-trigger-heartbeat", () => ({
-  decideGraphTriggerHeartbeat: decideGraphTriggerHeartbeatMock,
-  defaultCandidateSources: vi.fn(() => ({ sources: true })),
-  defaultGraphTriggerHeartbeatDeps: vi.fn(() => ({ deps: true })),
-}));
-
 vi.mock("~/server/app-layer/traces/trace-read-derivation.service", () => ({
   TraceReadDerivationService: class {
     deriveEvents = vi.fn().mockResolvedValue([]);

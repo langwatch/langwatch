@@ -1,6 +1,6 @@
 import type { Event } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { GraphTriggerEvaluationReason } from "~/server/app-layer/automations/graph-trigger-evaluation.service";
+import type { GraphTriggerEvaluationReason } from "@langwatch/automation-contract";
 import type { AutomationService } from "@langwatch/automation-contract";
 
 const logger = createLogger("langwatch:automation:graph-trigger-activity-subscriber");

@@ -7,6 +7,7 @@ import type {
 } from "./precondition-matchers";
 import { PRECONDITION_FIELD_MATCHERS } from "./precondition-matchers";
 import type { FilterField, TriggerFilters, TriggerFilterValue } from "./types";
+export { hasActionableTriggerFilters } from "@langwatch/automation-contract";
 
 const EVALUATION_FIELDS: ReadonlySet<string> = new Set([
   "evaluations.evaluator_id",
@@ -58,29 +59,6 @@ const MATCHABLE_EVENT_FILTER_FIELDS: ReadonlySet<string> = new Set([
  */
 export function triggerFiltersReferenceEvents(filters: TriggerFilters): boolean {
   return Object.keys(filters).some((field) => MATCHABLE_EVENT_FILTER_FIELDS.has(field));
-}
-
-/**
- * Whether this filter set actually narrows anything.
- *
- * A present-but-empty field selects nothing and is therefore not a condition:
- * `{ "metadata.labels": [] }` reads like a filter and matches every trace, the
- * same as `{}`. The server-side mirror of the drawer's `filtersAreSet`, so a
- * shape the browser refuses cannot be saved through an API instead.
- *
- * It shares `filterValueHasActionableCondition` with the matcher deliberately.
- * A validator that counted a key-selector wrapper as a condition while the
- * matcher discarded it would accept exactly the automations that go on to fire
- * on every trace: `{ "metadata.attributes": { region: [] } }` has an outer key
- * but no leaf, and constrains nothing.
- */
-export function hasActionableTriggerFilters(
-  // Widened past `TriggerFilters` on purpose: the REST surface validates
-  // filters as an open record, and its callers need the same answer without
-  // first proving the field names are known ones.
-  filters: Record<string, unknown>,
-): boolean {
-  return Object.values(filters).some(filterValueHasActionableCondition);
 }
 
 /**

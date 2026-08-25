@@ -23,13 +23,20 @@ import { prisma } from "~/server/db";
 import "~/server/metrics";
 
 import type { TriggerSummary } from "../trigger-summary";
+import { RUNAWAY_PAUSE_REASON } from "@langwatch/automation-contract";
 import {
-  handlePersistCapBreach,
-  RUNAWAY_PAUSE_REASON,
-  type RunawayContainmentDeps,
-} from "../runaway-containment.service";
-import { AppAutomationRuntime } from "~/runtime/app/features/automation";
-import type { AutomationService } from "@langwatch/automation-contract";
+  AppAutomationRuntime,
+  createAppAutomationTestGraphPorts,
+} from "~/runtime/app/features/automation";
+import type {
+  AutomationPersistCapBreach,
+  AutomationService,
+} from "@langwatch/automation-contract";
+import {
+  incrementAutomationAutoPausedTotal,
+  incrementAutomationCeilingBreachTotal,
+  incrementAutomationContainmentFailedTotal,
+} from "~/server/metrics";
 
 describe("Feature: runaway automation containment", () => {
   const ns = `runaway-${nanoid(8)}`;
@@ -41,6 +48,10 @@ describe("Feature: runaway automation containment", () => {
   let team: Team | undefined;
   let project: Project | undefined;
   let triggers: AutomationService;
+  type AutomationRunawayPort = Parameters<
+    typeof AppAutomationRuntime.create
+  >[0]["graph"]["runaway"];
+  let runawayRuntime: AutomationRunawayPort;
 
   let projectTraces24h = 10_000;
   let sentEmails: Array<{ kind: string; skippedToday: number }>;
@@ -54,21 +65,10 @@ describe("Feature: runaway automation containment", () => {
 
   const projectId = () => project!.id;
 
-  function deps(): RunawayContainmentDeps {
+  function runtime(): AutomationRunawayPort {
     return {
+      ...createAppAutomationTestGraphPorts().runaway,
       countProjectTraces24h: async () => projectTraces24h,
-      pauseTrigger: async ({ triggerId, projectId, reason, at }) => {
-        pauseAttempts++;
-        if (pauseFails) throw new Error("connection terminated");
-        await triggers.update({
-          id: triggerId,
-          projectId,
-          active: false,
-          pausedReason: reason,
-          pausedAt: at,
-        });
-        await triggers.invalidate(projectId);
-      },
       notificationRecipients: async () => ["admin@example.com"],
       sendLimitEmail: async ({ kind, skippedToday }) => {
         mailAttempts++;
@@ -88,6 +88,15 @@ describe("Feature: runaway automation containment", () => {
       },
       projectName: async () => "Test project",
       automationUrl: async () => "https://app.example.test/automations",
+      telemetry: {
+        onCeilingBreach: incrementAutomationCeilingBreachTotal,
+        onAutoPaused: () => incrementAutomationAutoPausedTotal(RUNAWAY_PAUSE_REASON),
+        onContainmentFailed: incrementAutomationContainmentFailedTotal,
+        log: {
+          error: () => undefined,
+          info: () => undefined,
+        },
+      },
     };
   }
 
@@ -165,7 +174,22 @@ describe("Feature: runaway automation containment", () => {
         apiKey: `test-api-key-${ns}`,
       },
     });
-    triggers = AppAutomationRuntime.create({ database: prisma, redis: null }).build();
+    const graph = createAppAutomationTestGraphPorts();
+    runawayRuntime = runtime();
+    triggers = AppAutomationRuntime.create({
+      database: prisma,
+      redis: null,
+      graph: { ...graph, runaway: runawayRuntime },
+    }).build();
+
+    const update = triggers.update.bind(triggers);
+    vi.spyOn(triggers, "update").mockImplementation(async (input) => {
+      if (input.pausedReason === RUNAWAY_PAUSE_REASON) {
+        pauseAttempts++;
+        if (pauseFails) throw new Error("connection terminated");
+      }
+      return update(input);
+    });
   });
 
   beforeEach(() => {
@@ -198,7 +222,7 @@ describe("Feature: runaway automation containment", () => {
     it("leaves it running so it dispatches again tomorrow", async () => {
       const row = await storeTrigger();
 
-      await handlePersistCapBreach(deps(), breach(summary(row), 150));
+      await triggers.handlePersistCapBreach(breach(summary(row), 150));
 
       const after = await prisma.trigger.findUniqueOrThrow({
         where: { id: row.id, projectId: projectId() },
@@ -212,7 +236,7 @@ describe("Feature: runaway automation containment", () => {
       const row = await storeTrigger();
       projectTraces24h = 10_000;
 
-      await handlePersistCapBreach(deps(), breach(summary(row), 150));
+      await triggers.handlePersistCapBreach(breach(summary(row), 150));
 
       expect(sentEmails.map((email) => email.kind)).toEqual(["ceiling_reached"]);
     });
@@ -220,18 +244,16 @@ describe("Feature: runaway automation containment", () => {
     /** @scenario "The customer is emailed once on the first day a trigger breaches" */
     it("emails once however many matches breach that day", async () => {
       const row = await storeTrigger();
-      const sharedDeps = deps();
-
       // Expiring the evaluation-rate claim between breaches stands in for the
       // minute between windows: each breach here re-evaluates in full, so the
       // single mail below is the DAY-long mail claim doing its job, not the
       // short claim in front of it.
       const checkClaim = `automation-containment-check:${row.id}`;
-      await handlePersistCapBreach(sharedDeps, breach(summary(row), 101));
+      await triggers.handlePersistCapBreach(breach(summary(row), 101));
       claimed.delete(checkClaim);
-      await handlePersistCapBreach(sharedDeps, breach(summary(row), 102));
+      await triggers.handlePersistCapBreach(breach(summary(row), 102));
       claimed.delete(checkClaim);
-      await handlePersistCapBreach(sharedDeps, breach(summary(row), 500));
+      await triggers.handlePersistCapBreach(breach(summary(row), 500));
 
       expect(sentEmails).toHaveLength(1);
       expect(sentEmails[0]).toMatchObject({ kind: "ceiling_reached" });
@@ -240,11 +262,10 @@ describe("Feature: runaway automation containment", () => {
     /** @scenario "A limit email that could not be sent is tried again" */
     it("does not spend the day's one email on a send that failed", async () => {
       const row = await storeTrigger();
-      const sharedDeps = deps();
       const checkClaim = `automation-containment-check:${row.id}`;
 
       mailFails = true;
-      await handlePersistCapBreach(sharedDeps, breach(summary(row), 101));
+      await triggers.handlePersistCapBreach(breach(summary(row), 101));
       expect(sentEmails).toHaveLength(0);
       expect(mailAttempts).toBe(1);
 
@@ -253,13 +274,13 @@ describe("Feature: runaway automation containment", () => {
       // explains why their automation stopped producing records.
       claimed.delete(checkClaim);
       mailFails = false;
-      await handlePersistCapBreach(sharedDeps, breach(summary(row), 102));
+      await triggers.handlePersistCapBreach(breach(summary(row), 102));
 
       expect(sentEmails.map((email) => email.kind)).toEqual(["ceiling_reached"]);
 
       // And once it has landed, the claim holds again for the rest of the day.
       claimed.delete(checkClaim);
-      await handlePersistCapBreach(sharedDeps, breach(summary(row), 103));
+      await triggers.handlePersistCapBreach(breach(summary(row), 103));
 
       expect(sentEmails).toHaveLength(1);
     });
@@ -267,7 +288,7 @@ describe("Feature: runaway automation containment", () => {
     /** @scenario "A breach storm measures the project's traffic once per window" */
     it("reads the project's traffic once for a whole storm of breaches", async () => {
       const row = await storeTrigger();
-      const sharedDeps = deps();
+      const sharedDeps = runawayRuntime;
       let trafficReads = 0;
       sharedDeps.countProjectTraces24h = async () => {
         trafficReads++;
@@ -275,7 +296,7 @@ describe("Feature: runaway automation containment", () => {
       };
 
       for (let index = 0; index < 5; index++) {
-        await handlePersistCapBreach(sharedDeps, breach(summary(row), 101 + index));
+        await triggers.handlePersistCapBreach(breach(summary(row), 101 + index));
       }
 
       // The pause decision costs a ClickHouse distinct-count over 24h of
@@ -290,7 +311,7 @@ describe("Feature: runaway automation containment", () => {
       const row = await storeTrigger();
       projectTraces24h = 1_000;
 
-      await handlePersistCapBreach(deps(), breach(summary(row), 990));
+      await triggers.handlePersistCapBreach(breach(summary(row), 990));
 
       const after = await prisma.trigger.findUniqueOrThrow({
         where: { id: row.id, projectId: projectId() },
@@ -307,7 +328,7 @@ describe("Feature: runaway automation containment", () => {
       const row = await storeTrigger();
       projectTraces24h = 10;
 
-      await handlePersistCapBreach(deps(), breach(summary(row), 110));
+      await triggers.handlePersistCapBreach(breach(summary(row), 110));
 
       const after = await prisma.trigger.findUniqueOrThrow({
         where: { id: row.id, projectId: projectId() },
@@ -322,7 +343,7 @@ describe("Feature: runaway automation containment", () => {
       // is the shape of the automation itself.
       projectTraces24h = 1_000_000;
 
-      await handlePersistCapBreach(deps(), breach(summary(row, { filters: {} }), 150));
+      await triggers.handlePersistCapBreach(breach(summary(row, { filters: {} }), 150));
 
       const after = await prisma.trigger.findUniqueOrThrow({
         where: { id: row.id, projectId: projectId() },
@@ -341,7 +362,7 @@ describe("Feature: runaway automation containment", () => {
         ),
       ).toContain(row.id);
 
-      await handlePersistCapBreach(deps(), breach(summary(row, { filters: {} }), 150));
+      await triggers.handlePersistCapBreach(breach(summary(row, { filters: {} }), 150));
 
       // The pause invalidates the cache, so the subscriber stops recording
       // matches immediately rather than after the TTL expires.
@@ -359,11 +380,8 @@ describe("Feature: runaway automation containment", () => {
       it("retries the pause instead of standing down for the day", async () => {
         const row = await storeTrigger({ filters: "{}" });
         projectTraces24h = 1_000_000;
-        const sharedDeps = deps();
-
         pauseFails = true;
-        await handlePersistCapBreach(
-          sharedDeps,
+        await triggers.handlePersistCapBreach(
           breach(summary(row, { filters: {} }), 150),
         );
         expect(pauseAttempts).toBe(1);
@@ -379,8 +397,7 @@ describe("Feature: runaway automation containment", () => {
         // runaway automation active until the UTC day rolled over.
         claimed.clear();
         pauseFails = false;
-        await handlePersistCapBreach(
-          sharedDeps,
+        await triggers.handlePersistCapBreach(
           breach(summary(row, { filters: {} }), 200),
         );
 
@@ -397,7 +414,7 @@ describe("Feature: runaway automation containment", () => {
         projectTraces24h = 1_000_000;
         pauseFails = true;
 
-        await handlePersistCapBreach(deps(), breach(summary(row, { filters: {} }), 150));
+        await triggers.handlePersistCapBreach(breach(summary(row, { filters: {} }), 150));
 
         // Telling a customer we paused something we did not pause is worse
         // than telling them nothing.
@@ -411,11 +428,8 @@ describe("Feature: runaway automation containment", () => {
       it("writes the pause once rather than once per breach", async () => {
         const row = await storeTrigger({ filters: "{}" });
         projectTraces24h = 1_000_000;
-        const sharedDeps = deps();
-
         for (let index = 0; index < 5; index++) {
-          await handlePersistCapBreach(
-            sharedDeps,
+          await triggers.handlePersistCapBreach(
             breach(summary(row, { filters: {} }), 150 + index),
           );
         }
@@ -450,7 +464,7 @@ describe("Feature: runaway automation containment", () => {
       const row = await storeTrigger();
       const before = await counterValue("automation_ceiling_breach_total");
 
-      await handlePersistCapBreach(deps(), breach(summary(row), 150));
+      await triggers.handlePersistCapBreach(breach(summary(row), 150));
 
       expect((await counterValue("automation_ceiling_breach_total")) - before).toBe(1);
     });
@@ -462,7 +476,7 @@ describe("Feature: runaway automation containment", () => {
         reason: RUNAWAY_PAUSE_REASON,
       });
 
-      await handlePersistCapBreach(deps(), breach(summary(row, { filters: {} }), 150));
+      await triggers.handlePersistCapBreach(breach(summary(row, { filters: {} }), 150));
 
       expect(
         (await counterValue("automation_auto_paused_total", {

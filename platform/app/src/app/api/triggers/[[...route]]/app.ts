@@ -5,7 +5,7 @@ import {
 } from "@langwatch/automation-contract";
 import { describeRoute, resolver } from "hono-openapi";
 import { nanoid } from "nanoid";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { createProjectApp, requires } from "~/server/api/security";
 import { validator as zValidator } from "~/server/api/validation";

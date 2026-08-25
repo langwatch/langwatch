@@ -10,10 +10,7 @@ vi.mock("~/utils/encryption", () => ({
 }));
 
 import { buildGraphAlertTemplateContext } from "@langwatch/automation-contract";
-import {
-  dispatchGraphAlertAction,
-  graphAlertFireDigest,
-} from "../graphAlertActionDispatch";
+import { dispatchGraphAlertAction } from "../graphAlertActionDispatch";
 
 const NOW = new Date("2026-06-21T10:00:00.000Z");
 
@@ -836,35 +833,6 @@ describe("dispatchGraphAlertAction", () => {
       ).rejects.toThrow(/not supported/);
       expect(sendEmail).not.toHaveBeenCalled();
       expect(sendSlack).not.toHaveBeenCalled();
-    });
-  });
-});
-
-describe("graphAlertFireDigest", () => {
-  describe("given the same fire generation", () => {
-    it("returns the same digest, so a retry reuses the recipient claims", () => {
-      const args = {
-        triggerId: "trg_1",
-        customGraphId: "graph_1",
-        previousFireId: "sent_7",
-      };
-      expect(graphAlertFireDigest(args)).toBe(graphAlertFireDigest(args));
-    });
-  });
-
-  describe("given the incident opened by the previous fire", () => {
-    it("returns a different digest, so the next fire re-notifies everyone", () => {
-      const before = graphAlertFireDigest({
-        triggerId: "trg_1",
-        customGraphId: "graph_1",
-        previousFireId: null,
-      });
-      const after = graphAlertFireDigest({
-        triggerId: "trg_1",
-        customGraphId: "graph_1",
-        previousFireId: "sent_1",
-      });
-      expect(after).not.toBe(before);
     });
   });
 });
