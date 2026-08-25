@@ -2,8 +2,6 @@ import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
-import { getApp } from "~/server/app-layer/app";
-
 const resourceType = z.enum(["TRACE", "THREAD"]);
 const visibility = z.enum(["PUBLIC", "ORGANIZATION", "PROJECT"]);
 
@@ -29,8 +27,8 @@ export const shareRouter = createTRPCRouter({
       }),
     )
     .permission("traces:share")
-    .query(async ({ input }) => {
-      return getApp().share.listForResource(input);
+    .query(async ({ input, ctx }) => {
+      return ctx.app.share.listForResource(input);
     }),
 
   /**
@@ -52,7 +50,7 @@ export const shareRouter = createTRPCRouter({
     )
     .permission("traces:share")
     .mutation(async ({ input, ctx }) => {
-      return getApp().share.createShare({
+      return ctx.app.share.createShare({
         projectId: input.projectId,
         resourceType: input.resourceType,
         resourceId: input.resourceId,
@@ -67,14 +65,14 @@ export const shareRouter = createTRPCRouter({
   revoke: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
     .permission("traces:share")
-    .mutation(async ({ input }) => {
-      await getApp().share.revokeById(input);
+    .mutation(async ({ input, ctx }) => {
+      await ctx.app.share.revokeById(input);
     }),
 
   revokeAllTraceShares: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .permission("project:update")
-    .mutation(async ({ input }) => {
-      await getApp().share.revokeAllTraceShares(input.projectId);
+    .mutation(async ({ input, ctx }) => {
+      await ctx.app.share.revokeAllTraceShares(input.projectId);
     }),
 });

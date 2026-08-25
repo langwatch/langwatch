@@ -11,7 +11,6 @@ import { on } from "node:events";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { getApp } from "~/server/app-layer/app";
 
 const logger = createLogger("langwatch:api:export");
 
@@ -73,7 +72,7 @@ function exportProgressSubscription(
     .permission(permission)
     .subscription(async function* (opts) {
       const { projectId, exportId } = opts.input;
-      const emitter = getApp().broadcast.getTenantEmitter(projectId);
+      const emitter = opts.ctx.app.broadcast.getTenantEmitter(projectId);
 
       logger.info(
         { projectId, exportId },

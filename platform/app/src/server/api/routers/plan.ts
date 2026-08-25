@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { getApp } from "~/server/app-layer/app";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const planRouter = createTRPCRouter({
@@ -11,7 +10,7 @@ export const planRouter = createTRPCRouter({
     )
     .permission("organization:view")
     .query(async ({ input, ctx }) => {
-      return await getApp().planProvider.getActivePlan({
+      return await ctx.app.planProvider.getActivePlan({
         organizationId: input.organizationId,
         user: ctx.session.user,
       });
