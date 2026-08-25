@@ -513,7 +513,7 @@ describe("RoleBindingService applyGroupEdits", () => {
         }),
       ).rejects.toMatchObject({ code: "scim_managed_group", httpStatus: 409 });
 
-      expect(groupMembershipDeleteMany).not.toHaveBeenCalled();
+      expect(removeGroupMembersWhere).not.toHaveBeenCalled();
     });
 
     it("refuses a member addition with scim_managed_group", async () => {
@@ -526,7 +526,7 @@ describe("RoleBindingService applyGroupEdits", () => {
         }),
       ).rejects.toMatchObject({ code: "scim_managed_group", httpStatus: 409 });
 
-      expect(groupMembershipCreateMany).not.toHaveBeenCalled();
+      expect(addGroupMembers).not.toHaveBeenCalled();
     });
   });
 });
