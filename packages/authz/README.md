@@ -2,27 +2,28 @@
 
 The unified authorization engine ([ADR-092](../../dev/docs/adr/092-unified-authorization-engine.md)).
 This package is the **pure core** of the design: the permission registry, the
-built-in roles, the `AuthzEngine` (the `decide()` walk), and the
-witness/passport primitives. It reads nothing and writes nothing - no Prisma,
-no env, no server imports - so the client (`useCan`), the server runtime, and
-any future service can all depend on it and get the same answer.
+built-in roles, the `AuthzEngine` (the `decide()` walk), and the witness and
+bitset primitives. It reads nothing and writes nothing - no Prisma, no env, no
+server imports - so the client (`useCan`), the server runtime, and any future
+service can all depend on it and get the same answer.
 
 The design is three layers, app-layer service/repository idiom throughout:
 
 - **`@langwatch/authz`** (this package) - the vocabulary and the pure
   `AuthzEngine`. Browser-safe.
 - **`@langwatch/authz-server`** - the server runtime: `AuthzCollectorService`,
-  `AuthzService` (with the epoch cache inside), `GrantsService`,
-  `AuthzShadowService` - all written against two repository INTERFACES
-  (`AuthzReadRepository`, `AuthzGrantsRepository`). No storage engine.
+  `AuthzService` (with the epoch cache inside), `GrantsService` - all written
+  against two repository INTERFACES (`AuthzReadRepository`,
+  `AuthzGrantsRepository`). No storage engine.
 - **the app** (`platform/app/src/server/app-layer/authz/`) - the Prisma repository
   implementations (`repositories/*.prisma.repository.ts`), the redis epoch
   store, the tRPC middleware, and `runtime.ts`: the composition root that
   builds ONE of each service and exports `authz`, `authzCollector` and
-  `grantsService()`. The shadow is the exception - `authzShadowFor(prisma)`
-  in `server/app-layer/authz/shadow.ts` composes one per call, because its caller
-  `rbac.ts` is imported by client code and must not pull the composition
-  root's server-only graph into the browser bundle.
+  `grantsService()`. Only server-only modules may import it: its graph reaches
+  Prisma, redis and the audit writer at module scope, and `rbac.ts` is
+  imported by client code, so a runtime import from there would put Prisma in
+  the browser bundle. `src/server/__tests__/frontend-boundary.unit.test.ts`
+  walks that graph and fails the build if it happens.
 
 ```text
  PERMISSION   "traces:view"             a verb on a resource, from ONE registry
@@ -44,8 +45,12 @@ The design is three layers, app-layer service/repository idiom throughout:
  epoch.ts (redis) ─ epochReader ─► AuthzService ── decides via ►│ explain()
  runtime.ts       ─ composes ────► AuthzCollectorService        registry · roles
  trpc-middleware (.permission())   GrantsService                witness · bitset
- useCan / RequireCan (client) ◄─── AuthzShadowService           PassportService
+ useCan / RequireCan (client) ◄─── effectivePermissions()       matchers · scope
 ```
+
+Nothing in that picture is a passport. The stateless-surface line in the stage
+ladder below is design, not code: there is no `passport.ts`, no
+`PassportService` and no `./passport` export.
 
 ## Using it
 
@@ -175,8 +180,9 @@ by *sharing* the resource, not by a role binding.
 ### Adding to the vocabulary
 
 1. Append the action or resource **at the end** in `registry.ts` - never
-   reorder, never insert. Bitset indices are derived from declaration order
-   and ship inside signed passports.
+   reorder, never insert. Bitset indices are derived from declaration order,
+   and the stage-F passport design would ship those indices over the wire.
+   The order has to be frozen before the first one is minted, not after.
 2. If built-in roles should grant it, add it to the role *differences* in
    `roles.ts` (member = viewer + additions, admin = member + additions).
 3. Update the pinned count and append to the full-order list in the app-side
@@ -199,7 +205,7 @@ otherwise, and an unregistered code reaches customers as "unknown error".
 | Hand-building an `AuthzScopeRef` literal in a route or service | Resolve it (`authzCollector.resolveScopeRef` / `resolveResourceScopeRef`) - lineage comes from storage, resource anchors from the fetched row |
 | Comparing role names (`role === "ADMIN"`) to gate behaviour | Ask for a permission - roles are grant bundles, not checks |
 | Inserting a permission mid-registry because it "belongs with" its siblings | Append only; the order test exists to stop exactly this |
-| Re-exporting `PassportService` from the barrel, or importing it client-side | The barrel stays browser-safe (`useCan` imports it); passports are server-only, `@langwatch/authz/passport` |
+| Putting a `node:crypto` or `Buffer` dependency on the package barrel | The barrel stays browser-safe - `useCan` imports it. A server-only primitive gets its own subpath export, the way `@langwatch/authz/witness` does. This is the rule the unbuilt passport work will land under; there is no `PassportService` to re-export today |
 | Toasting `error.message` from a denied mutation | The code-keyed presentation registry renders the copy (`permission_denied`) |
 | Constructing your own `AuthzService` / repository instead of importing from `runtime.ts` | The composition root builds one of each; a second instance means a second cache and a second config |
 | Calling `engine.decide()` with a hand-assembled `CollectedGrants` in production code | `AuthzService` collects through the repository; hand-assembly is for tests |
@@ -238,11 +244,11 @@ them, and the migration deletes the synonyms.
 | **Witness** | `Authorized<Scope>` - a branded, unforgeable proof that `authz.authorize()` allowed a permission at a scope. Repositories that accept a witness instead of a raw id make "forgot the check" fail to compile. |
 | **Repository port** | The storage interfaces the runtime services are written against: `AuthzReadRepository` (everything COLLECT reads) and `AuthzGrantsRepository` (everything the write surface touches, transactions included). The app implements them as `Prisma*Repository` classes. |
 | **Composition root** | `platform/app/src/server/app-layer/authz/runtime.ts` - the one place repositories, redis, the audit writer and the KSUID minter meet the services. Everything else imports the composed instances. |
-| **Passport** | A signed, short-TTL (≤60s), epoch-bound token carrying per-scope permission bitsets. Lets stateless surfaces (Go gateway, collectors) verify with an HMAC check and an epoch compare - zero database. |
-| **Bitset** | An effective permission set as bits indexed by registry order. The reason the registry is append-only: an index, once shipped inside a passport, must never change meaning. |
-| **Epoch** | A per-organization counter. Every grant write bumps it; caches and passports are valid only for the epoch they were built under, so revocation lands on the next request. |
-| **Shadow mode** | `AUTHZ_V2_SHADOW`: the engine runs beside the legacy resolvers on real traffic and logs mismatches with both verdicts. It never affects the response. |
-| **Divergence family** | A classified, *expected* shadow mismatch: `external-cap` (the legacy API-key path applies no lite-member cap) and `ceiling-legacy-fallback` (the legacy key ceiling consults TeamUser rows un-gated). Dashboards partition on these so real bugs stand out. |
+| **Passport** | **Designed, not built** (stage F). A signed, short-TTL (≤60s), epoch-bound token carrying per-scope permission bitsets, so that stateless surfaces (Go gateway, collectors) could verify with an HMAC check and an epoch compare - zero database. No code mints or checks one today; the word appears here so the constraints it imposes on the registry are not lost. |
+| **Bitset** | An effective permission set as bits indexed by registry order (`encodePermissionBitset` / `bitsetHasPermission`, both real and both on the barrel). The reason the registry is append-only: an index must never change meaning once anything ships one, and the cheapest moment to promise that is before the first passport exists. |
+| **Epoch** | A per-organization counter in redis. Every grant write bumps it; a cached grants reading is valid only for the epoch it was built under, so a revocation lands on the caller's next request. The passport design leans on the same counter. |
+| **Shadow mode** | **Removed.** For stage A the engine ran beside the legacy resolvers on real traffic and logged mismatches with both verdicts, behind `AUTHZ_V2_SHADOW`. The engine decides alone now, so the comparison, the flag and `AuthzShadowService` are all gone. |
+| **Divergence family** | A classified, *expected* shadow mismatch: `external-cap` (the legacy API-key path applied no lite-member cap) and `ceiling-legacy-fallback` (the legacy key ceiling consulted TeamUser rows un-gated). Historical - the vocabulary went with shadow mode. |
 
 ### "Permission" or "scope"? Permission - everywhere (2026-08-17)
 
@@ -279,12 +285,21 @@ and the [delivery plan](../../dev/docs/adr/110-grant-aggregates-are-grants.md)
 (stages, gates, rollbacks, and the data runbook). The shape:
 
 ```text
- A  EXTRACT    this package + adapters, parity suites, SHADOW mode   [shipped]
- B  BACKFILL   TeamUser → role bindings, then delete the fallback
- C  UNIFY      lite member becomes a role; ShareLink → resource grants (C5)
- D  ADOPT      .permission() everywhere; writes through GrantsService
- E  ENFORCE    every endpoint declares access or opts out, build-gated
- F  SCALE      epoch cache on, passports for stateless surfaces
+ A  EXTRACT    this package + adapters, parity suites, SHADOW mode     [shipped]
+ B  BACKFILL   TeamUser → role bindings, then delete the fallback      [shipped *]
+ C  UNIFY      lite member becomes a role; ShareLink → resource grants [C5 only *]
+ D  ADOPT      .permission() everywhere; writes through GrantsService  [shipped]
+ E  ENFORCE    every endpoint declares access or opts out, build-gated [shipped]
+ F  SCALE      epoch cache on, passports for stateless surfaces        [cache on *]
+
+ * B  the backfill shipped and every organization reads bindings. The
+      `legacy-team-fallback` step is still in the walk and the collector
+      still reads the legacy rows, so the deletion half is outstanding.
+ * C  C5 shipped: ShareLink IS resource-grant storage, no parallel table.
+      The lite member is still the cross-cutting cap it always was, not a
+      role - `lite-member-restricted` is a denial reason in the engine.
+ * F  the epoch cache is on by default; `AUTHZ_EPOCH_CACHE=0` turns it off.
+      Passports are not built - see the note under the diagram at the top.
 ```
 
 Data that actually moves (runbook M1-M7 in the delivery plan): the TeamUser
@@ -293,8 +308,9 @@ backfill with a per-user parity sweep (M1-M2), legacy API-key re-keying behind
 storage - no parallel table, no backfill (M5), deriving then deleting the
 legacy vocabulary in `rbac.ts` (M6), and the epoch discipline: every grant
 write path must bump the epoch **before** `AUTHZ_EPOCH_CACHE` ever ships on
-(M7). Every step is expand → dual-run → verify → cut over → delete, one flag
-per cutover.
+(M7 - met: `GrantsService` bumps on every write, which is what let the cache
+default on). Every step is expand → dual-run → verify → cut over → delete,
+one flag per cutover.
 
 ## Flags (resolved by the app's composition root, passed in as options)
 
@@ -303,17 +319,28 @@ flag and passes it to the service that needs it, so a test sets an option
 instead of an env var.
 
 ```text
- AUTHZ_V2_SHADOW        0 | 1 | 0.0-1.0   shadow-comparison sample rate (default off)
- AUTHZ_EPOCH_CACHE      0 | 1             L1 grants cache (default off = always collect)
- AUTHZ_PASSPORT_SECRET  hex               handed to PassportService's constructor when
-                                          stage F wires passports (unset = disabled)
+ AUTHZ_EPOCH_CACHE      unset | 0 | 1     L1 grants cache. ON unless the value is
+                                          0, false, off or no - trimmed and read
+                                          case-insensitively, so a kill switch
+                                          cannot no-op on casing. Anything else
+                                          leaves it on
+ AUTHZ_PASSPORT_SECRET  hex               RESERVED for the unbuilt stage-F passport
+                                          work. Nothing reads it today; there is no
+                                          PassportService to hand it to
+ AUTHZ_V2_SHADOW        —                 REMOVED with shadow mode, when the engine
+                                          became the only decider
 ```
 
-`passport.ts` is not re-exported from the package barrel - it uses
-`node:crypto` and `Buffer`, and the barrel stays browser-safe for `useCan`.
-Server code imports `@langwatch/authz/passport`, which is also where the
-base64url bitset codecs live (`bitsetToBase64Url` / `bitsetFromBase64Url`);
-the pure bit operations stay on the barrel. `mintWitness` is off the barrel
-for the same reason of blast radius, not bundle size - the server runtime
-imports `@langwatch/authz/witness`, and the `Authorized` type stays on the
-barrel because types are erased.
+The one flag that is live is resolved in the app's composition root
+(`runtime.ts`) through `epoch-cache-flag.ts`, per check rather than at module
+load, so turning the cache off is a restart-free lever. It fails toward ON: a
+value we do not recognise costs database reads, where a kill switch that
+silently did nothing would cost an incident.
+
+When the passport work lands it goes behind its own subpath export, not the
+barrel: it needs `node:crypto` and `Buffer`, and the barrel stays browser-safe
+for `useCan`. The base64url bitset codecs would live there with it; the pure
+bit operations (`encodePermissionBitset` / `bitsetHasPermission`) are on the
+barrel today. `mintWitness` already follows that shape for blast radius rather
+than bundle size - the server runtime imports `@langwatch/authz/witness`, and
+the `Authorized` type stays on the barrel because types are erased.
