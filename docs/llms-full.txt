@@ -34797,7 +34797,7 @@ import time
 import langwatch
 import requests
 
-SESSION_SECRET_NAME = "ACME_SESSION"  # the project secret that holds the session
+SESSION_ENTRY_NAME = "ACME_SESSION"  # the project secret that holds the session
 SESSION_TTL_SECONDS = 15 * 60  # what the target system promises
 REFRESH_MARGIN_SECONDS = 60  # refresh this early; keep it under the TTL
 
@@ -34838,7 +34838,7 @@ def get_session():
 def read_stored_session():
     """Return the stored session while it is fresh, else None."""
     try:
-        entry = json.loads(langwatch.secrets.get_value(SESSION_SECRET_NAME))
+        entry = json.loads(langwatch.secrets.get_value(SESSION_ENTRY_NAME))
         session = entry["session"]
         age = time.time() - float(entry["issued_at"])
     except Exception:  # noqa: BLE001 - no stored session is a valid answer
@@ -34878,7 +34878,7 @@ def store_session(session):
     cost is that the next row logs in again."""
     entry = json.dumps({"session": session, "issued_at": int(time.time())})
     try:
-        langwatch.secrets.set(SESSION_SECRET_NAME, entry)
+        langwatch.secrets.set(SESSION_ENTRY_NAME, entry)
     except Exception:  # noqa: BLE001 - the row must still answer
         report("could not be stored", "the next row will log in again")
 
@@ -34889,7 +34889,7 @@ def report(state, consequence):
     Nothing from the exception reaches the output. An error message can quote
     the credential that caused it, and a run shows stderr.
     """
-    print(f"{SESSION_SECRET_NAME} {state}, {consequence}", file=sys.stderr)
+    print(f"{SESSION_ENTRY_NAME} {state}, {consequence}", file=sys.stderr)
 
 
 def secret(name):
