@@ -5,7 +5,7 @@ import {
   SUBSCRIBABLE_PLANS,
   UserEmailRequiredError,
 } from "@langwatch/enterprise-billing-contract";
-import { getApp } from "~/server/app-layer/app";
+import type { App } from "~/server/app-layer/app";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 // No billing-specific error middleware: every error the services raise is a
@@ -16,8 +16,8 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const subscriptionPlanEnum = z.enum(SUBSCRIBABLE_PLANS);
 
-const requireSaasBilling = () => {
-  const { billingCustomer, subscription } = getApp();
+const requireSaasBilling = (app: App) => {
+  const { billingCustomer, subscription } = app;
   if (!billingCustomer || !subscription) {
     throw new Error("SaaS billing is not configured");
   }
@@ -42,8 +42,8 @@ export const createSubscriptionRouter = () => {
         }),
       )
       .permission("organization:manage")
-      .mutation(async ({ input }) => {
-        const { subscriptionService } = requireSaasBilling();
+      .mutation(async ({ input, ctx }) => {
+        const { subscriptionService } = requireSaasBilling(ctx.app);
         return await subscriptionService.updateSubscriptionItems({
           organizationId: input.organizationId,
           plan: input.plan as PlanType,
@@ -69,7 +69,9 @@ export const createSubscriptionRouter = () => {
       )
       .permission("organization:manage")
       .mutation(async ({ input, ctx }) => {
-        const { customerService, subscriptionService } = requireSaasBilling();
+        const { customerService, subscriptionService } = requireSaasBilling(
+          ctx.app,
+        );
         const customerId = await customerService.getOrCreateCustomerId({
           user: ctx.session.user,
           organizationId: input.organizationId,
@@ -91,7 +93,9 @@ export const createSubscriptionRouter = () => {
       .input(z.object({ organizationId: z.string(), baseUrl: z.string() }))
       .permission("organization:manage")
       .mutation(async ({ input, ctx }) => {
-        const { customerService, subscriptionService } = requireSaasBilling();
+        const { customerService, subscriptionService } = requireSaasBilling(
+          ctx.app,
+        );
         const customerId = await customerService.getOrCreateCustomerId({
           user: ctx.session.user,
           organizationId: input.organizationId,
@@ -112,8 +116,8 @@ export const createSubscriptionRouter = () => {
         }),
       )
       .permission("organization:manage")
-      .query(async ({ input }) => {
-        const { subscriptionService } = requireSaasBilling();
+      .query(async ({ input, ctx }) => {
+        const { subscriptionService } = requireSaasBilling(ctx.app);
         return await subscriptionService.previewProration({
           organizationId: input.organizationId,
           newTotalSeats: input.newTotalSeats,
@@ -123,8 +127,8 @@ export const createSubscriptionRouter = () => {
     getLastSubscription: protectedProcedure
       .input(z.object({ organizationId: z.string() }))
       .permission("organization:view")
-      .query(async ({ input }) => {
-        const { subscriptionService } = requireSaasBilling();
+      .query(async ({ input, ctx }) => {
+        const { subscriptionService } = requireSaasBilling(ctx.app);
         return await subscriptionService.getLastNonCancelledSubscription(
           input.organizationId,
         );
@@ -148,7 +152,9 @@ export const createSubscriptionRouter = () => {
       )
       .permission("organization:manage")
       .mutation(async ({ input, ctx }) => {
-        const { customerService, subscriptionService } = requireSaasBilling();
+        const { customerService, subscriptionService } = requireSaasBilling(
+          ctx.app,
+        );
         const customerId = await customerService.getOrCreateCustomerId({
           user: ctx.session.user,
           organizationId: input.organizationId,
@@ -177,7 +183,7 @@ export const createSubscriptionRouter = () => {
       )
       .permission("organization:manage")
       .mutation(async ({ input, ctx }) => {
-        const { subscriptionService } = requireSaasBilling();
+        const { subscriptionService } = requireSaasBilling(ctx.app);
         const actorEmail = ctx.session.user.email;
         if (!actorEmail) {
           throw new UserEmailRequiredError();
@@ -196,8 +202,8 @@ export const createSubscriptionRouter = () => {
     listInvoices: protectedProcedure
       .input(z.object({ organizationId: z.string() }))
       .permission("organization:view")
-      .query(async ({ input }) => {
-        const { subscriptionService } = requireSaasBilling();
+      .query(async ({ input, ctx }) => {
+        const { subscriptionService } = requireSaasBilling(ctx.app);
         return await subscriptionService.listInvoices({
           organizationId: input.organizationId,
         });
