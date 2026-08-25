@@ -131,6 +131,96 @@ Create a scenario whose criteria can only pass if the agent got through the auth
 
 That answer exists only behind the auth wall, so the scenario passing is the proof that authentication works.
 
+## Reusing one login across the rows of a run
+
+The rows of an experiment or a dataset run are isolated on purpose, so that they
+can run in parallel. Each row starts cold, and a login on every row is the
+default result. There is no per-batch cache and no shared-state hook.
+
+Use the project's own secret store as the shared store. The platform reads every
+project secret from the database when it prepares each row, so a row can read a
+session that an earlier row wrote. The REST secrets API accepts a project API
+key, which is how the agent writes it back.
+
+The value is encrypted at rest and no API returns it, so this is the correct
+place for a session token. A dataset row is the alternative and it is stored in
+clear and is readable in the UI, so it suits a fixture and not a credential.
+
+Add two more project secrets so the agent can write:
+
+```bash
+langwatch secret create LANGWATCH_ENDPOINT --value "https://app.langwatch.ai"
+```
+
+Create `LANGWATCH_API_KEY` through the **Settings → Secrets** UI, with your
+project API key as the value. That key holds project access, so the agent must
+send it to `LANGWATCH_ENDPOINT` and to no other address.
+
+The agent then reads the session, uses it when it is fresh, and logs in again
+when it is not. The full example, executed continuously against the real
+code-agent runtime, is
+[`shared_session_code_agent.py`](https://github.com/langwatch/langwatch/blob/main/services/nlpgo/app/engine/blocks/codeblock/examples/shared_session_code_agent.py).
+This is its center:
+
+```python
+SESSION_SECRET_NAME = "ACME_SESSION"   # the project secret that holds the session
+SESSION_TTL_SECONDS = 15 * 60          # what the target system promises
+REFRESH_MARGIN_SECONDS = 60            # refresh this long before the end
+
+
+class Code:
+    def __call__(self, message: str):
+        session = get_session()  # the one line each row calls
+        ...
+
+
+def get_session():
+    cached = read_cached_session()
+    if cached is not None:
+        return cached
+    session = login()
+    store_session(session)
+    return session
+
+
+def read_cached_session():
+    raw = optional_secret(SESSION_SECRET_NAME)
+    if raw is None:
+        return None
+    entry = json.loads(raw)
+    if time.time() - entry["issued_at"] >= SESSION_TTL_SECONDS - REFRESH_MARGIN_SECONDS:
+        return None
+    return entry["session"]
+```
+
+Set `SESSION_TTL_SECONDS` to what the target system promises, and keep
+`REFRESH_MARGIN_SECONDS` larger than your slowest row. A session that is older
+than the window minus the margin counts as stale, so the agent refreshes it
+before it expires instead of after a call fails.
+
+### What this pattern does not do
+
+The `secrets` namespace a row reads is a snapshot taken when that row starts. A
+row cannot read it again later, and it cannot see a write made by a row that runs
+beside it. Three results follow:
+
+- The first parallel wave performs one login per row in the wave. The rows after
+  the wave reuse the session. No lock prevents this, because a row that waits
+  still holds the old snapshot. Keep the login idempotent on the target system,
+  or lower the run's parallelism when the target rate-limits the login.
+- A row that starts with a fresh session keeps it for the whole row. Give the
+  margin enough room for the longest call the row makes.
+- A failed write does not fail the row. The row already holds a working session,
+  and the only cost is that the next row logs in again. The example reports it
+  and continues.
+
+<Note>
+  On a version without the secrets REST API, keep the same shape and put the
+  session in a dataset row instead. A dataset row is stored in clear and is
+  readable by anyone with project access, so use it only for a short-lived
+  token, never for a password.
+</Note>
+
 ## Troubleshooting
 
 | Symptom | Likely cause |
@@ -139,3 +229,5 @@ That answer exists only behind the auth wall, so the scenario passing is the pro
 | `missing_output` error | The Python returned a dict without one of the agent's declared output keys. |
 | Credential works locally but not on the platform | The secret name in `secrets.NAME` doesn't match a stored project secret, or the value was stored in a different project. |
 | Timeout | Token fetch + downstream call exceeded the 60s runner budget. Check both endpoints' latency. |
+| Every row logs in again | The session was not written back. Check the run output for the store failure, and check that `LANGWATCH_API_KEY` and `LANGWATCH_ENDPOINT` are project secrets. |
+| The first few rows log in, the rest do not | Expected. Rows that start together share one empty snapshot, so each one logs in. |
