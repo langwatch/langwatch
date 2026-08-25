@@ -52,11 +52,7 @@ export function AuthShell({
       // The modifier says the value panel is on screen, which is the one thing
       // the card needs to know without being told: it drops its own wordmark
       // so the page says it once, above the headline.
-      className={
-        isHosted && headline
-          ? "lw-auth lw-auth--split"
-          : "lw-auth"
-      }
+      className={isHosted && headline ? "lw-auth lw-auth--split" : "lw-auth"}
       position="relative"
       backgroundColor="auth.ground"
       minHeight="100vh"
@@ -68,9 +64,7 @@ export function AuthShell({
           so it exists exactly where the auth screens exists — same flag, same
           screens — and nowhere else. */}
       <CastleSnake />
-      {isHosted ? (
-        <AuthGround protect={headline ? "left" : "center"} />
-      ) : null}
+      {isHosted ? <AuthGround protect={headline ? "left" : "center"} /> : null}
       {isHosted && headline ? (
         // Capped at the site's content width and centred, so a big monitor
         // widens the field around the conversation rather than flinging the

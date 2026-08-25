@@ -22,7 +22,7 @@ Feature: The people and access settings, as one cluster
   #     │                    are here, what they can reach, what to do
   #     ├ Teams & Projects ─ the teams, and the projects each holds
   #     ├ Roles ──────────── roles · role assignments
-  #     ├ Single Sign-On ─── the connection, its domains and who proved them
+  #     ├ Authentication ─── how everyone signs in, and how accounts arrive
   #     ├ Directory ─────── status first, then groups, then tokens
   #     ├ Access ─────────── who may join, and the second-factor requirement
   #     └ Audit Log ──────── what was done in the organization, and by whom
@@ -375,6 +375,196 @@ Feature: The people and access settings, as one cluster
       When "ana" opens the directory page
       Then the navigation entry says "Directory"
       And the page still says SCIM, for the administrator who searched for it
+
+  # A COUNT IS THE ONE ANSWER NOBODY CAN CHECK. The band says the directory
+  # manages twelve people, and an administrator asking whether the sync is
+  # right is asking about a PERSON: did Sam come through Okta, is Ana still
+  # managed, why is this contractor here. A number cannot be wrong in a way you
+  # can see. So the page names them.
+
+  Rule: the people the directory manages are named, not only counted
+
+    @integration
+    Scenario: The directory's own people are listed by name
+      Given "acme" has members its identity provider created
+      When "ana" opens the directory page
+      Then each of them is a row with their name, their address and the access
+      they hold
+      And each row says the directory is where they came from
+
+    @integration
+    Scenario: The people who arrived another way are not in that list
+      Given "acme" has members its identity provider never created
+      When "ana" opens the directory page
+      Then they are not listed among the people the directory manages
+
+    @integration
+    Scenario: Somebody managed whose access is switched off is still listed
+      Given the directory manages somebody whose access here is switched off
+      When "ana" opens the directory page
+      Then they are still a row, marked as switched off
+      And an ordinary member is marked nothing at all
+
+    @integration
+    Scenario: A directory that has provisioned nobody says so honestly
+      Given "acme" has members and its identity provider created none of them
+      When "ana" opens the directory page
+      Then she is told the directory has provisioned nobody yet
+      And she is told those members arrived another way
+
+    @integration
+    Scenario: A roster that could not be read is not drawn as an empty one
+      Given the read that says who the directory manages fails
+      When "ana" opens the directory page
+      Then she is told what could not be read, in words, with a trace to quote
+      And nobody is listed as managed on the strength of the half that answered
+
+    @integration
+    Scenario: A reader who may not read membership is not shown a roster
+      Given "ana" may see single sign-on but may not manage the organization
+      When she opens the directory page
+      Then no list of the people the directory manages is on it
+
+  # AN EMPTY SCREEN IS AN INVITATION TO ACT. An organization with no connection
+  # was told three times that nothing was set up and offered nowhere to go.
+
+  Rule: the state with no data carries the first step
+
+    @integration
+    Scenario: An organization with no connection is offered the way to set one up
+      Given "acme" has never registered an identity provider
+      When "ana" opens the directory page
+      Then she is told no identity provider is connected
+      And she is offered the way to the page that registers one
+
+    @integration
+    Scenario: The first step is not offered to somebody who would be refused it
+      Given "ana" may see single sign-on but may not manage it
+      When she opens the directory page with no connection registered
+      Then no control for registering an identity provider is on it
+      And she is told who does set it up
+
+  # ── Authentication ─────────────────────────────────────────────────────
+
+  # ONE PAGE, TWO MODES, AND THE MODE IS THE CONNECTION'S. Before a connection
+  # is live there is nothing to overview: what an administrator needs is the
+  # setup journey, and that is the whole page. Once it is live the question
+  # changes from "how do I set this up" to "is it working", which is two cards
+  # and a glance: how everyone signs in, and how their accounts arrive. The
+  # journey does not go away — domains are claimed later and break-glass
+  # grants expire — it moves one quiet control behind the overview, on the
+  # same page and at the same address.
+
+  Rule: a live connection is read rather than configured
+
+    @integration
+    Scenario: The overview names the connection by the protocol it speaks
+      Given "acme" has a live OpenID Connect connection to "okta"
+      When "ana" opens the authentication page
+      Then the sign-on card is titled for OpenID Connect
+      And it names "okta" as the identity provider
+      And where the connection stands is said in words, never as a state name
+
+    @integration
+    Scenario: A connection that is on but carrying nobody says both
+      Given "acme" has a live connection its sign-ins have not moved to yet
+      When "ana" opens the authentication page
+      Then the card says the connection is on and not routing yet
+
+    @integration
+    Scenario: A domain whose record has gone says so on the overview
+      Given "acme" proved "acme.com" and its published record has been missing
+      for two days
+      When "ana" opens the authentication page
+      Then "acme.com" is listed as missing its record rather than as proved
+
+    @integration
+    Scenario: The overview offers only what the connection really has
+      Given "acme" has a live OpenID Connect connection
+      When "ana" opens the authentication page
+      Then she is offered a test sign-in through that connection
+      And no service provider metadata is offered, since only SAML publishes it
+      And no signing certificate expiry is shown, since none is read from it
+
+    @unit
+    Scenario: Every state a connection can be in has customer words
+      When each state a connection can rest in is put to the status chip
+      Then each one answers with words a customer reads
+      And none of them is the state's own name
+
+  Rule: how accounts arrive is on the same page as how people sign in
+
+    @integration
+    Scenario: The directory card carries the organization's real numbers
+      Given "acme" has a directory that manages three of its four members
+      When "ana" opens the authentication page
+      Then the directory card says three of four
+      And it says the fourth arrived another way
+      And it offers the way to the provisioned members
+
+    @integration
+    Scenario: A reader who may not read membership is told so
+      Given "ana" may see single sign-on but may not manage the organization
+      When she opens the authentication page
+      Then the counts she may not read say so rather than reading zero
+
+    @unit
+    Scenario: One source that stopped is never summarised as working
+      Given one source is syncing and another needs attention
+      When the sources are summarised into one chip
+      Then the chip does not say everything is working
+
+  Rule: setting up and checking are two modes of one page
+
+    @integration
+    Scenario: An organization with no connection gets the journey
+      Given "acme" has never registered an identity provider
+      When "ana" opens the authentication page
+      Then she is offered the first step of setting one up
+
+    @integration
+    Scenario: Managing a live connection stays on the same page
+      Given "acme" has a live connection
+      When "ana" opens the authentication page and chooses to manage it
+      Then the setup journey is on the same page
+      And she can go back to the overview
+
+    @integration
+    Scenario: The page points at where the reader's own sign-in lives
+      Given "acme" has a live connection
+      When "ana" opens the authentication page
+      Then it says her own passkeys and linked accounts are on her profile
+
+  # A REFUSAL IS NOT A SCREEN. An organization that cannot set single sign-on
+  # up — an unlicensed installation, one that has not restarted since its
+  # licence was activated, an organization not switched on for it — still came
+  # to find out how its people sign in. A page whose whole content is "you
+  # cannot use this" answers nothing, teaches nothing, and turns a navigation
+  # entry into a wall.
+
+  Rule: an organization that cannot set it up still reads the page
+
+    @integration
+    Scenario: The reason sits above the page rather than replacing it
+      Given "acme" is not switched on for setting single sign-on up itself
+      When "ana" opens the authentication page
+      Then she is told why she cannot start and what would change it
+      And the page still explains what single sign-on would give "acme"
+      And her directory's own facts are still on it
+      And her own sign-in methods are still pointed at
+
+    @integration
+    Scenario: Nothing is offered that would be refused
+      Given "acme" is not switched on for setting single sign-on up itself
+      When "ana" opens the authentication page
+      Then no control for registering an identity provider is on it
+      And no number is shown for a connection that does not exist
+
+  # NO SESSION POLICY. Requiring single sign-on of every member, falling back
+  # to a password, and how long a session lasts are not settings this
+  # organization has. The page says nothing about them: a frame drawn around a
+  # control that does not exist is a promise the product has not made, and a
+  # disabled one is worse, because it reads as a thing somebody switched off.
 
   # ── Access ─────────────────────────────────────────────────────────────
 

@@ -208,11 +208,9 @@ describe("the single sign-on settings surface", () => {
     /** @scenario "An administrator without the permission is not offered setup, and cannot reach it" */
     it("is refused the address, and the menu offers no entry to it either", async () => {
       readerHolding(["organization:manage"]);
-      const { default: SingleSignOnSettingsPage } = await import(
-        "../single-sign-on"
-      );
+      const { default: AuthenticationPage } = await import("../authentication");
 
-      draw(<SingleSignOnSettingsPage />);
+      draw(<AuthenticationPage />);
 
       // Opening the address directly is refused: the page is guarded on
       // `sso:view`, so what renders is the refusal rather than the setup.

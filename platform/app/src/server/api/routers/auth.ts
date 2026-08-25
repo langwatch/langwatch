@@ -147,7 +147,10 @@ export const authRouter = createTRPCRouter({
       }
 
       const verification = signUpVerification();
-      if ((await verification.addressState({ email: input.email })) === "confirmed") {
+      if (
+        (await verification.addressState({ email: input.email })) ===
+        "confirmed"
+      ) {
         throw new EmailAlreadyRegisteredError();
       }
 

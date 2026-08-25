@@ -5,22 +5,18 @@ import { SHAPE } from "../authTheme";
 
 /**
  * The way to the OTHER screen — sign-up from log-in, log-in from sign-up —
- * drawn as a button rather than as a sentence.
+ * quiet on purpose.
  *
- * It used to be a line of muted text with the last two words underlined, and
- * it sat directly under the primary action, which is the one place on this
- * card where a sentence has to compete with a filled pill for the same glance.
- * It lost every time: the card read as one action with a caption, and the
- * second way through was the least visible thing on a screen that only offers
- * two. As a button the card reads as what it is — a primary and an
- * alternative — and the column stops being top-heavy.
+ * It sits directly under the primary action, and it is not a peer of it: one
+ * person in a hundred needs to switch screens, everyone else needs the filled
+ * pill. Drawn at the primary's size it made the card read as two actions of
+ * equal weight. So it is a small, muted ghost — visibly pressable on hover,
+ * never competing for the first glance.
  *
- * Not a `MethodButton`, and deliberately unlike one. A method is a way to
- * finish THIS screen; this is a way to leave it for another. So it carries no
- * mark on the left rail (every seat in the method rail does), and it says the
- * action outright — "Create an account" rather than "Sign up" answering a
- * question that is no longer asked, because a button's words have to work
- * without the sentence that used to lead into them.
+ * Not a `MethodButton`: a method is a way to finish THIS screen; this is a
+ * way to leave it for another. It says the action outright — "Create an
+ * account", "Log in instead" — because its words have to work without the
+ * sentence that used to lead into them.
  *
  * An anchor, not a button that navigates: it goes somewhere, so it is
  * something to open in a new tab, copy, and see the destination of on hover.
@@ -38,18 +34,18 @@ export function SecondaryActionLink({
   return (
     <Button
       asChild
-      variant="outline"
-      width="full"
-      minHeight="44px"
-      fontSize="14px"
-      fontWeight={600}
+      variant="ghost"
+      alignSelf="center"
+      width="auto"
+      minHeight="32px"
+      paddingX="3"
+      fontSize="13px"
+      fontWeight={500}
+      color="fg.muted"
       borderRadius={SHAPE.control}
-      // The method rail's shell, so the card has one outline treatment rather
-      // than two that nearly match.
-      borderColor="auth.fieldBorder"
       _hover={{
+        color: "fg",
         backgroundColor: "auth.fieldBg",
-        borderColor: "fg.subtle",
       }}
       data-testid={testId}
     >

@@ -116,9 +116,7 @@ describe("ForgotPassword page", () => {
       expect(container.querySelector("[data-auth-card]")).toBeTruthy();
       expect(container.querySelector("[data-auth-card-logo]")).toBeTruthy();
       expect(container.querySelector(".lw-auth-card")).toBeTruthy();
-      expect(
-        container.querySelector("button.lw-auth-primary"),
-      ).toBeTruthy();
+      expect(container.querySelector("button.lw-auth-primary")).toBeTruthy();
       // The board's field, not the app's: a small mono label, no helper line
       // restating it in different words.
       const label = screen.getByText("Email");

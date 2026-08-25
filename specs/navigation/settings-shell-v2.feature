@@ -31,8 +31,11 @@ Feature: Settings shell in the new navigation modes
   which put a page they use often at the bottom of a group they have no
   use for.
 
-  PEOPLE & ACCESS holds Members, Teams & Projects, Roles, Single Sign-On,
-  Directory, Access and Audit Log. Role Bindings is gone as an entry: it
+  PEOPLE & ACCESS holds Members, Teams & Projects, Roles, Authentication,
+  Directory, Access and Audit Log. Authentication is the ORGANIZATION's: how
+  everyone in it signs in, and how their accounts arrive. How the reader
+  themselves signs in is Security, under You, and the two are never the same
+  entry. Role Bindings is gone as an entry: it
   is the second tab of Roles, and its address forwards there. Groups is
   gone as an entry too: a group is a thing a directory sends, so group
   management is a tab of Directory rather than a sibling of it. Directory
@@ -73,10 +76,10 @@ Feature: Settings shell in the new navigation modes
   Scenario: The access group is named for people and holds the organization's pages
     Given I open Settings in a new navigation mode
     Then the group is called "People & access"
-    And it offers Members, Roles, Directory and Access
+    And it offers Members, Roles, Authentication, Directory and Access
     And there is no separate Role Bindings entry, since it is a tab of Roles
     And there is no separate Groups entry, since it is a tab of Directory
-    And there is no Authentication entry, since Security is the reader's own
+    And Authentication is the organization's page, not the reader's own
     And Access is offered on every plan
 
   @integration

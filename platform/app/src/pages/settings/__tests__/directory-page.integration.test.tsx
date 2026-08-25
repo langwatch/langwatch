@@ -42,6 +42,12 @@ vi.mock("~/components/access/DirectorySummary", () => ({
   DirectorySummary: () => <div data-testid="directory-summary">status</div>,
 }));
 
+vi.mock("~/components/access/DirectoryMembersSection", () => ({
+  DirectoryMembersSection: () => (
+    <div data-testid="directory-managed-members">people</div>
+  ),
+}));
+
 vi.mock("~/components/access/GroupsSection", () => ({
   GroupsSection: () => <div data-testid="groups-section">groups</div>,
 }));
@@ -172,6 +178,16 @@ describe("given the directory page", () => {
         "aria-selected",
         "true",
       );
+    });
+
+    /** @scenario "A reader who may not read membership is not shown a roster" */
+    it("leaves out the roster, which reads the membership they may not have", () => {
+      state.permissions = new Set(["sso:view"]);
+      renderPage();
+
+      expect(screen.queryByTestId("directory-managed-members")).toBeNull();
+      // The half of the overview they may read is still there.
+      expect(screen.getByTestId("reconciliation-panel")).toBeInTheDocument();
     });
   });
 

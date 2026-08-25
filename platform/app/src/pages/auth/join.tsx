@@ -1,9 +1,6 @@
 import { useCallback, useRef } from "react";
 import { LoadingScreen } from "~/components/LoadingScreen";
-import {
-  AuthShell,
-  JoinBeforeCreateInterstitial,
-} from "~/features/auth";
+import { AuthShell, JoinBeforeCreateInterstitial } from "~/features/auth";
 import { usePublishAuthStage } from "~/features/auth/logic/groundStage";
 import type { JoinableOrganization } from "~/features/auth/logic/joinBeforeCreate";
 import { showErrorToast } from "~/features/errors";

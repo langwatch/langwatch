@@ -18,12 +18,16 @@ import { describe, expect, it } from "vitest";
  * convenience deny — it catches any future PR that downgrades a guard
  * back to `organization:view` or similar permissive shape.
  */
+/**
+ * Groups is not on this list: it is a forwarder onto the Groups tab of
+ * Directory, holding nothing to leak, and the page it lands on carries the
+ * guard. A pin on a redirect would only pin the redirect.
+ */
 const PAGES_REQUIRING_ORG_MANAGE = [
   "audit-log.tsx",
   "teams.tsx",
   "members.tsx",
   "roles.tsx",
-  "groups.tsx",
 ] as const;
 
 describe("legacy /settings admin pages", () => {

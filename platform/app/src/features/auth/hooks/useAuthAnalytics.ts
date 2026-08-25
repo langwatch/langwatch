@@ -75,7 +75,10 @@ export function useAuthAnalytics(surface: string): {
   // every render would make every one of them a changing dependency.
   const bound = useRef({
     submitted: (object: string, attributes?: Record<string, unknown>) =>
-      emitRef.current(AUTH_ACTION.submitted, object, { surface, ...attributes }),
+      emitRef.current(AUTH_ACTION.submitted, object, {
+        surface,
+        ...attributes,
+      }),
     chose: (methodId: string) =>
       emitRef.current(AUTH_ACTION.chose, "method", { surface, methodId }),
     refused: (object: string, code: string | null) =>

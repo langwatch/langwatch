@@ -42,7 +42,8 @@ function createStore(connections: { id: string; organizationId: string }[]) {
   let minted = 0;
   const matches = (row: TokenRow, where: Record<string, unknown>): boolean =>
     Object.entries(where).every(
-      ([field, value]) => (row as unknown as Record<string, unknown>)[field] === value,
+      ([field, value]) =>
+        (row as unknown as Record<string, unknown>)[field] === value,
     );
   return {
     tokens,

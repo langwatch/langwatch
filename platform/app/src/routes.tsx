@@ -210,8 +210,8 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/settings/access")),
       },
       {
-        path: "/settings/single-sign-on",
-        ...page(() => import("./pages/settings/single-sign-on")),
+        path: "/settings/authentication",
+        ...page(() => import("./pages/settings/authentication")),
       },
       {
         path: "/settings/subscription",

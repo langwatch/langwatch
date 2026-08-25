@@ -348,10 +348,7 @@ export function IdentifierFirstSignIn() {
         isSubmitting={routing.isDeciding}
         onSubmit={({ email }) => decide({ identifier: email, breakGlass })}
         footer={
-          <SignUpLink
-            callbackUrl={callbackUrl}
-            label="Create an account"
-          />
+          <SignUpLink callbackUrl={callbackUrl} label="Create an account" />
         }
         alternatives={
           hasAlternativeMethods(instanceMethods) ? (
@@ -419,8 +416,7 @@ function NoAccountYet({
   onVerificationSent: (email: string) => void;
   onUseDifferentEmail: () => void;
 }) {
-  const requestVerification =
-    api.auth.requestSignUpVerification.useMutation();
+  const requestVerification = api.auth.requestSignUpVerification.useMutation();
   const guidance = signInRoutingReasonCopy(reasonCode);
 
   const send = () => {
@@ -534,7 +530,9 @@ export function RoutedToConnection({
           hand-off that is taking too long is exactly where somebody realises
           they do not have an account here yet, and the browser's back button
           lands on a step this screen keeps in memory rather than in the URL. */}
-      {footer ?? <SignUpLink callbackUrl={callbackUrl} label="Create an account" />}
+      {footer ?? (
+        <SignUpLink callbackUrl={callbackUrl} label="Create an account" />
+      )}
     </AuthCard>
   );
 }

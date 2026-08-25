@@ -1,11 +1,12 @@
 import { Heading, Text, VStack } from "@chakra-ui/react";
 import SettingsLayout from "../../components/SettingsLayout";
-import { SingleSignOnSetup } from "../../components/settings/SingleSignOnSetup";
+import { AuthenticationSettings } from "../../components/settings/AuthenticationSettings";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
 /**
- * Setting enterprise single sign-on up yourself (D05 tiers 2 and 3).
+ * Authentication: how everyone in the organization signs in, and how their
+ * accounts arrive (D05, D08, ADR-124).
  *
  * Guarded on `sso:view` rather than on `organization:manage`: an
  * administrator who has not been given the single sign-on permissions is not
@@ -14,22 +15,27 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
  * anything needs `sso:manage`, which the registry's hierarchy makes a
  * superset of `sso:view`.
  */
-function SingleSignOnSettings() {
+function AuthenticationPage() {
   const { organization } = useOrganizationTeamProject();
 
   if (!organization) return <SettingsLayout />;
 
   return (
     <SettingsLayout>
-      <VStack align="stretch" gap={6} padding={6} width="full" maxWidth="920px">
+      <VStack
+        align="stretch"
+        gap={6}
+        padding={6}
+        width="full"
+        maxWidth="1120px"
+      >
         <VStack align="start" gap={1}>
-          <Heading size="lg">Single sign-on</Heading>
-          <Text color="gray.600">
-            Let people sign in to LangWatch with your company&apos;s identity
-            provider.
+          <Heading>Authentication</Heading>
+          <Text color="fg.muted" fontSize="sm">
+            {`How everyone in ${organization.name} signs in, and how their accounts arrive.`}
           </Text>
         </VStack>
-        <SingleSignOnSetup organizationId={organization.id} />
+        <AuthenticationSettings organizationId={organization.id} />
       </VStack>
     </SettingsLayout>
   );
@@ -38,4 +44,4 @@ function SingleSignOnSettings() {
 export default withPermissionGuard("sso:view", {
   layoutComponent: SettingsLayout,
   bypassOnboardingRedirect: true,
-})(SingleSignOnSettings);
+})(AuthenticationPage);

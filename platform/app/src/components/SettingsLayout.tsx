@@ -191,7 +191,7 @@ export default function SettingsLayout({
               "/settings/groups",
               "/settings/roles",
               "/settings/role-bindings",
-              "/settings/single-sign-on",
+              "/settings/authentication",
               "/settings/scim",
               "/settings/directory",
               "/settings/access",
@@ -210,15 +210,16 @@ export default function SettingsLayout({
             {showEnterpriseNav && !isLiteMember && (
               <MenuLink href="/settings/roles">Roles</MenuLink>
             )}
-            {/* Offered only to somebody who may at least SEE single sign-on
-                (D05). An administrator without the permission is not shown
-                the entry, and the page refuses the address as well — the
-                menu is a courtesy, not the gate. */}
+            {/* How the ORGANIZATION signs in; how the reader does is
+                Security, under You. Offered only to somebody who may at
+                least SEE single sign-on (D05). An administrator without the
+                permission is not shown the entry, and the page refuses the
+                address as well — the menu is a courtesy, not the gate. */}
             {showEnterpriseNav &&
               !isLiteMember &&
               hasPermission("sso:view") && (
-                <MenuLink href="/settings/single-sign-on">
-                  Single Sign-On
+                <MenuLink href="/settings/authentication">
+                  Authentication
                 </MenuLink>
               )}
             {showEnterpriseNav && !isLiteMember && (

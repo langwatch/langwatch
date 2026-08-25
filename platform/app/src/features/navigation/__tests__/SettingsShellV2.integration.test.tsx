@@ -404,11 +404,16 @@ describe("the settings shell in a new navigation mode", () => {
       expect(
         screen.queryByRole("link", { name: "Groups" }),
       ).not.toBeInTheDocument();
-      // Authentication is the reader's own page now, and it is called
-      // Security, under You.
+      // Authentication is the ORGANIZATION's page: how everyone in it signs
+      // in. The reader's own is Security, under You, and the two are
+      // separate entries at separate addresses.
       expect(
-        screen.queryByRole("link", { name: "Authentication" }),
-      ).not.toBeInTheDocument();
+        screen.getByRole("link", { name: "Authentication" }),
+      ).toHaveAttribute("href", "/settings/authentication");
+      expect(screen.getByRole("link", { name: "Security" })).toHaveAttribute(
+        "href",
+        "/settings/security",
+      );
       expect(screen.getByRole("link", { name: "Roles" })).toHaveAttribute(
         "href",
         "/settings/roles",

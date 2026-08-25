@@ -281,9 +281,7 @@ describe("the passkey ceremony's waiting state", () => {
         // And the breath exists only inside a no-preference block, so for
         // somebody who asked for less motion it never starts at all rather
         // than starting and being switched off.
-        const breath = authStyles.indexOf(
-          "animation: lw-auth-breathe",
-        );
+        const breath = authStyles.indexOf("animation: lw-auth-breathe");
         expect(breath).toBeGreaterThan(-1);
         const guard = authStyles.lastIndexOf(
           "@media (prefers-reduced-motion: no-preference)",

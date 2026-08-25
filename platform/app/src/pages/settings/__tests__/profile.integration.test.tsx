@@ -31,6 +31,9 @@ const harness = vi.hoisted(() => ({
   publicEnv: { PASSKEYS_ENABLED: true } as Record<string, unknown>,
   identifiers: [] as unknown[],
   identifiersError: null as unknown,
+  /** The account's own address, as the shell and Security read it. */
+  addressConfirmation: { email: "ana@acme.com", confirmed: true } as unknown,
+  addressConfirmationError: null as unknown,
   hasPassword: { hasPassword: true } as unknown,
   passwordError: null as unknown,
   twoStep: { offered: true, enabled: false } as unknown,
@@ -104,6 +107,16 @@ vi.mock("~/utils/api", () => ({
           isPending: false,
           isError: harness.identifiersError !== null,
           error: harness.identifiersError,
+        }),
+      },
+    },
+    auth: {
+      myAddressConfirmation: {
+        useQuery: () => ({
+          data: harness.addressConfirmation,
+          isPending: false,
+          isError: harness.addressConfirmationError !== null,
+          error: harness.addressConfirmationError,
         }),
       },
     },
@@ -229,6 +242,8 @@ beforeEach(() => {
     },
   ];
   harness.identifiersError = null;
+  harness.addressConfirmation = { email: "ana@acme.com", confirmed: true };
+  harness.addressConfirmationError = null;
   harness.hasPassword = { hasPassword: true };
   harness.passwordError = null;
   harness.twoStep = { offered: true, enabled: false };
@@ -442,6 +457,84 @@ describe("given my profile page", () => {
         screen.getByText(/Couldn't tell whether you have a password/i),
       ).toBeInTheDocument();
       expect(screen.getByTestId("method-row-email")).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * The regression this section was reported for. An account created by a
+   * passkey, or one older than the identifier projection, has an address on
+   * the user record and NOTHING in the projection — and the summary read only
+   * the projection, so it said "None yet" one band under the identity card
+   * showing that person's own address.
+   */
+  describe("when the identifier projection holds nothing for this account", () => {
+    /** @scenario "An account with no identifiers still states its own address" */
+    it("states the address on the account rather than claiming there is none", () => {
+      harness.identifiers = [];
+      harness.addressConfirmation = {
+        email: "alex+bunj@langwatch.ai",
+        confirmed: false,
+      };
+      harness.passkeys = [{ id: "pk_1", name: "Work laptop" }];
+      renderPage();
+
+      const row = screen.getByTestId("method-row-email");
+      expect(row.textContent).toContain("alex+bunj@langwatch.ai");
+      expect(row.textContent).not.toContain("None yet");
+    });
+
+    /** @scenario "An address I have not confirmed is marked in Security's words" */
+    it("marks that address unconfirmed in the words Security uses for it", () => {
+      harness.identifiers = [];
+      harness.addressConfirmation = {
+        email: "alex+bunj@langwatch.ai",
+        confirmed: false,
+      };
+      renderPage();
+
+      expect(screen.getByTestId("method-row-email").textContent).toContain(
+        "Not confirmed yet",
+      );
+    });
+
+    /** @scenario "An address I have not confirmed is marked in Security's words" */
+    it("says nothing about confirming an address the account has already confirmed", () => {
+      harness.identifiers = [];
+      harness.addressConfirmation = {
+        email: "alex+bunj@langwatch.ai",
+        confirmed: true,
+      };
+      renderPage();
+
+      const row = screen.getByTestId("method-row-email");
+      expect(row.textContent).toContain("alex+bunj@langwatch.ai");
+      expect(row.textContent).not.toContain("Not confirmed yet");
+    });
+
+    /** @scenario "Only an account with no address anywhere is told it has none" */
+    it("keeps None yet for the account that truly has no address anywhere", () => {
+      harness.identifiers = [];
+      harness.addressConfirmation = { email: null, confirmed: false };
+      renderPage();
+
+      expect(screen.getByTestId("method-row-email").textContent).toContain(
+        "None yet",
+      );
+    });
+
+    /** @scenario "The read of my own address failing says so" */
+    it("names the address read that failed and keeps the other methods", () => {
+      harness.identifiers = [];
+      harness.addressConfirmationError = {
+        message: "unknown_error",
+        data: { httpStatus: 500 },
+      };
+      renderPage();
+
+      expect(
+        screen.getByText(/Couldn't read the address on your account/i),
+      ).toBeInTheDocument();
+      expect(screen.getByTestId("method-row-password")).toBeInTheDocument();
     });
   });
 

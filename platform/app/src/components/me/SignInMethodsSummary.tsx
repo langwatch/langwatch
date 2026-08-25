@@ -1,16 +1,16 @@
-import { HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { KeyRound } from "lucide-react";
 import { signInMethodLabel } from "~/features/auth/logic/methodLabels";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { api } from "~/utils/api";
 import { authClient } from "~/utils/auth-client";
+import RouterLink from "~/utils/compat/next-link";
 import { IdentityChip } from "../access/IdentityRow";
 import { SectionErrorNotice } from "../settings/SectionErrorNotice";
 import {
   SettingsSection,
   SettingsSectionRow,
 } from "../settings/SettingsSection";
-import { Link } from "../ui/link";
 
 /**
  * How this account signs in, said in one line per method.
@@ -30,11 +30,27 @@ import { Link } from "../ui/link";
  * belongs to an organization and lives on its Access page; what this says is
  * only what this person actually holds.
  *
+ * THE ADDRESS COMES FROM TWO READS, AND IT HAS TO. The identifier projection
+ * is the richer answer — several addresses, which one is primary, which are
+ * confirmed — but it is only populated for accounts that have attached an
+ * identifier since the projection shipped. An account that predates it, or one
+ * created by a passkey and never asked for a second address, has an address on
+ * its user record and NOTHING in the projection, and this section read the
+ * projection alone: it said "None yet" directly under the identity card
+ * showing that person's own address. So the account's own address stands in
+ * where the projection has nothing, from `auth.myAddressConfirmation` — the
+ * same read the Security page and the shell's nudge already make, so the three
+ * can never disagree about the address or about whether it is confirmed.
+ *
+ * "None yet" now means what it says: no address in the projection AND none on
+ * the account.
+ *
  * Spec: specs/settings/profile.feature
  */
 export function SignInMethodsSummary() {
   const publicEnv = usePublicEnv();
   const identifiers = api.identity.myIdentifiers.useQuery({});
+  const confirmation = api.auth.myAddressConfirmation.useQuery();
   const password = api.user.hasPassword.useQuery({});
   const twoStep = api.twoStepVerification.account.useQuery({});
   const passkeys = authClient.useListPasskeys();
@@ -47,13 +63,23 @@ export function SignInMethodsSummary() {
       title="Sign-in methods"
       description="What this account can prove it is with."
       action={
-        <Link
-          href="/settings/security"
-          fontSize="sm"
+        // A BUTTON, not a sentence. This is the one control on the section and
+        // it was set as bare link text beside a bold title, where it read as a
+        // stray word rather than as the thing to press. Outline and xs: it has
+        // a real edge so it is obviously pressable, and it stays quieter than
+        // anything inside the band — a section header is a label, not a call
+        // to action.
+        <Button
+          asChild
+          size="xs"
+          variant="outline"
           data-testid="sign-in-methods-manage"
         >
-          Manage
-        </Link>
+          {/* The router's own link, not the themed `Link`: that one is a
+              Chakra link recipe and nesting it inside a button recipe puts two
+              sets of colour and underline rules on one element. */}
+          <RouterLink href="/settings/security">Manage</RouterLink>
+        </Button>
       }
       testId="sign-in-methods-settings-section"
     >
@@ -62,12 +88,16 @@ export function SignInMethodsSummary() {
           error={identifiers.error}
           fallbackTitle="Couldn't read your sign-in methods"
         />
-      ) : identifiers.isPending ? (
+      ) : identifiers.isPending || confirmation.isPending ? (
+        // Both reads gate the first row: drawing "None yet" for the half a
+        // second before the account's own address lands is the bug this
+        // section just had, with a shorter run time.
         <Spinner size="sm" />
       ) : (
         <VStack align="stretch" gap={2} width="full">
           {methodRows({
             identifiers: identifiers.data ?? [],
+            accountAddress: confirmation.data ?? null,
             offersPasskeys,
             passkeyCount: passkeys.data?.length ?? 0,
             hasPassword: password.data?.hasPassword === true,
@@ -78,21 +108,48 @@ export function SignInMethodsSummary() {
         </VStack>
       )}
 
-      {/* A read that failed takes its own row's word away, never the section:
-          the methods above it are still on screen and still true. */}
-      {password.isError && (
-        <SectionErrorNotice
-          error={password.error}
-          fallbackTitle="Couldn't tell whether you have a password"
-        />
-      )}
-      {twoStep.isError && (
-        <SectionErrorNotice
-          error={twoStep.error}
-          fallbackTitle="Couldn't read your two-step verification"
-        />
-      )}
+      <PartialReadNotices
+        confirmation={confirmation.error}
+        password={password.error}
+        twoStep={twoStep.error}
+      />
     </SettingsSection>
+  );
+}
+
+/**
+ * The reads that failed while the rest of the section carried on.
+ *
+ * A read that failed takes its own row's word away, never the section: the
+ * methods still on screen are still true, and the reader is told which
+ * question could not be answered rather than being left to notice a gap.
+ * `SectionErrorNotice` says nothing when handed nothing, so each of these is a
+ * statement rather than a branch.
+ */
+function PartialReadNotices({
+  confirmation,
+  password,
+  twoStep,
+}: {
+  confirmation: unknown;
+  password: unknown;
+  twoStep: unknown;
+}) {
+  return (
+    <>
+      <SectionErrorNotice
+        error={confirmation}
+        fallbackTitle="Couldn't read the address on your account"
+      />
+      <SectionErrorNotice
+        error={password}
+        fallbackTitle="Couldn't tell whether you have a password"
+      />
+      <SectionErrorNotice
+        error={twoStep}
+        fallbackTitle="Couldn't read your two-step verification"
+      />
+    </>
   );
 }
 
@@ -101,7 +158,9 @@ interface MethodRowProps {
   key: string;
   label: string;
   detail: string;
-  chip: string | null;
+  /** A state worth marking beside the value. Neutral unless the state is one
+   *  somebody has to act on — a tone on every chip is a tone on none. */
+  chip: { label: string; tone: "neutral" | "warning" } | null;
   testId: string;
 }
 
@@ -116,6 +175,7 @@ interface MethodRowProps {
  */
 function methodRows({
   identifiers,
+  accountAddress,
   offersPasskeys,
   passkeyCount,
   hasPassword,
@@ -128,6 +188,9 @@ function methodRows({
     isPrimary: boolean;
     confirmed: boolean;
   }>;
+  /** The address on the account itself, for the accounts whose identifier
+   *  projection holds nothing — see the section's docblock. */
+  accountAddress: { email: string | null; confirmed: boolean } | null;
   offersPasskeys: boolean;
   passkeyCount: number;
   hasPassword: boolean;
@@ -140,14 +203,14 @@ function methodRows({
       row.provider !== "credential" &&
       row.provider !== "passkey",
   );
-  const primary = addresses.find((row) => row.isPrimary) ?? addresses[0];
+  const shown = shownAddress({ addresses, accountAddress });
 
   return [
     {
       key: "email",
       label: "Email address",
-      detail: primary?.value ?? "None yet",
-      chip: addressChip({ count: addresses.length, primary }),
+      detail: shown?.value ?? "None yet",
+      chip: addressChip({ count: addresses.length, shown }),
       testId: "method-row-email",
     },
     ...federated.map((row) => ({
@@ -190,19 +253,57 @@ function methodRows({
 }
 
 /**
+ * The address this line states, from whichever read can state one.
+ *
+ * The projection first, because it is the richer answer and the only one that
+ * knows about a second address. The account's own address second, because an
+ * account whose projection is empty still HAS an address — and saying "None
+ * yet" about it, on a page whose identity card is showing that very address,
+ * is the screen calling itself a liar.
+ *
+ * Nothing at all is the third answer, and it is a real one: an account with no
+ * address anywhere gets "None yet", which now means it.
+ */
+function shownAddress({
+  addresses,
+  accountAddress,
+}: {
+  addresses: ReadonlyArray<{
+    value: string;
+    isPrimary: boolean;
+    confirmed: boolean;
+  }>;
+  accountAddress: { email: string | null; confirmed: boolean } | null;
+}): { value: string; confirmed: boolean } | null {
+  const primary = addresses.find((row) => row.isPrimary) ?? addresses[0];
+  if (primary) {
+    return { value: primary.value, confirmed: primary.confirmed };
+  }
+  if (accountAddress?.email) {
+    return { value: accountAddress.email, confirmed: accountAddress.confirmed };
+  }
+  return null;
+}
+
+/**
  * What the address line has to add: how many there are when there is more
- * than one, or that the only one is still unconfirmed — which is the state
- * that will lock somebody out and the one worth marking.
+ * than one, or that the one on screen is still unconfirmed — which is the
+ * state that will lock somebody out and the one worth marking.
+ *
+ * The words are the Security page's words. An address the reader sees marked
+ * "Not confirmed yet" there must not be marked "Unconfirmed" here: one state
+ * with two names reads as two states.
  */
 function addressChip({
   count,
-  primary,
+  shown,
 }: {
   count: number;
-  primary: { confirmed: boolean } | undefined;
-}): string | null {
-  if (count > 1) return `${count} addresses`;
-  if (count === 1 && primary?.confirmed === false) return "Unconfirmed";
+  shown: { confirmed: boolean } | null;
+}): MethodRowProps["chip"] {
+  if (count > 1) return { label: `${count} addresses`, tone: "neutral" };
+  if (shown && !shown.confirmed)
+    return { label: "Not confirmed yet", tone: "warning" };
   return null;
 }
 
@@ -225,12 +326,7 @@ function MethodRow({
   detail,
   chip,
   testId,
-}: {
-  label: string;
-  detail: string;
-  chip: string | null;
-  testId: string;
-}) {
+}: Omit<MethodRowProps, "key">) {
   return (
     <SettingsSectionRow testId={testId}>
       <Text fontSize="sm" fontWeight={500} minWidth="160px">
@@ -240,7 +336,7 @@ function MethodRow({
         <Text fontSize="sm" color="fg.muted" truncate>
           {detail}
         </Text>
-        {chip && <IdentityChip label={chip} />}
+        {chip && <IdentityChip label={chip.label} tone={chip.tone} />}
       </HStack>
     </SettingsSectionRow>
   );

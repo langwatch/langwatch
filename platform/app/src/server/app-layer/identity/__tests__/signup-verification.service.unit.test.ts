@@ -17,7 +17,10 @@ const FAKE_PASSWORD_HASH = "$2b$10$notthepassword";
 function makeService({
   registered = false,
   addressIsConfirmed = false,
-}: { registered?: boolean; addressIsConfirmed?: boolean } = {}) {
+}: {
+  registered?: boolean;
+  addressIsConfirmed?: boolean;
+} = {}) {
   const issued: Array<{ identifier: string; token: string; expires: Date }> =
     [];
   const sent: Array<{ email: string; verificationUrl: string }> = [];

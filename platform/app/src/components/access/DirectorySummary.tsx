@@ -7,12 +7,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { ReactNode } from "react";
-import { api } from "~/utils/api";
+import {
+  DirectoryFactUnavailable,
+  DirectorySourceChips,
+} from "~/features/directory/components/DirectoryFacts";
+import { useDirectoryFacts } from "~/features/directory/hooks/useDirectoryFacts";
 import { SectionErrorNotice } from "../settings/SectionErrorNotice";
-import { IdentityChip } from "./IdentityRow";
-
-/** Sources named in the band before the rest collapse into a count. */
-const SOURCES_SHOWN = 3;
 
 /**
  * The five facts an IT administrator opens the Directory page for.
@@ -32,9 +32,9 @@ const SOURCES_SHOWN = 3;
  * comes from the provenance every member already carries, so nothing new is
  * recorded to say it.
  *
- * Each number is read where it is already written: the reconciliation
- * projection for the first three, the group list for the fourth, member
- * provenance for the fifth.
+ * The numbers themselves are `useDirectoryFacts`, shared with the
+ * Authentication overview's directory card, so the two screens cannot report
+ * different syncs.
  *
  * WHAT IS NOT HERE. Departments, several kinds of source at once, and the
  * directory identities that never matched anybody are all things this
@@ -53,17 +53,8 @@ export function DirectorySummary({
    *  rather than a zero they would read as an answer. */
   canReadMembership: boolean;
 }) {
-  const reconciliation = api.scimReconciliation.getAll.useQuery({
-    organizationId,
-  });
-  const groups = api.group.listAll.useQuery(
-    { organizationId },
-    { enabled: canReadMembership && !!organizationId },
-  );
-  const provenance = api.organization.getMemberProvenance.useQuery(
-    { organizationId },
-    { enabled: canReadMembership && !!organizationId },
-  );
+  const facts = useDirectoryFacts({ organizationId, canReadMembership });
+  const { reconciliation, groups, provenance } = facts;
 
   if (reconciliation.isError) {
     return (
@@ -78,61 +69,58 @@ export function DirectorySummary({
     return <Spinner size="sm" />;
   }
 
-  const connections = reconciliation.data?.connections ?? [];
-  const lastPushedAtMs = connections.reduce<number | null>(
-    (latest, connection) =>
-      connection.lastPushedAtMs !== null &&
-      (latest === null || connection.lastPushedAtMs > latest)
-        ? connection.lastPushedAtMs
-        : latest,
-    null,
-  );
-  const people = connections.reduce(
-    (total, connection) => total + connection.managedPeople,
-    0,
-  );
-  const directoryGroups = (groups.data ?? []).filter(
-    (group) => group.scimSource !== null,
-  ).length;
-
-  const members = Object.values(provenance.data ?? {});
-  const outsideDirectory = members.filter(
-    (member) => member.source !== "directory",
-  ).length;
-
   return (
     <VStack align="stretch" gap={3} width="full">
       <Card.Root width="full" data-testid="directory-summary">
         <Card.Body>
           <SimpleGrid columns={{ base: 1, sm: 2, lg: 5 }} gap={6}>
             <Fact label="Sources connected">
-              <SourceChips connections={connections} />
+              <DirectorySourceChips connections={facts.connections} />
             </Fact>
             <Fact label="Last sync">
-              <Text fontSize="sm">
-                {lastPushedAtMs === null
+              {/* A date the directory has never written is not a date, so it
+                  is set in the muted ink the other "nothing yet" states use
+                  rather than in the weight a real timestamp earns. */}
+              <Text
+                fontSize="sm"
+                fontWeight={facts.lastPushedAtMs === null ? 400 : 500}
+                color={facts.lastPushedAtMs === null ? "fg.muted" : undefined}
+                truncate
+              >
+                {facts.lastPushedAtMs === null
                   ? "No push yet"
-                  : new Date(lastPushedAtMs).toLocaleString()}
+                  : new Date(facts.lastPushedAtMs).toLocaleString()}
               </Text>
             </Fact>
             <Fact label="People it manages">
-              <Text fontSize="sm">{people}</Text>
+              <Text fontSize="sm" fontWeight={500}>
+                {facts.managedPeople}
+              </Text>
             </Fact>
             <Fact label="Groups it sent">
-              <Unreadable canRead={canReadMembership} read={groups}>
-                <Text fontSize="sm">{directoryGroups}</Text>
-              </Unreadable>
+              <DirectoryFactUnavailable
+                canRead={canReadMembership}
+                read={groups}
+              >
+                <Text fontSize="sm" fontWeight={500}>
+                  {facts.directoryGroups.length}
+                </Text>
+              </DirectoryFactUnavailable>
             </Fact>
             <Fact label="Members it does not manage">
-              <Unreadable canRead={canReadMembership} read={provenance}>
+              <DirectoryFactUnavailable
+                canRead={canReadMembership}
+                read={provenance}
+              >
                 <Text
                   fontSize="sm"
+                  fontWeight={500}
                   title="People your identity provider did not create. A colleague invited them or a matching domain admitted them, so removing them from your directory will not remove them here."
                   data-testid="members-outside-directory"
                 >
-                  {outsideDirectory} of {members.length}
+                  {facts.outsideDirectory} of {facts.members.length}
                 </Text>
-              </Unreadable>
+              </DirectoryFactUnavailable>
             </Fact>
           </SimpleGrid>
         </Card.Body>
@@ -157,97 +145,34 @@ export function DirectorySummary({
 }
 
 /**
- * The connected sources, named.
+ * One fact: what it is called, and what it says.
  *
- * A source is a connection an identity provider pushes through, and naming
- * the provider is what lets an administrator with two of them tell which one
- * is the one that stopped. The status tone rides on the chip rather than
- * standing in a cell of its own, so two sources in two states read as two
- * sources rather than as one confusing summary of both.
+ * The five cells hold three different kinds of thing — chips, a date, bare
+ * numbers — and they were free to set their own type, so the band read as
+ * five unrelated little widgets that happened to be in a row. The label is
+ * fixed here and the value row is given ONE height, so a cell holding a chip
+ * and a cell holding a number put their contents on the same line. That is
+ * the whole difference between a row of facts and a row of oddments.
  */
-function SourceChips({
-  connections,
-}: {
-  connections: Array<{
-    connectionId: string;
-    providerId: string;
-    status: { headline: string; tone: string };
-  }>;
-}) {
-  if (connections.length === 0) {
-    return <IdentityChip label="Not set up yet" />;
-  }
-
-  const shown = connections.slice(0, SOURCES_SHOWN);
-  const rest = connections.length - shown.length;
-
-  return (
-    <HStack gap={1} flexWrap="wrap">
-      {shown.map((connection) => (
-        <IdentityChip
-          key={connection.connectionId}
-          label={`${connection.providerId} · ${connection.status.headline}`}
-          tone={toneOf(connection.status.tone)}
-          title={connection.status.headline}
-          data-testid="directory-source-chip"
-        />
-      ))}
-      {rest > 0 && (
-        <Text fontSize="xs" color="fg.muted">{`+${rest} more`}</Text>
-      )}
-    </HStack>
-  );
-}
-
-function toneOf(tone: string): "neutral" | "good" | "warning" | "bad" {
-  if (tone === "working") return "good";
-  if (tone === "attention") return "warning";
-  return "neutral";
-}
-
-/**
- * A fact this reader cannot have, said as a word rather than as a number.
- *
- * A zero is an answer, and "you may not read this" is not, so the two must
- * never look the same: an administrator scanning for a directory that sent no
- * groups would otherwise read a permission boundary as a working sync with
- * nothing in it.
- */
-function Unreadable({
-  canRead,
-  read,
-  children,
-}: {
-  canRead: boolean;
-  read: { isLoading: boolean; isError: boolean };
-  children: ReactNode;
-}) {
-  const { isLoading, isError } = read;
-  if (!canRead) {
-    return (
-      <Text fontSize="sm" color="fg.muted" title="Not yours to read.">
-        Unavailable
-      </Text>
-    );
-  }
-  if (isError) {
-    return (
-      <Text fontSize="sm" color="fg.muted">
-        Unavailable
-      </Text>
-    );
-  }
-  if (isLoading) return <Spinner size="xs" />;
-  return <>{children}</>;
-}
-
 function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <VStack align="start" gap={1}>
-      <Text fontSize="xs" color="fg.muted" textTransform="uppercase">
+    <VStack align="start" gap={1.5} minWidth={0}>
+      <Text
+        fontSize="xs"
+        color="fg.muted"
+        textTransform="uppercase"
+        letterSpacing="0.04em"
+        fontWeight={500}
+        lineHeight="1.3"
+      >
         {label}
       </Text>
-      <HStack>{children}</HStack>
+      {/* The chip is the tallest thing any cell can hold, so every cell
+          reserves its height. Without it the four text cells sat two pixels
+          higher than the one with a chip in it. */}
+      <HStack minHeight="6" align="center" minWidth={0}>
+        {children}
+      </HStack>
     </VStack>
   );
 }

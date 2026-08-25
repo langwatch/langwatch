@@ -233,15 +233,16 @@ function enterpriseAccessItems({
       alsoActiveAt: ["/settings/role-bindings"],
       isEnterprise: true,
     },
-    // Offered only to somebody who may at least SEE single sign-on (D05).
-    // An administrator without the permission is not shown the entry, and
-    // the page refuses the address as well — the menu is a courtesy, never
-    // the gate.
+    // How the ORGANIZATION signs in, which is a different subject from how
+    // the reader does: theirs is Security, under You. Offered only to
+    // somebody who may at least SEE single sign-on (D05) — an administrator
+    // without the permission is not shown the entry, and the page refuses
+    // the address as well, because the menu is a courtesy, never the gate.
     ...(hasPermission("sso:view")
       ? [
           {
-            label: "Single Sign-On",
-            href: "/settings/single-sign-on",
+            label: "Authentication",
+            href: "/settings/authentication",
             icon: Lock,
             isEnterprise: true,
           },

@@ -1,9 +1,5 @@
 import { useEffect, useSyncExternalStore } from "react";
-import type {
-  AuthDepth,
-  AuthDoor,
-  AuthStage,
-} from "./groundPalette";
+import type { AuthDepth, AuthDoor, AuthStage } from "./groundPalette";
 
 /**
  * Where in the auth screens somebody currently is, for the one thing that wants
