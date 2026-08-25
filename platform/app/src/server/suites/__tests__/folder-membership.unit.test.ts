@@ -19,21 +19,25 @@ function makeTx(overrides?: {
   scenarioFindMany: ReturnType<typeof vi.fn>;
   suiteUpdate: ReturnType<typeof vi.fn>;
   suiteFindFirst: ReturnType<typeof vi.fn>;
+  executeRaw: ReturnType<typeof vi.fn>;
 } {
   const scenarioFindMany = vi
     .fn()
     .mockResolvedValue(overrides?.scenarios ?? []);
   const suiteUpdate = vi.fn().mockResolvedValue({});
   const suiteFindFirst = vi.fn().mockResolvedValue(overrides?.folder ?? null);
+  const executeRaw = vi.fn().mockResolvedValue(0);
   return {
     scenario: { findMany: scenarioFindMany } as never,
     simulationSuite: {
       update: suiteUpdate,
       findFirst: suiteFindFirst,
     } as never,
+    $executeRaw: executeRaw as never,
     scenarioFindMany,
     suiteUpdate,
     suiteFindFirst,
+    executeRaw,
   };
 }
 
@@ -49,6 +53,12 @@ describe("reconcileFolderMembership", () => {
         tx,
       });
 
+      // The lock comes before the read that decides what to write, or a
+      // second writer reads the list as it was and overwrites this one.
+      expect(tx.executeRaw).toHaveBeenCalled();
+      expect(tx.executeRaw.mock.invocationCallOrder[0]!).toBeLessThan(
+        tx.scenarioFindMany.mock.invocationCallOrder[0]!,
+      );
       expect(tx.scenarioFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
