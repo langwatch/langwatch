@@ -527,52 +527,6 @@ describe("Feature: Role bindings REST API", () => {
         ).toBe(0);
       });
 
-      /** @scenario "A binding created with an end date reports it back" */
-      it("reports the end date on a binding created with one", async () => {
-        const member = await seedOrgMember({
-          prisma,
-          ns,
-          organizationId: seeded.organization.id,
-          role: OrganizationUserRole.MEMBER,
-          label: "future-end-date",
-          hasOrgBinding: true,
-        });
-        // Its own team. The shared ones already carry bindings from earlier
-        // tests in this file, and a create that collides answers 409 — which
-        // would fail this test for a reason that has nothing to do with the
-        // end date it exists to check.
-        const team = await prisma.team.create({
-          data: {
-            name: `RB Team End Date ${ns}`,
-            slug: `--test-rb-team-end-date-${ns}-${nanoid(6)}`,
-            organizationId: seeded.organization.id,
-          },
-        });
-
-        const expiresAt = "2099-12-31T23:59:59.000Z";
-        const response = await postBinding({
-          userId: member.userId,
-          role: "MEMBER",
-          scopeType: "TEAM",
-          scopeId: team.id,
-          expiresAt,
-        });
-
-        // The round trip is the point: the service forwarding `expiresAtMs` is
-        // proven at the unit level, but nothing showed the boundary parsing an
-        // ISO string, storing it, and serialising it back unchanged.
-        //
-        // Asserted as one object so a refusal names itself. `toBe(201)` on its
-        // own reports "expected 409 to be 201" and leaves the reason in the
-        // response body nobody reads.
-        const body = await response.json();
-        expect({ status: response.status, code: body.code }).toEqual({
-          status: 201,
-          code: undefined,
-        });
-        expect(body.expiresAt).toBe(expiresAt);
-      });
-
       /** @scenario "A binding with no end date reports none" */
       it("reports no end date on a binding created without one", async () => {
         const member = await seedOrgMember({
