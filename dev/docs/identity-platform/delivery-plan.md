@@ -175,6 +175,56 @@ Spec amendments ride the PR that makes them true (the amendment table below): PR
 
 > **D11 landed 2026-08-24** on the Wave 2 branch, riding the same PR as the docs (Alex's one-PR-per-wave call from Wave 1): 14-day expiry, conditional acceptance/resend claims, soft REVOKED, derived EXPIRED, identifier-aware acceptance, one-click resend, the WAITING_APPROVAL retirement (rows migrated to REVOKED, enum value deprecated in place), and both support-pain replay tests green against Postgres — `resilient-invitations.feature` 11/11 bound (the guided-signup scenario waits for D13's screens). Two notes against the gate as written: the identifier-aware match is **inert until users finalize** (the read fork answers null pre-latch, so deploy changes no acceptance behavior on its own), and rollback for the acceptance-match change is revert-level rather than a bake flag — the mechanical state changes (expiry, claims, revocation) are additive exactly as specified. `enforcement-members.feature`'s expired-invite counting scenarios were already state-model-agnostic and stand unamended; `update-pending-invitation.feature` slimmed to invitation creation.
 
+# Wave 3 — PR breakdown
+
+Written 2026-08-25, against Alex's capability checklist (password-if-none,
+passkeys, MFA, domain registration, licensed self-serve SSO, SCIM
+setup/manage/status, invite and join-request visibility, directory-caused
+removals, the passkey nudge, org-level factor enforcement). Where the wave
+opened: #7528 (stacked on #7485) already carries D05 tier 1
+(operator-attested onboarding), D12's aggregate + members panel, D08's
+pipeline/reconciler backend, the passkey settings surface and nudge
+(ADR-120), and set-a-password (ADR-119). **#7528 is frozen**: it takes the
+passkey spec-binding debt (tests for code it already contains) and nothing
+else; everything below stacks on its branch as its own PR.
+
+```text
+ PR 8   Wave 3 docs + specs (this PR)      PR 9   D06 — the factor surface
+ ADR-122 · scim-reconciliation-            TOTP enroll/backup/disable ·
+ surfaces.feature (inert) ·                the per-org enrollment gate ·
+ ADR-121 pulled into the wave ·            admin visibility · session list
+ this section                              methods · {actor, subject} claims
+
+ PR 10  D05 — tiers 2+3 + surfaces         PR 11  D08 — remainder + surfaces
+ licence-bound self-hosted OIDC ·          connection-scoped tokens in UI
+ hosted domain-claim queue ·          ──►  and REST · push-as-command ·
+ platform-ops lookup · org-admin           audit attribution · re-entry ·
+ panel · the permission split              both ADR-122 views + re-drive
+
+ PR 12  D12 — the automatic door           PR 13  ADR-121 — the strong factor
+ domain auto-join (opt-in, audited,        phishingResistantRequired ·
+ never inferred) · join-before-create      pre-flight lockout count ·
+ nudges + orphan-org metric                enterprise-gated (after 9 + 10)
+```
+
+- **PR 9 gate** is D06's exit gate as written above. The factors branch note
+  in #7528's body is stale (its remote head is an ancestor and the tree holds
+  no MFA UI); the surface is built fresh here — decided with Alex 2026-08-25.
+- **PR 10 gate** is D05's exit gate; the two spec files leave the parity
+  checker's inert list here.
+- **PR 11 gate** is D08's exit gate plus ADR-122's spec bound; the org view
+  ships on the "see single sign-on" permission, the ops view on operator
+  access, and the re-drive is a recorded command with its refusal paths
+  spec'd.
+- **PR 12 gate** is D12's exit gate (the auto-join half; requests landed with
+  #7528).
+- **PR 13** ships last: it needs PR 10's registry permissions and PR 9's
+  condition machinery. Per-org enterprise setting, not a deploy flag; turning
+  it on ends no session and the pre-flight count ships with the switch.
+
+Deferred out of the wave: nothing from the checklist. ADR-118 (signed session
+tokens) stays recorded-not-built.
+
 # ADRs to write (before or with the gated deliverable)
 
 Plain design docs, written before the code they cover:
@@ -182,6 +232,8 @@ Plain design docs, written before the code they cover:
 1. **Identity platform + identifiers** (D01) — **written: [ADR-101](../adr/101-identity-pipeline-and-identifiers.md)** (revised 2026-08-20; re-based on ADR-110 2026-08-23). The identity adapter (R10) with its per-user write gate; the truth split — a new pure event-truth Postgres `Identifier` projection, `Account` stays 100% row-truth protocol — which leaves **ADR-022 and ADR-015 unamended** (the earlier column-truth carve-out and replay column scoping are deleted from the program); the ADR-110-shaped rollout re-tenanted to users (org enrollment expanding to members, per-user `finalized` latch, calling-path apply as the one recorded divergence). Carries the payload rule (the email rides in the event where the fact is about one; HMAC-keyed hashes; secrets never) and erasure-as-event-plus-log-wipe (R11).
 3. **Sign-in router, screens + SSO self-service** (D03/D13–D05) — **spiked for review: [ADR-117](../adr/117-identifier-first-front-door.md)** (2026-08-24). Identifier-first routing, auto-link rules, the first-party screen set; explicitly amends ADR-027 (`027-license-gated-sso.md`; the number is collided) — hook → per-method router policy with the hook kept as enforcement backstop; carries over the constants table and the route-table canary; answers Open Q11 (startup semantics kept), Q9 (reset follows the identifier) and Q12 (no-oracle scoped to sign-in). The SAML engine choice is the spike's named debt, due at D04 implementation.
 4. **MFA + session shape** (D06/D07) — **MFA belongs to the account, not the organization** (revised 2026-08-24), so `mfaRequired` is a membership condition enforced as an enrollment gate, there is no step-up, and `mfaVerifiedAt` is dropped; `amr` semantics, whose one load-bearing job is the SSO case (a provider-asserted factor satisfies the condition, a provider asserting nothing does not); **Open Q4 answered: a passkey (`["phw"]`) satisfies it**, reasoning in `D07-passkeys.md`; and why there is **no** forced re-login and no session revoke at all.
+
+5. **SCIM reconciliation surfaces** (D08) — **written: [ADR-122](../adr/122-scim-reconciliation-is-a-visible-surface.md)** (2026-08-25). Sync state as a read surface in two views — the org SCIM settings page (self-serve status, directory-caused changes, failures as words) and the D05 operator surface (cross-customer oversight, dead-letter linking, the one guarded re-drive). Spec: `specs/identity/scim-reconciliation-surfaces.feature`, inert until PR 11 binds it.
 
 Gherkin specs to write fresh: none outstanding - every Wave 3 deliverable now has one. Use `/write-spec` per deliverable when that changes. **Written 2026-08-24 (Wave 2, `@unimplemented` until bound):** `specs/identity/signin-router.feature` (D03), `specs/identity/signin-signup-screens.feature` (D13), `specs/identity/sso-connection-lifecycle.feature` (D04), `specs/identity/resilient-invitations.feature` (D11). **Written 2026-08-24 ahead of Wave 3, every scenario `@unimplemented` and each file carried in `check-feature-parity.ts`'s inert list until its PR binds it:** `specs/identity/mfa-and-session-shape.feature` (D06, 49 scenarios), `specs/identity/passkeys.feature` (D07, 31 scenarios), `specs/identity/sso-onboarding-tiers.feature`, `specs/identity/platform-ops-identity-lookup.feature`, `specs/identity/org-admin-identity-surface.feature` (D05), `specs/identity/join-requests.feature`, `specs/identity/join-matching-and-privacy.feature`, `specs/identity/domain-auto-join.feature`, `specs/identity/join-before-create.feature` (D12), `specs/identity/scim-connection-sync.feature` (D08). The D05 files reshape that deliverable as three separable tiers in priority order - ops-assisted hosted onboarding first, licence-bound self-hosted self-serve second, hosted self-serve with its domain-claim queue last - and scope self-serve to OIDC, which moves ADR-117's SAML engine debt to D09. They also amend D04 with a fourth verification method, `operator-attested`, which is what lets tier 1 finish a customer's setup in one sitting. See the D05 deliverable's revision note and D04's amendment section.
 
