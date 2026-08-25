@@ -20,6 +20,9 @@
 export type DomainNextStepKind =
   /** Ask for the value to publish. Ours to hand over, theirs to publish. */
   | "get-record"
+  /** A value is already out. Publishing it is theirs, and asking again
+   *  would replace the one they are working from. */
+  | "publish-it"
   /** A person here is deciding it, because another organization holds it. */
   | "waiting-on-us"
   /** Refused. It can be claimed again without a second connection. */
@@ -42,6 +45,7 @@ export function domainNextStepFor({
   proofState,
   claim,
   provesWithLicense,
+  recordIssued = false,
 }: {
   proved: boolean;
   proofState: "VERIFIED" | "WAVERING" | "LAPSED";
@@ -50,6 +54,9 @@ export function domainNextStepFor({
   /** A licensed installation proves with its licence, in one press, with no
    *  record to publish anywhere. */
   provesWithLicense: boolean;
+  /** Whether a value has already been handed over for THIS domain and is
+   *  waiting to be published. */
+  recordIssued?: boolean;
 }): DomainNextStep {
   if (proved && proofState !== "VERIFIED") {
     return {
@@ -83,6 +90,20 @@ export function domainNextStepFor({
       action: null,
       explanation:
         "Another organization has already proved this domain, so somebody here is deciding this claim by hand. There is nothing for you to do until we come back to you.",
+    };
+  }
+  // A VALUE ALREADY HANDED OVER IS NOT A STEP TO REPEAT. Asking to prove
+  // again MINTS A NEW TOKEN and the old one stops counting, so a row that
+  // kept offering "Prove this domain" would invite somebody who had already
+  // published the value into silently invalidating it — and the record they
+  // are staring at in their DNS console would quietly become the wrong one.
+  // The move at this point is theirs and it is outside LangWatch.
+  if (recordIssued && !provesWithLicense) {
+    return {
+      kind: "publish-it",
+      action: null,
+      explanation:
+        "We have given you a value for this domain. Publish it, then use the check below. Asking to prove again replaces it with a new value, which would make anything you have already published stop counting.",
     };
   }
   return {

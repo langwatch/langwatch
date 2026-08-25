@@ -99,6 +99,7 @@ export function DomainsSection({
                 organizationId={organizationId}
                 connectionId={connectionId}
                 provesWithLicense={provesWithLicense}
+                recordIssued={record?.domain === entry}
               />
             ))}
           </Table.Body>
@@ -157,6 +158,7 @@ function DomainRow({
   organizationId,
   connectionId,
   provesWithLicense,
+  recordIssued,
 }: {
   domain: string;
   claimed: SelfServeDomainClaimView | undefined;
@@ -168,6 +170,9 @@ function DomainRow({
   organizationId: string;
   connectionId: string;
   provesWithLicense: boolean;
+  /** Whether a value is already out for this domain, waiting to be
+   *  published. Asking to prove again would replace it. */
+  recordIssued: boolean;
 }) {
   const claim = api.ssoSetup.claimDomain.useMutation();
   const prove = api.ssoSetup.proveDomain.useMutation();
@@ -184,6 +189,7 @@ function DomainRow({
     proofState: proof?.proofState ?? "VERIFIED",
     claim: claimed,
     provesWithLicense,
+    recordIssued,
   });
 
   const settle = {
@@ -363,6 +369,7 @@ function PublishedRecord({
   const checkFile = api.ssoSetup.checkDomainFile.useMutation();
   const prove = api.ssoSetup.proveDomain.useMutation();
   const utils = api.useUtils();
+  const [replacing, setReplacing] = useState(false);
 
   const target = { organizationId, connectionId, domain: record.domain };
   const settle = {
@@ -460,14 +467,45 @@ function PublishedRecord({
               <RefreshCw size={14} />
               Check for the file
             </Button>
-            <Button
-              variant="ghost"
-              loading={prove.isPending}
-              onClick={() => prove.mutate(target, settle)}
-            >
-              Give me a fresh value
-            </Button>
+            {/* NOT A RETRY, THOUGH IT SITS BESIDE TWO. It mints a new value
+                and the old one stops counting, so pressing it after
+                publishing quietly makes the record in somebody's DNS console
+                the wrong one — with nothing on screen having said so. It
+                asks first, and the question names the consequence. */}
+            {replacing ? (
+              <HStack gap={2}>
+                <Button
+                  colorPalette="orange"
+                  loading={prove.isPending}
+                  onClick={() => {
+                    setReplacing(false);
+                    prove.mutate(target, settle);
+                  }}
+                >
+                  Yes, replace it
+                </Button>
+                <Button
+                  variant="ghost"
+                  disabled={prove.isPending}
+                  onClick={() => setReplacing(false)}
+                >
+                  Keep the current value
+                </Button>
+              </HStack>
+            ) : (
+              <Button variant="ghost" onClick={() => setReplacing(true)}>
+                Give me a fresh value
+              </Button>
+            )}
           </HStack>
+          {replacing && (
+            <Text fontSize="sm" color="fg.muted" maxWidth="72ch">
+              A fresh value replaces the one above, and anything you have
+              already published stops counting — you would need to publish the
+              new value in its place. Only do this if the current value has
+              been lost or has expired.
+            </Text>
+          )}
           {/* The check's verdict, where the reader is looking. A check that
               found nothing is the single most common thing to happen here,
               and it must say so rather than appearing to do nothing. */}
