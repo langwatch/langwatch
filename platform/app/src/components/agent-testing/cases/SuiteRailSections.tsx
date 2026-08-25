@@ -12,11 +12,7 @@ import { Icon, Skeleton, VStack } from "@chakra-ui/react";
 import { Folder, FolderCode, FolderPlus, ListChecks } from "lucide-react";
 import { FG_FAINT } from "../shared/design";
 import type { SuiteRailProps } from "./SuiteRail";
-import {
-  RailAddButton,
-  RailItem,
-  RailSectionHeading,
-} from "./SuiteRailItem";
+import { RailAddButton, RailItem, RailSectionHeading } from "./SuiteRailItem";
 import { SuiteRailMenu } from "./SuiteRailMenu";
 import type { TestSuiteEntry } from "./test-cases";
 
@@ -48,7 +44,9 @@ export function SuiteRailSections(props: SuiteRailSectionsProps) {
       <RailItem
         label="All test cases"
         icon={
-          collapsed ? <Icon as={ListChecks} boxSize="13px" color={FG_FAINT} /> : undefined
+          collapsed ? (
+            <Icon as={ListChecks} boxSize="13px" color={FG_FAINT} />
+          ) : undefined
         }
         selected={selection.kind === "all"}
         collapsed={collapsed}
@@ -91,7 +89,9 @@ function SuiteRailSuiteList(props: SuiteRailSectionsProps) {
         <RailItem
           key={suite.id}
           label={suite.name}
-          icon={<Icon as={Folder} boxSize="13px" color={FG_FAINT} flexShrink={0} />}
+          icon={
+            <Icon as={Folder} boxSize="13px" color={FG_FAINT} flexShrink={0} />
+          }
           selected={selection.kind === "suite" && selection.slug === suite.slug}
           collapsed={collapsed}
           onClick={() => onSelect({ kind: "suite", slug: suite.slug })}

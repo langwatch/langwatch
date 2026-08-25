@@ -115,8 +115,7 @@ function HeaderActions({
         isRunning={detail.isRunning}
         onRunAgain={detail.handleRunAgainClick}
         onEditScenario={() =>
-          scenarioData &&
-          openCaseEditor({ scenarioId: scenarioData.id })
+          scenarioData && openCaseEditor({ scenarioId: scenarioData.id })
         }
         onOpenThread={isTraceReachable ? openThread : null}
         onOpenInTraces={isTraceReachable ? detail.handleOpenInTraces : null}

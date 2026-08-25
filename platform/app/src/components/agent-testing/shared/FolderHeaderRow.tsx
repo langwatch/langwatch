@@ -67,7 +67,9 @@ export function FolderHeaderRow({
         <Text
           fontSize="10.5px"
           color={FG_FAINT}
-          aria-label={caseCount === 1 ? "1 test case" : `${caseCount} test cases`}
+          aria-label={
+            caseCount === 1 ? "1 test case" : `${caseCount} test cases`
+          }
         >
           {caseCount}
         </Text>

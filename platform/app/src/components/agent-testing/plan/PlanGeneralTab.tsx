@@ -20,7 +20,8 @@ import {
 import { FG_FAINT } from "../shared/design";
 import type { PlanEditorState } from "./usePlanEditor";
 
-export function PlanGeneralTab({
+/** The list of test cases a hand-assembled run plan holds. */
+function ScenarioScopeField({
   editor,
   onNewTestCase,
 }: {
@@ -28,11 +29,49 @@ export function PlanGeneralTab({
   onNewTestCase: () => void;
 }) {
   const { suiteForm } = editor;
-  const { form } = suiteForm;
+  const errors = suiteForm.form.formState.errors;
+  const count = suiteForm.selectedScenarioIds.length;
+
+  return (
+    <>
+      <ScenarioPicker
+        scenarios={suiteForm.filteredScenarios}
+        selectedIds={suiteForm.selectedScenarioIds}
+        totalCount={suiteForm.totalScenarioCount}
+        onToggle={suiteForm.toggleScenario}
+        onSelectAll={suiteForm.selectAllScenarios}
+        onClear={suiteForm.clearScenarios}
+        searchQuery={suiteForm.scenarioSearch}
+        onSearchChange={suiteForm.setScenarioSearch}
+        allLabels={suiteForm.allLabels}
+        activeLabelFilter={suiteForm.activeLabelFilter}
+        onLabelFilterChange={suiteForm.setActiveLabelFilter}
+        onCreateNew={onNewTestCase}
+        hasError={!!errors.selectedScenarioIds}
+        archivedIds={editor.archivedScenariosWithNames}
+        onRemoveArchived={suiteForm.removeArchivedScenario}
+        folders={editor.folders}
+      />
+      <Text marginTop={1} fontSize="11px" color={FG_FAINT}>
+        {count === 1
+          ? "1 test case will run."
+          : `${count} test cases will run.`}
+      </Text>
+      <FieldError message={errors.selectedScenarioIds?.message} />
+    </>
+  );
+}
+
+/** What the plan is called and what it is for. */
+function NameAndDescriptionFields({
+  form,
+}: {
+  form: PlanEditorState["suiteForm"]["form"];
+}) {
   const errors = form.formState.errors;
 
   return (
-    <VStack align="stretch" gap={4}>
+    <>
       <Box>
         <FieldLabel>Name</FieldLabel>
         <Input
@@ -59,6 +98,22 @@ export function PlanGeneralTab({
         />
         <FieldError message={errors.description?.message} />
       </Box>
+    </>
+  );
+}
+
+export function PlanGeneralTab({
+  editor,
+  onNewTestCase,
+}: {
+  editor: PlanEditorState;
+  onNewTestCase: () => void;
+}) {
+  const { suiteForm } = editor;
+
+  return (
+    <VStack align="stretch" gap={4}>
+      <NameAndDescriptionFields form={suiteForm.form} />
 
       <Box>
         <FieldLabel>What runs</FieldLabel>
@@ -68,32 +123,7 @@ export function PlanGeneralTab({
             caseCount={suiteForm.selectedScenarioIds.length}
           />
         ) : (
-          <>
-            <ScenarioPicker
-              scenarios={suiteForm.filteredScenarios}
-              selectedIds={suiteForm.selectedScenarioIds}
-              totalCount={suiteForm.totalScenarioCount}
-              onToggle={suiteForm.toggleScenario}
-              onSelectAll={suiteForm.selectAllScenarios}
-              onClear={suiteForm.clearScenarios}
-              searchQuery={suiteForm.scenarioSearch}
-              onSearchChange={suiteForm.setScenarioSearch}
-              allLabels={suiteForm.allLabels}
-              activeLabelFilter={suiteForm.activeLabelFilter}
-              onLabelFilterChange={suiteForm.setActiveLabelFilter}
-              onCreateNew={onNewTestCase}
-              hasError={!!errors.selectedScenarioIds}
-              archivedIds={editor.archivedScenariosWithNames}
-              onRemoveArchived={suiteForm.removeArchivedScenario}
-              folders={editor.folders}
-            />
-            <Text marginTop={1} fontSize="11px" color={FG_FAINT}>
-              {suiteForm.selectedScenarioIds.length === 1
-                ? "1 test case will run."
-                : `${suiteForm.selectedScenarioIds.length} test cases will run.`}
-            </Text>
-            <FieldError message={errors.selectedScenarioIds?.message} />
-          </>
+          <ScenarioScopeField editor={editor} onNewTestCase={onNewTestCase} />
         )}
       </Box>
     </VStack>

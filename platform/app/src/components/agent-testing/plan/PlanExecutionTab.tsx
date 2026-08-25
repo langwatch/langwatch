@@ -21,6 +21,81 @@ import {
 import { FG_MUTED } from "../shared/design";
 import type { PlanEditorState } from "./usePlanEditor";
 
+/** How many times each scenario and target pair runs. */
+function RepeatCountField({
+  form,
+}: {
+  form: PlanEditorState["suiteForm"]["form"];
+}) {
+  const errors = form.formState.errors;
+
+  return (
+    <Box>
+      <HStack
+        gap={2}
+        borderWidth="1px"
+        borderColor="border"
+        borderRadius="lg"
+        paddingX={3}
+        paddingY={2.5}
+        fontSize="12.5px"
+      >
+        <Text fontWeight="medium">Repeat count</Text>
+        <Input
+          {...DIALOG_FIELD_STYLE}
+          type="number"
+          width="56px"
+          paddingX={2}
+          fontSize="12px"
+          aria-label="Repeat count"
+          min={1}
+          max={MAX_REPEAT_COUNT}
+          {...form.register("repeatCount", { valueAsNumber: true })}
+          borderColor={errors.repeatCount ? "red.500" : "border"}
+        />
+        <Text color={FG_MUTED}>
+          times per scenario x target (max {MAX_REPEAT_COUNT})
+        </Text>
+      </HStack>
+      <FieldError message={errors.repeatCount?.message} />
+    </Box>
+  );
+}
+
+/** The agents and prompts the plan runs against. */
+function TargetsField({
+  editor,
+  onAddTarget,
+}: {
+  editor: PlanEditorState;
+  onAddTarget: () => void;
+}) {
+  const { suiteForm } = editor;
+  const errors = suiteForm.form.formState.errors;
+
+  return (
+    <Box>
+      <FieldLabel>Agents and prompts to be tested</FieldLabel>
+      <TargetPicker
+        targets={suiteForm.filteredTargets}
+        selectedTargets={suiteForm.selectedTargets}
+        totalCount={suiteForm.availableTargets.length}
+        isTargetSelected={suiteForm.isTargetSelected}
+        onToggle={suiteForm.toggleTarget}
+        onSelectAll={suiteForm.selectAllTargets}
+        onClear={suiteForm.clearTargets}
+        searchQuery={suiteForm.targetSearch}
+        onSearchChange={suiteForm.setTargetSearch}
+        onAddTarget={onAddTarget}
+        hasError={!!errors.selectedTargets}
+        archivedTargets={editor.archivedTargetsWithNames}
+        onRemoveArchived={suiteForm.removeArchivedTarget}
+      />
+      <FieldError message={errors.selectedTargets?.message} />
+    </Box>
+  );
+}
+
 export function PlanExecutionTab({
   editor,
   onAddTarget,
@@ -29,30 +104,10 @@ export function PlanExecutionTab({
   onAddTarget: () => void;
 }) {
   const { suiteForm } = editor;
-  const { form } = suiteForm;
-  const errors = form.formState.errors;
 
   return (
     <VStack align="stretch" gap={4}>
-      <Box>
-        <FieldLabel>Agents and prompts to be tested</FieldLabel>
-        <TargetPicker
-          targets={suiteForm.filteredTargets}
-          selectedTargets={suiteForm.selectedTargets}
-          totalCount={suiteForm.availableTargets.length}
-          isTargetSelected={suiteForm.isTargetSelected}
-          onToggle={suiteForm.toggleTarget}
-          onSelectAll={suiteForm.selectAllTargets}
-          onClear={suiteForm.clearTargets}
-          searchQuery={suiteForm.targetSearch}
-          onSearchChange={suiteForm.setTargetSearch}
-          onAddTarget={onAddTarget}
-          hasError={!!errors.selectedTargets}
-          archivedTargets={editor.archivedTargetsWithNames}
-          onRemoveArchived={suiteForm.removeArchivedTarget}
-        />
-        <FieldError message={errors.selectedTargets?.message} />
-      </Box>
+      <TargetsField editor={editor} onAddTarget={onAddTarget} />
 
       <PromptTargetMappingSection
         selectedTargets={suiteForm.selectedTargets}
@@ -60,35 +115,7 @@ export function PlanExecutionTab({
         onMappingChange={suiteForm.setTargetMapping}
       />
 
-      <Box>
-        <HStack
-          gap={2}
-          borderWidth="1px"
-          borderColor="border"
-          borderRadius="lg"
-          paddingX={3}
-          paddingY={2.5}
-          fontSize="12.5px"
-        >
-          <Text fontWeight="medium">Repeat count</Text>
-          <Input
-            {...DIALOG_FIELD_STYLE}
-            type="number"
-            width="56px"
-            paddingX={2}
-            fontSize="12px"
-            aria-label="Repeat count"
-            min={1}
-            max={MAX_REPEAT_COUNT}
-            {...form.register("repeatCount", { valueAsNumber: true })}
-            borderColor={errors.repeatCount ? "red.500" : "border"}
-          />
-          <Text color={FG_MUTED}>
-            times per scenario x target (max {MAX_REPEAT_COUNT})
-          </Text>
-        </HStack>
-        <FieldError message={errors.repeatCount?.message} />
-      </Box>
+      <RepeatCountField form={suiteForm.form} />
     </VStack>
   );
 }

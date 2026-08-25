@@ -20,6 +20,59 @@ export type SuiteRailMenuProps = {
   onArchiveSuite: () => void;
 };
 
+const stop = (event: React.MouseEvent) => event.stopPropagation();
+
+/**
+ * The menu only appears under the pointer, so a rail of suites reads as a
+ * list of names and not as a column of controls.
+ */
+function MenuTrigger({ suiteName, ...rest }: { suiteName: string }) {
+  return (
+    <Button
+      size="xs"
+      variant="ghost"
+      minWidth="20px"
+      height="20px"
+      paddingX={0}
+      opacity={0}
+      _groupHover={{ opacity: 1 }}
+      _focusVisible={{ opacity: 1 }}
+      _open={{ opacity: 1 }}
+      aria-label={`Actions for ${suiteName}`}
+      onClick={stop}
+      {...rest}
+    >
+      <MoreVertical size={13} />
+    </Button>
+  );
+}
+
+/** One action of the menu, with the click kept off the row behind it. */
+function SuiteMenuItem({
+  value,
+  color,
+  onChoose,
+  children,
+}: {
+  value: string;
+  color?: string;
+  onChoose: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Menu.Item
+      value={value}
+      color={color}
+      onClick={(event) => {
+        stop(event);
+        onChoose();
+      }}
+    >
+      {children}
+    </Menu.Item>
+  );
+}
+
 export function SuiteRailMenu({
   suite,
   canManage,
@@ -30,85 +83,52 @@ export function SuiteRailMenu({
   onOpenLastRun,
   onArchiveSuite,
 }: SuiteRailMenuProps) {
-  const stop = (event: React.MouseEvent) => event.stopPropagation();
-
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
-        {/* The menu only appears under the pointer, so a rail of suites reads
-            as a list of names and not as a column of controls. */}
-        <Button
-          size="xs"
-          variant="ghost"
-          minWidth="20px"
-          height="20px"
-          paddingX={0}
-          opacity={0}
-          _groupHover={{ opacity: 1 }}
-          _focusVisible={{ opacity: 1 }}
-          _open={{ opacity: 1 }}
-          aria-label={`Actions for ${suite.name}`}
-          onClick={stop}
-        >
-          <MoreVertical size={13} />
-        </Button>
+        <MenuTrigger suiteName={suite.name} />
       </Menu.Trigger>
       <Menu.Content>
         {canManage && (
-          <Menu.Item
+          <SuiteMenuItem
             value="new-test-case"
-            onClick={(event) => {
-              stop(event);
-              onNewTestCase(suite.id);
-            }}
+            onChoose={() => onNewTestCase(suite.id)}
           >
             New test case
-          </Menu.Item>
+          </SuiteMenuItem>
         )}
         {canManage && (
-          <Menu.Item
+          <SuiteMenuItem
             value="run-suite"
-            onClick={(event) => {
-              stop(event);
-              onRunSuite(suite.id);
-            }}
+            onChoose={() => onRunSuite(suite.id)}
           >
             Run suite
-          </Menu.Item>
+          </SuiteMenuItem>
         )}
         {canManage && (
-          <Menu.Item
+          <SuiteMenuItem
             value="edit-suite"
-            onClick={(event) => {
-              stop(event);
-              onEditSuite(suite.id);
-            }}
+            onChoose={() => onEditSuite(suite.id)}
           >
             Edit suite
-          </Menu.Item>
+          </SuiteMenuItem>
         )}
         {hasRun && (
-          <Menu.Item
+          <SuiteMenuItem
             value="open-last-run"
-            onClick={(event) => {
-              stop(event);
-              onOpenLastRun(suite);
-            }}
+            onChoose={() => onOpenLastRun(suite)}
           >
             Open last run
-          </Menu.Item>
+          </SuiteMenuItem>
         )}
         {canManage && (
-          <Menu.Item
+          <SuiteMenuItem
             value="archive-suite"
             color="orange.500"
-            onClick={(event) => {
-              stop(event);
-              onArchiveSuite();
-            }}
+            onChoose={() => onArchiveSuite()}
           >
             Archive suite
-          </Menu.Item>
+          </SuiteMenuItem>
         )}
       </Menu.Content>
     </Menu.Root>

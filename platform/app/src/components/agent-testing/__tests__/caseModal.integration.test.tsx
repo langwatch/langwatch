@@ -26,7 +26,8 @@ const emptyQuery = vi.hoisted(() => () => ({
 }));
 
 const onSuccessOf = vi.hoisted(
-  () => (mutate: (...args: unknown[]) => void) =>
+  () =>
+    (mutate: (...args: unknown[]) => void) =>
     ({ onSuccess }: { onSuccess?: (saved: unknown) => void } = {}) => ({
       mutate: (input: unknown) => {
         mutate(input);
@@ -201,10 +202,7 @@ describe("the test case dialog", () => {
       openNew();
       await screen.findByTestId("case-modal");
 
-      await user.type(
-        screen.getByLabelText("Title"),
-        "Angry customer",
-      );
+      await user.type(screen.getByLabelText("Title"), "Angry customer");
       await user.type(screen.getByLabelText("Rubrics"), "Keeps a calm tone");
       await user.click(screen.getByTestId("case-modal-save-and-run"));
 
@@ -231,9 +229,7 @@ describe("the test case dialog", () => {
         refetch: vi.fn(),
       });
       render(<AgentTestingCaseEditor />, { wrapper: Wrapper });
-      useAgentTestingStore
-        .getState()
-        .openCaseEditor({ scenarioId: "case_1" });
+      useAgentTestingStore.getState().openCaseEditor({ scenarioId: "case_1" });
 
       expect(await screen.findByText("Edit test case")).toBeInTheDocument();
       const history = screen.getByTestId("case-modal-history");

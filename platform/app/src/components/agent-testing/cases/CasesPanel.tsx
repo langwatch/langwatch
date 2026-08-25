@@ -9,10 +9,7 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 
-import {
-  CONTENT_COLUMN_GUTTER,
-  ContentColumn,
-} from "../shared/ContentColumn";
+import { CONTENT_COLUMN_GUTTER, ContentColumn } from "../shared/ContentColumn";
 import type { AgentTestingSelection } from "../useAgentTestingRouting";
 import { CasesPanelBody } from "./CasesPanelBody";
 import { CasesPanelHeader } from "./CasesPanelHeader";
