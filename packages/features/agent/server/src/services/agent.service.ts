@@ -138,6 +138,18 @@ export class AgentService extends AgentServiceContract {
       } catch (error) {
         throw new InvalidAgentConfigError(type, error);
       }
+    } else if (
+      commandResult.data.type &&
+      commandResult.data.type !== existing.type
+    ) {
+      // A type-only update must not persist the old type's config under a new
+      // discriminator. Keep it valid only when that config also matches the
+      // requested type.
+      try {
+        config = parseAgentConfig(type, existing.config);
+      } catch (error) {
+        throw new InvalidAgentConfigError(type, error);
+      }
     }
     const updated = await this.repository.update({
       ...commandResult.data,

@@ -111,4 +111,18 @@ describe("Agents service", () => {
       projectId: "project_1",
     });
   });
+
+  it("does not persist a type-only update with an incompatible config", async () => {
+    const { service, database } = setup();
+    vi.mocked(database.agent.findFirst).mockResolvedValue(row());
+
+    await expect(
+      service.update({
+        id: "agent_1",
+        projectId: "project_1",
+        type: "code",
+      }),
+    ).rejects.toMatchObject({ name: "InvalidAgentConfigError" });
+    expect(database.agent.update).not.toHaveBeenCalled();
+  });
 });
