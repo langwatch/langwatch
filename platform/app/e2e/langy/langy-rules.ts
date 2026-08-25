@@ -236,6 +236,33 @@ export const LANGY_OPTIMIZE_LOOP_CRITERIA = [
 ];
 
 /**
+ * Outcome rubric for the half of the loop that runs in the user's OWN page.
+ *
+ * Every dispatched action answers with `executedVia`, and the skill tells Langy
+ * to read it and phrase itself accordingly (skills/prompt-optimization/SKILL.mdx).
+ * These grade what the reader is told about where the work happened, and the
+ * one refusal a wrong comparison payload earns. Both are conditional and pass
+ * when the condition never arises, stated inline so the judge never marks them
+ * inconclusive.
+ *
+ * The first criterion grades TRUTHFULNESS only, deliberately. The proactive
+ * half, that Langy volunteer which leg a change took so the reader knows
+ * whether to watch the table or to reload, is a documented product gap in the
+ * skill and is not judged here: the agent reads `executedVia` and never
+ * phrases anything from it. Measured on the 2026-08-25 live conversation
+ * (`local_langyconv_0003FCC6BtptpxybqxprAZUd8Mzbe`), read from the durable
+ * record so the mid-turn narration was included: three turns of otherwise good
+ * narration name the page, the browser or a reload not once. The spec scenario
+ * that carries the half (`Langy says where each change happened`, in
+ * specs/langy/langy-prompt-optimization-loop.feature) is `@unimplemented` for
+ * the same reason. Put it back here when the skill earns it.
+ */
+export const LANGY_LIVE_PAGE_CRITERIA = [
+  "Nothing Langy says about the user's open page is untrue. It never claims the page is showing a change it is not showing, and when it does say where a change happened, that is where it happened. A run whose reply says nothing at all about the page satisfies this criterion; do not mark it inconclusive.",
+  "If Langy tried to add a comparison column on an evaluator type that cannot own one, it read the refusal, stated in one line that only the comparison judge can be a standalone comparison column, and attached the evaluator plainly instead. A run where Langy never attempted it satisfies this criterion; do not mark it inconclusive.",
+];
+
+/**
  * Rubric for the evaluator inference branches of the bootstrap flow. The
  * mapping table mirrors the skill: labels get exact match, free text gets
  * LLM answer match, contexts suggest faithfulness, a named quality dimension

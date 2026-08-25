@@ -1627,10 +1627,11 @@ model Experiment {
 //
 // Ordinary typing in the workbench writes a single rolling row with
 // `autoSaved = true`, updated in place so a long editing session does not
-// leave one row per keystroke behind. A commit, an agent write and a restore
-// each write a new `autoSaved = false` row, which is what a person sees in
-// the version list. `version` matches the `Experiment.workbenchVersion` the
-// write produced, so history and the live row share one number line.
+// leave one row per keystroke behind. That row is shown as "Autosave" and
+// carries no number a person reads. A commit, an agent write and a restore
+// each write a new `autoSaved = false` row, and those rows are numbered
+// 1, 2, 3 with no gaps: the number is one higher than the highest numbered
+// row of the experiment, not the counter.
 //
 // `state` never carries run results: those live only on the live experiment
 // row, because a snapshot exists to restore a setup, not to replay an old run.
@@ -1638,10 +1639,19 @@ model Experiment {
 // current results across, so bringing an old setup back never clears the
 // output cells and evaluator scores of the run the experiment holds now.
 model ExperimentVersion {
-  id           String @id @default(nanoid())
-  experimentId String
-  projectId    String
-  version      Int
+  id             String @id @default(nanoid())
+  experimentId   String
+  projectId      String
+  /// The number the version is addressed and displayed by. Numbered rows hold
+  /// a gap-free sequence. The rolling autosave row rides on the counter
+  /// instead, which is what keeps it clear of that sequence.
+  version        Int
+  /// `Experiment.workbenchVersion` at the moment this row was last written.
+  /// The rolling row is rewritten in place, so this is the only column that
+  /// says how recent its content is, and the version list sorts and pages by
+  /// it. It also joins a row to the live state: the row whose `counterVersion`
+  /// equals the experiment's counter holds what the workbench shows now.
+  counterVersion Int
 
   autoSaved     Boolean @default(false)
   commitMessage String?
@@ -1659,10 +1669,13 @@ model ExperimentVersion {
 
   @@unique([experimentId, version])
   @@index([projectId, experimentId, autoSaved])
-  // The version list pages by version inside one experiment, and a restore
-  // reads one version number. Both name all three columns, so the sort key
-  // belongs in the index rather than being applied to fetched rows.
+  // A restore reads one version number of one experiment, and a numbered write
+  // reads the highest number that experiment holds. Both name all three
+  // columns, so the sort key belongs in the index rather than being applied to
+  // fetched rows.
   @@index([projectId, experimentId, version])
+  // The version list pages by counterVersion inside one experiment.
+  @@index([projectId, experimentId, counterVersion])
   @@index([createdAt])
 }
 

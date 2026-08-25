@@ -8,7 +8,7 @@ import AgentReportNotice from "/snippets/agent-report-notice.mdx";
 
 The CLI is designed to be driven by a coding assistant, and it reaches everything in the LangWatch app except cache rules, which you manage over [REST](/ai-gateway/api/management#cache-rules) or in the dashboard.
 
-Every subcommand supports `--help`, and every command accepts the output-contract flags (`-o json`, `--json <fields>`, `--jq <expr>`; see [Agent usage](#agent-usage)). Run `langwatch --help` to see the full command tree.
+Every subcommand supports `--help`, and every command accepts the output-contract flags (`-o json`, `--json <fields>`, `--jq <expr>`, `--limit <n>`; see [Agent usage](#agent-usage)). Run `langwatch --help` to see the full command tree.
 
 ## Install
 
@@ -769,10 +769,13 @@ record *payload*):
 |---|---|
 | `-o, --output <format>` | `table` (human default), `json`, `agents` (compact single-line JSON), `yaml` |
 | `--json <fields>` | JSON with only the given comma-separated fields |
-| `--jq <expr>` | Project the result before printing: dot paths, `.items[]`, `.items[].field`, `\| length` |
+| `--jq <expr>` | Project the result before printing: dot paths, `.items[]`, `.items[].field`, `.items[0]` (negative indexes count from the end), and `length` with or without a `\|` in front |
+| `--limit <n>` | Keep at most n rows of the result, in the machine formats. A command that pages with a `--limit` of its own keeps that one |
 
 ```bash
 langwatch trace search --jq '.traces[].traceId'
+langwatch prompt list --jq length          # how many, in one call
+langwatch prompt list --limit 5 -o json    # the first five rows only
 langwatch evaluator list --json id,name,slug
 langwatch monitor list -o yaml
 ```

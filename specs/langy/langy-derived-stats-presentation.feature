@@ -32,6 +32,23 @@ Feature: A derived stats card reads as a comparison, at any panel width
     When the figure is drawn
     Then the symbol is drawn as written, with no space before it
 
+  # A per-row cost is a few ten-thousandths of a unit, and the default number
+  # drawing keeps three decimal places, so a real reading was drawn as "0 usd"
+  # beside prose that named it exactly. A reading the model measured must never
+  # read as nothing.
+  @unit
+  Scenario: A reading smaller than a hundredth keeps its digits
+    Given a stats item whose value is a cost of 0.0001543
+    When the figure is drawn
+    Then it reads as 0.0001543, not as zero
+    And the unit is drawn the same way as for any other reading
+
+  @unit
+  Scenario: A reading of zero is still drawn as zero
+    Given a stats item whose value is zero
+    When the figure is drawn
+    Then it reads as zero
+
   @unit
   Scenario: Readings on one scale are a comparison
     Given two or more numeric stats items sharing one unit

@@ -36,6 +36,7 @@ import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../constants";
 
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
+import { usePromptTemplateFields } from "../../hooks/usePromptTemplateFields";
 import { useTargetName, useTargetNames } from "../../hooks/useTargetName";
 import type { TargetConfig } from "../../types";
 import { isComparisonEvaluator } from "../../types";
@@ -130,7 +131,10 @@ export const TargetHeader = memo(function TargetHeader({
   const activeDatasetId = useEvaluationsV3Store(
     (state) => state.activeDatasetId,
   );
-  const hasMissingMappings = targetHasMissingMappings(target, activeDatasetId);
+  const promptTemplateFields = usePromptTemplateFields();
+  const hasMissingMappings = targetHasMissingMappings(target, activeDatasetId, {
+    promptTemplateFields,
+  });
 
   // Glows this column's header when a pairwise verdict's variant name was
   // clicked, so users can trace an ambiguous "bot (1)" label back to its

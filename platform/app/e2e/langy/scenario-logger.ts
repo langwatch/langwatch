@@ -86,6 +86,13 @@ export async function runScenarioAndLog({
   } catch (error) {
     if (!isTransientInfrastructureError(error)) throw error;
     console.log(`[scenario] transient infrastructure failure, retrying once`);
+    // A replay is a new conversation. Without this the adapter keeps the id of
+    // the conversation that just failed, so the replay's first message arrives
+    // as a continuation of a turn the server is often still running: it
+    // answers `conversation_busy` until the test's own clock runs out.
+    for (const agent of config.agents ?? []) {
+      (agent as { resetSession?: () => void }).resetSession?.();
+    }
     await beforeRetry?.();
     result = await scenario.run(config);
   }

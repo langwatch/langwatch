@@ -1699,8 +1699,8 @@ A simple evaluator that checks if the output matches the expected_output exactly
     category: "quality",
     docsUrl: "",
     isGuardrail: false,
-    requiredFields: [],
-    optionalFields: ["output", "expected_output"],
+    requiredFields: ["output", "expected_output"],
+    optionalFields: [],
     settings: {
       case_sensitive: {
         description:
@@ -1734,8 +1734,8 @@ Uses an LLM to check if the generated output answers a question correctly the sa
     category: "quality",
     docsUrl: "",
     isGuardrail: false,
-    requiredFields: [],
-    optionalFields: ["input", "output", "expected_output"],
+    requiredFields: ["output", "expected_output"],
+    optionalFields: ["input"],
     settings: {
       model: {
         description: "The model to use for evaluation",

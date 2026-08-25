@@ -44,6 +44,37 @@ describe("formatStatFigure", () => {
     });
   });
 
+  describe("given a value smaller than a hundredth", () => {
+    /** @scenario "A reading smaller than a hundredth keeps its digits" */
+    it("keeps the digits rather than rounding to zero", () => {
+      expect(formatStatFigure({ value: 0.0001543, unit: "usd" })).toBe(
+        "0.0001543 usd",
+      );
+      expect(formatStatFigure({ value: -0.0001543, unit: "usd" })).toBe(
+        "-0.0001543 usd",
+      );
+      expect(formatStatFigure({ value: 0.00025 })).toBe("0.00025");
+    });
+
+    /** @scenario "A reading of zero is still drawn as zero" */
+    it("still draws zero as zero", () => {
+      expect(formatStatFigure({ value: 0, unit: "usd" })).toBe("0 usd");
+    });
+
+    /** @scenario "A reading of zero is still drawn as zero" */
+    it("draws negative zero as zero, with no sign", () => {
+      expect(formatStatFigure({ value: -0, unit: "usd" })).toBe("0 usd");
+    });
+  });
+
+  describe("given a value a hundredth or larger", () => {
+    it("leaves the reading as it was", () => {
+      expect(formatStatFigure({ value: 0.01, unit: "usd" })).toBe("0.01 usd");
+      expect(formatStatFigure({ value: 0.5, unit: "usd" })).toBe("0.5 usd");
+      expect(formatStatFigure({ value: 1204 })).toBe("1,204");
+    });
+  });
+
   describe("given a value that is already text", () => {
     it("leaves the text as written", () => {
       expect(formatStatFigure({ value: "n/a" })).toBe("n/a");

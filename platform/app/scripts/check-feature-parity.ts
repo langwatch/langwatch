@@ -405,7 +405,6 @@ const LEGACY_INERT: string[] = [
   "specs/experiments-v3/autosave-status.feature",
   "specs/experiments-v3/dataset-inline-editing.feature",
   "specs/experiments-v3/evaluation-creation-entrypoints.feature",
-  "specs/experiments-v3/evaluation-execution.feature",
   "specs/experiments-v3/evaluator-configuration.feature",
   "specs/experiments-v3/evaluator-mappings.feature",
   "specs/experiments-v3/execution-controls.feature",
