@@ -50,14 +50,18 @@ export type Pagination = z.infer<typeof paginationSchema>;
 
 /**
  * How many rows the upstream reduction took out of an array, read back from the
- * marker it leaves behind in their place ("… 29 more items truncated").
+ * marker it leaves behind in their place. The marker now also states the true
+ * total ("… 29 more items truncated, 41 total"); recorded conversations still
+ * carry the older form without it, so both parse.
  *
  * Zero for every other value, so a caller can fold this over rows without first
  * asking which of them are markers.
  */
 export const truncatedAwayCount = (row: unknown): number => {
   if (typeof row !== "string") return 0;
-  const match = /^…\s*(\d+)\s+more items truncated$/.exec(row.trim());
+  const match = /^…\s*(\d+)\s+more items truncated(?:,\s*\d+\s+total)?$/.exec(
+    row.trim(),
+  );
   return match ? Number(match[1]) : 0;
 };
 

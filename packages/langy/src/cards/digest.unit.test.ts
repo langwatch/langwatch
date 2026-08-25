@@ -136,6 +136,20 @@ describe("extractDigest, given a collection read", () => {
       expect(digest.counts).toEqual({ returned: 2, total: 31 });
     });
 
+    it("reads the newer marker form that states the total", () => {
+      const digest = extractDigest({
+        resource: "prompt",
+        verb: "list",
+        output: JSON.stringify([
+          { id: "prompt_1" },
+          { id: "prompt_2" },
+          "… 42 more items truncated, 44 total",
+        ]),
+      });
+
+      expect(digest.counts).toEqual({ returned: 2, total: 44 });
+    });
+
     it("counts a plain list of its rows when nothing was removed", () => {
       const digest = extractDigest({
         resource: "prompt",

@@ -55,10 +55,14 @@ func TestTruncateToolOutput_ReducesJSONStructurally(t *testing.T) {
 	if len(parsed.Traces) < 2 {
 		t.Errorf("a sample of the array must survive, got %d items", len(parsed.Traces))
 	}
-	// The clip marker rides IN the array, shape intact.
+	// The clip marker rides IN the array, shape intact, and states the true
+	// total so a reader with no count field of its own still has one.
 	last, _ := parsed.Traces[len(parsed.Traces)-1].(string)
 	if !strings.Contains(last, "more items truncated") {
 		t.Errorf("clipped array must carry the in-band marker, tail = %v", parsed.Traces[len(parsed.Traces)-1])
+	}
+	if !strings.Contains(last, "40 total") {
+		t.Errorf("the marker must state the array's true size, tail = %q", last)
 	}
 }
 

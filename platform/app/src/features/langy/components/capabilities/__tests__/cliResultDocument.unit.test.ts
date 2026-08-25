@@ -77,6 +77,19 @@ describe("given a list the reduction cut down", () => {
       ]);
     });
 
+    it("reads the newer marker form that states the total", () => {
+      const stated = [
+        { id: "prompt_1" },
+        { id: "prompt_2" },
+        "… 42 more items truncated, 44 total",
+      ];
+      expect(totalOf(stated)).toBe(44);
+      expect(collectionOf(stated)).toEqual([
+        { id: "prompt_1" },
+        { id: "prompt_2" },
+      ]);
+    });
+
     it("reads the marker inside a resource-named envelope too", () => {
       const document = { prompts: reduced };
       expect(totalOf(document)).toBe(31);
