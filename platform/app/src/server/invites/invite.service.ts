@@ -1630,7 +1630,7 @@ export class InviteService {
 
   /**
    * Approves all PAYMENT_PENDING invites for a given subscription:
-   * - Transitions each to PENDING with 48-hour expiration
+   * - Transitions each to PENDING with a fresh INVITE_EXPIRATION_MS window
    * - Sends invite emails
    */
   async approvePaymentPendingInvites({

@@ -66,6 +66,7 @@ export function PasswordInput({
         }}
       />
       <IconButton
+        type="button"
         variant="ghost"
         size="xs"
         position="absolute"

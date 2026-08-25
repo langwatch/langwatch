@@ -355,7 +355,14 @@ export function PasskeysSection() {
 
   const remove = async (id: string) => {
     try {
-      await authClient.passkey.deletePasskey({ id });
+      const result = await authClient.passkey.deletePasskey({ id });
+      if (result?.error) {
+        toaster.error({
+          title: "That passkey wasn't removed",
+          description: "Try again in a moment.",
+        });
+        return;
+      }
       toaster.success({ title: "Passkey removed" });
     } catch {
       toaster.error({
@@ -367,7 +374,14 @@ export function PasskeysSection() {
 
   const rename = async ({ id, name }: { id: string; name: string }) => {
     try {
-      await authClient.passkey.updatePasskey({ id, name });
+      const result = await authClient.passkey.updatePasskey({ id, name });
+      if (result?.error) {
+        toaster.error({
+          title: "That passkey wasn't renamed",
+          description: "Try again in a moment.",
+        });
+        return;
+      }
       toaster.success({ title: "Passkey renamed" });
     } catch {
       toaster.error({

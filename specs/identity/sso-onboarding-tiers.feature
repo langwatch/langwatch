@@ -351,7 +351,7 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
   Scenario: Issuing a token without naming a connection is refused
     Given "acme" holds two live connections
     When a directory provisioning token is issued without naming one
-    Then it is refused with the code "scim_token_requires_connection"
+    Then it is refused with the code "scim_connection_required"
     And the words say to pick the connection the directory will provision through
 
   @unit @unimplemented
