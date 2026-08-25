@@ -32,7 +32,7 @@ import {
   type LangyEventCursor,
 } from "@langwatch/langy-contract";
 import { LangyTokenBuffer } from "@langwatch/langy-server";
-import { getApp, tryGetApp } from "~/server/app-layer/app";
+import type { LangyService } from "@langwatch/langy-contract";
 
 /**
  * Settled state of one turn, decided ONCE from the fold event that carries it.
@@ -75,8 +75,13 @@ export function abortableDelay(ms: number, signal: AbortSignal): Promise<boolean
   });
 }
 
+type LangySettlementPorts = {
+  langy: Pick<LangyService, "getEventsAfter">;
+  redis: Parameters<typeof LangyTokenBuffer.create>[0]["redis"] | null;
+};
+
 type ConversationTurnEvents = Awaited<
-  ReturnType<ReturnType<typeof getApp>["langy"]["getEventsAfter"]>
+  ReturnType<LangySettlementPorts["langy"]["getEventsAfter"]>
 >;
 
 /**
@@ -141,12 +146,14 @@ export function settlementFromEvents(
  * error propagates.
  */
 async function readSettlementFromFold({
+  langy,
   projectId,
   conversationId,
   turnId,
   userId,
   signal,
 }: {
+  langy: LangySettlementPorts["langy"];
   projectId: string;
   conversationId: string;
   turnId: string;
@@ -155,8 +162,8 @@ async function readSettlementFromFold({
 }): Promise<TurnSettlement | null> {
   let cursor: LangyEventCursor = { acceptedAt: 0, eventId: "" };
   while (!signal.aborted) {
-    const events = await getApp()
-      .langy.getEventsAfter({
+    const events = await langy
+      .getEventsAfter({
         projectId,
         conversationId,
         userId,
@@ -231,15 +238,16 @@ async function watchBufferForTerminal(
  * is null when there is no Redis to watch.
  */
 function armBufferWatch({
+  redis,
   conversationId,
   turnId,
   signal,
 }: {
+  redis: LangySettlementPorts["redis"];
   conversationId: string;
   turnId: string;
   signal: AbortSignal;
 }): { terminalSeen: Promise<void> | null; releaseBuffer: () => void } {
-  const redis = tryGetApp()?.redis ?? null;
   if (!redis) {
     return {
       terminalSeen: null,
@@ -281,6 +289,8 @@ async function waitForNextPoll(
 }
 
 export async function awaitTurnSettlement({
+  langy,
+  redis,
   projectId,
   conversationId,
   turnId,
@@ -288,6 +298,8 @@ export async function awaitTurnSettlement({
   signal,
   pollIntervalMs = FALLBACK_POLL_MS,
 }: {
+  langy: LangySettlementPorts["langy"];
+  redis: LangySettlementPorts["redis"];
   projectId: string;
   conversationId: string;
   turnId: string;
@@ -295,13 +307,14 @@ export async function awaitTurnSettlement({
   signal: AbortSignal;
   pollIntervalMs?: number;
 }): Promise<TurnSettlement | null> {
-  const armed = armBufferWatch({ conversationId, turnId, signal });
+  const armed = armBufferWatch({ redis, conversationId, turnId, signal });
   let terminalSeen = armed.terminalSeen;
 
   let pollMs = terminalSeen !== null ? BUFFERED_POLL_MS : pollIntervalMs;
   try {
     while (!signal.aborted) {
       const settlement = await readSettlementFromFold({
+        langy,
         projectId,
         conversationId,
         turnId,

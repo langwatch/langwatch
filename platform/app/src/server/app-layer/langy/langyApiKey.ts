@@ -3,9 +3,10 @@ import { getLangWatchTracer } from "langwatch";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { batchProjectPermissions, type Permission } from "~/server/api/rbac";
 import { LANGY_SESSION_API_KEY_NAME } from "@langwatch/api-key-contract";
+import type { ApiKeyService } from "@langwatch/api-key-contract";
+import { LangySessionKeyScopeError } from "@langwatch/langy-server/ports/langy-turn-runtime";
 import type { Session } from "~/server/auth";
 import { getLangySessionKeysCounter } from "~/server/metrics";
-import { getApp } from "~/server/app-layer/app";
 
 const logger = createLogger("langwatch:langy:api-key");
 const tracer = getLangWatchTracer("langwatch.langy.api-key");
@@ -136,19 +137,21 @@ const LANGY_SESSION_KEY_TTL_MS = 6 * 60 * 60 * 1000; // 6h
  */
 export async function mintLangySessionApiKeyForUser({
   prisma,
+  apiKeys,
   userId,
   projectId,
   organizationId,
 }: {
   prisma: PrismaClient;
+  apiKeys: ApiKeyService;
   userId: string;
   projectId: string;
   organizationId: string;
 }): Promise<{ token: string; apiKeyId: string }> {
   // RBAC's contract is `session.user.id` and nothing more — verified against
   // resolveProjectPermission, which takes every other fact from Postgres.
-  const session = { user: { id: userId } } as unknown as Session;
-  return mintLangySessionApiKey({ prisma, session, projectId, organizationId });
+  const session: Session = { user: { id: userId }, expires: "" };
+  return mintLangySessionApiKey({ prisma, apiKeys, session, projectId, organizationId });
 }
 
 /** Outcome of a system revocation. `refused` means "that was not ours to touch". */
@@ -295,12 +298,7 @@ export async function reapExpiredLangySessionApiKeys({
  * a user-safe message; the credential service surfaces it as a 409/403 to the
  * chat route rather than letting the caller fall back to a broader key.
  */
-export class LangySessionKeyScopeError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "LangySessionKeyScopeError";
-  }
-}
+export { LangySessionKeyScopeError };
 
 /**
  * Mints an ephemeral, per-chat-session Langy API key SCOPED TO THE REQUESTING
@@ -336,12 +334,14 @@ export class LangySessionKeyScopeError extends Error {
  */
 export async function mintLangySessionApiKey({
   prisma,
+  apiKeys,
   session,
   projectId,
   organizationId,
 }: {
   prisma: PrismaClient;
-  session: Session;
+  apiKeys: ApiKeyService;
+  session: Pick<Session, "user"> & Partial<Pick<Session, "expires">>;
   projectId: string;
   organizationId: string;
   // The id is returned alongside the token because it is the ONLY handle the
@@ -395,7 +395,7 @@ export async function mintLangySessionApiKey({
       });
 
       const held = await batchProjectPermissions(
-        { prisma, session },
+        { prisma, session: { user: session.user, expires: session.expires ?? "" } },
         {
           organizationId,
           projectId,
@@ -415,7 +415,6 @@ export async function mintLangySessionApiKey({
     );
   }
 
-  const service = getApp().apiKeys;
   // Its own span: this is the INSERT (plus the ceiling check). Separating it from
   // the probes above is the point — a fat `mint` span tells you nothing, but
   // "probes 40ms / insert 8ms" tells you exactly which half to attack. It also
@@ -429,7 +428,7 @@ export async function mintLangySessionApiKey({
       },
     },
     async () =>
-      service.create({
+      apiKeys.create({
         // Reserved name — hidden from the API-keys UI so per-session keys don't
         // clutter the list (see HIDDEN_SYSTEM_KEY_NAMES). `isSystemManaged` is
         // what lets this path claim the name customer entry points are

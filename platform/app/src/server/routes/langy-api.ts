@@ -95,7 +95,7 @@ import {
   LangyApiIdentityDeniedError,
   LangyApiRequestInvalidError,
 } from "@langwatch/langy-contract";
-import type { LangyChatMessageInput } from "~/server/app-layer/langy/langy-turn.service";
+import type { LangyChatMessageInput } from "@langwatch/langy-server/services/langy-turn.service";
 import { resolveLangyActorSession } from "~/server/app-layer/langy/langyApiKeyActorSession";
 import { resolveLangyKeyIdentity } from "~/server/app-layer/langy/langyApiKeyIdentity";
 import { awaitTurnSettlement } from "~/server/app-layer/langy/streaming/awaitTurnSettlement";
@@ -331,6 +331,8 @@ async function startTurn({
     // Client disconnect and the wait deadline are one signal: an abandoned
     // hold stops consuming fold reads (and its blocking Redis read) at once.
     const settlement = await awaitTurnSettlement({
+      langy: appFromContext(c).langy,
+      redis: appFromContext(c).redis ?? null,
       projectId: auth.projectId,
       conversationId: result.conversationId,
       turnId: result.turnId,

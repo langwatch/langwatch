@@ -23,10 +23,6 @@ vi.mock("~/server/api/rbac", () => ({
 }));
 
 const apiKeyCreate = vi.fn();
-vi.mock("~/server/app-layer/app", () => ({
-  getApp: () => ({ apiKeys: { create: apiKeyCreate } }),
-}));
-
 import {
   LangySessionKeyScopeError,
   mintLangySessionApiKey,
@@ -40,6 +36,7 @@ const SESSION = { user: { id: "user-1" }, expires: "1" } as any;
 const prisma = {
   project: { findUnique: vi.fn().mockResolvedValue({ teamId: "team-1" }) },
 } as any;
+const apiKeys = { create: apiKeyCreate } as any;
 
 // The full candidate surface, in declaration order — used to assert the "all
 // permissions held" case grants exactly this set.
@@ -90,6 +87,7 @@ describe("mintLangySessionApiKey", () => {
 
         const { token, apiKeyId } = await mintLangySessionApiKey({
           prisma,
+          apiKeys,
           session: SESSION,
           projectId: "proj-1",
           organizationId: "org-1",
@@ -139,6 +137,7 @@ describe("mintLangySessionApiKey", () => {
 
         await mintLangySessionApiKey({
           prisma,
+          apiKeys,
           session: SESSION,
           projectId: "proj-1",
           organizationId: "org-1",
@@ -162,6 +161,7 @@ describe("mintLangySessionApiKey", () => {
 
         await mintLangySessionApiKey({
           prisma,
+          apiKeys,
           session: SESSION,
           projectId: "proj-1",
           organizationId: "org-1",
@@ -205,6 +205,7 @@ describe("mintLangySessionApiKey", () => {
 
         await mintLangySessionApiKey({
           prisma,
+          apiKeys,
           session: SESSION,
           projectId: "proj-1",
           organizationId: "org-1",
@@ -222,6 +223,7 @@ describe("mintLangySessionApiKey", () => {
 
         await mintLangySessionApiKey({
           prisma,
+          apiKeys,
           session: SESSION,
           projectId: "proj-1",
           organizationId: "org-1",
@@ -250,6 +252,7 @@ describe("mintLangySessionApiKey", () => {
 
         await mintLangySessionApiKey({
           prisma,
+          apiKeys,
           session: SESSION,
           projectId: "proj-1",
           organizationId: "org-1",
@@ -274,6 +277,7 @@ describe("mintLangySessionApiKey", () => {
 
         await mintLangySessionApiKey({
           prisma,
+          apiKeys,
           session: SESSION,
           projectId: "proj-1",
           organizationId: "org-1",
@@ -312,6 +316,7 @@ describe("mintLangySessionApiKey", () => {
 
         await mintLangySessionApiKey({
           prisma,
+          apiKeys,
           session: SESSION,
           projectId: "proj-1",
           organizationId: "org-1",
@@ -336,6 +341,7 @@ describe("mintLangySessionApiKey", () => {
 
         await mintLangySessionApiKey({
           prisma,
+          apiKeys,
           session: SESSION,
           projectId: "proj-1",
           organizationId: "org-1",
@@ -363,6 +369,7 @@ describe("mintLangySessionApiKey", () => {
 
         await mintLangySessionApiKey({
           prisma,
+          apiKeys,
           session: SESSION,
           projectId: "proj-1",
           organizationId: "org-1",
@@ -386,6 +393,7 @@ describe("mintLangySessionApiKey", () => {
 
         await mintLangySessionApiKey({
           prisma,
+          apiKeys,
           session: SESSION,
           projectId: "proj-1",
           organizationId: "org-1",
@@ -407,6 +415,7 @@ describe("mintLangySessionApiKey", () => {
         await expect(
           mintLangySessionApiKey({
             prisma,
+            apiKeys,
             session: SESSION,
             projectId: "proj-1",
             organizationId: "org-1",

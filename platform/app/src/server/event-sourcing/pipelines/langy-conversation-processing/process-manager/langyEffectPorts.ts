@@ -3,7 +3,7 @@ import { LangyDispatchRejectedError } from "@langwatch/langy-contract";
 import { serializeLangyTurnError } from "@langwatch/langy-server";
 import type { LangyEffectPorts } from "@langwatch/langy-server";
 import type { LangyTitleGenerator } from "~/server/app-layer/langy/langy-title-generation.service";
-import { LangyTurnDispatchRetry } from "~/server/app-layer/langy/langy-turn-retry.error";
+import { LangyTurnDispatchRetry } from "@langwatch/langy-server/processes/langy-turn-dispatch-retry";
 import { type LangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import type { LangyTurnHandoff, LangyTurnHandoffStore } from "@langwatch/langy-server";
 import type { LangyFailTurnCommandPort } from "@langwatch/langy-server";

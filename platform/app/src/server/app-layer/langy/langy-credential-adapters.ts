@@ -1,8 +1,8 @@
 import type { LangyCredentialSession } from "@langwatch/langy-contract";
 import type { GithubService } from "@langwatch/github-contract";
 import type { PrismaClient } from "~/generated/prisma/client";
-import type { Session } from "~/server/auth";
 import { mintLangySessionApiKey } from "./langyApiKey";
+import type { ApiKeyService } from "@langwatch/api-key-contract";
 import { provisionLangyVirtualKey } from "./langyVirtualKey";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { createLogger } from "@langwatch/observability";
@@ -10,7 +10,10 @@ import { createLogger } from "@langwatch/observability";
 const logger = createLogger("langwatch:langy:credentials");
 
 export class AppLangySessionKeyService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly apiKeys: ApiKeyService,
+  ) {}
 
   mint(input: {
     session: LangyCredentialSession;
@@ -19,7 +22,8 @@ export class AppLangySessionKeyService {
   }): Promise<{ token: string; apiKeyId: string }> {
     return mintLangySessionApiKey({
       prisma: this.prisma,
-      session: input.session as Session,
+      apiKeys: this.apiKeys,
+      session: input.session,
       projectId: input.projectId,
       organizationId: input.organizationId,
     });
@@ -91,19 +95,21 @@ export class AppLangyCredentialErrorReporter {
 
 export function createAppLangyCredentialComposition({
   prisma,
+  apiKeys,
   github,
   workerCallbackUrl,
   workerGatewayBaseUrl,
   mirrorProjectId,
 }: {
   prisma: PrismaClient;
+  apiKeys: ApiKeyService;
   github: () => GithubService;
   workerCallbackUrl?: string;
   workerGatewayBaseUrl?: string;
   mirrorProjectId?: string;
 }) {
-  return () => ({
-    sessionKeys: new AppLangySessionKeyService(prisma),
+  return {
+    sessionKeys: new AppLangySessionKeyService(prisma, apiKeys),
     virtualKeys: new AppLangyVirtualKeyService(prisma),
     github: new AppLangyGithubService(github),
     runtime: new ConfiguredLangyCredentialRuntimeService({
@@ -112,5 +118,5 @@ export function createAppLangyCredentialComposition({
       mirrorProjectId,
     }),
     errors: new AppLangyCredentialErrorReporter(),
-  });
+  };
 }

@@ -1,6 +1,6 @@
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
-import { decideSyntheticTerminal } from "../langyTurnSettlement";
+import { decideSyntheticTerminal } from "@langwatch/langy-server/streaming/langy-turn-settlement";
 
 describe("decideSyntheticTerminal", () => {
   describe("when the turn's heartbeat is still fresh", () => {

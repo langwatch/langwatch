@@ -21,6 +21,7 @@ import type {
 import { PrismaLangyCredentialRepository } from "@langwatch/langy-server/repositories/prisma/prisma.langy-credential.repository";
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { Session } from "~/server/auth";
+import type { ApiKeyService } from "@langwatch/api-key-contract";
 import { mintLangySessionApiKey } from "./langyApiKey";
 import { provisionLangyVirtualKey } from "./langyVirtualKey";
 
@@ -34,6 +35,9 @@ class TestSessionKeyService implements LangySessionKeyService {
   }) {
     return mintLangySessionApiKey({
       prisma: this.prisma,
+      // This compatibility adapter is only imported by tests that mock the mint
+      // itself; production composition injects the full ApiKeyService.
+      apiKeys: {} as ApiKeyService,
       session: input.session as Session,
       projectId: input.projectId,
       organizationId: input.organizationId,

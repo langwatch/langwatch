@@ -82,6 +82,7 @@ import {
   LangyTurnAccessStore,
   LangyTurnHandoffStore,
   LangyTokenBuffer,
+  PostgresLangyAdapter,
 } from "@langwatch/langy-server";
 import { AuthzFeature } from "~/runtime/app/features/authz";
 import { AnalyticsAdapter, LoggingAnalyticsTripwire } from "@langwatch/analytics-server";
@@ -104,7 +105,7 @@ import { sendRenderedSlackMessage } from "~/server/app-layer/automations/deliver
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
 import { liveTriggerNotifier } from "~/server/app-layer/automations/delivery/triggerNotifier";
 import { resolveNavigateFallbackUrl } from "~/server/app-layer/langy/streaming/langyNavigateFallback";
-import { resolveLangyCapabilityProgress } from "~/server/app-layer/langy/langy-capability-progress";
+import { resolveLangyCapabilityProgress } from "@langwatch/langy-server/streaming/langy-capability-progress";
 import { createAppLangyCredentialComposition } from "~/server/app-layer/langy/langy-credential-adapters";
 import {
   mintLangySessionApiKey,
@@ -112,6 +113,7 @@ import {
 } from "~/server/app-layer/langy/langyApiKey";
 import { resolveLangyHarness } from "~/server/app-layer/langy/langyHarness";
 import { createLangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
+import { renderLangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
 import { OpsExplainClickHouseRepository } from "~/server/app-layer/ops/repositories/ops-explain.clickhouse.repository";
 import { InstanceUsageStatsClickHouseRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
 import {
@@ -274,11 +276,9 @@ import { NullEvaluationAnalyticsRollupRepository } from "./evaluations/repositor
 import { FilterOptionsClickHouseRepository } from "./filters/repositories/filter-options.clickhouse.repository";
 import { GithubCompositionAdapter } from "@langwatch/github-server";
 import type { GithubService } from "@langwatch/github-contract";
-import { AppLangyRuntime } from "~/runtime/app/features/langy";
 import { AppDatasetRuntime } from "~/runtime/app/features/dataset";
 import { AppPromptRuntime } from "~/runtime/app/features/prompt";
 import { createLangyConversationTitleGenerator } from "./langy/langy-title-generation.service";
-import { LangyTurnService } from "./langy/langy-turn.service";
 import { ClickHouseLangyAnalyticsEventRepository } from "./langy/repositories/langy-analytics-event.clickhouse.repository";
 import { NullLangyAnalyticsEventRepository } from "./langy/repositories/langy-analytics-event.repository";
 import { CanonicalLogRecordClickHouseRepository } from "./logs/repositories/canonical-log-record.clickhouse.repository";
@@ -1017,8 +1017,8 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   );
   const sharedTraceCache = createSharedTracePayloadCache(redis);
 
-  const langyRuntime = AppLangyRuntime.create({ database: prisma });
-  const langyPersistence = langyRuntime.eventing();
+  const langyAdapter = PostgresLangyAdapter.create({ database: prisma });
+  const langyPersistence = langyAdapter.eventing();
   const langyAgentUrl = process.env.OPENCODE_AGENT_URL;
   const langyInternalSecret = process.env.LANGY_INTERNAL_SECRET;
   const langyWorker = createLangyWorkerPort({
@@ -1615,6 +1615,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   let github: GithubService | null = null;
   const langyCredentialComposition = createAppLangyCredentialComposition({
     prisma,
+    apiKeys,
     github: () => {
       if (!github) throw new Error("GitHub service has not been composed");
       return github;
@@ -1634,7 +1635,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   // no Redis); the service raises LangyAgentUnavailableError in that case, exactly
   // as the route 503'd.
   let processApp: App | null = null;
-  const langyService = langyRuntime.build({
+  const langyService = langyAdapter.build({
     commands: commands.langy,
     events: es.getEventStore<LangyConversationProcessingEvent>() ?? null,
     relay: redis
@@ -1653,32 +1654,38 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
         }
       : undefined,
     credentials: langyCredentialComposition,
-    turns: (ports) =>
-      LangyTurnService.create({
-        conversations: ports.conversations,
-        credentials: ports.credentials,
-        // ADR-050 versioned prompts. Only consulted when LANGY_PROMPT_PROJECT_ID
-        // names the project holding the rows; unset (the default) skips the
-        // registry entirely and the in-repo text is used verbatim.
-        prompts,
-        resolveModel: ({ projectId }) =>
+    turns: {
+      // ADR-050 versioned prompts. Only consulted when LANGY_PROMPT_PROJECT_ID
+      // names the project holding the rows; unset (the default) skips the
+      // registry entirely and the in-repo text is used verbatim.
+      prompts,
+      promptProjectId: env.LANGY_PROMPT_PROJECT_ID?.trim(),
+      models: {
+        resolve: ({ projectId }) =>
           getVercelAIModel({ projectId, featureKey: LANGY_CHAT_FEATURE_KEY }),
-        worker: langyAgentUrl && langyInternalSecret ? langyWorker : null,
-        tokenBuffer: redis ? langyTokenBuffer : null,
-        reservePermit: reserveLangyGithubPrPermit,
-        releasePermit: releaseLangyGithubPrPermit,
-        checkPermit: getLangyGithubPrUsage,
-        resolveHarness: resolveLangyHarness,
-        perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
-        mintSessionKey: ({ session, projectId, organizationId }) =>
-          mintLangySessionApiKey({ prisma, session, projectId, organizationId }),
-        revokeSessionKey: ({ apiKeyId, projectId }) =>
-          revokeLangySessionApiKey({ prisma, apiKeyId, projectId }).then(() => undefined),
-        admission: ports.admission,
-        accessStore: redis ? LangyTurnAccessStore.create({ redis }) : null,
-        handoffStore: redis ? langyHandoffStore : null,
-        messages: ports.messages,
-      }),
+      },
+      worker: langyAgentUrl && langyInternalSecret ? langyWorker : null,
+      tokenBuffer: redis ? langyTokenBuffer : null,
+      permits: {
+        reserve: reserveLangyGithubPrPermit,
+        release: releaseLangyGithubPrPermit,
+        check: getLangyGithubPrUsage,
+      },
+      harness: { resolve: resolveLangyHarness },
+      perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
+      sessionKeys: {
+        mint: ({ session, projectId, organizationId }) =>
+          mintLangySessionApiKey({ prisma, apiKeys, session, projectId, organizationId }),
+        revoke: ({ apiKeyId, projectId }) =>
+          revokeLangySessionApiKey({ prisma, apiKeyId, projectId }).then(() => void 0),
+      },
+      context: { render: renderLangyTurnContext },
+      metrics: {
+        count: ({ outcome }) => getLangyTurnsCounter(outcome).inc(),
+      },
+      accessStore: redis ? LangyTurnAccessStore.create({ redis }) : null,
+      handoffStore: redis ? langyHandoffStore : null,
+    },
     feedbackPromptRedis: redis,
   });
 
@@ -2577,7 +2584,7 @@ export function createTestApp(
         new OpsExplainClickHouseRepository({ fallbackClient: () => null }),
       ),
     },
-    langy: AppLangyRuntime.create({ database: testPrisma }).build({
+    langy: PostgresLangyAdapter.create({ database: testPrisma }).build({
       commands: {
         createConversation: noop,
         forkConversation: noop,
@@ -2596,34 +2603,40 @@ export function createTestApp(
         consumeTurnHandoff: noop,
         generateConversationTitle: noop,
       },
-      turns: (ports) =>
-        LangyTurnService.create({
-          conversations: ports.conversations,
-          credentials: ports.credentials,
-          prompts,
-          resolveModel: async () => {
+      turns: {
+        prompts,
+        promptProjectId: env.LANGY_PROMPT_PROJECT_ID?.trim(),
+        models: {
+          resolve: async () => {
             throw new Error("no model provider in test app");
           },
-          worker: null,
-          tokenBuffer: null,
-          reservePermit: async () => ({
+        },
+        worker: null,
+        tokenBuffer: null,
+        permits: {
+          reserve: async () => ({
             reserved: false,
             allowed: false,
             resetAt: 0,
           }),
-          releasePermit: noop,
-          perDayPrCap: 0,
-          mintSessionKey: async () => {
+          release: noop,
+          check: async () => ({ allowed: false }),
+        },
+        perDayPrCap: 0,
+        sessionKeys: {
+          mint: async () => {
             throw new Error("no session-key mint in test app");
           },
-          revokeSessionKey: noop,
-          admission: ports.admission,
-          accessStore: null,
-          handoffStore: null,
-          messages: ports.messages,
-        }),
+          revoke: noop,
+        },
+        context: { render: renderLangyTurnContext },
+        metrics: { count: () => void 0 },
+        accessStore: null,
+        handoffStore: null,
+      },
       credentials: createAppLangyCredentialComposition({
         prisma: testPrisma,
+        apiKeys,
         github: () => testGithub,
         workerCallbackUrl:
           env.LANGY_WORKER_CALLBACK_URL ??

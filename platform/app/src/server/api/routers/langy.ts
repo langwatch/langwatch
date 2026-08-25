@@ -20,15 +20,15 @@ import {
   LangyTurnAccessStore,
   LangyTokenBuffer,
 } from "@langwatch/langy-server";
-import type { LangyChatMessageInput } from "~/server/app-layer/langy/langy-turn.service";
-import { isLangyConversationUpdateVisibleToUser } from "~/server/app-layer/langy/langyConversationUpdateVisibility";
+import type { LangyChatMessageInput } from "@langwatch/langy-server/services/langy-turn.service";
+import { isLangyConversationUpdateVisibleToUser } from "@langwatch/langy-contract";
 import {
   type LangyTurnContext,
   langyTurnContextSchema,
 } from "~/server/app-layer/langy/langyTurnContext.schema";
 import { abortableDelay } from "~/server/app-layer/langy/streaming/awaitTurnSettlement";
 import type { LangyStreamEntry } from "@langwatch/langy-server";
-import { decideSyntheticTerminal } from "~/server/app-layer/langy/streaming/langyTurnSettlement";
+import { decideSyntheticTerminal } from "@langwatch/langy-server/streaming/langy-turn-settlement";
 import type { Session } from "~/server/auth";
 import {
   checkLangyMessageRateLimit,

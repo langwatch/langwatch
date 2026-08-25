@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { LangyTurnDispatchRetry } from "~/server/app-layer/langy/langy-turn-retry.error";
+import { LangyTurnDispatchRetry } from "@langwatch/langy-server/processes/langy-turn-dispatch-retry";
 import type { LangyTurnHandoff } from "@langwatch/langy-server";
 import { createLangyEffectPorts } from "../langyEffectPorts";
 

@@ -18,13 +18,6 @@ const mockGetEventsAfter = vi.fn();
 const mockDuplicate = vi.fn();
 const mockDisconnect = vi.fn();
 
-vi.mock("~/server/app-layer/app", () => ({
-  getApp: vi.fn(() => ({
-    langy: { conversations: { getEventsAfter: mockGetEventsAfter } },
-  })),
-  tryGetApp: vi.fn(() => ({ redis: { duplicate: mockDuplicate } })),
-}));
-
 const mockReadTail = vi.fn();
 const mockFollow = vi.fn();
 
@@ -68,6 +61,8 @@ const settledFold = {
 };
 
 const ARGS = {
+  langy: { getEventsAfter: mockGetEventsAfter },
+  redis: { duplicate: mockDuplicate },
   projectId: "project-1",
   conversationId: "conv-1",
   turnId: "turn-1",
