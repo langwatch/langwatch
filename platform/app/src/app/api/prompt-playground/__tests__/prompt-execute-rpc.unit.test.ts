@@ -10,7 +10,7 @@
  *
  * @see specs/prompts/playground-conversation.feature
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   PLAYGROUND_API_VERSION,
@@ -98,6 +98,10 @@ describe(`POST ${PROMPT_EXECUTE_ENDPOINT}`, () => {
     );
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   describe("when the caller holds prompts:view on the project", () => {
     /** @scenario A viewer can run a prompt in the playground */
     it("accepts the execution and streams start and done", async () => {
@@ -165,18 +169,15 @@ describe(`POST ${PROMPT_EXECUTE_ENDPOINT}`, () => {
 
   describe("when the project is the demo project", () => {
     it("refuses even though the demo grants prompts:view to everyone", async () => {
-      process.env.DEMO_PROJECT_ID = "project_demo";
-      try {
-        const response = await execute({ projectId: "project_demo" });
+      vi.stubEnv("DEMO_PROJECT_ID", "project_demo");
 
-        expect(response.status).toBe(403);
-        expect(await response.json()).toMatchObject({
-          code: "insufficient_permissions",
-        });
-        expect(studioBackendPostEvent).not.toHaveBeenCalled();
-      } finally {
-        delete process.env.DEMO_PROJECT_ID;
-      }
+      const response = await execute({ projectId: "project_demo" });
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({
+        code: "insufficient_permissions",
+      });
+      expect(studioBackendPostEvent).not.toHaveBeenCalled();
     });
   });
 
@@ -193,8 +194,8 @@ describe(`POST ${PROMPT_EXECUTE_ENDPOINT}`, () => {
     });
   });
 
-  describe("when the version segment is omitted or unknown", () => {
-    it("still serves the dated path the client is pinned to", async () => {
+  describe("when the version segment is unknown", () => {
+    it("answers 404 instead of falling through", async () => {
       expect(PROMPT_EXECUTE_ENDPOINT).toContain(PLAYGROUND_API_VERSION);
 
       const response = await app.request(

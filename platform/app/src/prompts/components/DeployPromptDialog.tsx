@@ -399,7 +399,7 @@ export function DeployPromptDialog({
                           }}
                           aria-label={`${tagDef.name.charAt(0).toUpperCase()}${tagDef.name.slice(1)} version`}
                         >
-                          <Select.Trigger clearable>
+                          <Select.Trigger>
                             <Select.ValueText placeholder="Select version">
                               {(items) => {
                                 const item = items[0] as

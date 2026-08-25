@@ -231,6 +231,9 @@ function SidebarItem({
               // Space scrolls the rail otherwise, and the row would activate
               // AND the panel would jump.
               event.preventDefault();
+              // Holding the key repeats the event, and the row would activate
+              // once per repeat.
+              if (event.repeat) return;
               onClick();
             }
           : undefined

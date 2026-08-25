@@ -73,6 +73,7 @@ function SeparatorLabel({
 export function TurnSeparator({
   index,
   traceId,
+  live = false,
 }: {
   index: number;
   /**
@@ -81,6 +82,11 @@ export function TurnSeparator({
    * only the affordance waits for somewhere to go.
    */
   traceId?: string;
+  /**
+   * The turn is happening now, so its trace is still on its way. Off for a
+   * replayed transcript, where a trace that is not there is not coming.
+   */
+  live?: boolean;
 }) {
   const { project } = useOrganizationTeamProject();
   const { openTraceDetailsDrawer } = useTraceDetailsDrawer();
@@ -93,6 +99,11 @@ export function TurnSeparator({
     {
       enabled: !!project && !!traceId,
       ...TRACE_QUERY_CONFIG,
+      // Each separator opens its own query, so a transcript of N turns holds N
+      // of them. Waiting out ten minute-spaced retries per turn is only worth
+      // it while the trace might still land; on a replay it is a retry tail
+      // for a trace that already does not exist.
+      retry: live ? TRACE_QUERY_CONFIG.retry : 0,
     },
   );
   // One value carries both facts the render needs: that a trace exists, and

@@ -29,10 +29,13 @@ const asString = (value: unknown): string | undefined =>
  * the result-pairing pass needs, and the visitor's `toolCall` / `toolResult`
  * branches do not surface them.
  */
-export function readToolBlock(
-  item: unknown,
-  { id, traceId, index }: PartContext,
-): DisplayPart | undefined {
+export function readToolBlock({
+  item,
+  context: { id, traceId, index },
+}: {
+  item: unknown;
+  context: PartContext;
+}): DisplayPart | undefined {
   if (!item || typeof item !== "object") return undefined;
   const block = item as Record<string, unknown>;
 
@@ -70,10 +73,13 @@ export function readToolBlock(
  * on `source.type` — a shared object literal over a union of sources matches
  * neither arm.
  */
-function audioPart(
-  audio: { data?: string; url?: string; format?: string; mimeType?: string },
-  { id, role, traceId, index }: PartContext,
-): DisplayPart | undefined {
+function audioPart({
+  audio,
+  context: { id, role, traceId, index },
+}: {
+  audio: { data?: string; url?: string; format?: string; mimeType?: string };
+  context: PartContext;
+}): DisplayPart | undefined {
   const mimeType =
     audio.mimeType ?? (audio.format === "mp3" ? "audio/mpeg" : "audio/wav");
   const partId = `${id}-audio${index}`;
@@ -170,17 +176,20 @@ function partVisitor(
       role,
       traceId,
     }),
-    inputAudio: (audio) => audioPart(audio, context),
+    inputAudio: (audio) => audioPart({ audio, context }),
   };
 }
 
 /** Decodes one content-array entry. */
-export function decodeContentPart(
-  item: unknown,
-  context: PartContext,
-): DisplayPart | undefined {
+export function decodeContentPart({
+  item,
+  context,
+}: {
+  item: unknown;
+  context: PartContext;
+}): DisplayPart | undefined {
   return (
-    readToolBlock(item, context) ??
+    readToolBlock({ item, context }) ??
     visitContentPart<DisplayPart | undefined>(item, partVisitor(context))
   );
 }

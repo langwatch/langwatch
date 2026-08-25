@@ -349,7 +349,7 @@ interface DraggableTabTriggerProps extends BoxProps {
   children: React.ReactNode;
   id: string;
   /** A lone tab grows into the space before its joined action cluster. */
-  fillAvailableWidth?: boolean;
+  shouldFillAvailableWidth?: boolean;
 }
 
 /**
@@ -370,12 +370,12 @@ export const TAB_MAX_WIDTH = "180px";
 function DraggableBrowserTabTrigger({
   value,
   children,
-  joinedTrailingActions = false,
+  isJoinedWithTrailingActions = false,
 }: {
   value: string;
   children: React.ReactNode;
   /** The action cluster beside this trigger continues the same tab surface. */
-  joinedTrailingActions?: boolean;
+  isJoinedWithTrailingActions?: boolean;
 }) {
   return (
     <Tabs.Trigger
@@ -392,7 +392,7 @@ function DraggableBrowserTabTrigger({
       // card. A tab rounded on all four corners is a pill sitting near the card
       // rather than the top edge of it.
       borderTopRadius={CARD_RADIUS}
-      borderTopRightRadius={joinedTrailingActions ? 0 : CARD_RADIUS}
+      borderTopRightRadius={isJoinedWithTrailingActions ? 0 : CARD_RADIUS}
       borderBottomRadius={0}
       background="transparent"
       color="fg.muted"
@@ -401,7 +401,7 @@ function DraggableBrowserTabTrigger({
       // time the selection moved.
       borderWidth={CARD_BORDER_WIDTH}
       borderBottomWidth={0}
-      borderRightWidth={joinedTrailingActions ? 0 : CARD_BORDER_WIDTH}
+      borderRightWidth={isJoinedWithTrailingActions ? 0 : CARD_BORDER_WIDTH}
       borderColor="transparent"
       // The `enclosed` variant lifts the selected trigger with a drop shadow,
       // which reads as a raised control — a combo box — rather than as a tab.
@@ -434,7 +434,7 @@ function DraggableBrowserTabTrigger({
 function DraggableTab({
   id,
   children,
-  fillAvailableWidth = false,
+  shouldFillAvailableWidth = false,
   ...rest
 }: DraggableTabTriggerProps) {
   const { windowId } = useTabWindowContext();
@@ -475,9 +475,9 @@ function DraggableTab({
       // it belongs to. They are never hidden — a hidden element has a zero-size
       // rect, which would corrupt @dnd-kit's drop-index math for these
       // sortables.
-      flex={fillAvailableWidth ? "1 1 0" : "0 1 auto"}
+      flex={shouldFillAvailableWidth ? "1 1 0" : "0 1 auto"}
       minWidth={TAB_MIN_WIDTH}
-      maxWidth={fillAvailableWidth ? "none" : TAB_MAX_WIDTH}
+      maxWidth={shouldFillAvailableWidth ? "none" : TAB_MAX_WIDTH}
       alignItems="stretch"
       cursor={isDragging ? "grabbing" : "grab"}
       transform={CSS.Transform.toString(transform)}

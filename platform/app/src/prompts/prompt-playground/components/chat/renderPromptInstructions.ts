@@ -27,7 +27,10 @@ export function renderPromptInstructions({
       .map(({ identifier, value }) => [identifier, value ?? ""]),
   );
 
-  if (latestInput !== undefined && !context.input) {
+  if (
+    latestInput !== undefined &&
+    (context.input === undefined || context.input === "")
+  ) {
     context.input = latestInput;
   }
 

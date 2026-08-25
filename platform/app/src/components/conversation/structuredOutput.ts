@@ -5,10 +5,6 @@
  * JSON object. Rendered as markdown that reads as a wall of braces, so the
  * surfaces that expect structured output render it as a tree instead.
  */
-/**
- * Attempts to parse a string as JSON.
- * Returns the parsed object if successful, undefined otherwise.
- */
 export function tryParseJson(content: string | undefined): object | undefined {
   if (!content || typeof content !== "string") {
     return undefined;

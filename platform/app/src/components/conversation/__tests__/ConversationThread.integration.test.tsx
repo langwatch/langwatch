@@ -73,23 +73,24 @@ const message = (msg: Record<string, unknown>) => msg as FlattenableMessage;
  * `shouldRenderStructuredOutput` on, the default `regular` variant (turn separators on)
  * and the default shouldAutoScroll, and adds nothing else.
  */
-function renderConversation(
-  messages: Record<string, unknown>[],
-  options: {
-    shouldRenderStructuredOutput?: boolean;
-    labels?: { user?: string; assistant?: string };
-    roleMode?: "chat" | "scenario";
-  } = {},
-): ReturnType<typeof render> {
+function renderConversation({
+  messages,
+  shouldRenderStructuredOutput = true,
+  labels,
+  roleMode = "chat",
+}: {
+  messages: Record<string, unknown>[];
+  shouldRenderStructuredOutput?: boolean;
+  labels?: { user?: string; assistant?: string };
+  roleMode?: "chat" | "scenario";
+}): ReturnType<typeof render> {
   const ui: ReactElement = (
     <ConversationThread
       parts={flattenMessages({ messages: messages.map(message) })}
       projectId="proj-1"
-      shouldRenderStructuredOutput={
-        options.shouldRenderStructuredOutput ?? true
-      }
-      labels={options.labels}
-      roleMode={options.roleMode ?? "chat"}
+      shouldRenderStructuredOutput={shouldRenderStructuredOutput}
+      labels={labels}
+      roleMode={roleMode}
     />
   );
   return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
@@ -137,7 +138,7 @@ describe("<ConversationThread />", () => {
 
     /** @scenario Tool calls from a loaded trace appear in the conversation */
     it("shows every call with its name and a summary of its primary argument", () => {
-      renderConversation(twoCalls);
+      renderConversation({ messages: twoCalls });
 
       expect(screen.getByText("search")).toBeInTheDocument();
       expect(screen.getByText("lookup")).toBeInTheDocument();
@@ -172,7 +173,7 @@ describe("<ConversationThread />", () => {
 
     /** @scenario A tool call and its result read as one card */
     it("draws one card for the pair, with the result body collapsed", async () => {
-      renderConversation(callAndResult);
+      renderConversation({ messages: callAndResult });
 
       // One card, not a call card followed by an orphan result card.
       expect(screen.getAllByText("search")).toHaveLength(1);
@@ -215,10 +216,16 @@ describe("<ConversationThread />", () => {
 
     /** @scenario A failed tool call is marked as failed */
     it("marks that card as failed and leaves the rest of the thread alone", () => {
-      renderConversation([
-        ...failedCall,
-        { id: "m3", role: "assistant", content: "I could not read the file." },
-      ]);
+      renderConversation({
+        messages: [
+          ...failedCall,
+          {
+            id: "m3",
+            role: "assistant",
+            content: "I could not read the file.",
+          },
+        ],
+      });
 
       expect(screen.getByText("error")).toBeInTheDocument();
       // The failure belongs to the card, not the conversation: the reply after
@@ -233,14 +240,16 @@ describe("<ConversationThread />", () => {
   describe("given an assistant message carrying reasoning", () => {
     /** @scenario Assistant reasoning is shown above the reply */
     it("shows the reasoning as its own block above the reply text", async () => {
-      renderConversation([
-        {
-          id: "m1",
-          role: "assistant",
-          content: "42",
-          reasoning_content: "Six times seven.",
-        },
-      ]);
+      renderConversation({
+        messages: [
+          {
+            id: "m1",
+            role: "assistant",
+            content: "42",
+            reasoning_content: "Six times seven.",
+          },
+        ],
+      });
 
       const reasoning = screen.getByText("Reasoned");
       const reply = screen.getByText("42");
@@ -262,9 +271,11 @@ describe("<ConversationThread />", () => {
   describe("given a user message written in markdown", () => {
     /** @scenario A user turn renders markdown */
     it("renders the emphasis as formatting rather than literal asterisks", () => {
-      const { container } = renderConversation([
-        { id: "m1", role: "user", content: "please **summarise** this" },
-      ]);
+      const { container } = renderConversation({
+        messages: [
+          { id: "m1", role: "user", content: "please **summarise** this" },
+        ],
+      });
 
       expect(container.querySelector("strong")).toHaveTextContent("summarise");
       expect(container.textContent).not.toContain("**summarise**");
@@ -274,18 +285,20 @@ describe("<ConversationThread />", () => {
   describe("given a loaded message carrying an audio attachment", () => {
     /** @scenario An attachment in a loaded message is rendered */
     it("renders a media part for the attachment", () => {
-      renderConversation([
-        {
-          id: "m1",
-          role: "user",
-          content: [
-            {
-              type: "input_audio",
-              input_audio: { data: "AAAA", format: "wav" },
-            },
-          ],
-        },
-      ]);
+      renderConversation({
+        messages: [
+          {
+            id: "m1",
+            role: "user",
+            content: [
+              {
+                type: "input_audio",
+                input_audio: { data: "AAAA", format: "wav" },
+              },
+            ],
+          },
+        ],
+      });
 
       expect(screen.getByTestId("media-part-audio")).toBeInTheDocument();
     });
@@ -298,14 +311,16 @@ describe("<ConversationThread />", () => {
 
     /** @scenario Each completed turn offers its trace */
     it("separates the turn with a labelled separator that opens the trace", async () => {
-      renderConversation([
-        {
-          id: "m1",
-          role: "assistant",
-          content: "done",
-          trace_id: "trace-1",
-        },
-      ]);
+      renderConversation({
+        messages: [
+          {
+            id: "m1",
+            role: "assistant",
+            content: "done",
+            trace_id: "trace-1",
+          },
+        ],
+      });
 
       expect(screen.getByText("Turn 1")).toBeInTheDocument();
 
@@ -323,14 +338,16 @@ describe("<ConversationThread />", () => {
   describe("given a turn whose trace has not landed yet", () => {
     /** @scenario A turn whose trace has not landed yet offers no trace affordance */
     it("leaves the separator a plain rule", () => {
-      renderConversation([
-        {
-          id: "m1",
-          role: "assistant",
-          content: "done",
-          trace_id: "trace-1",
-        },
-      ]);
+      renderConversation({
+        messages: [
+          {
+            id: "m1",
+            role: "assistant",
+            content: "done",
+            trace_id: "trace-1",
+          },
+        ],
+      });
 
       expect(screen.getByText("Turn 1")).toBeInTheDocument();
       // Advertising a trace that 404s is worse than waiting a beat for one
@@ -346,7 +363,9 @@ describe("<ConversationThread />", () => {
       // jsdom implements neither, so both are observed rather than measured.
       Element.prototype.scrollTo = scrollTo as unknown as Element["scrollTo"];
 
-      renderConversation([{ id: "m1", role: "user", content: "hello" }]);
+      renderConversation({
+        messages: [{ id: "m1", role: "user", content: "hello" }],
+      });
 
       // `scrollIntoView` walks up and scrolls EVERY ancestor scroll container
       // it finds. The playground puts this thread beside the prompt editor, so
@@ -368,15 +387,17 @@ describe("<ConversationThread />", () => {
       // assistant turn in it can name a trace that expired or was never
       // written. The affordance degrades; the transcript still renders.
       expect(() =>
-        renderConversation([
-          { id: "m1", role: "user", content: "hello" },
-          {
-            id: "m2",
-            role: "assistant",
-            content: "hi there",
-            trace_id: "trace-gone",
-          },
-        ]),
+        renderConversation({
+          messages: [
+            { id: "m1", role: "user", content: "hello" },
+            {
+              id: "m2",
+              role: "assistant",
+              content: "hi there",
+              trace_id: "trace-gone",
+            },
+          ],
+        }),
       ).not.toThrow();
 
       expect(screen.getByText("hello")).toBeInTheDocument();
@@ -390,10 +411,10 @@ describe("<ConversationThread />", () => {
 
     /** @scenario Structured output is shown as a tree once streaming finishes */
     it("renders the finished reply as a structured value rather than raw text", () => {
-      const { container } = renderConversation(
-        [{ id: "m1", role: "assistant", content: reply }],
-        { shouldRenderStructuredOutput: true },
-      );
+      const { container } = renderConversation({
+        messages: [{ id: "m1", role: "assistant", content: reply }],
+        shouldRenderStructuredOutput: true,
+      });
 
       // The value tree itself is a lazily-imported viewer that jsdom never
       // resolves, so what is asserted is the branch: a structured reply goes
@@ -407,9 +428,9 @@ describe("<ConversationThread />", () => {
     it("leaves an ordinary reply as prose", () => {
       const prose = "Yes, with high confidence.";
 
-      const { container } = renderConversation([
-        { id: "m1", role: "assistant", content: prose },
-      ]);
+      const { container } = renderConversation({
+        messages: [{ id: "m1", role: "assistant", content: prose }],
+      });
 
       // The other side of the same branch, on the same surface: a prompt with
       // one output field answers in prose, and prose still reads as a chat
@@ -428,7 +449,8 @@ describe("<ConversationThread />", () => {
 
     /** @scenario Named sides replace the generic message labels */
     it("labels each message with the name of the side that sent it", () => {
-      renderConversation(exchange, {
+      renderConversation({
+        messages: exchange,
         labels: { user: "Ada", assistant: "gpt-5-mini" },
       });
 
@@ -444,7 +466,10 @@ describe("<ConversationThread />", () => {
     it("leaves a side the caller could not name on its role label", () => {
       // The profile has no name to show yet. A blank chip is worse than the
       // generic word, so the unnamed side keeps what it already had.
-      renderConversation(exchange, { labels: { assistant: "gpt-5-mini" } });
+      renderConversation({
+        messages: exchange,
+        labels: { assistant: "gpt-5-mini" },
+      });
 
       expect(screen.getByText("gpt-5-mini")).toBeInTheDocument();
       expect(screen.getByText("User")).toBeInTheDocument();
@@ -457,13 +482,13 @@ describe("<ConversationThread />", () => {
       // Simulations name no sides, and must not inherit the playground's
       // naming: their roles are inverted, and "Agent" is the subject of the
       // run rather than a generic assistant.
-      renderConversation(
-        [
+      renderConversation({
+        messages: [
           { id: "m1", role: "user", content: "hello" },
           { id: "m2", role: "assistant", content: "hi there" },
         ],
-        { roleMode: "scenario" },
-      );
+        roleMode: "scenario",
+      });
 
       expect(screen.getByText("User Simulator")).toBeInTheDocument();
       expect(screen.getByText("Agent")).toBeInTheDocument();

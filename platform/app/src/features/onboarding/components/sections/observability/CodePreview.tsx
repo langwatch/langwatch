@@ -86,13 +86,7 @@ function boundedHeightProps(maxHeight: string | number | undefined) {
 
 function stickyHeaderProps(maxHeight: string | number | undefined) {
   if (!maxHeight) return {};
-  return {
-    flexShrink: 0,
-    position: "sticky",
-    top: 0,
-    zIndex: 1,
-    background: "bg.subtle",
-  } as const;
+  return { flexShrink: 0 } as const;
 }
 
 export function CodePreview({
@@ -123,8 +117,10 @@ export function CodePreview({
         return createHighlighter({
           langs: [
             "typescript",
+            "javascript",
             "python",
             "go",
+            "php",
             "yaml",
             "bash",
             "json",

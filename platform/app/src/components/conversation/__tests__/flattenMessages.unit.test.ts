@@ -229,6 +229,26 @@ describe("flattenMessages", () => {
       });
     });
 
+    it("carries it onto a typed text block too", () => {
+      // Reasoning hangs off the message, and a typed content array has no
+      // block of its own to put it in. Reading only the untyped path dropped
+      // the working from every provider that sends structured content.
+      const [part] = flatten([
+        {
+          id: "m1",
+          role: "assistant",
+          content: [{ type: "text", text: "The answer is 4." }],
+          thinking: "2+2 is addition.",
+        },
+      ]);
+
+      expect(part).toMatchObject({
+        kind: "text",
+        content: "The answer is 4.",
+        reasoning: "2+2 is addition.",
+      });
+    });
+
     it("ignores an empty reasoning field", () => {
       const [part] = flatten([
         { id: "m1", role: "assistant", content: "hi", reasoning_content: "  " },
@@ -360,5 +380,20 @@ describe("groupIntoTurns", () => {
     expect(turns[0]?.turnNumber).toBe(1);
     expect(turns[1]?.turnNumber).toBeUndefined();
     expect(contentsOf(turns[1]?.parts)).toEqual(["b"]);
+  });
+
+  describe("when the conversation is live", () => {
+    it("numbers a trailing untraced part rather than waiting for its trace", () => {
+      // The playground's own branch: the exchange starts when the reader
+      // sends, so the separator is numbered from that moment and only the
+      // trace affordance waits.
+      const turns = groupIntoTurns([part("a", "trace-1"), part("b")], {
+        live: true,
+      });
+
+      expect(turns).toHaveLength(2);
+      expect(turns[1]?.turnNumber).toBe(2);
+      expect(contentsOf(turns[1]?.parts)).toEqual(["b"]);
+    });
   });
 });

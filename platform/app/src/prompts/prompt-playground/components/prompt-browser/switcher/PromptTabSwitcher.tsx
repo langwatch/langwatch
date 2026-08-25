@@ -167,7 +167,6 @@ function PromptTabSwitcherRow({
               size="8px"
               bg="orange.solid"
               flexShrink={0}
-              tabIndex={0}
               aria-label="This prompt has unsaved changes"
             />
           </Tooltip>

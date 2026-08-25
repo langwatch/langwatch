@@ -132,6 +132,72 @@ describe("diffPromptVersions", () => {
     });
   });
 
+  describe("given a message was inserted ahead of the existing ones", () => {
+    describe("when the two versions are compared", () => {
+      it("reports one addition rather than every later message changing", () => {
+        const changes = diffPromptVersions({
+          previous: {
+            messages: [
+              { role: "user", content: "First" },
+              { role: "assistant", content: "Reply" },
+            ],
+          },
+          version: {
+            messages: [
+              { role: "system", content: "You are a terse assistant." },
+              { role: "user", content: "First" },
+              { role: "assistant", content: "Reply" },
+            ],
+          },
+        });
+
+        expect(changes).toEqual([
+          {
+            key: "message-0",
+            label: "System prompt",
+            kind: "text",
+            status: "added",
+            before: "",
+            after: "You are a terse assistant.",
+          },
+        ]);
+      });
+    });
+  });
+
+  describe("given the first message was removed", () => {
+    describe("when the two versions are compared", () => {
+      it("reports one removal rather than every later message changing", () => {
+        const changes = diffPromptVersions({
+          previous: {
+            messages: [
+              { role: "system", content: "You are a terse assistant." },
+              { role: "user", content: "First" },
+              { role: "assistant", content: "Reply" },
+            ],
+          },
+          version: {
+            messages: [
+              { role: "user", content: "First" },
+              { role: "assistant", content: "Reply" },
+            ],
+          },
+        });
+
+        expect(changes).toEqual([
+          {
+            key: "message-0",
+            label: "System prompt",
+            kind: "text",
+            status: "removed",
+            before: "You are a terse assistant.",
+            after: "",
+          },
+        ]);
+      });
+    });
+  });
+
   describe("given the inputs and outputs changed", () => {
     describe("when the two versions are compared", () => {
       it("lists each field with its type", () => {

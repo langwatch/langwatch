@@ -141,7 +141,7 @@ export function PromptPlaygroundBrowser() {
               onSelectTab={(tabId) =>
                 handleTabChange({ windowId: tabbedWindow.id, tabId })
               }
-              joinTrailingActions={tabbedWindow.tabs.length === 1}
+              shouldJoinTrailingActions={tabbedWindow.tabs.length === 1}
             />
             {/* Strip chrome, not a toolbar: these are secondary to the tabs
                 they sit beside, so they run at the strip's own button scale

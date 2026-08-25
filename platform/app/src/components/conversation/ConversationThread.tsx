@@ -255,7 +255,11 @@ export function ConversationThread({
         : turns.map((turn) => (
             <VStack key={turn.key} align="stretch" gap={4} width="100%">
               {turn.turnNumber != null && (
-                <TurnSeparator index={turn.turnNumber} traceId={turn.traceId} />
+                <TurnSeparator
+                  index={turn.turnNumber}
+                  traceId={turn.traceId}
+                  live={live}
+                />
               )}
               {turn.parts.map(renderPart)}
             </VStack>

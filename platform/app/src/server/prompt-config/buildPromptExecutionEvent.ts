@@ -40,6 +40,9 @@ export interface PromptChatTurn {
   content: string;
 }
 
+/** Absent and empty both mean "the panel left it alone"; `0` and `false` do not. */
+const isUnsetInput = (value: unknown) => value === undefined || value === "";
+
 /**
  * Resolves the conversation history and the input bindings for one run.
  *
@@ -98,17 +101,18 @@ export function resolvePromptInputs({
     return acc;
   }, {});
 
-  // Falsy check, not `=== undefined`: a saved prompt declares `input` in its
+  // `isUnsetInput`, not `=== undefined`: a saved prompt declares `input` in its
   // inputs list, so the form always carries an `input` key, defaulting to "".
   // A strict-undefined check left it empty, `{{input}}` rendered to nothing,
   // AND the absorb step above dropped the live turn — the 2026-05-17 prod
-  // regression. Treating empty as "not set" keeps the user's intent: an
-  // explicit value from the Variables panel still wins.
+  // regression. A plain falsy check goes too far the other way and swallows an
+  // explicit `0` or `false`, so both ends are named: any other value from the
+  // Variables panel still wins.
   const lastLiveUserContent =
     typeof lastLiveUserMsg?.content === "string"
       ? lastLiveUserMsg.content
       : undefined;
-  if (lastLiveUserContent !== undefined && !inputs.input) {
+  if (lastLiveUserContent !== undefined && isUnsetInput(inputs.input)) {
     inputs.input = lastLiveUserContent;
   }
 
@@ -232,7 +236,6 @@ export function buildPromptExecutionEvent({
   return {
     type: "execute_component",
     payload: {
-      enable_tracing: true,
       trace_id: traceId,
       thread_id: threadId,
       workflow: buildWorkflow({
@@ -244,7 +247,7 @@ export function buildPromptExecutionEvent({
       inputs: { ...inputs, messages: messagesHistory },
       origin: "playground",
     },
-  } as StudioClientEvent;
+  };
 }
 
 /** The output fields a run streams, defaulting to the single `output` field. */

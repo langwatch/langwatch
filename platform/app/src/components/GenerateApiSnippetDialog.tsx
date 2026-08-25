@@ -327,13 +327,16 @@ function fileNameForLanguage(language: string): string {
   }
 }
 
-/** Language mark shown in the code block's title bar. */
+/**
+ * Language mark shown in the code block's title bar. A language we carry no
+ * mark for goes without one — borrowing a neighbouring language's logo tells
+ * the reader they are looking at a snippet they are not.
+ */
 function languageIconFor(language: string): string | undefined {
   switch (language) {
     case "python":
       return "/images/external-icons/python.svg";
     case "typescript":
-    case "javascript":
       return "/images/external-icons/typescript.svg";
     case "go":
       return "/images/external-icons/golang.svg";

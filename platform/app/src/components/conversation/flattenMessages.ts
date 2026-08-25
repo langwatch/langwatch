@@ -74,10 +74,13 @@ function readToolCalls(
 }
 
 /** Walks a typed content array into parts, preserving source order. */
-function flattenTypedParts(
-  content: unknown[],
-  msg: FlattenableMessage,
-): DisplayPart[] {
+function flattenTypedParts({
+  content,
+  msg,
+}: {
+  content: unknown[];
+  msg: FlattenableMessage;
+}): DisplayPart[] {
   const base: Omit<PartContext, "index"> = {
     id: String(msg.id ?? ""),
     role: msg.role ?? "assistant",
@@ -85,15 +88,29 @@ function flattenTypedParts(
   };
 
   const parts = content
-    .map((item, index) => decodeContentPart(item, { ...base, index }))
+    .map((item, index) =>
+      decodeContentPart({ item, context: { ...base, index } }),
+    )
     .filter((part): part is DisplayPart => part !== undefined);
 
-  return collapseAudioTranscript(parts);
+  const collapsed = collapseAudioTranscript(parts);
+
+  // Reasoning hangs off the MESSAGE, not off any content block, so a typed
+  // content array has nowhere of its own to put it. It rides the first text
+  // part, which is the reply the bubble draws it above — the same place the
+  // untyped path puts it.
+  const reasoning = readReasoning(msg);
+  const firstText = collapsed.find((part) => part.kind === "text");
+  if (reasoning && firstText?.kind === "text") {
+    firstText.reasoning = reasoning;
+  }
+
+  return collapsed;
 }
 
 function flattenContent(msg: FlattenableMessage): DisplayPart[] {
   const coerced = coerceContentToArray(msg.content);
-  if (coerced) return flattenTypedParts(coerced, msg);
+  if (coerced) return flattenTypedParts({ content: coerced, msg });
 
   if (!msg.content || msg.content === NO_CONTENT_SENTINEL) return [];
 
@@ -187,10 +204,13 @@ function pairToolResults(parts: DisplayPart[]): DisplayPart[] {
 }
 
 /** Replies still arriving that the stored message list has not caught up with. */
-function streamingParts(
-  messages: FlattenableMessage[],
-  streaming: StreamingPart[],
-): DisplayPart[] {
+function streamingParts({
+  messages,
+  streaming,
+}: {
+  messages: FlattenableMessage[];
+  streaming: StreamingPart[];
+}): DisplayPart[] {
   const stored = new Set(messages.map((msg) => msg.id).filter(Boolean));
   return streaming
     .filter((message) => !stored.has(message.messageId))
@@ -231,7 +251,7 @@ export function flattenMessages({
 
   return [
     ...pairToolResults(parts),
-    ...(streaming?.length ? streamingParts(messages, streaming) : []),
+    ...(streaming?.length ? streamingParts({ messages, streaming }) : []),
   ];
 }
 

@@ -435,8 +435,8 @@ export const VariableInsertMenu = ({
                   marginTop={filteredSources.length > 0 ? 2 : 0}
                   onClick={() => onCreateVariable?.(normalizedQuery)}
                 >
-                  <Plus size={12} color="var(--chakra-colors-blue-500)" />
-                  <Text fontSize="13px" color="blue.600">
+                  <Plus size={12} color="var(--chakra-colors-blue-fg)" />
+                  <Text fontSize="13px" color="blue.fg">
                     Create variable "{`{{${normalizedQuery}}}`}"
                   </Text>
                 </HStack>

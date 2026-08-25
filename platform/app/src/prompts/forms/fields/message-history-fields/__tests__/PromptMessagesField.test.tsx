@@ -36,7 +36,6 @@ const switchEditingMode = async (
   user: ReturnType<typeof userEvent.setup>,
   targetMode: "prompt" | "messages",
 ) => {
-  // Find and click the menu trigger (the title text)
   const titles = screen.queryAllByText(/^(Instructions|Messages)$/);
   const menuTrigger = titles[0]; // The first one is the title/trigger
   if (menuTrigger) {
@@ -272,7 +271,7 @@ describe("PromptMessagesField", () => {
     });
   });
 
-  describe("Instructions mode", () => {
+  describe("when the editor is in Instructions mode", () => {
     it("shows only the system message textarea", () => {
       renderComponent();
 
@@ -323,6 +322,28 @@ describe("PromptMessagesField", () => {
       expect(screen.getByText("Messages")).toBeInTheDocument();
       expect(screen.getAllByTestId("prompt-textarea")).toHaveLength(2);
       expect(screen.getByText("User")).toBeInTheDocument();
+    });
+
+    /** @scenario Adding a user message when an assistant message follows it */
+    it("focuses the existing user message rather than the assistant one", async () => {
+      const user = userEvent.setup();
+      renderComponent({
+        defaultMessages: [
+          { role: "system", content: "System prompt" },
+          { role: "user", content: "Custom user message" },
+          { role: "assistant", content: "Assistant response" },
+        ],
+      });
+
+      await switchEditingMode(user, "prompt");
+      await user.click(screen.getByTestId("add-user-message-button"));
+
+      await waitFor(() => {
+        expect((document.activeElement as HTMLTextAreaElement).value).toBe(
+          "Custom user message",
+        );
+      });
+      expect(screen.getAllByTestId("prompt-textarea")).toHaveLength(3);
     });
   });
 

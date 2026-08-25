@@ -37,10 +37,10 @@ export function AddPromptButton({
   return (
     <Tooltip content="New prompt" disabled={!iconOnly}>
       <PageLayout.HeaderButton
-        onClick={handleClick}
-        aria-label="New prompt"
         gap={1}
         {...buttonProps}
+        aria-label="New prompt"
+        onClick={handleClick}
       >
         <LuPlus size={14} />
         {/* Sentence case, and the same words as the accessible name, so what

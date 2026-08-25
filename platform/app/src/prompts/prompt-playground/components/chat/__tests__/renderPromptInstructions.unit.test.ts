@@ -30,4 +30,25 @@ describe("renderPromptInstructions", () => {
       }),
     ).toBe("Answer: Saved input");
   });
+
+  it("returns the template unchanged while a Liquid tag is half typed", () => {
+    const template = "Answer: {% if tone ";
+
+    expect(
+      renderPromptInstructions({
+        template,
+        variables: [{ identifier: "tone", value: "plain" }],
+      }),
+    ).toBe(template);
+  });
+
+  it("keeps an input variable that is explicitly false", () => {
+    expect(
+      renderPromptInstructions({
+        template: "Answer: {{ input }}",
+        variables: [{ identifier: "input", value: false }],
+        latestInput: "Conversation input",
+      }),
+    ).toBe("Answer: false");
+  });
 });

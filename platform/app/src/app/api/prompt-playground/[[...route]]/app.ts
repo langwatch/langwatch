@@ -177,7 +177,7 @@ const requireSameOrigin: MiddlewareHandler = async (c, next) => {
 
 /** Resolves the browser session, refusing anonymous callers with a code. */
 const sessionAuth: MiddlewareHandler = async (c, next) => {
-  const session = await getServerAuthSession({ req: c.req.raw as any });
+  const session = await getServerAuthSession({ req: c.req.raw });
   if (!session) {
     throw new MissingSessionError();
   }

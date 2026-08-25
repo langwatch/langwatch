@@ -24,10 +24,13 @@ import type { DisplayPart } from "./types";
  * this disagreed with it, a message's own hover actions landed against the
  * opposite edge of the thread from the bubble they belong to.
  */
-export function alignForRole(
-  role?: string,
-  roleMode: "chat" | "scenario" = "chat",
-): "flex-start" | "flex-end" {
+export function alignForRole({
+  role,
+  roleMode = "chat",
+}: {
+  role?: string;
+  roleMode?: "chat" | "scenario";
+}): "flex-start" | "flex-end" {
   const { displayRole } = getDisplayRoleVisuals(
     role === "assistant" ? "assistant" : "user",
     { isScenario: roleMode === "scenario" },
@@ -35,11 +38,14 @@ export function alignForRole(
   return displayRole === "user" ? "flex-start" : "flex-end";
 }
 
-const textAlignForRole = (
-  role?: string,
-  roleMode: "chat" | "scenario" = "chat",
-): "left" | "right" =>
-  alignForRole(role, roleMode) === "flex-start" ? "left" : "right";
+const textAlignForRole = ({
+  role,
+  roleMode = "chat",
+}: {
+  role?: string;
+  roleMode?: "chat" | "scenario";
+}): "left" | "right" =>
+  alignForRole({ role, roleMode }) === "flex-start" ? "left" : "right";
 
 export function TextPart({
   part,
@@ -61,9 +67,11 @@ export function TextPart({
       ? tryParseJson(part.content)
       : undefined;
 
+  const align = alignForRole({ role: part.role, roleMode });
+
   if (structured) {
     return (
-      <VStack align="flex-start" width="100%" gap={1}>
+      <VStack align={align} width="100%" gap={1}>
         <Box
           as="pre"
           borderRadius="6px"
@@ -75,7 +83,11 @@ export function TextPart({
         >
           <RenderInputOutput value={structured} showTools />
         </Box>
-        {actions}
+        {actions && (
+          <PartActionsRow align={align} compact={compact}>
+            {actions}
+          </PartActionsRow>
+        )}
       </VStack>
     );
   }
@@ -85,7 +97,6 @@ export function TextPart({
     isScenario: roleMode === "scenario",
   });
   const RoleIcon = visuals.Icon;
-  const align = alignForRole(part.role, roleMode);
   // Keyed by the role the message was sent with rather than the side it is
   // drawn on, so a caller names the speakers it knows about without having to
   // know which edge of the thread `roleMode` will put them against.
@@ -149,7 +160,7 @@ export function ImagePart({
   part: Extract<DisplayPart, { kind: "image" }>;
   roleMode?: "chat" | "scenario";
 }) {
-  const align = alignForRole(part.role, roleMode);
+  const align = alignForRole({ role: part.role, roleMode });
   return (
     <VStack align={align} data-align={align}>
       {/* Chakra's Image emits a bare <img>, and one with no alt is announced
@@ -176,7 +187,7 @@ export function MediaRow({
   audioPlayback?: AudioPlaybackProps;
   roleMode?: "chat" | "scenario";
 }) {
-  const align = alignForRole(part.role, roleMode);
+  const align = alignForRole({ role: part.role, roleMode });
   // Players stretch to the container; attachment chips hug the side the message
   // came from, the way a bubble would. Mirrored into `data-media-align` because
   // jsdom cannot read compiled flex styles.
@@ -201,7 +212,7 @@ export function MediaRow({
             color="fg.muted"
             fontStyle="italic"
             paddingX={2}
-            textAlign={textAlignForRole(part.role, roleMode)}
+            textAlign={textAlignForRole({ role: part.role, roleMode })}
           >
             {part.transcript}
           </Text>

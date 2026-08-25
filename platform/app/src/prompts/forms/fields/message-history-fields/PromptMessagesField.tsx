@@ -267,9 +267,12 @@ export function PromptMessagesField({
   // This allows us to re-compute when messages change (e.g., form reset)
   const lastMessagesSignatureRef = useRef<string>("");
 
-  // Set when a message was just added or revealed, so the effect below can
-  // bring it into view once it has actually rendered.
-  const [pendingReveal, setPendingReveal] = useState(false);
+  // Which row the effect below should bring into view once it has actually
+  // rendered: the one just appended, or the user row that "Add user message"
+  // points at, which is not the last row when an assistant message follows it.
+  const [pendingRevealTarget, setPendingRevealTarget] = useState<
+    "last-row" | "last-user-row" | null
+  >(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Compute a signature from messages to detect changes
@@ -302,19 +305,23 @@ export function PromptMessagesField({
   // cursor in it. Adding a message you cannot see is the same as nothing
   // happening, and the list is often taller than the pane.
   useEffect(() => {
-    if (!pendingReveal || editingMode !== "messages") return;
-    setPendingReveal(false);
+    if (!pendingRevealTarget || editingMode !== "messages") return;
+    setPendingRevealTarget(null);
 
     const container = containerRef.current;
     if (!container) return;
-    const rows = container.querySelectorAll<HTMLElement>("[data-message-row]");
+    const rows = container.querySelectorAll<HTMLElement>(
+      pendingRevealTarget === "last-user-row"
+        ? '[data-message-row="user"]'
+        : "[data-message-row]",
+    );
     const target = rows[rows.length - 1];
     if (!target) return;
 
     // jsdom does not implement scrollIntoView, and this is presentation only.
     target.scrollIntoView?.({ block: "nearest" });
     target.querySelector("textarea")?.focus();
-  }, [pendingReveal, editingMode]);
+  }, [pendingRevealTarget, editingMode]);
 
   // Access inputs field array to add new variables
   const inputsFieldArray = useFieldArray({
@@ -372,7 +379,7 @@ export function PromptMessagesField({
 
   const handleAdd = (role: "user" | "assistant") => {
     messageFields.append({ role, content: "" });
-    setPendingReveal(true);
+    setPendingRevealTarget("last-row");
   };
 
   /**
@@ -389,7 +396,7 @@ export function PromptMessagesField({
     }
     setEditingMode("messages");
     setHasUserChangedMode(true);
-    setPendingReveal(true);
+    setPendingRevealTarget("last-user-row");
   }, [messageFields]);
 
   // Ensure system message exists when switching to prompt mode

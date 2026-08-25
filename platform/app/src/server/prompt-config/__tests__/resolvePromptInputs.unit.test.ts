@@ -158,6 +158,18 @@ describe("resolvePromptInputs", () => {
 
       expect(inputs.input).toBe("typed in the chat");
     });
+
+    it("keeps an explicitly falsy panel value over the live message", () => {
+      for (const value of [0, false]) {
+        const { inputs } = resolvePromptInputs({
+          formValues: formWithTemplate([{ role: "user", content: INPUT_SLOT }]),
+          messages: [{ role: "user", content: "typed in the chat" }],
+          variables: [{ identifier: "input", value }],
+        });
+
+        expect(inputs.input).toBe(value);
+      }
+    });
   });
 
   describe("given a system message in the live conversation", () => {
