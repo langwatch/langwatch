@@ -1,14 +1,15 @@
-import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { Prisma } from "@langwatch/prisma-client/generated";
+import type { LangyDatabase } from "./langy-database.port";
 
 import { LangyCredentialRepository } from "../langy-credential.repository";
 
 export class PrismaLangyCredentialRepository extends LangyCredentialRepository {
-  constructor(private readonly prisma: PrismaClient) {
+  constructor(private readonly prisma: LangyDatabase) {
     super();
   }
 
-  static create(database: object): PrismaLangyCredentialRepository {
-    return new PrismaLangyCredentialRepository(database as PrismaClient);
+  static create(database: LangyDatabase): PrismaLangyCredentialRepository {
+    return new PrismaLangyCredentialRepository(database);
   }
 
   async tryFindProject(projectId: string): Promise<{ organizationId: string } | null> {

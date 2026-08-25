@@ -1,9 +1,10 @@
 import type {
   LangyConversationCommands,
-  LangyEventingCapabilities,
-  LangyTurnCompositionPorts,
+  LangyEventingPorts,
+  LangyTurnTechnicalPorts,
 } from "@langwatch/langy-server";
 import { PostgresLangyAdapter } from "@langwatch/langy-server";
+import type { LangyDatabase } from "../src/repositories/prisma/langy-database.port";
 import { describe, expect, it, vi } from "vitest";
 
 const COMMAND_NAMES = [
@@ -31,10 +32,10 @@ function commands(): LangyConversationCommands {
   ) as unknown as LangyConversationCommands;
 }
 
-function composition(turns: (ports: LangyTurnCompositionPorts) => object) {
+function composition(turns: LangyTurnTechnicalPorts) {
   return {
     commands: commands(),
-    credentials: () => ({
+    credentials: {
       sessionKeys: { mint: vi.fn() },
       virtualKeys: { provision: vi.fn() },
       github: { enabled: false, mintTurnToken: vi.fn() },
@@ -43,7 +44,7 @@ function composition(turns: (ports: LangyTurnCompositionPorts) => object) {
         workerGatewayBaseUrl: "https://langwatch.test/gateway",
         mirrorProjectId: undefined,
       },
-    }),
+    },
     turns,
     feedbackPromptRedis: null,
   };
@@ -51,9 +52,10 @@ function composition(turns: (ports: LangyTurnCompositionPorts) => object) {
 
 describe("PostgresLangyAdapter", () => {
   it("shares the memoized generic stores with every eventing consumer", () => {
-    const instance = PostgresLangyAdapter.create({ database: {} });
+    const database: LangyDatabase = undefined!;
+    const instance = PostgresLangyAdapter.create({ database });
 
-    const first: LangyEventingCapabilities = instance.eventing();
+    const first: LangyEventingPorts = instance.eventing();
     const second = instance.eventing();
 
     expect(second).toBe(first);
@@ -64,20 +66,32 @@ describe("PostgresLangyAdapter", () => {
   });
 
   it("builds one service graph from the same private repositories", () => {
-    let received: LangyTurnCompositionPorts | undefined;
-    const options = composition((ports) => {
-      received = ports;
-      return {};
+    const options = composition({
+      models: { resolve: vi.fn() },
+      worker: null,
+      tokenBuffer: null,
+      accessStore: null,
+      handoffStore: null,
+      permits: {
+        reserve: vi.fn(),
+        release: vi.fn(),
+        check: vi.fn(),
+      },
+      perDayPrCap: 0,
+      sessionKeys: {
+        mint: vi.fn(),
+        revoke: vi.fn(),
+      },
+      context: { render: vi.fn(() => null) },
+      metrics: { count: vi.fn() },
     });
-    const instance = PostgresLangyAdapter.create({ database: {} });
+    const database: LangyDatabase = undefined!;
+    const instance = PostgresLangyAdapter.create({ database });
 
     const first = instance.build(options);
     const second = instance.build(options);
 
     expect(second).toBe(first);
-    expect(received).toBeDefined();
-    expect(received?.messages).toBeDefined();
-    expect(received?.admission).toBeDefined();
-    expect(received?.trustedMessages).toBeDefined();
+    expect(first).toBeDefined();
   });
 });

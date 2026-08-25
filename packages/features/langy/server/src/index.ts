@@ -1,15 +1,12 @@
 export {
   PostgresLangyAdapter,
-  type LangyCompositionCapabilities,
   type LangyCredentialComposition,
-  type LangyEventingCapabilities,
-  type LangyMessageTurnCompositionCapability,
   type LangyServiceCompositionOptions,
-  type LangyTurnComposition,
-  type LangyTurnCompositionPorts,
-  type LangyTrustedMessageCompositionCapability,
+  LangyEventingPorts,
+  LangyTrustedMessagePort,
   type PostgresLangyAdapterOptions,
 } from "./adapters/langy.langy.adapter";
+export type { LangyTurnTechnicalPorts } from "./services/langy-turn.service";
 export { ADOPTABLE_CONVERSATION_ID } from "./services/langy.service";
 export type {
   LangyConversationCommands,

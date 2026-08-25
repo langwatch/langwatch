@@ -5,17 +5,9 @@ import type {
 } from "@langwatch/eventing";
 import type { LangyConversationStateData } from "@langwatch/langy-contract";
 import type { Prisma } from "@langwatch/prisma-client/generated";
+import type { LangyDatabase } from "./langy-database.port";
 
 type Row = Prisma.LangyConversationProjectionGetPayload<object>;
-
-type ConversationProjectionPrismaClient = {
-  langyConversationProjection: {
-    findUnique(
-      args: Prisma.LangyConversationProjectionFindUniqueArgs,
-    ): Promise<Row | null>;
-    upsert(args: Prisma.LangyConversationProjectionUpsertArgs): Promise<Row>;
-  };
-};
 
 function fromRow(row: Row): StoredProjection<LangyConversationStateData> {
   const {
@@ -39,12 +31,10 @@ function fromRow(row: Row): StoredProjection<LangyConversationStateData> {
 
 /** Postgres row I/O for the type-aware conversation projection. */
 export class PrismaLangyConversationProjectionRepository implements StateProjectionStore<LangyConversationStateData> {
-  constructor(private readonly prisma: ConversationProjectionPrismaClient) {}
+  constructor(private readonly prisma: LangyDatabase) {}
 
-  static create(database: object): PrismaLangyConversationProjectionRepository {
-    return new PrismaLangyConversationProjectionRepository(
-      database as ConversationProjectionPrismaClient,
-    );
+  static create(database: LangyDatabase): PrismaLangyConversationProjectionRepository {
+    return new PrismaLangyConversationProjectionRepository(database);
   }
 
   async tryLoad(

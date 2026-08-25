@@ -11,7 +11,7 @@ and the Langy event-sourcing pipeline.
 - `web/` contains browser-facing contract helpers.
 - `specs/` and `adrs/` record the current behavioural and architectural facts.
 
-The process builds one `LangyService` through `AppLangyRuntime` and injects it
-into transports and workers. Callers use its flat methods; they do not create
-sub-services or access repositories. Existing transport paths and wire shapes
-are compatibility surfaces.
+The process builds one `LangyService` through `PostgresLangyAdapter` and
+injects it into transports and workers. Callers use its flat methods; they do
+not create sub-services or access repositories. Existing transport paths and
+wire shapes are compatibility surfaces.

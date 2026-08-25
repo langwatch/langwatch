@@ -14,6 +14,7 @@ import {
 } from "@langwatch/langy-contract";
 import { z } from "zod";
 import { Prisma } from "@langwatch/prisma-client/generated";
+import type { LangyDatabase } from "./langy-database.port";
 
 /**
  * The status values this column accepts, derived from the ONE definition rather
@@ -45,15 +46,6 @@ const planSchema = z.array(langyPlanItemSchema);
 const toolCallsSchema = z.array(langyTurnToolCallSchema);
 
 type Row = Prisma.LangyConversationTurnProjectionGetPayload<object>;
-
-type ConversationTurnProjectionPrismaClient = {
-  langyConversationTurnProjection: {
-    findUnique(
-      args: Prisma.LangyConversationTurnProjectionFindUniqueArgs,
-    ): Promise<Row | null>;
-    upsert(args: Prisma.LangyConversationTurnProjectionUpsertArgs): Promise<Row>;
-  };
-};
 
 function fromRow(row: Row): StoredProjection<LangyConversationTurnData> {
   const {
@@ -94,12 +86,12 @@ function fromRow(row: Row): StoredProjection<LangyConversationTurnData> {
 
 /** Postgres row I/O for the type-aware turn projection. */
 export class PrismaLangyConversationTurnProjectionRepository implements StateProjectionStore<LangyConversationTurnData> {
-  constructor(private readonly prisma: ConversationTurnProjectionPrismaClient) {}
+  constructor(private readonly prisma: LangyDatabase) {}
 
-  static create(database: object): PrismaLangyConversationTurnProjectionRepository {
-    return new PrismaLangyConversationTurnProjectionRepository(
-      database as ConversationTurnProjectionPrismaClient,
-    );
+  static create(
+    database: LangyDatabase,
+  ): PrismaLangyConversationTurnProjectionRepository {
+    return new PrismaLangyConversationTurnProjectionRepository(database);
   }
 
   async tryLoad(

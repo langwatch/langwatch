@@ -1,4 +1,5 @@
-import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Prisma } from "@langwatch/prisma-client/generated";
+import type { LangyDatabase } from "./langy-database.port";
 
 import { LangyConversationRepository } from "../langy-conversation-projection.repository";
 import type {
@@ -50,12 +51,12 @@ function afterCursor(
 }
 
 export class PrismaLangyConversationRepository extends LangyConversationRepository {
-  constructor(private readonly prisma: PrismaClient) {
+  constructor(private readonly prisma: LangyDatabase) {
     super();
   }
 
-  static create(database: object): PrismaLangyConversationRepository {
-    return new PrismaLangyConversationRepository(database as PrismaClient);
+  static create(database: LangyDatabase): PrismaLangyConversationRepository {
+    return new PrismaLangyConversationRepository(database);
   }
 
   async tryFindVisibleById({
@@ -148,7 +149,7 @@ export class PrismaLangyConversationRepository extends LangyConversationReposito
       where: { projectId, UserId: userId, ArchivedAt: null },
       select: { ConversationId: true },
     });
-    return rows.map((row) => row.ConversationId);
+    return rows.map((row: { ConversationId: string }) => row.ConversationId);
   }
 
   async tryFindPendingHandoff({

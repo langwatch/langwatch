@@ -1,4 +1,5 @@
-import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { Prisma } from "@langwatch/prisma-client/generated";
+import type { LangyDatabase, LangyDatabaseTransaction } from "./langy-database.port";
 
 import { LangyTurnAdmissionRepository } from "../langy-turn-admission.repository";
 import type { LangyTurnAdmissionClaim } from "../langy-turn-admission.repository";
@@ -27,7 +28,8 @@ const COMMITTED_ABANDON_MS = 10 * 60 * 1000;
 
 function isRetryableTransactionError(error: unknown): boolean {
   return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error instanceof Error &&
+    "code" in error &&
     (error.code === "P2002" || error.code === "P2034")
   );
 }
@@ -37,12 +39,12 @@ function isRetryableTransactionError(error: unknown): boolean {
  * admission. The event projection remains a cheap rejection hint only.
  */
 export class PrismaLangyTurnAdmissionRepository extends LangyTurnAdmissionRepository {
-  constructor(private readonly prisma: PrismaClient) {
+  constructor(private readonly prisma: LangyDatabase) {
     super();
   }
 
-  static create(database: object): PrismaLangyTurnAdmissionRepository {
-    return new PrismaLangyTurnAdmissionRepository(database as PrismaClient);
+  static create(database: LangyDatabase): PrismaLangyTurnAdmissionRepository {
+    return new PrismaLangyTurnAdmissionRepository(database);
   }
 
   async claim(input: {
@@ -55,7 +57,7 @@ export class PrismaLangyTurnAdmissionRepository extends LangyTurnAdmissionReposi
     for (let attempt = 0; attempt < MAX_SERIALIZATION_ATTEMPTS; attempt++) {
       try {
         return await this.prisma.$transaction(
-          async (tx) => {
+          async (tx: LangyDatabaseTransaction) => {
             const now = new Date();
             const leaseExpiresAt = new Date(now.getTime() + PREPARATION_LEASE_MS);
             const claimToken = crypto.randomUUID();
@@ -222,7 +224,7 @@ export class PrismaLangyTurnAdmissionRepository extends LangyTurnAdmissionReposi
     turnId: string;
     claimToken: string;
   }): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx: LangyDatabaseTransaction) => {
       const receiptUpdate = await tx.langyTurnRequest.updateMany({
         where: {
           projectId: input.projectId,
@@ -294,7 +296,7 @@ export class PrismaLangyTurnAdmissionRepository extends LangyTurnAdmissionReposi
     turnId: string;
     claimToken: string;
   }): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx: LangyDatabaseTransaction) => {
       await tx.langyActiveTurn.deleteMany({
         where: {
           projectId: input.projectId,
@@ -323,7 +325,7 @@ export class PrismaLangyTurnAdmissionRepository extends LangyTurnAdmissionReposi
     conversationId: string;
     turnId: string;
   }): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
+    await this.prisma.$transaction(async (tx: LangyDatabaseTransaction) => {
       const active = await tx.langyActiveTurn.findUnique({
         where: {
           projectId: input.projectId,

@@ -48,14 +48,7 @@ import {
   type ConversationListItem,
   type ConversationListPage,
 } from "./langy-conversation.service";
-import {
-  LangyMessageService,
-  type LangyTrustedMessageReader,
-} from "./langy-message.service";
-import {
-  LangyCredentialService,
-  type LangyCredentialServiceOptions,
-} from "./langy-credential.service";
+import type { LangyTrustedMessageReader } from "./langy-message.service";
 import { LangyTurnRelay, type LangyRelayRedis } from "../streaming/langy-turn-relay";
 import { LangyFeedbackPromptPolicy } from "../ports/langy-feedback-prompt.port";
 
@@ -73,9 +66,6 @@ export type LangyRelayCompositionOptions = {
   };
 };
 
-export type LangyConversationCapability = LangyConversationService;
-export type LangyMessageCapability = LangyMessageService;
-export type LangyCredentialCapability = LangyCredentialService;
 export type {
   LangyConversationCommands,
   LangyConversationEventsReader,
@@ -209,32 +199,13 @@ type AppCapabilities = {
   };
 };
 
-export type LangyLegacyCapabilities = {
-  conversations: object;
-  turns: object;
-  messages: object;
-  credentials: object;
-};
-
-type SelectedCapabilities<C> = C extends LangyLegacyCapabilities ? C : never;
-
-export class LangyService<Capabilities = never> extends LangyServiceContract {
-  declare readonly conversations: SelectedCapabilities<Capabilities>["conversations"];
-  declare readonly turns: SelectedCapabilities<Capabilities>["turns"];
-  declare readonly messages: SelectedCapabilities<Capabilities>["messages"];
-  declare readonly credentials: SelectedCapabilities<Capabilities>["credentials"];
-
+export class LangyService extends LangyServiceContract {
   private constructor(
     private readonly repositories: Repositories | null,
     private readonly feedbackPrompt: LangyFeedbackPromptPolicy,
-    capabilities?: Capabilities,
+    private readonly collaborators: AppCapabilities | null = null,
     private readonly relayOptions: LangyRelayCompositionOptions | null = null,
-  ) {
-    super();
-    if (capabilities !== undefined) {
-      Object.assign(this, capabilities);
-    }
-  }
+  ) { super(); }
 
   static create(
     options: Repositories,
@@ -243,15 +214,16 @@ export class LangyService<Capabilities = never> extends LangyServiceContract {
     return new LangyService(options, feedbackPrompt);
   }
 
-  static compose<Capabilities extends LangyLegacyCapabilities>(
-    capabilities: Capabilities,
+  /** Builds the process-owned capability around already-composed private collaborators. */
+  static createComposed(
+    collaborators: AppCapabilities,
     feedbackPrompt: LangyFeedbackPromptPolicy,
     relayOptions?: LangyRelayCompositionOptions,
-  ): LangyService<Capabilities> {
-    return new LangyService<Capabilities>(
+  ): LangyService {
+    return new LangyService(
       null,
       feedbackPrompt,
-      capabilities,
+      collaborators,
       relayOptions ?? null,
     );
   }
@@ -274,35 +246,6 @@ export class LangyService<Capabilities = never> extends LangyServiceContract {
         : {}),
       ...(this.relayOptions.logger ? { logger: this.relayOptions.logger } : {}),
     });
-  }
-
-  /** Composition-only factories keep concrete capability classes private. */
-  static createConversationCapability(
-    ...args: Parameters<typeof LangyConversationService.create>
-  ): LangyConversationCapability {
-    return LangyConversationService.create(...args);
-  }
-
-  static createMessageCapability(
-    ...args: Parameters<typeof LangyMessageService.create>
-  ): LangyMessageCapability {
-    return LangyMessageService.create(...args);
-  }
-
-  static createCredentialCapability(
-    options: LangyCredentialServiceOptions,
-  ): LangyCredentialCapability {
-    return LangyCredentialService.create(options);
-  }
-
-  static extractTextFromParts(parts: unknown): string {
-    return LangyMessageService.extractTextFromParts(parts);
-  }
-
-  static createTrustedMessageReader(
-    ...args: Parameters<typeof LangyMessageService.createTrustedMessageReader>
-  ): LangyTrustedMessageReader {
-    return LangyMessageService.createTrustedMessageReader(...args);
   }
 
   private get persistence(): Repositories {
@@ -347,7 +290,7 @@ export class LangyService<Capabilities = never> extends LangyServiceContract {
 
   async stopTurn(input: LangyStopTurnInput & { userId?: string }): Promise<void> {
     if (input.userId !== undefined) {
-      await this.appCapabilities().turns.stopTurn(
+      await this.runtime.turns.stopTurn(
         input as {
           projectId: string;
           conversationId: string;
@@ -395,72 +338,75 @@ export class LangyService<Capabilities = never> extends LangyServiceContract {
     return this.persistence.relay.publish(langyRelayFrameSchema.parse(frame));
   }
 
-  private appCapabilities(): AppCapabilities {
-    return this as unknown as AppCapabilities;
+  private get runtime(): AppCapabilities {
+    if (this.collaborators === null) {
+      throw new Error("Langy runtime is not configured");
+    }
+    return this.collaborators;
   }
 
   getPage(
     input: Parameters<AppCapabilities["conversations"]["getPage"]>[0],
   ): Promise<ContractConversationListPage> {
-    return this.appCapabilities().conversations.getPage(input);
+    return this.runtime.conversations.getPage(input);
   }
 
   getEventsAfter(
     input: Parameters<AppCapabilities["conversations"]["getEventsAfter"]>[0],
   ): Promise<LangyConversationEventPage> {
-    return this.appCapabilities().conversations.getEventsAfter(input);
+    return this.runtime.conversations.getEventsAfter(input);
   }
 
   tryFindByIdVisible(
     input: Parameters<AppCapabilities["conversations"]["tryFindByIdVisible"]>[0],
   ): Promise<ContractConversationDetail | null> {
-    return this.appCapabilities().conversations.tryFindByIdVisible(input);
+    return this.runtime.conversations.tryFindByIdVisible(input);
   }
 
   getById(
     input: Parameters<AppCapabilities["conversations"]["getById"]>[0],
   ): Promise<ContractConversationDetail> {
-    return this.appCapabilities().conversations.getById(input);
+    return this.runtime.conversations.getById(input);
   }
 
   getAllByConversation(
     input: Parameters<AppCapabilities["messages"]["getAllByConversation"]>[0],
   ): Promise<ContractMessageRow[]> {
-    return this.appCapabilities().messages.getAllByConversation(input);
+    return this.runtime.messages.getAllByConversation(input);
   }
 
   deleteById(
     input: Parameters<AppCapabilities["conversations"]["deleteById"]>[0],
   ): Promise<boolean> {
-    return this.appCapabilities().conversations.deleteById(input);
+    return this.runtime.conversations.deleteById(input);
   }
 
   updateById(
     input: Parameters<AppCapabilities["conversations"]["updateById"]>[0],
   ): Promise<ContractConversationDetail> {
-    return this.appCapabilities().conversations.updateById(input);
+    return this.runtime.conversations.updateById(input);
   }
 
   forkById(
     input: Parameters<AppCapabilities["conversations"]["forkById"]>[0],
   ): Promise<{ conversation: ContractConversationDetail }> {
-    return this.appCapabilities().conversations.forkById(input);
+    return this.runtime.conversations.forkById(input);
   }
 
   startConversationTurn(
     input: LangyStartConversationTurnInput,
   ): Promise<{ conversationId: string; turnId: string }> {
-    return this.appCapabilities().turns.startConversationTurn(input);
+    return this.runtime.turns.startConversationTurn(input);
   }
 
   warmConversationWorker(
     input: Parameters<AppCapabilities["turns"]["warmConversationWorker"]>[0],
   ): Promise<{ conversationId: string | null; warmed: boolean }> {
-    return this.appCapabilities().turns.warmConversationWorker(input);
+    return this.runtime.turns.warmConversationWorker(input);
   }
 
   tryGetModelsAllowedForProject(projectId: string): Promise<string[] | null> {
-    return this.appCapabilities().credentials.tryGetModelsAllowedForProject(projectId);
+    return this.runtime.credentials.tryGetModelsAllowedForProject(projectId);
   }
 
   shouldAskFeedback(input: {
@@ -478,41 +424,41 @@ export class LangyService<Capabilities = never> extends LangyServiceContract {
   turnExists(
     input: Parameters<AppCapabilities["conversations"]["turnExists"]>[0],
   ): Promise<boolean> {
-    return this.appCapabilities().conversations.turnExists(input);
+    return this.runtime.conversations.turnExists(input);
   }
 
   ingestAgentTurnResult(input: LangyTurnResultInput): Promise<void> {
-    return this.appCapabilities().conversations.ingestAgentTurnResult(input);
+    return this.runtime.conversations.ingestAgentTurnResult(input);
   }
 
   tryGetRunToken(
     input: Parameters<AppCapabilities["conversations"]["tryGetRunToken"]>[0],
   ): Promise<string | null> {
-    return this.appCapabilities().conversations.tryGetRunToken(input);
+    return this.runtime.conversations.tryGetRunToken(input);
   }
 
   recordToolCallStarted(
     input: Parameters<AppCapabilities["conversations"]["recordToolCallStarted"]>[0],
   ): Promise<void> {
-    return this.appCapabilities().conversations.recordToolCallStarted(input);
+    return this.runtime.conversations.recordToolCallStarted(input);
   }
 
   recordToolCallCompleted(
     input: Parameters<AppCapabilities["conversations"]["recordToolCallCompleted"]>[0],
   ): Promise<void> {
-    return this.appCapabilities().conversations.recordToolCallCompleted(input);
+    return this.runtime.conversations.recordToolCallCompleted(input);
   }
 
   recordTurnHandoff(
     input: Parameters<AppCapabilities["conversations"]["recordTurnHandoff"]>[0],
   ): Promise<void> {
-    return this.appCapabilities().conversations.recordTurnHandoff(input);
+    return this.runtime.conversations.recordTurnHandoff(input);
   }
 
   recordPlanUpdated(
     input: Parameters<AppCapabilities["conversations"]["recordPlanUpdated"]>[0],
   ): Promise<void> {
-    return this.appCapabilities().conversations.recordPlanUpdated(input);
+    return this.runtime.conversations.recordPlanUpdated(input);
   }
 
   private async startTurnForConversation(

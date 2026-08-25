@@ -13,9 +13,8 @@ with private repositories and services; the application does not construct or
 reach through subordinate Langy services.
 
 `PostgresLangyAdapter` is the server composition seam. It constructs the
-private persistence graph once and returns the contract service. `AppLangyRuntime`
-is the application wrapper around that adapter. The process composition root
-builds one instance and injects it into transports and workers.
+private persistence graph once and returns the contract service. The process
+composition root builds one instance and injects it into transports and workers.
 
 The feedback prompt is part of `LangyService` through `shouldAskFeedback` and
 `markFeedbackShown`. Its Redis record, parser, constants, and implementation

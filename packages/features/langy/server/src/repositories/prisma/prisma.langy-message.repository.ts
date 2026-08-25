@@ -1,15 +1,15 @@
 import { langyMessagePartSchema } from "@langwatch/langy-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { LangyDatabase } from "./langy-database.port";
 import { LangyMessageRepository } from "../langy-message.repository";
 import type { LangyMessageRow, MessageRole } from "../langy-message.repository";
 
 export class PrismaLangyMessageRepository extends LangyMessageRepository {
-  constructor(private readonly prisma: PrismaClient) {
+  constructor(private readonly prisma: LangyDatabase) {
     super();
   }
 
-  static create(database: object): PrismaLangyMessageRepository {
-    return new PrismaLangyMessageRepository(database as PrismaClient);
+  static create(database: LangyDatabase): PrismaLangyMessageRepository {
+    return new PrismaLangyMessageRepository(database);
   }
 
   async findAllByConversation({
@@ -23,11 +23,13 @@ export class PrismaLangyMessageRepository extends LangyMessageRepository {
       where: { projectId, ConversationId },
       orderBy: [{ CreatedAt: "asc" }, { MessageId: "asc" }],
     });
-    return rows.map((row) => ({
-      id: row.MessageId,
-      role: row.Role as MessageRole,
-      parts: langyMessagePartSchema.array().parse(row.Parts),
-      createdAt: new Date(row.CreatedAt),
-    }));
+    return rows.map(
+      (row: { MessageId: string; Role: string; Parts: unknown; CreatedAt: number }) => ({
+        id: row.MessageId,
+        role: row.Role as MessageRole,
+        parts: langyMessagePartSchema.array().parse(row.Parts),
+        createdAt: new Date(row.CreatedAt),
+      }),
+    );
   }
 }

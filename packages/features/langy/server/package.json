@@ -30,6 +30,18 @@
       "types": "./src/ports/langy-frame-auth.port.ts",
       "default": "./src/ports/langy-frame-auth.port.ts"
     },
+    "./streaming/langy-capability-progress": {
+      "types": "./src/streaming/langy-capability-progress.ts",
+      "default": "./src/streaming/langy-capability-progress.ts"
+    },
+    "./streaming/langy-turn-settlement": {
+      "types": "./src/streaming/langy-turn-settlement.ts",
+      "default": "./src/streaming/langy-turn-settlement.ts"
+    },
+    "./processes/langy-turn-dispatch-retry": {
+      "types": "./src/processes/langy-turn-dispatch-retry.error.ts",
+      "default": "./src/processes/langy-turn-dispatch-retry.error.ts"
+    },
     "./langy.ids": {
       "types": "./src/ports/langy-ids.port.ts",
       "default": "./src/ports/langy-ids.port.ts"
@@ -65,6 +77,14 @@
     "./services/langy-message.service": {
       "types": "./src/services/langy-message.service.ts",
       "default": "./src/services/langy-message.service.ts"
+    },
+    "./services/langy-turn.service": {
+      "types": "./src/services/langy-turn.service.ts",
+      "default": "./src/services/langy-turn.service.ts"
+    },
+    "./ports/langy-turn-runtime": {
+      "types": "./src/ports/langy-turn-runtime.port.ts",
+      "default": "./src/ports/langy-turn-runtime.port.ts"
     },
     "./subscribers/langy-conversation": {
       "types": "./src/subscribers/langy-conversation.subscriber.ts",
