@@ -340,20 +340,24 @@ function AdvancedSection({
       <Collapsible.Content>
         <VStack align="stretch" gap={3} paddingTop={3}>
           <Grid templateColumns="1fr 1fr" gap={3}>
-            <SimulationModelSelect
-              label="User simulator"
-              value={draft.simulatorModel}
-              onChange={(value) => setDraft({ simulatorModel: value })}
-              featureKey="scenarios.user_simulator"
-              size="sm"
-            />
-            <SimulationModelSelect
-              label="Judge"
-              value={draft.judgeModel}
-              onChange={(value) => setDraft({ judgeModel: value })}
-              featureKey="scenarios.judge"
-              size="sm"
-            />
+            <Box>
+              <FieldLabel>User simulator</FieldLabel>
+              <SimulationModelSelect
+                value={draft.simulatorModel}
+                onChange={(value) => setDraft({ simulatorModel: value })}
+                featureKey="scenarios.user_simulator"
+                size="sm"
+              />
+            </Box>
+            <Box>
+              <FieldLabel>Judge</FieldLabel>
+              <SimulationModelSelect
+                value={draft.judgeModel}
+                onChange={(value) => setDraft({ judgeModel: value })}
+                featureKey="scenarios.judge"
+                size="sm"
+              />
+            </Box>
           </Grid>
           <Grid templateColumns="1fr 1fr" gap={3}>
             <Box>
