@@ -20898,8 +20898,6 @@ The first run asks one question:
 
 LangWatch remembers the answer, so later runs do not ask again. Everything else is unchanged: `langwatch codex` accepts the same flags and the same subcommands as `codex`, and it returns the same exit code.
 
-You do not always see the question. When your organization allows only one of the two paths, LangWatch takes that path without asking. A run with no terminal attached, in CI for example, keeps your own plan and sends telemetry only. `--tool-mode` settles it explicitly on any run, and overrides a remembered answer.
-
 <Note>
   A virtual key is created the first time you choose the gateway, not at login. If you always keep your own subscription, LangWatch never creates one for you.
 </Note>
@@ -20988,6 +20986,12 @@ To collect the usage numbers and no content, remove the `notify` setting from `~
 ## Troubleshooting
 
 <AccordionGroup>
+  <Accordion title="The first run did not ask anything">
+    Two cases skip the question. Your organization allows one connection path only, and LangWatch takes that path without asking. Or the run has no terminal attached, for example in CI: it keeps your own plan and sends telemetry only.
+
+    To set the path on one run, use `--tool-mode`. It overrides the remembered answer.
+  </Accordion>
+
   <Accordion title="Nothing arrives in LangWatch">
     Run `langwatch instrument codex` again and read what it prints. It names the file it wrote and the destination the telemetry goes to.
 
