@@ -122,9 +122,28 @@ async function bootSpendSpikeAnomalyWorker(
 async function bootRealtimeSessionPoller(
   shutdownHandles: ShutdownHandles,
 ): Promise<void> {
-  const { startRealtimeSessionPoller } =
-    await import("~/server/gateway/realtimeSessionPoller");
-  const poller = startRealtimeSessionPoller();
+  const [pollerModule, { prisma }, credentialService, sessionService, gatewayServer] =
+    await Promise.all([
+      import("~/runtime/worker/gateway-realtime-session-reconciliation.adapter"),
+      import("~/server/db"),
+      import("~/server/gateway/elevenLabsCredential.service"),
+      import("~/server/gateway/realtimeSession.service"),
+      import("@langwatch/gateway-server/realtime-session-reconciliation"),
+    ]);
+  const poller = pollerModule.startRealtimeSessionPoller({
+    database: pollerModule.PrismaRealtimeSessionPollerDatabase.create({
+      database: prisma,
+    }),
+    sessions: {
+      expireStaleSessions: sessionService.expireStaleRealtimeSessions,
+      releaseRealtimeSession: sessionService.releaseRealtimeSession,
+      closeAndConfirmRealtimeSession: sessionService.closeAndConfirmRealtimeSession,
+    },
+    credentials: { getApiCredential: credentialService.getElevenLabsApiCredential },
+    logger: createLogger("langwatch:workers:realtimeSessionPoller"),
+    config: gatewayServer.realtimeSessionReconciliationConfig,
+    clock: { now: () => new Date() },
+  });
   shutdownHandles.push(() => poller.stop());
   logger.info("realtime voice session poller ready");
 }

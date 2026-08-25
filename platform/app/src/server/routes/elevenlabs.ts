@@ -32,7 +32,7 @@
  * for every tenant on the endpoint.
  *
  * That is why this webhook is an optimisation and not the billing path. The
- * reconciler in realtimeSessionPoller.ts asks the vendor for the same numbers
+ * Gateway reconciliation worker asks the vendor for the same numbers
  * on a schedule, so a lost or rejected delivery costs latency rather than
  * money, and a webhook that was never registered at all still bills correctly.
  * An unmatched call is not lost either: its spend record settles as

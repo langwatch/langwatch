@@ -12,6 +12,7 @@
  * a report arriving after that supersedes the settled row.
  */
 
+import type { GatewayRealtimeSessionRecord } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import type {
   GatewayRealtimeSession,
@@ -253,7 +254,7 @@ export async function matchRealtimeSession(params: {
  * pricing the same call is how they come to disagree about it.
  */
 export async function closeAndConfirmRealtimeSession(params: {
-  session: GatewayRealtimeSession;
+  session: GatewayRealtimeSessionRecord;
   usage: Partial<SpendUsage>;
   vendorCostRaw?: unknown;
   occurredAt?: Date;

@@ -148,6 +148,7 @@
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/experiment-server": "workspace:*",
     "@langwatch/experiment-web": "workspace:*",
+    "@langwatch/gateway-server": "workspace:*",
     "@langwatch/github-contract": "workspace:*",
     "@langwatch/github-server": "workspace:*",
     "@langwatch/group-queue": "workspace:*",

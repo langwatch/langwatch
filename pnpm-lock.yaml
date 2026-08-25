@@ -2073,6 +2073,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../prisma-client
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../runtime-composition
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -3599,6 +3602,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../packages/design-system
+      '@langwatch/gateway-server':
+        specifier: workspace:*
+        version: link:../../packages/features/gateway/server
       '@langwatch/enterprise-audit-log-server':
         specifier: workspace:*
         version: link:../../packages/enterprise/features/audit-log/server

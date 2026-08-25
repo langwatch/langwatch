@@ -17,9 +17,9 @@
  * meant to agree rather than add, exactly as they do for every other request.
  */
 
+import type { GatewayRealtimeSessionRecord } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import { createHash } from "crypto";
-import type { GatewayRealtimeSession } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
 import { ATTR_KEYS as ATTR } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import type { SpendUsage } from "~/server/event-sourcing/pipelines/gateway-spend-processing/schemas/commands";
@@ -60,7 +60,7 @@ function attr(key: string, value: string | number) {
  * and raising would roll back a settlement that has already been accepted.
  */
 export async function recordRealtimeSessionSpan(params: {
-  session: GatewayRealtimeSession;
+  session: GatewayRealtimeSessionRecord;
   usage: SpendUsage;
   costNanoUsd: number;
   durationMs: number;
