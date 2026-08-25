@@ -40,7 +40,7 @@ import type {
   CustomerService,
 } from "~/runtime/app/features/billing";
 import type Stripe from "stripe";
-import type { AnalyticsService } from "~/server/app-layer/analytics/analytics.service";
+import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { InstanceUsageStatsRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
 import type { BillableEventsRepository } from "~/server/event-sourcing/registration/global/repositories/billable-events.clickhouse.repository";
 import type { AppCommands } from "~/server/event-sourcing/registration/pipelineRegistry";
@@ -197,9 +197,7 @@ export interface AppDependencies {
    * the graph-trigger dispatch closure) constructing — and each resolving a
    * ClickHouse client — its own.
    */
-  analytics: {
-    service: AnalyticsService;
-  };
+  analytics: AnalyticsService;
   /** One process-owned Simulation capability for reads and execution. */
   simulations: SimulationService;
   /** API-specific CSV composition over the canonical Simulation service. */

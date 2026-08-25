@@ -1,5 +1,4 @@
 import { sharedFiltersInputSchema } from "../../../analytics/types";
-import { getApp } from "../../../app-layer/app";
 import { protectedProcedure } from "../../trpc";
 
 // Note: getFeedbacks only uses projectId, startDate, endDate, filters
@@ -8,12 +7,7 @@ import { protectedProcedure } from "../../trpc";
 export const feedbacks = protectedProcedure
   .input(sharedFiltersInputSchema)
   .permission("cost:view")
-  .query(async ({ input }) => {
-    const analyticsService = getApp().analytics.service;
-    return analyticsService.getFeedbacks(
-      input.projectId,
-      input.startDate,
-      input.endDate,
-      input.filters,
-    );
+  .query(async ({ input, ctx }) => {
+    const analyticsService = ctx.app.analytics;
+    return analyticsService.getFeedbacks(input);
   });

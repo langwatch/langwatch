@@ -1,11 +1,10 @@
 import { timeseriesInput } from "../../../analytics/registry";
-import { getApp } from "../../../app-layer/app";
 import { protectedProcedure } from "../../trpc";
 
 export const getTimeseries = protectedProcedure
   .input(timeseriesInput)
   .permission("analytics:view")
-  .query(async ({ input }) => {
-    const analyticsService = getApp().analytics.service;
+  .query(async ({ input, ctx }) => {
+    const analyticsService = ctx.app.analytics;
     return analyticsService.getTimeseries(input);
   });

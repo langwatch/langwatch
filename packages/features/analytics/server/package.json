@@ -1,0 +1,30 @@
+{
+  "name": "@langwatch/analytics-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical server-side Analytics timeseries service and ClickHouse composition.",
+  "type": "module",
+  "exports": {
+    ".": { "types": "./src/index.ts", "default": "./src/index.ts" }
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": ["src"],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@clickhouse/client": "^1.23.0",
+    "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@opentelemetry/api": "^1.9.1",
+    "date-fns": "^4.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}

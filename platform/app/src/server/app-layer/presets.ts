@@ -83,8 +83,12 @@ import {
   LangyTurnHandoffStore,
 } from "@langwatch/langy-server";
 import { AuthzFeature } from "~/runtime/app/features/authz";
+import {
+  AnalyticsAdapter,
+  LoggingAnalyticsTripwire,
+} from "@langwatch/analytics-server";
 import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
-import { ClickHouseAnalyticsService } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
+import { featureFlagService } from "~/server/featureFlag";
 import {
   LwqlKeyMapClickHouseRepository,
   NullLwqlKeyMapRepository,
@@ -224,8 +228,6 @@ import {
 import { stripUnsupportedLLMParamsFromWorkflow } from "../workflows/stripUnsupportedLLMParams";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { nlpgoFetch } from "../nlpgo/nlpgoFetch";
-import { createAnalyticsService } from "./analytics";
-import { LegacyAnalyticsBackendClickHouseRepository } from "./analytics/repositories/legacy-analytics-backend.clickhouse.repository";
 import { App, getApp, globalForApp, initializeApp } from "./app";
 import { demoProjectId } from "./authz/demo-project";
 import { testFireTrigger } from "./automations/trigger-template.service";
@@ -786,17 +788,20 @@ export function initializeDefaultApp(options?: {
     ),
     "DspyStepService",
   );
-  // The ADR-034 analytics read API, built once here (same
-  // shape `createAnalyticsService` always used — unconditional on
+  // The Analytics read API, built once here (unconditional on
   // `clickhouseEnabled`, since the resolver itself already throws at query
   // time when ClickHouse isn't configured) and handed out as
-  // `getApp().analytics.service` instead of each of its ~6 callers
+  // `app.analytics` instead of each of its callers
   // constructing — and each resolving a ClickHouse client — its own.
-  const analyticsService = createAnalyticsService({
+  const analyticsService = AnalyticsAdapter.create({
     resolveClient: resolveClickHouseClient,
-    legacyBackend: new ClickHouseAnalyticsService(
-      new LegacyAnalyticsBackendClickHouseRepository(resolveClickHouseClient),
-    ),
+    tripwire: LoggingAnalyticsTripwire.create({
+      isEnabled: async (projectId) =>
+        featureFlagService.isEnabled(
+          "release_event_sourced_analytics_read_tripwire",
+          { distinctId: projectId, projectId },
+        ),
+    }),
   });
   // SuiteRunService is created after pipeline registration (needs startSuiteRun command)
 
@@ -2093,7 +2098,7 @@ export function initializeDefaultApp(options?: {
     automation,
     triggerTemplates,
     dspySteps: { steps: dspySteps },
-    analytics: { service: analyticsService },
+    analytics: analyticsService,
     simulations,
     simulationExports,
     suiteRuns: { runs: suiteRunService },
@@ -2547,14 +2552,11 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     })(),
     evaluations: testEvaluationService,
     dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
-    analytics: {
-      service: createAnalyticsService({
-        resolveClient: async () => {
-          throw new Error("ClickHouse not available in test app");
-        },
-        legacyBackend: new ClickHouseAnalyticsService(null),
-      }),
-    },
+    analytics: AnalyticsAdapter.create({
+      resolveClient: async () => {
+        throw new Error("ClickHouse not available in test app");
+      },
+    }),
     experiments: AppExperimentRuntime.create({
       database: testPrisma,
       resolveClickHouseClient: async () => null,

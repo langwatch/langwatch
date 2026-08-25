@@ -260,7 +260,7 @@ secured.access(analyticsViewAuth).post(
     }
 
     try {
-      const analyticsService = getApp().analytics.service;
+      const analyticsService = c.app.analytics;
       const timeseriesResult = await analyticsService.getTimeseries(params);
       return c.json(timeseriesResult);
     } catch (e) {

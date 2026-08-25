@@ -1,4 +1,10 @@
 import { z } from "zod";
+import type {
+  AnalyticsFeedbacksResult,
+  AnalyticsTimeseriesBucket,
+  AnalyticsTimeseriesResult,
+  AnalyticsTopDocumentsResult,
+} from "@langwatch/analytics-contract";
 
 import type { RotatingColorSet } from "../../utils/rotatingColors";
 import type { DeepRequired, Unpacked } from "../../utils/types";
@@ -118,15 +124,8 @@ export type TracesPivotFilterQuery = {
 /**
  * Timeseries result structure
  */
-export interface TimeseriesResult {
-  previousPeriod: TimeseriesBucket[];
-  currentPeriod: TimeseriesBucket[];
-}
-
-export interface TimeseriesBucket {
-  date: string;
-  [key: string]: number | string | Record<string, Record<string, number>>;
-}
+export type TimeseriesResult = AnalyticsTimeseriesResult;
+export type TimeseriesBucket = AnalyticsTimeseriesBucket;
 
 /**
  * Filter data result for dropdown options
@@ -142,87 +141,9 @@ export interface FilterDataResult {
 /**
  * Top documents result for RAG analytics
  */
-export interface TopDocumentsResult {
-  topDocuments: Array<{
-    documentId: string;
-    count: number;
-    traceId: string;
-    content?: string;
-  }>;
-  totalUniqueDocuments: number;
-}
+export type TopDocumentsResult = AnalyticsTopDocumentsResult;
 
 /**
  * Feedbacks result
  */
-export interface FeedbacksResult {
-  events: Array<{
-    event_id: string;
-    event_type: string;
-    project_id?: string;
-    trace_id: string;
-    timestamps: {
-      started_at: number;
-      inserted_at: number;
-      updated_at: number;
-    };
-    metrics?: Array<{ key: string; value: number }>;
-    event_details?: Array<{ key: string; value: string }>;
-  }>;
-}
-
-/**
- * Analytics backend interface for dependency injection. Covers the legacy
- * non-timeseries reads (filter options, feedbacks, top documents).
- * Timeseries reads are owned end-to-end by the app-layer service
- * (`~/server/app-layer/analytics`) — routing, query building, and the
- * shared row parser — so this interface deliberately has no
- * `getTimeseries`: a second implementation would be a place for bucket
- * semantics to drift.
- */
-export interface AnalyticsBackend {
-  getDataForFilter(
-    projectId: string,
-    field: FilterField,
-    startDate: number,
-    endDate: number,
-    filters: Partial<
-      Record<
-        FilterField,
-        | string[]
-        | Record<string, string[]>
-        | Record<string, Record<string, string[]>>
-      >
-    >,
-    key?: string,
-    subkey?: string,
-    searchQuery?: string,
-  ): Promise<FilterDataResult>;
-  getTopUsedDocuments(
-    projectId: string,
-    startDate: number,
-    endDate: number,
-    filters?: Partial<
-      Record<
-        FilterField,
-        | string[]
-        | Record<string, string[]>
-        | Record<string, Record<string, string[]>>
-      >
-    >,
-  ): Promise<TopDocumentsResult>;
-  getFeedbacks(
-    projectId: string,
-    startDate: number,
-    endDate: number,
-    filters?: Partial<
-      Record<
-        FilterField,
-        | string[]
-        | Record<string, string[]>
-        | Record<string, Record<string, string[]>>
-      >
-    >,
-  ): Promise<FeedbacksResult>;
-  isAvailable(): boolean;
-}
+export type FeedbacksResult = AnalyticsFeedbacksResult;

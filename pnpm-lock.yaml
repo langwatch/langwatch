@@ -1092,6 +1092,47 @@ importers:
         specifier: ^4.1.9
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
+  packages/features/analytics/contract:
+    dependencies:
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/features/analytics/server:
+    dependencies:
+      '@clickhouse/client':
+        specifier: ^1.23.0
+        version: 1.23.0
+      '@langwatch/analytics-contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../../observability
+      '@opentelemetry/api':
+        specifier: ^1.9.1
+        version: 1.9.1
+      date-fns:
+        specifier: ^4.4.0
+        version: 4.4.0
+    devDependencies:
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@4.1.10)(@vitest/coverage-v8@4.1.10)(@vitest/ui@4.1.10)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
   packages/features/api-key/contract:
     dependencies:
       '@langwatch/authz-contract':
@@ -2553,6 +2594,12 @@ importers:
       '@langwatch/agent-web':
         specifier: workspace:*
         version: link:../../packages/features/agent/web
+      '@langwatch/analytics-contract':
+        specifier: workspace:*
+        version: link:../../packages/features/analytics/contract
+      '@langwatch/analytics-server':
+        specifier: workspace:*
+        version: link:../../packages/features/analytics/server
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../packages/api

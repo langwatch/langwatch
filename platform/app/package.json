@@ -98,6 +98,8 @@
     "@hono/standard-validator": "^0.2.3",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/agent-server": "workspace:*",
+    "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/analytics-server": "workspace:*",
     "@langwatch/agent-web": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/actor": "workspace:*",
