@@ -302,7 +302,7 @@ function MigrationSection({
         <Spacer />
         {canManage && migration.availableOnThisInstallation && (
           <HStack>
-            {isSaaS && (
+            {isSaaS && !migration.enrolledAutomatically && (
               <>
                 <EnrollAction
                   migrationName={migration.name}
@@ -341,7 +341,16 @@ function MigrationSection({
         </Text>
       ) : (
         <Stack gap={4}>
-          {isSaaS && (
+          {isSaaS && migration.enrolledAutomatically && (
+            <Text fontSize="sm" color="fg.muted">
+              Every organization runs this step, including any created from now
+              on, so there is nothing to enroll. Roll an organization back to
+              take it out: that works whatever state the organization is in,
+              including one that keeps erroring and one this step has not
+              reached yet, and it keeps every later pass off it.
+            </Text>
+          )}
+          {isSaaS && !migration.enrolledAutomatically && (
             <EnrollmentTable enrollments={enrollments} canManage={canManage} />
           )}
           {migration.attention.length === 0 ? (
@@ -909,7 +918,7 @@ function RollBackAction({
           });
         }}
         title={`Roll an organization back from the ${migrationTitle.toLowerCase()}`}
-        description="The organization returns to the behavior it had before this step finalized, and stays there until an operator intervenes again. Only migrated or finalized organizations can be rolled back."
+        description="The organization returns to the behavior it had before this step finalized, and every later pass leaves it alone, until an operator intervenes again. Any organization can be rolled back, including one that keeps erroring and one this step has not reached yet."
         isLoading={rollBack.isPending}
         confirmDisabled={organization === null}
       >

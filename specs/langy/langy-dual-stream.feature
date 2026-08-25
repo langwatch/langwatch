@@ -196,11 +196,33 @@ Feature: Langy dual-stream — a raw token fast-path beside the durable event-so
     Then it yields a synthesized end (or error, carrying the failure) and closes
     And the client reconciles the full transcript from langy.messages
 
+  @unit
   Scenario: Stream A stays patient while a turn is still live or cold-starting
     Given I am watching a turn whose durable fold still reports it in flight
     When no tokens arrive on the live edge for a while
     Then Stream A keeps following and does not synthesize a terminal
     And a turn that keeps a fresh heartbeat is never cut off
+
+  # The stream used to carry a second deadline as well: an absolute two minute
+  # timeout, borrowed from the budget we give the MANAGER to answer one request.
+  # A prompt improvement loop runs for ten minutes, so the page went deaf
+  # half-way through every one of them. The panel kept the last thing it had
+  # heard on screen, and each agent action after the cap found no page listening
+  # and ran on the backend instead, so the second half of the loop arrived as a
+  # single refetch at the end. Length is not a symptom. Silence is.
+  @unit
+  Scenario: A turn that runs longer than the manager's request budget keeps its stream
+    Given I am watching a turn that has been running for ten minutes
+    And its heartbeat is fresh because the worker is still working
+    Then Stream A is still following the live edge
+    And the agent's UI actions still reach the page that is watching
+
+  @unit
+  Scenario: A turn that neither settles nor beats gives its stream up
+    Given I am watching a turn whose durable fold never settles
+    And its heartbeat has read stale for ninety seconds
+    Then Stream A stops following and releases its blocking connection
+    And it synthesizes no terminal, because how the turn ended is not known
 
   # ---------------------------------------------------------------------------
   # Transport honesty: streaming must actually stream, end to end

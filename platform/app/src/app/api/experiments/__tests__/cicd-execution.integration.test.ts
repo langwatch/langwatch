@@ -157,7 +157,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
 
         expect(response.status).toBe(401);
         const body = await response.json();
-        expect(body.error).toContain("Missing API key");
+        expect(body.error).toContain("Missing credentials");
       });
 
       it("returns 401 with invalid API key", async () => {
@@ -173,7 +173,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
 
         expect(response.status).toBe(401);
         const body = await response.json();
-        expect(body.error).toContain("Invalid API key");
+        expect(body.error).toContain("Invalid credentials");
       });
 
       /** @scenario API key authentication via X-Auth-Token header */

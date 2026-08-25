@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.10.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.9.0...typescript-sdk@v1.10.0) (2026-08-25)
+
+
+### Features
+
+* **agent-plugin:** agent-declared working context with langwatch ingest context ([#7464](https://github.com/langwatch/langwatch/issues/7464)) ([9ffa03d](https://github.com/langwatch/langwatch/commit/9ffa03dfc1b1b2b777ee37bb42703de5c8fef0e0))
+
+## [1.9.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.8.0...typescript-sdk@v1.9.0) (2026-08-25)
+
+
+### Features
+
+* **cli-auth:** langwatch login mints a user-scoped key that inherits the user's permissions ([#7410](https://github.com/langwatch/langwatch/issues/7410)) ([c935339](https://github.com/langwatch/langwatch/commit/c935339ca69bbbc9e0272f8a0f71eadf170c0ce6))
+* **langy:** drive the experiments workbench as a prompt improvement copilot ([#7424](https://github.com/langwatch/langwatch/issues/7424)) ([1e0d104](https://github.com/langwatch/langwatch/commit/1e0d1040b39c13089ecca01e437a15d2590224ae))
+* **lwql:** workbench epic - granularity contract, run-by-chart-id, dashboard widgets, chart CLI, Langy skill, QA fixes ([#7474](https://github.com/langwatch/langwatch/issues/7474)) ([df4f775](https://github.com/langwatch/langwatch/commit/df4f775bd2a3d3547bad95822278a8ec69682a1c))
+
+
+### Bug Fixes
+
+* **cli:** the codex harvest reads the checkout, so a session reports the branch it is on ([#7415](https://github.com/langwatch/langwatch/issues/7415)) ([b1bc36f](https://github.com/langwatch/langwatch/commit/b1bc36fef3e787d4152a7e3bb2ecdd7e51519704))
+
 ## [1.8.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.7.0...typescript-sdk@v1.8.0) (2026-08-22)
 
 

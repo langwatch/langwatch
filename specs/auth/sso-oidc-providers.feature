@@ -1,9 +1,17 @@
 Feature: Sign in with Amazon Cognito, OneLogin or any other OIDC provider
 
-  Self-hosted deployments federate to one identity provider, named by
-  NEXTAUTH_PROVIDER. Cognito and OneLogin join the providers already supported,
-  so an operator whose company already runs one of them does not have to stand
-  up a second identity provider just to sign in to LangWatch.
+  A self-hosted deployment names the identity provider it federates to, and
+  that provider is what its default sign-in method set offers (ADR-117 §4).
+  Cognito and OneLogin join the providers already supported, so an operator
+  whose company already runs one of them does not have to stand up a second
+  identity provider just to sign in to LangWatch.
+
+  Ported at D13 (ADR-117): naming a provider mounts it and puts it in the
+  default method set. Where a given address is SENT is the router's decision,
+  which can route one organization's domain to a connection while everyone
+  else sees the default set - so "the deployment federates to one provider" is
+  a fact about what is mounted, no longer a limit on what a person can be
+  offered.
 
   Both speak OpenID Connect, so both are configured the way Okta already is:
   the operator supplies a client id, a client secret and the issuer URL, and

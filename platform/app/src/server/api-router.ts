@@ -5,9 +5,7 @@
 
 import { app as scimApp } from "@ee/scim/routes";
 import { app as webhooksApp } from "@ee/scim/webhooks";
-import { LEGACY_CALLBACK_PROVIDER_IDS } from "@ee/sso/providers";
-import { type Context, Hono } from "hono";
-import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import { Hono } from "hono";
 import { app as adminApp } from "../../ee/admin/routes/admin";
 import { app as agentsApp } from "../app/api/agents/[[...route]]/app";
 import { app as analyticsApp } from "../app/api/analytics/[...route]/app";
@@ -73,6 +71,7 @@ import { app as ingestionRoutesApp } from "./routes/ingest/ingestionRoutes";
 import { app as langyApiApp } from "./routes/langy-api";
 import { app as langyInternalApp } from "./routes/langy-internal";
 import { app as langyRelayApp } from "./routes/langy-relay";
+import { app as langyUiActionsApp } from "./routes/langy-ui-actions";
 import { app as miscApp } from "./routes/misc";
 import { app as opsApp } from "./routes/ops";
 import { app as otelApp } from "./routes/otel";
@@ -90,33 +89,22 @@ import { app as workflowsApp } from "./routes/workflows";
 export function createApiRouter() {
   const api = new Hono();
 
-  // Legacy OAuth callback rewrites — customer IdPs registered with old URLs.
-  // These only rewrite the path and re-dispatch to /api/auth/oauth2/callback/*
-  // (handled by authApp), so they carry a public policy and are registered
-  // through the builder rather than raw Hono.
-  const legacyOAuthCallbacks = createServiceApp({
-    basePath: "/api/auth/callback",
-  });
-  const rewriteCallback = (provider: string) => (c: Context) => {
-    const url = new URL(c.req.url);
-    url.pathname = `/api/auth/oauth2/callback/${provider}`;
-    return api.fetch(new Request(url.toString(), c.req.raw));
-  };
-  // Driven off the same list the providers pin their `redirectURI` to, so a
-  // provider cannot be added on one side and forgotten on the other. Without a
-  // rewrite the round-trip still lands on the `/api/auth/*` catch-all, but it
-  // reaches better-auth's core social callback rather than the genericOAuth
-  // plugin's own, which is a second code path nobody chose.
-  for (const provider of LEGACY_CALLBACK_PROVIDER_IDS) {
-    legacyOAuthCallbacks
-      .access(
-        publicEndpoint(
-          "legacy IdP callback URL; rewrites to /api/auth/oauth2/callback/* and re-dispatches",
-        ),
-      )
-      .all(`/${provider}`, rewriteCallback(provider));
-  }
-  api.route("/", legacyOAuthCallbacks.hono);
+  // The legacy IdP callback rewrite lived here until better-auth 1.7. It took
+  // `/api/auth/callback/<provider>` — the URL customer IdPs were registered
+  // with — and re-dispatched it to the genericOAuth plugin's own
+  // `/api/auth/oauth2/callback/<provider>`, because that was a second, more
+  // specific code path and landing on the core social callback instead was
+  // "a code path nobody chose".
+  //
+  // 1.7 removed the plugin's endpoints entirely: generic-oauth providers are
+  // registered as first-class social providers now, so the CORE callback is
+  // the only one there is — and it is mounted at exactly the path the rewrite
+  // was rewriting away from. Keeping it would rewrite a working URL to a 404,
+  // which is the whole of enterprise SSO. The catch-all serves it correctly,
+  // so the right move is to stop intercepting it.
+  //
+  // `LEGACY_CALLBACK_PROVIDER_IDS` still pins each provider's `redirectURI`
+  // (ee/sso/providers.ts) — the URL is unchanged, only who answers it.
 
   // ORDERING: specific paths before catch-all siblings with same basePath
   api.route("/", datasetGenerateApp); // /api/dataset/generate (before datasetApp's /:slugOrId)
@@ -196,6 +184,7 @@ export function createApiRouter() {
   api.route("/", rumApp); // /api/rum/v1/traces — browser telemetry proxy
   api.route("/", playgroundApp);
   api.route("/", langyApiApp); // /api/langy/conversations — key-authed turns
+  api.route("/", langyUiActionsApp); // /api/langy/ui/actions — agent-to-page dispatch
   api.route("/", langyInternalApp);
   api.route("/", langyRelayApp);
   api.route("/", elevenLabsApp); // /api/elevenlabs/webhook/:modelProviderId

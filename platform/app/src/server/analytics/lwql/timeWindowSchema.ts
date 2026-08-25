@@ -17,6 +17,8 @@
  */
 import { z } from "zod";
 
+import { LWQL_GRANULARITY_STEPS } from "./timeWindow";
+
 /**
  * The widest and narrowest UTC years a bound may land on.
  *
@@ -53,3 +55,23 @@ export const lwqlTimeWindowSchema = z.object({
   start: lwqlTimeWindowBound,
   end: lwqlTimeWindowBound,
 });
+
+/**
+ * The datapoint step a caller may request, as every door accepts it — one of
+ * the offered {@link LWQL_GRANULARITY_STEPS}, nothing else.
+ *
+ * Built from the tuple rather than three hand-written `z.literal` members, so
+ * a step added to or removed from {@link LWQL_GRANULARITY_STEPS} changes what
+ * every door accepts automatically. Three call sites once spelled this union
+ * out by literal tuple index (`LWQL_GRANULARITY_STEPS[0]`, `[1]`, `[2]`) —
+ * that pattern silently stops covering the offered steps the moment a fourth
+ * is added, because TypeScript has no reason to flag an index that is simply
+ * never read.
+ */
+export const lwqlGranularityStepSchema = z.union(
+  LWQL_GRANULARITY_STEPS.map((step) => z.literal(step)) as [
+    z.ZodLiteral<(typeof LWQL_GRANULARITY_STEPS)[number]>,
+    z.ZodLiteral<(typeof LWQL_GRANULARITY_STEPS)[number]>,
+    ...z.ZodLiteral<(typeof LWQL_GRANULARITY_STEPS)[number]>[],
+  ],
+);

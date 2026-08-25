@@ -1,19 +1,22 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * Every generic-OAuth provider pins its `redirectURI` to the legacy
- * `/api/auth/callback/<providerId>` path, and `createApiRouter` has to rewrite
- * that path to the genericOAuth plugin's own callback for each of them.
+ * Every generic-OAuth provider pins its `redirectURI` to
+ * `/api/auth/callback/<providerId>` — the URL self-hosting operators register
+ * with their IdP, and the one customer IdPs have had on file for years.
  *
- * The two lived apart until a provider was added to one and not the other. The
- * failure is quiet rather than loud: the round-trip still lands on the
- * `/api/auth/*` catch-all and better-auth's core social callback picks it up
- * from `ctx.socialProviders`, so sign-in appears to work while taking a
- * different code path from the providers that are rewritten. Nothing else in
- * the suite notices, because everything it asserts still holds.
+ * It was called the LEGACY path because better-auth's genericOAuth plugin used
+ * to answer at `/api/auth/oauth2/callback/<providerId>` instead, and
+ * `createApiRouter` rewrote one to the other. Since better-auth 1.7 the plugin
+ * mounts no endpoints at all — each config is registered as a first-class
+ * social provider — so the core callback answers this path directly, the
+ * rewrite is gone, and the "legacy" URL is simply the URL.
  *
- * So this asserts the two halves agree, both ways.
+ * What still has to hold is the pin itself, both ways: a provider that builds
+ * a config without pinning would send its IdP to whatever better-auth defaults
+ * to, and a provider added to the OIDC table but missing from the id list
+ * would never be checked at all. Both fail quietly — sign-in keeps working for
+ * every provider except the one that drifted.
  */
-import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
   buildGenericOAuthConfigs,
@@ -80,29 +83,6 @@ describe("legacy callback rewrites", () => {
     it("covers every provider in the OIDC table", () => {
       for (const provider of PLAIN_OIDC_PROVIDERS) {
         expect(LEGACY_CALLBACK_PROVIDER_IDS).toContain(provider.providerId);
-      }
-    });
-
-    /**
-     * Reads the router source rather than booting it: `createApiRouter` pulls
-     * in the whole API surface (prisma, redis, every route module), which a
-     * unit test must not pay for. The registration is a loop over the exported
-     * list, so what matters is that it is still driven by that list and has not
-     * been unrolled back into hand-written per-provider lines.
-     */
-    it("registers the rewrites from that same list, not by hand", async () => {
-      const source = await readFile(
-        new URL("../../../src/server/api-router.ts", import.meta.url),
-        "utf8",
-      );
-
-      expect(source).toContain("LEGACY_CALLBACK_PROVIDER_IDS");
-      expect(source).toContain("rewriteCallback(provider)");
-
-      // A hand-written registration for a single provider is what drifted
-      // before, so it must not come back.
-      for (const providerId of LEGACY_CALLBACK_PROVIDER_IDS) {
-        expect(source).not.toContain(`.all("/${providerId}", rewriteCallback(`);
       }
     });
   });

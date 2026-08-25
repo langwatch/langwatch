@@ -117,11 +117,12 @@ describe("resolveNavigateFallbackUrl", () => {
 
   describe("given a prompt id the project can see", () => {
     /** @scenario "The platform fallback resolves every resource surface Langy opens" */
-    it("resolves the prompts page with that prompt's editor drawer open: the reported chained-navigate case", async () => {
+    /** @scenario "A prompt opens in the playground, ready to run" */
+    it("resolves the playground with that prompt open as a tab", async () => {
       getPromptByIdOrHandle.mockResolvedValue({ id: "prompt_abc" });
 
       expect(await resolve("prompt_abc")).toBe(
-        "https://app.langwatch.ai/acme/prompts?drawer.open=promptEditor&drawer.promptId=prompt_abc",
+        "https://app.langwatch.ai/acme/prompts?promptId=prompt_abc",
       );
       expect(getPromptByIdOrHandle).toHaveBeenCalledWith({
         idOrHandle: "prompt_abc",

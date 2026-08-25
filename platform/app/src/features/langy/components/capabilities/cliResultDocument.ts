@@ -25,7 +25,12 @@ import {
   textValueSchema,
 } from "@langwatch/langy";
 
-/** Keys whose array value is the result list in a LangWatch JSON document. */
+/**
+ * Keys whose array value is the result list in a LangWatch JSON document.
+ * List envelopes named after their resource (`{ experiments: [...] }`,
+ * `{ prompts: [...] }`) are recognised structurally below instead of being
+ * enumerated here.
+ */
 const COLLECTION_KEYS = ["traces", "items", "records", "results", "data"];
 
 /**
@@ -52,6 +57,21 @@ export function collectionOf(document: unknown): unknown[] | null {
   for (const key of COLLECTION_KEYS) {
     const value = record[key];
     if (Array.isArray(value)) return value;
+  }
+
+  // The CLI's list envelopes name the list after the resource
+  // (`{ experiments: [...], pagination }`). With exactly one array-valued key
+  // the list is unambiguous when the envelope is paginated or holds nothing
+  // else; two arrays or an array beside other fields stays null rather than
+  // a guess.
+  const arrayKeys = Object.keys(record).filter((key) =>
+    Array.isArray(record[key]),
+  );
+  if (arrayKeys.length === 1) {
+    const onlyKey = arrayKeys[0]!;
+    if ("pagination" in record || Object.keys(record).length === 1) {
+      return record[onlyKey] as unknown[];
+    }
   }
   return null;
 }

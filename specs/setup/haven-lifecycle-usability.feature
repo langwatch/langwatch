@@ -111,6 +111,25 @@ Feature: haven lifecycle usability
     Then it streams plainly in the foreground and Ctrl-C stops the stack
     And agent mode streams the same way even from a terminal
 
+  # A human's up detaches on purpose: closing the terminal leaves the stack
+  # for `haven down`. The foreground run an agent or a pipe gets has no such
+  # handover — whoever launched it is its only owner, and signals are the only
+  # goodbye it ever gets. A launcher killed by pid says none. Observed: a
+  # foreground `haven up --agent` still supervising a full stack, two days
+  # after the session that ran it was gone. So the foreground run watches the
+  # process group it was launched into, the same way dev-supervisor does, and
+  # shuts down as if interrupted when that group loses its leader.
+  @unit
+  Scenario: A foreground up goes down with the group that launched it
+    Given a foreground "haven up" launched from a shell's process group
+    When that group's leader dies without signalling anything
+    Then the run shuts down as if interrupted, stack and routes included
+
+  @unit
+  Scenario: A run that leads its own process group watches nothing
+    Given "haven up" running as its own process-group leader, the shape of an interactive job
+    Then no launcher watch is armed, because the terminal already owns its lifetime
+
   # Attached and detached run the identical backgrounded child — the viewer is
   # only attached on top — so there is no second logging path to keep in step.
   # Bound by cmd/uplifecycle_test.go.

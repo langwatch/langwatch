@@ -23,12 +23,16 @@ const mockMutateAsync = vi.hoisted(() =>
   }),
 );
 
+const mockStateFetch = vi.hoisted(() => vi.fn());
+
 vi.mock("../../utils/api", () => ({
   api: {
     useUtils: () => ({
       experiments: {
         getEvaluationsV3BySlug: {
           invalidate: vi.fn(),
+          reset: vi.fn(),
+          fetch: mockStateFetch,
         },
       },
     }),
@@ -80,7 +84,9 @@ vi.mock("../../utils/posthogErrorCapture", () => ({
 
 // Import hook after mocks
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { captureException } from "../../utils/posthogErrorCapture";
 import { useAutosaveEvaluationsV3 } from "../hooks/useAutosaveEvaluationsV3";
+import { extractPersistedState } from "../types/persistence";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -97,14 +103,16 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 // Test component that uses the autosave hook
+let autosave: ReturnType<typeof useAutosaveEvaluationsV3> | null = null;
 const TestAutosaveComponent = () => {
-  useAutosaveEvaluationsV3();
+  autosave = useAutosaveEvaluationsV3();
   return <div data-testid="autosave-test">Autosave Active</div>;
 };
 
 describe("Autosave evaluation state", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    autosave = null;
     vi.useFakeTimers({ shouldAdvanceTime: true });
     queryClient.clear();
     // Reset the mock to default success implementation
@@ -222,6 +230,43 @@ describe("Autosave evaluation state", () => {
     );
   });
 
+  // Dataset records, prompt text and run results are customer content. The
+  // capture stays useful with identifiers and counts, so none of it has to
+  // travel to telemetry.
+  it("reports a failed save with identifiers and counts, never workbench content", async () => {
+    const customerContent = "patient record 4711, contact jane@example.com";
+    render(<TestAutosaveComponent />, { wrapper: Wrapper });
+
+    await act(async () => {
+      vi.advanceTimersByTime(50);
+    });
+
+    mockMutateAsync.mockRejectedValueOnce(new Error("Network error"));
+
+    act(() => {
+      useEvaluationsV3Store
+        .getState()
+        .setCellValue("test-data", 0, "input", customerContent);
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
+    });
+
+    expect(captureException).toHaveBeenCalled();
+    const captured = vi.mocked(captureException).mock.calls.at(-1)?.[1];
+    expect(JSON.stringify(captured?.extra)).not.toContain(customerContent);
+    expect(captured?.extra).toMatchObject({
+      context: "Failed to autosave evaluations v3",
+      projectId: "test-project-id",
+      experimentId: "test-experiment-id",
+      datasetCount: 1,
+      targetCount: 0,
+      evaluatorCount: 0,
+    });
+    expect(captured?.extra?.stateByteSize).toBeGreaterThan(0);
+  });
+
   it("saves when a new dataset is added", async () => {
     render(<TestAutosaveComponent />, { wrapper: Wrapper });
 
@@ -292,5 +337,134 @@ describe("Autosave evaluation state", () => {
     });
 
     expect(mockMutateAsync).toHaveBeenCalled();
+  });
+
+  describe("when the save is refused as stale", () => {
+    /** @scenario Autosave hitting a stale version pauses and offers reload */
+    it("stands down instead of clobbering, and saves nothing further", async () => {
+      // The tRPC envelope for experiment_stale_workbench_state, as
+      // readHandledError expects it: payload under data.error.
+      mockMutateAsync.mockRejectedValue({
+        data: {
+          error: {
+            code: "experiment_stale_workbench_state",
+            httpStatus: 409,
+            message: "experiment_stale_workbench_state",
+            meta: { currentVersion: 9 },
+          },
+        },
+      });
+      useEvaluationsV3Store.getState().setWorkbenchVersion(4);
+
+      render(<TestAutosaveComponent />, { wrapper: Wrapper });
+      await act(async () => {
+        vi.advanceTimersByTime(50);
+      });
+
+      act(() => {
+        useEvaluationsV3Store
+          .getState()
+          .setCellValue("test-data", 0, "input", "an edit that will lose");
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
+      });
+
+      expect(mockMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ expectedVersion: 4 }),
+      );
+      expect(useEvaluationsV3Store.getState().staleWorkbench).toEqual({
+        serverVersion: 9,
+      });
+      expect(
+        useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation,
+      ).toBe("error");
+
+      // Standing down: further edits do not save while stale.
+      mockMutateAsync.mockClear();
+      act(() => {
+        useEvaluationsV3Store
+          .getState()
+          .setCellValue("test-data", 0, "input", "another edit");
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
+      });
+      expect(mockMutateAsync).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A refused save names who holds the newer version" */
+    it("keeps who wrote the newer version, so the banner can name them", async () => {
+      mockMutateAsync.mockRejectedValue({
+        data: {
+          error: {
+            code: "experiment_stale_workbench_state",
+            httpStatus: 409,
+            message: "experiment_stale_workbench_state",
+            meta: { currentVersion: 9, actorLabel: "langy" },
+          },
+        },
+      });
+      useEvaluationsV3Store.getState().setWorkbenchVersion(4);
+
+      render(<TestAutosaveComponent />, { wrapper: Wrapper });
+      await act(async () => {
+        vi.advanceTimersByTime(50);
+      });
+
+      act(() => {
+        useEvaluationsV3Store
+          .getState()
+          .setCellValue("test-data", 0, "input", "an edit that will lose");
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
+      });
+
+      expect(useEvaluationsV3Store.getState().staleWorkbench).toEqual({
+        serverVersion: 9,
+        actorLabel: "langy",
+      });
+    });
+  });
+
+  // The silent reconciliation path reloads a clean workbench, and the server
+  // often holds exactly what the page already shows. Nothing changes, so the
+  // autosave effect never runs, so a "skip the next pass" flag armed by the
+  // reload would still be armed when the user types, and that edit would be
+  // dropped.
+  describe("when a reload finds the server state unchanged", () => {
+    it("saves the next edit", async () => {
+      useEvaluationsV3Store.getState().setWorkbenchVersion(3);
+      render(<TestAutosaveComponent />, { wrapper: Wrapper });
+      await act(async () => {
+        vi.advanceTimersByTime(50);
+      });
+
+      // Byte for byte what the workbench already holds.
+      mockStateFetch.mockResolvedValue({
+        id: "test-experiment-id",
+        slug: "test-slug",
+        version: 3,
+        workbenchState: extractPersistedState(useEvaluationsV3Store.getState()),
+      });
+
+      await act(async () => {
+        await autosave!.reloadFromServer();
+      });
+
+      act(() => {
+        useEvaluationsV3Store
+          .getState()
+          .setCellValue("test-data", 0, "input", "typed right after a reload");
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
+      });
+
+      expect(mockMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ expectedVersion: 3 }),
+      );
+    });
   });
 });

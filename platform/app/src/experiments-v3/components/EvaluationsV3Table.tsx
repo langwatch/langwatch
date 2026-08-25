@@ -7,7 +7,6 @@ import {
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { nanoid } from "nanoid";
 import {
   useCallback,
   useEffect,
@@ -196,12 +195,24 @@ type EvaluationsV3TableProps = {
   isLoadingDatasets?: boolean;
   /** Disable virtualization (for tests) */
   disableVirtualization?: boolean;
+  /**
+   * "Optimize this prompt": hand the column to Langy. The page owns the
+   * hook (it is the Langy integration point); undefined hides the menu item.
+   */
+  onOptimizeTarget?: ({
+    target,
+    name,
+  }: {
+    target: TargetConfig;
+    name: string;
+  }) => void;
 };
 
 export function EvaluationsV3Table({
   isLoadingExperiment = false,
   isLoadingDatasets = false,
   disableVirtualization = false,
+  onOptimizeTarget,
 }: EvaluationsV3TableProps) {
   const { openDrawer, closeDrawer, currentDrawer } = useDrawer();
   // Serializable drawer URL params (evaluatorType, evaluatorId, …). Read here so
@@ -239,6 +250,7 @@ export function EvaluationsV3Table({
     setColumnWidths,
     toggleColumnVisibility,
     addTarget,
+    duplicateTarget,
     updateTarget,
     updateTargetComparison,
     removeTarget,
@@ -280,6 +292,7 @@ export function EvaluationsV3Table({
       setColumnWidths: state.setColumnWidths,
       toggleColumnVisibility: state.toggleColumnVisibility,
       addTarget: state.addTarget,
+      duplicateTarget: state.duplicateTarget,
       updateTarget: state.updateTarget,
       updateTargetComparison: state.updateTargetComparison,
       removeTarget: state.removeTarget,
@@ -806,17 +819,19 @@ export function EvaluationsV3Table({
   // Handler for duplicating a target
   const handleDuplicateTarget = useCallback(
     (target: TargetConfig) => {
-      const newTarget: TargetConfig = {
-        ...target,
-        id: `target-${nanoid(8)}`,
-      };
-      addTarget(newTarget);
+      const duplicatedId = duplicateTarget({ targetId: target.id });
+      if (!duplicatedId) return;
+      // Read the copy back: the store wired it up (its own mappings plus every
+      // evaluator's mappings for it), so this is not the target we passed in.
+      const duplicated = useEvaluationsV3Store
+        .getState()
+        .targets.find((t) => t.id === duplicatedId);
       // Open the prompt editor for the duplicated target if it's a prompt
-      if (newTarget.type === "prompt") {
-        void openTargetEditor(newTarget);
+      if (duplicated?.type === "prompt") {
+        void openTargetEditor(duplicated);
       }
     },
-    [addTarget, openTargetEditor],
+    [duplicateTarget, openTargetEditor],
   );
 
   // Extracted so BOTH the Add→Comparison flow and the reload re-hydration
@@ -1494,6 +1509,7 @@ export function EvaluationsV3Table({
       evaluatorsMap,
       openTargetEditor,
       handleDuplicateTarget,
+      handleOptimizeTarget: onOptimizeTarget,
       handleSwitchTarget,
       handleRemoveTarget,
       handleAddEvaluator,
@@ -1524,6 +1540,7 @@ export function EvaluationsV3Table({
       evaluatorsMap,
       openTargetEditor,
       handleDuplicateTarget,
+      onOptimizeTarget,
       handleSwitchTarget,
       handleRemoveTarget,
       handleAddEvaluator,

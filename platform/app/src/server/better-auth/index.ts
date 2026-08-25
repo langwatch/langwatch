@@ -1,8 +1,8 @@
+import { passkey } from "@better-auth/passkey";
 import {
   buildGenericOAuthConfigs,
   buildSocialProviders,
 } from "@ee/sso/providers";
-import { platformSSOAllowed, resolveAuthProvider } from "@ee/sso/sso-gate";
 import {
   isCredentialMutationPath,
   isEmailAuthPath,
@@ -12,15 +12,23 @@ import {
   normalizedRequestPathname,
   requestPathname,
 } from "@ee/sso/ssoPathGate";
+import type { SignInMethodPolicy } from "@langwatch/identity";
 import { createLogger } from "@langwatch/observability";
 import { RedisConfigService } from "@langwatch/redis-client";
 import { compare, hash } from "bcrypt";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
-import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError } from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
+import { twoFactor } from "better-auth/plugins/two-factor";
 import { env } from "~/env.mjs";
 import { tryGetApp } from "~/server/app-layer/app";
+import {
+  deploymentIsFederationCapable,
+  identityBridgeCeremonies,
+  identityCeremonies,
+  identityStorageAdapter,
+  resolveSignInMethodPolicy,
+} from "~/server/app-layer/identity/runtime";
 import { prisma } from "~/server/db";
 import { fireActivityTrackingNurturing } from "../../../ee/billing/nurturing/hooks/activityTracking";
 import { ensureUserSyncedToCio } from "../../../ee/billing/nurturing/hooks/userSync";
@@ -34,7 +42,9 @@ import {
   beforeSessionCreate,
   beforeUserCreate,
 } from "./hooks";
+import { passkeySignUpRegistration } from "./passkey-signup";
 import { revokeAllSessionsForUser } from "./revokeSessions";
+import { runSignInRouterShadow } from "./signInRouterShadow";
 
 const logger = createLogger("langwatch:better-auth");
 
@@ -67,10 +77,61 @@ const genericOAuthConfigs = buildGenericOAuthConfigs(env);
 // it would override admin impersonation with its own mechanism. We use our
 // own `isAdmin` check (ee/admin/isAdmin.ts) and the legacy
 // Session.impersonating JSON column handled in src/server/auth.ts.
-const plugins =
-  genericOAuthConfigs.length > 0
+/**
+ * D06 / D07. Both flags are read at module load, because that is when
+ * `betterAuth()` below is constructed and a plugin decides which ROUTES
+ * exist. With a flag off the plugin is not registered at all, so its routes
+ * are not mounted and nothing about the feature is reachable — which is what
+ * makes "with the flag off nothing about it exists" true of the surface
+ * rather than merely of the screens.
+ *
+ * Turning a flag back off is not a deletion. `TwoFactor` and `Passkey` rows
+ * survive it and nobody is signed out; the feature stops being ASKED for,
+ * and turning it on again finds everything where it was.
+ *
+ * Env rather than a feature flag for both: a challenge stands between a
+ * password and a session, and registering a passkey happens on the sign-in
+ * screen. Feature flags are read per project, and neither caller has one yet.
+ */
+const mfaEnrollmentOpen = env.MFA_ENROLLMENT_OPEN === "on";
+const passkeysEnabled = env.PASSKEYS_ENABLED === "on";
+
+const plugins = [
+  ...(genericOAuthConfigs.length > 0
     ? [genericOAuth({ config: genericOAuthConfigs })]
-    : [];
+    : []),
+  ...(mfaEnrollmentOpen
+    ? [
+        twoFactor({
+          issuer: "LangWatch",
+          // Encrypted, not hashed. A backup code has to be COMPARED against
+          // what the person types, and the plugin's own verification path
+          // decrypts and compares; hashing them would make the plugin
+          // unable to verify its own codes. `NEXTAUTH_SECRET` is the key,
+          // which is why turning the flag on without one set is refused at
+          // boot by the env schema rather than at first use.
+          backupCodeOptions: { storeBackupCodes: "encrypted" },
+        }),
+      ]
+    : []),
+  ...(passkeysEnabled
+    ? [
+        passkey({
+          rpName: "LangWatch",
+          // The relying party is the app's own origin. Left to the plugin's
+          // default derivation from `baseURL` so a self-hosted install on
+          // its own hostname works without a second place to configure it.
+
+          // Signing UP with a passkey, not only adding one to an account that
+          // already exists. This is what drops the session requirement from
+          // the two registration endpoints — see `passkey-signup.ts` for what
+          // stands in its place, and why an address that already has an
+          // account must be refused there.
+          registration: passkeySignUpRegistration,
+        }),
+      ]
+    : []),
+];
 
 /**
  * Wire BetterAuth's secondary storage to the App's Redis connection. Used by
@@ -129,7 +190,9 @@ let droppedSecondaryWrites = 0;
  * The key is deliberately not logged. Better-auth keys secondary storage by
  * session token, so the key IS a credential.
  */
-const reportDroppedSecondaryWrite = (operation: "set" | "delete"): void => {
+const reportDroppedSecondaryWrite = (
+  operation: "set" | "delete" | "increment",
+): void => {
   droppedSecondaryWrites += 1;
   logger.warn(
     { operation, droppedSecondaryWrites },
@@ -155,6 +218,38 @@ export const secondaryStorage: BetterAuthOptions["secondaryStorage"] =
           // A miss, not a failure: better-auth falls through to the database.
           if (!redis) return null;
           return await redis.get(`better-auth:${key}`);
+        },
+        // Read-and-clear in one round trip, so two callers racing for a
+        // single-use value cannot both be handed it. `GETDEL` is what the
+        // rest of the app already uses for exactly this (the scenario tab
+        // registry, the GitHub install nonce).
+        getAndDelete: async (key) => {
+          const redis = secondaryStorageConnection();
+          if (!redis) return null;
+          return await redis.getdel(`better-auth:${key}`);
+        },
+        // The counter behind distributed rate limiting. Required by
+        // better-auth 1.7 — before it, the limiter read and wrote a serialized
+        // record, which two pods could interleave.
+        //
+        // The TTL is applied ONLY on creation, which is the whole shape of a
+        // fixed window: extending it on every hit would mean a key under
+        // sustained traffic never expires, and the limit becomes permanent
+        // rather than per-window.
+        increment: async (key, ttl) => {
+          const redis = secondaryStorageConnection();
+          // No Redis, no counter. Answering "first hit in the window" leaves
+          // the limiter open rather than closed, which is the same call every
+          // other callback here makes: this store is an accelerator, and a
+          // deployment that loses it must not lose the ability to sign in.
+          if (!redis) {
+            reportDroppedSecondaryWrite("increment");
+            return 1;
+          }
+          const namespaced = `better-auth:${key}`;
+          const count = await redis.incr(namespaced);
+          if (count === 1) await redis.expire(namespaced, ttl);
+          return count;
         },
         set: async (key, value, ttl) => {
           const redis = secondaryStorageConnection();
@@ -182,22 +277,29 @@ const isBuildTime = !!process.env.BUILD_TIME;
  * Two conditions, and the second is the one that is easy to leave out. The
  * route has to be one that mints or recovers a password account, and this
  * deployment has to actually federate — a stronger claim than the license gate
- * allowing it. `resolveAuthProvider` reports "email" when NEXTAUTH_PROVIDER
- * names a provider this build cannot mount, and the sign-in page renders the
- * credential form on exactly that answer. Refusing the form the page just
- * offered would tell a licensed operator their account is managed by an
- * identity provider that does not exist, and leave them no way in at all.
+ * allowing it. The resolved method policy carries no federated method when
+ * NEXTAUTH_PROVIDER names a provider this build cannot mount, and the sign-in
+ * page renders the credential form on exactly that answer. Refusing the form
+ * the page just offered would tell a licensed operator their account is
+ * managed by an identity provider that does not exist, and leave them no way
+ * in at all.
+ *
+ * ADR-117 §4 is what changed here, and only in mechanism: the question used to
+ * be asked of `resolveAuthProvider()` directly and is now asked of the method
+ * policy that resolver feeds. Same answer, one source.
  */
-async function refusesCredentialRoute({
+function refusesCredentialRoute({
   pathname,
   isResetPath,
+  policy,
 }: {
   pathname: string;
   isResetPath: boolean;
-}): Promise<boolean> {
+  policy: SignInMethodPolicy;
+}): boolean {
   if (!isResetPath && !isEmailAuthPath(pathname)) return false;
 
-  return (await resolveAuthProvider()) !== "email";
+  return policy.defaultMethods.some((method) => method.kind === "federated");
 }
 
 export const auth = betterAuth({
@@ -215,7 +317,21 @@ export const auth = betterAuth({
           : []),
       ],
   secret: isBuildTime ? "build-time-only" : env.NEXTAUTH_SECRET,
-  database: prismaAdapter(prisma, { provider: "postgresql" }),
+  /**
+   * The identity storage adapter (ADR-116 §1) — one `database:` entry,
+   * forever. It IS the implementation `createAdapterFactory` is built
+   * around, which is what puts better-auth's own traffic (its join
+   * emulation, its transactions) on it rather than below it, and inside it
+   * a per-user gate routes between the stock Prisma behaviour and
+   * event-sourced storage.
+   *
+   * The gate ships CLOSED, so every user takes the legacy branch — the
+   * stock engine, byte for byte — until an operator enrols one and their
+   * identifier backfill finalizes. Deploying this changes nothing on its
+   * own; `identity-storage-adapter-legacy.unit.test.ts` is the proof,
+   * walking the whole flow over both engines and comparing transcripts.
+   */
+  database: identityStorageAdapter(),
 
   /**
    * Tell BetterAuth's rate limiter (and session IP tracking) which
@@ -281,6 +397,16 @@ export const auth = betterAuth({
      * Both crash with "Record not found" when the row only exists in Redis.
      * Forcing dual-write keeps Redis useful (rate limiting, secondary
      * storage for plugins) while preserving DB-backed impersonation.
+     *
+     * D06 gives this a second, independent reason that outlives the first.
+     * A session now records WHICH sign-in method minted it and WHAT that
+     * sign-in proved (`Session.identifierId`, `Session.amr`), and an
+     * organization's two-step requirement reads that when a member reaches
+     * its data. A session row that existed only in Redis could not carry
+     * either column, so the requirement would read null for everybody and
+     * hold every federated member at a gate they cannot pass. Even when
+     * impersonation eventually stops using `Session.impersonating`, this
+     * option stays required.
      */
     storeSessionInDatabase: true,
   },
@@ -413,6 +539,14 @@ export const auth = betterAuth({
       // prevents using that response as an enumeration side-channel).
       "/request-password-reset": { window: 60 * 60, max: 5 },
       "/reset-password": { window: 60 * 60, max: 5 },
+      // Passkey sign-up drops the session requirement from these two, so they
+      // are an unauthenticated way to create an account and are limited as
+      // one — alongside `/sign-up/email`, which is the same thing by another
+      // door. Options are generated once per attempt and verification runs
+      // only after a system prompt, so a person doing this by hand never
+      // approaches either number.
+      "/passkey/generate-register-options": { window: 60 * 60, max: 50 },
+      "/passkey/verify-registration": { window: 60 * 60, max: 50 },
     },
   },
 
@@ -438,6 +572,17 @@ export const auth = betterAuth({
           });
         },
       },
+      delete: {
+        /**
+         * ADR-101 §2: a user delete is an ERASURE, and erasure is what wipes
+         * `Identifier.value` and `identifierHash`. Before the row goes, so a
+         * refused ceremony refuses the delete with it; a no-op for users
+         * whose backfill has not latched.
+         */
+        before: async (user) => {
+          await identityCeremonies().beforeUserDelete(user);
+        },
+      },
     },
     account: {
       create: {
@@ -450,6 +595,15 @@ export const auth = betterAuth({
               accountId: account.accountId,
             },
           });
+          // ADR-101 §2: the account row is an identifier attach. Returning
+          // the row data pins its id, which is what makes the live
+          // identifier id and the backfill's derived id the same id.
+          //
+          // The BRIDGE ceremonies, not the bare ones (ADR-116 §5): the
+          // storage adapter states this fact itself for every user it routes
+          // to the identity branch, and a hook that stated it too would
+          // append the event twice whenever the first fold had not landed.
+          return identityBridgeCeremonies().beforeAccountCreate(account);
         },
         after: async (account) => {
           if (!account.userId || !account.providerId || !account.accountId)
@@ -479,6 +633,13 @@ export const auth = betterAuth({
               accountId: account.accountId as string,
             },
           });
+        },
+      },
+      delete: {
+        /** ADR-101 §2: an account row removed is an identifier detach — and
+         *  the adapter's own, for anyone it routes to the identity branch. */
+        before: async (account) => {
+          await identityBridgeCeremonies().beforeAccountDelete(account);
         },
       },
     },
@@ -542,11 +703,21 @@ export const auth = betterAuth({
   hooks: {
     before: async (ctx) => {
       const url = ctx.request?.url ?? "";
-      // Email-mode deployments never register an IdP, so the gate is moot —
-      // leave every route untouched (zero behavior change from `main`).
-      if (env.NEXTAUTH_PROVIDER === "email") return;
-
       const pathname = normalizedRequestPathname(url);
+
+      // ADR-117 §7: shadow mode's entire live-path footprint. It runs before
+      // the email-mode early return on purpose — an email-mode deployment is a
+      // routing decision the router has to agree with too, and it is the
+      // commonest one in the fleet. With the flag off it returns having read
+      // nothing, computed nothing and logged nothing.
+      await runSignInRouterShadow({ pathname, url, body: ctx.body });
+
+      // Deployments that name no federated method never register an IdP, so
+      // there is no policy to enforce — leave every route untouched (zero
+      // behavior change from `main`). Synchronous by contract (ADR-117 §4):
+      // an email-mode deployment must not wait on the licensing store to be
+      // told it has nothing to wait for.
+      if (!deploymentIsFederationCapable()) return;
 
       // Credential-mutation block: keyed off the CONFIGURED mode, blocked in
       // every gate state (ADR-027 Constants table). The password-reset pair
@@ -565,10 +736,20 @@ export const auth = betterAuth({
       // route table, so it never waits on the gate (see `isGateDependentPath`).
       if (!isGateDependentPath(url)) return;
 
-      if (await platformSSOAllowed()) {
+      // ADR-117 §4: the hook is the ENFORCEMENT BACKSTOP now, and it asks the
+      // router's method policy rather than raw env. The decision moved to
+      // where the data is; enforcement stayed here, because absence from a
+      // picker is not enforcement — a pinned legacy callback URL never renders
+      // one, and this is still the only interception point that sees the
+      // `/callback/auth0|okta` rewrite. Every ADR-027 semantic is unchanged:
+      // the gate inside the policy is the same per-process memo, so a license
+      // still takes effect on restart and never mid-flight.
+      const policy = await resolveSignInMethodPolicy();
+
+      if (policy.federationLicensed) {
         // Gate ALLOW (site #3): refuse the routes that would otherwise mint a
         // password account on a licensed SSO-capable deployment (v5 BLOCKER).
-        if (await refusesCredentialRoute({ pathname, isResetPath })) {
+        if (refusesCredentialRoute({ pathname, isResetPath, policy })) {
           throw APIError.from("BAD_REQUEST", {
             code: "EMAIL_PASSWORD_DISABLED",
             message:

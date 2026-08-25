@@ -1512,9 +1512,9 @@ export const opsRouter = createTRPCRouter({
   /**
    * Enroll one organization for one registered migration. Takes effect on
    * the next pass - enrollment is read fresh each time. The service refuses
-   * duplicates, unknown migrations, unknown organizations, and any
-   * enrollment on a self-hosted installation, each with a handled error the
-   * page renders.
+   * duplicates, unknown migrations, unknown organizations, migrations that
+   * admit every organization already, and any enrollment on a self-hosted
+   * installation, each with a handled error the page renders.
    */
   enrollMigrationTenant: protectedProcedure
     .use(opsManagePermission)
@@ -1594,7 +1594,8 @@ export const opsRouter = createTRPCRouter({
    * Withdraw an enrollment: later passes stop processing the organization
    * for that migration. State already recorded stays exactly as it is -
    * pausing the rollout is this action's whole job; undoing it is the
-   * rollback's.
+   * rollback's. Refused for a migration that admits every organization
+   * anyway, where the row it deletes pauses nothing.
    */
   withdrawMigrationTenant: protectedProcedure
     .use(opsManagePermission)
@@ -1616,9 +1617,10 @@ export const opsRouter = createTRPCRouter({
   /**
    * Run one migration for one organization now. Awaited: the operator asked
    * about one organization and gets the status it ended the run in. The
-   * service refuses unknown migrations, unknown organizations, unenrolled
-   * organizations (cloud) and an organization whose claim another pass
-   * already holds, each with a handled error the page renders.
+   * service refuses unknown migrations, unknown organizations, an
+   * organization outside the migration's cohort (cloud, and only for a
+   * migration enrollment still paces) and an organization whose claim
+   * another pass already holds, each with a handled error the page renders.
    */
   runSystemMigrationForOrganization: protectedProcedure
     .use(opsManagePermission)

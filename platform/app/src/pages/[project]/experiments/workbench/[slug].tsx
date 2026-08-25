@@ -1,7 +1,14 @@
 import { Alert, Box, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { nanoid } from "nanoid";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
+import {
+  WORKBENCH_ACTION_KINDS,
+  WORKBENCH_ACTIONS,
+} from "~/experiments-v3/actions/manifest";
+import { narrateWorkbenchAction } from "~/experiments-v3/actions/narration";
+import { projectWorkbenchState } from "~/experiments-v3/actions/projection";
+import { scopeFromRunPayload } from "~/experiments-v3/actions/runScope";
 import { AutosaveStatus } from "~/experiments-v3/components/AutosaveStatus";
 import { EditableHeading } from "~/experiments-v3/components/EditableHeading";
 import { EvaluationsV3Table } from "~/experiments-v3/components/EvaluationsV3Table";
@@ -10,19 +17,72 @@ import { RunEvaluationButton } from "~/experiments-v3/components/RunEvaluationBu
 import { SavedDatasetLoaders } from "~/experiments-v3/components/SavedDatasetLoaders";
 import { TableSettingsMenu } from "~/experiments-v3/components/TableSettingsMenu";
 import { UndoRedo } from "~/experiments-v3/components/UndoRedo";
+import { VersionHistoryButton } from "~/experiments-v3/components/VersionHistoryButton";
+import { WorkbenchStaleBanner } from "~/experiments-v3/components/WorkbenchStaleBanner";
 import { useAutosaveEvaluationsV3 } from "~/experiments-v3/hooks/useAutosaveEvaluationsV3";
 import { useEvaluationsV3Store } from "~/experiments-v3/hooks/useEvaluationsV3Store";
 import { useExecuteEvaluation } from "~/experiments-v3/hooks/useExecuteEvaluation";
 import { useLambdaWarmup } from "~/experiments-v3/hooks/useLambdaWarmup";
+import { useOptimizeWithLangy } from "~/experiments-v3/hooks/useOptimizeWithLangy";
+import { useReportPageActivityToLangy } from "~/experiments-v3/hooks/useReportPageActivityToLangy";
 import { useSavedDatasetLoader } from "~/experiments-v3/hooks/useSavedDatasetLoader";
+import { useWorkbenchUpdateListener } from "~/experiments-v3/hooks/useWorkbenchUpdateListener";
+import {
+  revealTargetColumn,
+  targetColumnLabel,
+} from "~/experiments-v3/utils/revealTargetColumn";
 import { HandledErrorAlert } from "~/features/errors";
 import type { ProposalHandlers } from "~/features/langy/components/MessageContent";
-import { useRegisterLangyHandlers } from "~/features/langy/LangyContext";
+import {
+  useRegisterLangyActions,
+  useRegisterLangyHandlers,
+} from "~/features/langy/LangyContext";
+import {
+  LangyUiPageOutOfDateError,
+  LangyUiSaveFailedError,
+} from "~/features/langy/uiActions/errors";
+import type { LangyUiActionHandlers } from "~/features/langy/uiActions/types";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { assertCrispChatHidden } from "~/utils/crispBubblePolicy";
+
+/**
+ * The workbench as the agent should read it: the LIVE store, so unsaved prompt
+ * drafts, pending cells and in-memory results are included, which the saved
+ * copy cannot show. `source` mirrors the backend fallback's marker, so the
+ * agent always knows whether it read the live page or the saved document.
+ */
+function readLiveWorkbench({ includeResults }: { includeResults?: boolean }) {
+  const state = useEvaluationsV3Store.getState();
+
+  const identity: { experimentId?: string; experimentSlug?: string } = {};
+  if (state.experimentId) identity.experimentId = state.experimentId;
+  if (state.experimentSlug) identity.experimentSlug = state.experimentSlug;
+
+  const withResults: { results?: typeof state.results } = {};
+  if (includeResults !== false) withResults.results = state.results;
+
+  const projection = projectWorkbenchState({
+    state: {
+      name: state.name,
+      datasets: state.datasets,
+      activeDatasetId: state.activeDatasetId,
+      evaluators: state.evaluators,
+      targets: state.targets,
+      ...identity,
+    },
+    ...withResults,
+  });
+
+  const version: { version?: number } = {};
+  if (state.workbenchVersion !== undefined) {
+    version.version = state.workbenchVersion;
+  }
+
+  return { source: "live", ...version, ...projection };
+}
 
 /**
  * Experiments Workbench Page
@@ -60,8 +120,25 @@ export default function ExperimentsWorkbenchPage() {
   const upsertDataset = api.dataset.upsert.useMutation();
   const createDatasetRecords = api.datasetRecord.create.useMutation();
   const utils = api.useUtils();
-  const { execute: executeEvaluation } = useExecuteEvaluation();
+  const {
+    execute: executeEvaluation,
+    status: executionStatus,
+    progress: executionProgress,
+  } = useExecuteEvaluation();
+  // What this page is doing for Langy right now, so the panel's status line
+  // can say it. A run reports itself from the execution hook above; an action
+  // is over in microseconds but a slow save is not, so the handlers name
+  // themselves while they work.
+  const [actionActivity, setActionActivity] = useState<string | null>(null);
+  // The column being run, named as its own header names it. Captured when the
+  // run starts rather than derived here: the header already disambiguates the
+  // candidates, which all carry the same prompt handle, and a second
+  // derivation is how the panel ends up naming a different column.
+  const [runTargetLabel, setRunTargetLabel] = useState<string | null>(null);
   const { openDrawer } = useDrawer();
+  // "Optimize this prompt": hand the column to Langy. The page is the Langy
+  // integration point; undefined while flagged off, which hides the menu item.
+  const optimizeTarget = useOptimizeWithLangy();
 
   // Enable autosave for evaluation state - this also handles loading existing experiments
   const {
@@ -70,10 +147,31 @@ export default function ExperimentsWorkbenchPage() {
     isError,
     error,
     reset: resetAutosave,
+    isDirty,
+    reloadFromServer,
+    saveNow,
   } = useAutosaveEvaluationsV3();
+
+  // A save that lands elsewhere (Langy's backend fallback, the API, another
+  // tab) reloads a clean workbench silently and banners a dirty one.
+  const { stale: staleWorkbench, reload: reloadStaleWorkbench } =
+    useWorkbenchUpdateListener({
+      projectId: project?.id ?? "",
+      experimentSlug: typeof slug === "string" ? slug : undefined,
+      isDirty,
+      reloadFromServer,
+    });
 
   // Track loading state for saved datasets
   const { isLoading: isLoadingDatasets } = useSavedDatasetLoader();
+
+  useReportPageActivityToLangy({
+    isRunning: executionStatus === "running",
+    runTargetName: runTargetLabel,
+    completed: executionProgress.completed,
+    total: executionProgress.total,
+    actionActivity,
+  });
 
   const proposalHandlers = useMemo<ProposalHandlers>(() => {
     const projectId = project?.id;
@@ -280,6 +378,129 @@ export default function ExperimentsWorkbenchPage() {
 
   useRegisterLangyHandlers(proposalHandlers, { experimentSlug: slug });
 
+  // The live UI actions this page executes for the agent
+  // (specs/langy/langy-ui-actions.feature). Transform-backed kinds run
+  // through the store's one shared code path (`applyWorkbenchAction`), so an
+  // agent edit and a user edit are the same mutation, one undo entry each.
+  // Reads project the LIVE store — unsaved prompt drafts, pending cells and
+  // in-memory results included, which the saved copy cannot show.
+  const uiActionHandlers = useMemo<LangyUiActionHandlers>(() => {
+    // A page the server has already moved past cannot write: autosave stands
+    // down there by design. Answering "done" from that state told the agent a
+    // document existed that only this tab could see, so every later step was
+    // built on it. Checked before the change, so nothing is half applied, and
+    // again after the save, which is where the refusal actually lands.
+    const assertPageIsCurrent = () => {
+      if (useEvaluationsV3Store.getState().staleWorkbench) {
+        throw new LangyUiPageOutOfDateError();
+      }
+    };
+    /**
+     * Persist, and answer only if the write landed.
+     *
+     * `saveNow` reports its outcome rather than throwing, because the debounced
+     * path treats a failure as a status change on the badge. A dropped network
+     * or a rejected document therefore left it resolving normally, and the
+     * handler read that as a save: the agent was told the change was on the
+     * server when only this tab had it, which is the same false success a
+     * stale page used to give.
+     */
+    const saveOrRefuse = async () => {
+      const outcome = await saveNow();
+      if (outcome === "failed") {
+        throw new LangyUiSaveFailedError();
+      }
+      // Covers the refusal this save was given, and any staleness a broadcast
+      // raised while it was in flight. Both are the same answer to the agent.
+      assertPageIsCurrent();
+      if (outcome === "refused") {
+        throw new LangyUiPageOutOfDateError();
+      }
+    };
+    const handlers: LangyUiActionHandlers = {};
+    for (const kind of WORKBENCH_ACTION_KINDS) {
+      const definition = WORKBENCH_ACTIONS[kind];
+      if (definition.backend !== "transform") continue;
+      handlers[kind] = {
+        payloadSchema: definition.payloadSchema,
+        // Apply, then persist before answering. The agent reads a successful
+        // action as "the document now says this", and its next step is usually
+        // a server-side one — a run, a REST read, a version. Left on the 1.5s
+        // autosave debounce, the duplicate column existed only in this tab:
+        // the run that followed wrote results from the state without it, the
+        // broadcast came back with a newer version, and the pending save was
+        // then refused as out of date. The column could never be saved after
+        // that, so the loop worked on a page nothing else could see.
+        run: async (payload: unknown) => {
+          // Named while it works, so the panel's status line says what this
+          // page is doing rather than falling back to a verb that claims
+          // nothing. The edit itself is instant; the save after it is not.
+          setActionActivity(narrateWorkbenchAction(kind));
+          try {
+            assertPageIsCurrent();
+            const result = useEvaluationsV3Store
+              .getState()
+              .applyWorkbenchAction({ kind, payload });
+            await saveOrRefuse();
+            // Every action that touches a column answers with its id. A new
+            // column lands to the right of all the others, off the edge of a
+            // wide workbench, so without this the reader watches a real change
+            // happen out of sight and reads the step as nothing happening.
+            const touched = (result as { targetId?: unknown } | undefined)
+              ?.targetId;
+            if (typeof touched === "string") revealTargetColumn(touched);
+            return result;
+          } finally {
+            setActionActivity(null);
+          }
+        },
+      };
+    }
+    handlers["workbench.getState"] = {
+      payloadSchema: WORKBENCH_ACTIONS["workbench.getState"].payloadSchema,
+      run: (payload: { includeResults?: boolean }) =>
+        readLiveWorkbench(payload),
+    };
+    handlers["workbench.run"] = {
+      payloadSchema: WORKBENCH_ACTIONS["workbench.run"].payloadSchema,
+      run: async (payload: { targetIds?: string[]; rowIndices?: number[] }) => {
+        // Remembered before the run starts, so the status line can name the
+        // column the reader is watching fill rather than "the evaluation".
+        const runningTarget = payload.targetIds?.[0] ?? null;
+        setRunTargetLabel(
+          runningTarget ? targetColumnLabel(runningTarget) : null,
+        );
+        // Watch the column that is about to fill, not whichever one the
+        // reader happened to be looking at.
+        if (runningTarget) revealTargetColumn(runningTarget);
+        // Only covers getting the run started: the save before it is the slow
+        // part. Once cells are arriving the run reports its own progress, and
+        // this is cleared so it cannot outlive the run it announced.
+        setActionActivity(narrateWorkbenchAction("workbench.run"));
+        try {
+          // Persist first: a run writes its results back as a new version, so
+          // any edit still sitting in this tab would be a version behind before
+          // the first cell lands. A tab that cannot save is a tab whose columns
+          // the run would not compute, so it refuses rather than running the
+          // wrong document.
+          assertPageIsCurrent();
+          await saveOrRefuse();
+          // Fire-and-forget like the run proposal: the run streams into the
+          // table the user is watching, and the agent polls the runs API for
+          // completion. The payload-to-scope mapping is shared with the backend
+          // fallback so both dispatch paths cover the same cells.
+          void executeEvaluation(scopeFromRunPayload(payload));
+          return { status: "running" as const };
+        } finally {
+          setActionActivity(null);
+        }
+      },
+    };
+    return handlers;
+  }, [executeEvaluation, saveNow]);
+
+  useRegisterLangyActions(uiActionHandlers);
+
   // Warm up lambda instances in the background (invisible to user)
   useLambdaWarmup();
 
@@ -358,11 +579,19 @@ export default function ExperimentsWorkbenchPage() {
             <UndoRedo />
             <TableSettingsMenu disabled={isLoadingExperiment} />
             <HistoryButton disabled={isLoadingExperiment} />
+            <VersionHistoryButton disabled={isLoadingExperiment} />
             <RunEvaluationButton
               disabled={isLoadingExperiment || isLoadingDatasets}
             />
           </HStack>
         </HStack>
+
+        {staleWorkbench && (
+          <WorkbenchStaleBanner
+            actorLabel={staleWorkbench.actorLabel}
+            onReload={reloadStaleWorkbench}
+          />
+        )}
 
         {/* Main content - table container with config panel */}
         <Box
@@ -380,6 +609,7 @@ export default function ExperimentsWorkbenchPage() {
             <EvaluationsV3Table
               isLoadingExperiment={isLoadingExperiment}
               isLoadingDatasets={isLoadingDatasets}
+              onOptimizeTarget={optimizeTarget}
             />
           </Box>
         </Box>

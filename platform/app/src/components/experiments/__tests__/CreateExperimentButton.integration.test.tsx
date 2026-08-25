@@ -104,23 +104,23 @@ describe("given experiment creation permissions and mutation boundaries", () => 
 
   afterEach(() => cleanup());
 
-  describe("when workflows:create is granted", () => {
+  describe("when experiments:update is granted", () => {
     it("renders the create button", () => {
       renderButton();
 
-      expect(mockHasPermission).toHaveBeenCalledWith("workflows:create");
+      expect(mockHasPermission).toHaveBeenCalledWith("experiments:update");
       expect(
         screen.getByRole("button", { name: "New Experiment" }),
       ).toBeTruthy();
     });
   });
 
-  describe("when workflows:create is denied", () => {
+  describe("when experiments:update is denied", () => {
     it("keeps the create button hidden", () => {
       permissionResult.current = false;
       renderButton();
 
-      expect(mockHasPermission).toHaveBeenCalledWith("workflows:create");
+      expect(mockHasPermission).toHaveBeenCalledWith("experiments:update");
       expect(
         screen.queryByRole("button", { name: "New Experiment" }),
       ).toBeNull();

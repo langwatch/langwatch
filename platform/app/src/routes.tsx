@@ -79,7 +79,15 @@ const routes: RouteObject[] = [
     path: "/auth/reset-password",
     ...page(() => import("./pages/auth/reset-password")),
   },
+  // The email-verification magic link lands here; it renders only (D01).
+  {
+    path: "/auth/verify-email",
+    ...page(() => import("./pages/auth/verify-email")),
+  },
   { path: "/auth/error", ...page(() => import("./pages/auth/error")) },
+  // Join before create (ADR-117 §6): a new account passes through here on its
+  // way to making an organization. Renders nothing until D12 fills it.
+  { path: "/auth/join", ...page(() => import("./pages/auth/join")) },
 
   // Top-level pages
   { path: "/", ...page(() => import("./pages/index")) },
@@ -212,13 +220,15 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/governance/index")),
       },
       {
-        path: "/governance/ingestion-sources",
-        ...page(
-          () => import("@ee/governance/dashboard/pages/ingestion-sources"),
-        ),
+        // The inventory: a tabbed shell — Catalog (the tool-tiles editor)
+        // and Sources (the ingestion-sources table). The retired
+        // /governance/{catalog,ingestion-sources,tool-catalog} addresses
+        // redirect here via legacyRedirectRoutes.
+        path: "/governance/inventory",
+        ...page(() => import("@ee/governance/dashboard/pages/inventory")),
       },
       {
-        path: "/governance/ingestion-sources/:id",
+        path: "/governance/inventory/:id",
         ...page(
           () =>
             import("@ee/governance/dashboard/pages/ingestion-source-detail"),
@@ -229,22 +239,29 @@ const routes: RouteObject[] = [
         ...page(() => import("@ee/governance/dashboard/pages/anomaly-rules")),
       },
       {
-        path: "/governance/tool-catalog",
-        ...page(() => import("./pages/governance/tool-catalog")),
+        path: "/governance/people",
+        ...page(() => import("./pages/governance/people")),
       },
       {
-        path: "/governance/departments",
-        ...page(() => import("./pages/governance/departments")),
+        // Behind release_ui_governance_billed_cost_enabled (the pages
+        // guard themselves); the nav items are filtered on the same flag.
+        path: "/governance/costs",
+        ...page(() => import("./pages/governance/costs")),
       },
       {
-        // The departments page was once named cost centers; old bookmarks
-        // land on the new name (the legacy /settings/governance/cost-centers
-        // address chains through here).
+        path: "/governance/billed",
+        ...page(() => import("./pages/governance/billed")),
+      },
+      {
+        // The people page has been cost centers and then departments; old
+        // bookmarks land on the newest name in one hop (the legacy
+        // /settings/governance/cost-centers address chains through here,
+        // and /governance/departments redirects via legacyRedirectRoutes).
         path: "/governance/cost-centers",
         element: (
           <LegacyPrefixRedirect
             from="/governance/cost-centers"
-            to="/governance/departments"
+            to="/governance/people"
           />
         ),
       },
@@ -680,6 +697,10 @@ const routes: RouteObject[] = [
   {
     path: "/ops/backoffice/subscriptions",
     ...page(() => import("./pages/ops/backoffice/subscriptions")),
+  },
+  {
+    path: "/ops/backoffice/sso-connections",
+    ...page(() => import("./pages/ops/backoffice/sso-connections")),
   },
 
   // @project redirect - Next.js parallel route that redirects /@project/path to /:project/path

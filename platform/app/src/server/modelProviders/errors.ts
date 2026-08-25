@@ -201,6 +201,34 @@ export class ModelDefaultScopeForbiddenError extends HandledError {
 }
 
 /**
+ * The credential is valid, but it carries no user, and a default-models write
+ * is decided per user.
+ *
+ * Every scope check walks the caller's role bindings, so the write needs a
+ * person to walk them for. A project token names only a project, so there is
+ * nobody to check and the call cannot proceed. That is a property of the
+ * credential, not of the request, and the caller fixes it by sending a
+ * different one.
+ *
+ * Coded rather than left as the plain `Error("Not authenticated")` it was: the
+ * request WAS authenticated, and the word told an API caller to go and look at
+ * a key that is working. It also collapsed to a 400, which reads as a
+ * malformed body. Both sent people to the wrong place.
+ */
+export class ModelDefaultUserKeyRequiredError extends HandledError {
+  declare readonly code: "model_default_user_key_required";
+
+  constructor() {
+    super(
+      "model_default_user_key_required",
+      "Default models are set per user, and this API key is not tied to one. Use a user API key, or change the default in settings.",
+      { httpStatus: 403, fault: "customer" },
+    );
+    this.name = "ModelDefaultUserKeyRequiredError";
+  }
+}
+
+/**
  * Too many credential checks in too short a window.
  *
  * Every check is an outbound request from our servers carrying a customer's
