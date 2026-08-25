@@ -145,9 +145,10 @@ overrides:
   # both arrive only as unused transitive baggage.
   "@elastic/elasticsearch": "-"
   "@opensearch-project/opensearch": "-"
-  # Path-scoped, so they touch only these two dependents.
+  # Path-scoped, so it touches only this one dependent. The sibling
+  # `@langchain/community>fast-xml-parser` entry went with CopilotKit: that
+  # dependent is no longer in the tree, so the override had nothing to bind to.
   "@aws-sdk/xml-builder>fast-xml-parser": ^5.7.0
-  "@langchain/community>fast-xml-parser": ^5.7.0
   # The scenario child bundle inlines @langwatch/scenario and its whole graph
   # (build-server.mjs, `inlineAll`) but keeps @opentelemetry/* external, so the
   # SDK bundled in there binds `NoopLoggerProvider` against the app's own
