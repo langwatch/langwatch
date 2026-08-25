@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 )
@@ -108,12 +109,25 @@ func (s *Server) Handler() http.Handler {
 // Serve runs the HTTP listener (and the verification DNS server when
 // configured) until ctx ends, then shuts down gracefully.
 func (s *Server) Serve(ctx context.Context) error {
-	dns, err := startDNS(ctx, s.cfg.DNSAddr, s.verification, s.recordDNSLookup)
-	if err != nil {
-		return err
-	}
-	if dns != nil {
-		s.dnsAddr = dns.Addr()
+	// The verification DNS listener is the one part of the simulator that wants
+	// a fixed, well-known port — a resolver has to be pointed at it — which is
+	// also the one part another process can already be holding. Losing DNS
+	// costs you the DNS half of domain verification; losing the whole simulator
+	// costs you OIDC, SAML, SCIM and the HTTP half too. So a busy port falls
+	// back to an ephemeral one and says so, and a listener that cannot be had
+	// at all is a warning rather than a refusal to start.
+	if dns, err := startDNS(ctx, s.cfg.DNSAddr, s.verification, s.recordDNSLookup); err == nil {
+		if dns != nil {
+			s.dnsAddr = dns.Addr()
+		}
+	} else {
+		fmt.Fprintf(os.Stderr, "idpsim: could not bind the verification DNS listener on %s (%v)\n", s.cfg.DNSAddr, err)
+		if dns, retryErr := startDNS(ctx, "127.0.0.1:0", s.verification, s.recordDNSLookup); retryErr == nil && dns != nil {
+			s.dnsAddr = dns.Addr()
+			fmt.Fprintf(os.Stderr, "idpsim: serving verification DNS on %s instead\n", s.dnsAddr)
+		} else {
+			fmt.Fprintln(os.Stderr, "idpsim: continuing without DNS — domain verification over HTTP still works")
+		}
 	}
 
 	var lc net.ListenConfig

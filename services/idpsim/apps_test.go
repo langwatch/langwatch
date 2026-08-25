@@ -1,13 +1,16 @@
 package idpsim
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -169,6 +172,42 @@ func TestUnregisteredClientStillWorks(t *testing.T) {
 	out := completeCodeFlow(t, s, nil, nil) // client_id "test-client", registered nowhere
 	assert.Equal(t, http.StatusOK, out["_status"], out)
 	assert.NotEmpty(t, out["id_token"])
+}
+
+// The verification DNS listener wants a fixed port so a resolver can be
+// pointed at it, which is exactly what makes it collidable — a second stack, or
+// an earlier run that outlived its parent. Losing DNS costs the DNS half of
+// domain verification; refusing to start costs OIDC, SAML, SCIM and the HTTP
+// half as well, which is the worse trade every time.
+//
+// @scenario "A busy verification DNS port does not stop the simulator"
+func TestBusyDNSPortDoesNotStopTheSimulator(t *testing.T) {
+	var lc net.ListenConfig
+	busy, err := lc.ListenPacket(t.Context(), "udp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer func() { _ = busy.Close() }()
+
+	s, err := NewServer(Config{
+		Addr: "127.0.0.1:0", BaseURL: testBase, Tenants: 1,
+		DNSAddr: busy.LocalAddr().String(),
+	})
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	errCh := make(chan error, 1)
+	go func() { errCh <- s.Serve(ctx) }()
+
+	select {
+	case err := <-errCh:
+		t.Fatalf("the simulator refused to start because the DNS port was busy: %v", err)
+	case <-time.After(250 * time.Millisecond):
+	}
+	assert.NotEmpty(t, s.dnsAddr, "it should say where it put the DNS listener instead")
+	assert.NotEqual(t, busy.LocalAddr().String(), s.dnsAddr)
+
+	cancel()
+	assert.NoError(t, <-errCh)
 }
 
 // activityOf reads a tenant's feed through the control API.

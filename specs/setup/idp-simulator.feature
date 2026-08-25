@@ -157,6 +157,13 @@ Feature: Local IdP simulator (idpsim)
     Then the answer is a name error
 
   @unit
+  Scenario: A busy verification DNS port does not stop the simulator
+    Given something already holds the verification DNS port
+    When the simulator starts
+    Then it keeps serving OIDC, SAML, SCIM and HTTP verification
+    And it says where it put the DNS listener instead
+
+  @unit
   Scenario: A verification token is served over HTTP for non-DNS verification
     Given a well-known verification token configured through the control API
     When a client fetches the well-known verification path for that domain
