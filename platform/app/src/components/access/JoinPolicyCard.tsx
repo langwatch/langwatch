@@ -120,8 +120,8 @@ export function JoinPolicyCard({
               Colleagues who verify an address on your company domain can find
               you instead of starting a workspace of their own. This is for
               people who arrive without single sign-on — where an identity
-              provider already admits a domain, it is the way in and this is
-              not offered alongside it.
+              provider already admits a domain, it is the way in and this is not
+              offered alongside it.
             </Text>
             {lock.locked && (
               <HStack gap={2} paddingTop={1} data-testid="join-policy-notice">

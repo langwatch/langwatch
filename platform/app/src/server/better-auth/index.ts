@@ -45,13 +45,10 @@ import {
   beforeUserCreate,
 } from "./hooks";
 import { passkeySignUpRegistration } from "./passkey-signup";
+import { isSingleSignOnRequest, registeredIssuers } from "./registeredIssuers";
 import { revokeAllSessionsForUser } from "./revokeSessions";
 import { sessionClaimsData } from "./session-claims-hook";
 import { runSignInRouterShadow } from "./signInRouterShadow";
-import {
-  isSingleSignOnRequest,
-  registeredIssuers,
-} from "./registeredIssuers";
 import { resolveTrustedOrigins } from "./trustedOrigins";
 import { runTwoStepCeremony } from "./two-step-ceremonies";
 

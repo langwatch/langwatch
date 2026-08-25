@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { AuthCard } from "~/components/auth/AuthCard";
 import { AuthShell, useIdentityAuthScreens } from "~/features/auth";
+import { SHAPE } from "~/features/auth/authTheme";
 import { AuthField } from "~/features/auth/components/AuthField";
 import {
   AUTH_PRIMARY_STYLE,
@@ -16,9 +17,8 @@ import {
   useAuthAnalytics,
   usePublishAuthStep,
 } from "~/features/auth/hooks/useAuthAnalytics";
-import { AUTH_SURFACE } from "~/features/auth/logic/authAnalytics";
-import { SHAPE } from "~/features/auth/authTheme";
 import { useSignsInWithPasskeys } from "~/features/auth/hooks/useSignsInWithPasskeys";
+import { AUTH_SURFACE } from "~/features/auth/logic/authAnalytics";
 import { usePublishAuthStage } from "~/features/auth/logic/groundStage";
 import { HandledErrorAlert } from "~/features/errors";
 import { readHandledError } from "~/features/errors/logic/readHandledError";

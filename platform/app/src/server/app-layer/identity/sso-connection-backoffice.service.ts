@@ -1,8 +1,8 @@
-import {
-  type SsoConnectionLifecycleState,
-  type SsoConnectionState,
-  type SsoConnectionType,
-  type SsoDomainVerification,
+import type {
+  SsoConnectionLifecycleState,
+  SsoConnectionState,
+  SsoConnectionType,
+  SsoDomainVerification,
 } from "@langwatch/identity";
 import type { SsoConnectionService } from "@langwatch/identity-server";
 import {

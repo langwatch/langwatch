@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   SIGN_UP_VERIFICATION_TTL_MS,
-  SPENT_LINK_GRACE_MS,
   SignUpVerificationService,
+  SPENT_LINK_GRACE_MS,
 } from "../signup-verification.service";
 
 /**

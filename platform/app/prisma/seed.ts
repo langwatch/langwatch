@@ -139,8 +139,7 @@ async function backfillIdentifierRows(): Promise<void> {
 
     // The per-user hash pepper is minted at user creation on the live path;
     // a seeded or pre-pipeline user may predate it.
-    const userHashKey =
-      user.userHashKey ?? randomBytes(32).toString("hex");
+    const userHashKey = user.userHashKey ?? randomBytes(32).toString("hex");
     if (!user.userHashKey) {
       await prisma.user.update({
         where: { id: user.id },

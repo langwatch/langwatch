@@ -6,19 +6,19 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { AuthCard } from "~/components/auth/AuthCard";
 import { AuthShell, useIdentityAuthScreens } from "~/features/auth";
-import { CheckYourEmail } from "~/features/auth/components/CheckYourEmail";
+import { SHAPE } from "~/features/auth/authTheme";
 import {
+  AuthField,
   FIELD_FOCUS,
   FIELD_SURFACE,
-  AuthField,
 } from "~/features/auth/components/AuthField";
 import { AuthPrimaryButton } from "~/features/auth/components/AuthPrimaryButton";
+import { CheckYourEmail } from "~/features/auth/components/CheckYourEmail";
 import {
   useAuthAnalytics,
   usePublishAuthStep,
 } from "~/features/auth/hooks/useAuthAnalytics";
 import { AUTH_SURFACE } from "~/features/auth/logic/authAnalytics";
-import { SHAPE } from "~/features/auth/authTheme";
 import { usePublishAuthStage } from "~/features/auth/logic/groundStage";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { authClient } from "~/utils/auth-client";

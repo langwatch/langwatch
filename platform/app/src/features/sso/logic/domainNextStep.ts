@@ -49,7 +49,8 @@ export function domainNextStepFor({
 }: {
   proved: boolean;
   proofState: "VERIFIED" | "WAVERING" | "LAPSED";
-  claim: { state: "WAITING" | "APPROVED" | "REJECTED"; waitsForReview: boolean }
+  claim:
+    | { state: "WAITING" | "APPROVED" | "REJECTED"; waitsForReview: boolean }
     | undefined;
   /** A licensed installation proves with its licence, in one press, with no
    *  record to publish anywhere. */
