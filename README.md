@@ -172,9 +172,9 @@ Please read our [Contribution Guidelines](https://github.com/langwatch/langwatch
 
 ## ✍️ License: open-core split
 
-LangWatch is Apache 2.0 and free to use, for individuals and for companies, self-hosted or not. The enterprise modules (SSO, SCIM provisioning, audit logs, gateway webhooks, billing, back-office) live under [`platform/app/ee/`](/platform/app/ee/) and are the one part that needs a commercial license in production. The SDKs (`typescript-sdk`, `python-sdk`, `mcp-server`) are MIT.
+LangWatch is Apache 2.0 and free to use, for individuals and for companies, self-hosted or not. Enterprise source lives under [`packages/enterprise/`](/packages/enterprise/) and is the one part that needs a commercial licence in production. Core operations and back-office tooling are not Enterprise features. The SDKs (`typescript-sdk`, `python-sdk`, `mcp-server`) are MIT.
 
-See [Editions and licensing](https://docs.langwatch.ai/self-hosting/licensing) for what a license adds, and [`LICENSE.md`](/LICENSE.md), [`NOTICE`](/NOTICE), [`platform/app/ee/LICENSE.md`](/platform/app/ee/LICENSE.md) for the full text and the per-folder breakdown.
+See [Editions and licensing](https://docs.langwatch.ai/self-hosting/licensing) for what a licence adds, and [`LICENSE.md`](/LICENSE.md), [`NOTICE`](/NOTICE), and [`packages/enterprise/LICENSE.md`](/packages/enterprise/LICENSE.md) for the full text and the per-folder breakdown.
 
 ## 👮‍♀️ Security + Compliance
 
@@ -190,4 +190,3 @@ Please refer to our Security page for more information. Contact us at [security@
 ### Vulnerability Disclosure
 
 If you need to do a responsible disclosure of a security vulnerability, you may do so by email to [security@langwatch.ai](mailto:security@langwatch.ai), or if you prefer you can reach out to one of our team privately on [Discord](https://discord.com/invite/kT4PhDS2gH).
-

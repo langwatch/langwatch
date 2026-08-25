@@ -349,8 +349,9 @@ to core extension points.
 
 Enterprise grouping does not weaken singular product ownership or the
 browser/server, contract, and repository boundaries. The Enterprise catalogue
-contains only the independently owned features listed by ADR-112; core `ops`
-and `saas` are not Enterprise features.
+contains only the independently owned features listed by ADR-112. Core `ops`
+is not an Enterprise feature; `saas` remains under the Enterprise legal root
+because that source is governed by the Enterprise licence.
 
 ADR-111 adds the deliberate aggregate root around those features. The portable
 `@langwatch/enterprise` package owns catalogue vocabulary; separate
