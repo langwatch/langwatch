@@ -16,9 +16,9 @@ import { ReportScheduleField } from "../ReportScheduleField";
 
 // The viewer's locale is non-deterministic across machines/CI, so pin the
 // browser timezone the "default to locale" behaviour reads.
-vi.mock("../../logic/reportSchedule", async (importOriginal) => {
+vi.mock("@langwatch/automation-web", async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import("../../logic/reportSchedule")>();
+    await importOriginal<typeof import("@langwatch/automation-web")>();
   return { ...actual, defaultTimezone: () => "Europe/Amsterdam" };
 });
 

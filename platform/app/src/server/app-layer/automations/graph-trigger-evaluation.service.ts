@@ -54,12 +54,12 @@ import type { ActionParams } from "~/server/app-layer/automations/trigger.types"
 import {
   evaluateCustomGraphThreshold,
   isNoDataPredicate,
-} from "./evaluate-custom-graph-threshold.service";
+} from "@langwatch/automation-contract";
 import type {
   GraphTriggerSentRepository,
   OpenGraphTriggerSent,
 } from "./graph-trigger-sent.repository";
-import { parseSeriesIndex } from "./seriesName";
+import { parseSeriesIndex } from "@langwatch/automation-contract";
 
 const logger = createLogger("langwatch:graph-trigger-evaluation");
 

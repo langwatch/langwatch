@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { substituteLiquidForJsonValidation } from "../liquidJsonSubstitution";
+import { substituteLiquidForJsonValidation } from "@langwatch/automation-web";
 
 describe("substituteLiquidForJsonValidation", () => {
   describe("given Liquid output inside a string", () => {

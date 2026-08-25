@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 
-import { RUNAWAY_PAUSE_REASON } from "~/features/automations/logic/pauseReasons";
+import { RUNAWAY_PAUSE_REASON } from "@langwatch/automation-contract";
 import {
   incrementAutomationAutoPausedTotal,
   incrementAutomationCeilingBreachTotal,

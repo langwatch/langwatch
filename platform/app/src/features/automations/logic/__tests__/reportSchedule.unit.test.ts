@@ -9,7 +9,7 @@ import {
   partsFromCron,
   type ScheduleParts,
   summarizeSchedule,
-} from "../reportSchedule";
+} from "@langwatch/automation-web";
 
 describe("reportSchedule", () => {
   describe("given cronFromParts", () => {

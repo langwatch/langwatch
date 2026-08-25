@@ -18,7 +18,7 @@ import {
   extractGraphAlertFromTriggerRow as parseGraphAlertRow,
 } from "~/server/app-layer/automations/graph-alert.builder";
 import type { FilterField } from "~/server/filters/types";
-import { describeCron, isValidCron } from "./reportSchedule";
+import { describeCron, isValidCron } from "@langwatch/automation-web";
 
 /**
  * Pure state machine for the staged automation drawer (ADR-036). Lives

@@ -32,9 +32,8 @@ import {
 } from "@langwatch/analytics-contract";
 import type { ActionParams } from "~/server/app-layer/automations/trigger.types";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { isNoDataPredicate } from "./evaluate-custom-graph-threshold.service";
+import { isNoDataPredicate, parseSeriesIndex } from "@langwatch/automation-contract";
 import type { GraphTriggerEvaluationReason } from "./graph-trigger-evaluation.service";
-import { parseSeriesIndex } from "./seriesName";
 import type { AutomationService } from "@langwatch/automation-contract";
 
 const logger = createLogger(

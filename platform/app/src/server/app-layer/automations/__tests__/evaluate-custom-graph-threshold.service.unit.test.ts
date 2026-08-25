@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   evaluateCustomGraphThreshold,
   isNoDataPredicate,
-} from "../evaluate-custom-graph-threshold.service";
+} from "@langwatch/automation-contract";
 
 describe("evaluateCustomGraphThreshold", () => {
   describe("when operator is gt", () => {

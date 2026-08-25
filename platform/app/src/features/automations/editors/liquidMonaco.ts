@@ -1,6 +1,6 @@
 import type { Monaco } from "@monaco-editor/react";
 import type { editor, languages, Position, Uri } from "monaco-editor";
-import { substituteLiquidForJsonValidation } from "./liquidJsonSubstitution";
+import { substituteLiquidForJsonValidation } from "@langwatch/automation-web";
 import { registerJsonSchema } from "./monacoSchemas";
 
 /**
@@ -153,10 +153,10 @@ export function registerLiquidLanguage(monaco: Monaco): void {
         root: [
           [/\{\{/, { token: "delimiter.liquid", next: "@liquidOutput" }],
           [/\{%/, { token: "delimiter.liquid", next: "@liquidTag" }],
-          [/[{}\[\]]/, "@brackets"],
+          [/[{}[\]]/, "@brackets"],
           [/[,:]/, "delimiter"],
           [/"/, { token: "string.quote", next: "@string" }],
-          [/-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+\-]?\d+)?/, "number"],
+          [/-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/, "number"],
           [
             /[a-zA-Z_]\w*/,
             { cases: { "@keywords": "keyword", "@default": "" } },

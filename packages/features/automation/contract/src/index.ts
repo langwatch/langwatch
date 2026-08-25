@@ -22,6 +22,8 @@ export * from "./cadences";
 export * from "./providers";
 export * from "./email-suppression";
 export * from "./custom-graph";
+export * from "./graph-alert";
+export * from "./pause-reasons";
 export * from "./webhook-delivery";
 export * from "./report";
 export * from "./templating";

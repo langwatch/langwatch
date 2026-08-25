@@ -28,9 +28,9 @@ class EmptyCustomGraphs extends CustomGraphRepository {
 	findAllNamesByIds(): Promise<[]> { return Promise.resolve([]); }
 }
 class EmptyWebhookDeliveries extends WebhookDeliveryRepository {
-	create(_input: WebhookDeliveryInput): Promise<void> { return Promise.resolve(); }
-	findAllRecentByTriggerId(): Promise<WebhookDeliveryRow[]> { return Promise.resolve([]); }
-	pruneExpired(): Promise<number> { return Promise.resolve(0); }
+	create = vi.fn(async (_input: WebhookDeliveryInput) => undefined);
+	findAllRecentByTriggerId = vi.fn(async () => [] as WebhookDeliveryRow[]);
+	pruneExpired = vi.fn(async () => 0);
 }
 const suppression = (
 	email: string,
@@ -242,6 +242,7 @@ class Fires extends TriggerFireHistoryRepository {
 const makeService = (
 	triggers = new Triggers(),
 	history = new Fires(),
+	webhookDeliveries = new EmptyWebhookDeliveries(),
 ): AutomationService =>
 	AutomationService.create({
 		triggers,
@@ -256,7 +257,7 @@ const makeService = (
 		}),
 		clock: new Clock(),
 		customGraphs: new EmptyCustomGraphs(),
-		webhookDeliveries: new EmptyWebhookDeliveries(),
+		webhookDeliveries,
 	});
 
 describe("AutomationService trigger and fire-history lifecycle", () => {
@@ -368,6 +369,49 @@ describe("AutomationService trigger and fire-history lifecycle", () => {
 			projectId: "p",
 			limit: 10,
 		});
+	});
+
+	it("owns webhook delivery recording, reads, and pruning", async () => {
+		const webhookDeliveries = new EmptyWebhookDeliveries();
+		webhookDeliveries.findAllRecentByTriggerId.mockResolvedValue([
+			{
+				id: "row-1",
+				triggerId: "t",
+				dispatchId: "d1",
+				responseStatus: 200,
+				latencyMs: 42,
+				error: null,
+				response: null,
+				outcome: "success",
+				firedAt: new Date("2026-01-01T00:00:00Z"),
+			},
+		]);
+		webhookDeliveries.pruneExpired.mockResolvedValue(7);
+		const service = makeService(new Triggers(), new Fires(), webhookDeliveries);
+		const input: WebhookDeliveryInput = {
+			projectId: "p",
+			triggerId: "t",
+			dispatchId: "d1",
+			responseStatus: 200,
+			latencyMs: 42,
+			outcome: "success",
+		};
+
+		await service.recordWebhookDelivery(input);
+		expect(webhookDeliveries.create).toHaveBeenCalledWith(input);
+		expect(
+			await service.getRecentWebhookDeliveries({
+				projectId: "p",
+				triggerId: "t",
+				limit: 25,
+			}),
+		).toMatchObject([{ dispatchId: "d1", triggerId: "t" }]);
+		expect(webhookDeliveries.findAllRecentByTriggerId).toHaveBeenCalledWith({
+			projectId: "p",
+			triggerId: "t",
+			limit: 25,
+		});
+		expect(await service.pruneWebhookDeliveries()).toBe(7);
 	});
 });
 

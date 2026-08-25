@@ -13,9 +13,11 @@ the `AutomationService` capability from the contract package. Persistence is
 private to the server package and is supplied through repository ports and
 composition adapters.
 
-Provider schemas, sentinels, action vocabulary, and reusable templating live in
-the automation contract. The former standalone provider package is retired;
-it is not a second service or domain abstraction.
+Provider schemas, sentinels, action vocabulary, graph-alert/report policy, and
+reusable templating live in the automation contract. Browser-safe authoring
+helpers live in `automation-web`; threshold/series policy lives in the contract
+and delivery persistence policy lives in `automation-server`. These are package
+slices, not second services.
 
 ## Context
 

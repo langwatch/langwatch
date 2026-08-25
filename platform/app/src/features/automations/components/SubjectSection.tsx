@@ -29,7 +29,12 @@ import {
 import { api } from "~/utils/api";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import { queryIsStructurable } from "../logic/conditionQuery";
-import { type DailyCapAdvice, dailyCapAdvice } from "../logic/dailyCapAdvice";
+import {
+  type DailyCapAdvice,
+  dailyCapAdvice,
+  estimateFiringRate,
+  estimateRatePerDay,
+} from "@langwatch/automation-web";
 import {
   type AutomationDraft,
   filterQueryIsSet,
@@ -38,7 +43,6 @@ import {
   type ReportSourceKind,
   subjectIsSet,
 } from "../logic/draftReducer";
-import { estimateFiringRate, estimateRatePerDay } from "../logic/firingRate";
 import { deriveSeriesOptionsFromGraph } from "../logic/seriesOptions";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";

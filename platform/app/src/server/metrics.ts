@@ -6,7 +6,7 @@ import {
   Histogram,
   register,
 } from "prom-client";
-import type { AutomationPauseReason } from "~/features/automations/logic/pauseReasons";
+import type { AutomationPauseReason } from "@langwatch/automation-contract";
 
 // Enable default metrics collection (heap, stack, GC, etc.)
 if (!register.getSingleMetric("process_cpu_user_seconds_total")) {

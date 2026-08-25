@@ -75,8 +75,10 @@ import {
 import { api } from "~/utils/api";
 import { MainSectionList } from "./components/MainSectionList";
 import { ConfigurationSecondaryDrawer } from "./components/secondaries/ConfigurationSecondaryDrawer";
-import { ALERT_TEMPLATE_VARIABLES } from "./editors/alertVariables";
-import { REPORT_TEMPLATE_VARIABLES } from "./editors/reportVariables";
+import {
+  ALERT_TEMPLATE_VARIABLES,
+  REPORT_TEMPLATE_VARIABLES,
+} from "@langwatch/automation-web";
 import {
   type AutomationDraft,
   actionParamsFromDraft,

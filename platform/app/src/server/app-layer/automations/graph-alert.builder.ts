@@ -1,4 +1,7 @@
-import { z } from "zod";
+import {
+  extractGraphAlertFromTriggerRow as extractPortableGraphAlert,
+} from "@langwatch/automation-contract";
+import type { GraphAlertActionParams } from "@langwatch/automation-contract";
 import type {
   AlertType,
   Prisma,
@@ -21,45 +24,29 @@ import type {
  * trigger row.
  */
 
-export const GRAPH_ALERT_OPERATORS = ["gt", "lt", "gte", "lte", "eq"] as const;
-export type GraphAlertOperator = (typeof GRAPH_ALERT_OPERATORS)[number];
+export { GRAPH_ALERT_OPERATORS, GRAPH_ALERT_TIME_PERIODS } from "@langwatch/automation-contract";
+export type {
+  GraphAlertActionParams,
+  GraphAlertOperator,
+  GraphAlertTimePeriod,
+} from "@langwatch/automation-contract";
 
 /** Time-window values the graph-alert UI offers (minutes). Mirrors the
  *  `TIME_PERIOD_LABELS` options rendered in the drawer's `CadenceSection.tsx`.
  *  The dispatcher accepts any positive integer, but the UI is constrained
  *  to this set so the validator can reject typos / hostile input on the
  *  wire. */
-export const GRAPH_ALERT_TIME_PERIODS = [1, 5, 15, 30, 60, 1440] as const;
-export type GraphAlertTimePeriod = (typeof GRAPH_ALERT_TIME_PERIODS)[number];
-
-export const graphAlertOperatorSchema = z.enum(GRAPH_ALERT_OPERATORS);
+export { graphAlertOperatorSchema, graphAlertTimePeriodSchema } from "@langwatch/automation-contract";
 // Keep the literals in sync with GRAPH_ALERT_TIME_PERIODS above. Spelling
 // them out (instead of casting `.map(z.literal)` to a tuple) means a
 // mismatch surfaces as a type error rather than being silently swallowed by
 // an `as unknown as` cast.
-export const graphAlertTimePeriodSchema = z.union([
-  z.literal(1),
-  z.literal(5),
-  z.literal(15),
-  z.literal(30),
-  z.literal(60),
-  z.literal(1440),
-]);
 
 /** Validation schema for the graph-alert portion of `actionParams`. The
  *  destination keys (`members` / `slackWebhook`) are validated by the
  *  per-action schema; this schema only covers the threshold-rule keys
  *  the graph-alert flow contributes. */
-export const graphAlertActionParamsSchema = z.object({
-  threshold: z.number().finite(),
-  operator: graphAlertOperatorSchema,
-  timePeriod: graphAlertTimePeriodSchema,
-  seriesName: z.string().min(1, "Pick a series to monitor."),
-});
-
-export type GraphAlertActionParams = z.infer<
-  typeof graphAlertActionParamsSchema
->;
+export { graphAlertActionParamsSchema } from "@langwatch/automation-contract";
 
 export interface BuildGraphAlertTriggerDataInput {
   id: string;
@@ -134,14 +121,5 @@ export function buildGraphAlertTriggerData({
 export function extractGraphAlertFromTriggerRow(
   actionParams: unknown,
 ): (GraphAlertActionParams & Record<string, unknown>) | null {
-  if (typeof actionParams !== "object" || actionParams === null) return null;
-  const parsed = graphAlertActionParamsSchema.safeParse(actionParams);
-  if (!parsed.success) return null;
-  // Preserve destination keys (members, slackWebhook, etc.) alongside the
-  // typed threshold rule. Zod's `.safeParse` strips unknowns; we merge them
-  // back so callers don't lose the send-side context.
-  return {
-    ...(actionParams as Record<string, unknown>),
-    ...parsed.data,
-  };
+  return extractPortableGraphAlert(actionParams);
 }

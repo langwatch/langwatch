@@ -7,38 +7,6 @@
 		".": {
 			"types": "./src/index.ts",
 			"default": "./src/index.ts"
-		},
-		"./cadences": {
-			"types": "./src/cadences.ts",
-			"default": "./src/cadences.ts"
-		},
-		"./automation": {
-			"types": "./src/automation.ts",
-			"default": "./src/automation.ts"
-		},
-		"./trigger": {
-			"types": "./src/trigger.ts",
-			"default": "./src/trigger.ts"
-		},
-		"./trigger.queries": {
-			"types": "./src/trigger.queries.ts",
-			"default": "./src/trigger.queries.ts"
-		},
-		"./providers": {
-			"types": "./src/providers.ts",
-			"default": "./src/providers.ts"
-		},
-		"./provider-types": {
-			"types": "./src/provider-types.ts",
-			"default": "./src/provider-types.ts"
-		},
-		"./report": {
-			"types": "./src/report.ts",
-			"default": "./src/report.ts"
-		},
-		"./templating": {
-			"types": "./src/templating.ts",
-			"default": "./src/templating.ts"
 		}
 	},
 	"main": "./src/index.ts",

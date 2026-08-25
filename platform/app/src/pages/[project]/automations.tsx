@@ -46,7 +46,7 @@ import {
   SectionHeader,
   TableShell,
 } from "~/features/automations/components/page/AutomationTableCells";
-import { RUNAWAY_PAUSE_REASON } from "~/features/automations/logic/pauseReasons";
+import { RUNAWAY_PAUSE_REASON } from "@langwatch/automation-contract";
 import type { TriggerActionParams } from "~/features/automations/logic/triggerActionParams";
 import { CLIENT_PROVIDERS } from "~/features/automations/providers/registry";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";

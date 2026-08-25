@@ -1,6 +1,6 @@
 import { TriggerAction } from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
-import { dailyCapAdvice, isPersistAction } from "../dailyCapAdvice";
+import { dailyCapAdvice, isPersistAction } from "@langwatch/automation-web";
 
 const overCap = {
   action: TriggerAction.ADD_TO_DATASET as string,

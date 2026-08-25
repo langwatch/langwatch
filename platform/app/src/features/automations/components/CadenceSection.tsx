@@ -20,7 +20,7 @@ import {
   OPERATOR_LABELS,
   TIME_PERIOD_LABELS,
 } from "../logic/draftReducer";
-import { describeCron } from "../logic/reportSchedule";
+import { describeCron } from "@langwatch/automation-web";
 import { useAutomationStore } from "../state/automationStore";
 import { useDraft } from "../state/selectors";
 import { CadenceField } from "./CadenceField";
