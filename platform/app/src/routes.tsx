@@ -79,6 +79,11 @@ const routes: RouteObject[] = [
     path: "/auth/reset-password",
     ...page(() => import("./pages/auth/reset-password")),
   },
+  // The email-verification magic link lands here; it renders only (D01).
+  {
+    path: "/auth/verify-email",
+    ...page(() => import("./pages/auth/verify-email")),
+  },
   { path: "/auth/error", ...page(() => import("./pages/auth/error")) },
 
   // Top-level pages

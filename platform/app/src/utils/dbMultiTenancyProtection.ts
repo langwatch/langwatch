@@ -41,6 +41,20 @@ const GLOBAL_MODELS = [
   "Session",
   "User",
   "VerificationToken",
+  // Identity pipeline projection tables (ADR-101, D01): per-user, not
+  // per-project/org, and the D03 router's lookup is by identifier VALUE
+  // before any user is known - inherently cross-user, the same posture as
+  // `User` by email above.
+  "Identifier",
+  "IdentityProjectionCursor",
+  // The credential half of the old `Account` row (ADR-116) - the same posture
+  // as `Account` above, which it replaces: per-user, keyed by the pinned
+  // account id, and read on the sign-in path before any tenant is known.
+  "AccountCredential",
+  // The address lock (ADR-116 §6): keyed by a normalized identifier value
+  // and claimed BEFORE any user is known to hold it, which is the whole
+  // point - it is what decides who gets to.
+  "IdentifierReservation",
   // Top-level tenancy entities, addressed by their own id / slug.
   "Organization",
   "Project",

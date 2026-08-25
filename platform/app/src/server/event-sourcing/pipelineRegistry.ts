@@ -18,6 +18,12 @@ import {
 import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
 import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/webhookDelivery.process";
 import type {
+  IdentityHeadsRepository,
+  IdentityReservationRepository,
+  IdentityUsersRepository,
+} from "@langwatch/identity-server";
+import { IdentityGuards } from "@langwatch/identity-server";
+import type {
   LangyConversationStateData,
   LangyConversationTurnData,
   LangyMessageProjectionRecord,
@@ -148,6 +154,8 @@ import { getOpenAdmissionFindersByInstance } from "./pipelines/gateway-spend-pro
 import { GATEWAY_SPEND_PIPELINE_NAME } from "./pipelines/gateway-spend-processing/schemas/constants";
 import { createGithubMaintenancePipeline } from "./pipelines/github-maintenance/pipeline";
 import { createGovernanceEventsPipeline } from "./pipelines/governance-events/pipeline";
+import { createIdentityPipeline } from "./pipelines/identity/pipeline";
+import type { IdentityFoldState } from "./pipelines/identity/projections/identityState.foldProjection";
 import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
 import type { LangyAnalyticsEventProjectionRecord } from "./pipelines/langy-conversation-processing/projections/langyAnalyticsEvent.mapProjection";
 import { createLangyMaintenancePipeline } from "./pipelines/langy-maintenance/pipeline";
@@ -352,6 +360,23 @@ export interface PipelineRepositories {
   authzGrantsWrite: GrantProjectionWriteStore;
   /** Insert-only audit sink for the grants ledger (ADR-092 decision 17). */
   authzAuditTrail: AuthzAuditTrailStore;
+  /** The identity pipeline's `Identifier` head + cursor (ADR-101 §3). */
+  identityProjection: StateProjectionStore<IdentityFoldState>;
+  /** Postgres reads the identity guards run against (ADR-101 §2). */
+  identityHeads: IdentityHeadsRepository;
+  /**
+   * The `User` reads the same guards run against. The staged re-run has to
+   * ask the cross-population collision question the calling path asked
+   * (ADR-116 §6) — a guard that could only see the projection here would let
+   * the queue state a fact the caller was refused.
+   */
+  identityUsers: IdentityUsersRepository;
+  /**
+   * The address lock the same guards claim before stating a fact (ADR-116
+   * §6). The staged re-run arrives with the caller's own command id, so its
+   * claim is the same claim rather than a second one.
+   */
+  identityReservations: IdentityReservationRepository;
 }
 
 export interface PipelineRegistryDeps {
@@ -645,6 +670,20 @@ export class PipelineRegistry {
       createAuthzGrantsPipeline({
         authzGrantsWriteStore: this.deps.repositories.authzGrantsWrite,
         authzAuditTrailStore: this.deps.repositories.authzAuditTrail,
+      }),
+    );
+    // The identity pipeline (ADR-101, D01 PR 1). Ships dark: no production
+    // writer dispatches these commands until the identity adapter lands, and
+    // the adapter's per-user write gate itself ships closed until a user's
+    // backfill (PR 2) latches — a deploy changes nothing on its own.
+    this.deps.eventSourcing.register(
+      createIdentityPipeline({
+        identityProjectionStore: this.deps.repositories.identityProjection,
+        identityGuards: new IdentityGuards(
+          this.deps.repositories.identityHeads,
+          this.deps.repositories.identityUsers,
+          this.deps.repositories.identityReservations,
+        ),
       }),
     );
 

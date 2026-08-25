@@ -165,21 +165,6 @@ const SEAT_LIMIT_LABELS: Record<string, string> = {
 };
 
 /**
- * The migration runner's per-tenant statuses as a sentence reads them.
- *
- * Authored rather than derived: `meta.status` is a machine sub-classifier, and
- * this registry's rule for those is to branch on the value and return copy,
- * never to render the value. Reshaping `rolled_back` into prose with string
- * surgery also only works by accident — `String.prototype.replace` with a
- * string pattern converts the FIRST match, so the first status with two
- * underscores would reach a customer half-converted.
- */
-const MIGRATION_STATUS_LABELS: Record<string, string> = {
-  parked: "parked for retry",
-  rolled_back: "already rolled back",
-};
-
-/**
  * Registered migration names, in the operator's words rather than the
  * column's. Stable identifiers (renaming one orphans its state rows), so
  * keying copy on them is safe; an unmapped name falls back to the generic
@@ -1155,6 +1140,18 @@ const presentations = {
     describe: () =>
       "Your membership is still here with everything you did. An organization admin can turn your access back on when a seat is free.",
   },
+  migration_enrolled_automatically: {
+    title: "This migration already covers every organization",
+    describe: (error) => {
+      const migration = label(
+        MIGRATION_NAME_LABELS,
+        str(error, "migrationName", ""),
+      );
+      return migration
+        ? `Every organization is already covered by ${migration}, including any created from now on, so there is nothing to enroll.`
+        : "Every organization is already covered by this migration, including any created from now on, so there is nothing to enroll.";
+    },
+  },
   migration_enrollment_already_exists: {
     title: "This organization is already enrolled",
     describe: (error) => {
@@ -1211,11 +1208,6 @@ const presentations = {
     describe: () =>
       "It arrives in a later release and will run automatically then — nothing to do until that release.",
   },
-  migration_state_not_found: {
-    title: "No migration state for that organization",
-    describe: () =>
-      "Check the organization id — only organizations a migration has already processed have state to act on.",
-  },
   migration_rollback_blocked_by_dependent: {
     title: "Another migration still stands on this one",
     describe: (error) => {
@@ -1232,15 +1224,6 @@ const presentations = {
     title: "This organization has not been cut over",
     describe: () =>
       "It is still waiting to cut over, so there is nothing to roll back. It stays on the legacy path until the cutover runs.",
-  },
-  migration_rollback_requires_migrated_or_finalized: {
-    title: "Only a migrated or finalized organization can be rolled back",
-    describe: (error) => {
-      const state = label(MIGRATION_STATUS_LABELS, str(error, "status", ""));
-      return state
-        ? `This organization is ${state}, so it is already on — or on its way back to — the legacy path.`
-        : "This organization has not reached the ledger, so it is already on the legacy path.";
-    },
   },
   duplicate_invite: {
     title: "They already have an invite",
@@ -1700,6 +1683,51 @@ const presentations = {
     title: "Billing isn't available here",
     describe: () =>
       "This is a self-hosted deployment, so plans are managed outside the app.",
+  },
+
+  // ---- identity ----
+  identity_verification_invalid: {
+    title: "That verification link didn't work",
+    describe: () =>
+      "Open the newest verification email and finish confirming from the place where you requested it.",
+  },
+  identity_verification_expired: {
+    title: "That verification link has expired",
+    describe: () => "Request a new verification email and use the newest link.",
+  },
+  identity_identifier_not_found: {
+    title: "That sign-in method is no longer on your account",
+    describe: () =>
+      "Refresh the page to see your current sign-in methods, then try again.",
+  },
+  identity_identifier_not_verifiable: {
+    title: "That sign-in method can't be verified right now",
+    describe: () =>
+      "It is already verified, or it was removed. Refresh the page to see its current state.",
+  },
+  identity_primary_must_demote_first: {
+    title: "Your primary sign-in method can't be removed",
+    describe: () =>
+      "Make another verified sign-in method primary first, then remove this one.",
+  },
+  identity_primary_requires_verified: {
+    title: "Only a verified sign-in method can be primary",
+    describe: () => "Verify this sign-in method first, then make it primary.",
+  },
+  identity_unsupported_storage_query: {
+    title: "We couldn't read your sign-in methods",
+    describe: () =>
+      "Nothing was changed, and we've been alerted. Try again in a moment, and contact support if it keeps happening.",
+  },
+  identity_email_in_use: {
+    title: "That email address is already in use",
+    describe: () =>
+      "Another account already holds it. Sign in with that account, or use a different address here.",
+  },
+  identity_engine_unavailable: {
+    title: "We couldn't finish creating your account",
+    describe: () =>
+      "Nothing was created, and we've been alerted. Try again in a moment, and contact support if it keeps happening.",
   },
 
   // ---- governance ----
