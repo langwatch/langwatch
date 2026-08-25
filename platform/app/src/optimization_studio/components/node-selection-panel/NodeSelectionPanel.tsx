@@ -12,7 +12,7 @@ import { useAgentPickerFlow } from "../../hooks/useAgentPickerFlow";
 import { useEvaluatorPickerFlow } from "../../hooks/useEvaluatorPickerFlow";
 import { usePromptPickerFlow } from "../../hooks/usePromptPickerFlow";
 import { useWorkflowStore } from "@langwatch/workflow-web";
-import { MODULES } from "../../registry";
+import { MODULES } from "@langwatch/workflow-web";
 import type { ComponentType, Custom, Field } from "@langwatch/workflow-contract";
 import { getInputsOutputs } from "@langwatch/workflow-contract";
 import { NodeComponents } from "../nodes";

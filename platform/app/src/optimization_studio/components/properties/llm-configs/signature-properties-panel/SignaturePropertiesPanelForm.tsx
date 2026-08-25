@@ -25,7 +25,7 @@ import {
 import { api } from "~/utils/api";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 import type { LlmPromptConfigComponent } from "@langwatch/workflow-contract";
-import { buildAvailableSources } from "../../../../utils/edgeMappingUtils";
+import { buildAvailableSources } from "@langwatch/workflow-web";
 import { PromptSourceHeader } from "../promptSourceSelect/PromptSourceHeader";
 import { WrappedOptimizationStudioLLMConfigField } from "../WrappedOptimizationStudioLLMConfigField";
 import { computeMessageEdgeUpdate } from "./messageEdgeUtils";

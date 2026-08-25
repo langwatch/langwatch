@@ -1,25 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { StudioClientEvent } from "../../types/events";
+import type { DatasetService } from "@langwatch/dataset-contract";
+import type { StudioClientEvent } from "@langwatch/workflow-contract";
 
-vi.mock("../../../server/app-layer/app", () => ({
-  getApp: vi.fn(),
-}));
-
-vi.mock("../../utils/datasetUtils", async () => {
-  const actual = await vi.importActual<typeof import("../../utils/datasetUtils")>(
-    "../../utils/datasetUtils",
-  );
-  return actual;
-});
-
-import { getApp } from "../../../server/app-layer/app";
-import { loadDatasets } from "../loadDatasets";
+import { materializeStudioDatasets } from "../src/services/studio-dataset-materializer.service";
 
 const PROJECT_ID = "project-123";
 
 const makeEntryNode = (dataset: any) => ({
   id: "entry",
   type: "entry",
+  position: { x: 0, y: 0 },
   data: {
     name: "Entry",
     dataset,
@@ -43,7 +33,7 @@ const makeEvent = (
         name: "Test",
         icon: "x",
         description: "x",
-        version: "x",
+        version: "1.0",
         template_adapter: "default",
         default_llm: { model: "openai/gpt-4o" },
         nodes: [makeEntryNode(entryDataset)],
@@ -56,12 +46,10 @@ const makeEvent = (
 
 describe("loadDatasets", () => {
   const getDatasetWithRecords = vi.fn();
+  const datasets = { getDatasetWithRecords } as unknown as DatasetService;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(getApp).mockReturnValue({
-      dataset: { getDatasetWithRecords },
-    } as never);
   });
 
   // Regression pin for the 3.2.0 prod break (a customer saw
@@ -106,7 +94,11 @@ describe("loadDatasets", () => {
       },
     );
 
-    const enriched = await loadDatasets(event, PROJECT_ID);
+    const enriched = await materializeStudioDatasets({
+      event,
+      projectId: PROJECT_ID,
+      datasets,
+    });
 
     expect(getDatasetWithRecords).toHaveBeenCalledWith({
       slugOrId: "ds_xyz",
@@ -140,7 +132,11 @@ describe("loadDatasets", () => {
       },
     );
 
-    const enriched = await loadDatasets(event, PROJECT_ID);
+    const enriched = await materializeStudioDatasets({
+      event,
+      projectId: PROJECT_ID,
+      datasets,
+    });
 
     expect(getDatasetWithRecords).not.toHaveBeenCalled();
     if (!("workflow" in enriched.payload)) {
@@ -157,7 +153,11 @@ describe("loadDatasets", () => {
       { node_id: "some_node", inputs: { foo: "bar" } },
     );
 
-    const enriched = await loadDatasets(event, PROJECT_ID);
+    const enriched = await materializeStudioDatasets({
+      event,
+      projectId: PROJECT_ID,
+      datasets,
+    });
 
     expect(getDatasetWithRecords).not.toHaveBeenCalled();
     if (!("workflow" in enriched.payload)) {

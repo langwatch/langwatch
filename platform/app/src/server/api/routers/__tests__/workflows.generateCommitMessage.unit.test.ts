@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 
-import { blankTemplate } from "../../../../optimization_studio/templates/blank";
+import { blankTemplate } from "@langwatch/workflow-web";
 import { createInnerTRPCContext } from "../../trpc";
 import { workflowRouter } from "../workflows";
 

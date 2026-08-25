@@ -59,12 +59,12 @@ export const blankTemplate: StudioWorkflow = {
           {
             identifier: "llm",
             type: "llm",
-            value: undefined,
+            value: void 0,
           },
           {
             identifier: "prompting_technique",
             type: "prompting_technique",
-            value: undefined,
+            value: void 0,
           },
           {
             // Mirrors the default new-prompt shape (buildDefaultFormValues),
@@ -87,7 +87,7 @@ export const blankTemplate: StudioWorkflow = {
           {
             identifier: "demonstrations",
             type: "dataset",
-            value: undefined,
+            value: void 0,
           },
         ],
         inputs: [{ identifier: "input", type: "str" }],

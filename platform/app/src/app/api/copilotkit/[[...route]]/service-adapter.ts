@@ -5,18 +5,16 @@ import type {
 } from "@copilotkit/runtime";
 import { randomUUID } from "@copilotkit/shared";
 import { createLogger } from "@langwatch/observability";
+import type { DatasetService } from "@langwatch/dataset-contract";
 import type z from "zod";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
-import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
+import { loadDatasets } from "~/optimization_studio/server/load-datasets.adapter";
 import {
   LATEST_SPEC_VERSION,
   type LlmPromptConfigComponent,
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
-import type {
-  StudioClientEvent,
-  StudioServerEvent,
-} from "~/optimization_studio/types/events";
+import type { StudioClientEvent, StudioServerEvent } from "@langwatch/workflow-contract";
 import { LlmSignatureNodeFactory } from "~/optimization_studio/utils/llmSignatureNodeFactory";
 import type { runtimeInputsSchema } from "@langwatch/prompt-contract";
 import { versionMetadataToNodeFormat } from "~/prompts/schemas/version-metadata-schema";
@@ -37,6 +35,7 @@ const TEMPLATE_INPUT_PLACEHOLDER_RE = /\{\{\s*input\s*\}\}/;
 
 type PromptStudioAdapterParams = {
   projectId: string;
+  datasets: DatasetService;
 };
 
 /**
@@ -46,6 +45,7 @@ type PromptStudioAdapterParams = {
  */
 export class PromptStudioAdapter implements CopilotServiceAdapter {
   private projectId: string;
+  private datasets: DatasetService;
 
   /**
    * Creates a new PromptStudioAdapter instance.
@@ -53,6 +53,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
    */
   constructor(params: PromptStudioAdapterParams) {
     this.projectId = params.projectId;
+    this.datasets = params.datasets;
   }
 
   /**
@@ -229,6 +230,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       preparedEvent = await loadDatasets(
         await addEnvs(rawEvent, this.projectId),
         this.projectId,
+        this.datasets,
       );
     } catch (earlyError: any) {
       logger.error({ err: earlyError }, "early error preparing prompt workflow");

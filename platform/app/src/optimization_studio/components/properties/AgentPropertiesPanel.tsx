@@ -48,12 +48,12 @@ import {
   nodeMatchesAgent,
   readCodeSnapshot,
   readHttpSnapshot,
-} from "../../utils/agentNodeData";
+} from "@langwatch/workflow-web";
 import {
   applyMappingChange,
   buildAvailableSources,
   buildInputMappings,
-} from "../../utils/edgeMappingUtils";
+} from "@langwatch/workflow-web";
 import { CodeEditorModal } from "../code/CodeEditorModal";
 import { useRegisterDrawerFooter } from "../drawers/useInsideDrawer";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";

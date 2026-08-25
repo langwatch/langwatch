@@ -22,6 +22,7 @@ const mockSetNode = vi.fn();
 const mockDeleteNode = vi.fn();
 const mockSetSelectedNode = vi.fn();
 vi.mock("@langwatch/workflow-web", () => ({
+  MODULES: { signature: { name: "Prompt" } },
   store: vi.fn(() => ({})),
   initialState: {},
   useWorkflowStore: vi.fn((selector: any) =>
@@ -50,7 +51,7 @@ vi.mock("~/hooks/useDrawer", () => ({
   getFlowCallbacks: () => ({}),
 }));
 
-import { MODULES } from "../../registry";
+import { MODULES } from "@langwatch/workflow-web";
 import { usePromptPickerFlow } from "../usePromptPickerFlow";
 
 /**

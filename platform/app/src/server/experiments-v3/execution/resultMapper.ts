@@ -12,7 +12,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { trace as otelTrace } from "@opentelemetry/api";
 
-import type { StudioServerEvent } from "~/optimization_studio/types/events";
+import type { StudioServerEvent } from "@langwatch/workflow-contract";
 import { nodeErrorToDomainError } from "~/optimization_studio/utils/nodeErrorDomain";
 import { EvaluatorExecutionError } from "~/server/app-layer/evaluations/errors";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";

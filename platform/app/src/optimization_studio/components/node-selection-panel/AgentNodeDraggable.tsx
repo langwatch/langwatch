@@ -1,4 +1,4 @@
-import { MODULES } from "~/optimization_studio/registry";
+import { MODULES } from "@langwatch/workflow-web";
 import type { Component } from "@langwatch/workflow-contract";
 import type { NodeWithOptionalPosition } from "~/types";
 import { NodeDraggable } from "./NodeDraggable";

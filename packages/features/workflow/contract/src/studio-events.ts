@@ -1,10 +1,11 @@
 import { z } from "zod";
+
+import type { BaseComponent, StudioWorkflow } from "./studio-workflow";
+import { studioWorkflowSchema } from "./studio-workflow";
 import {
-  type BaseComponent,
-  type StudioWorkflow,
-  studioWorkflowSchema,
-} from "@langwatch/workflow-contract";
-import { OPTIMIZERS, optimizerParamsSchema } from "@langwatch/workflow-web";
+  studioOptimizerIdSchema,
+  studioOptimizerParamsSchema,
+} from "./studio-optimization";
 
 export const studioClientEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("is_alive"), payload: z.record(z.string(), z.never()) }),
@@ -56,8 +57,8 @@ export const studioClientEventSchema = z.discriminatedUnion("type", [
       run_id: z.string(),
       workflow: studioWorkflowSchema,
       workflow_version_id: z.string(),
-      optimizer: z.enum(Object.keys(OPTIMIZERS) as [keyof typeof OPTIMIZERS]),
-      params: optimizerParamsSchema,
+      optimizer: studioOptimizerIdSchema,
+      params: studioOptimizerParamsSchema,
     }),
   }),
   z.object({
@@ -79,9 +80,7 @@ export const studioClientEventSchema = z.discriminatedUnion("type", [
 export type StudioClientEvent = z.infer<typeof studioClientEventSchema>;
 
 export type StudioServerEvent =
-  | {
-      type: "is_alive_response";
-    }
+  | { type: "is_alive_response" }
   | {
       type: "component_state_change";
       payload: {
@@ -113,18 +112,6 @@ export type StudioServerEvent =
         optimization_state: StudioWorkflow["state"]["optimization"];
       };
     }
-  | {
-      type: "debug";
-      payload: {
-        message: string;
-      };
-    }
-  | {
-      type: "error";
-      payload: {
-        message: string;
-      };
-    }
-  | {
-      type: "done";
-    };
+  | { type: "debug"; payload: { message: string } }
+  | { type: "error"; payload: { message: string } }
+  | { type: "done" };

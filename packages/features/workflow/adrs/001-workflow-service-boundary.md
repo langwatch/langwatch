@@ -28,12 +28,18 @@ compatibility.
 typed `StudioWorkflow` refinement. Both server and browser use its migration;
 there is no second persisted schema or legacy editor `Workflow` alias.
 
+It also owns the portable execution-event and optimizer-parameter wire shapes,
+plus entry-default materialization. Unknown DSL and state fields remain intact.
+
 ## Persistence
 
 The service receives its private Workflow repository and the canonical Dataset
 service used by workflow copying. Prisma is confined to
 `repositories/prisma`, and the process composes one service via
 `PostgresWorkflowAdapter`.
+
+Studio execution materializes referenced datasets through an explicit
+`DatasetService`; it does not read a process-global application instance.
 
 ## Dependencies
 
@@ -48,10 +54,11 @@ Existing tRPC names and REST paths remain compatibility transports. The
 `/workflows/:id/evaluate` route remains an app-owned composition over Workflow
 version selection and Evaluation execution.
 
-The browser surface is `@langwatch/workflow-web`. It owns graph utilities, the
-workflow Zustand store, and small browser hooks. App page shells, query/event
-transport composition, Monaco/editor chrome, and Lambda/worker infrastructure
-remain application responsibilities.
+The browser surface is `@langwatch/workflow-web`. It owns graph and field-edge
+mapping utilities, creation templates, the node palette registry, agent-node
+transforms, the workflow Zustand store, and small browser hooks. App page
+shells, query/event transport composition, Monaco/editor chrome, and
+Lambda/worker infrastructure remain application responsibilities.
 
 ## Runtime and registration
 

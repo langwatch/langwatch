@@ -22,7 +22,7 @@ vi.mock("~/app/api/workflows/post_event/post-event", () => ({
 vi.mock("~/optimization_studio/server/addEnvs", () => ({
   addEnvs: (event: unknown) => Promise.resolve(event),
 }));
-vi.mock("~/optimization_studio/server/loadDatasets", () => ({
+vi.mock("~/optimization_studio/server/load-datasets.adapter", () => ({
   loadDatasets: (event: unknown) => Promise.resolve(event),
 }));
 

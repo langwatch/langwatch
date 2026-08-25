@@ -30,6 +30,22 @@ Feature: Workflow service boundary
     Then it uses the Workflow contract migration
     And both paths produce the same current DSL shape
 
+  Scenario: Studio execution events use one portable wire contract
+    Given Studio dispatches a component, flow, evaluation, or optimization event
+    When a browser or server consumes the event
+    Then it validates the same Zod 4 contract and optimizer parameter shape
+
+  Scenario: New Studio workflows use portable templates and entry defaults
+    Given a user creates a blank or custom-evaluator workflow
+    When an inline entry dataset is materialized
+    Then declared entry defaults fill only missing values
+    And the browser template does not pin a resolved project model
+
+  Scenario: Execution materializes a saved entry dataset through DatasetService
+    Given a Studio execution event references a saved entry dataset
+    When Workflow materializes the event with an injected DatasetService
+    Then execution receives inline records without accessing application globals
+
   Scenario: Copying referenced datasets uses the Dataset service
     Given a workflow copy includes referenced datasets
     When Workflow copies the definition into another project

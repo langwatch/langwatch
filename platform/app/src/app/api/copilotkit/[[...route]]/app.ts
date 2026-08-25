@@ -9,6 +9,7 @@ import { CopilotRuntime, copilotRuntimeNodeHttpEndpoint } from "@copilotkit/runt
 import { createLogger } from "@langwatch/observability";
 import { describeRoute } from "hono-openapi";
 import { createProjectApp, requires } from "~/server/api/security";
+import { getApp } from "~/server/app-layer/app";
 import { PromptStudioAdapter } from "./service-adapter";
 
 const logger = createLogger("langwatch:api:copilotkit");
@@ -32,6 +33,7 @@ secured.access(requires("prompts:view")).post(
       runtime,
       serviceAdapter: new PromptStudioAdapter({
         projectId: project.id,
+        datasets: getApp().dataset,
       }),
       endpoint: "/api/copilotkit",
     });

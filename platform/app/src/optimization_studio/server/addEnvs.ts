@@ -12,7 +12,7 @@ import {
   type LLMConfig,
   type ServerWorkflow,
 } from "@langwatch/workflow-contract";
-import type { StudioClientEvent } from "../types/events";
+import type { StudioClientEvent } from "@langwatch/workflow-contract";
 
 /**
  * An llm parameter reached dispatch without a model. Persisted DSLs are

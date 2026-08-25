@@ -21,6 +21,27 @@ const mockSetNode = vi.fn();
 const mockDeleteNode = vi.fn();
 const mockSetSelectedNode = vi.fn();
 vi.mock("@langwatch/workflow-web", () => ({
+  buildAgentNodeData: (agent: {
+    id: string;
+    name: string;
+    type: string;
+    config: { url?: string; method?: string };
+  }) => ({
+    name: agent.name,
+    agent: `agents/${agent.id}`,
+    agentType: agent.type,
+    inputs: [{ identifier: "input", type: "str" }],
+    outputs: [{ identifier: "output", type: "str" }],
+    parameters: [
+      { identifier: "agent_type", type: "str", value: agent.type },
+      ...(agent.config.url
+        ? [{ identifier: "url", type: "str", value: agent.config.url }]
+        : []),
+      ...(agent.config.method
+        ? [{ identifier: "method", type: "str", value: agent.config.method }]
+        : []),
+    ],
+  }),
   store: vi.fn(() => ({})),
   initialState: {},
   useWorkflowStore: vi.fn((selector: any) =>

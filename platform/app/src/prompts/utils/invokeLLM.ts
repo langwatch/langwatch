@@ -7,7 +7,7 @@ import {
   type LlmPromptConfigComponent,
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
-import type { StudioServerEvent } from "~/optimization_studio/types/events";
+import type { StudioServerEvent } from "@langwatch/workflow-contract";
 import { LlmSignatureNodeFactory } from "~/optimization_studio/utils/llmSignatureNodeFactory";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
 

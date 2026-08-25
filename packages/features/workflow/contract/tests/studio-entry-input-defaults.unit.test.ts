@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type { Field, StudioWorkflow } from "@langwatch/workflow-contract";
-import { applyEntryInputDefaults, entryInlineWithDefaults } from "../entryInputDefaults";
+import type { Field, StudioWorkflow } from "../src/studio-workflow";
+import {
+  applyEntryInputDefaults,
+  entryInlineWithDefaults,
+} from "../src/studio-entry-input-defaults";
 
 const inline = (records: Record<string, unknown[]>) => ({
   records,
@@ -31,7 +34,7 @@ describe("entryInlineWithDefaults", () => {
       const fields: Field[] = [{ identifier: "lang", type: "str", value: "en" }];
 
       const result = entryInlineWithDefaults(
-        inline({ lang: ["fr", null, undefined, ""] }),
+        inline({ lang: ["fr", null, void 0, ""] }),
         fields,
       );
 
@@ -81,8 +84,15 @@ describe("applyEntryInputDefaults", () => {
 
       const result = applyEntryInputDefaults(workflow);
       const entry = result.nodes.find((n) => n.id === "entry");
+      if (!entry) throw new Error("Expected an entry node");
 
-      expect((entry?.data as any).dataset.inline.records.lang).toEqual(["en", "en"]);
+      expect(
+        (
+          entry.data as {
+            dataset: { inline: { records: Record<string, unknown[]> } };
+          }
+        ).dataset.inline.records.lang,
+      ).toEqual(["en", "en"]);
     });
   });
 

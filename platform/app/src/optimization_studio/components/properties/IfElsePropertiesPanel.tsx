@@ -13,7 +13,7 @@ import {
   applyMappingChange,
   buildAvailableSources,
   buildInputMappings,
-} from "../../utils/edgeMappingUtils";
+} from "@langwatch/workflow-web";
 import { LiquidConditionEditor } from "../code/LiquidConditionEditor";
 import { BasePropertiesPanel, PropertySectionTitle } from "./BasePropertiesPanel";
 

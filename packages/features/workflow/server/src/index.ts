@@ -11,3 +11,4 @@ export {
   WorkflowService,
   type WorkflowServiceOptions,
 } from "./services/workflow.service";
+export { materializeStudioDatasets } from "./services/studio-dataset-materializer.service";

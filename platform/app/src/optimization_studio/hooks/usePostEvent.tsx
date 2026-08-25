@@ -7,7 +7,7 @@ import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { BaseComponent } from "@langwatch/workflow-contract";
-import type { StudioClientEvent, StudioServerEvent } from "../types/events";
+import type { StudioClientEvent, StudioServerEvent } from "@langwatch/workflow-contract";
 import {
   type CodedExecutionFailure,
   explainExecutionStateError,

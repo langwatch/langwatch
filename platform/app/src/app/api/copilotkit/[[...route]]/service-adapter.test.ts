@@ -35,7 +35,7 @@ vi.mock("~/optimization_studio/server/addEnvs", () => ({
   getS3CacheKey: vi.fn(),
 }));
 
-vi.mock("~/optimization_studio/server/loadDatasets", () => ({
+vi.mock("~/optimization_studio/server/load-datasets.adapter", () => ({
   loadDatasets: vi.fn(),
 }));
 
@@ -73,7 +73,8 @@ import type {
 } from "@copilotkit/runtime";
 import { beforeEach, describe, expect, it } from "vitest";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
-import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
+import { loadDatasets } from "~/optimization_studio/server/load-datasets.adapter";
+import type { DatasetService } from "@langwatch/dataset-contract";
 import { studioBackendPostEvent } from "../../workflows/post_event/post-event";
 import { PromptStudioAdapter } from "./service-adapter";
 
@@ -177,7 +178,10 @@ describe("PromptStudioAdapter", () => {
   let adapter: PromptStudioAdapter;
 
   beforeEach(() => {
-    adapter = new PromptStudioAdapter({ projectId: "proj-test" });
+    adapter = new PromptStudioAdapter({
+      projectId: "proj-test",
+      datasets: {} as DatasetService,
+    });
     generateOtelTraceIdMock.mockReset();
     let callCount = 0;
     generateOtelTraceIdMock.mockImplementation(() => {

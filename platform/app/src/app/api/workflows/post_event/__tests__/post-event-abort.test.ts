@@ -11,7 +11,7 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { StudioClientEvent } from "../../../../../optimization_studio/types/events";
+import type { StudioClientEvent } from "@langwatch/workflow-contract";
 
 vi.mock("../../../../../optimization_studio/server/addEnvs", async () => {
   const actual = await vi.importActual<

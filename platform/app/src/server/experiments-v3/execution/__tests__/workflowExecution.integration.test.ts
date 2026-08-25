@@ -8,8 +8,9 @@ import type {
 } from "~/experiments-v3/types";
 import type { Project } from "~/generated/prisma/client";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
-import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
-import type { StudioServerEvent } from "~/optimization_studio/types/events";
+import { loadDatasets } from "~/optimization_studio/server/load-datasets.adapter";
+import { getApp } from "~/server/app-layer/app";
+import type { StudioServerEvent } from "@langwatch/workflow-contract";
 import { getTestProject } from "~/utils/testUtils";
 import type { ExecutionCell } from "../types";
 import { buildCellWorkflow } from "../workflowBuilder";
@@ -162,6 +163,7 @@ describe.skipIf(!hasNlpService)("WorkflowExecution Integration", () => {
     const enrichedEvent = await loadDatasets(
       await addEnvs(rawEvent, project.id),
       project.id,
+      getApp().dataset,
     );
 
     // Execute through the NLP backend

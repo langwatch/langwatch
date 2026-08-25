@@ -48,12 +48,12 @@ export const customEvaluatorTemplate: StudioWorkflow = {
           {
             identifier: "llm",
             type: "llm",
-            value: undefined,
+            value: void 0,
           },
           {
             identifier: "prompting_technique",
             type: "prompting_technique",
-            value: undefined,
+            value: void 0,
           },
           {
             identifier: "instructions",
@@ -100,7 +100,7 @@ Return your judgment as either TRUE (no significant cognitive biases) or FALSE (
           {
             identifier: "demonstrations",
             type: "dataset",
-            value: undefined,
+            value: void 0,
           },
         ],
         inputs: [{ identifier: "input", type: "str" }],

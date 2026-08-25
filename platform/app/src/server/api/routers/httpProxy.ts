@@ -13,7 +13,7 @@ import {
   LATEST_SPEC_VERSION,
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
-import type { StudioServerEvent } from "~/optimization_studio/types/events";
+import type { StudioServerEvent } from "@langwatch/workflow-contract";
 import { buildHttpNodeParameters } from "~/server/agents/http-node";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {

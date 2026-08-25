@@ -19,7 +19,7 @@ import {
   applyMappingChange,
   buildAvailableSources,
   buildInputMappings,
-} from "../../utils/edgeMappingUtils";
+} from "@langwatch/workflow-web";
 
 /** Check whether two sets of fields have identical identifiers and types (order-independent). */
 function fieldsMatch(a: Field[], b: { identifier: string; type: string }[]): boolean {

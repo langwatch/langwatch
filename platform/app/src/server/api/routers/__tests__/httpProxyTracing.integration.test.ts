@@ -7,7 +7,7 @@
  */
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Field } from "@langwatch/workflow-contract";
-import type { StudioClientEvent } from "~/optimization_studio/types/events";
+import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import { getTestUser } from "../../../../utils/testUtils";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";

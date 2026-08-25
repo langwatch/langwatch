@@ -23,7 +23,7 @@ import {
   applyMappingChange,
   buildAvailableSources,
   buildInputMappings,
-} from "../../utils/edgeMappingUtils";
+} from "@langwatch/workflow-web";
 import { useRegisterDrawerFooter } from "../drawers/useInsideDrawer";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
 

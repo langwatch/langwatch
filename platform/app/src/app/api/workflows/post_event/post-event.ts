@@ -4,7 +4,7 @@ import { invokeLambda } from "../../../../optimization_studio/server/lambda";
 import type {
   StudioClientEvent,
   StudioServerEvent,
-} from "../../../../optimization_studio/types/events";
+} from "@langwatch/workflow-contract";
 import { prisma } from "../../../../server/db";
 import { stripUnsupportedLLMParamsFromWorkflow } from "../../../../server/workflows/stripUnsupportedLLMParams";
 

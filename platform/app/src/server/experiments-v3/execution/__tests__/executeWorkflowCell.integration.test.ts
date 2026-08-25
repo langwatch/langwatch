@@ -7,7 +7,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EvaluatorConfig } from "~/experiments-v3/types";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
-import type { StudioServerEvent } from "~/optimization_studio/types/events";
+import type { StudioServerEvent } from "@langwatch/workflow-contract";
 
 // vi.mock is hoisted above declarations, so the scripted events live in a
 // hoisted holder the mock factory can safely close over. The workflow run and
@@ -42,7 +42,7 @@ vi.mock("~/app/api/workflows/post_event/post-event", () => ({
 vi.mock("~/optimization_studio/server/addEnvs", () => ({
   addEnvs: vi.fn(async (event: unknown) => event),
 }));
-vi.mock("~/optimization_studio/server/loadDatasets", () => ({
+vi.mock("~/optimization_studio/server/load-datasets.adapter", () => ({
   loadDatasets: vi.fn(async (event: unknown) => event),
 }));
 

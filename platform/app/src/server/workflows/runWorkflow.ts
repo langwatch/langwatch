@@ -6,7 +6,7 @@ import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import type { ExecutionStatus, StudioWorkflow } from "@langwatch/workflow-contract";
-import type { StudioClientEvent } from "../../optimization_studio/types/events";
+import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import { migrateDSLVersion } from "@langwatch/workflow-contract";
 import { getEntryInputs } from "@langwatch/workflow-contract";
 import {

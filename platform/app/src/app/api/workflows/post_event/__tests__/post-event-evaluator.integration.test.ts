@@ -30,7 +30,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import type { StudioServerEvent } from "../../../../../optimization_studio/types/events";
+import type { StudioServerEvent } from "@langwatch/workflow-contract";
 
 vi.mock("../../../../../server/featureFlag/featureFlag.service", () => ({
   featureFlagService: {

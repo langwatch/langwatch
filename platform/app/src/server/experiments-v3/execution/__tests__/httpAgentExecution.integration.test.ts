@@ -16,9 +16,10 @@ import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-even
 import type { HttpConfig, TargetConfig } from "~/experiments-v3/types";
 import type { Project } from "~/generated/prisma/client";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
-import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
+import { loadDatasets } from "~/optimization_studio/server/load-datasets.adapter";
+import { getApp } from "~/server/app-layer/app";
 import type { HttpComponentConfig } from "@langwatch/workflow-contract";
-import type { StudioServerEvent } from "~/optimization_studio/types/events";
+import type { StudioServerEvent } from "@langwatch/workflow-contract";
 import { getTestProject } from "~/utils/testUtils";
 import type { ExecutionCell } from "../types";
 import { buildCellWorkflow } from "../workflowBuilder";
@@ -174,6 +175,7 @@ describe.skipIf(process.env.CI)("HTTP Agent Execution Integration", () => {
     const enrichedEvent = await loadDatasets(
       await addEnvs(rawEvent, project.id),
       project.id,
+      getApp().dataset,
     );
 
     await studioBackendPostEvent({

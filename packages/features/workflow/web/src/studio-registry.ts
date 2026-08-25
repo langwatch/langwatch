@@ -1,5 +1,8 @@
-import { DEFAULT_FORM_VALUES } from "~/prompts/utils/buildDefaultFormValues";
-import { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
+import {
+  AVAILABLE_EVALUATORS,
+  evaluatorDisplayName,
+  type EvaluatorTypes,
+} from "@langwatch/evaluator-contract";
 
 import type {
   BaseComponent,
@@ -9,20 +12,24 @@ import type {
   PromptingTechnique,
   Signature,
 } from "@langwatch/workflow-contract";
-import { convertEvaluators } from "./utils/registryUtils";
 
-// Get defaults from the single source of truth
-const defaults = DEFAULT_FORM_VALUES.version.configData;
-const systemMessage = defaults.messages.find((m) => m.role === "system");
-const messages = defaults.messages.filter((m) => m.role !== "system");
+const defaults = {
+  messages: [
+    { role: "system", content: "You are a helpful assistant." },
+    { role: "user", content: "{{input}}" },
+  ],
+  inputs: [{ identifier: "input", type: "str" }],
+  outputs: [{ identifier: "output", type: "str" }],
+};
+const systemMessage = defaults.messages.find((message) => message.role === "system");
+const messages = defaults.messages.filter((message) => message.role !== "system");
 const defaultInput = defaults.inputs[0];
 const defaultOutput = defaults.outputs[0];
 
 /**
  * Default Empty LLM Signature Node
  *
- * Uses unified defaults from buildDefaultFormValues for consistency across
- * Playground, Evaluations V3, and Optimization Studio.
+ * Uses the portable Studio default shape shared by the node palette.
  */
 const signature: Signature = {
   name: "Prompt",
@@ -40,7 +47,7 @@ const signature: Signature = {
     {
       identifier: "prompting_technique",
       type: "prompting_technique",
-      value: undefined,
+      value: void 0,
     },
     {
       identifier: "instructions",
@@ -55,7 +62,7 @@ const signature: Signature = {
     {
       identifier: "demonstrations",
       type: "dataset",
-      value: undefined,
+      value: void 0,
     },
   ],
   inputs: defaults.inputs.map((i) => ({
@@ -130,8 +137,70 @@ const ALLOWED_EVALUATORS = [
   "ragas/rouge_score",
 ];
 
+const studioEvaluatorFields = (fields: string[], optional = false): Field[] =>
+  fields.map((identifier) => ({
+    identifier,
+    type:
+      identifier === "contexts" || identifier === "expected_contexts"
+        ? "list[str]"
+        : "str",
+    ...(optional ? { optional: true } : {}),
+  }));
+
+const convertStudioEvaluators = (evaluators: typeof AVAILABLE_EVALUATORS): Evaluator[] =>
+  Object.entries(evaluators)
+    .filter(
+      ([evaluator, definition]) =>
+        !definition.requiredFields.includes("conversation") &&
+        !definition.optionalFields.includes("conversation") &&
+        !evaluator.startsWith("example/"),
+    )
+    .map(([evaluator, definition]) => {
+      const inputs = [
+        ...studioEvaluatorFields(definition.requiredFields),
+        ...studioEvaluatorFields(definition.optionalFields, true),
+      ].sort(
+        (left, right) =>
+          [
+            "conversation",
+            "input",
+            "contexts",
+            "output",
+            "expected_output",
+            "expected_contexts",
+          ].indexOf(left.identifier) -
+          [
+            "conversation",
+            "input",
+            "contexts",
+            "output",
+            "expected_output",
+            "expected_contexts",
+          ].indexOf(right.identifier),
+      );
+      const outputs: Field[] = [
+        ...(definition.result.score
+          ? [{ identifier: "score", type: "float" as const }]
+          : []),
+        ...(definition.result.passed
+          ? [{ identifier: "passed", type: "bool" as const }]
+          : []),
+        ...(definition.result.label
+          ? [{ identifier: "label", type: "str" as const }]
+          : []),
+      ];
+      return {
+        cls: "LangWatchEvaluator",
+        evaluator: evaluator as EvaluatorTypes,
+        name: evaluatorDisplayName(definition.name).replace("Evaluator", "").trim(),
+        description: definition.description,
+        inputs,
+        outputs,
+      };
+    });
+
 const evaluators: Evaluator[] = [
-  ...convertEvaluators(
+  ...convertStudioEvaluators(
     Object.fromEntries(
       Object.entries(AVAILABLE_EVALUATORS)
         .filter(([cls, _evaluator]) => ALLOWED_EVALUATORS.includes(cls))

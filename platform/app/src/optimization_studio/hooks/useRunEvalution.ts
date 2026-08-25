@@ -7,7 +7,7 @@ import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { useVersionState } from "../components/History";
-import type { StudioClientEvent } from "../types/events";
+import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import { hasDSLChanged } from "@langwatch/workflow-contract";
 import { mergeLocalConfigsIntoDsl } from "../utils/mergeLocalConfigs";
 import { usePostEvent } from "./usePostEvent";

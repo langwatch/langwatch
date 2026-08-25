@@ -28,7 +28,7 @@ vi.mock("../../../license-enforcement", async (importOriginal) => {
 
 import { cleanupTestRows, requireAssigned } from "~/test-utils/cleanupTestRows";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
-import { blankTemplate } from "../../../../optimization_studio/templates/blank";
+import { blankTemplate } from "@langwatch/workflow-web";
 import type { LLMConfig, StudioWorkflow } from "@langwatch/workflow-contract";
 import { DEFAULT_MODEL } from "../../../../utils/constants";
 import { prisma } from "../../../db";

@@ -18,7 +18,7 @@ import {
   applyMappingChange,
   buildAvailableSources,
   buildInputMappings,
-} from "../../utils/edgeMappingUtils";
+} from "@langwatch/workflow-web";
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
 
 /**

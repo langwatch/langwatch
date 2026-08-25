@@ -9,7 +9,7 @@ import {
   applyMappingChangeToEdges,
   buildAvailableSources,
   buildInputMappingsFromEdges,
-} from "../edgeMappingUtils";
+} from "../src/utils/edge-mapping";
 
 function createNode(
   id: string,

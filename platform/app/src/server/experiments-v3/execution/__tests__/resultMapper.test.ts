@@ -1,6 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
-import type { StudioServerEvent } from "~/optimization_studio/types/events";
+import type { StudioServerEvent } from "@langwatch/workflow-contract";
 import {
   coercePassed,
   coerceScore,

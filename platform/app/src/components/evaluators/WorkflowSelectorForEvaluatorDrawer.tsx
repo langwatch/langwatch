@@ -23,7 +23,7 @@ import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer"
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { EmojiPickerModal } from "~/optimization_studio/components/properties/modals/EmojiPickerModal";
 import { getRandomWorkflowIcon } from "~/optimization_studio/components/workflow/NewWorkflowForm";
-import { customEvaluatorTemplate } from "~/optimization_studio/templates/custom_evaluator";
+import { customEvaluatorTemplate } from "@langwatch/workflow-web";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";

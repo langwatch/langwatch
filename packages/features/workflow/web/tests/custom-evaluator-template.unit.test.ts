@@ -1,34 +1,38 @@
 import { describe, expect, it } from "vitest";
-import { customEvaluatorTemplate } from "../custom_evaluator";
+import { customEvaluatorTemplate } from "../src/templates/custom-evaluator.template";
 
-const node = (id: string) => customEvaluatorTemplate.nodes.find((n) => n.id === id);
+const node = (id: string) => {
+  const result = customEvaluatorTemplate.nodes.find((candidate) => candidate.id === id);
+  if (!result) throw new Error(`Missing ${id} template node`);
+  return result;
+};
 
 describe("customEvaluatorTemplate", () => {
   describe("the entry point", () => {
     /** @scenario Custom evaluator template entry exposes only a question input */
     it("exposes only a question output", () => {
-      expect((node("entry")?.data as { outputs: unknown }).outputs).toEqual([
+      expect((node("entry").data as { outputs: unknown }).outputs).toEqual([
         { identifier: "question", type: "str" },
       ]);
     });
 
     /** @scenario Custom evaluator template has no attached dataset */
     it("has no attached dataset", () => {
-      expect((node("entry")?.data as { dataset?: unknown }).dataset).toBeUndefined();
+      expect((node("entry").data as { dataset?: unknown }).dataset).toBeUndefined();
     });
   });
 
   describe("the sample LLM node", () => {
     /** @scenario Custom evaluator template LLM input is named input */
     it("takes a single input named input", () => {
-      expect((node("llm_call")?.data as { inputs: unknown }).inputs).toEqual([
+      expect((node("llm_call").data as { inputs: unknown }).inputs).toEqual([
         { identifier: "input", type: "str" },
       ]);
     });
 
     it("references the input in its prompt and drops llm_output", () => {
       const params = (
-        node("llm_call")?.data as {
+        node("llm_call").data as {
           parameters: Array<{ identifier: string; value: unknown }>;
         }
       ).parameters;
@@ -44,7 +48,7 @@ describe("customEvaluatorTemplate", () => {
     /** @scenario Custom evaluator template lists details first on the end node */
     it("puts details first so the reasoning edge does not cross the verdict", () => {
       expect(
-        (node("end")?.data as { inputs: Array<{ identifier: string }> }).inputs.map(
+        (node("end").data as { inputs: Array<{ identifier: string }> }).inputs.map(
           (i) => i.identifier,
         ),
       ).toEqual(["details", "passed", "score", "label"]);

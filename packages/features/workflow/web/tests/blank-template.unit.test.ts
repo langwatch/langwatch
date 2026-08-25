@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { blankTemplate } from "../blank";
+import { blankTemplate } from "../src/templates/blank.template";
 
-const node = (id: string) => blankTemplate.nodes.find((n) => n.id === id);
+const node = (id: string) => {
+  const result = blankTemplate.nodes.find((candidate) => candidate.id === id);
+  if (!result) throw new Error(`Missing ${id} template node`);
+  return result;
+};
 
 const param = ({ nodeId, identifier }: { nodeId: string; identifier: string }) =>
   (
-    node(nodeId)?.data as {
+    node(nodeId).data as {
       parameters: Array<{ identifier: string; value: unknown }>;
     }
   ).parameters.find((p) => p.identifier === identifier)?.value;
@@ -15,7 +19,7 @@ describe("blankTemplate", () => {
     describe("when inspecting the entry point", () => {
       /** @scenario Blank workflow entry exposes a single input */
       it("exposes a single input output", () => {
-        expect((node("entry")?.data as { outputs: unknown }).outputs).toEqual([
+        expect((node("entry").data as { outputs: unknown }).outputs).toEqual([
           { identifier: "input", type: "str" },
         ]);
       });
@@ -36,10 +40,10 @@ describe("blankTemplate", () => {
       });
 
       it("names its input and output input/output", () => {
-        expect((node("llm_call")?.data as { inputs: unknown }).inputs).toEqual([
+        expect((node("llm_call").data as { inputs: unknown }).inputs).toEqual([
           { identifier: "input", type: "str" },
         ]);
-        expect((node("llm_call")?.data as { outputs: unknown }).outputs).toEqual([
+        expect((node("llm_call").data as { outputs: unknown }).outputs).toEqual([
           { identifier: "output", type: "str" },
         ]);
       });

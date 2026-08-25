@@ -3,7 +3,7 @@ import type { AgentWithFields as TypedAgent } from "@langwatch/agent-contract";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import type { NodeWithOptionalPosition } from "~/types";
 import type { Component } from "@langwatch/workflow-contract";
-import { buildAgentNodeData } from "../utils/agentNodeData";
+import { buildAgentNodeData } from "@langwatch/workflow-web";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 
 /**

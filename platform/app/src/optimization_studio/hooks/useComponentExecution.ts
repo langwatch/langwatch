@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toaster } from "../../components/ui/toaster";
 import { generateOtelTraceId } from "../../utils/trace";
 import type { BaseComponent, Component, Field } from "@langwatch/workflow-contract";
-import type { StudioClientEvent } from "../types/events";
+import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import { mergeLocalConfigsIntoDsl } from "../utils/mergeLocalConfigs";
 import { useAlertOnComponent } from "./useAlertOnComponent";
 import { usePostEvent } from "./usePostEvent";

@@ -1,14 +1,5 @@
-import { z } from "zod";
-import { type LLMConfig, llmConfigSchema } from "@langwatch/workflow-contract";
-
-export const optimizerParamsSchema = z.object({
-  llm: llmConfigSchema.optional().nullable(),
-  num_candidates: z.number().optional(),
-  max_bootstrapped_demos: z.number().optional(),
-  max_labeled_demos: z.number().optional(),
-  max_rounds: z.number().optional(),
-  num_candidate_programs: z.number().optional(),
-});
+import type { LLMConfig, StudioOptimizerParams } from "@langwatch/workflow-contract";
+export { studioOptimizerParamsSchema as optimizerParamsSchema } from "@langwatch/workflow-contract";
 
 export const OPTIMIZERS = {
   MIPROv2: {
@@ -51,6 +42,6 @@ export const OPTIMIZERS = {
     name: string;
     description: string;
     minimum_train_set: number;
-    params: z.infer<typeof optimizerParamsSchema>;
+    params: StudioOptimizerParams;
   }
 >;

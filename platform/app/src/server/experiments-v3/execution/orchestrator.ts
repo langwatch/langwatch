@@ -31,9 +31,9 @@ import { isRowEmpty } from "~/experiments-v3/utils/emptyRowDetection";
 import { toComparisonConfig } from "~/experiments-v3/utils/normalizeComparison";
 import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
-import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
+import { loadDatasets } from "~/optimization_studio/server/load-datasets.adapter";
 import type { ExecutionState, StudioWorkflow } from "@langwatch/workflow-contract";
-import type { StudioServerEvent } from "~/optimization_studio/types/events";
+import type { StudioServerEvent } from "@langwatch/workflow-contract";
 import { nodeErrorToDomainError } from "~/optimization_studio/utils/nodeErrorDomain";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import { getApp } from "~/server/app-layer/app";
@@ -1201,6 +1201,7 @@ export async function* executeCell(
       const enrichedEvent = await loadDatasets(
         await addEnvs(rawEvent, projectId),
         projectId,
+        getApp().dataset,
       );
 
       // Execute target and collect events
@@ -1357,6 +1358,7 @@ export async function* executeWorkflowCell({
     const enrichedEvent = await loadDatasets(
       await addEnvs(rawEvent, projectId),
       projectId,
+      getApp().dataset,
     );
 
     const events: StudioServerEvent[] = [];

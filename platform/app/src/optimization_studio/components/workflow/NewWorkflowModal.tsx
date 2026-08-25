@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, File, Upload } from "react-feather";
 import { Dialog } from "../../../components/ui/dialog";
 import { toaster } from "../../../components/ui/toaster";
-import { TEMPLATES } from "../../templates/registry";
+import { TEMPLATES } from "@langwatch/workflow-web";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { studioWorkflowSchema } from "@langwatch/workflow-contract";
 import { NewWorkflowForm } from "./NewWorkflowForm";

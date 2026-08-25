@@ -196,7 +196,7 @@ export function readCodeSnapshot(
   data: Pick<AgentComponent, "parameters">,
 ): string | undefined {
   const value = readParameter(data, "code");
-  return typeof value === "string" ? value : undefined;
+  return typeof value === "string" ? value : void 0;
 }
 
 export type HttpNodeSnapshot = {
@@ -215,7 +215,7 @@ export type HttpNodeSnapshot = {
 export function readHttpSnapshot(
   data: Pick<AgentComponent, "parameters">,
 ): HttpNodeSnapshot | undefined {
-  if (readParameter(data, "agent_type") !== "http") return undefined;
+  if (readParameter(data, "agent_type") !== "http") return void 0;
 
   const headersValue = readParameter(data, "headers");
   const headers =
@@ -224,7 +224,7 @@ export function readHttpSnapshot(
           key,
           value,
         }))
-      : undefined;
+      : void 0;
 
   const authType = readParameter(data, "auth_type");
   const auth: HttpAuth | undefined =
@@ -237,7 +237,7 @@ export function readHttpSnapshot(
           username: readParameter(data, "auth_username"),
           password: readParameter(data, "auth_password"),
         } as HttpAuth)
-      : undefined;
+      : void 0;
 
   return {
     url: readParameter(data, "url") as string | undefined,

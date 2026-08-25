@@ -1,6 +1,21 @@
 import type { Edge, Node } from "@xyflow/react";
-import type { AvailableSource, FieldMapping } from "~/components/variables";
-import type { Component, Field } from "@langwatch/workflow-contract";
+import type { Component, ComponentType, Field } from "@langwatch/workflow-contract";
+
+export type StudioMappingField = {
+  name: string;
+  type: Field["type"];
+};
+
+export type StudioMappingSource = {
+  id: string;
+  name: string;
+  type: ComponentType | "dataset";
+  fields: StudioMappingField[];
+};
+
+export type StudioFieldMapping =
+  | { type: "source"; sourceId: string; path: string[] }
+  | { type: "value"; value: string };
 
 /**
  * Builds available sources for variable mapping from the workflow graph.
@@ -14,7 +29,7 @@ export function buildAvailableSources({
   nodeId: string;
   nodes: Node<Component>[];
   edges: Edge[];
-}): AvailableSource[] {
+}): StudioMappingSource[] {
   const downstreamNodes = new Set<string>();
   const toVisit = [nodeId];
   while (toVisit.length > 0) {
@@ -37,7 +52,7 @@ export function buildAvailableSources({
         // dataset name. Evaluations v3 has its own buildAvailableSources and
         // keeps the dataset-name behavior.
         name: isEntry ? "Entry" : (n.data.name ?? n.id),
-        type: n.type as AvailableSource["type"],
+        type: n.type as StudioMappingSource["type"],
         fields:
           n.data.outputs?.map((output) => ({
             name: output.identifier,
@@ -58,8 +73,8 @@ export function buildInputMappingsFromEdges({
 }: {
   nodeId: string;
   edges: Edge[];
-}): Record<string, FieldMapping> {
-  const mappings: Record<string, FieldMapping> = {};
+}): Record<string, StudioFieldMapping> {
+  const mappings: Record<string, StudioFieldMapping> = {};
   edges
     .filter((edge) => edge.target === nodeId)
     .forEach((edge) => {
@@ -89,7 +104,7 @@ export function applyMappingChangeToEdges({
 }: {
   nodeId: string;
   identifier: string;
-  mapping: FieldMapping | undefined;
+  mapping: StudioFieldMapping | undefined;
   currentEdges: Edge[];
 }): Edge[] {
   // Remove existing edge for this input
@@ -125,8 +140,8 @@ export function buildInputMappings({
   nodeId: string;
   edges: Edge[];
   inputs: Field[];
-}): Record<string, FieldMapping> {
-  const mappings: Record<string, FieldMapping> = {};
+}): Record<string, StudioFieldMapping> {
+  const mappings: Record<string, StudioFieldMapping> = {};
 
   // Source mappings from edges
   edges
@@ -170,7 +185,7 @@ export function applyMappingChange({
 }: {
   nodeId: string;
   identifier: string;
-  mapping: FieldMapping | undefined;
+  mapping: StudioFieldMapping | undefined;
   currentEdges: Edge[];
   currentInputs: Field[];
 }): { edges: Edge[]; inputs: Field[] } {
