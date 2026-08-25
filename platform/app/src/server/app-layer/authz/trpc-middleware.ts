@@ -48,6 +48,7 @@ import {
   LiteMemberRestrictedError,
   MembershipDisabledError,
 } from "../permissions/errors";
+import { explainDenial } from "./denial-explanation";
 
 const logger = createLogger("langwatch:authz");
 
@@ -109,7 +110,8 @@ export const checkDeclaredPermission = ({
         scope,
       });
       if (!permitted) {
-        throw deniedError({
+        throw await deniedError({
+          userId: ctx.session.user.id,
           permission,
           scope,
           organizationRole,
@@ -159,7 +161,8 @@ export const checkDeclaredPermissionAny = (
         permissions,
       });
       if (!permitted) {
-        throw deniedError({
+        throw await deniedError({
+          userId: ctx.session.user.id,
           permission: permissions[0],
           scope: { tier: "project", id: projectId },
           organizationRole,
@@ -288,24 +291,52 @@ function wiringBug({
 }
 
 /**
+ * The engine's "why" is an extra, and an extra must never be able to turn a
+ * refusal into a 500 or hold one open.
+ *
+ * `explainDenial` already guards itself and runs under its own deadline;
+ * this restates the guarantee at the boundary that makes the promise, so a
+ * regression there costs a sentence rather than the denial.
+ */
+async function explainedSafely(args: {
+  userId: string;
+  permission: AuthzPermission;
+  scope: DeclaredScopeId;
+}): Promise<Awaited<ReturnType<typeof explainDenial>>> {
+  try {
+    return await explainDenial(args);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The one denial shape for every tier. An id that resolves to nothing
  * answers exactly like an id the caller may not touch — the resolvers
  * already fold both into `permitted: false`, so no probe can learn whether a
  * scope EXISTS. The lite-member cause drives the client's restriction modal;
  * the `PermissionDeniedError` cause carries the stable code and meta for
  * everything else.
+ *
+ * A missing grant is also the one denial a person can DO something about, so
+ * it is the one that carries the engine's "why" (ADR-092 section 6): which of
+ * the roles they already hold were consulted, and which roles would grant the
+ * action. Asked for here and nowhere else, because a denial is the only place
+ * the extra collect is affordable.
  */
-function deniedError({
+async function deniedError({
+  userId,
   permission,
   scope,
   organizationRole,
   denialReason,
 }: {
+  userId: string;
   permission: AuthzPermission;
   scope: DeclaredScopeId;
   organizationRole: OrganizationUserRole | null;
   denialReason?: AuthzDenialReason;
-}): TRPCError {
+}): Promise<TRPCError> {
   // Checked before the role, because a disabled member HAS a role and the
   // role-shaped answers would all be wrong for them: the lite-member modal
   // offers an upgrade they cannot buy, and the generic denial names a
@@ -329,10 +360,20 @@ function deniedError({
       ),
     });
   }
+  const reason = denialReason ?? "no-binding";
+  // Only a missing binding gets the "why": every other reason has an answer
+  // of its own, and "these roles would grant it" is the wrong one for all of
+  // them. Best effort throughout - explainDenial swallows its own failures,
+  // and a null simply leaves the generic copy standing.
+  const explanation =
+    reason === "no-binding"
+      ? await explainedSafely({ userId, permission, scope })
+      : null;
   const denied = new PermissionDeniedError({
     permission,
     scope: { type: scope.tier, id: scope.id },
-    denialReason: denialReason ?? "no-binding",
+    denialReason: reason,
+    ...(explanation ? { explanation } : {}),
   });
   // The wire code that results is FORBIDDEN, not the UNAUTHORIZED spelled
   // here: `handledErrorMiddleware` re-derives it from the handled cause's

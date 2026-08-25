@@ -171,6 +171,84 @@ describe("explainHandledError", () => {
     });
   });
 
+  describe("when the authorization engine explained the denial", () => {
+    const denial = (
+      explanation: unknown,
+    ): Parameters<typeof explainHandledError>[0] =>
+      shape({
+        code: "permission_denied",
+        httpStatus: 403,
+        meta: {
+          permission: "traces:share",
+          scopeType: "project",
+          denialReason: "no-binding",
+          explanation,
+        },
+      });
+
+    /** @scenario "A denied member is told which of their roles fell short" */
+    it("names the role that fell short and the roles that would grant", () => {
+      const { title, description } = explainHandledError(
+        denial({ heldRoles: ["Viewer"], wouldGrantRoles: ["Admin", "Member"] }),
+      );
+
+      expect(title).toBe("You don't have permission to do this");
+      expect(description).toBe(
+        'Your Viewer role doesn\'t include "traces:share". The Admin and Member roles do. Ask an organization admin to give you one of them.',
+      );
+    });
+
+    /** @scenario "A denied member is told which of their roles fell short" */
+    it("agrees in number when exactly one role would grant it", () => {
+      const { description } = explainHandledError(
+        denial({ heldRoles: ["Viewer", "Member"], wouldGrantRoles: ["Admin"] }),
+      );
+
+      expect(description).toBe(
+        'Your Viewer and Member roles don\'t include "traces:share". The Admin role does. Ask an organization admin to give you that role.',
+      );
+    });
+
+    /** @scenario "A denied member is told which of their roles fell short" */
+    it("says so plainly when they hold no role on this scope at all", () => {
+      const { description } = explainHandledError(
+        denial({ heldRoles: [], wouldGrantRoles: ["Admin"] }),
+      );
+
+      expect(description).toContain("You hold no role here");
+      expect(description).toContain("The Admin role does");
+    });
+
+    /** @scenario "The denial still works when the explanation cannot be computed" */
+    it("falls back to the generic ask when no explanation was attached", () => {
+      const { title, description } = explainHandledError(
+        shape({
+          code: "permission_denied",
+          httpStatus: 403,
+          meta: { permission: "traces:share", scopeType: "project" },
+        }),
+      );
+
+      expect(title).toBe("You don't have permission to do this");
+      expect(description).toBe(
+        'Ask an organization admin to grant you "traces:share".',
+      );
+    });
+
+    /** @scenario "meta is read only where the client knows its shape" */
+    it("ignores an explanation of the wrong shape rather than rendering it", () => {
+      // `meta` is untrusted input like any other wire field, and this one is
+      // nested - a bare property read would render "[object Object]".
+      for (const malformed of ["Admin", 7, null, { heldRoles: "Viewer" }]) {
+        const { description } = explainHandledError(denial(malformed));
+
+        expect(description, JSON.stringify(malformed)).toBe(
+          'Ask an organization admin to grant you "traces:share".',
+        );
+      }
+    });
+  });
+
   describe("when a seat allowance is what ran out", () => {
     /** @scenario Running out of Lite Member seats names that allowance */
     it("names which seats ran out and the reversible way to free one", () => {

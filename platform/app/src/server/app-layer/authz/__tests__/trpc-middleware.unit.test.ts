@@ -17,7 +17,10 @@ import { BlankScopeIdError, PermissionDeniedError } from "@langwatch/authz";
 import type { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
+import {
+  LiteMemberRestrictedError,
+  MembershipDisabledError,
+} from "~/server/app-layer/permissions/errors";
 
 /**
  * Severity is behaviour here, not decoration: the blank-id split exists so a
@@ -43,6 +46,14 @@ const resolveProjectPermission = vi.fn();
 const resolveTeamPermission = vi.fn();
 const hasOrganizationPermission = vi.fn();
 const resolveProjectPermissionAny = vi.fn();
+const explainDenial = vi.fn();
+
+// The engine's "why" (ADR-092 section 6) reaches a real collector, so it is
+// stubbed here: what this suite owns is WHEN the seam asks for one and what
+// it does with the answer, never how the answer is computed.
+vi.mock("../denial-explanation", () => ({
+  explainDenial: (...args: unknown[]) => explainDenial(...args),
+}));
 
 vi.mock("~/server/api/rbac", () => ({
   resolveProjectPermission: (...args: unknown[]) =>
@@ -115,6 +126,7 @@ beforeEach(() => {
     permitted: true,
     organizationRole: "MEMBER",
   });
+  explainDenial.mockResolvedValue(null);
 });
 
 describe("checkDeclaredPermission", () => {
@@ -340,6 +352,118 @@ describe("checkDeclaredPermission", () => {
         ),
       );
       expect(error.cause).toBeInstanceOf(LiteMemberRestrictedError);
+    });
+
+    /** @scenario "A denied member is told which of their roles fell short" */
+    /** @scenario "The explanation names roles, never the bindings behind them" */
+    it("carries the roles held and the roles that would grant, on a missing binding", async () => {
+      resolveProjectPermission.mockResolvedValue({
+        permitted: false,
+        organizationRole: "MEMBER",
+      });
+      explainDenial.mockResolvedValue({
+        heldRoles: ["Viewer"],
+        wouldGrantRoles: ["Admin", "Member"],
+      });
+
+      const error = await rejection(() =>
+        checkDeclaredPermission({ permission: "traces:share" })(
+          paramsFor({ projectId: "proj-1" }) as any,
+        ),
+      );
+
+      expect(explainDenial).toHaveBeenCalledWith({
+        userId: "alice",
+        permission: "traces:share",
+        scope: { tier: "project", id: "proj-1" },
+      });
+      const cause = error.cause as PermissionDeniedError;
+      expect(cause.meta.explanation).toEqual({
+        heldRoles: ["Viewer"],
+        wouldGrantRoles: ["Admin", "Member"],
+      });
+      // Role labels, and nothing behind them. The engine's own walk names the
+      // scope a binding sits at; meta carries the TIER and never the id.
+      expect(JSON.stringify(cause.meta)).not.toContain("proj-1");
+    });
+
+    /** @scenario "The denial still works when the explanation cannot be computed" */
+    it("refuses identically when the engine cannot say why", async () => {
+      resolveProjectPermission.mockResolvedValue({
+        permitted: false,
+        organizationRole: "MEMBER",
+      });
+      explainDenial.mockResolvedValue(null);
+
+      const error = await rejection(() =>
+        checkDeclaredPermission({ permission: "traces:share" })(
+          paramsFor({ projectId: "proj-1" }) as any,
+        ),
+      );
+
+      const cause = error.cause as PermissionDeniedError;
+      expect(cause.code).toBe("permission_denied");
+      expect(cause.meta).not.toHaveProperty("explanation");
+    });
+
+    /** @scenario "The denial still works when the explanation cannot be computed" */
+    it("refuses identically when explaining throws, instead of failing the call", async () => {
+      // The explanation is an extra. A regression inside it must cost the
+      // sentence, never the denial - which is what a thrown error would do,
+      // since this runs on the path that produces the refusal.
+      resolveProjectPermission.mockResolvedValue({
+        permitted: false,
+        organizationRole: "MEMBER",
+      });
+      explainDenial.mockRejectedValue(new Error("collector unavailable"));
+
+      const error = await rejection(() =>
+        checkDeclaredPermission({ permission: "traces:share" })(
+          paramsFor({ projectId: "proj-1" }) as any,
+        ),
+      );
+
+      const cause = error.cause as PermissionDeniedError;
+      expect(cause).toBeInstanceOf(PermissionDeniedError);
+      expect(cause.code).toBe("permission_denied");
+      expect(cause.meta).not.toHaveProperty("explanation");
+    });
+
+    /** @scenario "A lite member's denial keeps its own messaging" */
+    it("never asks why a lite member was refused", async () => {
+      resolveTeamPermission.mockResolvedValue({
+        permitted: false,
+        organizationRole: "EXTERNAL",
+      });
+
+      const error = await rejection(() =>
+        checkDeclaredPermission({ permission: "team:manage" })(
+          paramsFor({ teamId: "team-1" }) as any,
+        ),
+      );
+
+      expect(error.cause).toBeInstanceOf(LiteMemberRestrictedError);
+      // Offering a lite member a role they cannot be given is the errand the
+      // restriction modal exists to avoid.
+      expect(explainDenial).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A denial for a reason no grant would fix carries no explanation" */
+    it("never asks why a disabled membership was refused", async () => {
+      resolveProjectPermission.mockResolvedValue({
+        permitted: false,
+        organizationRole: "MEMBER",
+        denialReason: "membership-disabled",
+      });
+
+      const error = await rejection(() =>
+        checkDeclaredPermission({ permission: "traces:share" })(
+          paramsFor({ projectId: "proj-1" }) as any,
+        ),
+      );
+
+      expect(error.cause).toBeInstanceOf(MembershipDisabledError);
+      expect(explainDenial).not.toHaveBeenCalled();
     });
 
     it("denies at the organization tier without a lite-member special case", async () => {
