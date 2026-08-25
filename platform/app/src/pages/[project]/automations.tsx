@@ -31,8 +31,7 @@ import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { UseCaseStrip } from "~/features/automations/components/page/AutomationsEducation";
-import { AutomationsHistory } from "~/features/automations/components/page/AutomationsHistory";
+import { AutomationHistory, AutomationUseCaseStrip } from "@langwatch/automation-web";
 import {
   AlertRuleCell,
   AlertSubjectCell,
@@ -538,7 +537,7 @@ function AutomationsPage() {
                     }
                   />
                   {alerts.length === 0 ? (
-                    <UseCaseStrip
+                    <AutomationUseCaseStrip
                       kind="alert"
                       onOpen={(prefill) => openDrawer("automation", prefill)}
                     />
@@ -656,7 +655,7 @@ function AutomationsPage() {
                       title="Recent activity"
                       summary="See what alerts, schedules, and automations have done recently."
                     />
-                    <AutomationsHistory
+                    <AutomationHistory
                       fires={activity.data ?? []}
                       triggers={triggers.data ?? []}
                       isLoading={activity.isLoading}
@@ -665,6 +664,7 @@ function AutomationsPage() {
                           automationId: triggerId,
                         })
                       }
+                      formatTimeAgo={formatTimeAgo}
                     />
                   </VStack>
 
@@ -677,7 +677,7 @@ function AutomationsPage() {
                       <Text textStyle="xs" fontWeight="semibold" color="fg.muted">
                         Alerts
                       </Text>
-                      <UseCaseStrip
+                      <AutomationUseCaseStrip
                         kind="alert"
                         showLabel={false}
                         onOpen={(prefill) => openDrawer("automation", prefill)}
@@ -687,7 +687,7 @@ function AutomationsPage() {
                       <Text textStyle="xs" fontWeight="semibold" color="fg.muted">
                         Automations
                       </Text>
-                      <UseCaseStrip
+                      <AutomationUseCaseStrip
                         kind="automation"
                         showLabel={false}
                         onOpen={(prefill) => openDrawer("automation", prefill)}
@@ -828,7 +828,7 @@ function AutomationsPage() {
                     onAdd={() => openDrawer("automation", {})}
                   />
                   {traceAutomations.length === 0 ? (
-                    <UseCaseStrip
+                    <AutomationUseCaseStrip
                       kind="automation"
                       onOpen={(prefill) => openDrawer("automation", prefill)}
                     />

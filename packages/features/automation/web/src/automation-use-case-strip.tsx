@@ -1,4 +1,5 @@
 import { SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import { TriggerAction } from "@langwatch/automation-contract";
 import {
   AlertTriangle,
   Database,
@@ -6,35 +7,27 @@ import {
   Edit3,
   Flag,
   TrendingDown,
-} from "react-feather";
-import type { TriggerAction } from "~/generated/prisma/client";
+} from "lucide-react";
 
-export type AutomationKind = "alert" | "automation";
+export type AutomationUseCaseKind = "alert" | "automation";
 
-/** Drawer params a use-case card seeds into a fresh create. Matches the
- *  `initial*` props on `AutomationDrawer` — nothing here locks anything.
- *  Alerts leave the graph for the user (we can't know which one); trace
- *  cards seed their filters too so the example arrives working, not as an
- *  empty shell. `initialFilters` is a JSON-encoded trigger filter object —
- *  the same shape the drawer persists — kept as a string so it survives
- *  the drawer's URL round-trip. */
-export interface UseCasePrefill {
+export type AutomationUseCasePrefill = {
   initialSource?: "customGraph";
   initialName: string;
   initialAction: TriggerAction;
   initialFilters?: string;
-}
+};
 
 const ERROR_TRACES_FILTER = JSON.stringify({ "traces.error": ["true"] });
 
-interface UseCase {
+type UseCase = {
   title: string;
   description: string;
   icon: typeof Flag;
-  prefill: UseCasePrefill;
-}
+  prefill: AutomationUseCasePrefill;
+};
 
-const USE_CASES: Record<AutomationKind, UseCase[]> = {
+const USE_CASES: Record<AutomationUseCaseKind, UseCase[]> = {
   alert: [
     {
       title: "Error spike",
@@ -43,7 +36,7 @@ const USE_CASES: Record<AutomationKind, UseCase[]> = {
       prefill: {
         initialSource: "customGraph",
         initialName: "Error spike alert",
-        initialAction: "SEND_SLACK_MESSAGE",
+        initialAction: TriggerAction.SEND_SLACK_MESSAGE,
       },
     },
     {
@@ -53,7 +46,7 @@ const USE_CASES: Record<AutomationKind, UseCase[]> = {
       prefill: {
         initialSource: "customGraph",
         initialName: "Traffic drop alert",
-        initialAction: "SEND_EMAIL",
+        initialAction: TriggerAction.SEND_EMAIL,
       },
     },
     {
@@ -63,7 +56,7 @@ const USE_CASES: Record<AutomationKind, UseCase[]> = {
       prefill: {
         initialSource: "customGraph",
         initialName: "Cost spike alert",
-        initialAction: "SEND_EMAIL",
+        initialAction: TriggerAction.SEND_EMAIL,
       },
     },
   ],
@@ -74,7 +67,7 @@ const USE_CASES: Record<AutomationKind, UseCase[]> = {
       icon: Flag,
       prefill: {
         initialName: "Failing evaluations",
-        initialAction: "SEND_SLACK_MESSAGE",
+        initialAction: TriggerAction.SEND_SLACK_MESSAGE,
       },
     },
     {
@@ -83,7 +76,7 @@ const USE_CASES: Record<AutomationKind, UseCase[]> = {
       icon: Database,
       prefill: {
         initialName: "Error dataset",
-        initialAction: "ADD_TO_DATASET",
+        initialAction: TriggerAction.ADD_TO_DATASET,
         initialFilters: ERROR_TRACES_FILTER,
       },
     },
@@ -93,7 +86,7 @@ const USE_CASES: Record<AutomationKind, UseCase[]> = {
       icon: Edit3,
       prefill: {
         initialName: "Review queue",
-        initialAction: "ADD_TO_ANNOTATION_QUEUE",
+        initialAction: TriggerAction.ADD_TO_ANNOTATION_QUEUE,
         initialFilters: ERROR_TRACES_FILTER,
       },
     },
@@ -105,9 +98,10 @@ function UseCaseCard({
   onOpen,
 }: {
   useCase: UseCase;
-  onOpen: (prefill: UseCasePrefill) => void;
+  onOpen: (prefill: AutomationUseCasePrefill) => void;
 }) {
   const Icon = useCase.icon;
+
   return (
     <VStack
       as="button"
@@ -140,20 +134,13 @@ function UseCaseCard({
   );
 }
 
-/**
- * Empty-state strip for a section on the Alerts & automations page: three
- * clickable examples that open the drawer pre-filled with a name, kind, and
- * action. Graph and filters stay with the user. Sections with rows don't
- * render this — the header's add button is the create entry point there.
- *
- */
-export function UseCaseStrip({
+export function AutomationUseCaseStrip({
   kind,
   onOpen,
   showLabel = true,
 }: {
-  kind: AutomationKind;
-  onOpen: (prefill: UseCasePrefill) => void;
+  kind: AutomationUseCaseKind;
+  onOpen: (prefill: AutomationUseCasePrefill) => void;
   showLabel?: boolean;
 }) {
   return (

@@ -486,7 +486,6 @@
   "src/features/automations/components/__tests__/QueryFilterInput.integration.test.tsx": 2942,
   "src/features/automations/components/__tests__/ReportScheduleField.integration.test.tsx": 4321,
   "src/features/automations/components/__tests__/SubjectSection.integration.test.tsx": 1821,
-  "src/features/automations/components/page/__tests__/AutomationsEducation.integration.test.tsx": 634,
   "src/features/automations/editors/__tests__/liquidJsonSubstitution.unit.test.ts": 57,
   "src/features/automations/providers/__tests__/parity.unit.test.ts": 249,
   "src/features/automations/providers/dataset/__tests__/client.integration.test.tsx": 771,

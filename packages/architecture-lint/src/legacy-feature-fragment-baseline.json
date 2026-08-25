@@ -398,16 +398,6 @@
     },
     {
       "feature": "automation",
-      "file": "platform/app/src/features/automations/components/page/AutomationsEducation.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/features/automations/components/page/AutomationsHistory.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "automation",
       "file": "platform/app/src/features/automations/components/page/AutomationTableCells.tsx",
       "kind": "page-shell"
     },

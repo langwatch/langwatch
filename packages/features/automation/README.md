@@ -16,14 +16,15 @@ history, report schedules, delivery policy, and project email suppression.
 - The contract owns graph-alert threshold/no-data policy and series-name
   parsing shared by event and heartbeat dispatch.
 - `web/` owns browser-safe authoring helpers, template variable catalogues,
-  Liquid JSON substitution, cadence UI, and the browser transport client.
+  Liquid JSON substitution, cadence UI, overview presentation, and the browser
+  transport client.
 
 The process-owned composition root is
 `platform/app/src/runtime/app/features/automation.ts` (`AppAutomationRuntime`).
 It builds one `AutomationService`; routes and workers consume that capability.
 
-The application retains only transport and composition code where it requires
-Prisma, tRPC, React page composition, mail/Slack credentials, or Eventing
+The application retains transport and composition code where it requires
+Prisma, tRPC, page/routing composition, mail/Slack credentials, or Eventing
 wiring: `platform/app/src/features/automations/`,
 `platform/app/src/components/automations/`, and the app-layer delivery
 adapters.

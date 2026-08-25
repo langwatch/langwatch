@@ -20,12 +20,16 @@
   },
   "dependencies": {
     "@langwatch/automation-contract": "workspace:*",
-    "@langwatch/design-system": "workspace:*"
+    "@langwatch/design-system": "workspace:*",
+    "lucide-react": "^1.22.0"
   },
   "devDependencies": {
     "@chakra-ui/react": "^3.36.0",
+    "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.14",
+    "jsdom": "^30.0.1",
     "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "typescript": "^7.0.2",
     "vitest": "^4.1.9"
   },

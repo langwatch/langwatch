@@ -1,6 +1,18 @@
 export * from "@langwatch/automation-contract";
 export { AutomationClient, type AutomationClientOptions } from "./automation-client";
 export { AutomationCadenceField } from "./cadence-field";
+export {
+  AutomationHistory,
+  toAutomationActivityEntries,
+  type AutomationActivityEntry,
+  type AutomationActivityFire,
+  type AutomationActivityTrigger,
+} from "./automation-history";
+export {
+  AutomationUseCaseStrip,
+  type AutomationUseCaseKind,
+  type AutomationUseCasePrefill,
+} from "./automation-use-case-strip";
 export * from "./logic/daily-cap-advice";
 export * from "./logic/firing-rate";
 export * from "./logic/report-schedule";

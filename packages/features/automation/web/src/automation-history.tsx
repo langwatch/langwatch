@@ -1,34 +1,31 @@
 import { Badge, Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import type { TriggerKind } from "@langwatch/automation-contract";
 import { AlertTriangle, Calendar, CheckCircle, Zap } from "lucide-react";
 import { useMemo } from "react";
-import type { RouterOutputs } from "~/utils/api";
-import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
-type TriggerFire = RouterOutputs["automation"]["getRecentActivity"][number];
-type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];
+export type AutomationActivityFire = {
+  id: string;
+  triggerId: string;
+  customGraphId: string | null;
+  createdAt: Date | string;
+  resolvedAt: Date | string | null;
+};
 
-/**
- * What actually happened, newest first.
- *
- * The feed is derived from the fire ledger (`TriggerSent`), which is
- * DELIBERATELY metadata-only: it carries no trace ids and no trace content,
- * because fire history is gated by `triggers:view` — a weaker permission than
- * the trace-content protections. Nothing here may reference a trace.
- *
- * One ledger row can be two moments in time: a graph alert's row records both
- * when the alert opened (`createdAt`) and when it recovered (`resolvedAt`), so
- * a recovered alert contributes two entries to the timeline.
- */
+export type AutomationActivityTrigger = {
+  id: string;
+  name: string;
+  triggerKind: TriggerKind;
+};
 
 type ActivityKind = "fired" | "alertOpened" | "alertRecovered" | "reportSent";
 
-interface ActivityEntry {
+export type AutomationActivityEntry = {
   id: string;
   triggerId: string;
   name: string;
   kind: ActivityKind;
   at: Date;
-}
+};
 
 const KIND_META: Record<
   ActivityKind,
@@ -40,7 +37,6 @@ const KIND_META: Record<
   reportSent: { label: "Sent", icon: Calendar, palette: "purple" },
 };
 
-/** Local calendar day, so "Today" means the reader's today. */
 function dayKeyOf(date: Date): string {
   return date.toLocaleDateString(undefined, {
     year: "numeric",
@@ -52,8 +48,15 @@ function dayKeyOf(date: Date): string {
 function dayLabelOf(date: Date): string {
   const today = new Date();
   const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
-  if (dayKeyOf(date) === dayKeyOf(today)) return "Today";
-  if (dayKeyOf(date) === dayKeyOf(yesterday)) return "Yesterday";
+
+  if (dayKeyOf(date) === dayKeyOf(today)) {
+    return "Today";
+  }
+
+  if (dayKeyOf(date) === dayKeyOf(yesterday)) {
+    return "Yesterday";
+  }
+
   return date.toLocaleDateString(undefined, {
     weekday: "short",
     month: "short",
@@ -61,19 +64,29 @@ function dayLabelOf(date: Date): string {
   });
 }
 
-/** Flatten the ledger into timeline moments, newest first. */
-export function toActivityEntries({
+function activityKind(input: { isAlert: boolean; isReport: boolean }): ActivityKind {
+  if (input.isAlert) {
+    return "alertOpened";
+  }
+
+  if (input.isReport) {
+    return "reportSent";
+  }
+
+  return "fired";
+}
+
+export function toAutomationActivityEntries({
   fires,
   triggersById,
 }: {
-  fires: TriggerFire[];
-  triggersById: Map<string, EnhancedTrigger>;
-}): ActivityEntry[] {
-  const entries: ActivityEntry[] = [];
+  fires: readonly AutomationActivityFire[];
+  triggersById: ReadonlyMap<string, AutomationActivityTrigger>;
+}): AutomationActivityEntry[] {
+  const entries: AutomationActivityEntry[] = [];
+
   for (const fire of fires) {
     const trigger = triggersById.get(fire.triggerId);
-    // A fire whose automation has since been deleted still happened — say so
-    // rather than dropping it, or the timeline would quietly rewrite history.
     const name = trigger?.name ?? "Deleted automation";
     const isAlert = fire.customGraphId !== null;
     const isReport = trigger?.triggerKind === "REPORT";
@@ -82,13 +95,10 @@ export function toActivityEntries({
       id: fire.id,
       triggerId: fire.triggerId,
       name,
-      kind: isAlert ? "alertOpened" : isReport ? "reportSent" : "fired",
+      kind: activityKind({ isAlert, isReport }),
       at: new Date(fire.createdAt),
     });
 
-    // Only a graph alert resolves. A trace row's `resolvedAt` is never set, and
-    // a report's is stamped at write time purely so it can't read as an open
-    // incident — neither is a "recovery" the reader should see.
     if (isAlert && fire.resolvedAt) {
       entries.push({
         id: `${fire.id}:resolved`,
@@ -99,30 +109,41 @@ export function toActivityEntries({
       });
     }
   }
+
   return entries.sort((a, b) => b.at.getTime() - a.at.getTime());
 }
 
-export function AutomationsHistory({
+export function AutomationHistory({
   fires,
   triggers,
   isLoading,
   onOpenAutomation,
+  formatTimeAgo,
 }: {
-  fires: TriggerFire[];
-  triggers: EnhancedTrigger[];
+  fires: readonly AutomationActivityFire[];
+  triggers: readonly AutomationActivityTrigger[];
   isLoading: boolean;
   onOpenAutomation: (triggerId: string) => void;
+  formatTimeAgo: (timestamp: number) => string;
 }) {
-  const triggersById = useMemo(() => new Map(triggers.map((t) => [t.id, t])), [triggers]);
+  const triggersById = useMemo(
+    () => new Map(triggers.map((trigger) => [trigger.id, trigger])),
+    [triggers],
+  );
   const days = useMemo(() => {
-    const entries = toActivityEntries({ fires, triggersById });
-    const grouped = new Map<string, ActivityEntry[]>();
+    const entries = toAutomationActivityEntries({ fires, triggersById });
+    const grouped = new Map<string, AutomationActivityEntry[]>();
+
     for (const entry of entries) {
       const key = dayKeyOf(entry.at);
       const bucket = grouped.get(key);
-      if (bucket) bucket.push(entry);
-      else grouped.set(key, [entry]);
+      if (bucket) {
+        bucket.push(entry);
+      } else {
+        grouped.set(key, [entry]);
+      }
     }
+
     return [...grouped.values()];
   }, [fires, triggersById]);
 
@@ -173,6 +194,7 @@ export function AutomationsHistory({
               <ActivityRow
                 key={entry.id}
                 entry={entry}
+                formatTimeAgo={formatTimeAgo}
                 onOpen={() => onOpenAutomation(entry.triggerId)}
               />
             ))}
@@ -183,9 +205,18 @@ export function AutomationsHistory({
   );
 }
 
-function ActivityRow({ entry, onOpen }: { entry: ActivityEntry; onOpen: () => void }) {
+function ActivityRow({
+  entry,
+  formatTimeAgo,
+  onOpen,
+}: {
+  entry: AutomationActivityEntry;
+  formatTimeAgo: (timestamp: number) => string;
+  onOpen: () => void;
+}) {
   const meta = KIND_META[entry.kind];
   const Icon = meta.icon;
+
   return (
     <HStack
       gap={3}
