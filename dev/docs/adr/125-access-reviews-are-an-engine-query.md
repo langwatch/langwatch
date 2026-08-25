@@ -107,7 +107,7 @@ The Access surface lists bindings through `AccessListingRepository`
 It is a good listing and a bad review, for five reasons that are all visible in
 its own code and comments:
 
-```
+```text
   WHAT THE LISTING SHOWS              WHAT A REVIEW NEEDS
   ────────────────────────────────    ──────────────────────────────────────
   rows AT a scope                     everything that REACHES a scope
@@ -213,7 +213,7 @@ ranByUserId, previousReviewId, status) and a bundle of files in stored objects.
 The row is what makes "since the last review" mean something mechanical; the
 bundle is the evidence.
 
-```
+```text
  review_<ksuid>/                        one organization, one instant
  ├── manifest.json     ── what this bundle IS, and what it deliberately omits
  │     reviewId · organizationId · capturedAt · ranBy
@@ -322,7 +322,7 @@ only (`routers/authz.ts:8-12`); the review needs it for every principal. The
 derivation is the same call with the principal varied, and the answer carries
 the path:
 
-```
+```text
   who can reach project "chatbot"?
       │
       ▼
@@ -430,7 +430,7 @@ may contain a `token` field, and the spec binds it.
 
 ### 7. The flow, and big organizations
 
-```
+```text
    ClickHouse event_log  ──► fold ──► Postgres projections
    (aggregate authz_grants,           Grant · Role · GrantUsage
     the source of truth)                   │

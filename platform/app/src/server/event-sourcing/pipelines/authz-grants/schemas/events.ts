@@ -271,11 +271,15 @@ export type RoleDeletedEvent = z.infer<typeof roleDeletedEventSchema>;
  * removal left no trace anywhere, and a past-tense access answer computed
  * afterwards understated the access that really existed.
  *
- * `membershipId` is the aggregate id, minted per fact rather than derived from
- * the pair: the pair repeats. Somebody removed from a group can be added back,
- * and that is a new membership with its own beginning and its own end — a
- * second `group_member_added` on the SAME id would read as a redelivery of
- * the first and fold to nothing.
+ * `membershipId` is the membership's identity, minted per fact rather than
+ * derived from the pair: the pair repeats. Somebody removed from a group can
+ * be added back, and that is a new membership with its own beginning and its
+ * own end — a second `group_member_added` on the SAME id would read as a
+ * redelivery of the first and fold to nothing.
+ *
+ * It is NOT the aggregate id. The aggregate is the group-user pair
+ * (`groupMembershipAggregateId`), which is what puts a remove and the re-add
+ * that follows it on one ordered lane instead of two racing ones.
  *
  * No `actor.type: "anyone"` question arises here and no principal union is
  * needed: a membership names one user and one group, both required.

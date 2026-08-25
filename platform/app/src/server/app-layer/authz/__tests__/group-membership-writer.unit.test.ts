@@ -65,7 +65,7 @@ describe("given an organization on the authorization ledger", () => {
       expect(db.groupMembership.createMany).not.toHaveBeenCalled();
     });
 
-    /** @scenario "The removal moves the organization's change counter" */
+    /** @scenario "Adding somebody moves the organization's change counter too" */
     it("moves the organization's change counter", async () => {
       const { writer, db } = harness({ onLedger: true });
       db.groupMembership.count.mockResolvedValue(1);
