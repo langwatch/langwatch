@@ -5,8 +5,10 @@ import {
   InvalidScenarioReferencesError,
   InvalidTargetReferencesError,
   suiteArchivedNamesInputSchema,
+  suiteBatchHistoryInputSchema,
   suiteIdInputSchema,
   suiteRunInputSchema,
+  suiteRunStateInputSchema,
   SuiteNameTakenError,
   SuiteNotFoundError,
   SuiteService as SuiteServiceContract,
@@ -14,9 +16,12 @@ import {
   type CreateSuiteCommand,
   type Suite,
   type SuiteArchivedNamesInput,
+  type SuiteBatchHistoryInput,
   type SuiteIdInput,
   type SuiteRunInput,
   type SuiteRunResult,
+  type SuiteRunStateData,
+  type SuiteRunStateInput,
   type SuiteTarget,
   type UpdateSuiteCommand,
 } from "@langwatch/suite-contract";
@@ -25,6 +30,7 @@ import type { PromptService } from "@langwatch/prompt-contract";
 import type { ScenarioService } from "@langwatch/scenario-contract";
 import type { SuiteExecutionPort } from "../ports/suite-execution.port";
 import type { SuiteRepository } from "../repositories/suite.repository";
+import type { SuiteRunRepository } from "../repositories/suite-run.repository";
 
 const archivedSlugSuffix = "__archived";
 
@@ -57,6 +63,7 @@ export type SuiteServiceOptions = {
   agents: AgentService;
   prompts: PromptService;
   execution: SuiteExecutionPort;
+  runRepository: SuiteRunRepository;
   generateId?: () => string;
   now?: () => Date;
 };
@@ -68,8 +75,11 @@ export class SuiteService extends SuiteServiceContract {
     return new SuiteService(options);
   }
 
+  private readonly runRepository: SuiteRunRepository;
+
   private constructor(private readonly options: SuiteServiceOptions) {
     super();
+    this.runRepository = options.runRepository;
   }
 
   list(input: { projectId: string }): Promise<Suite[]> {
@@ -199,6 +209,18 @@ export class SuiteService extends SuiteServiceContract {
       batchRunId: parsed.batchRunId,
       parameters: parsed.parameters,
     });
+  }
+
+  async getSuiteRunState(input: SuiteRunStateInput): Promise<SuiteRunStateData | null> {
+    return this.runRepository.getSuiteRunState(
+      suiteRunStateInputSchema.parse(input),
+    );
+  }
+
+  async getBatchHistory(input: SuiteBatchHistoryInput): Promise<SuiteRunStateData[]> {
+    return this.runRepository.getBatchHistory(
+      suiteBatchHistoryInputSchema.parse(input),
+    );
   }
 
   async resolveArchivedNames(input: SuiteArchivedNamesInput): Promise<{

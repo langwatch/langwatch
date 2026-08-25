@@ -86,3 +86,41 @@ export type SuiteRunResult = {
     name: string | undefined;
   }>;
 };
+
+/** The durable fold state exposed by the Suite run read model. */
+export const suiteRunStateDataSchema = z.object({
+  SuiteRunId: z.string(),
+  BatchRunId: z.string(),
+  ScenarioSetId: z.string(),
+  SuiteId: z.string(),
+  Status: z.string(),
+  Total: z.number(),
+  StartedCount: z.number(),
+  CompletedCount: z.number(),
+  FailedCount: z.number(),
+  Progress: z.number(),
+  PassRateBps: z.number().nullable(),
+  CreatedAt: z.number(),
+  UpdatedAt: z.number(),
+  LastEventOccurredAt: z.number(),
+  StartedAt: z.number().nullable(),
+  FinishedAt: z.number().nullable(),
+  PassedCount: z.number(),
+  GradedCount: z.number(),
+}).strict();
+export type SuiteRunStateData = z.infer<typeof suiteRunStateDataSchema>;
+
+export const suiteRunStateInputSchema = z.object({
+  projectId: z.string().min(1),
+  batchRunId: z.string().min(1),
+}).strict();
+export type SuiteRunStateInput = z.infer<typeof suiteRunStateInputSchema>;
+
+export const suiteBatchHistoryInputSchema = z.object({
+  projectId: z.string().min(1),
+  // Empty is a legacy value that the read repository expands to the default
+  // set alongside the current "default" value.
+  scenarioSetId: z.string(),
+  limit: z.number().int().positive().optional(),
+}).strict();
+export type SuiteBatchHistoryInput = z.infer<typeof suiteBatchHistoryInputSchema>;

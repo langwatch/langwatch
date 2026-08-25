@@ -14,6 +14,7 @@ import { ScenarioService } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 import { SuiteExecutionPort } from "../src/ports/suite-execution.port";
 import { SuiteRepository } from "../src/repositories/suite.repository";
+import { MemorySuiteRunRepository } from "../src/repositories/memory/memory.suite-run.repository";
 import {
   SuiteService,
   type SuiteServiceOptions,
@@ -75,6 +76,7 @@ function serviceOptions(
     agents: {} as AgentService,
     prompts: {} as PromptService,
     execution: new UnusedExecutionPort(),
+    runRepository: MemorySuiteRunRepository.create(),
     ...overrides,
   };
 }
@@ -167,6 +169,7 @@ describe("SuiteService", () => {
         getNamesByIds: vi.fn(),
       }),
       execution: new ExecutionPort(),
+      runRepository: MemorySuiteRunRepository.create(),
     });
 
     await service.run({
@@ -203,6 +206,7 @@ describe("SuiteService", () => {
       agents: mockAgentService({ getReferenceStates: vi.fn(), getNamesByIds: vi.fn() }),
       prompts: mockPromptService({ getExistingIds: vi.fn(), getNamesByIds: vi.fn() }),
       execution: new ExecutionPort(),
+      runRepository: MemorySuiteRunRepository.create(),
     });
 
     await expect(service.run({
@@ -256,6 +260,7 @@ describe("SuiteService", () => {
       agents,
       prompts,
       execution,
+      runRepository: MemorySuiteRunRepository.create(),
     });
 
     const result = await service.run({
@@ -306,6 +311,7 @@ describe("SuiteService", () => {
       agents: mockAgentService({ getReferenceStates: vi.fn(), getNamesByIds: vi.fn() }),
       prompts: mockPromptService({ getExistingIds: vi.fn(), getNamesByIds: vi.fn() }),
       execution,
+      runRepository: MemorySuiteRunRepository.create(),
     });
 
     await expect(service.run({
@@ -329,6 +335,7 @@ describe("SuiteService", () => {
       agents: mockAgentService({ getReferenceStates: vi.fn().mockResolvedValue([]), getNamesByIds: vi.fn() }),
       prompts: mockPromptService({ getExistingIds: vi.fn(), getNamesByIds: vi.fn() }),
       execution: targetExecution,
+      runRepository: MemorySuiteRunRepository.create(),
     });
 
     await expect(targetService.run({
@@ -357,6 +364,7 @@ describe("SuiteService", () => {
       }),
       prompts: mockPromptService({ getExistingIds: vi.fn(), getNamesByIds: vi.fn() }),
       execution,
+      runRepository: MemorySuiteRunRepository.create(),
     });
 
     await expect(service.run({
