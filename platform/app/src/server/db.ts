@@ -1,14 +1,22 @@
-import { type Prisma, PrismaClient } from "~/generated/prisma/client";
+import {
+  PrismaConfigService,
+  type PrismaConnection,
+  PrismaConnectionService,
+  PrismaQueryGuard,
+  type PrismaQueryContext,
+  type PrismaQueryExecutor,
+  PrismaShutdownService,
+} from "@langwatch/prisma-client";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import { env } from "../env.mjs";
 import type { GuardNext, GuardParams } from "../utils/dbGuardMiddleware";
 import { guardEnMasse } from "../utils/dbMassDeleteProtection";
 import { guardProjectId } from "../utils/dbMultiTenancyProtection";
 import { guardOrganizationId } from "../utils/dbOrganizationIdProtection";
 import { withQueryTiming } from "./dbSlowQueryWarning";
-import { createPrismaPgAdapter } from "./prismaPgAdapter";
 
 const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
+  prismaConnection: PrismaConnection | undefined;
 };
 
 /**
@@ -30,45 +38,16 @@ const withGuards = (
   return withQueryTiming({ params, run: () => guardEnMasse(params, run) });
 };
 
-const createGuardedPrismaClient = (): PrismaClient => {
-  const client = new PrismaClient({
-    // The process-env fallback mirrors the classic engine, which resolved the
-    // schema's `env("DATABASE_URL")` from process.env itself — test suites
-    // that mock `~/env.mjs` with a partial env relied on that.
-    adapter: createPrismaPgAdapter(env.DATABASE_URL ?? process.env.DATABASE_URL ?? ""),
-    log: env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
-  });
-
-  // Prisma 7 removed `$use`; the query extension below is its replacement and
-  // covers the same surface the middlewares saw: every top-level model
-  // operation plus the raw entry points. The extension does not change any
-  // result or argument types (the guards only validate and throw), so the
-  // extended client is handed back out under the plain PrismaClient type the
-  // rest of the codebase is written against.
-  return client.$extends({
-    query: {
-      $allModels: {
-        $allOperations({ model, operation, args, query }) {
-          return withGuards({ model, action: operation, args }, (a) =>
-            query(a as typeof args),
-          );
-        },
-      },
-      $queryRaw({ args, query }) {
-        return withGuards({ action: "queryRaw", args }, (a) => query(a as typeof args));
-      },
-      $queryRawUnsafe({ args, query }) {
-        return withGuards({ action: "queryRaw", args }, (a) => query(a as typeof args));
-      },
-      $executeRaw({ args, query }) {
-        return withGuards({ action: "executeRaw", args }, (a) => query(a as typeof args));
-      },
-      $executeRawUnsafe({ args, query }) {
-        return withGuards({ action: "executeRaw", args }, (a) => query(a as typeof args));
-      },
-    },
-  }) as unknown as PrismaClient;
-};
+class AppPrismaQueryGuard extends PrismaQueryGuard {
+  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
+    const params: GuardParams = {
+      ...(context.model === void 0 ? {} : { model: context.model }),
+      action: context.action,
+      args: context.args,
+    };
+    return withGuards(params, next);
+  }
+}
 
 /**
  * Whether `client` is the root client rather than an interactive-transaction
@@ -81,14 +60,40 @@ export const isRootPrismaClient = (
   client: PrismaClient | Prisma.TransactionClient,
 ): client is PrismaClient => "$connect" in client;
 
-let lazyClient: PrismaClient | undefined;
+let lazyConnection: PrismaConnection | undefined;
+
+const createPrismaConnection = (): PrismaConnection => {
+  const configuration = PrismaConfigService.create().resolve({
+    databaseUrl: env.DATABASE_URL ?? process.env.DATABASE_URL ?? "",
+    log: env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+  });
+  return PrismaConnectionService.create({
+    guard: new AppPrismaQueryGuard(),
+  }).connect(configuration);
+};
+
+const getConnection = (): PrismaConnection => {
+  if (lazyConnection) return lazyConnection;
+
+  lazyConnection = globalForPrisma.prismaConnection ?? createPrismaConnection();
+  if (env.NODE_ENV !== "production") {
+    globalForPrisma.prismaConnection = lazyConnection;
+  }
+  return lazyConnection;
+};
 
 const getClient = (): PrismaClient => {
-  if (lazyClient) return lazyClient;
-  lazyClient = globalForPrisma.prisma ?? createGuardedPrismaClient();
-  if (env.NODE_ENV !== "production") globalForPrisma.prisma = lazyClient;
-  return lazyClient;
+  return getConnection().client;
 };
+
+export async function closePrismaConnection(): Promise<void> {
+  const connection = lazyConnection ?? globalForPrisma.prismaConnection;
+  lazyConnection = void 0;
+  globalForPrisma.prismaConnection = void 0;
+  if (!connection) return;
+
+  await PrismaShutdownService.create().shutdown(connection);
+}
 
 /**
  * Lazy: importing this module must not construct a client (and with it a pg

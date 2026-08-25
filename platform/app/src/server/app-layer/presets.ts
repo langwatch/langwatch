@@ -134,7 +134,7 @@ import {
   _getSharedClickHouseClient,
   closeClickHouseClient,
 } from "~/server/clickhouse/client";
-import { prisma as globalPrisma } from "~/server/db";
+import { closePrismaConnection, prisma as globalPrisma } from "~/server/db";
 import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { createRetentionFloorService } from "~/server/app-layer/clients/clickhouse/retention-floor";
 import { generateApiKey } from "~/server/utils/apiKeyGenerator";
@@ -1919,7 +1919,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       systemMigrations.stop(),
     );
   }
-  shutdownResources.register("database", "prisma", () => prisma.$disconnect());
+  shutdownResources.register("database", "prisma", closePrismaConnection);
 
   const notifications = NotificationService.create({
     config: {
