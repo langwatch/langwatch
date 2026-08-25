@@ -1,6 +1,6 @@
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { CannotImpersonateWithoutSecondFactorError } from "@langwatch/identity";
-import { Prisma, type PrismaClient } from "~/generated/prisma/client";
+import type { PrismaClient } from "~/generated/prisma/client";
 import { isAdmin } from "./isAdmin";
 
 /** Impersonation window handed to the UI once a start call succeeds. */
@@ -104,8 +104,11 @@ export class ImpersonationService {
    * Start an impersonation window on an existing BetterAuth session.
    *
    * Validates the target user, writes an audit log entry, and stores the
-   * impersonating identity on the session row so the rest of the app can
-   * read `session.user.impersonator` through `getServerAuthSession`.
+   * `{actor, subject}` claims on the session row so the rest of the app can
+   * read `session.principal` and `session.user.impersonator` through
+   * `getServerAuthSession` (D06). The reason is stored beside both people,
+   * not only in the audit log, so a request made under an impersonation
+   * carries its own justification.
    *
    * Throws (and does NOT mutate the session) when:
    *   - The target user does not exist → {@link UserToImpersonateNotFoundError}
@@ -195,29 +198,37 @@ export class ImpersonationService {
       req: input.req,
     });
 
+    // The {actor, subject} claims, which is the shape the authz principal
+    // already speaks (D06). The operator is the actor and stays the session's
+    // own user; the target is the subject. Nothing here copies the target's
+    // name, e-mail or picture onto the session — the legacy payload did, and
+    // it went stale the moment either of them changed.
     await this.prisma.session.update({
       where: { id: input.sessionId },
       data: {
-        impersonating: {
-          id: target.id,
-          name: target.name,
-          email: target.email,
-          image: target.image,
-          expires: new Date(Date.now() + IMPERSONATION_TTL_MS),
-        },
+        actorUserId: input.impersonatorUserId,
+        subjectUserId: target.id,
+        impersonationReason: input.reason,
+        impersonationExpiresAt: new Date(Date.now() + IMPERSONATION_TTL_MS),
       },
     });
   }
 
   /**
    * End the impersonation window on the given session. Idempotent at the
-   * Prisma level — clearing an already-empty `impersonating` column is a
-   * no-op.
+   * Prisma level — clearing claims that are already empty is a no-op, and the
+   * operator's own session is untouched either way: stopping returns them to
+   * themselves rather than signing them out.
    */
   async stop(input: StopImpersonationInput): Promise<void> {
     await this.prisma.session.update({
       where: { id: input.sessionId },
-      data: { impersonating: Prisma.DbNull },
+      data: {
+        actorUserId: null,
+        subjectUserId: null,
+        impersonationReason: null,
+        impersonationExpiresAt: null,
+      },
     });
   }
 }

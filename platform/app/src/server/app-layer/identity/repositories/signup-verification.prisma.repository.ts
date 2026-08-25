@@ -1,6 +1,7 @@
 import type { PrismaClient } from "~/generated/prisma/client";
 import type {
   SignUpAccountDirectory,
+  SignUpAddressState,
   SignUpVerificationTokenStore,
 } from "../signup-verification.service";
 
@@ -54,19 +55,20 @@ export class PrismaSignUpVerificationTokenStore
 }
 
 /**
- * Whether an address already has an account. Case-insensitive for the same
- * reason `user.register` is: rows written before sign-up lowercased addresses
- * may carry capitals, and a case-twin beside one would leave two accounts
+ * What an address already is to us. Case-insensitive for the same reason
+ * `user.register` is: rows written before sign-up lowercased addresses may
+ * carry capitals, and a case-twin beside one would leave two accounts
  * answering for one person.
  */
 export class PrismaSignUpAccountDirectory implements SignUpAccountDirectory {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async hasAccountFor({ email }: { email: string }): Promise<boolean> {
+  async stateFor({ email }: { email: string }): Promise<SignUpAddressState> {
     const user = await this.prisma.user.findFirst({
       where: { email: { equals: email, mode: "insensitive" } },
-      select: { id: true },
+      select: { emailVerified: true },
     });
-    return user !== null;
+    if (!user) return "unknown";
+    return user.emailVerified ? "confirmed" : "awaiting_confirmation";
   }
 }

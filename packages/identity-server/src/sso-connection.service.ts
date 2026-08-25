@@ -44,6 +44,12 @@ import {
   VERIFY_DOMAIN_COMMAND_TYPE,
   type VerifyDomainCommandData,
   verifyDomainCommandDataSchema,
+  RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
+  RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
+  type RecordDomainProofAbsentCommandData,
+  type RecordDomainProofPresentCommandData,
+  recordDomainProofAbsentCommandDataSchema,
+  recordDomainProofPresentCommandDataSchema,
 } from "@langwatch/identity";
 import type { SsoConnectionGuards } from "./sso-connection-guards";
 import type { SsoConnectionLedger } from "./sso-connection-ledger";
@@ -147,6 +153,32 @@ export class SsoConnectionService {
     return this.commit(
       { type: VERIFY_DOMAIN_COMMAND_TYPE, data },
       await this.guards.verifyDomain(data),
+    );
+  }
+
+  /**
+   * What a re-check saw (ADR-123). Both verbs are ordinary members of this
+   * surface — a sweep changes a connection the same way a person does, through
+   * a parsed command, a guard and the ledger — and both routinely commit
+   * NOTHING, because the guard states a fact only when the world changed.
+   */
+  async recordDomainProofAbsent(
+    input: RecordDomainProofAbsentCommandData,
+  ): Promise<SsoConnectionFact[]> {
+    const data = recordDomainProofAbsentCommandDataSchema.parse(input);
+    return this.commit(
+      { type: RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE, data },
+      await this.guards.recordDomainProofAbsent(data),
+    );
+  }
+
+  async recordDomainProofPresent(
+    input: RecordDomainProofPresentCommandData,
+  ): Promise<SsoConnectionFact[]> {
+    const data = recordDomainProofPresentCommandDataSchema.parse(input);
+    return this.commit(
+      { type: RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE, data },
+      await this.guards.recordDomainProofPresent(data),
     );
   }
 

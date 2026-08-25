@@ -9,6 +9,7 @@ import { SsoConnectionService } from "../sso-connection.service";
 import {
   InMemoryConnections,
   StubBreakGlassBindings,
+  StubLicenseAuthority,
   StubPlatformOperators,
   StubStranding,
 } from "./support/in-memory-connections";
@@ -81,6 +82,7 @@ beforeEach(() => {
       breakGlass,
       stranding: new StubStranding([]),
       platformOperators: new StubPlatformOperators([OLIVE.id]),
+      licenseAuthority: new StubLicenseAuthority(),
     }),
     ledger,
   );
@@ -178,12 +180,13 @@ describe("ops-assisted onboarding", () => {
       // office and the operator lookup read the same answer without either
       // one having to replay history.
       expect(held?.domainVerifications).toEqual([
-        {
+        expect.objectContaining({
           domain: "acme.com",
           method: "operator-attested",
           actorId: OLIVE.id,
           verifiedAtMs: T0,
-        },
+          proofState: "VERIFIED",
+        }),
       ]);
       // And it never reads as a domain the customer proved: the method is a
       // value of its own, so there is no reading of this row under which the

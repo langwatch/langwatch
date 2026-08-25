@@ -52,6 +52,26 @@ function truncateJsonForCsv(value: unknown): string {
   return `${s.slice(0, CSV_JSON_CAP)}…[truncated ${s.length - CSV_JSON_CAP} chars]`;
 }
 
+/**
+ * Which system made the change, in the reader's words.
+ *
+ * "Directory" is the one that earns its place (ADR-122): a membership change
+ * the customer's identity provider made has no user to name, so without it
+ * the row reads as a change with no author — and that is the reading that
+ * sends an administrator hunting for a person who does not exist.
+ */
+const SOURCE_LABEL: Record<string, string> = {
+  gateway: "Gateway",
+  directory: "Directory",
+  platform: "Platform",
+};
+
+const SOURCE_TONE: Record<string, string> = {
+  gateway: "purple",
+  directory: "blue",
+  platform: "gray",
+};
+
 function AuditLogPage() {
   const { organization, project, organizations } = useOrganizationTeamProject();
   const { isEnterprise, isLoading: isPlanLoading } = useActivePlan();
@@ -595,11 +615,9 @@ function AuditLogPage() {
                         <Badge
                           size="sm"
                           variant="subtle"
-                          colorPalette={
-                            log.source === "gateway" ? "purple" : "gray"
-                          }
+                          colorPalette={SOURCE_TONE[log.source] ?? "gray"}
                         >
-                          {log.source === "gateway" ? "Gateway" : "Platform"}
+                          {SOURCE_LABEL[log.source] ?? "Platform"}
                         </Badge>
                       </Table.Cell>
                       <Table.Cell>

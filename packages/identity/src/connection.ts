@@ -97,6 +97,84 @@ export type SsoVerificationCeremonyMethod = z.infer<
 >;
 
 /**
+ * Who authorized a domain claim. The trust decision behind a domain has
+ * three possible sources, and a connection's history has to say which one it
+ * was:
+ *
+ * - `platform-operator` — a LangWatch operator decided it, which is tier 1
+ *   and the dispute queue. Still the abuse boundary for the one question a
+ *   record cannot answer: two organizations claiming the same domain.
+ * - `license` — a self-hosted installation's enterprise licence decided it
+ *   (D05 tier 2). There is nobody to reach on such an installation, so the
+ *   licence IS the authorization; it can never authorize a hosted
+ *   organization's claim, because a hosted deployment holds no instance
+ *   licence to speak with.
+ * - `dns-proof` — a record published on the domain decided it. The strongest
+ *   evidence anybody can hand us, and the one an operator re-reading it
+ *   could only agree with, so it authorizes the claim directly. It is never
+ *   a value a caller may assert: the guard states it itself, in the same
+ *   commit as the proof it rests on, and refuses it anywhere else.
+ *
+ * Recorded on the approval fact rather than inferred from the deployment,
+ * because a deployment changes and a fact does not: a dispute about a domain
+ * is answered from the history alone.
+ */
+export const SSO_DOMAIN_CLAIM_AUTHORITIES = [
+  "platform-operator",
+  "license",
+  "dns-proof",
+] as const;
+export const ssoDomainClaimAuthoritySchema = z.enum(
+  SSO_DOMAIN_CLAIM_AUTHORITIES,
+);
+export type SsoDomainClaimAuthority = z.infer<
+  typeof ssoDomainClaimAuthoritySchema
+>;
+
+/**
+ * Whether the evidence behind a proved domain is still there.
+ *
+ * A published record is only evidence while it is published, and until
+ * re-verification existed a domain proved once was proved forever — a
+ * customer who deleted the record in a spring clean, or lost the domain
+ * entirely, kept vouching for whoever asked. These three states are the
+ * answer, and they are deliberately about the EVIDENCE rather than about the
+ * connection: none of them moves the lifecycle, suspends anything, or stops
+ * a single person who already works there from signing in.
+ *
+ * - `VERIFIED` — the record is where it should be, or has not been
+ *   contradicted. The only state that vouches for somebody NEW.
+ * - `WAVERING` — a check found the name resolving with no matching record on
+ *   it. Nothing changes about who may do what; the organization's
+ *   administrators are told, and a clock starts.
+ * - `LAPSED` — the record stayed missing through the whole grace window. The
+ *   domain stops vouching for new people: no provisioning on first sign-in,
+ *   no joining by domain. Everyone already here is untouched, and publishing
+ *   the record again returns it to `VERIFIED` with nothing to redo.
+ *
+ * What can never move a domain along this path is a lookup that FAILED. A
+ * resolver that timed out has said nothing about the customer's DNS, so it
+ * starts no clock and advances none — see `SSO_DNS_REPROOF_GRACE_MS`.
+ */
+export const SSO_DOMAIN_PROOF_STATES = [
+  "VERIFIED",
+  "WAVERING",
+  "LAPSED",
+] as const;
+export const ssoDomainProofStateSchema = z.enum(SSO_DOMAIN_PROOF_STATES);
+export type SsoDomainProofState = z.infer<typeof ssoDomainProofStateSchema>;
+
+/** Where a domain claim stands. `WAITING` is the only state the tier-3 queue
+ *  lists, and `REJECTED` is not terminal — the domain may be claimed again. */
+export const SSO_DOMAIN_CLAIM_STATES = [
+  "WAITING",
+  "APPROVED",
+  "REJECTED",
+] as const;
+export const ssoDomainClaimStateSchema = z.enum(SSO_DOMAIN_CLAIM_STATES);
+export type SsoDomainClaimState = z.infer<typeof ssoDomainClaimStateSchema>;
+
+/**
  * Where a connection came from. `legacy-grandfathered` is stamped on every
  * event the grandfather migration emits, so an operator reading a
  * connection's history can always tell which ones a human configured and
@@ -141,6 +219,12 @@ export const DOMAIN_ATTESTED_EVENT_TYPE =
   "lw.identity.domain_attested" as const;
 export const DOMAIN_VERIFIED_EVENT_TYPE =
   "lw.identity.domain_verified" as const;
+export const DOMAIN_PROOF_WAVERED_EVENT_TYPE =
+  "lw.identity.domain_proof_wavered" as const;
+export const DOMAIN_PROOF_LAPSED_EVENT_TYPE =
+  "lw.identity.domain_proof_lapsed" as const;
+export const DOMAIN_PROOF_RECOVERED_EVENT_TYPE =
+  "lw.identity.domain_proof_recovered" as const;
 export const CONNECTION_ACTIVATED_EVENT_TYPE =
   "lw.identity.connection_activated" as const;
 export const CONNECTION_SUSPENDED_EVENT_TYPE =
@@ -161,6 +245,9 @@ export const SSO_CONNECTION_EVENT_TYPES = [
   VERIFICATION_REQUESTED_EVENT_TYPE,
   DOMAIN_ATTESTED_EVENT_TYPE,
   DOMAIN_VERIFIED_EVENT_TYPE,
+  DOMAIN_PROOF_WAVERED_EVENT_TYPE,
+  DOMAIN_PROOF_LAPSED_EVENT_TYPE,
+  DOMAIN_PROOF_RECOVERED_EVENT_TYPE,
   CONNECTION_ACTIVATED_EVENT_TYPE,
   CONNECTION_SUSPENDED_EVENT_TYPE,
   CONNECTION_RESUMED_EVENT_TYPE,
@@ -200,6 +287,12 @@ export const domainClaimApprovedPayloadSchema = z.object({
   /** The ops user who approved. Recorded because first-verifier-owns makes
    *  this step the abuse boundary (D04 Security Concerns). */
   actor: identityActorSchema,
+  /**
+   * What authorized the approval (D05 tier 2). Defaults to the operator so
+   * every fact written before tier 2 existed decodes as what it was; an
+   * approval a licence authorized says so, permanently.
+   */
+  authority: ssoDomainClaimAuthoritySchema.default("platform-operator"),
   ...sourced,
 });
 
@@ -226,6 +319,17 @@ export const verificationRequestedPayloadSchema = z.object({
    *  shown once and never recorded — a log that carried it would let anyone
    *  with read access to history satisfy someone else's ceremony. */
   tokenHash: z.string().min(1),
+  /**
+   * When the published record stops proving anything, or null for a ceremony
+   * that does not expire. Nullable with a default so every ceremony fact
+   * written before D05 decodes as the open-ended one it was.
+   *
+   * A deadline rather than a sweep: nothing deletes an expired ceremony, the
+   * guard simply refuses to read it as a proof. Asking again issues a fresh
+   * record against the same approved claim, so an expiry costs a customer a
+   * click and never their place in the queue.
+   */
+  expiresAtMs: z.number().int().nonnegative().nullable().default(null),
   actor: identityActorSchema,
   ...sourced,
 });
@@ -256,6 +360,60 @@ export const domainVerifiedPayloadSchema = z.object({
   connectionId: z.string().min(1),
   domain: z.string().min(1),
   method: ssoVerificationMethodSchema,
+  actor: identityActorSchema,
+  ...sourced,
+});
+
+/**
+ * A re-check found the record gone (ADR-123). Stated once, when the evidence
+ * first goes missing — a second check that finds it still missing states
+ * nothing, because nothing about the world has changed and a fact per check
+ * would bury the two that matter under thousands that do not.
+ *
+ * `graceEndsAtMs` rides on the fact rather than being recomputed at read
+ * time, for the reason the teardown deadline does: the deadline a customer
+ * was TOLD is the deadline they get, and shortening the grace window later
+ * must not silently move a clock that is already running.
+ */
+export const domainProofWaveredPayloadSchema = z.object({
+  connectionId: z.string().min(1),
+  domain: z.string().min(1),
+  /** When the record was first found missing. The clock starts here. */
+  firstAbsentAtMs: z.number().int().nonnegative(),
+  /** When continued absence becomes a lapse. */
+  graceEndsAtMs: z.number().int().nonnegative(),
+  actor: identityActorSchema,
+  ...sourced,
+});
+
+/**
+ * The grace ran out with the record still missing (ADR-123). What changes is
+ * narrow and stated here so a reader never has to infer it: the domain stops
+ * vouching for NEW people. It does not suspend the connection, does not stop
+ * a single existing member signing in, and does not un-prove anything —
+ * `verifiedDomains` is untouched, because routing is untouched.
+ */
+export const domainProofLapsedPayloadSchema = z.object({
+  connectionId: z.string().min(1),
+  domain: z.string().min(1),
+  /** Carried forward so the fact says how long it was gone before we acted,
+   *  without a reader having to find the wavering fact to know. */
+  firstAbsentAtMs: z.number().int().nonnegative(),
+  actor: identityActorSchema,
+  ...sourced,
+});
+
+/**
+ * The record is published again (ADR-123). Recovery costs the customer
+ * nothing but publishing it: no re-claim, no fresh token, no queue — the
+ * domain was never un-proved, only doubted.
+ */
+export const domainProofRecoveredPayloadSchema = z.object({
+  connectionId: z.string().min(1),
+  domain: z.string().min(1),
+  /** How long the evidence was missing, end to end. The number an operator
+   *  answers "how long were they exposed" with. */
+  absentForMs: z.number().int().nonnegative(),
   actor: identityActorSchema,
   ...sourced,
 });
@@ -339,6 +497,18 @@ export const ssoConnectionFactInputSchema = z.discriminatedUnion("type", [
     data: domainVerifiedPayloadSchema,
   }),
   z.object({
+    type: z.literal(DOMAIN_PROOF_WAVERED_EVENT_TYPE),
+    data: domainProofWaveredPayloadSchema,
+  }),
+  z.object({
+    type: z.literal(DOMAIN_PROOF_LAPSED_EVENT_TYPE),
+    data: domainProofLapsedPayloadSchema,
+  }),
+  z.object({
+    type: z.literal(DOMAIN_PROOF_RECOVERED_EVENT_TYPE),
+    data: domainProofRecoveredPayloadSchema,
+  }),
+  z.object({
     type: z.literal(CONNECTION_ACTIVATED_EVENT_TYPE),
     data: connectionActivatedPayloadSchema,
   }),
@@ -383,12 +553,69 @@ export interface SsoDomainVerification {
    *  Null for a system actor, which is what the grandfather migration is. */
   actorId: string | null;
   verifiedAtMs: number;
+  /**
+   * Whether the evidence is still there (ADR-123). Defaults to `VERIFIED` so
+   * every proof recorded before re-verification existed decodes as what it
+   * was: a domain nothing had contradicted.
+   */
+  proofState: SsoDomainProofState;
+  /** When the record was first found missing; null while it is there. */
+  firstAbsentAtMs: number | null;
+  /** When continued absence becomes a lapse; null while it is there. The
+   *  deadline the customer was told, kept rather than recomputed. */
+  graceEndsAtMs: number | null;
+  /**
+   * `sha256:…` of the token the ceremony published, carried forward from the
+   * ceremony that proved this domain so a LATER read can recognise the very
+   * record the customer put up (ADR-123).
+   *
+   * The token itself is still never kept — this is the same hash the
+   * ceremony recorded, and it is what makes a re-read verification rather
+   * than "is anything at all published at our name". Null for every proof no
+   * record made, and for every domain proved before re-verification existed:
+   * a re-read that cannot compare a value is not evidence of anything, so
+   * those domains are not re-read at all.
+   */
+  tokenHash: string | null;
 }
 
 /**
  * One connection as the projection knows it — one row of `SsoConnection`,
  * and the state every guard is evaluated against.
  */
+/**
+ * One domain claim, from the moment it was made to the moment it was
+ * decided — the tier-3 queue's row, and the answer to "how long did this
+ * customer wait" long after the wait is over.
+ *
+ * Kept per domain on the connection rather than derived from the log at read
+ * time, because the queue is read constantly and a replay of every
+ * connection's history to sort a list is not a queue. The log stays the
+ * arbiter; this is its head.
+ *
+ * `waitedMs` is RECORDED rather than computed from the two timestamps,
+ * because a domain may be claimed again after a rejection and the second
+ * claim overwrites the first one's clock. What the queue's latency was is a
+ * measurement, and a measurement that a later action can silently rewrite is
+ * not one (epic Open Q2: measure queue latency from day one).
+ */
+export interface SsoDomainClaim {
+  domain: string;
+  state: SsoDomainClaimState;
+  /** When the claim was made. The queue's clock starts here. */
+  claimedAtMs: number;
+  claimedByActorId: string | null;
+  /** When it was decided; null while it is still waiting. */
+  decidedAtMs: number | null;
+  decidedByActorId: string | null;
+  /** What authorized the decision; null while it is still waiting. */
+  authority: SsoDomainClaimAuthority | null;
+  /** How long the claim waited to be decided, in milliseconds. */
+  waitedMs: number | null;
+  /** The reviewer's words, on a rejection. Read back on a re-claim. */
+  note: string | null;
+}
+
 export interface SsoConnectionState {
   connectionId: string;
   organizationId: string;
@@ -396,6 +623,9 @@ export interface SsoConnectionState {
   state: SsoConnectionLifecycleState;
   /** Claimed but not yet approved. */
   claimedDomains: string[];
+  /** Every claim this connection has ever made, in the order they were made:
+   *  where each stands, when it was made, and how long it waited. */
+  domainClaims: SsoDomainClaim[];
   /** Approved by ops, not yet proved. */
   approvedDomains: string[];
   /** Proved, and the only ones that ever route. */
@@ -407,6 +637,9 @@ export interface SsoConnectionState {
     domain: string;
     method: SsoVerificationMethod;
     tokenHash: string;
+    /** When the published record stops proving anything; null when the
+     *  ceremony does not expire. */
+    expiresAtMs: number | null;
   } | null;
   idpMetadata: SsoIdpMetadata;
   allowsJit: boolean;
@@ -441,6 +674,7 @@ export function emptySsoConnection({
     type: "oidc",
     state: "DRAFT",
     claimedDomains: [],
+    domainClaims: [],
     approvedDomains: [],
     verifiedDomains: [],
     domainVerifications: [],
@@ -463,6 +697,48 @@ const without = (domains: string[], domain: string): string[] =>
 const withDomain = (domains: string[], domain: string): string[] =>
   domains.includes(domain) ? domains : [...domains, domain];
 
+/**
+ * One claim row per domain, last claim wins. A domain claimed again after a
+ * rejection REPLACES its row: the queue lists one claim per domain, and the
+ * earlier attempt with the reviewer's note stays in the event log, which is
+ * where a dispute reads it.
+ */
+const withClaim = (
+  held: SsoDomainClaim[],
+  claim: SsoDomainClaim,
+): SsoDomainClaim[] => [
+  ...held.filter((entry) => entry.domain !== claim.domain),
+  claim,
+];
+
+/** Decide the waiting claim on a domain, leaving every other row alone. A
+ *  decision on a domain with no waiting claim changes nothing — the guards
+ *  refuse that before any fact exists. */
+const decideClaim = (
+  held: SsoDomainClaim[],
+  decision: {
+    domain: string;
+    state: Exclude<SsoDomainClaimState, "WAITING">;
+    decidedAtMs: number;
+    decidedByActorId: string | null;
+    authority: SsoDomainClaimAuthority;
+    note: string | null;
+  },
+): SsoDomainClaim[] =>
+  held.map((entry) =>
+    entry.domain === decision.domain
+      ? {
+          ...entry,
+          state: decision.state,
+          decidedAtMs: decision.decidedAtMs,
+          decidedByActorId: decision.decidedByActorId,
+          authority: decision.authority,
+          waitedMs: Math.max(0, decision.decidedAtMs - entry.claimedAtMs),
+          note: decision.note,
+        }
+      : entry,
+  );
+
 /** One proof per domain, last one wins — a domain re-proved by a later
  *  ceremony is described by what proved it most recently, and the earlier
  *  proof stays in the event log where a dispute reads it. */
@@ -473,6 +749,36 @@ const withVerification = (
   ...held.filter((entry) => entry.domain !== verification.domain),
   verification,
 ];
+
+/**
+ * Change what one domain's proof SAYS about itself, leaving what proved it
+ * alone (ADR-123). A waver, a lapse and a recovery are all statements about
+ * the evidence's condition — never about the method, the prover or the date —
+ * so they map the row rather than replacing it, and an attested domain that
+ * wavers is still an attested domain afterwards.
+ *
+ * A statement about a domain with no proof changes nothing. The guards refuse
+ * that before any fact exists.
+ */
+const withProofCondition = (
+  held: SsoDomainVerification[],
+  condition: {
+    domain: string;
+    proofState: SsoDomainProofState;
+    firstAbsentAtMs: number | null;
+    graceEndsAtMs: number | null;
+  },
+): SsoDomainVerification[] =>
+  held.map((entry) =>
+    entry.domain === condition.domain
+      ? {
+          ...entry,
+          proofState: condition.proofState,
+          firstAbsentAtMs: condition.firstAbsentAtMs,
+          graceEndsAtMs: condition.graceEndsAtMs,
+        }
+      : entry,
+  );
 
 /**
  * The reducer. Pure and total: every fact answers a next state, and the
@@ -508,6 +814,17 @@ export function reduceSsoConnection({
         ...touched,
         state: "CLAIMED",
         claimedDomains: withDomain(state.claimedDomains, fact.data.domain),
+        domainClaims: withClaim(state.domainClaims, {
+          domain: fact.data.domain,
+          state: "WAITING",
+          claimedAtMs: fact.occurredAt,
+          claimedByActorId: fact.data.actor.id,
+          decidedAtMs: null,
+          decidedByActorId: null,
+          authority: null,
+          waitedMs: null,
+          note: null,
+        }),
         rejection: null,
       };
     case DOMAIN_CLAIM_APPROVED_EVENT_TYPE:
@@ -516,12 +833,28 @@ export function reduceSsoConnection({
         state: "APPROVED",
         claimedDomains: without(state.claimedDomains, fact.data.domain),
         approvedDomains: withDomain(state.approvedDomains, fact.data.domain),
+        domainClaims: decideClaim(state.domainClaims, {
+          domain: fact.data.domain,
+          state: "APPROVED",
+          decidedAtMs: fact.occurredAt,
+          decidedByActorId: fact.data.actor.id,
+          authority: fact.data.authority,
+          note: null,
+        }),
       };
     case DOMAIN_CLAIM_REJECTED_EVENT_TYPE:
       return {
         ...touched,
         state: "REJECTED",
         claimedDomains: without(state.claimedDomains, fact.data.domain),
+        domainClaims: decideClaim(state.domainClaims, {
+          domain: fact.data.domain,
+          state: "REJECTED",
+          decidedAtMs: fact.occurredAt,
+          decidedByActorId: fact.data.actor.id,
+          authority: "platform-operator",
+          note: fact.data.note,
+        }),
         rejection: { domain: fact.data.domain, note: fact.data.note },
       };
     case CONNECTION_DISCARDED_EVENT_TYPE:
@@ -534,6 +867,7 @@ export function reduceSsoConnection({
           domain: fact.data.domain,
           method: fact.data.method,
           tokenHash: fact.data.tokenHash,
+          expiresAtMs: fact.data.expiresAtMs,
         },
       };
     // Attestation is one step, not two: there is nothing to wait for between
@@ -550,6 +884,12 @@ export function reduceSsoConnection({
           method: "operator-attested",
           actorId: fact.data.actor.id,
           verifiedAtMs: fact.occurredAt,
+          proofState: "VERIFIED",
+          firstAbsentAtMs: null,
+          graceEndsAtMs: null,
+          // An attestation publishes nothing, so there is no record to read
+          // again and nothing to read it against.
+          tokenHash: null,
         }),
         pendingVerification: null,
       };
@@ -564,8 +904,58 @@ export function reduceSsoConnection({
           method: fact.data.method,
           actorId: fact.data.actor.id,
           verifiedAtMs: fact.occurredAt,
+          // A domain proved again is a domain nothing is doubting: re-proving
+          // through the ceremony clears a waver or a lapse in the same
+          // stroke, which is what makes "publish it again" the whole remedy.
+          proofState: "VERIFIED",
+          firstAbsentAtMs: null,
+          graceEndsAtMs: null,
+          // Carried forward from the ceremony this fact closes, which is the
+          // one moment the hash is in hand. Derived from the folded state
+          // rather than from the fact, so a replay reconstructs it identically
+          // and no payload has to grow a field that is already known here.
+          tokenHash:
+            state.pendingVerification?.domain === fact.data.domain &&
+            state.pendingVerification.method === "dns-txt"
+              ? state.pendingVerification.tokenHash
+              : null,
         }),
         pendingVerification: null,
+      };
+    // The three condition facts (ADR-123). None of them touches `state`,
+    // `verifiedDomains` or anything routing reads: what they change is what
+    // the evidence SAYS, and the only behaviour hanging off that is whether
+    // the domain vouches for somebody NEW.
+    case DOMAIN_PROOF_WAVERED_EVENT_TYPE:
+      return {
+        ...touched,
+        domainVerifications: withProofCondition(state.domainVerifications, {
+          domain: fact.data.domain,
+          proofState: "WAVERING",
+          firstAbsentAtMs: fact.data.firstAbsentAtMs,
+          graceEndsAtMs: fact.data.graceEndsAtMs,
+        }),
+      };
+    case DOMAIN_PROOF_LAPSED_EVENT_TYPE:
+      return {
+        ...touched,
+        domainVerifications: withProofCondition(state.domainVerifications, {
+          domain: fact.data.domain,
+          proofState: "LAPSED",
+          firstAbsentAtMs: fact.data.firstAbsentAtMs,
+          // The deadline has passed, so there is no longer one to keep.
+          graceEndsAtMs: null,
+        }),
+      };
+    case DOMAIN_PROOF_RECOVERED_EVENT_TYPE:
+      return {
+        ...touched,
+        domainVerifications: withProofCondition(state.domainVerifications, {
+          domain: fact.data.domain,
+          proofState: "VERIFIED",
+          firstAbsentAtMs: null,
+          graceEndsAtMs: null,
+        }),
       };
     case CONNECTION_ACTIVATED_EVENT_TYPE:
       return {
@@ -586,6 +976,205 @@ export function reduceSsoConnection({
     case CONNECTION_TORN_DOWN_EVENT_TYPE:
       return { ...touched, state: "TORN_DOWN", tearDownAfterMs: null };
   }
+}
+
+// ---- claims and ceremonies, read ------------------------------------------
+
+/**
+ * The claims on one connection that are still waiting for LangWatch (D05
+ * tier 3). Pure, so the queue's ordering rule is one function the surface,
+ * the read model and a test all share.
+ */
+export function waitingDomainClaims(
+  state: SsoConnectionState,
+): SsoDomainClaim[] {
+  return state.domainClaims.filter((claim) => claim.state === "WAITING");
+}
+
+/**
+ * How long a claim has waited: the recorded wait once it is decided, and the
+ * wait so far while it is not. Longest first is the queue's order, and this
+ * is the number it sorts on.
+ */
+export function domainClaimWaitedMs({
+  claim,
+  nowMs,
+}: {
+  claim: SsoDomainClaim;
+  nowMs: number;
+}): number {
+  if (claim.waitedMs !== null) return claim.waitedMs;
+  return Math.max(0, nowMs - claim.claimedAtMs);
+}
+
+/** The claim on one domain, or null when the connection never made one. */
+export function domainClaimFor({
+  state,
+  domain,
+}: {
+  state: SsoConnectionState;
+  domain: string;
+}): SsoDomainClaim | null {
+  return state.domainClaims.find((claim) => claim.domain === domain) ?? null;
+}
+
+/**
+ * One waiting claim, as the tier-3 approval queue lists it.
+ *
+ * Its own shape rather than the claim plus a connection, because what an
+ * operator needs to decide one is exactly this: whose domain, on whose
+ * connection, asked for when, and how long they have been waiting for us.
+ */
+export interface SsoDomainClaimQueueEntry {
+  connectionId: string;
+  organizationId: string;
+  domain: string;
+  claimedAtMs: number;
+  claimedByActorId: string | null;
+  /** How long it has waited so far, at the moment the queue was read. */
+  waitedMs: number;
+  /** The organization that already proved this domain, which is the whole
+   *  reason the claim is a person's to decide; null on a claim nobody
+   *  contests, which no longer reaches an operator at all. */
+  disputedWithOrganizationId: string | null;
+}
+
+/**
+ * The queue, longest wait first (D05 tier 3).
+ *
+ * Pure, so the ordering rule is one function the read repository, the
+ * operator surface and a test all share — and so the number the epic's Open
+ * Q2 wants measured is computed in exactly one place.
+ */
+export function domainClaimQueue({
+  connections,
+  nowMs,
+}: {
+  connections: readonly SsoConnectionState[];
+  nowMs: number;
+}): SsoDomainClaimQueueEntry[] {
+  return connections
+    .flatMap((connection) =>
+      waitingDomainClaims(connection).map((claim) => ({
+        connectionId: connection.connectionId,
+        organizationId: connection.organizationId,
+        domain: claim.domain,
+        claimedAtMs: claim.claimedAtMs,
+        claimedByActorId: claim.claimedByActorId,
+        waitedMs: domainClaimWaitedMs({ claim, nowMs }),
+        disputedWithOrganizationId: null,
+      })),
+    )
+    .sort((left, right) => right.waitedMs - left.waitedMs);
+}
+
+/**
+ * The queue an operator actually works: the waiting claims on a domain some
+ * OTHER organization has already proved.
+ *
+ * Everything else was taken off a person's desk when the published record
+ * became the decision — an uncontested claim is finished by the customer
+ * publishing DNS, and listing it would be listing work nobody has to do. A
+ * dispute is the one question a record cannot answer, because both sides can
+ * publish one only if one of them controls the domain, and by then the
+ * argument is about which organization the domain belongs to rather than
+ * about DNS.
+ *
+ * `verifiedElsewhere` maps a domain to the organization already holding it,
+ * which the caller reads from wherever domains are held. A claim by that same
+ * organization is not a dispute with itself and is dropped, so the answer is
+ * the same whether or not the caller filtered first.
+ */
+export function disputedDomainClaimQueue({
+  connections,
+  nowMs,
+  verifiedElsewhere,
+}: {
+  connections: readonly SsoConnectionState[];
+  nowMs: number;
+  verifiedElsewhere: ReadonlyMap<string, string>;
+}): SsoDomainClaimQueueEntry[] {
+  return domainClaimQueue({ connections, nowMs }).flatMap((entry) => {
+    const holder = verifiedElsewhere.get(entry.domain);
+    if (holder === undefined || holder === entry.organizationId) return [];
+    return [{ ...entry, disputedWithOrganizationId: holder }];
+  });
+}
+
+// ---- the condition of a proof, read ---------------------------------------
+
+/** What proved one domain and whether that evidence is still there, or null
+ *  when the connection never proved it. */
+export function domainProofFor({
+  state,
+  domain,
+}: {
+  state: SsoConnectionState;
+  domain: string;
+}): SsoDomainVerification | null {
+  return (
+    state.domainVerifications.find((entry) => entry.domain === domain) ?? null
+  );
+}
+
+/**
+ * Whether this domain still vouches for somebody NEW (ADR-123).
+ *
+ * The one question the whole re-verification arc exists to answer, in one
+ * function, so provisioning on first sign-in and joining by domain cannot
+ * drift apart about what a lapse means. A domain nothing has contradicted
+ * vouches; one whose record went missing this morning still vouches, because
+ * a waver is a warning and not a punishment; one whose record stayed missing
+ * through the grace window does not.
+ *
+ * Deliberately says nothing about signing IN. Everybody already here keeps
+ * their way in whatever this answers, which is why no caller of this is on
+ * the sign-in path.
+ */
+export function domainVouchesForNewPeople({
+  state,
+  domain,
+}: {
+  state: SsoConnectionState;
+  domain: string;
+}): boolean {
+  if (!state.verifiedDomains.includes(domain)) return false;
+  return domainProofFor({ state, domain })?.proofState !== "LAPSED";
+}
+
+/** The domains whose evidence went missing and stayed missing. What the
+ *  projection stores alongside `verifiedDomains` so the join and provisioning
+ *  reads can ask in one query rather than folding a history each time. */
+export function lapsedDomains(state: SsoConnectionState): string[] {
+  return state.domainVerifications
+    .filter((entry) => entry.proofState === "LAPSED")
+    .map((entry) => entry.domain);
+}
+
+/** The domains whose evidence is missing and whose grace has not run out —
+ *  the ones an administrator has been emailed about and can still fix at no
+ *  cost at all. */
+export function waveringDomains(state: SsoConnectionState): string[] {
+  return state.domainVerifications
+    .filter((entry) => entry.proofState === "WAVERING")
+    .map((entry) => entry.domain);
+}
+
+/**
+ * Whether the ceremony in flight has passed its expiry. An expired record
+ * proves nothing — the guard refuses to read it as a proof — and nothing
+ * deletes it, so the customer sees the record they were given until they ask
+ * for a fresh one.
+ */
+export function verificationHasExpired({
+  pending,
+  nowMs,
+}: {
+  pending: SsoConnectionState["pendingVerification"];
+  nowMs: number;
+}): boolean {
+  if (!pending || pending.expiresAtMs === null) return false;
+  return nowMs > pending.expiresAtMs;
 }
 
 // ---- routing projection --------------------------------------------------

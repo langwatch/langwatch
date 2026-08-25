@@ -1190,6 +1190,60 @@
           "consumes": []
         },
         {
+          "id": "settings.profile",
+          "name": "Profile",
+          "description": "Set the name and photo colleagues see you by; read back the sign-in methods this account holds, the browsers it is signed in on (and sign one out), and the API keys issued to you",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/profile",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": null,
+            "docs": null
+          },
+          "sync": null,
+          "produces": [],
+          "consumes": []
+        },
+        {
+          "id": "settings.security",
+          "name": "Security",
+          "description": "The ways one account signs in: its email addresses and linked providers, its passkeys, its second step and its password",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/security",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": null,
+            "docs": null
+          },
+          "sync": null,
+          "produces": [],
+          "consumes": []
+        },
+        {
           "id": "settings.organization",
           "name": "Organization",
           "description": "Read and update the organization profile, and provision organizations on a self-hosted instance",
@@ -1227,7 +1281,7 @@
         {
           "id": "settings.members",
           "name": "Members and Invites",
-          "description": "Manage who belongs to the organization: member roles, access, removal, and pending invites",
+          "description": "Who belongs to the organization, who has been invited and who has asked to join, each in its own tab; open one person to read how they sign in, why they are here and what they can reach",
           "surfaces": {
             "code": {
               "sdk": {
@@ -1306,7 +1360,7 @@
         {
           "id": "settings.groups",
           "name": "Access Groups",
-          "description": "Group members so a single role binding grants everyone in the group",
+          "description": "Group members so a single role binding grants everyone in the group; managed on the groups tab of the Directory page, alongside the groups an identity provider sends",
           "surfaces": {
             "code": {
               "sdk": {
@@ -1330,7 +1384,7 @@
               "docs": null
             },
             "platform": {
-              "ui": "/settings/groups",
+              "ui": "/settings/directory?tab=groups",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -1382,8 +1436,8 @@
         },
         {
           "id": "settings.role-bindings",
-          "name": "Role Bindings",
-          "description": "Grant a role to a user, a group or an API key at an organization, team or project scope",
+          "name": "Role Assignments",
+          "description": "Assign a role to a member, a group or an API key on the organization, a team or a project, and read every assignment in the organization",
           "surfaces": {
             "code": {
               "sdk": {
@@ -1400,7 +1454,7 @@
               "docs": null
             },
             "platform": {
-              "ui": "/settings/role-bindings",
+              "ui": "/settings/roles?tab=assignments",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -1415,9 +1469,38 @@
           "consumes": []
         },
         {
+          "id": "settings.single-sign-on",
+          "name": "Single Sign-On",
+          "description": "Register an identity provider, prove a domain, test a sign-in through it, name someone who can still get in without it, and turn it on — without a support ticket",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/single-sign-on",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": null,
+            "docs": null
+          },
+          "sync": null,
+          "produces": [
+            "sso-connections"
+          ],
+          "consumes": []
+        },
+        {
           "id": "settings.scim",
-          "name": "SCIM Provisioning",
-          "description": "Mint and revoke the bearer tokens an identity provider uses to sync users and groups",
+          "name": "Directory",
+          "description": "Read which sources are connected, when the directory last pushed, how many people and groups it manages, how many members it does not manage, and what it changed or failed to apply; manage every group; issue and revoke the per-connection tokens it syncs with",
           "surfaces": {
             "code": {
               "sdk": {
@@ -1433,7 +1516,7 @@
               "docs": null
             },
             "platform": {
-              "ui": "/settings/scim",
+              "ui": "/settings/directory",
               "mcp": null,
               "skill": null,
               "docs": null
@@ -1446,6 +1529,35 @@
             "scim-tokens"
           ],
           "consumes": []
+        },
+        {
+          "id": "settings.access",
+          "name": "Organization Access",
+          "description": "The rules an organization applies to everybody in it: who may join without an invitation, whether every member must be able to prove a second factor, and which domains have been proved",
+          "surfaces": {
+            "code": {
+              "sdk": {
+                "python": null,
+                "typescript": null
+              },
+              "cli": [],
+              "skill": null,
+              "docs": null
+            },
+            "platform": {
+              "ui": "/settings/access",
+              "mcp": null,
+              "skill": null,
+              "docs": null
+            },
+            "api": null,
+            "docs": null
+          },
+          "sync": null,
+          "produces": [],
+          "consumes": [
+            "sso-connections"
+          ]
         },
         {
           "id": "settings.model-providers",

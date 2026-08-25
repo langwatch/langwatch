@@ -42,11 +42,26 @@ import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import type { OrganizationUserRole } from "~/generated/prisma/client";
 import type { Session } from "../../auth";
+import { prisma } from "../../db";
 import { type App, getApp } from "../app";
+import { organizationMfa } from "../identity/runtime";
+import { deploymentOffersTwoStepVerification } from "../identity/signin-method-policy";
 import {
   LiteMemberRestrictedError,
   MembershipDisabledError,
 } from "../permissions/errors";
+import {
+  permissionDecisionRecord,
+  principalOfSession,
+  recordPermissionDecision,
+} from "./decision-record";
+import {
+  assertSecondFactorSatisfied,
+  type MfaGateCache,
+  type MfaGateDeps,
+  newMfaGateCache,
+} from "./mfa-gate";
+import { PrismaScopeOwnership } from "./mfa-gate-adapters";
 
 const logger = createLogger("langwatch:authz");
 
@@ -59,9 +74,36 @@ type MiddlewareParams = {
     app?: App;
     permissionChecked: boolean;
     organizationRole?: OrganizationUserRole | null;
+    /**
+     * The two-step verification gate's per-request memo (D06). A tRPC batch
+     * shares one context, so this is what makes one person cost one query
+     * across a dozen procedure calls rather than a dozen queries. Created on
+     * first use — a context that never reaches a permission check never
+     * allocates one.
+     */
+    mfaGateCache?: MfaGateCache;
+    /** Injectable so a test can watch the gate without mocking a module. */
+    mfaGate?: Partial<
+      Pick<MfaGateDeps, "offered" | "scopes" | "organizationMfa">
+    >;
   };
   input: ScopeInput;
   next: () => any;
+};
+
+/**
+ * The gate's dependencies for this request: the flag, the scope lookup, the
+ * organization service — and the memo that makes the whole thing cost one
+ * query per person per request.
+ */
+const mfaGateDepsFor = (ctx: MiddlewareParams["ctx"]): MfaGateDeps => {
+  ctx.mfaGateCache ??= newMfaGateCache();
+  return {
+    offered: ctx.mfaGate?.offered ?? deploymentOffersTwoStepVerification,
+    scopes: ctx.mfaGate?.scopes ?? new PrismaScopeOwnership(prisma),
+    organizationMfa: ctx.mfaGate?.organizationMfa ?? organizationMfa,
+    cache: ctx.mfaGateCache,
+  };
 };
 
 /**
@@ -107,6 +149,21 @@ export const checkDeclaredPermission = ({
         permission,
         scope,
       });
+
+      // D06: both people, on every decision. Under an impersonation the actor
+      // is the operator and the subject is the person whose access they are
+      // borrowing, so the audit trail can answer who really did it. On every
+      // other request the two halves are the same person and it says so.
+      recordPermissionDecision(
+        permissionDecisionRecord({
+          principal: principalOfSession({ session: ctx.session }),
+          permission,
+          scope,
+          permitted,
+          denialReason,
+        }),
+      );
+
       if (!permitted) {
         throw deniedError({
           permission,
@@ -115,6 +172,19 @@ export const checkDeclaredPermission = ({
           denialReason,
         });
       }
+
+      // D06 follow-up 2: the organization's membership condition, enforced
+      // rather than merely offered. Runs AFTER the permission, so somebody
+      // who has no business here is refused for that reason rather than sent
+      // to set up a second factor they would still be refused with. With
+      // `MFA_ENROLLMENT_OPEN` off this is a boolean and a return.
+      await assertSecondFactorSatisfied({
+        deps: mfaGateDepsFor(ctx),
+        userId: ctx.session.user.id,
+        sessionId: ctx.session.sessionId,
+        scope,
+      });
+
       // Legacy parity: the organization tier never carried a role onto the
       // context, so only the project/team resolutions (non-null role) do.
       if (organizationRole !== null) {
@@ -189,8 +259,15 @@ export const declaredNoPermission = ({
     { kind: "no-permission", reason, allow },
     async ({ ctx, input, next }: MiddlewareParams) => {
       const allowedKeys = Object.keys(allow ?? {});
+      // A procedure that declares no `.input()` arrives here with `undefined`,
+      // and `in` throws on it — which turned every such procedure into a 500
+      // at the boundary rather than a call (`identity.myIdentifiers` was one).
+      // Nothing is skipped by this: an input that does not exist carries no
+      // scope field to smuggle past the check.
+      const declaredInput =
+        typeof input === "object" && input !== null ? input : {};
       for (const key of SENSITIVE_SCOPE_FIELDS) {
-        if (key in input && !allowedKeys.includes(key)) {
+        if (key in declaredInput && !allowedKeys.includes(key)) {
           throw new Error(
             `${key} is not allowed to be used without permission check`,
           );

@@ -41,7 +41,7 @@ export {
 } from "./crypto/identifier-identity";
 export { s256Challenge } from "./crypto/pkce";
 export { mintUserHashKey } from "./crypto/user-hash-key";
-export { IdentityGuards } from "./guards";
+export { detachStrandsUser, IdentityGuards } from "./guards";
 export {
   type BackfillAccountRow,
   type BackfillUserRow,
@@ -84,9 +84,29 @@ export type {
   IdentityVerificationRepository,
 } from "./identity-verification.repository";
 export { IdentityService } from "./identity.service";
+export { LinkProposalGuards } from "./link-proposal-guards";
+export type {
+  LinkProposalDecision,
+  LinkProposalReadsRepository,
+  LinkProposalRecord,
+} from "./link-proposal.repository";
+export {
+  type LinkProposalDirectoryPort,
+  LinkProposalService,
+  type LinkProposalServiceDeps,
+} from "./link-proposal.service";
 export type { MfaEnrollmentRepository } from "./mfa-enrollment.repository";
 export { MfaGuards } from "./mfa-guards";
 export {
+  expireMfaEnrollmentCommandId,
+  mfaCeremonyCommandId,
+  newMfaCommandId,
+  newMfaEnrollmentId,
+} from "./mfa-id";
+export type { MfaLedger } from "./mfa-ledger";
+export { MfaService } from "./mfa.service";
+export {
+  type SignInAccountLookupPort,
   type SignInBreakGlassLimiter,
   type SignInDomainRoutingPort,
   type SignInMethodPolicyPort,
@@ -133,6 +153,7 @@ export type {
 } from "./join-request.repository";
 export { JoinRequestService } from "./join-request.service";
 export {
+  retiredLetter,
   SCIM_APPLY_MAX_ATTEMPTS,
   ScimSyncGuards,
 } from "./scim-sync-guards";
@@ -152,6 +173,7 @@ export {
 export {
   grandfatherCommandId,
   grandfatheredSsoConnectionId,
+  newSsoBreakGlassBindingId,
   newSsoConnectionCommandId,
   newSsoConnectionId,
 } from "./sso-connection-id";
@@ -166,9 +188,76 @@ export type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
+  SsoDomainClaimQueueRepository,
+  SsoLicenseAuthorityRepository,
   SsoPlatformOperatorRepository,
 } from "./sso-connection.repository";
 export { SsoConnectionService } from "./sso-connection.service";
+export type {
+  SsoBreakGlassRepository,
+  SsoBreakGlassWarningNotifier,
+} from "./break-glass.repository";
+export {
+  SsoBreakGlassService,
+  type SsoBreakGlassServiceDeps,
+} from "./break-glass.service";
+export {
+  type SelfServeActor,
+  type SelfServeBreakGlassBindingView,
+  type SelfServeDnsRecordLocation,
+  type SelfServeDnsRecordView,
+  type SelfServeDomainClaimView,
+  type SelfServeGoLiveView,
+  type SelfServeIssuedDnsRecord,
+  type SelfServeSetupView,
+  type SsoBreakGlassReadPort,
+  type SsoConnectionRoutingLookup,
+  type SsoDomainProofLookup,
+  type SsoDomainTxtLookup,
+  type SsoLicenseProofPort,
+  type SsoOrganizationMember,
+  type SsoOrganizationMemberLookup,
+  SsoSelfServeService,
+  type SsoSelfServeContextPort,
+  type SsoSelfServeServiceDeps,
+  type SsoTestSignIn,
+  type SsoTestSignInLookup,
+} from "./sso-self-serve.service";
+export {
+  SSO_DOMAIN_REPROOF_BATCH,
+  SsoDomainReproofService,
+  type SsoDomainReproofNotifier,
+  type SsoDomainReproofOutcome,
+  type SsoDomainReproofServiceDeps,
+  type SsoDomainReproofTarget,
+  type SsoDomainReproofTargetRepository,
+} from "./sso-domain-reproof.service";
+export {
+  SSO_CREDENTIAL_KINDS,
+  type SsoCredentialKind,
+  type SsoCredentialStore,
+} from "./sso-credential-store";
+export {
+  connectionIsDialable,
+  engineProviderFor,
+  serviceProviderDetailsFor,
+  type SsoEngineProviderRow,
+  type SsoServiceProviderDetails,
+} from "./sso-engine-provider";
+export {
+  discoveryEndpointFor,
+  parseSamlIdpConfig,
+  ssoIdpRegistrationSchema,
+  ssoOidcRegistrationSchema,
+  ssoSamlRegistrationSchema,
+  type SsoIdpRegistration,
+  type SsoIssuerDiscoveryPort,
+  type SsoOidcRegistration,
+  type SsoSamlIdpConfig,
+  type SsoSamlRegistration,
+  validateOidcRegistration,
+  validateSamlRegistration,
+} from "./sso-idp-registration";
 export {
   IDENTITY_VERIFICATION_TTL_MS,
   type MintedEmailVerification,

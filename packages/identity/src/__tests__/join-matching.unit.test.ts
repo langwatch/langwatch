@@ -4,6 +4,7 @@ import {
   isPublicEmailDomain,
   type JoinCandidateOrganization,
   joinDomainOf,
+  organizationAdmitsDomain,
   organizationAdmitsDomainAutomatically,
   PUBLIC_EMAIL_DOMAINS,
   resolveJoinLookup,
@@ -29,6 +30,7 @@ const acme: JoinCandidateOrganization = {
   verifiedMembersOnDomain: 3,
   memberCount: 117,
   autoJoinDomains: [],
+  domainProofLapsed: false,
 };
 
 const lookup = (
@@ -375,6 +377,30 @@ describe("given the pure helpers the rules are built from", () => {
           domain: "acme.com",
         }),
       ).toBe(false);
+    });
+
+    /** @scenario "A lapse stops new people and stops nobody who is already here" */
+    it("refuses to admit automatically on a domain whose record stopped being published", () => {
+      const automatic: JoinCandidateOrganization = {
+        ...acme,
+        domainJoin: "auto",
+        autoJoinDomains: ["acme.com"],
+        verifiedMembersOnDomain: 2,
+        domainProofLapsed: true,
+      };
+
+      expect(
+        organizationAdmitsDomainAutomatically({
+          organization: automatic,
+          domain: "acme.com",
+        }),
+      ).toBe(false);
+      // Asking is still open, and deliberately: a request reaches somebody at
+      // the company, who is exactly the person able to tell a colleague from
+      // whoever now owns a domain this company let go.
+      expect(
+        organizationAdmitsDomain({ organization: automatic, domain: "acme.com" }),
+      ).toBe(true);
     });
   });
 });

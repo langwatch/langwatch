@@ -14,7 +14,7 @@
 
 ## Context
 
-LangWatch has two products behind one front door:
+LangWatch has two products behind one auth screens:
 
 1. **AI Governance** — track coding-agent usage, spend, and sessions per developer. Setup is three CLI commands (`npm i -g langwatch` → `langwatch login` → `langwatch claude`) and results appear on `/me` in ~30 seconds (docs: `ai-governance/track-your-claude-code-usage`).
 2. **LLMOps** — traces, evaluations, datasets, prompts, experiments. Setup is SDK/MCP integration against a project API key.

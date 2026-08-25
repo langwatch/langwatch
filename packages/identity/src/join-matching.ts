@@ -158,6 +158,16 @@ export interface JoinCandidateOrganization {
   /** The domains an administrator named when turning automatic joining on.
    *  Empty means automatic joining admits nobody, whatever the setting says. */
   autoJoinDomains: readonly string[];
+  /**
+   * True when this organization's SSO connection proved the domain and the
+   * published record has since stayed missing through its grace (ADR-123).
+   *
+   * It stops AUTOMATIC joining and nothing else. Asking still works, because
+   * a request reaches somebody at the company who can tell a colleague from a
+   * stranger — which is exactly the judgement a lapsed proof can no longer
+   * make on their behalf.
+   */
+  domainProofLapsed: boolean;
 }
 
 /** What is safe to say about an organization to somebody who is not in it:
@@ -291,6 +301,12 @@ export function organizationAdmitsDomainAutomatically({
   domain: string;
 }): boolean {
   if (!organizationAdmitsDomain({ organization, domain })) return false;
+  // A domain whose published record went missing and stayed missing stops
+  // vouching for anybody NEW (ADR-123), and walking straight in is the most
+  // vouching there is. Asking is still open, deliberately: a request reaches
+  // a human at the company, who is exactly the person able to say whether
+  // this is a colleague or somebody who bought a lapsed domain.
+  if (organization.domainProofLapsed) return false;
   if (organization.domainJoin !== "auto") return false;
   if (!organization.autoJoinDomains.includes(domain)) return false;
   return (

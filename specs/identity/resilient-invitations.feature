@@ -131,7 +131,7 @@ Feature: Resilient invitations - any verified method gets you in, and expiry is 
   Scenario: Signing out from the mismatch returns to the same invitation
     Given "sam" is signed in as the wrong account and sees the mismatch
     When "sam" takes the offered way out
-    Then "sam" arrives at the front door with the invitation still in hand
+    Then "sam" arrives at the auth screens with the invitation still in hand
     And accepting as the invited account makes "sam" a member
 
   # ── Asking again ───────────────────────────────────────────────────────

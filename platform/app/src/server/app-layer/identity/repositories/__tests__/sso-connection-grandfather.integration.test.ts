@@ -65,7 +65,7 @@ const legacyRouting = new LegacySsoDomainRoutingRepository(
 );
 const connectionRouting = new SsoConnectionDomainRoutingRepository(
   prisma,
-  async (methodId) => methodId === PROVIDER,
+  async ({ methodId }) => methodId === PROVIDER,
 );
 
 let appended = 0;
@@ -129,6 +129,11 @@ function grandfather() {
         connections: new PrismaSsoConnectionReadRepository(prisma),
         breakGlass: new LocalDoorBreakGlassBinding(),
         stranding: new PrismaSsoConnectionStrandingRepository(prisma),
+        // The migration states history and commands nothing an operator or a
+        // licence has to authorize, so both gates answer no here — and the
+        // pass still lands, which is the point of the assertion below.
+        platformOperators: { isPlatformOperator: async () => false },
+        licenseAuthority: { licenseAuthorizesDomainClaims: async () => false },
       }),
       ledger,
     ),
@@ -253,6 +258,10 @@ describe("the sso connection grandfather migration against Postgres", () => {
             connections: new PrismaSsoConnectionReadRepository(prisma),
             breakGlass: new LocalDoorBreakGlassBinding(),
             stranding: new PrismaSsoConnectionStrandingRepository(prisma),
+            platformOperators: { isPlatformOperator: async () => false },
+            licenseAuthority: {
+              licenseAuthorizesDomainClaims: async () => false,
+            },
           }),
           ledger,
         ),

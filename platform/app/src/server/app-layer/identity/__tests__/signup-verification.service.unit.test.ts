@@ -14,7 +14,10 @@ const NOW = new Date("2026-08-24T12:00:00.000Z");
 /** Stands in for bcrypt: what matters is that it is not the password. */
 const FAKE_PASSWORD_HASH = "$2b$10$notthepassword";
 
-function makeService({ registered = false }: { registered?: boolean } = {}) {
+function makeService({
+  registered = false,
+  addressIsConfirmed = false,
+}: { registered?: boolean; addressIsConfirmed?: boolean } = {}) {
   const issued: Array<{ identifier: string; token: string; expires: Date }> =
     [];
   const sent: Array<{ email: string; verificationUrl: string }> = [];
@@ -41,7 +44,12 @@ function makeService({ registered = false }: { registered?: boolean } = {}) {
         sent.push(message);
       },
     },
-    directory: { hasAccountFor: async () => addressIsTaken },
+    directory: {
+      stateFor: async () => {
+        if (!addressIsTaken) return "unknown";
+        return addressIsConfirmed ? "confirmed" : "awaiting_confirmation";
+      },
+    },
     accounts: {
       createCredentialAccount: async (account) => {
         created.push(account);
@@ -108,6 +116,9 @@ describe("given a sign-up address to confirm", () => {
         email: "sam@acme.com",
         accountCreated: false,
         accountExists: false,
+        // Nothing here to mark as confirmed, so the proof carries the
+        // confirmation to whichever call creates the account next.
+        addressProof: expect.any(String),
       });
 
       await expect(
@@ -167,6 +178,9 @@ describe("given a sign-up address to confirm", () => {
         email: "sam@acme.com",
         accountCreated: false,
         accountExists: false,
+        // Nothing here to mark as confirmed, so the proof carries the
+        // confirmation to whichever call creates the account next.
+        addressProof: expect.any(String),
       });
       expect(harness.created).toHaveLength(0);
     });
@@ -199,6 +213,7 @@ describe("given a sign-up address to confirm", () => {
         email: "sam@acme.com",
         accountCreated: true,
         accountExists: true,
+        addressProof: null,
       });
       expect(harness.created).toEqual([
         { email: "sam@acme.com", passwordHash: FAKE_PASSWORD_HASH },
@@ -221,6 +236,7 @@ describe("given a sign-up address to confirm", () => {
         email: "sam@acme.com",
         accountCreated: false,
         accountExists: true,
+        addressProof: null,
       });
       expect(harness.confirmed).toEqual(["sam@acme.com"]);
       expect(harness.created).toHaveLength(0);

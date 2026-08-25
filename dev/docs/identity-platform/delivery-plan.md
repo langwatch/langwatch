@@ -32,7 +32,7 @@ The chart shows the wave structure; the exact per-deliverable dependencies live 
 
 ```text
  WAVE 1                      WAVE 2                         WAVE 3                           WAVE 4
- foundations —               the new front door             self-service + factors           Auth0 dies —
+ foundations —               the new auth screens             self-service + factors           Auth0 dies —
  nothing a user can see      + the invite fix               (parallel tracks)                customer-paced
 
  D01 identifiers             D03 router  ═╗                 D05 self-serve SSO +             D09 per-customer
@@ -55,13 +55,13 @@ Nothing a customer can see. Both deliverables exist to make Wave 2 safe.
 |---|---|---|---|
 | D01 | — | The identifier model: one user, many verified sign-in methods, a new pure event-truth Postgres `Identifier` projection (born clean; `Account` stays 100% row-truth protocol), full backfill via system-migrations with per-user write gating | No product change yet — but identity state becomes *visible data* for the first time, and every other deliverable builds on it |
 
-## Wave 2 — the new front door + the invite fix
+## Wave 2 — the new auth screens + the invite fix
 
 The customer-visible core: a completely new unauthenticated experience, and the end of the invitation dead ends.
 
 | # | Needs | What ships | Impact when it lands |
 |---|---|---|---|
-| D03 | D01 | The identifier-first routing engine: email → route to the right IdP or method set, auto-link rules, shadow-compared cutover | One front door for every method at once — ends the one-method-per-deployment limit; account-linking dead ends stop being support tickets |
+| D03 | D01 | The identifier-first routing engine: email → route to the right IdP or method set, auto-link rules, shadow-compared cutover | One auth screens for every method at once — ends the one-method-per-deployment limit; account-linking dead ends stop being support tickets |
 | D13 | D01; flips with D03 | The complete first-party sign-in & sign-up screens (Auth0 owned these visuals until now): sign-in, sign-up, method picker, password reset, email verification, every deny/guidance state | The first thing every user ever sees is ours; sign-up gains the join-your-team step **before** workspace creation, which is where orphaned organizations stop being minted |
 | D04 | D03 | `SsoConnection` as a real aggregate with a guarded lifecycle; existing `ssoDomain` strings grandfathered in silently | Enterprise SSO becomes data with history instead of two hand-set strings; no customer notices, which is the point |
 | D11 | D01 only | Resilient invitations: accept via any verified method, one-click resend, 14-day expiry, visible states | The loudest support pain (invited with email, has a Google account, can't get in) is fixed — before the router cutover makes noise |
@@ -88,7 +88,7 @@ Parallel tracks; staff in any order capacity allows.
 # Sequencing rationale
 
 - **D03 and D13 flip together** — one flag (`IDENTITY_ROUTER_V2`): the router is the logic, the screens are the experience, and shipping either alone would mean building throwaway UI or an invisible engine. Shadow mode exercises the router only; the screens appear at the enforce flip.
-- **D03 is the highest-risk deliverable** — every human's front door. It lands only after D01's replay parity is green.
+- **D03 is the highest-risk deliverable** — every human's auth screens. It lands only after D01's replay parity is green.
 - **D11 was pulled out of the old combined deliverable into Wave 2**: identifier-aware acceptance and one-click resend need only D01's identifiers — they fix the loudest support pain and shouldn't wait for the router. Resend UI lands in the existing members/invitations area; the org-admin surface absorbs it at D05.
 - **D06/D07/D08/D12 are mutually independent** after D03/D05. Suggested order: D06 → D07 → D08. **D12 needs only D13's interstitial hook** (which rides D03's flag): its approvals land in the existing `/settings/members` area beside D11's invitations, on the `organization:manage` permission that already gates inviting, so it does not wait on D05's org-admin surface or on anything from the authz checklist.
 - **D09 is customer-paced, per tenant, slow by design** — no fleet deadline. **D10 is a program exit criterion, not a schedulable milestone**: it starts when the last legacy connection tears down; Auth0 spend and the agents-box login survive until then, and that's fine.
@@ -139,7 +139,7 @@ D11 (invitations) forks off after PR 2 for a second engineer; D03/D13 start only
 
 # Wave 2 — PR breakdown
 
-Proposed 2026-08-24 (spike, with [ADR-117](../adr/117-identifier-first-front-door.md) and the four Wave 2 spec files — all scenarios `@unimplemented` until their PR binds them). Same discipline as Wave 1: every PR ships gated closed and is production-safe alone; gates and data protect the rollout, not PR boundaries.
+Proposed 2026-08-24 (spike, with [ADR-117](../adr/117-identifier-first-auth-screen.md) and the four Wave 2 spec files — all scenarios `@unimplemented` until their PR binds them). Same discipline as Wave 1: every PR ships gated closed and is production-safe alone; gates and data protect the rollout, not PR boundaries.
 
 **Precondition inside the wave:** ADR-116's Phase 2 (the identity storage adapter) is its own PR on the D01 line, not a Wave 2 PR — but D03's identifier-first resolution is served *by* that adapter, so the router PR lands after it. D11 needs neither and starts immediately.
 
@@ -166,7 +166,7 @@ Proposed 2026-08-24 (spike, with [ADR-117](../adr/117-identifier-first-front-doo
 - **PR 4 gate** (= the D11 exit gate): the two support-pain replay tests green; invite → wrong-method → accepted and expiry → resend → accepted round-trips green; changes additive, old acceptance flag-restorable during bake.
 - **PR 5 gate:** router decisions computed in shadow on every live login with zero behavior change; the ADR-027 constants table and route canary green against the amended mechanism; reason-code vocabulary registered with presentation copy. Rollback: revert — nothing user-visible exists.
 - **PR 6 gate** (= the D03+D13 exit gate): zero unexplained shadow mismatches over the bake window; every unauthenticated journey round-trips in the new UI; sign-in success and sign-up completion ≥ baseline on dashboards that exist before the flip; zero Auth0-hosted pages. Rollback: flag off, legacy path and screens intact until bake end.
-- **PR 6 rider — the castle Snake easter egg (optional, Alex 2026-08-25):** double-tapping the LangWatch castle mark on the front door starts a game of Snake played along the border lines of the ground's signal grid (`lw-front-door-signal-grid`, 72px). The snake eats tokens; a small LSD molecule gives chase. Entirely client-side and self-contained: it rides D13's screens inside the same flag, never blocks or reflows the auth card, exits on Escape, and — being started only by a deliberate double-tap — may animate under `prefers-reduced-motion` while everything ambient stays stood down. No gate impact; if PR 6 runs tight, it trails as its own tiny PR.
+- **PR 6 rider — the castle Snake easter egg (optional, Alex 2026-08-25):** double-tapping the LangWatch castle mark on the auth screens starts a game of Snake played along the border lines of the ground's signal grid (`lw-auth-signal-grid`, 72px). The snake eats tokens; a small LSD molecule gives chase. Entirely client-side and self-contained: it rides D13's screens inside the same flag, never blocks or reflows the auth card, exits on Escape, and — being started only by a deliberate double-tap — may animate under `prefers-reduced-motion` while everything ambient stays stood down. No gate impact; if PR 6 runs tight, it trails as its own tiny PR.
 - **PR 7 gate** (= the D04 exit gate): routing parity silent over the bake; grandfathered orgs sign in unchanged; `ssoDomain` writes stopped. Rollback: flag off — strings still dual-written until the flip.
 
 Spec amendments ride the PR that makes them true (the amendment table below): PR 4 amends `update-pending-invitation.feature` (WAITING_APPROVAL retires) and `enforcement-members.feature`; PR 6 retires the `NEXTAUTH_PROVIDER` matrix scenarios and ports the sign-in flow specs; PR 7 ports `sso-wrong-provider-recovery.feature` to connections.
@@ -230,7 +230,7 @@ tokens) stays recorded-not-built.
 Plain design docs, written before the code they cover:
 
 1. **Identity platform + identifiers** (D01) — **written: [ADR-101](../adr/101-identity-pipeline-and-identifiers.md)** (revised 2026-08-20; re-based on ADR-110 2026-08-23). The identity adapter (R10) with its per-user write gate; the truth split — a new pure event-truth Postgres `Identifier` projection, `Account` stays 100% row-truth protocol — which leaves **ADR-022 and ADR-015 unamended** (the earlier column-truth carve-out and replay column scoping are deleted from the program); the ADR-110-shaped rollout re-tenanted to users (org enrollment expanding to members, per-user `finalized` latch, calling-path apply as the one recorded divergence). Carries the payload rule (the email rides in the event where the fact is about one; HMAC-keyed hashes; secrets never) and erasure-as-event-plus-log-wipe (R11).
-3. **Sign-in router, screens + SSO self-service** (D03/D13–D05) — **spiked for review: [ADR-117](../adr/117-identifier-first-front-door.md)** (2026-08-24). Identifier-first routing, auto-link rules, the first-party screen set; explicitly amends ADR-027 (`027-license-gated-sso.md`; the number is collided) — hook → per-method router policy with the hook kept as enforcement backstop; carries over the constants table and the route-table canary; answers Open Q11 (startup semantics kept), Q9 (reset follows the identifier) and Q12 (no-oracle scoped to sign-in). The SAML engine choice is the spike's named debt, due at D04 implementation.
+3. **Sign-in router, screens + SSO self-service** (D03/D13–D05) — **spiked for review: [ADR-117](../adr/117-identifier-first-auth-screen.md)** (2026-08-24). Identifier-first routing, auto-link rules, the first-party screen set; explicitly amends ADR-027 (`027-license-gated-sso.md`; the number is collided) — hook → per-method router policy with the hook kept as enforcement backstop; carries over the constants table and the route-table canary; answers Open Q11 (startup semantics kept), Q9 (reset follows the identifier) and Q12 (no-oracle scoped to sign-in). The SAML engine choice is the spike's named debt, due at D04 implementation.
 4. **MFA + session shape** (D06/D07) — **MFA belongs to the account, not the organization** (revised 2026-08-24), so `mfaRequired` is a membership condition enforced as an enrollment gate, there is no step-up, and `mfaVerifiedAt` is dropped; `amr` semantics, whose one load-bearing job is the SSO case (a provider-asserted factor satisfies the condition, a provider asserting nothing does not); **Open Q4 answered: a passkey (`["phw"]`) satisfies it**, reasoning in `D07-passkeys.md`; and why there is **no** forced re-login and no session revoke at all.
 
 5. **SCIM reconciliation surfaces** (D08) — **written: [ADR-122](../adr/122-scim-reconciliation-is-a-visible-surface.md)** (2026-08-25). Sync state as a read surface in two views — the org SCIM settings page (self-serve status, directory-caused changes, failures as words) and the D05 operator surface (cross-customer oversight, dead-letter linking, the one guarded re-drive). Spec: `specs/identity/scim-reconciliation-surfaces.feature`, inert until PR 11 binds it.
@@ -275,7 +275,7 @@ House discipline: dashboards before flags flip. Metrics pack per deliverable: ro
 | Risk | Where | Mitigation |
 |---|---|---|
 | Cutover breaks sign-in fleet-wide | D03 | Shadow bake with zero-mismatch gate; flag off = instant revert |
-| New front door tanks sign-up conversion | D13 | Sign-up funnel dashboard live before the flip; completion ≥ baseline in the exit gate; flag off restores legacy screens |
+| New auth screens tanks sign-up conversion | D13 | Sign-up funnel dashboard live before the flip; completion ≥ baseline in the exit gate; flag off restores legacy screens |
 | Domain auto-join admits the wrong person | D12 | Org opt-in only; verified email required; public email domains excluded outright; every auto-join is an audited event admins are notified of |
 | Replay touches protocol secrets | D01 | Structurally impossible: `Account` is not a projection and never enters replay; `Identifier` carries no secrets and replays whole-row (ADR-101 §3); replay-parity test in exit gate |
 | Session revoke-all strands users mid-work | D06 | **Removed as a risk (2026-08-24): there is no session revoke at all.** MFA is a condition on the account, so turning `mfaRequired` on ends zero sessions — members who cannot prove a factor meet an enrollment gate for that org alone. The only deploy-time revoke is sessions holding the legacy `impersonating` payload — operators only, one click to resume |

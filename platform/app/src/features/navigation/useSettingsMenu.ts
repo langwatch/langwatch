@@ -4,6 +4,7 @@ import {
   Archive,
   BadgeCheck,
   Blocks,
+  BookUser,
   Brain,
   Bug,
   Building2,
@@ -17,7 +18,6 @@ import {
   FolderOpen,
   Gauge,
   KeyRound,
-  Link2,
   Lock,
   type LucideIcon,
   MailX,
@@ -25,11 +25,13 @@ import {
   RefreshCw,
   ScrollText,
   Settings2,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
   UserCog,
+  UserRound,
+  UserSearch,
   Users,
-  UsersRound,
   Workflow,
 } from "lucide-react";
 import { isPathUnder } from "~/features/navigation/products";
@@ -102,6 +104,31 @@ interface SettingsMenuGates {
   isLiteMember: boolean;
 }
 
+/**
+ * The two pages that are about the reader rather than about the organization
+ * they happen to be in, and the reason this group is first.
+ *
+ * Everything below it is somebody's colleague's business; a name, a photo and
+ * a password are nobody's but the reader's. Security in particular used to sit
+ * among the roles of other people and the domains an administrator proved,
+ * which is the wrong neighbourhood for the one page in Settings a member with
+ * no authority at all can still act on.
+ *
+ * NO GATES. Not the plan, not lite membership, not a permission: a member who
+ * may do nothing else here still has a password to change. Anything an
+ * ORGANIZATION requires of everybody who signs in lives on Access instead.
+ */
+function youGroup(): SettingsMenuGroup {
+  return {
+    id: "settings-you",
+    label: "You",
+    items: [
+      { label: "Profile", href: "/settings/profile", icon: UserRound },
+      { label: "Security", href: "/settings/security", icon: Fingerprint },
+    ],
+  };
+}
+
 function organizationGroup({
   hasPermission,
   isSaaS,
@@ -124,11 +151,6 @@ function organizationGroup({
       ...(!isLiteMember
         ? [{ label: "API Keys", href: "/settings/api-keys", icon: KeyRound }]
         : []),
-      {
-        label: "Authentication",
-        href: "/settings/authentication",
-        icon: Fingerprint,
-      },
       ...(showEnterpriseNav && !isLiteMember && hasPermission("auditLog:view")
         ? [
             {
@@ -159,12 +181,16 @@ function organizationGroup({
 }
 
 function accessGroup({
+  hasPermission,
   showEnterpriseNav,
   isLiteMember,
 }: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-access",
-    label: "Access",
+    // "People & access" rather than "Access": the group holds the people and
+    // the rules about them, and a one-word heading made a reader looking for
+    // a colleague scan past it.
+    label: "People & access",
     items: [
       {
         label: "Members",
@@ -177,35 +203,59 @@ function accessGroup({
         href: "/settings/teams",
         icon: FolderKanban,
       },
-      ...(showEnterpriseNav && !isLiteMember ? enterpriseAccessItems() : []),
+      ...(showEnterpriseNav && !isLiteMember
+        ? enterpriseAccessItems({ hasPermission })
+        : []),
+      // Last, and on every plan: the rules apply to every organization, and
+      // the card that is enterprise-only carries its own lock.
+      {
+        label: "Access",
+        href: "/settings/access",
+        icon: ShieldAlert,
+      },
     ],
   };
 }
 
-function enterpriseAccessItems(): SettingsMenuItem[] {
+function enterpriseAccessItems({
+  hasPermission,
+}: Pick<SettingsMenuGates, "hasPermission">): SettingsMenuItem[] {
   return [
+    // Groups has no entry of its own: a group is what a directory sends and
+    // what an administrator grants a role to, so it is a tab of Directory and
+    // the old address forwards onto it.
     {
-      label: "Groups",
-      href: "/settings/groups",
-      icon: UsersRound,
-      isEnterprise: true,
-    },
-    {
-      label: "Roles & Permissions",
+      // Definitions and the grants of those definitions are two tabs of one
+      // page now; the old Role Bindings address forwards onto the second.
+      label: "Roles",
       href: "/settings/roles",
       icon: ShieldCheck,
+      alsoActiveAt: ["/settings/role-bindings"],
       isEnterprise: true,
     },
+    // Offered only to somebody who may at least SEE single sign-on (D05).
+    // An administrator without the permission is not shown the entry, and
+    // the page refuses the address as well — the menu is a courtesy, never
+    // the gate.
+    ...(hasPermission("sso:view")
+      ? [
+          {
+            label: "Single Sign-On",
+            href: "/settings/single-sign-on",
+            icon: Lock,
+            isEnterprise: true,
+          },
+        ]
+      : []),
     {
-      label: "Role Bindings",
-      href: "/settings/role-bindings",
-      icon: Link2,
-      isEnterprise: true,
-    },
-    {
-      label: "SCIM Provisioning",
-      href: "/settings/scim",
-      icon: RefreshCw,
+      // Named for what it holds, not for the protocol that fills it. "SCIM"
+      // survives in the page's own copy, for the administrator who searches
+      // for the protocol by name. The old address forwards here, and so does
+      // the old groups address, onto the tab groups became.
+      label: "Directory",
+      href: "/settings/directory",
+      icon: BookUser,
+      alsoActiveAt: ["/settings/scim", "/settings/groups"],
       isEnterprise: true,
     },
   ];
@@ -362,6 +412,16 @@ export function backofficeGroup(): SettingsMenuGroup {
         icon: ShieldCheck,
       },
       {
+        label: "Identity Lookup",
+        href: "/ops/backoffice/identity-lookup",
+        icon: UserSearch,
+      },
+      {
+        label: "Directory Sync",
+        href: "/ops/backoffice/directory-sync",
+        icon: RefreshCw,
+      },
+      {
         label: "Bug Reports",
         href: "/ops/backoffice/bug-reports",
         icon: Bug,
@@ -374,7 +434,8 @@ export function backofficeGroup(): SettingsMenuGroup {
  * The settings menu as data for the navigation-v2 settings sidebar:
  * grouped, iconed, and filtered by the same gates the legacy settings
  * navigation applies (plan tier, lite membership, permissions, SaaS
- * against self-hosted, ops access). Every page keeps its address.
+ * against self-hosted, ops access) — except the YOU group, which is
+ * offered to everybody because none of its pages is the organization's.
  *
  * Spec: specs/navigation/settings-shell-v2.feature
  */
@@ -401,6 +462,7 @@ export function useSettingsMenu(): SettingsMenuGroup[] {
   };
 
   const groups: SettingsMenuGroup[] = [
+    youGroup(),
     organizationGroup(gates),
     accessGroup(gates),
     aiInfrastructureGroup(gates),

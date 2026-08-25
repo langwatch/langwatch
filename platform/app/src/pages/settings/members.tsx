@@ -1,41 +1,39 @@
-// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty blocks in this file are deliberate no-ops.
-
 import {
   Badge,
-  Box,
   Button,
-  Card,
   Heading,
   HStack,
   Input,
   Spacer,
-  Table,
+  Spinner,
+  Tabs,
   Text,
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { Ban, MoreVertical, Pencil, Plus, Trash2, Undo2 } from "lucide-react";
+import { Ban, MoreVertical, Plus, Trash2, Undo2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { OverflownTextWithTooltip } from "~/components/OverflownText";
-import { RandomColorAvatar } from "~/components/RandomColorAvatar";
+import { useSearchParams } from "react-router";
+import { IdentityRow, IdentityRowList } from "~/components/access/IdentityRow";
+import { ProvenanceChip } from "~/components/access/ProvenanceChip";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import {
-  type OrganizationUserRole,
-  RoleBindingScopeType,
-} from "~/generated/prisma/client";
+import type { OrganizationUserRole } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useMemberDisableAction } from "~/hooks/useMemberDisableAction";
 import { captureException } from "~/utils/posthogErrorCapture";
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import { CopyInput } from "../../components/CopyInput";
-import { DomainJoinCard } from "../../components/members/DomainJoinCard";
+import { AutomaticJoinsNotice } from "../../components/members/AutomaticJoinsNotice";
 import { InvitesTable } from "../../components/members/InvitesTable";
 import { JoinRequestsTable } from "../../components/members/JoinRequestsTable";
+import { SecondFactorCell } from "../../components/members/SecondFactorCell";
 import { useJoinRequests } from "../../components/members/useJoinRequests";
+import { useTwoStepRequirement } from "../../components/members/useTwoStepRequirement";
 import SettingsLayout from "../../components/SettingsLayout";
 import { DepartmentPicker } from "../../components/settings/DepartmentPicker";
-import { MemberDetailDialog } from "../../components/settings/MemberDetailDialog";
 import { MemberSeatUsage } from "../../components/settings/MemberSeatUsage";
+import { orgRoleOptions } from "../../components/settings/OrganizationUserRoleField";
+import { SectionErrorNotice } from "../../components/settings/SectionErrorNotice";
 import { useDepartmentColumn } from "../../components/settings/useDepartmentColumn";
 import { Dialog } from "../../components/ui/dialog";
 import { Menu } from "../../components/ui/menu";
@@ -49,10 +47,25 @@ import type {
   OrganizationWithMembersAndTheirTeams,
   TeamWithProjects,
 } from "../../server/app-layer/organizations/repositories/organization.repository";
-import type { RouterOutputs } from "../../utils/api";
 import { api } from "../../utils/api";
 
-type Binding = RouterOutputs["roleBinding"]["listForOrg"][number];
+/**
+ * The people of an organization, in three tabs (D05, D11, D12).
+ *
+ * The page used to be everything at once: the member table, the invitations,
+ * the requests to join, the second-factor requirement, the domain policy and
+ * the seat count, stacked down one scroll. Two of those are POLICY — rules
+ * about who may become a member — and they moved to /settings/access, where
+ * a rule is not mistaken for a person. What is left here is people, and the
+ * three tabs are the three states a person can be in: here, invited, or
+ * asking.
+ *
+ * Every one of the three lists the same identity row, so a person mid-flight
+ * looks like the person they will become rather than like a different kind of
+ * object.
+ */
+const TABS = ["members", "invitations", "requests"] as const;
+type MembersTab = (typeof TABS)[number];
 
 function Members() {
   const { organization } = useOrganizationTeamProject();
@@ -74,8 +87,25 @@ function Members() {
     },
   );
 
-  if (!organization || !organizationWithMembers.data || !activePlan.data)
-    return <SettingsLayout />;
+  if (!organization) return <SettingsLayout />;
+
+  if (organizationWithMembers.isError) {
+    return (
+      <SettingsLayout>
+        <SectionErrorNotice
+          error={organizationWithMembers.error}
+          fallbackTitle="Couldn't load your members"
+        />
+      </SettingsLayout>
+    );
+  }
+
+  if (!organizationWithMembers.data || !activePlan.data)
+    return (
+      <SettingsLayout>
+        <Spinner />
+      </SettingsLayout>
+    );
 
   return (
     <MembersList
@@ -109,14 +139,26 @@ function MembersList({
 
   const queryClient = api.useUtils();
 
-  const [selectedMember, setSelectedMember] = useState<{
-    userId: string;
-    role: OrganizationUserRole;
-    user: { name: string | null; email: string | null };
-  } | null>(null);
+  // Which tab is open lives in the address: an administrator sending a
+  // colleague "there are three people waiting" needs the link to open on the
+  // requests, not on the members.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawTab = searchParams.get("tab");
+  const tab: MembersTab = TABS.includes(rawTab as MembersTab)
+    ? (rawTab as MembersTab)
+    : "members";
+  const selectTab = (next: string) =>
+    setSearchParams(
+      (previous) => {
+        const params = new URLSearchParams(previous);
+        // Members is the default, so it stays out of the address entirely.
+        if (next === "members") params.delete("tab");
+        else params.set("tab", next);
+        return params;
+      },
+      { replace: true },
+    );
 
-  // "Add members" is now a URL-routed drawer (see drawers.md), openable from
-  // here, the command bar, and the inline invite box below.
   const { openDrawer } = useDrawer();
 
   const {
@@ -132,13 +174,11 @@ function MembersList({
       },
       { enabled: !!organization },
     );
-  const deleteMemberMutation = api.organization.deleteMember.useMutation();
 
   const [selectedInvites, setSelectedInvites] = useState<
     { inviteCode: string; email: string }[]
   >([]);
 
-  // Watch for changes in selectedInvites and open popup when it changes
   useEffect(() => {
     if (selectedInvites.length > 0) {
       onInviteLinkOpen();
@@ -148,19 +188,21 @@ function MembersList({
   const publicEnv = usePublicEnv();
   const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY;
 
-  // The add-member flow (create invites) now lives in the invite drawer; the
-  // page keeps these handlers for the invites table's resend / revoke.
   const { resendInvite, revokeInvite } = useInviteActions({
     organizationId: organization.id,
     hasEmailProvider: hasEmailProvider ?? false,
     onInviteCreated: setSelectedInvites,
-    onClose: () => {},
+    onClose: () => {
+      // Nothing to close: the invite flow is its own drawer.
+    },
     refetchInvites: () => void pendingInvites.refetch(),
     pricingModel: (organization as { pricingModel?: string }).pricingModel,
     activePlanFree: activePlan.free,
     activePlanType: activePlan.type,
     activePlanSource: activePlan.planSource,
   });
+
+  const deleteMemberMutation = api.organization.deleteMember.useMutation();
 
   const deleteMember = (userId: string) => {
     deleteMemberMutation.mutate(
@@ -226,29 +268,15 @@ function MembersList({
     onInviteLinkClose();
   };
 
-  const {
-    data: allBindings,
-    isLoading: isBindingsLoading,
-    isError: isBindingsError,
-  } = api.roleBinding.listForOrg.useQuery(
+  /**
+   * Why each person is here. A second query on purpose: the list must never
+   * wait on it, and a provenance read that fails leaves every row without a
+   * chip rather than leaving the page without rows.
+   */
+  const provenance = api.organization.getMemberProvenance.useQuery(
     { organizationId: organization.id },
     { enabled: !!organization.id && hasOrganizationManagePermission },
   );
-
-  const bindingsByUser = useMemo(() => {
-    const map = new Map<string, Binding[]>();
-    for (const b of allBindings ?? []) {
-      if (b.userId) {
-        if (!map.has(b.userId)) map.set(b.userId, []);
-        map.get(b.userId)!.push(b);
-      }
-      for (const uid of b.memberUserIds) {
-        if (!map.has(uid)) map.set(uid, []);
-        map.get(uid)!.push(b);
-      }
-    }
-    return map;
-  }, [allBindings]);
 
   const sortedMembers = useMemo(
     () =>
@@ -276,12 +304,21 @@ function MembersList({
     () => pendingInvites.data ?? [],
     [pendingInvites.data],
   );
+  /** Only the ones still waiting on somebody count on the tab. */
+  const openInviteCount = invites.filter(
+    (invite) =>
+      invite.displayStatus === "PENDING" || invite.displayStatus === "EXPIRED",
+  ).length;
 
-  // One panel, two directions (D12): an invitation is the organization
-  // reaching out, a request is somebody reaching in, and an admin answers
-  // both in the same place. Renders nothing when nothing is waiting — which
-  // is also what the flag being off looks like from here.
   const joinRequests = useJoinRequests({
+    organizationId: organization.id,
+    canManage: hasOrganizationManagePermission,
+  });
+
+  // The second-factor column, where the deployment offers one at all. The
+  // REQUIREMENT itself now lives on /settings/access; what a person can
+  // prove is a fact about them and stays beside them.
+  const twoStep = useTwoStepRequirement({
     organizationId: organization.id,
     canManage: hasOrganizationManagePermission,
   });
@@ -290,7 +327,7 @@ function MembersList({
     <SettingsLayout>
       <VStack gap={6} width="full" align="start">
         <HStack width="full">
-          <Heading>Organization Members</Heading>
+          <Heading>Members</Heading>
           <Spacer />
           {hasOrganizationManagePermission && (
             <HStack gap={2}>
@@ -311,107 +348,92 @@ function MembersList({
             </HStack>
           )}
         </HStack>
+
         {hasOrganizationManagePermission && (
           <MemberSeatUsage
             organizationId={organization.id}
             activePlan={activePlan}
           />
         )}
-        <Card.Root width="full" overflow="hidden">
-          {/*
-            Card wraps the table in overflowX="auto" so the row never
-            clips the rightmost ⋮ actions menu on narrow viewports; the
-            department picker keeps its full width (do NOT shrink it), and
-            the email column truncates with a hover tooltip via
-            OverflownTextWithTooltip so long synthetic addresses don't
-            push the row width past the viewport.
-          */}
-          <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-            <Table.Root variant="line" size="md" width="full">
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader width="56px" />
-                  <Table.ColumnHeader>Name</Table.ColumnHeader>
-                  <Table.ColumnHeader maxWidth="280px">
-                    Email
-                  </Table.ColumnHeader>
-                  {hasOrganizationManagePermission && (
-                    <Table.ColumnHeader textAlign="right">
-                      Access
-                    </Table.ColumnHeader>
-                  )}
-                  {showDepartment && (
-                    <Table.ColumnHeader>Department</Table.ColumnHeader>
-                  )}
-                  <Table.ColumnHeader width="60px"></Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {sortedMembers.map((member) => {
-                  return (
-                    <Table.Row key={member.userId}>
-                      <Table.Cell>
-                        <RandomColorAvatar
-                          size="2xs"
-                          name={member.user.name ?? ""}
-                          image={member.user.image}
+
+        <Tabs.Root
+          value={tab}
+          onValueChange={(event) => selectTab(event.value)}
+          colorPalette="blue"
+          width="full"
+        >
+          <Tabs.List marginBottom={4}>
+            <Tabs.Trigger value="members">Members</Tabs.Trigger>
+            <Tabs.Trigger value="invitations">
+              Invitations{pendingInvites.data ? ` (${openInviteCount})` : ""}
+            </Tabs.Trigger>
+            <Tabs.Trigger value="requests">
+              Join requests
+              {joinRequests.requests.length > 0
+                ? ` (${joinRequests.requests.length})`
+                : ""}
+            </Tabs.Trigger>
+          </Tabs.List>
+
+          <Tabs.Content value="members">
+            <VStack align="stretch" gap={4} width="full">
+              {provenance.isError && (
+                <SectionErrorNotice
+                  error={provenance.error}
+                  fallbackTitle="Couldn't work out why each person is here"
+                />
+              )}
+              <IdentityRowList
+                data-testid="members-list"
+                empty="Nobody is a member of this organization yet."
+              >
+                {sortedMembers.map((member) => (
+                  <IdentityRow
+                    key={member.userId}
+                    id={member.userId}
+                    name={member.user.name}
+                    address={member.user.email}
+                    image={member.user.image}
+                    muted={!!member.disabledAt}
+                    data-testid="member-row"
+                    onOpen={() =>
+                      openDrawer("person", { userId: member.userId })
+                    }
+                    badges={
+                      <>
+                        {member.role === "EXTERNAL" && (
+                          <Badge colorPalette="gray" size="sm">
+                            Lite Member
+                          </Badge>
+                        )}
+                        {member.user.deactivatedAt && (
+                          <Badge colorPalette="red" size="sm">
+                            Deactivated
+                          </Badge>
+                        )}
+                        {member.disabledAt && (
+                          <Badge colorPalette="orange" size="sm">
+                            Disabled
+                          </Badge>
+                        )}
+                      </>
+                    }
+                    chips={
+                      <>
+                        <ProvenanceChip
+                          provenance={provenance.data?.[member.userId]}
                         />
-                      </Table.Cell>
-                      <Table.Cell>
-                        <HStack>
-                          <Button
-                            variant="plain"
-                            size="sm"
-                            padding={0}
-                            height="auto"
-                            fontWeight="normal"
-                            color="colorPalette.fg"
-                            colorPalette="blue"
-                            onClick={() => {
-                              setSelectedMember({
-                                userId: member.userId,
-                                role: member.role,
-                                user: {
-                                  name: member.user.name ?? null,
-                                  email: member.user.email ?? null,
-                                },
-                              });
-                            }}
-                          >
-                            {member.user.name}
-                          </Button>
-                          {member.role === "EXTERNAL" && (
-                            <Badge colorPalette="gray" size="sm">
-                              Lite Member
-                            </Badge>
-                          )}
-                          {member.user.deactivatedAt && (
-                            <Badge colorPalette="red" size="sm">
-                              Deactivated
-                            </Badge>
-                          )}
-                          {member.disabledAt && (
-                            <Badge colorPalette="orange" size="sm">
-                              Disabled
-                            </Badge>
-                          )}
-                        </HStack>
-                      </Table.Cell>
-                      <Table.Cell maxWidth="280px">
-                        <OverflownTextWithTooltip>
-                          {member.user.email}
-                        </OverflownTextWithTooltip>
-                      </Table.Cell>
-                      {hasOrganizationManagePermission && (
-                        <Table.Cell>
-                          <MemberAccessDisplay
-                            bindings={bindingsByUser.get(member.userId) ?? []}
-                            isLoading={isBindingsLoading || isBindingsError}
+                        {twoStep.show && (
+                          <SecondFactorCell
+                            member={twoStep.byUser.get(member.userId)}
+                            mfaRequired={twoStep.mfaRequired}
                           />
-                        </Table.Cell>
-                      )}
-                      {showDepartment && (
-                        <Table.Cell>
+                        )}
+                      </>
+                    }
+                    trailing={
+                      <HStack gap={3}>
+                        {showDepartment && (
                           <DepartmentPicker
                             organizationId={organization.id}
                             kind="user"
@@ -420,71 +442,67 @@ function MembersList({
                             departments={department.departments}
                             onAssigned={department.refetch}
                           />
-                        </Table.Cell>
-                      )}
-                      <Table.Cell>
-                        <Box
-                          width="full"
-                          height="full"
-                          display="flex"
-                          justifyContent="end"
+                        )}
+                        <Text
+                          fontSize="sm"
+                          color="fg.muted"
+                          minWidth="90px"
+                          textAlign="right"
                         >
-                          <MemberRowActions
-                            member={member}
-                            canDisable={canDisableMember(member.userId)}
-                            canDelete={canDeleteMember(member.userId)}
-                            onEdit={setSelectedMember}
-                            onSetDisabled={setMemberDisabled}
-                            onDelete={deleteMember}
-                          />
-                        </Box>
-                      </Table.Cell>
-                    </Table.Row>
-                  );
-                })}
-              </Table.Body>
-            </Table.Root>
-          </Card.Body>
-        </Card.Root>
+                          {orgRoleLabel(member.role)}
+                        </Text>
+                        <MemberRowActions
+                          member={member}
+                          canDisable={canDisableMember(member.userId)}
+                          canDelete={canDeleteMember(member.userId)}
+                          onOpen={() =>
+                            openDrawer("person", { userId: member.userId })
+                          }
+                          onSetDisabled={setMemberDisabled}
+                          onDelete={deleteMember}
+                        />
+                      </HStack>
+                    }
+                  />
+                ))}
+              </IdentityRowList>
+            </VStack>
+          </Tabs.Content>
 
-        {hasOrganizationManagePermission && (
-          <DomainJoinCard
-            key={`${joinRequests.joining.domainJoin}:${joinRequests.joining.joinDomains.join(",")}`}
-            domainJoin={joinRequests.joining.domainJoin}
-            joinDomains={joinRequests.joining.joinDomains}
-            saving={joinRequests.savingJoining}
-            onSave={joinRequests.setJoining}
-          />
-        )}
+          <Tabs.Content value="invitations">
+            {pendingInvites.isError ? (
+              <SectionErrorNotice
+                error={pendingInvites.error}
+                fallbackTitle="Couldn't load your invitations"
+              />
+            ) : (
+              <InvitesTable
+                invites={invites}
+                isAdmin={hasOrganizationManagePermission}
+                teams={teams}
+                onViewInviteLink={viewInviteLink}
+                onResendInvite={resendInvite}
+                onRevokeInvite={revokeInvite}
+              />
+            )}
+          </Tabs.Content>
 
-        <JoinRequestsTable
-          requests={joinRequests.requests}
-          isAdmin={hasOrganizationManagePermission}
-          answeringId={joinRequests.answeringId}
-          onApprove={joinRequests.approve}
-          onReject={joinRequests.reject}
-        />
-
-        <InvitesTable
-          invites={invites}
-          isAdmin={hasOrganizationManagePermission}
-          teams={teams}
-          onViewInviteLink={viewInviteLink}
-          onResendInvite={resendInvite}
-          onRevokeInvite={revokeInvite}
-        />
+          <Tabs.Content value="requests">
+            <VStack align="stretch" gap={4} width="full">
+              {/* Who walked in without anybody approving, in the same tab as
+                  the people still waiting to be let in. */}
+              <AutomaticJoinsNotice joins={joinRequests.automaticJoins} />
+              <JoinRequestsTable
+                requests={joinRequests.requests}
+                isAdmin={hasOrganizationManagePermission}
+                answeringId={joinRequests.answeringId}
+                onApprove={joinRequests.approve}
+                onReject={joinRequests.reject}
+              />
+            </VStack>
+          </Tabs.Content>
+        </Tabs.Root>
       </VStack>
-
-      {selectedMember && (
-        <MemberDetailDialog
-          member={selectedMember}
-          organizationId={organization.id}
-          canManage={hasOrganizationManagePermission}
-          isCurrentUser={selectedMember.userId === user?.id}
-          open={!!selectedMember}
-          onClose={() => setSelectedMember(null)}
-        />
-      )}
 
       <Dialog.Root
         open={isInviteLinkOpen}
@@ -526,17 +544,17 @@ function MembersList({
         </Dialog.Content>
       </Dialog.Root>
       {/* The "Add members" flow itself is the URL-routed invite drawer
-          (registry key "inviteMember"), rendered by <CurrentDrawer /> — opened
-          from the header button, the inline invite box, and the command bar. */}
+          (registry key "inviteMember"), and one person is the "person"
+          drawer — both rendered by <CurrentDrawer />. */}
     </SettingsLayout>
   );
 }
 
-/**
- * Inline invite box: the moment someone starts typing an email here, hand off
- * to the invite drawer carrying what they typed, so the box is a fast launcher
- * rather than a second, competing invite form.
- */
+/** The seat a member holds, in the words the role picker uses. */
+function orgRoleLabel(role: OrganizationUserRole): string {
+  return orgRoleOptions.find((option) => option.value === role)?.label ?? role;
+}
+
 /**
  * Row actions for a member. Disable is the reversible one, and is how an
  * organization gets back within its licensed seats; delete removes the
@@ -546,7 +564,7 @@ function MemberRowActions({
   member,
   canDisable,
   canDelete,
-  onEdit,
+  onOpen,
   onSetDisabled,
   onDelete,
 }: {
@@ -558,11 +576,7 @@ function MemberRowActions({
   };
   canDisable: boolean;
   canDelete: boolean;
-  onEdit: (member: {
-    userId: string;
-    role: OrganizationUserRole;
-    user: { name: string | null; email: string | null };
-  }) => void;
+  onOpen: () => void;
   onSetDisabled: (userId: string, disabled: boolean) => void;
   onDelete: (userId: string) => void;
 }) {
@@ -578,21 +592,8 @@ function MemberRowActions({
         </Button>
       </Menu.Trigger>
       <Menu.Content>
-        <Menu.Item
-          value="edit"
-          onClick={() =>
-            onEdit({
-              userId: member.userId,
-              role: member.role,
-              user: {
-                name: member.user.name ?? null,
-                email: member.user.email ?? null,
-              },
-            })
-          }
-        >
-          <Pencil size={16} />
-          Edit
+        <Menu.Item value="open" onClick={onOpen}>
+          Open
         </Menu.Item>
         {canDisable &&
           (member.disabledAt ? (
@@ -601,7 +602,7 @@ function MemberRowActions({
               onClick={() => onSetDisabled(member.userId, false)}
             >
               <Undo2 size={16} />
-              Enable
+              Give their seat back
             </Menu.Item>
           ) : (
             <Menu.Item
@@ -609,7 +610,7 @@ function MemberRowActions({
               onClick={() => onSetDisabled(member.userId, true)}
             >
               <Ban size={16} />
-              Disable
+              Take their seat away
             </Menu.Item>
           ))}
         {canDelete && (
@@ -619,7 +620,7 @@ function MemberRowActions({
             onClick={() => onDelete(member.userId)}
           >
             <Trash2 size={16} />
-            Delete
+            Remove from organization
           </Menu.Item>
         )}
       </Menu.Content>
@@ -627,6 +628,11 @@ function MemberRowActions({
   );
 }
 
+/**
+ * Inline invite box: the moment someone starts typing an email here, hand off
+ * to the invite drawer carrying what they typed, so the box is a fast launcher
+ * rather than a second, competing invite form.
+ */
 function InlineInviteBox({
   onStartTyping,
 }: {
@@ -650,65 +656,5 @@ function InlineInviteBox({
         }
       }}
     />
-  );
-}
-
-function scopeTypeLabel(type: RoleBindingScopeType) {
-  if (type === RoleBindingScopeType.ORGANIZATION) return "🏢";
-  if (type === RoleBindingScopeType.TEAM) return "👥";
-  return "📁";
-}
-
-function roleBadgeColor(role: string) {
-  if (role === "ADMIN") return "red";
-  if (role === "MEMBER") return "blue";
-  return "gray";
-}
-
-function MemberAccessDisplay({
-  bindings,
-  isLoading,
-}: {
-  bindings: Binding[];
-  isLoading?: boolean;
-}) {
-  if (isLoading) {
-    return (
-      <Text fontSize="xs" color="fg.subtle" textAlign="right">
-        -
-      </Text>
-    );
-  }
-  if (bindings.length === 0) {
-    return (
-      <Text fontSize="xs" color="fg.subtle" textAlign="right">
-        No access configured
-      </Text>
-    );
-  }
-  return (
-    <VStack gap={1} align="end">
-      {bindings.map((b) => (
-        <HStack key={b.id} gap={1} fontSize="xs">
-          <Badge colorPalette={roleBadgeColor(b.role)} size="sm">
-            {b.customRoleName ?? b.role}
-          </Badge>
-          <Text color="fg.muted">on</Text>
-          <Badge colorPalette="purple" size="sm">
-            {scopeTypeLabel(b.scopeType)}{" "}
-            {b.scopeName ?? b.scopeId.slice(0, 8) + "…"}
-          </Badge>
-          {b.groupId && (
-            <Text
-              color="fg.subtle"
-              fontSize="xs"
-              title={`via group: ${b.groupName ?? b.groupId}`}
-            >
-              via {b.groupName ?? "group"}
-            </Text>
-          )}
-        </HStack>
-      ))}
-    </VStack>
   );
 }

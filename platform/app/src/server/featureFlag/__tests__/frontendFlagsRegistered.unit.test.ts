@@ -38,12 +38,39 @@ import { resolveFlagDefinition } from "../registry";
  */
 
 /**
+ * The frontend flags that resolve to NO registry definition on purpose.
+ *
+ * Being in `FRONTEND_FEATURE_FLAGS` does two things, and only one of them is
+ * "readable through `featureFlag.isEnabled`": it is also the list the local
+ * override machinery walks (`useFeatureFlagOverrides`, the Feature Flags (Dev)
+ * drawer, `?ff_<flag>=on`). A flag that is only ever answered from this
+ * browser's own override therefore belongs in the list and has nothing for a
+ * registry definition to do — an operator lever at /ops/feature-flags would
+ * be a switch wired to nothing, which is worse than no switch, because it
+ * looks like the way to change the behaviour.
+ *
+ * Each member states why it is one, and each has its reason written beside it
+ * in `frontendFeatureFlags.ts` too:
+ *
+ *   - `ops_ui_ops_menu_pinned` — a per-browser convenience for somebody who
+ *     already has ops access. It widens nothing: the sidebar still gates on
+ *     access, so forcing it On shows a non-ops user nothing.
+ *   - `release_ui_identity_front_door_enabled` — every screen it governs is
+ *     reached SIGNED OUT, and `featureFlag.isEnabled` is a protected procedure
+ *     that answers 401 rather than false to a visitor with no session
+ *     (`useIdentityAuthScreens` never calls it). The fleet-wide lever for this
+ *     one is the deployment's `IDENTITY_ROUTER_V2`, which is what a registry
+ *     row would have to disagree with to matter.
+ *
  * Exact contents, not a count: pinning the members means swapping a key —
  * or adding one — shows up as a changed literal in review. It does not
  * prevent a future author from widening the list, it only makes widening
  * a deliberate, visible edit.
  */
-const UNREGISTERED_GRANDFATHERED = ["ops_ui_ops_menu_pinned"];
+const UNREGISTERED_BY_DESIGN = [
+  "ops_ui_ops_menu_pinned",
+  "release_ui_identity_front_door_enabled",
+];
 
 /**
  * Frontend-exposed flags that are SYSTEM on purpose: internal levers
@@ -64,8 +91,7 @@ describe("frontend feature flags", () => {
     it("resolves to a registry definition so operators can target it per organization", () => {
       const unregistered = FRONTEND_FEATURE_FLAGS.filter(
         (key) =>
-          !resolveFlagDefinition(key) &&
-          !UNREGISTERED_GRANDFATHERED.includes(key),
+          !resolveFlagDefinition(key) && !UNREGISTERED_BY_DESIGN.includes(key),
       );
 
       expect(unregistered).toEqual([]);
@@ -87,7 +113,10 @@ describe("frontend feature flags", () => {
 
   describe("when the pinned lists are read", () => {
     it("names exactly the keys each one covers", () => {
-      expect(UNREGISTERED_GRANDFATHERED).toEqual(["ops_ui_ops_menu_pinned"]);
+      expect(UNREGISTERED_BY_DESIGN).toEqual([
+        "ops_ui_ops_menu_pinned",
+        "release_ui_identity_front_door_enabled",
+      ]);
       expect(FRONTEND_SYSTEM_FLAGS).toEqual([
         "release_langy_enabled",
         "release_langy_ui_actions",

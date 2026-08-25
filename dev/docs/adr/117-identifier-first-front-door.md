@@ -1,4 +1,4 @@
-# ADR-117: The identifier-first front door — sign-in router, first-party screens, SSO connections
+# ADR-117: The identifier-first auth screens — sign-in router, first-party screens, SSO connections
 
 **Date:** 2026-08-24
 
@@ -23,7 +23,7 @@ per-method policy on the router; every semantic ADR-027 locked is preserved
 ## Context
 
 Sign-in today is `NEXTAUTH_PROVIDER`: one method per deployment, chosen by
-env at boot, with the front-door visuals owned by Auth0's hosted pages.
+env at boot, with the auth-screen visuals owned by Auth0's hosted pages.
 Enterprise SSO is two hand-set strings on `Organization`
 (`ssoDomain`/`ssoProvider`), matched in better-auth hooks. The support pain
 is structural: a user invited by email who holds a Google account cannot get
@@ -33,7 +33,7 @@ data nobody can inspect.
 D01 gave identity real data: the `Identifier` projection, per-user
 `finalized` latches, and (ADR-116) a storage adapter that resolves sign-in
 reads — any verified email, OAuth `(provider, subject)` — from the identity
-tables for latched users. Wave 2 builds the front door on it:
+tables for latched users. Wave 2 builds the auth screens on it:
 
 - **D03** — the routing engine: email in, decision out.
 - **D13** — the first-party screen set that renders those decisions; flips
@@ -51,7 +51,7 @@ Three constraints shape everything here:
 2. **No user-level existence oracle.** Domain-level SSO routing is
    discoverable by design; whether an *account* exists must not be, on the
    sign-in surface (the sign-up surface is scoped out — §6).
-3. **The front door is the highest-risk flip in the program.** Every human
+3. **The auth screens is the highest-risk flip in the program.** Every human
    enters through it. Shadow comparison, a zero-mismatch bake, and a
    one-flag rollback are non-negotiable.
 
@@ -323,6 +323,145 @@ holds:** the router's decision object stays existence-independent (§1, §2,
 bound by `signin-router.feature`), the picker renders identical methods for
 any address, and password reset keeps its uniform response.
 
+### Revision (2026-08-25) — the router-level no-oracle is retired too
+
+The 2026-08-24 revision retired the no-oracle at the SCREEN and explicitly
+kept it at the router: "the router's decision object stays
+existence-independent". That half-measure is now retired as well, at the
+owner's direction.
+
+**The argument.** Protecting the answer on one path while the sibling path
+gives it away is theater. Sign-up's `EMAIL_ALREADY_REGISTERED` conversion
+(Q12, and the revision above) tells anybody who asks whether an address has
+an account — one request, no session, same rate limit. A sign-in router that
+spends an architectural constraint hiding the same fact is not buying
+secrecy; it is buying a worse sign-in for the people who actually have
+accounts, and paying for it with the one thing the constraint was supposed
+to protect still being freely readable next door.
+
+**What changes.** `routeSignIn` gains one input — what the identified
+account holds — and two answers:
+
+- an identifier **no account exists for** routes to the verification-first
+  sign-up flow (`route_to_signup` / `identifier_unknown`) instead of a
+  password screen the person cannot pass. The old behaviour was a dead end
+  dressed as a form.
+- an identifier **an account does exist for** routes to a method screen
+  showing the methods *that account* holds, strongest-first, instead of
+  every method the instance offers. A passkey-only account no longer gets a
+  password box that can only fail.
+
+Domain routing still runs first and is unchanged: an address on a connected
+domain redirects to its identity provider whether or not an account exists,
+because just-in-time provisioning is what makes that correct.
+
+**What still holds, and is not negotiable.**
+
+- **The credential refusal stays one refusal.** `identity_sign_in_refused`
+  covers a wrong password and an address with no account alike
+  (`server/better-auth/handled-errors.ts`,
+  `specs/auth/sign-in-failure-messages.feature`). Knowing an account exists
+  is now cheap; knowing *which half of a submitted pair was wrong* is still
+  never told, because that is what turns a credential-stuffing run from
+  guessing pairs into guessing one field at a time.
+- **The lookup stays rate-limited.** `auth.route` keeps its per-address
+  budget, so enumerating the user base is still a slow, expensive, logged
+  activity rather than a free one. Cheap-per-answer is not the same as
+  free-in-bulk, and only the second is worth defending.
+- **Password reset keeps its uniform response**
+  (`specs/auth/password-reset.feature`). Reset sends mail to an address, and
+  a mailer that answers differently for a registered address is an oracle
+  with a delivery mechanism attached.
+- **The router still reads no secret.** It learns *that* an account exists
+  and *which kinds* of method it holds. It never reads a credential, a
+  hash, a passkey's material or a session.
+
+### Revision (2026-08-25) — the method screen is ranked, and starts the ceremony
+
+Consequence of the revision above, and the reason it was asked for: with the
+account's own methods in hand, the post-identifier screen stops being a list
+and becomes a route.
+
+- An account holding a **passkey** starts the ceremony on arrival. The
+  real-gesture rule in ADR-120 governs the CONDITIONAL request only — an
+  offer nobody asked for. Submitting an identifier is a deliberate act, and
+  the ceremony it leads to is the answer to it, which is the pattern every
+  major provider now uses.
+- "Use your password instead" sits under it as the quiet secondary, **and
+  only when the account holds a password.**
+- A ceremony that fails or is cancelled **degrades to the next-best method
+  with the retry offered inline**, rather than stacking a warning over an
+  unrelated form.
+- Order is most-recently-used-on-this-browser first — a local hint, absent
+  by default, read through a guard — then strongest-first: passkey, then a
+  federated connection, then password. This supersedes the "badged, never
+  reordered" line in `signin-signup-screens.feature`: the badge was the
+  right answer while every address saw the same list, and it is the wrong
+  one now that the list is the account's.
+
+No new existence information is revealed by any of this beyond what the
+first revision already concedes.
+
+### Revision (2026-08-25) — sign-up creates the account, the link opens the session
+
+§6 says "sign-up is verification-first" and it still does. What needed
+writing down is HOW, because the mechanism changed underneath the sentence
+and for a while the code and this document disagreed.
+
+**The old mechanism.** The address step sent the link, and the account did not
+exist until the link came back. "Has an account" and "proved the address"
+were one fact, so nothing had to say which was which.
+
+**Why it could not stay.** A passkey cannot be enrolled against an account
+that does not exist. Sign-up with a passkey — the thing D07 and Passkey
+Central ask for — needs a row to attach the credential to, at the moment of
+the ceremony. So the account has to be created by the credential step.
+
+**What holds the guarantee instead.** The account is created; the SESSION is
+not. Sign-up opens no session at all, and the emailed link opens the first
+one. The invariant is therefore unchanged in the only form that matters:
+
+> An account whose address was never confirmed is an account nobody has
+> ever signed into.
+
+The order:
+
+```
+address ─► password or passkey ─► account created, link sent ─► confirm ─► in
+```
+
+**Three consequences worth naming.**
+
+- **The link is sent by the call that creates the account** (`user.register`,
+  and the passkey hook), not by the screen. The screen has no session to send
+  from — that is what the order costs — and the alternative is a public "send
+  a confirmation to this address" endpoint, which is a mailer pointed at
+  anything anybody types. Sending it from the write that just created the
+  account closes that completely: the only reachable address is the one just
+  registered.
+- **`completeVerification` mints a single-use address proof** for the one case
+  where a link confirms an address that has NO account behind it — a link from
+  the log-in door, where somebody typed an address nobody holds. The account is
+  created a screen later, and without the proof it would be born unconfirmed
+  and immediately mailed a second link, asking somebody to prove twice an
+  address they had just proved. The proof is server-minted, single-use and
+  bound to its address, because "this address is already confirmed" is exactly
+  the claim a caller must not be able to make.
+- **Sign-up asks the router before offering any credential.** It did not, and
+  that was a hole: an address on a domain a customer routes through an
+  identity provider could be given a password box, which is the one thing the
+  connection exists to prevent. The router already answers correctly — a live
+  domain connection outranks "no account for this address" in §1's table — so
+  sign-up asks the same question sign-in asks and hands off on
+  `redirect_to_connection`.
+
+**What is NOT gated: additional addresses.** The rule is about the address
+somebody signs up with. A second address added later blocks nothing — the
+platform already holds a confirmed address for that person — so it is nudged
+from inside the app (`UnconfirmedAddressBanner`) and never demanded. This is
+the distinction the earlier "confirmation follows you in" experiment
+flattened, and flattening it is what made sign-up feel unguarded.
+
 ### 7. One flag, shadow-first, and the cutover
 
 - **`IDENTITY_ROUTER_V2`** covers D03 + D13 together: the router is the
@@ -372,7 +511,7 @@ exists to prevent, and it would make the shadow comparison unable to say
 
 ## Consequences
 
-- One front door for every method ends the one-method-per-deployment
+- One auth screens for every method ends the one-method-per-deployment
   limit; account-linking dead ends become data (events + proposals)
   instead of support tickets.
 - The `before` hook shrinks to enforcement; `ssoPathGate.ts` and the

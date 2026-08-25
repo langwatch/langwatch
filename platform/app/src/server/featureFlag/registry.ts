@@ -383,6 +383,28 @@ export const FEATURE_FLAGS = [
       "Lets somebody with a verified company address find the organization their colleagues are already in and ask to join it, and lets an administrator turn that into automatic joining for a domain they name (spec: specs/identity/join-requests.feature, join-matching-and-privacy.feature, domain-auto-join.feature, join-before-create.feature). Off = the sign-up interstitial never renders, the members area shows no requests section, the lookup answers nothing to everyone, and no join command is ever dispatched. This is the whole of the rollback. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=join_requests, or set JOIN_REQUESTS=1 on a deployment.",
   },
   {
+    // D05 tier 3 (ADR-117). Named `self_serve_sso` rather than the usual
+    // `release_...` prefix so its auto-derived env override is exactly
+    // `SELF_SERVE_SSO`, which is the per-organization lever the epic names
+    // and the whole of what rolling tier 3 back consists of.
+    key: "self_serve_sso",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Lets an organization set enterprise single sign-on up itself on the hosted service: register the identity provider, claim a domain, and prove it with a record it publishes once a LangWatch operator has approved the claim (spec: specs/identity/sso-onboarding-tiers.feature). Off = the settings entry is not offered and every self-serve command is refused by name, pointing the reader at talking to us. Self-hosted installations do not consult it — their licence is the authorization there. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=self_serve_sso, or target an organization from /ops/feature-flags.",
+  },
+  {
+    // D09 (ADR-117). Named `sso_connection_routing` rather than the usual
+    // `release_...` prefix so its auto-derived env override is exactly
+    // `SSO_CONNECTION_ROUTING`, and so it reads as what it is next to the
+    // `SSOCONN_ROUTING` environment variable it takes the routing half of.
+    key: "sso_connection_routing",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Lets one organization's sign-in be decided by the single sign-on connection it registered, instead of the legacy domain and provider columns (spec: specs/identity/sso-idp-termination.feature). Off — the default, and every organization that has not been named — the legacy columns answer exactly as they did before, so an existing customer's sign-in is untouched. On, and that organization's own identity provider terminates its sign-ins. Per organization on purpose: this is the lever a cutover is done and rolled back with, one customer at a time. Target an organization from /ops/feature-flags, or force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=sso_connection_routing.",
+  },
+  {
     key: "release_webhook_automations",
     scope: "PRODUCT",
     defaultValue: false,

@@ -1,0 +1,44 @@
+import { Alert } from "@chakra-ui/react";
+import { explainAnyError } from "~/features/errors/logic/presentation";
+import { toaster } from "../../ui/toaster";
+
+/**
+ * How single sign-on setup reports a failure, in one place.
+ *
+ * Both of these read the CODE-keyed registry and never `error.message`: since
+ * #5984 the wire message for a handled error is the code, so rendering it
+ * would show an administrator `sso_activation_break_glass_missing`.
+ */
+
+/**
+ * A read that failed, said out loud.
+ *
+ * Never an empty list and never a silent nothing: "we could not find out" and
+ * "there is nothing here" are different facts, and showing the second when
+ * the first is true is how somebody concludes their way back in vanished.
+ */
+export function LoadFailure({ error, what }: { error: unknown; what: string }) {
+  const copy = explainAnyError(error);
+  return (
+    <Alert.Root status="error">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>{copy.title}</Alert.Title>
+        <Alert.Description>
+          {copy.description} We could not load {what}.
+        </Alert.Description>
+      </Alert.Content>
+    </Alert.Root>
+  );
+}
+
+/** A refusal from a change, in the words registered for its code. */
+export function reportRefusal(error: unknown): void {
+  const copy = explainAnyError(error);
+  toaster.create({
+    title: copy.title,
+    description: copy.description,
+    type: "error",
+    duration: 8000,
+  });
+}

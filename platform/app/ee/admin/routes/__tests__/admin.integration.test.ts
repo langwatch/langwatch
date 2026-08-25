@@ -173,6 +173,41 @@ describe("admin routes", () => {
   describe("given an admin impersonation request missing its fields", () => {
     beforeEach(signInAsAdmin);
 
+    /** @scenario "Starting an impersonation still takes a reason" */
+    it("refuses an impersonation started without a reason", async () => {
+      const response = await post(
+        "/api/admin/impersonate",
+        JSON.stringify({ userIdToImpersonate: "user_target" }),
+      );
+
+      expect(response.status).toBe(422);
+      const body = await bodyOf(response);
+      expect(body.error).toBe("validation_error");
+      expect(Object.keys(body.fieldErrors)).toEqual(["reason"]);
+      expect(impersonationStart).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Starting an impersonation still takes a reason" */
+    it("proceeds with a reason, and records it beside both people", async () => {
+      const response = await post(
+        "/api/admin/impersonate",
+        JSON.stringify({
+          userIdToImpersonate: "user_target",
+          reason: "customer asked us to look",
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(impersonationStart).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionId: "sess_1",
+          impersonatorUserId: "user_admin",
+          userIdToImpersonate: "user_target",
+          reason: "customer asked us to look",
+        }),
+      );
+    });
+
     it("answers 422 validation_error naming each missing field", async () => {
       const response = await post("/api/admin/impersonate", JSON.stringify({}));
 

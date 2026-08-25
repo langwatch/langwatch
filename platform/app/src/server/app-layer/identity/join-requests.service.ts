@@ -10,6 +10,7 @@ import {
   type JoinLookupDecision,
   JoinNotAvailableError,
   type JoinOffer,
+  JoinPolicyNotLicensedError,
   type JoinRequestAggregateState,
   JoinRequestNotFoundError,
   JoinRequestThrottledError,
@@ -36,7 +37,7 @@ const logger = createLogger("langwatch:identity:join-requests");
 
 /**
  * How often somebody may ask, and how often they may look. The sign-in
- * endpoints' own shape (`frontDoor.ts`): a per-actor sliding window, generous
+ * endpoints' own shape (`auth.ts`): a per-actor sliding window, generous
  * enough that nobody legitimate meets it and tight enough that volume is not
  * free. A request costs an admin attention, which is the thing being
  * protected here.
@@ -54,6 +55,16 @@ export const JOIN_LOOKUPS_PER_WINDOW = 60;
  * no should not have to say it again next morning.
  */
 export const JOIN_REJECTION_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * How far back the members area looks for people who walked in.
+ *
+ * Fourteen days, matching the expiry window a request lives inside: an admin
+ * who reads the panel once a fortnight sees every automatic join exactly
+ * once, and the notice empties itself rather than growing into a second,
+ * permanent membership list nobody maintains.
+ */
+export const AUTOMATIC_JOIN_NOTICE_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 
 /** What an organization's admins are told, and by what means. Injected so
  *  the mail is the app's business and this service stays testable. */
@@ -102,6 +113,18 @@ export interface JoinMembershipPort {
   isMember(args: { userId: string; organizationId: string }): Promise<boolean>;
 }
 
+/**
+ * The domains a person has said "no thanks" to being offered.
+ *
+ * A port rather than a column read, for the reason every other seam here is
+ * one: the service decides WHEN an offer is silenced, and the app decides
+ * where that decision is written down.
+ */
+export interface JoinOfferDismissalPort {
+  dismissedDomains(args: { userId: string }): Promise<string[]>;
+  dismiss(args: { userId: string; domain: string }): Promise<void>;
+}
+
 /** Whether this organization may change its joining setting, and to what. */
 export interface JoinSettingPort {
   read(args: {
@@ -114,6 +137,22 @@ export interface JoinSettingPort {
   }): Promise<void>;
 }
 
+/**
+ * What changed when an administrator saved the joining setting: both values,
+ * and both domain lists.
+ *
+ * Both halves are returned rather than just the new one because the audit row
+ * the caller writes has to say what it was as well as what it became — "ana
+ * turned automatic joining on" is only readable next to what it was on
+ * before.
+ */
+export interface JoinSettingChange {
+  previous: DomainJoinSetting;
+  next: DomainJoinSetting;
+  previousDomains: readonly string[];
+  nextDomains: readonly string[];
+}
+
 export interface JoinRequestsServiceDeps {
   requests: JoinRequestService;
   reads: PrismaJoinRequestReadRepository;
@@ -121,8 +160,22 @@ export interface JoinRequestsServiceDeps {
   membership: JoinMembershipPort;
   notifier: JoinRequestNotifier;
   settings: JoinSettingPort;
+  dismissals: JoinOfferDismissalPort;
   /** The licence gate. Holds `auto`, lets `request` through. */
   autoJoinLicensed: () => Promise<boolean>;
+  /**
+   * Whether this organization's plan carries the who-can-join control at all.
+   *
+   * A different question from `autoJoinLicensed`, which asks whether the
+   * DEPLOYMENT may federate. This one is per-organization and holds BOTH open
+   * doors — asking to join and walking straight in — because opening the
+   * organization to people nobody invited is the paid control. Closing it
+   * never consults this.
+   *
+   * A port for the same reason the licence gate is a closure: nothing below
+   * the composition root reads a subscription row or a license file.
+   */
+  joinPolicyEntitled: (args: { organizationId: string }) => Promise<boolean>;
   /** Whether any of this exists at all. Flag off, nothing here runs. */
   enabled: (args: { userId: string }) => Promise<boolean>;
   now?: () => number;
@@ -193,6 +246,47 @@ export class JoinRequestsService {
       "join lookup answered for a verified domain",
     );
     return decision;
+  }
+
+  /**
+   * The same lookup, for somebody who is already signed in and already has an
+   * organization — the post-login offer rather than the sign-up step.
+   *
+   * One difference, and it is the whole reason this is a separate verb: an
+   * offer somebody has waved away stays waved away. Sign-up's own lookup is
+   * untouched by that, because nobody has dismissed anything at sign-up, and
+   * silencing the step that exists to stop orphaned organizations would undo
+   * the deliverable.
+   */
+  async offerForSignedInUser({
+    userId,
+    verifiedEmail,
+  }: {
+    userId: string;
+    verifiedEmail: string | null;
+  }): Promise<JoinLookupDecision> {
+    const domain = verifiedEmail ? joinDomainOf(verifiedEmail) : null;
+    if (!domain) return { outcome: "none" };
+
+    const dismissed = await this.deps.dismissals.dismissedDomains({ userId });
+    // The same nothing every other closed door answers with. A dismissed
+    // offer is not a refusal to explain — it is an offer that is over.
+    if (dismissed.includes(domain)) return { outcome: "none" };
+
+    return this.lookup({ userId, verifiedEmail });
+  }
+
+  /** "No thanks", remembered for that domain and no other. */
+  async dismissOffer({
+    userId,
+    verifiedEmail,
+  }: {
+    userId: string;
+    verifiedEmail: string | null;
+  }): Promise<void> {
+    const domain = verifiedEmail ? joinDomainOf(verifiedEmail) : null;
+    if (!domain) return;
+    await this.deps.dismissals.dismiss({ userId, domain });
   }
 
   /**
@@ -479,9 +573,15 @@ export class JoinRequestsService {
   /**
    * Turn automatic joining on, off, or back to asking.
    *
-   * Three refusals, in the order that costs the customer least to fix: the
-   * licence, then the identity provider that already admits people, then the
-   * domain nobody has proved.
+   * Four refusals, in the order that costs the customer least to fix: the
+   * organization's plan, then the deployment's licence, then the identity
+   * provider that already admits people, then the domain nobody has proved.
+   *
+   * The plan is asked ONLY of a change that opens the door wider — a new
+   * setting other than "off", or another domain named on an open one. Closing
+   * the door is free on every plan, and clearing the last domain is closing
+   * it. An organization that leaves the plan with a door open must be able to
+   * shut it, or the lapse would be a door it cannot close.
    */
   async setJoining({
     organizationId,
@@ -491,9 +591,21 @@ export class JoinRequestsService {
     organizationId: string;
     domainJoin: DomainJoinSetting;
     domains: readonly string[];
-  }): Promise<{ previous: DomainJoinSetting; next: DomainJoinSetting }> {
+  }): Promise<JoinSettingChange> {
     const current = await this.deps.settings.read({ organizationId });
     const normalized = domains.map(normalizeDomain).filter(Boolean);
+
+    if (
+      opensTheDoorWider({
+        from: { domainJoin: current.domainJoin, domains: current.joinDomains },
+        to: { domainJoin, domains: normalized },
+      }) &&
+      !(await this.deps.joinPolicyEntitled({ organizationId }))
+    ) {
+      throw new JoinPolicyNotLicensedError(
+        `organization ${organizationId} asked to set joining to ${domainJoin} on a plan that does not carry the control`,
+      );
+    }
 
     if (domainJoin === "auto") {
       if (!(await this.deps.autoJoinLicensed())) {
@@ -511,15 +623,21 @@ export class JoinRequestsService {
       }
     }
 
+    // Turning automatic joining off clears the domains it named: a setting
+    // flipped back on later must name them again, deliberately, rather than
+    // inherit a list from a decision somebody made months ago.
+    const nextDomains = domainJoin === "auto" ? normalized : [];
     await this.deps.settings.write({
       organizationId,
       domainJoin,
-      // Turning automatic joining off clears the domains it named: a setting
-      // flipped back on later must name them again, deliberately, rather than
-      // inherit a list from a decision somebody made months ago.
-      joinDomains: domainJoin === "auto" ? normalized : [],
+      joinDomains: nextDomains,
     });
-    return { previous: current.domainJoin, next: domainJoin };
+    return {
+      previous: current.domainJoin,
+      next: domainJoin,
+      previousDomains: current.joinDomains,
+      nextDomains,
+    };
   }
 
   /** How this organization has set joining, for the settings card. */
@@ -538,6 +656,25 @@ export class JoinRequestsService {
     organizationId: string;
   }): Promise<JoinRequestAggregateState[]> {
     return this.deps.reads.findPendingForOrganization({ organizationId });
+  }
+
+  /**
+   * Who walked in on this organization's domain setting lately, for the
+   * members area.
+   *
+   * The in-product half of telling the admins after the fact. The mail goes
+   * out the moment it happens; this is what an admin who was not reading
+   * their inbox sees, in the same panel, off the same projection.
+   */
+  async automaticJoinsForOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<JoinRequestAggregateState[]> {
+    return this.deps.reads.findAutomaticJoinsForOrganization({
+      organizationId,
+      resolvedAfterMs: this.now() - AUTOMATIC_JOIN_NOTICE_WINDOW_MS,
+    });
   }
 
   /** What this person is waiting on. */
@@ -726,6 +863,15 @@ export class JoinRequestsService {
         `an active connection already admits ${domain} for ${organizationId}`,
       );
     }
+    // A domain whose published record went missing and stayed missing is not
+    // a domain to open a door on (ADR-123). The refusal is the same one an
+    // unproven domain gets, and for the same reason: what would authorize
+    // this is evidence, and right now there is none.
+    if (candidate?.domainProofLapsed) {
+      throw new JoinAutoDomainUnprovenError(
+        `${domain} was proved for ${organizationId} by a record that is no longer published`,
+      );
+    }
     const verified = candidate?.verifiedMembersOnDomain ?? 0;
     if (verified < JOIN_AUTO_VERIFIED_MEMBER_THRESHOLD) {
       throw new JoinAutoDomainUnprovenError(
@@ -738,4 +884,27 @@ export class JoinRequestsService {
 /** What the screen says is left, from the limiter's own answer. */
 function retryAfterSeconds(resetAt: number): number {
   return Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
+}
+
+/**
+ * Whether a save lets more people in than the setting already did.
+ *
+ * The one question the plan gate asks, and it is asked of the CHANGE rather
+ * than of the destination: settling on "off" narrows, saving what is already
+ * saved changes nothing, and naming another domain on an open door widens it
+ * even though the setting itself did not move.
+ */
+function opensTheDoorWider({
+  from,
+  to,
+}: {
+  from: { domainJoin: DomainJoinSetting; domains: readonly string[] };
+  to: { domainJoin: DomainJoinSetting; domains: readonly string[] };
+}): boolean {
+  if (to.domainJoin === "off") return false;
+  if (to.domainJoin !== from.domainJoin) return true;
+  // Same setting, so the only thing left that can widen it is a domain the
+  // organization was not already admitting.
+  const already = new Set(from.domains);
+  return to.domains.some((domain) => !already.has(domain));
 }

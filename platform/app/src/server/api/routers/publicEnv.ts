@@ -2,7 +2,10 @@ import { resolveGatewayBaseUrl } from "@ee/governance/services/gatewayUrl";
 import { resolveAuthProvider } from "@ee/sso/sso-gate";
 import { RUM_DEFAULT_SAMPLE_RATIO } from "@langwatch/react-rum/constants";
 import { z } from "zod";
-import { deploymentOffersPasskeys } from "~/server/app-layer/identity/signin-method-policy";
+import {
+  deploymentOffersPasskeys,
+  deploymentOffersTwoStepVerification,
+} from "~/server/app-layer/identity/signin-method-policy";
 import { signInRouterMode } from "~/server/better-auth/signInRouterShadow";
 import { env } from "../../../env.mjs";
 import { hasEmailProvider } from "../../mailer/providers";
@@ -32,7 +35,7 @@ export const publicEnvRouter = publicProcedure
       // a disabled IdP. `resolveAuthProvider()` is the single source of
       // truth — never read `env.NEXTAUTH_PROVIDER` directly here.
       NEXTAUTH_PROVIDER: await resolveAuthProvider(),
-      // ADR-117 §7: whether the identifier-first screens are the front door
+      // ADR-117 §7: whether the identifier-first screens are the auth screens
       // on this deployment. A derived boolean rather than the flag's value,
       // because the only thing a browser may act on is "are these screens
       // live" — the router also runs in shadow, and screens never render
@@ -46,6 +49,12 @@ export const publicEnvRouter = publicProcedure
       // cannot honour. Same read the plugin registration makes, so the button
       // and the endpoint cannot disagree.
       PASSKEYS_ENABLED: deploymentOffersPasskeys(),
+      // Whether this deployment mounted the two-factor plugin at boot (D06).
+      // Derived for the same reason `PASSKEYS_ENABLED` is: the only thing a
+      // browser may act on is "is there an endpoint behind the button", and
+      // offering a setup where the plugin was never registered is an offer we
+      // cannot honour. Same read the plugin registration makes.
+      MFA_ENROLLMENT_OPEN: deploymentOffersTwoStepVerification(),
       DEMO_PROJECT_SLUG: env.DEMO_PROJECT_SLUG,
       NODE_ENV: env.NODE_ENV,
 

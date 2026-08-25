@@ -32,7 +32,7 @@ import { evaluatorsRouter } from "./routers/evaluators";
 import { experimentsRouter } from "./routers/experiments";
 import { exportRouter } from "./routers/export";
 import { featureFlagRouter } from "./routers/featureFlag";
-import { frontDoorRouter } from "./routers/frontDoor";
+import { authRouter } from "./routers/auth";
 import { gatewayBudgetsRouter } from "./routers/gatewayBudgets";
 import { gatewayCacheRulesRouter } from "./routers/gatewayCacheRules";
 import { gatewayGuardrailsRouter } from "./routers/gatewayGuardrails";
@@ -44,6 +44,7 @@ import { groupRouter } from "./routers/group";
 import { homeRouter } from "./routers/home";
 import { httpProxyRouter } from "./routers/httpProxy";
 import { identityRouter } from "./routers/identity";
+import { identityLookupRouter } from "./routers/identityLookup";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
 import { joinRequestsRouter } from "./routers/joinRequests";
 import { langyRouter } from "./routers/langy";
@@ -72,6 +73,8 @@ import { roleBindingRouter } from "./routers/roleBinding";
 import { routingPoliciesRouter } from "./routers/routingPolicies";
 import { savedViewsRouter } from "./routers/savedViews";
 import { scenarioRouter } from "./routers/scenarios";
+import { scimOversightRouter } from "./routers/scimOversight";
+import { scimReconciliationRouter } from "./routers/scimReconciliation";
 import { scimTokenRouter } from "./routers/scimToken";
 import { secretsRouter } from "./routers/secrets";
 import { setupSkillsRouter } from "./routers/setupSkills";
@@ -79,6 +82,7 @@ import { shareRouter } from "./routers/share";
 import { sharedTraceRouter } from "./routers/sharedTrace";
 import { spansRouter } from "./routers/spans";
 import { ssoConnectionsRouter } from "./routers/ssoConnections";
+import { ssoSetupRouter } from "./routers/ssoSetup";
 import { storedObjectsRouter } from "./routers/stored-objects.router";
 import { subscriptionRouter } from "./routers/subscription";
 import { suiteRouter } from "./routers/suites";
@@ -88,6 +92,7 @@ import { traceEditOverlayRouter } from "./routers/traceEditOverlay";
 import { tracesRouter } from "./routers/traces";
 import { tracesV2Router } from "./routers/tracesV2";
 import { translateRouter } from "./routers/translate";
+import { twoStepVerificationRouter } from "./routers/twoStepVerification";
 import { userRouter } from "./routers/user";
 import { virtualKeysRouter } from "./routers/virtualKeys";
 import { webhookEndpointsRouter } from "./routers/webhookEndpoints";
@@ -99,6 +104,7 @@ const coreRouters = {
   httpProxy: httpProxyRouter,
   organization: organizationRouter,
   joinRequests: joinRequestsRouter,
+  twoStepVerification: twoStepVerificationRouter,
   project: projectRouter,
   team: teamRouter,
   traces: tracesRouter,
@@ -124,7 +130,8 @@ const coreRouters = {
   automation: automationRouter,
   authz: authzRouter,
   identity: identityRouter,
-  frontDoor: frontDoorRouter,
+  identityLookup: identityLookupRouter,
+  auth: authRouter,
   experiments: experimentsRouter,
   featureFlag: featureFlagRouter,
   annotation: annotationRouter,
@@ -133,6 +140,7 @@ const coreRouters = {
   user: userRouter,
   bugReports: bugReportsRouter,
   ssoConnections: ssoConnectionsRouter,
+  ssoSetup: ssoSetupRouter,
   annotationScore: annotationScoreRouter,
   publicEnv: publicEnvRouter,
   setupSkills: setupSkillsRouter,
@@ -156,6 +164,8 @@ const coreRouters = {
   secrets: secretsRouter,
   license: licenseRouter,
   licenseEnforcement: licenseEnforcementRouter,
+  scimOversight: scimOversightRouter,
+  scimReconciliation: scimReconciliationRouter,
   scimToken: scimTokenRouter,
   roleBinding: roleBindingRouter,
   apiKey: apiKeyRouter,

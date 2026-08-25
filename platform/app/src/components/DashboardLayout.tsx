@@ -51,7 +51,7 @@ import { FullLogo } from "./icons/FullLogo";
 import { LogoIcon } from "./icons/LogoIcon";
 import { LoadingScreen } from "./LoadingScreen";
 import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
-import { PasskeyNudge } from "./me/PasskeyNudge";
+import { SecureAccountNudge } from "./me/SecureAccountNudge";
 import { PersonalSidebar } from "./PersonalSidebar";
 import { ProjectAvatar } from "./ProjectAvatar";
 import { DevBadge } from "./ui/DevBadge";
@@ -559,7 +559,7 @@ export const LegacyDashboardLayout = ({
           thirty days (ADR-120). Mounted in the shell rather than on a route
           because "after signing in" is wherever they landed; it decides for
           itself whether to render, and renders nothing on nearly every load. */}
-      <PasskeyNudge />
+      <SecureAccountNudge />
 
       {/* Header bar - spans full width with gray background. Pinned to the
           shared APP_HEADER_HEIGHT: the viewport math below and the docked

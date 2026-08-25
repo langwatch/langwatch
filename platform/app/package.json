@@ -89,6 +89,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1080.0",
     "@azure/identity": "^4.13.1",
     "@better-auth/passkey": "1.7.1",
+    "@better-auth/sso": "1.7.1",
     "@chakra-ui/react": "^3.36.0",
     "@clickhouse/client": "^1.23.0",
     "@clickhouse/parser": "0.3.0",

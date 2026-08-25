@@ -150,6 +150,17 @@ export default function SettingsLayout({
           gap={2}
           display={isSubscription ? "none" : "flex"}
         >
+          {/* The reader's own two pages come first, and carry no gate: a
+              member with no authority over the organization still has a name,
+              a photo and a password. */}
+          <NavSection
+            label="You"
+            paths={["/settings/profile", "/settings/security"]}
+          >
+            <MenuLink href="/settings/profile">Profile</MenuLink>
+            <MenuLink href="/settings/security">Security</MenuLink>
+          </NavSection>
+
           <MenuLink href="/settings">General Settings</MenuLink>
           {!isLiteMember && (
             <MenuLink href="/settings/api-keys">API Keys</MenuLink>
@@ -173,15 +184,17 @@ export default function SettingsLayout({
           </NavSection>
 
           <NavSection
-            label="Teams & Access"
+            label="People & access"
             paths={[
               "/settings/teams",
               "/settings/members",
               "/settings/groups",
               "/settings/roles",
               "/settings/role-bindings",
-              "/settings/authentication",
+              "/settings/single-sign-on",
               "/settings/scim",
+              "/settings/directory",
+              "/settings/access",
               "/settings/audit-log",
             ]}
           >
@@ -189,19 +202,29 @@ export default function SettingsLayout({
               Members
             </MenuLink>
             <MenuLink href="/settings/teams">Teams & Projects</MenuLink>
+            {/* Definitions and the grants of those definitions are two tabs
+                of one page now; /settings/role-bindings forwards onto the
+                second and no longer has an entry of its own. Groups is the
+                same shape: it is a tab of Directory, and /settings/groups
+                forwards onto it. */}
             {showEnterpriseNav && !isLiteMember && (
-              <MenuLink href="/settings/groups">Groups</MenuLink>
+              <MenuLink href="/settings/roles">Roles</MenuLink>
             )}
+            {/* Offered only to somebody who may at least SEE single sign-on
+                (D05). An administrator without the permission is not shown
+                the entry, and the page refuses the address as well — the
+                menu is a courtesy, not the gate. */}
+            {showEnterpriseNav &&
+              !isLiteMember &&
+              hasPermission("sso:view") && (
+                <MenuLink href="/settings/single-sign-on">
+                  Single Sign-On
+                </MenuLink>
+              )}
             {showEnterpriseNav && !isLiteMember && (
-              <MenuLink href="/settings/roles">Roles & Permissions</MenuLink>
+              <MenuLink href="/settings/directory">Directory</MenuLink>
             )}
-            <MenuLink href="/settings/authentication">Authentication</MenuLink>
-            {showEnterpriseNav && !isLiteMember && (
-              <MenuLink href="/settings/scim">SCIM Provisioning</MenuLink>
-            )}
-            {showEnterpriseNav && !isLiteMember && (
-              <MenuLink href="/settings/role-bindings">Role Bindings</MenuLink>
-            )}
+            <MenuLink href="/settings/access">Access</MenuLink>
             {showEnterpriseNav &&
               !isLiteMember &&
               hasPermission("auditLog:view") && (

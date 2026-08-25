@@ -262,6 +262,15 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // bare `findMany()` over everybody's pending requests is exactly what it
   // should refuse.
   JoinRequest: {},
+  // The credential vault behind an SSO connection's references (D09). Every
+  // read names either the organization or one reference's own id, and there
+  // is no query in the product that wants somebody else's — so the ordinary
+  // guard is exactly right, and a bare `findMany()` over every tenant's
+  // client secrets is what it must refuse.
+  SsoCredential: {
+    extraBound: ({ clause }) =>
+      typeof clauseField(clause, "connectionId") === "string",
+  },
   // One row per SSO connection's sync state (D08), carrying the connection's
   // `organizationId`. Reachable by that or by the connection itself, which
   // belongs to exactly one organization.
@@ -468,6 +477,13 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   "PlatformToolPolicy",
   "PromptTag",
   "ScimToken",
+  // A way back in and its expiry (D05). Org-bearing, and one of its reads is
+  // cross-organization on purpose: the sweep that sends the fourteen, seven
+  // and one day warnings scans every organization's bindings that are about
+  // to end, exactly as the realtime-session poller does above. A guard
+  // demanding organizationId would refuse the sweep and leave every warning
+  // unsent. Every other read names its organization. It holds ids and dates.
+  "SsoBreakGlassBinding",
   // The D04 SSO connection projection (ADR-117 §5). Org-bearing, and
   // deliberately not org-CONSTRAINED: it is addressed by connection id (the
   // fold's load and store), and two of its reads are cross-organization on
@@ -477,6 +493,15 @@ export const ORG_TENANCY_EXEMPT: readonly string[] = [
   // ownership rule is made of. It holds no customer content: ids, domains,
   // enums and credential references.
   "SsoConnection",
+  // The engine's provider table (D09), org-bearing and deliberately not
+  // org-CONSTRAINED for the same reason `SsoConnection` is not: better-auth's
+  // single sign-on plugin addresses a provider by its globally-unique
+  // `providerId` and matches an email domain across every row, both BEFORE
+  // any organization is in hand — which is what resolving a sign-in means. A
+  // guard demanding organizationId would refuse exactly the lookups the
+  // sign-in path is made of. It holds endpoints and dialing configuration,
+  // no customer content.
+  "SsoProvider",
   "Subscription",
 ];
 

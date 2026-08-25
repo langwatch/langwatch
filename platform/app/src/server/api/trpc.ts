@@ -73,6 +73,7 @@ import {
   declaredNoPermission,
   declaredServiceAuthorization,
 } from "../app-layer/authz/trpc-middleware";
+import { isAuditLogExempt } from "./auditLogExemptions";
 import type { OpsScope, PermissionMiddleware } from "./rbac";
 
 const logger = createLogger("langwatch:trpc");
@@ -585,25 +586,8 @@ function findFirstId(value: unknown): string | undefined {
   return undefined;
 }
 
-/**
- * Mutations that fire on a heartbeat / per-tab cadence and aren't worth
- * recording in the audit log. `presence.*` runs every ~15s per open tab
- * (heartbeat + cursor broadcasts + leave on pagehide); auditing them
- * buries every genuine action — project edits, deletions, role changes —
- * under a wall of `presence.update` rows. They're already silenced from
- * the request log via SILENCED_LOG_PATH_PREFIXES; this is the audit-log
- * equivalent.
- *
- * Add new entries here when a router's mutations exist purely for
- * ephemeral session state that doesn't need a permanent forensic record.
- */
-const AUDIT_LOG_EXEMPT_PATHS = new Set(["user.updateLastLogin"]);
-const AUDIT_LOG_EXEMPT_PATH_PREFIXES = ["presence."] as const;
-
-function isAuditLogExempt(path: string): boolean {
-  if (AUDIT_LOG_EXEMPT_PATHS.has(path)) return true;
-  return AUDIT_LOG_EXEMPT_PATH_PREFIXES.some((p) => path.startsWith(p));
-}
+// The exemption list lives in `auditLogExemptions.ts` so a test can ask
+// whether an action is audited without importing this module's whole graph.
 
 /**
  * Fields on a model-provider write whose values are secrets. All three ride

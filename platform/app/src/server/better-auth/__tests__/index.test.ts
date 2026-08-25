@@ -52,8 +52,12 @@ describe("better-auth config", () => {
     });
 
     /** @scenario Credentials-only on-prem mode */
-    /** @scenario The BetterAuth admin plugin is intentionally omitted */
-    // Verifies that impersonation stays in Session.impersonating, not the admin() plugin.
+    // The scenario that used to bind here retired at D06 (the legacy
+    // impersonation pair in phase-1-better-auth-config.feature, and with it
+    // the "only genericOAuth is present" assertion). The CHECK survives
+    // unchanged and is what matters: `admin()` would take impersonation over
+    // from the principal, and nothing but a deliberate registration may
+    // appear in this array.
     it("does not register the BetterAuth admin plugin", async () => {
       const { auth } = await import("../index");
       const options = (auth as any).options;
@@ -63,8 +67,8 @@ describe("better-auth config", () => {
       expect(pluginIds).not.toContain("admin");
       // The allow-list is the point: a plugin appearing here that nobody
       // deliberately registered is the failure this catches, and `admin` in
-      // particular would take impersonation over from the legacy
-      // Session.impersonating JSON column.
+      // particular would take impersonation over from the authorization
+      // principal that carries it.
       //
       // `two-factor` (D06) and `passkey` (D07) are registered only when
       // their env flag is on, which is why they are permitted rather than
