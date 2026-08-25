@@ -3,7 +3,6 @@ import os
 import logging
 import threading
 from typing import List, Optional, Sequence, ClassVar
-from urllib.parse import urlsplit
 
 from langwatch.__version__ import __version__
 from langwatch.attributes import AttributeKey
@@ -720,11 +719,13 @@ class Client(LangWatchClientProtocol):
         }
 
         if Client._debug:
-            # A configured URL can carry credentials in its userinfo, so the
-            # line names the host the exporter will send to and nothing else.
-            host = urlsplit(Client._endpoint_url or "").hostname
+            # Nothing taken from the endpoint reaches this line. A URL can carry
+            # credentials in its userinfo, and the one thing the line has to
+            # answer is whether the exporter goes to LangWatch Cloud or to an
+            # instance the caller named, which this says without quoting it.
             logger.info(
-                "Configuring OTLP exporter for %s", host or "the configured endpoint"
+                "Configuring OTLP exporter for the %s endpoint",
+                "default" if Client._endpoint_url == DEFAULT_ENDPOINT else "configured",
             )
 
         otlp_exporter = OTLPSpanExporter(
