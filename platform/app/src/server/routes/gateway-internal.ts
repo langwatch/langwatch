@@ -46,6 +46,7 @@ import {
   GatewayGuardrailEvaluationService,
   GUARDRAIL_WIRE_DIRECTIONS,
 } from "~/server/gateway/guardrailEvaluation.service";
+import { runEvaluation } from "~/server/evaluations/runEvaluation";
 import {
   correlateRealtimeSession,
   releaseRealtimeSession,
@@ -724,10 +725,13 @@ secured.access(gatewayPolicy()).post("/guardrail/check", async (c) => {
       400,
     );
   }
-  const verdict = await GatewayGuardrailEvaluationService.create(
-    prisma,
-    c.app.modelProviders,
-    c.app.managedProviders,
+  const verdict = await GatewayGuardrailEvaluationService.create(prisma, (input) =>
+    runEvaluation({
+      ...input,
+      modelProviders: c.app.modelProviders,
+      managedProviders: c.app.managedProviders,
+      workflows: c.app.workflows,
+    }),
   ).check({
     projectId: parsed.data.project_id,
     guardrailIds: parsed.data.guardrail_ids,

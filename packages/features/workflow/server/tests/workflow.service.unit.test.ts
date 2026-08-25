@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DatasetService } from "@langwatch/dataset-contract";
 import type {
   Workflow,
   WorkflowVersion,
@@ -6,12 +7,18 @@ import type {
 } from "@langwatch/workflow-contract";
 import {
   WorkflowNotPublishedError,
+  studioClientEventSchema,
   type RunWorkflowCommand,
 } from "@langwatch/workflow-contract";
 import {
   WorkflowDslMigrationPort,
   WorkflowExecutionPort,
+  type WorkflowExecutionInput,
 } from "../src/ports/workflow.port";
+import type {
+  StudioEventPreparer,
+  StudioEventPreparationInput,
+} from "../src/services/studio-event-preparer.service";
 import { WorkflowService as ServerWorkflowService } from "../src/services/workflow.service";
 import {
   WorkflowRepository,
@@ -195,11 +202,9 @@ class FakeWorkflowRepository extends WorkflowRepository {
 }
 
 class FakeWorkflowExecutionPort extends WorkflowExecutionPort {
-  readonly calls: Parameters<WorkflowExecutionPort["execute"]>[0][] = [];
+  readonly calls: WorkflowExecutionInput[] = [];
 
-  async execute(
-    input: Parameters<WorkflowExecutionPort["execute"]>[0],
-  ): Promise<unknown> {
+  async execute(input: WorkflowExecutionInput): Promise<unknown> {
     this.calls.push(input);
     return { status: "success" };
   }
@@ -211,20 +216,132 @@ class FakeWorkflowDslMigrationPort extends WorkflowDslMigrationPort {
   }
 }
 
+class FakeDatasetService extends DatasetService {
+  upsertDataset(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+  validateDatasetName(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+  findNextAvailableName(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+  getBySlugOrId(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+  getByIds(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+  renameDataset(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+  listDatasets(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+  archiveDataset(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+  restoreDataset(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+  updateMapping(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+  listRecords(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+  getDatasetPage(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+  getDatasetWithRecords(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+  getDatasetHead(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+  upsertRecord(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+  batchCreateRecords(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+  deleteRecords(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+  copyDataset(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+  uploadToExistingDataset(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+  createDatasetFromUpload(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+  createPendingUpload(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+  writeStagedUpload(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+  abortPendingUpload(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+  finalizeUpload(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+  retryNormalize(_input: never): Promise<never> {
+    throw new Error("Not used by this test.");
+  }
+}
+
+class FakeStudioEventPreparer implements StudioEventPreparer {
+  readonly enriched: StudioEventPreparationInput[] = [];
+  readonly prepared: StudioEventPreparationInput[] = [];
+
+  enrich(input: StudioEventPreparationInput) {
+    this.enriched.push(input);
+    return Promise.resolve(input.event);
+  }
+
+  prepare(input: StudioEventPreparationInput) {
+    this.prepared.push(input);
+    return Promise.resolve(input.event);
+  }
+}
+
 const service = (
   repository = new FakeWorkflowRepository(),
-  options: { execution?: WorkflowExecutionPort } = {},
+  options: {
+    execution?: WorkflowExecutionPort;
+    studioEvents?: StudioEventPreparer;
+  } = {},
 ) =>
   ServerWorkflowService.create({
     repository,
+    datasets: new FakeDatasetService(),
+    studioEvents: options.studioEvents ?? new FakeStudioEventPreparer(),
     dslMigration: new FakeWorkflowDslMigrationPort(),
     ...options,
   });
 
 describe("WorkflowService", () => {
+  it("delegates Studio preparation through its canonical collaborator", async () => {
+    const studioEvents = new FakeStudioEventPreparer();
+    const workflowService = service(undefined, { studioEvents });
+    const event = studioClientEventSchema.parse({ type: "is_alive", payload: {} });
+
+    await expect(
+      workflowService.prepareStudioEvent({ event, projectId: "project_1" }),
+    ).resolves.toBe(event);
+    expect(studioEvents.prepared).toEqual([{ event, projectId: "project_1" }]);
+    expect(studioEvents.enriched).toEqual([]);
+  });
+
   it("creates, versions and publishes through the repository boundary", async () => {
     const workflowService = ServerWorkflowService.create({
       repository: new FakeWorkflowRepository(),
+      datasets: new FakeDatasetService(),
+      studioEvents: new FakeStudioEventPreparer(),
       dslMigration: new FakeWorkflowDslMigrationPort(),
       generateId: () => "id",
     });

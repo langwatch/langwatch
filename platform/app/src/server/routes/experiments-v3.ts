@@ -294,6 +294,7 @@ secured.access(sessionAuth).post(
           loadedPrompts,
           loadedAgents,
           modelProviders: c.app.modelProviders,
+          workflows: c.app.workflows,
           loadedEvaluators,
           loadedWorkflows,
           concurrency: request.concurrency,
@@ -621,6 +622,7 @@ secured.access(apiKeyAuthRun).post(
             loadedPrompts: loadedPrompts as Map<string, VersionedPrompt>,
             loadedAgents: loadedAgents as Map<string, TypedAgent>,
             modelProviders: c.app.modelProviders,
+            workflows: c.app.workflows,
             loadedEvaluators,
             loadedWorkflows,
           });
@@ -668,6 +670,7 @@ secured.access(apiKeyAuthRun).post(
       loadedPrompts: loadedPrompts as Map<string, VersionedPrompt>,
       loadedAgents: loadedAgents as Map<string, TypedAgent>,
       modelProviders: c.app.modelProviders,
+      workflows: c.app.workflows,
       loadedEvaluators,
       loadedWorkflows,
     });

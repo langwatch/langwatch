@@ -1,7 +1,7 @@
 import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { WorkflowDsl, WorkflowService } from "@langwatch/workflow-contract";
-import type { WorkflowExecutionPort } from "@langwatch/workflow-server";
+import type { WorkflowExecutionInput } from "@langwatch/workflow-server";
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -17,8 +17,6 @@ import type { NLPOrigin } from "../nlpgo/nlpgoFetch";
 import { WorkflowExecutionFailedError } from "./errors";
 
 const logger = createLogger("langwatch:workflows:execution");
-
-type WorkflowExecutionInput = Parameters<WorkflowExecutionPort["execute"]>[0];
 
 const workflowExecutionResponseSchema = z.object({
   result: z.record(z.string(), z.unknown()).nullable().optional(),
@@ -43,7 +41,7 @@ export type WorkflowExecutionRuntime = {
     projectId: string;
     workflow: StudioWorkflow;
   }): Promise<void>;
-  addEnvs(event: StudioClientEvent, projectId: string): Promise<StudioClientEvent>;
+  workflows: WorkflowService;
   dispatchNlp(input: {
     projectId: string;
     body: StudioClientEvent;
@@ -180,7 +178,10 @@ export class WorkflowNlpExecutor {
 
     const response = await this.runtime.dispatchNlp({
       projectId: input.projectId,
-      body: await this.runtime.addEnvs(event, input.projectId),
+      body: await this.runtime.workflows.enrichStudioEvent({
+        event,
+        projectId: input.projectId,
+      }),
       origin,
       causalityDepth: input.causalityDepth,
       parentTrace: input.parentTrace,
@@ -277,7 +278,7 @@ function normalizeEvaluationResponse(value: unknown): {
   }
   const score = response.result.score;
   const passed = response.result.passed;
-  const normalized = {
+  const normalized: Record<string, unknown> = {
     ...response.result,
     ...(typeof score === "number" || typeof score === "string"
       ? { score: Number.parseFloat(String(score)) || 0 }

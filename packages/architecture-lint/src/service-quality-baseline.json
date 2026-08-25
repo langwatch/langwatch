@@ -139,7 +139,7 @@
     },
     {
       "file": "packages/features/workflow/server/src/services/workflow.service.ts",
-      "moduleLines": 560,
+      "moduleLines": 511,
       "methodLines": 80,
       "statements": 24,
       "complexity": 24,

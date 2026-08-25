@@ -21,10 +21,6 @@ vi.mock("~/app/api/workflows/post_event/post-event", () => ({
   studioBackendPostEvent: (args: unknown) => mockPostEvent(args),
 }));
 
-vi.mock("~/optimization_studio/server/addEnvs", () => ({
-  addEnvs: (event: unknown) => Promise.resolve(event),
-}));
-
 // Mock getApp().traces.recordSpan to capture the OTLP span the route records.
 // Mock both path forms used across the codebase — relative (matches the
 // httpProxyTracing.ts import) and tsconfig-alias. vi.mock is hoisted so the

@@ -14,16 +14,10 @@ import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 // The evaluate endpoint now runs through the evaluations-v3 orchestrator, which
 // dispatches each row to nlpgo in the background. That boundary is mocked so the
 // tests assert the API response and the experiment it creates, not what the
-// engine does. addEnvs and loadDatasets are identity-mocked.
+// engine does. Studio execution dispatch is identity-mocked.
 const mockStudioBackendPostEvent = vi.fn().mockResolvedValue(undefined);
 vi.mock("~/app/api/workflows/post_event/post-event", () => ({
   studioBackendPostEvent: (args: unknown) => mockStudioBackendPostEvent(args),
-}));
-vi.mock("~/optimization_studio/server/addEnvs", () => ({
-  addEnvs: (event: unknown) => Promise.resolve(event),
-}));
-vi.mock("~/optimization_studio/server/load-datasets.adapter", () => ({
-  loadDatasets: (event: unknown) => Promise.resolve(event),
 }));
 
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
@@ -373,7 +367,7 @@ describe("Workflows REST API", () => {
       await prisma.user.delete({ where: { id: author.id } });
     });
 
-    const expectRunResponse = async (
+    const assertRunResponse = async (
       res: Response,
     ): Promise<{
       run_id: string;
@@ -397,7 +391,7 @@ describe("Workflows REST API", () => {
 
         const res = await postEvaluate(`/api/workflows/${workflow.id}/evaluate`);
 
-        const body = await expectRunResponse(res);
+        const body = await assertRunResponse(res);
 
         const experiment = await prisma.experiment.findFirst({
           where: {
@@ -414,10 +408,10 @@ describe("Workflows REST API", () => {
         await createVersion("1", entryDsl());
 
         const first = await postEvaluate(`/api/workflows/${workflow.id}/evaluate`);
-        const firstBody = await expectRunResponse(first);
+        const firstBody = await assertRunResponse(first);
 
         const second = await postEvaluate(`/api/workflows/${workflow.id}/evaluate`);
-        const secondBody = await expectRunResponse(second);
+        const secondBody = await assertRunResponse(second);
 
         expect(secondBody.run_id).not.toBe(firstBody.run_id);
         const experiments = await prisma.experiment.findMany({
@@ -436,7 +430,7 @@ describe("Workflows REST API", () => {
 
         const res = await postEvaluate(`/api/workflows/${workflow.id}/evaluate`);
 
-        const body = await expectRunResponse(res);
+        const body = await assertRunResponse(res);
         expect(body.workflow_version_id).toBe(version.id);
         expect(body.version).toBe("1");
       });
@@ -456,7 +450,7 @@ describe("Workflows REST API", () => {
 
         const res = await postEvaluate(`/api/workflows/${workflow.id}/evaluate`);
 
-        const body = await expectRunResponse(res);
+        const body = await assertRunResponse(res);
         expect(body.workflow_version_id).toBe(v2.id);
       });
 
@@ -469,7 +463,7 @@ describe("Workflows REST API", () => {
           version_id: v1.id,
         });
 
-        const body = await expectRunResponse(res);
+        const body = await assertRunResponse(res);
         expect(body.workflow_version_id).toBe(v1.id);
       });
 
@@ -481,7 +475,7 @@ describe("Workflows REST API", () => {
           parameters: { feature_flag: "variant-b" },
         });
 
-        await expectRunResponse(res);
+        await assertRunResponse(res);
 
         // The entry only declares `question`. A parameter the workflow does not
         // declare still has to reach the nodes: it rides as a dataset column
@@ -517,7 +511,8 @@ describe("Workflows REST API", () => {
           data: [{ question: "x" }, { question: "y" }],
         });
 
-        await expectRunResponse(res);
+        expect(res.ok).toBe(true);
+        await assertRunResponse(res);
       });
 
       /** @scenario "The endpoint rejects inline data and a dataset id together" */

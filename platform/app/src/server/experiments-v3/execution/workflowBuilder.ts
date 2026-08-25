@@ -754,7 +754,7 @@ export const buildSignatureNodeFromAgent = (
  * 2. Parameters array with llm/instructions/messages entries - workflow node format
  *
  * This function normalizes both formats into the parameters array
- * so that addEnvs() can process them consistently.
+ * so Workflow event enrichment can process them consistently.
  */
 const buildSignatureNodeParameters = (config: TypedAgent["config"]): Field[] => {
   const baseParams = config.parameters ?? [];

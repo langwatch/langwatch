@@ -1736,7 +1736,7 @@ describe("prefetchScenarioData", () => {
 
     describe("when the llm parameter value is a partial object without a top-level model key", () => {
       // Regression: existingValue like { temperature: 0.7 } (no `model` field) must still
-      // produce an emitted value with a top-level `model`, matching addEnvs.ts behaviour.
+      // produce an emitted value with the model resolved during Workflow preparation.
       // Downstream NLP reads value.model directly; missing it causes runtime failure.
       it("guarantees a top-level model key in the emitted llm value", async () => {
         const prepareFn = vi.fn().mockResolvedValue({

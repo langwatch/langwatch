@@ -4,6 +4,9 @@ import {
   PostgresWorkflowAdapter,
   WorkflowDslMigrationPort,
   WorkflowExecutionPort,
+  type WorkflowExecutionInput,
+  type WorkflowLlmParametersPort,
+  type WorkflowProjectEnvironmentPort,
 } from "@langwatch/workflow-server";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { WorkflowDsl } from "@langwatch/workflow-contract";
@@ -12,36 +15,42 @@ import {
   WorkflowNlpExecutor,
 } from "~/server/workflows/runWorkflow";
 
-/**
- * Application-owned composition seam for Workflow. The App root supplies the
- * one database connection and canonical feature services; transport handlers
- * receive the returned service through App/request context.
- *
- * This file intentionally does not register itself in presets.ts. Registration
- * belongs to the parent composition change once the execution adapter is
- * available there.
- */
+/** App composition supplies one WorkflowService through request context. */
 export type AppWorkflowRuntimeOptions = {
   database: PrismaClient;
-  datasets?: DatasetService;
+  datasets: DatasetService;
   execution?: WorkflowExecutionPort;
   dslMigration?: WorkflowDslMigrationPort;
   generateId?: () => string;
+  projectEnvironment: WorkflowProjectEnvironmentPort;
+  llmParameters: WorkflowLlmParametersPort;
 };
-
-type WorkflowExecutionInput = Parameters<WorkflowExecutionPort["execute"]>[0];
 
 /** Binds the process-owned Workflow NLP executor to the canonical port. */
 export class AppWorkflowExecutionPort extends WorkflowExecutionPort {
-  static create(executor: WorkflowNlpExecutor): AppWorkflowExecutionPort {
-    return new AppWorkflowExecutionPort(executor);
+  static create(): AppWorkflowExecutionPort {
+    return new AppWorkflowExecutionPort();
   }
 
-  private constructor(private readonly executor: WorkflowNlpExecutor) {
+  private constructor() {
     super();
   }
 
+  private executor: WorkflowNlpExecutor | undefined;
+
+  connect(executor: WorkflowNlpExecutor): void {
+    if (this.executor) {
+      throw new Error("Workflow execution port is already connected.");
+    }
+
+    this.executor = executor;
+  }
+
   execute(input: WorkflowExecutionInput): Promise<unknown> {
+    if (!this.executor) {
+      throw new Error("Workflow execution port is not connected.");
+    }
+
     return this.executor.execute(input);
   }
 }

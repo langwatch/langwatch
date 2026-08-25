@@ -40,6 +40,7 @@ import type { Protections } from "~/server/traces/protections";
 import type { TraceService } from "~/server/traces/trace.service";
 import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { LangEvalsClient } from "../clients/langevals/langevals.client";
 import {
   EvaluatorConfigError,
@@ -65,6 +66,7 @@ export interface EvaluationExecutionDeps {
   managedProviders: ManagedProviderService;
   modelEnvResolver: ModelEnvResolver;
   langevalsClient: LangEvalsClient;
+  workflows: WorkflowService;
   workflowExecutor: WorkflowExecutor;
 }
 
@@ -550,8 +552,7 @@ export class EvaluationExecutionService {
           traceId: trace?.trace_id,
           parentCausalityDepth,
           parentTrace: extractParentTraceForNlpgo(trace),
-          modelProviders: this.deps.modelProviders,
-          managedProviders: this.deps.managedProviders,
+          workflows: this.deps.workflows,
         });
       }
       return this.runCustomEvaluation(

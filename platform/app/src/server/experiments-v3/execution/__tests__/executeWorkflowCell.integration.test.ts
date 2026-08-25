@@ -39,12 +39,6 @@ vi.mock("~/app/api/workflows/post_event/post-event", () => ({
     },
   ),
 }));
-vi.mock("~/optimization_studio/server/addEnvs", () => ({
-  addEnvs: vi.fn(async (event: unknown) => event),
-}));
-vi.mock("~/optimization_studio/server/load-datasets.adapter", () => ({
-  loadDatasets: vi.fn(async (event: unknown) => event),
-}));
 
 import { executeWorkflowCell } from "../orchestrator";
 import type { EvaluationV3Event, ExecutionCell } from "../types";
@@ -108,6 +102,7 @@ const run = async (cell: ExecutionCell): Promise<EvaluationV3Event[]> => {
     workflowDsl,
     datasetColumns: [{ id: "col_1", name: "question", type: "string" }],
     modelProviders: getApp().modelProviders,
+    workflows: getApp().workflows,
   })) {
     events.push(event);
   }

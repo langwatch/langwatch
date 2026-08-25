@@ -21,7 +21,6 @@ import type {
   EvaluatorTypes,
   SingleEvaluationResult,
 } from "../evaluations/evaluators.generated";
-import { runEvaluation } from "../evaluations/runEvaluation";
 
 const logger = createLogger("langwatch:gateway:guardrail-evaluation");
 
@@ -112,24 +111,26 @@ export function evaluationDataFor({
  * it keeps the scoping, aggregation and failure-mode rules testable against a
  * real database without standing up the evaluator runtime.
  */
-export type EvaluatorRunner = (args: {
+export type EvaluatorRunInput = {
   projectId: string;
   evaluatorType: EvaluatorTypes;
   data: { type: "default"; data: { input: string; output: string } };
   settings?: Record<string, unknown>;
-}) => Promise<SingleEvaluationResult>;
+};
 
-const defaultEvaluatorRunner: EvaluatorRunner = (args) => runEvaluation(args);
+export type EvaluatorRunner = (
+  args: EvaluatorRunInput,
+) => Promise<SingleEvaluationResult>;
 
 export class GatewayGuardrailEvaluationService {
-  constructor(
+  private constructor(
     private readonly prisma: PrismaClient,
-    private readonly runEvaluator: EvaluatorRunner = defaultEvaluatorRunner,
+    private readonly runEvaluator: EvaluatorRunner,
   ) {}
 
   static create(
     prisma: PrismaClient,
-    runEvaluator?: EvaluatorRunner,
+    runEvaluator: EvaluatorRunner,
   ): GatewayGuardrailEvaluationService {
     return new GatewayGuardrailEvaluationService(prisma, runEvaluator);
   }

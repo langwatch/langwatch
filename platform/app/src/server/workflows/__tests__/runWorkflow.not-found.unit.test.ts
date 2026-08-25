@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { WorkflowNlpExecutor, type WorkflowExecutionRuntime } from "../runWorkflow";
+import { TestWorkflowService } from "./test-workflow.service";
 
 const workflow: StudioWorkflow = {
   spec_version: "1.5",
@@ -47,7 +48,7 @@ describe("WorkflowNlpExecutor", () => {
       migrateDsl: vi.fn().mockReturnValue(workflow),
       getProjectModelProviders: vi.fn().mockResolvedValue({}),
       stripUnsupportedParams: vi.fn().mockResolvedValue(undefined),
-      addEnvs: async (event) => event,
+      workflows: new TestWorkflowService(),
       dispatchNlp,
       createTraceId: () => "trace_generated",
     };

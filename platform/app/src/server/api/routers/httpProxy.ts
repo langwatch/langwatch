@@ -2,7 +2,6 @@ import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
-import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import type { RequestAppServices } from "~/runtime/app/requestApp";
 import {
   type BaseComponent,
@@ -115,7 +114,7 @@ export const httpProxyRouter = createTRPCRouter({
           traceId,
           inputs: templateVariables,
           modelProviders: ctx.app.modelProviders,
-          managedProviders: ctx.app.managedProviders,
+          workflows: ctx.app.workflows,
         });
         result = toProxyResult({
           state,
@@ -206,7 +205,7 @@ const runNode = async ({
   traceId,
   inputs,
   modelProviders,
-  managedProviders,
+  workflows,
 }: {
   projectId: string;
   nodeId: string;
@@ -214,7 +213,7 @@ const runNode = async ({
   traceId: string;
   inputs: Record<string, unknown>;
   modelProviders: import("@langwatch/model-provider-contract").ModelProviderService;
-  managedProviders: import("@langwatch/enterprise-managed-provider-contract").ManagedProviderService;
+  workflows: import("@langwatch/workflow-contract").WorkflowService;
 }): Promise<NonNullable<BaseComponent["execution_state"]>> => {
   const event = {
     type: "execute_component" as const,
@@ -234,7 +233,7 @@ const runNode = async ({
   await studioBackendPostEvent({
     projectId,
     modelProviders,
-    message: await addEnvs(event, projectId, modelProviders, managedProviders),
+    message: await workflows.enrichStudioEvent({ event, projectId }),
     onEvent: (serverEvent: StudioServerEvent) => {
       // Keep the last state the node reported; the engine streams it as the
       // node moves from running to its terminal status.

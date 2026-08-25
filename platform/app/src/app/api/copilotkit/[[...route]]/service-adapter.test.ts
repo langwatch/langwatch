@@ -13,32 +13,6 @@
 // under test, so stubs are sufficient.
 import { vi } from "vitest";
 
-vi.mock("~/server/api/routers/modelProviders.utils", () => ({
-  getProjectModelProviders: vi.fn(),
-  prepareLitellmParams: vi.fn(),
-}));
-
-vi.mock("~/server/db", () => ({
-  prisma: {
-    project: { findUniqueOrThrow: vi.fn() },
-    projectSecret: { findMany: vi.fn() },
-  },
-}));
-
-vi.mock("~/utils/encryption", () => ({
-  encrypt: vi.fn((v: string) => `encrypted:${v}`),
-  decrypt: vi.fn((v: string) => v.replace("encrypted:", "")),
-}));
-
-vi.mock("~/optimization_studio/server/addEnvs", () => ({
-  addEnvs: vi.fn(),
-  getS3CacheKey: vi.fn(),
-}));
-
-vi.mock("~/optimization_studio/server/load-datasets.adapter", () => ({
-  loadDatasets: vi.fn(),
-}));
-
 // Mocks the relative import used by service-adapter.ts
 vi.mock("../../workflows/post_event/post-event", () => ({
   studioBackendPostEvent: vi.fn(),
@@ -72,10 +46,9 @@ import type {
   CopilotRuntimeChatCompletionResponse,
 } from "@copilotkit/runtime";
 import { beforeEach, describe, expect, it } from "vitest";
-import { addEnvs } from "~/optimization_studio/server/addEnvs";
-import { loadDatasets } from "~/optimization_studio/server/load-datasets.adapter";
-import type { DatasetService } from "@langwatch/dataset-contract";
 import { studioBackendPostEvent } from "../../workflows/post_event/post-event";
+import { testModelProviders } from "~/server/modelProviders/__tests__/model-provider-services.test-support";
+import { TestWorkflowService } from "~/server/workflows/__tests__/test-workflow.service";
 import { PromptStudioAdapter } from "./service-adapter";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -176,11 +149,17 @@ async function runProcess(
 
 describe("PromptStudioAdapter", () => {
   let adapter: PromptStudioAdapter;
+  let workflows: TestWorkflowService;
 
   beforeEach(() => {
+    workflows = new TestWorkflowService();
+    vi.spyOn(workflows, "prepareStudioEvent").mockImplementation(
+      async ({ event }) => event,
+    );
     adapter = new PromptStudioAdapter({
       projectId: "proj-test",
-      datasets: {} as DatasetService,
+      modelProviders: testModelProviders,
+      workflows,
     });
     generateOtelTraceIdMock.mockReset();
     let callCount = 0;
@@ -255,8 +234,6 @@ describe("PromptStudioAdapter", () => {
     beforeEach(() => {
       vi.mocked(studioBackendPostEvent).mockReset();
       vi.mocked(studioBackendPostEvent).mockResolvedValue(undefined as any);
-      vi.mocked(addEnvs).mockImplementation(async (event: any) => event);
-      vi.mocked(loadDatasets).mockImplementation(async (event: any) => event);
     });
 
     it("binds the latest live user-message content to inputs.input", async () => {

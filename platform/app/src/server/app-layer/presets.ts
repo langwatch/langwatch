@@ -70,6 +70,11 @@ import {
   AppWorkflowRuntime,
 } from "~/runtime/app/features/workflow";
 import {
+  AppWorkflowEnvironmentEncryption,
+  AppWorkflowLlmParametersPort,
+  AppWorkflowProjectEnvironmentPort,
+} from "~/runtime/app/features/workflow-studio-enrichment.adapter";
+import {
   AppExperimentDspyRetentionPort,
   AppExperimentRuntime,
 } from "~/runtime/app/features/experiment";
@@ -236,7 +241,6 @@ import {
   WorkflowNlpExecutor,
 } from "../workflows/runWorkflow";
 import { stripUnsupportedLLMParamsFromWorkflow } from "../workflows/stripUnsupportedLLMParams";
-import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { nlpgoFetch } from "../nlpgo/nlpgoFetch";
 import { App, AppShutdownResources, getApp, globalForApp, initializeApp } from "./app";
 import { demoProjectId } from "./authz/demo-project";
@@ -695,6 +699,23 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     }).build(),
     "AnnotationService",
   );
+  const workflowExecution = AppWorkflowExecutionPort.create();
+  const workflows = traced(
+    AppWorkflowRuntime.create({
+      database: prisma,
+      datasets: dataset,
+      execution: workflowExecution,
+      projectEnvironment: AppWorkflowProjectEnvironmentPort.create({
+        database: prisma,
+        encryption: AppWorkflowEnvironmentEncryption.create(),
+      }),
+      llmParameters: AppWorkflowLlmParametersPort.create({
+        modelProviders,
+        managedProviders,
+      }),
+    }).build(),
+    "WorkflowService",
+  );
   const workflowNlpExecutor = WorkflowNlpExecutor.create({
     migrateDsl: migrateWorkflowDslForExecution,
     getProjectModelProviders: (projectId) => modelProviders.getForProject({ projectId }),
@@ -703,8 +724,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
         projectId,
         workflow,
       }),
-    addEnvs: (event, projectId) =>
-      addEnvs(event, projectId, modelProviders, managedProviders),
+    workflows,
     dispatchNlp: (input) =>
       nlpgoFetch({
         projectId: input.projectId,
@@ -716,14 +736,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       }),
     createTraceId: createWorkflowTraceId,
   });
-  const workflows = traced(
-    AppWorkflowRuntime.create({
-      database: prisma,
-      datasets: dataset,
-      execution: AppWorkflowExecutionPort.create(workflowNlpExecutor),
-    }).build(),
-    "WorkflowService",
-  );
+  workflowExecution.connect(workflowNlpExecutor);
   const agents = AgentsFeature.create({
     prisma,
     session: null,
@@ -754,6 +767,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       langevalsClient: config.langevalsEndpoint
         ? new LangEvalsHttpClient(config.langevalsEndpoint)
         : new NullLangevalsClient(),
+      workflows,
       workflowExecutor: WorkflowEvaluationRunner.create(workflows),
     }),
     "EvaluationExecutionService",
@@ -2316,6 +2330,14 @@ export function createTestApp(
   const testWorkflows = AppWorkflowRuntime.create({
     database: testPrisma,
     datasets: testDataset,
+    projectEnvironment: AppWorkflowProjectEnvironmentPort.create({
+      database: testPrisma,
+      encryption: AppWorkflowEnvironmentEncryption.create(),
+    }),
+    llmParameters: AppWorkflowLlmParametersPort.create({
+      modelProviders,
+      managedProviders,
+    }),
   }).build();
   const agents = AgentsFeature.create({
     prisma: testPrisma,

@@ -8,7 +8,7 @@ import {
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { useWorkflowStore } from "@langwatch/workflow-web";
 import type { LLMConfig } from "@langwatch/workflow-contract";
-import { normalizeToSnakeCase } from "./normalizeToSnakeCase";
+import { normalizeWorkflowLlmConfig } from "@langwatch/workflow-contract";
 
 type OptimizationStudioLLMConfigFieldProps = {
   llmConfig: LLMConfig;
@@ -58,7 +58,7 @@ export function OptimizationStudioLLMConfigField({
 
   const handleChange = useCallback(
     (newLlmConfig: LLMConfig) => {
-      onChange(normalizeToSnakeCase(newLlmConfig));
+      onChange(normalizeWorkflowLlmConfig(newLlmConfig));
     },
     [onChange],
   );

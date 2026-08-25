@@ -677,7 +677,7 @@ export const studioWorkflowSchema = studioWorkflowWireSchema.transform<StudioWor
 export const parseStudioWorkflow = (value: unknown): StudioWorkflow =>
   studioWorkflowSchema.parse(value);
 
-export type ServerWorkflow = Omit<StudioWorkflow, "workflow_id"> & {
+export type ServerWorkflow = StudioWorkflow & {
   api_key: string;
   workflow_id: string;
   project_id: string;

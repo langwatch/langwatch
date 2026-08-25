@@ -14,15 +14,13 @@ import { streamSSE } from "hono/streaming";
 import { CompletionCopilot } from "monacopilot";
 import { z } from "zod";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
-import { addEnvs, LlmModelNotSetError } from "~/optimization_studio/server/addEnvs";
-import { loadDatasets } from "~/optimization_studio/server/load-datasets.adapter";
 import {
+  LlmModelNotSetError,
   type StudioClientEvent,
   type StudioServerEvent,
   studioClientEventSchema,
 } from "@langwatch/workflow-contract";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
-import { getApp } from "~/server/app-layer/app";
 import { validator as zValidator } from "~/server/api/validation";
 import { probeProjectPermission } from "~/server/app-layer/permissions/imperative";
 import { getServerAuthSession } from "~/server/auth";
@@ -167,11 +165,10 @@ secured
 
       let message: StudioClientEvent;
       try {
-        message = await loadDatasets(
-          await addEnvs(eventWithoutEnvs, projectId),
+        message = await c.app.workflows.prepareStudioEvent({
+          event: eventWithoutEnvs,
           projectId,
-          getApp().dataset,
-        );
+        });
       } catch (error) {
         // I-READY: loading a dataset that's still preparing (s3_jsonl normalize in
         // flight) is a client-precondition failure, not a server fault — surface a

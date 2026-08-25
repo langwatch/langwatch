@@ -7,7 +7,7 @@
  * must fail with a 422 configuration error naming the node — never the
  * pre-fix opaque 500 "Model provider not configured: " (empty provider
  * name from splitting an empty model string). Auth is stubbed at the
- * session boundary; addEnvs runs for real against the real database.
+ * session boundary; Workflow Studio preparation uses the real database.
  *
  * Requires: PostgreSQL database (Prisma)
  */

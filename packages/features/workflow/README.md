@@ -8,7 +8,8 @@ and its migration history.
   parameters, local-config execution transforms, default LLM-node values, and
   service capability.
 - `server/` owns persistence, versioning, restore, copy, dispatch ports, and
-  explicit DatasetService-backed Studio dataset materialization.
+  `prepareStudioEvent`: project environment, LiteLLM parameters and
+  DatasetService-backed materialization through typed ports.
 - `web/` owns browser graph and Studio dataset transforms, field/edge mapping,
   templates, canvas-node renderers and palette dragging, code-node Python
   language providers, the node palette and default-edge registries,

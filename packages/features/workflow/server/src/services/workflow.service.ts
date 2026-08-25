@@ -15,12 +15,14 @@ import {
   WorkflowVersionRequiredError,
   type Workflow,
   type WorkflowEvaluatorFields,
+  type RunWorkflowCommand,
   type WorkflowVersion,
   type WorkflowVersionHistoryEntry,
   type WorkflowVersionHistoryMode,
   type WorkflowWithVersion,
+  type StudioClientEvent,
 } from "@langwatch/workflow-contract";
-import type { DatasetService, Dataset } from "@langwatch/dataset-contract";
+import type { Dataset, DatasetService } from "@langwatch/dataset-contract";
 import type {
   WorkflowDslMigrationPort,
   WorkflowExecutionPort,
@@ -29,26 +31,18 @@ import type {
   PersistWorkflowVersionInput,
   WorkflowRepository,
 } from "../repositories/workflow.repository";
+import type { StudioEventPreparationInput } from "./studio-event-preparer.service";
+import type { StudioEventPreparer } from "./studio-event-preparer.service";
+import { WorkflowDslService } from "./workflow-dsl.service";
 
 export type WorkflowServiceOptions = {
   repository: WorkflowRepository;
-  datasets?: DatasetService;
+  datasets: DatasetService;
   execution?: WorkflowExecutionPort;
+  studioEvents: StudioEventPreparer;
   dslMigration: WorkflowDslMigrationPort;
   generateId?: () => string;
 };
-
-const copyJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
-
-const dslMetadata = (dsl: {
-  name: string;
-  icon?: string | null;
-  description?: string | null;
-}) => ({
-  name: dsl.name,
-  ...(dsl.icon !== undefined ? { icon: dsl.icon } : {}),
-  ...(dsl.description !== undefined ? { description: dsl.description } : {}),
-});
 
 /** Canonical Workflow lifecycle. Persistence and cross-feature capabilities are injected. */
 export class WorkflowService extends WorkflowServiceContract {
@@ -58,6 +52,16 @@ export class WorkflowService extends WorkflowServiceContract {
 
   private constructor(private readonly options: WorkflowServiceOptions) {
     super();
+  }
+
+  private readonly dsl = WorkflowDslService.create();
+
+  enrichStudioEvent(input: StudioEventPreparationInput): Promise<StudioClientEvent> {
+    return this.options.studioEvents.enrich(input);
+  }
+
+  prepareStudioEvent(input: StudioEventPreparationInput): Promise<StudioClientEvent> {
+    return this.options.studioEvents.prepare(input);
   }
 
   async getById(input: {
@@ -87,27 +91,13 @@ export class WorkflowService extends WorkflowServiceContract {
       projectId: input.projectId,
       includeVersion: true,
     });
-    const current = workflow.currentVersion?.dsl;
-    const nodes = current?.nodes ?? [];
-    const entry = nodes.find((node) => this.nodeType(node) === "entry");
-    const end = nodes.find(
-      (node) => this.nodeType(node) === "end" || this.nodeId(node) === "end",
-    );
-    const fields = this.fieldsFromNode(entry, "outputs");
-    const declaredOutputs = this.fieldsFromNode(end, "inputs");
+    const fields = this.dsl.evaluatorFields(workflow.currentVersion?.dsl);
+
     return {
       workflowId: workflow.id,
       workflowName: workflow.name,
       ...(workflow.icon ? { workflowIcon: workflow.icon } : {}),
-      fields,
-      outputFields:
-        declaredOutputs.length > 0
-          ? declaredOutputs
-          : [
-              { identifier: "passed", type: "bool" },
-              { identifier: "score", type: "float" },
-              { identifier: "label", type: "str" },
-            ],
+      ...fields,
     };
   }
 
@@ -261,7 +251,7 @@ export class WorkflowService extends WorkflowServiceContract {
   ): Promise<Workflow> {
     const command = this.parse(updateWorkflowCommandSchema, input);
     const existing = await this.getById(command);
-    const data = dslMetadata({
+    const data = this.dsl.metadata({
       name: command.name ?? existing.name,
       icon: command.icon !== undefined ? command.icon : existing.icon,
       description:
@@ -312,7 +302,7 @@ export class WorkflowService extends WorkflowServiceContract {
       id: command.workflowId,
       projectId: command.projectId,
       data: {
-        ...dslMetadata(dsl),
+        ...this.dsl.metadata(dsl),
         currentVersionId: version.id,
         ...(command.setAsLatestVersion === false ? {} : { latestVersionId: version.id }),
       },
@@ -366,9 +356,10 @@ export class WorkflowService extends WorkflowServiceContract {
     const sourceVersion =
       source.latestVersion ??
       (await this.latestVersion(command.sourceWorkflowId, command.sourceProjectId));
-    const dsl = copyJson(sourceVersion.dsl);
-    if (command.copyDatasets && this.options.datasets)
+    const dsl = this.dsl.copy(sourceVersion.dsl);
+    if (command.copyDatasets) {
       await this.copyDatasets(dsl, command.sourceProjectId, command.targetProjectId);
+    }
     const workflowId = command.id ?? `workflow_${this.id()}`;
     const workflow = await this.options.repository.createWorkflow({
       id: workflowId,
@@ -428,7 +419,7 @@ export class WorkflowService extends WorkflowServiceContract {
         (!input.allowedProjectIds || input.allowedProjectIds.includes(copy.projectId)),
     );
     for (const copy of selected) {
-      const dsl = copyJson(sourceVersion.dsl);
+      const dsl = this.dsl.copy(sourceVersion.dsl);
       await this.saveVersion({
         workflowId: copy.id,
         projectId: copy.projectId,
@@ -440,7 +431,7 @@ export class WorkflowService extends WorkflowServiceContract {
     return { pushedTo: selected.length, selectedCopies: selected.length };
   }
 
-  async run(input: Parameters<WorkflowServiceContract["run"]>[0]): Promise<unknown> {
+  async run(input: RunWorkflowCommand): Promise<unknown> {
     if (!this.options.execution) throw new Error("Workflow execution is not configured.");
     const command = this.parse(runWorkflowCommandSchema, input);
     const version = await this.getPublishedVersion({
@@ -467,7 +458,6 @@ export class WorkflowService extends WorkflowServiceContract {
     sourceProjectId: string,
     targetProjectId: string,
   ): Promise<void> {
-    if (!this.options.datasets) return;
     const seen = new Map<string, Dataset>();
     for (const node of dsl.nodes) {
       if (!node || typeof node !== "object") continue;
@@ -497,45 +487,6 @@ export class WorkflowService extends WorkflowServiceContract {
         ref.name = copied.name;
       }
     }
-  }
-
-  private nodeType(node: unknown): string | undefined {
-    return node &&
-      typeof node === "object" &&
-      typeof (node as { type?: unknown }).type === "string"
-      ? (node as { type: string }).type
-      : undefined;
-  }
-
-  private nodeId(node: unknown): string | undefined {
-    return node &&
-      typeof node === "object" &&
-      typeof (node as { id?: unknown }).id === "string"
-      ? (node as { id: string }).id
-      : undefined;
-  }
-
-  private fieldsFromNode(
-    node: unknown,
-    key: "inputs" | "outputs",
-  ): Array<{ identifier: string; type: string; optional?: boolean }> {
-    if (!node || typeof node !== "object") return [];
-    const data = (node as { data?: Record<string, unknown> }).data;
-    const values = data?.[key];
-    if (!Array.isArray(values)) return [];
-    return values.flatMap((value) => {
-      if (!value || typeof value !== "object") return [];
-      const field = value as { identifier?: unknown; type?: unknown; optional?: unknown };
-      if (typeof field.identifier !== "string" || typeof field.type !== "string")
-        return [];
-      return [
-        {
-          identifier: field.identifier,
-          type: field.type,
-          ...(typeof field.optional === "boolean" ? { optional: field.optional } : {}),
-        },
-      ];
-    });
   }
 
   private id(): string {

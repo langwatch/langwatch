@@ -10,15 +10,12 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { prisma } from "../../db";
 import { runCodeEvaluator } from "../runCodeEvaluator";
+import { TestWorkflowService } from "../../workflows/__tests__/test-workflow.service";
 
 const { nlpgoFetchMock } = vi.hoisted(() => ({ nlpgoFetchMock: vi.fn() }));
 
 vi.mock("~/server/nlpgo/nlpgoFetch", () => ({
   nlpgoFetch: nlpgoFetchMock,
-}));
-
-vi.mock("~/optimization_studio/server/addEnvs", () => ({
-  addEnvs: vi.fn(async (event: unknown) => event),
 }));
 
 const projectId = "test-project-id";
@@ -72,6 +69,7 @@ describe("runCodeEvaluator result conversion", () => {
         projectId,
         evaluatorId,
         data: { output: "boom" },
+        workflows: new TestWorkflowService(),
       });
 
       expect(result.status).toBe("error");
@@ -97,6 +95,7 @@ describe("runCodeEvaluator result conversion", () => {
         projectId,
         evaluatorId,
         data: { output: "hello" },
+        workflows: new TestWorkflowService(),
       });
 
       expect(result).toMatchObject({

@@ -18,12 +18,16 @@ import {
 } from "../orchestrator";
 import type { EvaluationV3Event } from "../types";
 
-type OrchestratorInput = Omit<ProductionOrchestratorInput, "modelProviders">;
+type OrchestratorInput = Omit<
+  ProductionOrchestratorInput,
+  "modelProviders" | "workflows"
+>;
 
 const runTestOrchestrator = (input: OrchestratorInput) =>
   runOrchestrator({
     ...input,
     modelProviders: getApp().modelProviders,
+    workflows: getApp().workflows,
   });
 
 /**

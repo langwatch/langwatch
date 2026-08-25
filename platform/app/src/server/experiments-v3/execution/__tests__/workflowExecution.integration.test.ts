@@ -7,8 +7,6 @@ import type {
   TargetConfig,
 } from "~/experiments-v3/types";
 import type { Project } from "~/generated/prisma/client";
-import { addEnvs } from "~/optimization_studio/server/addEnvs";
-import { loadDatasets } from "~/optimization_studio/server/load-datasets.adapter";
 import { getApp } from "~/server/app-layer/app";
 import type { StudioServerEvent } from "@langwatch/workflow-contract";
 import { getTestProject } from "~/utils/testUtils";
@@ -158,13 +156,11 @@ describe.skipIf(!hasNlpService)("WorkflowExecution Integration", () => {
       },
     };
 
-    // Add environment variables (api_key, litellm_params, etc.) - same as production
-    // Then load/process datasets
-    const enrichedEvent = await loadDatasets(
-      await addEnvs(rawEvent, project.id),
-      project.id,
-      getApp().dataset,
-    );
+    // Prepare credentials, LiteLLM parameters and datasets as production does.
+    const enrichedEvent = await getApp().workflows.prepareStudioEvent({
+      event: rawEvent,
+      projectId: project.id,
+    });
 
     // Execute through the NLP backend
     await studioBackendPostEvent({
@@ -249,25 +245,6 @@ describe.skipIf(!hasNlpService)("WorkflowExecution Integration", () => {
 
       expect(errorEvent).toBeDefined();
     }, 60000);
-  });
-
-  // Note: evaluator and execute_flow tests are skipped due to a "coroutine raised StopIteration"
-  // Python async bug in the NLP service. This is being tracked separately.
-  // The key functionality (prompt execution via execute_component) works correctly.
-  describe.skip("execute_component for evaluator - NLP service bug", () => {
-    it("executes exact_match evaluator with passing result", async () => {
-      // Skipped: NLP service throws "coroutine raised StopIteration" for evaluators
-    });
-
-    it("executes exact_match evaluator with failing result", async () => {
-      // Skipped: NLP service throws "coroutine raised StopIteration" for evaluators
-    });
-  });
-
-  describe.skip("full workflow (execute_flow) - NLP service bug", () => {
-    it("executes target and evaluator in a full flow", async () => {
-      // Skipped: NLP service throws "coroutine raised StopIteration" for execute_flow
-    });
   });
 
   describe("result structure validation", () => {

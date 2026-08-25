@@ -713,6 +713,9 @@ secured.access(legacyEvaluationAuth).post(
         data,
         evaluatorType: checkType as EvaluatorTypes,
         settings: (settings as Record<string, unknown>) ?? {},
+        modelProviders: c.app.modelProviders,
+        managedProviders: c.app.managedProviders,
+        workflows: c.app.workflows,
       });
     } catch (error) {
       result = {
@@ -1381,6 +1384,9 @@ async function handleEvaluatorCall(
       evaluatorType: checkType as EvaluatorTypes,
       data,
       settings,
+      modelProviders: c.app.modelProviders,
+      managedProviders: c.app.managedProviders,
+      workflows: c.app.workflows,
     });
 
   try {

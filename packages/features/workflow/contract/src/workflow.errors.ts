@@ -40,3 +40,17 @@ export class WorkflowVersionRequiredError extends Error {
     this.name = "WorkflowVersionRequiredError";
   }
 }
+
+/** A dispatched Studio LLM node must name its model. */
+export class LlmModelNotSetError extends Error {
+  readonly cause = "LLM_MODEL_NOT_SET" as const;
+
+  constructor(nodeName?: string) {
+    super(
+      `LLM node ${
+        nodeName ? `"${nodeName}" ` : ""
+      }has no model selected. Open the node and choose a model.`,
+    );
+    this.name = "LlmModelNotSetError";
+  }
+}

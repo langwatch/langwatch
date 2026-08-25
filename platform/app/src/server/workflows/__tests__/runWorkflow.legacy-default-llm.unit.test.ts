@@ -5,6 +5,7 @@ import {
   migrateWorkflowDslForExecution,
   type WorkflowExecutionRuntime,
 } from "../runWorkflow";
+import { TestWorkflowService } from "./test-workflow.service";
 
 const migratedLegacyWorkflow: StudioWorkflow = {
   spec_version: "1.5",
@@ -55,6 +56,7 @@ describe("WorkflowNlpExecutor with a migrated legacy version", () => {
         {
           id: "llm_call",
           type: "signature",
+          position: { x: 0, y: 0 },
           data: {
             parameters: [{ identifier: "llm", type: "llm", value: null }],
           },
@@ -82,7 +84,7 @@ describe("WorkflowNlpExecutor with a migrated legacy version", () => {
       migrateDsl: vi.fn().mockReturnValue(migratedLegacyWorkflow),
       getProjectModelProviders: vi.fn().mockResolvedValue({}),
       stripUnsupportedParams: vi.fn().mockResolvedValue(undefined),
-      addEnvs: async (event) => event,
+      workflows: new TestWorkflowService(),
       dispatchNlp,
       createTraceId: () => "trace_1",
     };

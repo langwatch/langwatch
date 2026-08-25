@@ -5,20 +5,18 @@ import type {
 } from "@copilotkit/runtime";
 import { randomUUID } from "@copilotkit/shared";
 import { createLogger } from "@langwatch/observability";
-import type { DatasetService } from "@langwatch/dataset-contract";
-import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type z from "zod";
-import { addEnvs } from "~/optimization_studio/server/addEnvs";
-import { loadDatasets } from "~/optimization_studio/server/load-datasets.adapter";
 import {
   buildWorkflowLlmConfig,
   buildLlmSignatureNode,
   LATEST_SPEC_VERSION,
   type LlmPromptConfigComponent,
+  type StudioClientEvent,
   type StudioWorkflow,
+  type WorkflowService,
 } from "@langwatch/workflow-contract";
-import type { StudioClientEvent, StudioServerEvent } from "@langwatch/workflow-contract";
+import type { StudioServerEvent } from "@langwatch/workflow-contract";
 import type { runtimeInputsSchema } from "@langwatch/prompt-contract";
 import { versionMetadataToNodeFormat } from "~/prompts/schemas/version-metadata-schema";
 import type { PromptConfigFormValues } from "~/prompts/types";
@@ -37,9 +35,8 @@ const TEMPLATE_INPUT_PLACEHOLDER_RE = /\{\{\s*input\s*\}\}/;
 
 type PromptStudioAdapterParams = {
   projectId: string;
-  datasets: DatasetService;
   modelProviders: ModelProviderService;
-  managedProviders: ManagedProviderService;
+  workflows: WorkflowService;
 };
 
 /**
@@ -49,9 +46,8 @@ type PromptStudioAdapterParams = {
  */
 export class PromptStudioAdapter implements CopilotServiceAdapter {
   private projectId: string;
-  private datasets: DatasetService;
   private modelProviders: ModelProviderService;
-  private managedProviders: ManagedProviderService;
+  private workflows: WorkflowService;
 
   /**
    * Creates a new PromptStudioAdapter instance.
@@ -59,9 +55,8 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
    */
   constructor(params: PromptStudioAdapterParams) {
     this.projectId = params.projectId;
-    this.datasets = params.datasets;
     this.modelProviders = params.modelProviders;
-    this.managedProviders = params.managedProviders;
+    this.workflows = params.workflows;
   }
 
   /**
@@ -234,17 +229,11 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         },
       } as StudioClientEvent;
 
-      // Enrich with envs and datasets to match server route behavior
-      preparedEvent = await loadDatasets(
-        await addEnvs(
-          rawEvent,
-          this.projectId,
-          this.modelProviders,
-          this.managedProviders,
-        ),
-        this.projectId,
-        this.datasets,
-      );
+      // Prepare runtime credentials and datasets to match server route behavior.
+      preparedEvent = await this.workflows.prepareStudioEvent({
+        event: rawEvent,
+        projectId: this.projectId,
+      });
     } catch (earlyError: any) {
       logger.error({ err: earlyError }, "early error preparing prompt workflow");
       // Use the pre-allocated traceId so the frontend's TraceMessage queries

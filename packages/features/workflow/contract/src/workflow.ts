@@ -115,6 +115,16 @@ export const workflowFieldSchema = z.object({
   optional: z.boolean().optional(),
 });
 
+/** Open Workflow node refinement used by field-discovery queries. */
+export const workflowFieldNodeSchema = z.looseObject({
+  id: z.string(),
+  type: z.string().optional(),
+  data: z.looseObject({
+    inputs: z.array(z.unknown()).optional(),
+    outputs: z.array(z.unknown()).optional(),
+  }),
+});
+
 export type WorkflowField = z.infer<typeof workflowFieldSchema>;
 
 /** Portable field metadata consumed by Evaluator without a Workflow repository. */

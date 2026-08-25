@@ -125,7 +125,8 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
     # Parity with the Python executor's build_secrets_preamble
     # (langwatch_nlp/studio/utils.py): decrypted project secrets ride on
-    # the workflow DSL (`workflow.secrets`, populated by addEnvs.ts) and
+    # the workflow DSL (`workflow.secrets`, populated by
+    # WorkflowService.prepareStudioEvent) and
     # are surfaced to user code as attribute access on a `secrets` object,
     # matching the Studio code-editor hint ("Use secrets.NAME syntax").
 

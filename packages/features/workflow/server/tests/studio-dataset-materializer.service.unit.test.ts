@@ -44,7 +44,7 @@ const makeEvent = (
     },
   }) as unknown as StudioClientEvent;
 
-describe("loadDatasets", () => {
+describe("materializeStudioDatasets", () => {
   const getDatasetWithRecords = vi.fn();
   const datasets = { getDatasetWithRecords } as unknown as DatasetService;
 
@@ -58,7 +58,7 @@ describe("loadDatasets", () => {
   // execute_evaluation forced entrySelection="all" then short-circuited
   // the database-dataset branch with `if (entrySelection == "all") return
   // node;`, so the Go engine received a dataset_id-only payload and
-  // rejected it. Now loadDatasets always fetches + inlines on the
+  // rejected it. Now materializeStudioDatasets always fetches + inlines on the
   // database path, regardless of evaluate_on/entry_selection mode.
   it("inlines saved (database) datasets on execute_evaluation when entry_selection is all", async () => {
     getDatasetWithRecords.mockResolvedValue({

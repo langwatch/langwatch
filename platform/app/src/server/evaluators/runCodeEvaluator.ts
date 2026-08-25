@@ -1,9 +1,9 @@
 import { nanoid } from "nanoid";
-import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import { addEnvs } from "~/optimization_studio/server/addEnvs";
-import type { ExecutionStatus } from "@langwatch/workflow-contract";
-import type { StudioClientEvent } from "@langwatch/workflow-contract";
+import type {
+  ExecutionStatus,
+  StudioClientEvent,
+  WorkflowService,
+} from "@langwatch/workflow-contract";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
 import { nlpgoFetch } from "~/server/nlpgo/nlpgoFetch";
 import { prisma } from "../db";
@@ -38,8 +38,7 @@ export async function runCodeEvaluator({
   traceId,
   parentCausalityDepth,
   parentTrace,
-  modelProviders,
-  managedProviders,
+  workflows,
 }: {
   projectId: string;
   evaluatorId: string;
@@ -47,8 +46,7 @@ export async function runCodeEvaluator({
   traceId?: string;
   parentCausalityDepth?: number;
   parentTrace?: { traceId: string; parentSpanId: string };
-  modelProviders: ModelProviderService;
-  managedProviders: ManagedProviderService;
+  workflows: WorkflowService;
 }): Promise<SingleEvaluationResult> {
   try {
     const evaluator = await prisma.evaluator.findFirst({
@@ -86,12 +84,10 @@ export async function runCodeEvaluator({
       },
     };
 
-    const eventWithEnvs = await addEnvs(
+    const eventWithEnvs = await workflows.enrichStudioEvent({
       event,
       projectId,
-      modelProviders,
-      managedProviders,
-    );
+    });
 
     const response = await nlpgoFetch<{
       result: Record<string, unknown>;

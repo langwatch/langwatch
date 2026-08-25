@@ -1,4 +1,5 @@
 import { mapReasoningToProvider } from "@langwatch/prompt-contract";
+import { z } from "zod";
 
 import {
   llmConfigSchema,
@@ -7,6 +8,41 @@ import {
 } from "./studio-workflow";
 
 export type SupportedLlmParameter = string;
+
+const camelToSnakeLlmParameter = {
+  topP: "top_p",
+  frequencyPenalty: "frequency_penalty",
+  presencePenalty: "presence_penalty",
+  maxTokens: "max_tokens",
+  topK: "top_k",
+  minP: "min_p",
+  repetitionPenalty: "repetition_penalty",
+} as const;
+
+const looseLlmConfigSchema = llmConfigSchema.passthrough();
+const looseLlmParametersSchema = z.looseObject({});
+
+/** Converts legacy editor camelCase keys without requiring a complete config. */
+export function normalizeWorkflowLlmParameters(
+  llmParameters: unknown,
+): Record<string, unknown> {
+  const result = { ...looseLlmParametersSchema.parse(llmParameters) };
+
+  for (const [camelKey, snakeKey] of Object.entries(camelToSnakeLlmParameter)) {
+    if (camelKey in result && result[camelKey] !== void 0) {
+      const value = result[camelKey];
+      delete result[camelKey];
+      result[snakeKey] = value;
+    }
+  }
+
+  return result;
+}
+
+/** Validates and normalizes a complete execution config. */
+export function normalizeWorkflowLlmConfig(llmConfig: unknown): LLMConfig {
+  return looseLlmConfigSchema.parse(normalizeWorkflowLlmParameters(llmConfig));
+}
 
 /**
  * Convert the editor's camel-case LLM settings to the execution DSL shape.

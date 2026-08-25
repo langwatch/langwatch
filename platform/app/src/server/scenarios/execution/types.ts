@@ -6,7 +6,7 @@
  * only depend on what they actually need.
  */
 
-import { z } from "zod/v4";
+import { z } from "zod";
 import { FieldMappingSchema } from "../field-mapping";
 import { runParameterValuesSchema } from "../parameters";
 
@@ -155,7 +155,7 @@ export const CodeAgentDataSchema = z.object({
   /**
    * Project secrets exposed to the Python code as the `secrets.NAME` namespace.
    * Pre-fetched so the worker-thread adapter runs without DB access. Mirrors
-   * the studio's addEnvs behavior for in-app workflow execution.
+   * Workflow Studio preparation for in-app execution.
    */
   secrets: z.record(z.string(), z.string()).default({}),
 });
@@ -194,9 +194,8 @@ export const WorkflowAgentDataSchema = z.object({
   /** Which output field to use as the scenario result. When unset, uses the first output. */
   scenarioOutputField: z.string().optional(),
   /**
-   * Project secrets merged into the workflow DSL before execution. Mirrors the
-   * studio's addEnvs behavior so `secrets.NAME` works inside code nodes of the
-   * published workflow.
+   * Project secrets merged into the workflow DSL before execution. This keeps
+   * `secrets.NAME` aligned with Workflow Studio preparation.
    */
   secrets: z.record(z.string(), z.string()).default({}),
 });

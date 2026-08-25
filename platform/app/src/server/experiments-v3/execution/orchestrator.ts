@@ -31,13 +31,12 @@ import {
 import { isRowEmpty } from "~/experiments-v3/utils/emptyRowDetection";
 import { toComparisonConfig } from "~/experiments-v3/utils/normalizeComparison";
 import { disambiguateNames } from "~/experiments-v3/utils/variantDisambiguation";
-import { addEnvs } from "~/optimization_studio/server/addEnvs";
-import { loadDatasets } from "~/optimization_studio/server/load-datasets.adapter";
 import {
   nodeErrorToDomainError,
   type ExecutionState,
   type StudioServerEvent,
   type StudioWorkflow,
+  type WorkflowService,
 } from "@langwatch/workflow-contract";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import { getApp } from "~/server/app-layer/app";
@@ -91,6 +90,7 @@ export type OrchestratorInput = {
   loadedPrompts: Map<string, VersionedPrompt>;
   loadedAgents: Map<string, TypedAgent>;
   modelProviders: ModelProviderService;
+  workflows: WorkflowService;
   /** Evaluators loaded from DB - settings and names are fetched fresh from here */
   loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
   /** Studio workflows loaded for workflow targets (committed DSL run per row) */
@@ -984,6 +984,7 @@ type CellEvaluatorContext = {
   targetNodes: Set<string>;
   config: ResultMapperConfig;
   modelProviders: ModelProviderService;
+  workflows: WorkflowService;
   isAborted?: () => Promise<boolean>;
 };
 
@@ -1005,6 +1006,7 @@ async function* runOneCellEvaluator({
   targetNodes,
   config,
   modelProviders,
+  workflows,
   isAborted,
 }: CellEvaluatorContext & {
   evaluatorId: string;
@@ -1030,12 +1032,10 @@ async function* runOneCellEvaluator({
   await studioBackendPostEvent({
     projectId,
     modelProviders,
-    message: await addEnvs(
-      evaluatorEvent,
+    message: await workflows.enrichStudioEvent({
+      event: evaluatorEvent,
       projectId,
-      modelProviders,
-      getApp().managedProviders,
-    ),
+    }),
     isAborted,
     onEvent: (serverEvent) => {
       evaluatorEvents.push(serverEvent);
@@ -1138,6 +1138,7 @@ export async function* executeCell(
     evaluators?: Map<string, { id: string; name: string; config: unknown }>;
   },
   modelProviders: ModelProviderService,
+  workflows: WorkflowService,
   resultMapperConfig?: ResultMapperConfig,
   isAborted?: () => Promise<boolean>,
 ): AsyncGenerator<EvaluationV3Event> {
@@ -1211,12 +1212,11 @@ export async function* executeCell(
         },
       };
 
-      // Add environment variables and process datasets
-      const enrichedEvent = await loadDatasets(
-        await addEnvs(rawEvent, projectId, modelProviders, getApp().managedProviders),
+      // Prepare runtime credentials and datasets in canonical service order.
+      const enrichedEvent = await workflows.prepareStudioEvent({
+        event: rawEvent,
         projectId,
-        getApp().dataset,
-      );
+      });
 
       // Execute target and collect events
       const targetEvents: StudioServerEvent[] = [];
@@ -1294,6 +1294,7 @@ export async function* executeCell(
         targetNodes,
         config: cellConfig,
         modelProviders,
+        workflows,
         isAborted,
       });
     }
@@ -1328,6 +1329,7 @@ export async function* executeWorkflowCell({
   resultMapperConfig,
   isAborted,
   modelProviders,
+  workflows,
 }: {
   cell: ExecutionCell;
   projectId: string;
@@ -1337,6 +1339,7 @@ export async function* executeWorkflowCell({
   resultMapperConfig?: ResultMapperConfig;
   isAborted?: () => Promise<boolean>;
   modelProviders: ModelProviderService;
+  workflows: WorkflowService;
 }): AsyncGenerator<EvaluationV3Event> {
   yield {
     type: "cell_started",
@@ -1373,11 +1376,10 @@ export async function* executeWorkflowCell({
       },
     };
 
-    const enrichedEvent = await loadDatasets(
-      await addEnvs(rawEvent, projectId, modelProviders, getApp().managedProviders),
+    const enrichedEvent = await workflows.prepareStudioEvent({
+      event: rawEvent,
       projectId,
-      getApp().dataset,
-    );
+    });
 
     const events: StudioServerEvent[] = [];
     await studioBackendPostEvent({
@@ -1533,6 +1535,8 @@ export async function* executeWorkflowCell({
         traceId: finalTraceId,
         targetNodes: new Set([cell.targetId]),
         config: resultMapperConfig ?? {},
+        modelProviders,
+        workflows,
         isAborted,
       });
     }
@@ -1975,6 +1979,7 @@ export async function* runOrchestrator(
     concurrency: requestedConcurrency,
     seedTargetOutputs,
     modelProviders,
+    workflows,
   } = input;
 
   // Use requested concurrency, environment variable, or default
@@ -2364,6 +2369,7 @@ export async function* runOrchestrator(
                   resultMapperConfig,
                   isAborted: checkAbort,
                   modelProviders,
+                  workflows,
                 })
               : executeCell(
                   cell,
@@ -2371,6 +2377,7 @@ export async function* runOrchestrator(
                   datasetColumns,
                   loadedData,
                   modelProviders,
+                  workflows,
                   resultMapperConfig,
                   checkAbort,
                 );
@@ -2607,6 +2614,7 @@ export async function* runOrchestrator(
                   datasetColumns,
                   loadedData,
                   modelProviders,
+                  workflows,
                   resultMapperConfig,
                   checkAbort,
                 )) {

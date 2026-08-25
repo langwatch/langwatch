@@ -81,6 +81,12 @@ Feature: Workflow service boundary
     When Workflow materializes the event with an injected DatasetService
     Then execution receives inline records without accessing application globals
 
+  Scenario: Workflow prepares a Studio event through typed runtime ports
+    Given a Studio event needs project credentials, model parameters, and datasets
+    When a caller invokes prepareStudioEvent for its project
+    Then Workflow enriches the event before materializing referenced datasets
+    And application transports do not copy the preparation helper
+
   Scenario: Copying referenced datasets uses the Dataset service
     Given a workflow copy includes referenced datasets
     When Workflow copies the definition into another project

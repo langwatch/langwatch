@@ -23,12 +23,6 @@ vi.mock("~/app/api/workflows/post_event/post-event", () => ({
   studioBackendPostEvent: (args: unknown) => mockPostEvent(args),
 }));
 
-// The env decoration reads project credentials from the database and has
-// nothing to do with the node under test.
-vi.mock("~/optimization_studio/server/addEnvs", () => ({
-  addEnvs: (event: unknown) => Promise.resolve(event),
-}));
-
 // Proves the request never leaves through the app's own client any more.
 const mockSsrfSafeFetch = vi.fn();
 vi.mock("~/utils/ssrfProtection", async (importOriginal) => ({

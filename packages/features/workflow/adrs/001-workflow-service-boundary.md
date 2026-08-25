@@ -43,10 +43,11 @@ Studio execution materializes referenced datasets through an explicit
 
 ## Dependencies
 
-NLP execution and persisted-DSL migration are explicit ports supplied by the
-application composition root. A cross-feature dependency is added only when
-Workflow actually calls that service; speculative Model Provider and Agent
-dependencies are not part of the constructor.
+NLP execution, persisted-DSL migration, project environment and LiteLLM
+parameters are explicit ports supplied by application composition. The adapter
+requires Dataset, environment and LLM parameter dependencies to construct the
+private Studio-event preparer given to `WorkflowService`; neither it nor the
+service receives Prisma or a Model Provider service directly.
 
 ## Public surfaces and transports
 
@@ -68,10 +69,10 @@ package owns the code-node Python provider behaviour used by that chrome.
 ## Runtime and registration
 
 The process creates one `PostgresWorkflowAdapter` during App composition and
-passes its resulting `WorkflowService` through request context. The adapter
-constructor obligations are `database`, the optional canonical `datasets`
-service when copies may include datasets, plus the DSL migration and execution
-ports.
+passes its resulting `WorkflowService` through request context. Its required
+dependencies are the private database adapter, canonical `DatasetService`,
+project-environment and LiteLLM-parameter ports, plus DSL migration; execution
+is an explicit optional dispatch port.
 
 ## Environment and configuration
 

@@ -5,10 +5,10 @@ import {
 import type { EvaluationService } from "@langwatch/evaluation-contract";
 import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { WorkflowService } from "@langwatch/workflow-contract";
 import { setupModelEnv } from "~/server/app-layer/evaluations/evaluation-execution.factories";
 import { codeEvaluatorIdFromCheckType } from "~/server/evaluators/codeEvaluator";
 import { runCodeEvaluator } from "~/server/evaluators/runCodeEvaluator";
-import { getApp } from "~/server/app-layer/app";
 import { stagedLangevalsFetch } from "~/server/langevals/stagedFetch";
 import type { Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
@@ -258,6 +258,7 @@ export const runEvaluationForTrace = async ({
   evaluations,
   modelProviders,
   managedProviders,
+  workflows,
 }: {
   projectId: string;
   traceId: string;
@@ -270,6 +271,7 @@ export const runEvaluationForTrace = async ({
   evaluations: EvaluationService;
   modelProviders: ModelProviderService;
   managedProviders: ManagedProviderService;
+  workflows: WorkflowService;
 }): Promise<EvaluationResultWithThreadId> => {
   // #4991: the trace being evaluated is read content-first — resolve the
   // FULL offloaded IO (ADR-022) so the evaluator never scores a preview.
@@ -331,6 +333,7 @@ export const runEvaluationForTrace = async ({
     workflowId,
     modelProviders,
     managedProviders,
+    workflows,
     parentCausalityDepth: maxCausalityDepthOfSpans(
       trace.spans as unknown as Array<{
         attributes?: Record<string, unknown> | null;
@@ -356,6 +359,7 @@ export const runEvaluation = async ({
   parentCausalityDepth,
   modelProviders,
   managedProviders,
+  workflows,
 }: {
   projectId: string;
   evaluatorType: EvaluatorTypes | "workflow";
@@ -367,6 +371,7 @@ export const runEvaluation = async ({
   parentCausalityDepth?: number;
   modelProviders: ModelProviderService;
   managedProviders: ManagedProviderService;
+  workflows: WorkflowService;
 }): Promise<SingleEvaluationResult> => {
   if (data.type === "custom") {
     // Code evaluators arrive as `{type:"custom"}` with an evaluatorType of
@@ -382,14 +387,14 @@ export const runEvaluation = async ({
         traceId: trace?.trace_id,
         parentCausalityDepth,
         parentTrace: extractParentTraceForNlpgo(trace),
-        modelProviders,
-        managedProviders,
+        workflows,
       });
     }
     return customEvaluation(
       projectId,
       evaluatorType,
       data.data,
+      workflows,
       trace,
       workflowId,
       parentCausalityDepth,
@@ -580,6 +585,7 @@ export const runEvaluation = async ({
         parentCausalityDepth,
         modelProviders,
         managedProviders,
+        workflows,
         retries: retries - 1,
       });
     }
@@ -624,6 +630,7 @@ const customEvaluation = async (
   projectId: string,
   evaluatorType: EvaluatorTypes | "workflow",
   data: Record<string, any>,
+  workflows: WorkflowService,
   trace?: Trace,
   workflowId?: string | null,
   parentCausalityDepth?: number,
@@ -643,7 +650,7 @@ const customEvaluation = async (
   const parentTrace = extractParentTraceForNlpgo(trace);
 
   const response = await WorkflowEvaluationRunner.run(
-    getApp().workflows,
+    workflows,
     resolvedWorkflowId,
     projectId,
     requestBody,

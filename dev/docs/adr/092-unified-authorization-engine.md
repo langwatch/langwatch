@@ -301,7 +301,7 @@ Concretely, all verified in-tree, July 2026:
     optimization-studio → nlpgo hop carries no auth at all ("There is no
     auth on this hop", `nlpgoFetch.ts:115`) and the control plane injects
     the legacy project key - the RBAC-bypassing credential from #6 - into
-    every workflow payload (`addEnvs.ts:21-69`), so studio and evaluation
+    every workflow payload (`WorkflowService.prepareStudioEvent`), so studio and evaluation
     runs act as an unrestricted full-project principal. Background workers
     run with no principal at all (raw Prisma/ClickHouse, tenant isolation
     only via ids in job payloads). And the same action needs different

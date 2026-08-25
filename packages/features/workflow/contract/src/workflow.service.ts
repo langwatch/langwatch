@@ -15,8 +15,17 @@ import type {
   WorkflowVersionHistoryMode,
   WorkflowWithVersion,
 } from "./workflow";
+import type { StudioClientEvent } from "./studio-events";
 
 export abstract class WorkflowService {
+  abstract enrichStudioEvent(input: {
+    event: StudioClientEvent;
+    projectId: string;
+  }): Promise<StudioClientEvent>;
+  abstract prepareStudioEvent(input: {
+    event: StudioClientEvent;
+    projectId: string;
+  }): Promise<StudioClientEvent>;
   abstract getById(input: {
     id: string;
     projectId: string;
