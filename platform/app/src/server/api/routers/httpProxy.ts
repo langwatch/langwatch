@@ -3,6 +3,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
+import type { RequestAppServices } from "~/runtime/app/requestApp";
 import {
   type BaseComponent,
   type Field,
@@ -381,13 +382,17 @@ const recordTestTrace = async ({
   traceIds: ReturnType<typeof generateTraceIds> | undefined;
   headers: z.infer<typeof httpHeaderSchema>[];
   result: HttpProxyResult;
-  ctx: { session: { user: { id: string } } };
+  ctx: {
+    session: { user: { id: string } };
+    app: RequestAppServices;
+  };
 }) => {
   const { agentId, projectId, url, method, auth, outputPath } = input;
   if (!agentId) return;
 
   try {
     await createAgentTestTrace({
+      traces: ctx.app.traces,
       projectId,
       agentId,
       userId: ctx.session.user.id,

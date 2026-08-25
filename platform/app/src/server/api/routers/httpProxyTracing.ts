@@ -7,7 +7,7 @@
  */
 
 import crypto from "node:crypto";
-import { getApp } from "../../app-layer/app";
+import type { RequestAppServices } from "~/runtime/app/requestApp";
 import { DEFAULT_PII_REDACTION_LEVEL } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import type { CustomMetadata, Span } from "../../tracer/types";
 import { CollectorSpanUtils } from "../../traces/collectorSpan.utils";
@@ -138,6 +138,7 @@ export function buildTraceparentHeader({
  * Creates a trace for an HTTP agent test execution and submits it to the collector.
  */
 export async function createAgentTestTrace({
+  traces,
   projectId,
   agentId,
   userId,
@@ -149,6 +150,7 @@ export async function createAgentTestTrace({
   customAuthHeaderName,
   result,
 }: {
+  traces: RequestAppServices["traces"];
   projectId: string;
   agentId: string;
   userId: string;
@@ -242,7 +244,7 @@ export async function createAgentTestTrace({
     expectedOutput: null,
   });
 
-  await getApp().traces.recordSpan({
+  await traces.recordSpan({
     tenantId: projectId,
     span: CollectorSpanUtils.convertSpanToOtlp(span),
     resource,
