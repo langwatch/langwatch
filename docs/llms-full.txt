@@ -19883,7 +19883,7 @@ Candidates come from the user; when they name none, take the current obvious one
 For each candidate, reprice the same mix:
 
 1. **Direct repricing**: the same tokens at the candidate's rates, cache split preserved where the candidate has caching.
-2. **No-cache degradation**: for a candidate without caching, cache reads rebill as fresh input. State this row separately; it is where most "80% cheaper" claims die.
+2. **No-cache degradation**: for a candidate without caching, cache reads and cache writes both rebill as fresh input, because the candidate is sent the same context in full on every call. Add the two together, do not price the writes at a write rate the candidate does not have, and state this row separately; it is where most "80% cheaper" claims die.
 3. **Sensitivity**: recompute at the observed cache-hit share, at half of it, and at zero, so the conclusion survives a workload change.
 4. **The non-price caveats, named not judged**: a different model is a different model. State window differences and any capability constraint the user's workload obviously depends on (tool calling, long context), and leave the quality judgment to the user; this is a cost analysis.
 
@@ -53443,7 +53443,7 @@ Candidates come from the user; when they name none, take the current obvious one
 For each candidate, reprice the same mix:
 
 1. **Direct repricing**: the same tokens at the candidate's rates, cache split preserved where the candidate has caching.
-2. **No-cache degradation**: for a candidate without caching, cache reads rebill as fresh input. State this row separately; it is where most "80% cheaper" claims die.
+2. **No-cache degradation**: for a candidate without caching, cache reads and cache writes both rebill as fresh input, because the candidate is sent the same context in full on every call. Add the two together, do not price the writes at a write rate the candidate does not have, and state this row separately; it is where most "80% cheaper" claims die.
 3. **Sensitivity**: recompute at the observed cache-hit share, at half of it, and at zero, so the conclusion survives a workload change.
 4. **The non-price caveats, named not judged**: a different model is a different model. State window differences and any capability constraint the user's workload obviously depends on (tool calling, long context), and leave the quality judgment to the user; this is a cost analysis.
 
