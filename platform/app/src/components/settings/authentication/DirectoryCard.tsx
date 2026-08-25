@@ -120,19 +120,22 @@ export function DirectoryCard({
           the phrase this page hands somebody, and sending them to another
           screen to find out what one is makes the trip the explanation. The
           short version lives here; the full one is beside the table. */}
-      <OverviewDetail label="Provisioning token">
-        <VStack align="start" gap={1}>
-          <Text fontSize="sm" color="fg.muted">
-            The password your identity provider uses to create and remove people
-            here on its own, without anybody signing in. One token per
-            connection, shown once when it is issued.
+      {/* SAID HERE, NOT ONLY WHERE THEY ARE MANAGED. "Provisioning token" is
+          the phrase this page hands somebody, and sending them to another
+          screen to find out what one is makes the trip the explanation. The
+          short version is the row's hint — which is where an explanation
+          belongs now that a row is a name on the left and its state on the
+          right; as a value it pushed the only pressable thing in the row off
+          the line every other value sits on. */}
+      <OverviewDetail
+        label="Provisioning token"
+        hint="The password your identity provider uses to create and remove people here on its own, without anybody signing in. One per connection, shown once when it is issued."
+      >
+        <Link href="/settings/directory?tab=tokens">
+          <Text fontSize="12.5px" color="colorPalette.fg" whiteSpace="nowrap">
+            Issue or revoke
           </Text>
-          <Link href="/settings/directory?tab=tokens">
-            <Text fontSize="sm" color="colorPalette.fg">
-              Issue or revoke tokens
-            </Text>
-          </Link>
-        </VStack>
+        </Link>
       </OverviewDetail>
 
       <OverviewDetail label="Groups it sent">

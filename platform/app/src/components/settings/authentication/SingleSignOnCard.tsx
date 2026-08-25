@@ -10,7 +10,19 @@ import {
   connectionStatusChipFor,
 } from "~/features/sso/logic/connectionStatus";
 import { domainProofChipFor } from "~/features/sso/logic/domainProofChip";
+import { identityProviderPreset } from "../singleSignOn/identityProviders";
 import { OverviewCard, OverviewDetail } from "./OverviewCard";
+
+/**
+ * The protocol's own mark, from the catalogue the setup journey picks from —
+ * so the card wears the tile somebody chose rather than a second icon set
+ * invented here. Nothing is drawn where the catalogue has no mark: initials
+ * standing in for a logo read as a logo nobody recognises.
+ */
+function ProtocolMark({ type }: { type: string }) {
+  const Icon = identityProviderPreset(type).icon;
+  return Icon ? <Icon size={14} aria-hidden /> : null;
+}
 
 /** A setup read whose connection is known to exist. */
 type LiveSetup = SelfServeSetupView & {
@@ -58,6 +70,11 @@ export function SingleSignOnCard({
   return (
     <OverviewCard
       title={connectionProtocolName(connection.type)}
+      // The PROTOCOL'S mark, taken from the same catalogue the setup journey
+      // picks from, so the card wears the tile somebody chose. The title here
+      // is a sentence rather than a name, and a sentence is slower to
+      // recognise than a mark.
+      leading={<ProtocolMark type={connection.type} />}
       chip={connectionStatusChipFor({
         state: connection.state,
         routingSwitchedOn: goLive?.routingSwitchedOn ?? false,
