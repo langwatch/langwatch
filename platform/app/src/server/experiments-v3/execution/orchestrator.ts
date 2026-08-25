@@ -37,7 +37,11 @@ import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import { nodeErrorToDomainError } from "~/optimization_studio/utils/nodeErrorDomain";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { getApp } from "~/server/app-layer/app";
-import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
+import type {
+  EvaluatorTypes,
+  SingleEvaluationResult,
+} from "~/server/evaluations/evaluators";
+import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators";
 import type {
   RecordEvaluatorResultCommandData,
   RecordTargetResultCommandData,
@@ -52,7 +56,11 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { generateOtelTraceId } from "~/utils/trace";
 import { abortManager } from "./abortManager";
-import { type LoadedWorkflow, workflowLoadKey } from "./dataLoader";
+import {
+  type LoadedWorkflow,
+  promptLoadKey,
+  workflowLoadKey,
+} from "./dataLoader";
 import { buildStripScoreEvaluatorIds } from "./evaluatorScoreFilter";
 import {
   extractTargetOutput,
@@ -157,6 +165,26 @@ export const resolveScopedRowIndices = ({
 };
 
 /**
+ * The dataset id a run reads its mapping buckets from.
+ *
+ * Rows come from the ACTIVE dataset, so `mappings[datasetId]` has to be keyed
+ * on that same dataset. The saved-state path hands the orchestrator EVERY
+ * dataset the workbench has, and the active one is not always the first, so
+ * reading `datasets[0]` there picks another dataset's bucket and every node
+ * runs with no inputs. The first dataset stays as the fallback for state that
+ * names no active dataset.
+ */
+const resolveMappingDatasetId = (
+  state: Pick<EvaluationsV3State, "datasets" | "activeDatasetId">,
+): string => {
+  const activeId = state.activeDatasetId;
+  if (activeId && state.datasets.some((d) => d.id === activeId)) {
+    return activeId;
+  }
+  return state.datasets[0]?.id ?? activeId ?? "dataset-1";
+};
+
+/**
  * Generates all cells to execute based on the scope.
  */
 export const generateCells = (
@@ -174,8 +202,7 @@ export const generateCells = (
   } = {},
 ): ExecutionCell[] => {
   const cells: ExecutionCell[] = [];
-  const datasetId =
-    state.datasets[0]?.id ?? state.activeDatasetId ?? "dataset-1";
+  const datasetId = resolveMappingDatasetId(state);
 
   // Handle evaluator-all-rows scope - run one evaluator across all rows with existing target outputs
   if (scope.type === "evaluator-all-rows") {
@@ -444,11 +471,30 @@ export type ComparisonSkipReason = {
    *    the picked output field is gone (renamed schema) or the output was
    *    empty/unserializable. Re-running the target will NOT help; the config or
    *    the output is the problem.
+   *  - "too-few-variants": fewer than two columns are picked, so there is
+   *    nothing to compare against.
+   *  - "golden-not-set": the comparison is set to judge against a golden
+   *    answer but no dataset column is picked for it.
+   *  - "variant-not-found": a picked column no longer exists in the workbench.
+   *
+   * The last three are setup problems rather than data problems: no cell can be
+   * built for ANY row until the user finishes configuring the comparison.
    */
-  kind: "missing-output" | "empty-output";
+  kind:
+    | "missing-output"
+    | "empty-output"
+    | "too-few-variants"
+    | "golden-not-set"
+    | "variant-not-found";
   /** Display-friendly identifiers of the variants that triggered the skip. */
   variantNames: string[];
 };
+
+/** Why one comparison could not be resolved into cells at all. */
+type ComparisonSetupSkip = Extract<
+  ComparisonSkipReason["kind"],
+  "too-few-variants" | "golden-not-set" | "variant-not-found"
+>;
 
 /**
  * "a", "a and b", "a, b and c" — for the skip-reason message, which used to be
@@ -457,6 +503,53 @@ export type ComparisonSkipReason = {
 export const formatList = (names: string[]): string => {
   if (names.length <= 1) return names[0] ?? "";
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+};
+
+/**
+ * The row-level error copy for a skipped comparison: what happened, and the one
+ * thing the user can do about it.
+ *
+ * Exported so the wording and the `error_type` are pinned by tests without
+ * running a whole orchestration.
+ */
+export const comparisonSkipMessage = (
+  reason: Pick<ComparisonSkipReason, "kind" | "variantNames">,
+): { detail: string; errorType: string } => {
+  const which = formatList(reason.variantNames);
+  switch (reason.kind) {
+    case "missing-output":
+      return {
+        detail: `Waiting on ${which}: no ${
+          reason.variantNames.length > 1 ? "outputs" : "output"
+        } for this row yet. Run ${which} first, then re-run this comparison.`,
+        errorType: "MissingVariantOutput",
+      };
+    case "empty-output":
+      // Re-running will not help: the output is empty or the picked field is
+      // gone. Point the user at the output-field config.
+      return {
+        detail: `${which} produced no text to compare for this row. Check the output field selected for ${which}.`,
+        errorType: "EmptyVariantOutput",
+      };
+    case "too-few-variants":
+      return {
+        detail:
+          "This comparison needs at least 2 columns to compare. Pick the columns to compare in the evaluator settings, then run again.",
+        errorType: "TooFewComparisonVariants",
+      };
+    case "golden-not-set":
+      return {
+        detail:
+          "This comparison judges against a golden answer but no column is picked for it. Pick the golden field in the evaluator settings, then run again.",
+        errorType: "GoldenFieldNotSet",
+      };
+    case "variant-not-found":
+      return {
+        detail:
+          "A column this comparison compares no longer exists. Pick the columns to compare in the evaluator settings, then run again.",
+        errorType: "ComparisonVariantNotFound",
+      };
+  }
 };
 
 export const generateComparisonCells = ({
@@ -502,8 +595,7 @@ export const generateComparisonCells = ({
 }): { cells: ExecutionCell[]; skipReasons: ComparisonSkipReason[] } => {
   const cells: ExecutionCell[] = [];
   const skipReasons: ComparisonSkipReason[] = [];
-  const datasetId =
-    state.datasets[0]?.id ?? state.activeDatasetId ?? "dataset-1";
+  const datasetId = resolveMappingDatasetId(state);
   const rowsInScope =
     scopedRowIndices ?? datasetRows.map((_, rowIndex) => rowIndex);
 
@@ -607,7 +699,7 @@ export const generateComparisonCells = ({
   // KSUID wouldn't normalize and the verdict would be dropped.
   const variantIdentifierFor = (t: TargetConfig): string => {
     if (t.type === "prompt" && t.promptId) {
-      const handle = loadedPrompts?.get(t.promptId)?.handle;
+      const handle = loadedPrompts?.get(promptLoadKey(t))?.handle;
       if (handle) return handle;
     }
     return t.id;
@@ -654,7 +746,7 @@ export const generateComparisonCells = ({
   const variantDisplayNameFor = (t: TargetConfig): string => {
     if (t.type === "prompt") {
       if (!t.promptId) return "New Prompt";
-      const loaded = loadedPrompts?.get(t.promptId);
+      const loaded = loadedPrompts?.get(promptLoadKey(t));
       return loaded?.handle ?? loaded?.name ?? "New Prompt";
     }
     if (t.type === "evaluator" && t.targetEvaluatorId) {
@@ -676,23 +768,30 @@ export const generateComparisonCells = ({
   ): string[] => disambiguateNames(resolvedVariants.map(variantDisplayNameFor));
 
   /**
-   * Resolve configured variant ids to their TargetConfigs, or null if
-   * unusable. Applies the same "is this comparison usable" gate to every
-   * comparison carrier — chip-style (evaluator.comparison) and column-style
-   * (target.comparison) alike — so a comparison missing its golden field
-   * (see isGoldenFieldSatisfied, #5378) is skipped consistently rather than
-   * running with an empty `golden` while its settings claim golden-aware.
+   * Resolve configured variant ids to their TargetConfigs, or the reason the
+   * comparison is unusable. Applies the same "is this comparison usable" gate
+   * to every comparison carrier — chip-style (evaluator.comparison) and
+   * column-style (target.comparison) alike — so a comparison missing its
+   * golden field (see isGoldenFieldSatisfied, #5378) is skipped consistently
+   * rather than running with an empty `golden` while its settings claim
+   * golden-aware.
+   *
+   * Every skip is returned rather than only logged: an unfinished comparison
+   * produces no cell for any row, and a column that renders "No verdict yet"
+   * forever tells the user nothing about what to fix.
    */
   const resolveVariants = (
     cfg: ComparisonEvaluatorConfig,
     ownerId: string,
-  ): TargetConfig[] | null => {
+  ):
+    | { variants: TargetConfig[]; skip?: never }
+    | { skip: ComparisonSetupSkip; variants?: never } => {
     if (!cfg.variants || cfg.variants.length < 2) {
       logger.warn(
         { ownerId, variants: cfg.variants },
         "Comparison skipped: fewer than 2 variants configured",
       );
-      return null;
+      return { skip: "too-few-variants" };
     }
     if (!isGoldenFieldSatisfied(cfg)) {
       logger.debug(
@@ -704,7 +803,7 @@ export const generateComparisonCells = ({
         },
         "Comparison skipped: golden field not configured",
       );
-      return null;
+      return { skip: "golden-not-set" };
     }
     const resolved = cfg.variants.map((id) =>
       state.targets.find((t) => t.id === id),
@@ -714,9 +813,43 @@ export const generateComparisonCells = ({
         { ownerId, variants: cfg.variants },
         "Comparison skipped: one or more variant targets not found",
       );
-      return null;
+      return { skip: "variant-not-found" };
     }
-    return resolved as TargetConfig[];
+    return { variants: resolved as TargetConfig[] };
+  };
+
+  /**
+   * The column a chip-style comparison's verdict hangs under: its first
+   * variant. An unfinished comparison still needs one, so the first variant
+   * that names a target the workbench still has is used. With none, the
+   * comparison has no cell in the grid to report into and the log line above
+   * is all there is.
+   */
+  const anchorVariantId = (
+    cfg: ComparisonEvaluatorConfig,
+  ): string | undefined =>
+    (cfg.variants ?? []).find((id) => state.targets.some((t) => t.id === id));
+
+  /** One error row per scoped row for a comparison that cannot be built. */
+  const pushSetupSkips = ({
+    kind,
+    targetId,
+    evaluatorId,
+  }: {
+    kind: ComparisonSetupSkip;
+    targetId: string;
+    evaluatorId: string;
+  }): void => {
+    for (const rowIndex of rowsInScope) {
+      if (!datasetRows[rowIndex]) continue;
+      skipReasons.push({
+        rowIndex,
+        targetId,
+        evaluatorId,
+        kind,
+        variantNames: [],
+      });
+    }
   };
 
   /**
@@ -820,8 +953,19 @@ export const generateComparisonCells = ({
     const cfg = toComparisonConfig(evaluator);
     if (!cfg) continue;
 
-    const resolvedVariants = resolveVariants(cfg, evaluator.id);
-    if (!resolvedVariants) continue;
+    const resolution = resolveVariants(cfg, evaluator.id);
+    if (resolution.skip) {
+      const anchorId = anchorVariantId(cfg);
+      if (anchorId) {
+        pushSetupSkips({
+          kind: resolution.skip,
+          targetId: anchorId,
+          evaluatorId: evaluator.id,
+        });
+      }
+      continue;
+    }
+    const resolvedVariants = resolution.variants;
 
     const variantIds = buildVariantIdentifiers(resolvedVariants);
     const variantDisplayNames = buildVariantDisplayNames(resolvedVariants);
@@ -882,8 +1026,17 @@ export const generateComparisonCells = ({
     // variants, or a golden field the settings claim but didn't pick) is
     // skipped the same way a chip-style comparison would be, rather than
     // hitting the judge endpoint and rendering a verdict-shaped 400 error.
-    const resolvedVariants = resolveVariants(cfg, target.id);
-    if (!resolvedVariants) continue;
+    const resolution = resolveVariants(cfg, target.id);
+    if (resolution.skip) {
+      // A comparison COLUMN always has a cell to report into: its own.
+      pushSetupSkips({
+        kind: resolution.skip,
+        targetId: target.id,
+        evaluatorId: target.id,
+      });
+      continue;
+    }
+    const resolvedVariants = resolution.variants;
 
     const variantIds = buildVariantIdentifiers(resolvedVariants);
     const variantDisplayNames = buildVariantDisplayNames(resolvedVariants);
@@ -1106,6 +1259,26 @@ async function* runOneCellEvaluator({
   evaluatorNodeId: string;
 }): AsyncGenerator<EvaluationV3Event> {
   const evaluatorInputs = buildEvaluatorInputs(cell, evaluatorId, targetOutput);
+
+  // The dispatch decision. An evaluator whose every input resolved empty is
+  // not run: it would score empty against empty and report that as a verdict.
+  const evaluator = cell.evaluatorConfigs.find((e) => e.id === evaluatorId);
+  if (
+    evaluator &&
+    hasNoResolvedInputs({ cell, evaluator, inputs: evaluatorInputs })
+  ) {
+    logger.info(
+      {
+        rowIndex: cell.rowIndex,
+        targetId: cell.targetId,
+        evaluatorId,
+        evaluatorType: evaluator.evaluatorType,
+      },
+      "Evaluator not dispatched: every input resolved empty",
+    );
+    yield noInputsResolvedResult({ cell, evaluator, evaluatorId });
+    return;
+  }
 
   const evaluatorEvent = {
     type: "execute_component" as const,
@@ -1808,6 +1981,98 @@ export const buildEvaluatorInputs = (
   return inputs;
 };
 
+/** The `error_type` a row carries when an evaluator resolved no input at all. */
+export const NO_INPUTS_RESOLVED = "NoInputsResolved";
+
+/** A resolved value that carries nothing for the evaluator to read. */
+const isEmptyInputValue = (value: unknown): boolean =>
+  value === undefined ||
+  value === null ||
+  (typeof value === "string" && value.trim() === "");
+
+/**
+ * The fields an evaluator reads: the ones declared on its own config, and the
+ * catalog's required plus optional fields otherwise. Optional counts here — an
+ * evaluator whose only field is optional is just as broken when that field is
+ * unmapped as one whose field is required.
+ */
+const declaredEvaluatorFields = (evaluator: EvaluatorConfig): string[] => {
+  const declared = evaluator.inputs?.map((field) => field.identifier) ?? [];
+  if (declared.length > 0) return declared;
+
+  const definition =
+    AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes];
+  return [
+    ...(definition?.requiredFields ?? []),
+    ...(definition?.optionalFields ?? []),
+  ];
+};
+
+/** What the row calls the evaluator that could not run. */
+const evaluatorDisplayName = (evaluator: EvaluatorConfig): string =>
+  AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes]?.name ??
+  evaluator.evaluatorType;
+
+/**
+ * Whether dispatching would hand the evaluator nothing to read.
+ *
+ * An evaluator that declares fields and resolves every one of them empty
+ * cannot produce a verdict, but it does produce a RESULT: `exact_match`
+ * compares "" to "" and reports a pass, and that pass is counted in the run's
+ * pass rate. The row reports the unmapped fields instead of running.
+ *
+ * A comparison cell is exempt. `buildCandidates` refuses to build a cell whose
+ * candidates carry no text and reports the missing or empty variants with its
+ * own error, so the payload is resolved as long as one candidate has text.
+ */
+export const hasNoResolvedInputs = ({
+  cell,
+  evaluator,
+  inputs,
+}: {
+  cell: ExecutionCell;
+  evaluator: EvaluatorConfig;
+  inputs: Record<string, unknown>;
+}): boolean => {
+  if (cell.comparison && toComparisonConfig(evaluator)) {
+    return !cell.comparison.candidates.some(
+      (candidate) => !isEmptyInputValue(candidate.output),
+    );
+  }
+
+  // An evaluator that declares no field reads nothing from the row, so there is
+  // nothing to be missing.
+  if (declaredEvaluatorFields(evaluator).length === 0) return false;
+
+  // An empty payload is the shape the production failure takes: no mapping
+  // resolved, so no key was ever written.
+  return Object.values(inputs).every(isEmptyInputValue);
+};
+
+/** The error row an evaluator with nothing mapped reports for itself. */
+const noInputsResolvedResult = ({
+  cell,
+  evaluator,
+  evaluatorId,
+}: {
+  cell: ExecutionCell;
+  evaluator: EvaluatorConfig;
+  evaluatorId: string;
+}): EvaluationV3Event => ({
+  type: "evaluator_result",
+  rowIndex: cell.rowIndex,
+  targetId: cell.targetId,
+  evaluatorId,
+  result: {
+    status: "error",
+    error_type: NO_INPUTS_RESOLVED,
+    details: `${evaluatorDisplayName(
+      evaluator,
+    )} received no input for this row. Map its fields in the evaluator settings, then run again.`,
+    traceback: [],
+  },
+});
+
 /**
  * Builds the input values for a target from the cell's dataset entry.
  *
@@ -1866,7 +2131,7 @@ export const buildTargetMetadata = ({
     }
     // Otherwise, check loaded prompts (for saved prompts)
     else if (t.type === "prompt" && t.promptId) {
-      const loadedPrompt = loadedPrompts.get(t.promptId);
+      const loadedPrompt = loadedPrompts.get(promptLoadKey(t));
       if (loadedPrompt?.model) {
         model = loadedPrompt.model;
       }
@@ -1903,7 +2168,7 @@ export const buildTargetMetadata = ({
 
     // Get name from loaded entity
     if (t.type === "prompt" && t.promptId) {
-      name = loadedPrompts.get(t.promptId)?.name ?? null;
+      name = loadedPrompts.get(promptLoadKey(t))?.name ?? null;
     } else if (t.type === "agent" && t.dbAgentId) {
       name = loadedAgents.get(t.dbAgentId)?.name ?? null;
     } else if (t.type === "evaluator" && t.targetEvaluatorId) {
@@ -2622,21 +2887,7 @@ export async function* runOrchestrator(
             aborted = true;
             break;
           }
-          const which = formatList(reason.variantNames);
-          const { detail, errorType } =
-            reason.kind === "missing-output"
-              ? {
-                  detail: `Waiting on ${which} — no ${
-                    reason.variantNames.length > 1 ? "outputs" : "output"
-                  } for this row yet. Run ${which} first, then re-run this comparison.`,
-                  errorType: "MissingVariantOutput",
-                }
-              : {
-                  // Re-running won't help — the output is empty or the picked
-                  // field is gone. Point the user at the output-field config.
-                  detail: `${which} produced no text to compare for this row. Check the output field selected for ${which}.`,
-                  errorType: "EmptyVariantOutput",
-                };
+          const { detail, errorType } = comparisonSkipMessage(reason);
           const skipEvent: EvaluationV3Event = {
             type: "evaluator_result",
             rowIndex: reason.rowIndex,
@@ -2880,7 +3131,7 @@ const getLoadedDataForTarget = (
   workflow?: LoadedWorkflow;
 } => {
   if (targetConfig.type === "prompt" && targetConfig.promptId) {
-    const prompt = loadedPrompts.get(targetConfig.promptId);
+    const prompt = loadedPrompts.get(promptLoadKey(targetConfig));
     if (prompt) {
       return { prompt };
     }

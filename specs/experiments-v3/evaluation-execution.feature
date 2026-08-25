@@ -132,6 +132,53 @@ Feature: Evaluation execution - UI
     And cells that were loading show an error state
 
   # ==========================================================================
+  # Error Handling - Nothing To Evaluate
+  # ==========================================================================
+
+  @integration
+  Scenario: An evaluator with no resolved inputs reports an error instead of a pass
+    Given the "exact_match" evaluator has none of its fields mapped
+    When I run the evaluation
+    Then the evaluator is not sent to the evaluation service
+    And the "exact_match" chip in every row shows an error
+    And the error names the evaluator and says to map its fields
+    And the run reports no passes for that evaluator
+
+  @unit
+  Scenario: An evaluator that compares two fields lists both as required
+    Given the workbench reads the fields of "exact_match" from the evaluator catalog
+    When it classifies each field as required or optional
+    Then "output" and "expected_output" are both required
+    And the same holds for "llm_answer_match", whose judge needs both answers
+
+  Scenario: A comparison the user has not finished configuring says what to fix
+    Given a comparison column with fewer than 2 columns picked to compare
+    When I run the evaluation
+    Then every row of the comparison column shows an error
+    And the error says to pick the columns to compare
+    And a comparison whose golden answer is on with no column picked says to pick the golden field
+
+  # ==========================================================================
+  # Multiple Datasets And Pinned Versions
+  # ==========================================================================
+
+  @integration
+  Scenario: The run reads its mappings from the dataset the rows come from
+    Given the workbench has 2 datasets and the second one is active
+    And the mappings are set on the active dataset
+    When I run the evaluation
+    Then the target and evaluator run with the values from the active dataset
+    And no cell runs with an empty input
+
+  @integration
+  Scenario: Two columns pinned to different versions of one prompt each run their own version
+    Given target "my-prompt v1" is pinned to version 1 of a prompt
+    And target "my-prompt v2" is pinned to version 2 of the same prompt
+    When I run the evaluation
+    Then each column runs the version it is pinned to
+    And the run records the version and model of each column separately
+
+  # ==========================================================================
   # Partial Execution UI
   # ==========================================================================
   @unimplemented
