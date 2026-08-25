@@ -184,13 +184,9 @@ describe("given every unauthenticated screen", () => {
         "features/auth/components/TwoStepChallengePanel.tsx",
       ]) {
         const source = repoFile(file);
-        expect(source, file).toMatch(
-          /AuthPrimaryButton|AUTH_PRIMARY_STYLE/,
-        );
+        expect(source, file).toMatch(/AuthPrimaryButton|AUTH_PRIMARY_STYLE/);
         // None of them re-states the fill by hand any more.
-        expect(source, file).not.toContain(
-          'backgroundColor="auth.action"',
-        );
+        expect(source, file).not.toContain('backgroundColor="auth.action"');
       }
     });
   });
@@ -198,9 +194,7 @@ describe("given every unauthenticated screen", () => {
   describe("when a stage is in flight", () => {
     /** @scenario A stage in flight says so in place */
     it("keeps the button's label beside its spinner, and stops taking presses", () => {
-      const button = repoFile(
-        "features/auth/components/AuthPrimaryButton.tsx",
-      );
+      const button = repoFile("features/auth/components/AuthPrimaryButton.tsx");
 
       // Chakra's default swaps the label for a bare spinner: the content
       // changes width, the row re-centres, and the one word telling somebody
@@ -247,17 +241,13 @@ describe("given every unauthenticated screen", () => {
 
     /** @scenario Every stage offers the other door */
     it("carries the address across, in the fragment the browser does not send", () => {
-      const carried = repoFile(
-        "features/auth/logic/carriedEmail.ts",
-      );
+      const carried = repoFile("features/auth/logic/carriedEmail.ts");
 
       // A `#` rather than a `?`: the fragment reaches no access log and no
       // `Referer` header on the way to the other door.
       expect(carried).toContain("#");
       expect(
-        repoFile(
-          "features/auth/components/IdentifierFirstSignIn.tsx",
-        ),
+        repoFile("features/auth/components/IdentifierFirstSignIn.tsx"),
       ).toContain("email={email}");
     });
   });

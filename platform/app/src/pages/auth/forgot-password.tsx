@@ -5,10 +5,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { AuthCard } from "~/components/auth/AuthCard";
-import {
-  AuthShell,
-  useIdentityAuthScreens,
-} from "~/features/auth";
+import { AuthShell, useIdentityAuthScreens } from "~/features/auth";
 import { CheckYourEmail } from "~/features/auth/components/CheckYourEmail";
 import {
   FIELD_FOCUS,

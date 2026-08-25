@@ -2,10 +2,7 @@ import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { AuthCard } from "~/components/auth/AuthCard";
-import {
-  AuthShell,
-  useIdentityAuthScreens,
-} from "~/features/auth";
+import { AuthShell, useIdentityAuthScreens } from "~/features/auth";
 import { AUTH_PRIMARY_STYLE } from "~/features/auth/components/AuthPrimaryButton";
 import { SHAPE } from "~/features/auth/authTheme";
 import { usePublishAuthStage } from "~/features/auth/logic/groundStage";

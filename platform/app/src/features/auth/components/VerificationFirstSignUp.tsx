@@ -8,7 +8,10 @@ import { signIn } from "~/utils/auth-client";
 import Link from "~/utils/compat/next-link";
 import { useSearchParams } from "~/utils/compat/next-navigation";
 import { hardRedirect } from "~/utils/hardRedirect";
-import { usePublishAuthStep, useAuthAnalytics } from "../hooks/useAuthAnalytics";
+import {
+  usePublishAuthStep,
+  useAuthAnalytics,
+} from "../hooks/useAuthAnalytics";
 import { useSignInRouting } from "../hooks/useSignInRouting";
 import { AUTH_SURFACE, SIGN_UP_STEP } from "../logic/authAnalytics";
 import { forgetCarriedEmail, readCarriedEmail } from "../logic/carriedEmail";
@@ -87,8 +90,7 @@ export function VerificationFirstSignUp() {
   const [carriedEmail] = useState(readCarriedEmail);
   useEffect(forgetCarriedEmail, []);
 
-  const requestVerification =
-    api.auth.requestSignUpVerification.useMutation();
+  const requestVerification = api.auth.requestSignUpVerification.useMutation();
   const completeVerification =
     api.auth.completeSignUpVerification.useMutation();
   const routing = useSignInRouting();
@@ -330,9 +332,7 @@ export function VerificationFirstSignUp() {
         onContinue={dialFederated}
         callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH}
         title="Create your LangWatch account"
-        footer={
-          <LogInLink callbackUrl={callbackUrl} label="Log in instead" />
-        }
+        footer={<LogInLink callbackUrl={callbackUrl} label="Log in instead" />}
       />
     );
   }
@@ -344,10 +344,7 @@ export function VerificationFirstSignUp() {
   // "check your email". The address is confirmed before anybody gets in.
   if (signingUpEmail) {
     return (
-      <AuthCard
-        title="Choose how to sign in"
-        finePrint={<AuthFinePrint />}
-      >
+      <AuthCard title="Choose how to sign in" finePrint={<AuthFinePrint />}>
         <SignUpCredentialForm
           email={signingUpEmail}
           callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH}
@@ -414,12 +411,7 @@ export function VerificationFirstSignUp() {
           }
           setSigningUpEmail(email);
         }}
-        footer={
-          <LogInLink
-            callbackUrl={callbackUrl}
-            label="Log in instead"
-          />
-        }
+        footer={<LogInLink callbackUrl={callbackUrl} label="Log in instead" />}
         alternatives={
           hasAlternativeMethods(instanceMethods) ? (
             <AlternativeMethods
@@ -588,12 +580,7 @@ function LinkNoLongerWorks({
         // often a link somebody already used on another device, so the person
         // reading this may well have an account already — and burning a fresh
         // one to find that out is the round trip this saves.
-        footer={
-          <LogInLink
-            callbackUrl={callbackUrl}
-            label="Log in instead"
-          />
-        }
+        footer={<LogInLink callbackUrl={callbackUrl} label="Log in instead" />}
       />
     </AuthCard>
   );
@@ -672,7 +659,8 @@ function signUpStep({
   if (challenged) return SIGN_UP_STEP.challenge;
   if (ceremony) return SIGN_UP_STEP.passkeyCeremony;
   if (welcomeBackEmail !== null) return SIGN_UP_STEP.welcomeBack;
-  if (verifiedEmail !== null && accountIsReady) return SIGN_UP_STEP.accountReady;
+  if (verifiedEmail !== null && accountIsReady)
+    return SIGN_UP_STEP.accountReady;
   if (verifiedEmail !== null) return SIGN_UP_STEP.methodChoice;
   if (sentTo !== null) return SIGN_UP_STEP.checkEmail;
   if (linkIsDead) return SIGN_UP_STEP.linkDead;

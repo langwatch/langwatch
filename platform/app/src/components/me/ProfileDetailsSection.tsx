@@ -111,9 +111,19 @@ export function ProfileDetailsSection({
             )}
           </HStack>
 
+          {/* THE PRIMARY ACTION, DRESSED AS ONE. Save took the button
+              recipe's defaults, which are a grey solid on a grey band: enabled
+              it read as a word someone had shaded in, and disabled — the state
+              it is in every time the page loads — it read as grey text that
+              had been switched off. Both readings are "not a button".
+              The filled palette gives it an unmistakable surface in either
+              theme, and the disabled state fades that surface rather than
+              removing it, so the control stays a control while it waits for
+              something to save. */}
           <HStack>
             <Button
               size="sm"
+              colorPalette="orange"
               disabled={!maySave}
               loading={updateName.isPending}
               data-testid="profile-name-save"

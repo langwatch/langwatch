@@ -271,12 +271,42 @@ describe("<SecuritySettings/>", () => {
       expect(within(band).getByTestId("linked-accounts-section")).toBeTruthy();
 
       // One action row: adding an address and connecting a provider are the
-      // same offer, so they share a line rather than stacking as two.
-      const add = within(band).getByTestId("add-address");
-      const connect = within(band).getByTestId("link-method-google");
-      expect(add.parentElement?.parentElement).toBe(
-        connect.parentElement?.parentElement,
+      // same offer, so they share a line rather than stacking as two. Asserted
+      // on the row itself rather than on how many parents up it happens to be,
+      // which is a fact about the flexbox and not about the offer.
+      const row = within(band).getByTestId("identifier-action-row");
+      expect(within(row).getByTestId("add-address")).toBeTruthy();
+      expect(within(row).getByTestId("link-method-google")).toBeTruthy();
+    });
+
+    /**
+     * The layout pop this row was reported for: opening the field used to
+     * replace the button with a much wider input, and every Connect button
+     * slid sideways out from under the cursor that had just pressed it.
+     */
+    /** @scenario Email addresses and linked accounts sit under one heading */
+    it("leaves the connect buttons where they were when the address field opens", () => {
+      publicEnvRef.current = { NEXTAUTH_PROVIDER: "email" };
+      renderPage();
+
+      const band = screen.getByTestId(
+        "email-and-linked-accounts-settings-section",
       );
+      const row = within(band).getByTestId("identifier-action-row");
+      const before = within(row)
+        .getAllByRole("button")
+        .map((b) => b.textContent);
+
+      fireEvent.click(within(band).getByTestId("add-address"));
+
+      // The field opened somewhere, and it did not open in this row.
+      expect(within(band).getByTestId("new-address")).toBeTruthy();
+      expect(within(row).queryByTestId("new-address")).toBeNull();
+      expect(
+        within(row)
+          .getAllByRole("button")
+          .map((b) => b.textContent),
+      ).toEqual(before);
     });
   });
 

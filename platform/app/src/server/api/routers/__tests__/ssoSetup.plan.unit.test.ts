@@ -30,8 +30,10 @@ const { mockSelfServe, mockBreakGlass, mockAuditLog, mockPlan } = vi.hoisted(
 );
 
 /** Enough of better-auth's adapter shape for `betterAuth()` to finish
- *  constructing: the auth module is on this router's import graph. */
-const stubBetterAuthAdapter = {
+ *  constructing: the auth module is on this router's import graph. Hoisted
+ *  because the mock factory below hands it out during module load, before
+ *  this file's own statements have run. */
+const stubBetterAuthAdapter = vi.hoisted(() => ({
   id: "stub",
   create: async () => ({}),
   update: async () => ({}),
@@ -41,7 +43,7 @@ const stubBetterAuthAdapter = {
   delete: async () => undefined,
   deleteMany: async () => 0,
   count: async () => 0,
-};
+}));
 
 /**
  * The composition root, mocked whole — it reaches Prisma at module scope, so

@@ -1,14 +1,14 @@
-import { HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { KeySquare } from "lucide-react";
 import { api } from "~/utils/api";
 import { useSession } from "~/utils/auth-client";
+import RouterLink from "~/utils/compat/next-link";
 import { IdentityChip } from "../access/IdentityRow";
 import { SectionErrorNotice } from "../settings/SectionErrorNotice";
 import {
   SettingsSection,
   SettingsSectionRow,
 } from "../settings/SettingsSection";
-import { Link } from "../ui/link";
 import { formatRelativeTime } from "./relativeTime";
 
 /**
@@ -57,13 +57,18 @@ export function PersonalApiKeysSummary({
       title="Your API keys"
       description="The keys issued to you, and when each was last used."
       action={
-        <Link
-          href="/settings/api-keys"
-          fontSize="sm"
+        // The same button the sign-in methods above it carry. Two summary
+        // bands on one page whose only control is "go to the page that
+        // changes this" have to offer it as the same object, or the page
+        // reads as two conventions arguing.
+        <Button
+          asChild
+          size="xs"
+          variant="outline"
           data-testid="api-keys-manage"
         >
-          Manage API keys
-        </Link>
+          <RouterLink href="/settings/api-keys">Manage API keys</RouterLink>
+        </Button>
       }
       testId="personal-api-keys-settings-section"
     >

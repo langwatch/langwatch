@@ -50,11 +50,7 @@
 	/* The one gradient word: blue into warm orange, the site's
 	   `.text-gradient`. Not a colour token - Chakra's `colors` namespace holds
 	   colours, and this is a paint. */
-	--lw-auth-accent-gradient: linear-gradient(
-		100deg,
-		#2563eb 0%,
-		#d9531e 100%
-	);
+	--lw-auth-accent-gradient: linear-gradient(100deg, #2563eb 0%, #d9531e 100%);
 	/* The card's shadow: three stacked layers, which `shadows` could hold but
 	   only by splitting one effect across two token systems. It stays here,
 	   beside the glass it belongs to. */
@@ -66,11 +62,7 @@
 
 .dark {
 	/* The site's `.text-gradient-dark`: the same pair, lifted to read on ink. */
-	--lw-auth-accent-gradient: linear-gradient(
-		100deg,
-		#5fa3ff 0%,
-		#ffa24d 100%
-	);
+	--lw-auth-accent-gradient: linear-gradient(100deg, #5fa3ff 0%, #ffa24d 100%);
 	/* Dark glass is smoked, not clear, so the type always has a dark floor
 	   under it - a clear film over a bright warp left the words fighting the
 	   light behind them. */
@@ -105,9 +97,7 @@
 		--chakra-colors-auth-ink: color(display-p3 0.62 0.247 0.02);
 		--chakra-colors-auth-detail: color(display-p3 0.91 0.427 0.114);
 		--chakra-colors-auth-tint: color(display-p3 0.98 0.925 0.882);
-		--chakra-colors-auth-focus-ring: color(
-			display-p3 0.91 0.427 0.114 / 0.22
-		);
+		--chakra-colors-auth-focus-ring: color(display-p3 0.91 0.427 0.114 / 0.22);
 		--chakra-colors-auth-glow: color(display-p3 0.91 0.427 0.114 / 0.28);
 		--lw-auth-accent-gradient: linear-gradient(
 			100deg,
@@ -117,18 +107,12 @@
 	}
 
 	.dark {
-		--chakra-colors-auth-action: color(
-			display-p3 0.91 0.427 0.114 / 0.92
-		);
+		--chakra-colors-auth-action: color(display-p3 0.91 0.427 0.114 / 0.92);
 		--chakra-colors-auth-action-hover: color(display-p3 0.98 0.549 0.259);
 		--chakra-colors-auth-ink: color(display-p3 0.98 0.549 0.259);
-		--chakra-colors-auth-detail: color(
-			display-p3 0.98 0.549 0.259 / 0.75
-		);
+		--chakra-colors-auth-detail: color(display-p3 0.98 0.549 0.259 / 0.75);
 		--chakra-colors-auth-tint: color(display-p3 0.91 0.427 0.114 / 0.18);
-		--chakra-colors-auth-focus-ring: color(
-			display-p3 0.98 0.549 0.259 / 0.22
-		);
+		--chakra-colors-auth-focus-ring: color(display-p3 0.98 0.549 0.259 / 0.22);
 		--chakra-colors-auth-glow: color(display-p3 0.98 0.549 0.259 / 0.22);
 		--lw-auth-accent-gradient: linear-gradient(
 			100deg,

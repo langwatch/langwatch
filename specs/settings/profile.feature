@@ -129,6 +129,40 @@ Feature: Profile - who I am here, and where I am signed in
       Then my other ways in are still listed
       And I am told what could not be read, in words, with a trace to quote
 
+  # THE SUMMARY MUST NOT CONTRADICT THE CARD ABOVE IT. An account created by a
+  # passkey, or one older than the identifier projection, has an address on the
+  # account and nothing in the projection — and the summary said it had no
+  # address at all, one band under the card showing that very address.
+
+  Rule: the address said here is the address I actually have
+
+    @integration
+    Scenario: An account with no identifiers still states its own address
+      Given my account signs in by passkey and has never added an address
+      When I open the sign-in methods on my profile
+      Then the address line says the address my account is reached at
+      And it does not say I have none
+
+    @integration
+    Scenario: An address I have not confirmed is marked in Security's words
+      Given the address on my account has not been confirmed
+      When I open the sign-in methods on my profile
+      Then it is marked not confirmed yet
+      And a confirmed address is marked nothing at all
+
+    @integration
+    Scenario: Only an account with no address anywhere is told it has none
+      Given my account has no address on it and no identifiers
+      When I open the sign-in methods on my profile
+      Then the address line says there is none yet
+
+    @integration
+    Scenario: The read of my own address failing says so
+      Given the read that says what address my account has fails
+      When I open the sign-in methods on my profile
+      Then I am told what could not be read, in words, with a trace to quote
+      And my other ways in are still listed
+
   # ── Where I am signed in ───────────────────────────────────────────────
 
   Rule: a browser is named by what it is, not by when it signed in

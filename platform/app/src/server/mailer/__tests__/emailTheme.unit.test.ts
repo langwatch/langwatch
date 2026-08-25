@@ -31,9 +31,7 @@ const authThemeSource = readFileSync(
 
 /** `brand = { ..., 600: "#c2510a", ... }` */
 const brandStop = (stop: number): string | undefined =>
-  new RegExp(`\\b${stop}:\\s*"(#[0-9a-fA-F]{6})"`).exec(
-    authThemeSource,
-  )?.[1];
+  new RegExp(`\\b${stop}:\\s*"(#[0-9a-fA-F]{6})"`).exec(authThemeSource)?.[1];
 
 describe("emailTheme", () => {
   describe("given the auth screens' own theme module", () => {
@@ -59,9 +57,7 @@ describe("emailTheme", () => {
     });
 
     it("takes the tinted-surface text colour from the same ramp", () => {
-      const stop = /ink:\s*mode\(\s*brand\[(\d+)\]/.exec(
-        authThemeSource,
-      )?.[1];
+      const stop = /ink:\s*mode\(\s*brand\[(\d+)\]/.exec(authThemeSource)?.[1];
 
       expect(stop).toBeDefined();
       expect(EMAIL_COLOR.accentText).toBe(brandStop(Number(stop)));

@@ -85,9 +85,7 @@ export function AuthGround({
   return (
     <div
       className={
-        centered
-          ? "lw-auth-ambient lw-auth-ambient--center"
-          : "lw-auth-ambient"
+        centered ? "lw-auth-ambient lw-auth-ambient--center" : "lw-auth-ambient"
       }
       data-testid="auth-screen-ambient"
       aria-hidden="true"

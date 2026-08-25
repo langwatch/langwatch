@@ -209,7 +209,7 @@ describe("unlinking a linked account", () => {
   });
 
   describe("given the section is asked what it can connect", () => {
-    /** @scenario The linked accounts are their own section, apart from the password */
+    /** @scenario The password and the linked accounts are separate sections */
     it("lists the linked provider without any password affordance", () => {
       accountsRef.current = [
         { id: "acct_sso", provider: "okta", providerAccountId: "okta|sam" },

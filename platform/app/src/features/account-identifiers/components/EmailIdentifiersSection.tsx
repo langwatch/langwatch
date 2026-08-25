@@ -73,8 +73,7 @@ export function EmailIdentifiersSection({
   // The account's own address and whether it is confirmed — the same read the
   // app shell's nudge makes, so the two can never disagree about it.
   const confirmation = api.auth.myAddressConfirmation.useQuery();
-  const resendOwnAddress =
-    api.auth.sendMyAddressConfirmation.useMutation();
+  const resendOwnAddress = api.auth.sendMyAddressConfirmation.useMutation();
   const resendAdded = api.identity.resendIdentifierConfirmation.useMutation();
   // When each address last got somebody in. Answers the one question a list
   // of addresses otherwise cannot: which of these am I still relying on.
@@ -138,6 +137,8 @@ export function EmailIdentifiersSection({
     }
   };
 
+  const draft = useAddAddressDraft({ onAdd: add });
+
   const remove = async (row: (typeof rows)[number]) => {
     try {
       await removeIdentifier.mutateAsync({ identifierId: row.identifierId });
@@ -184,9 +185,7 @@ export function EmailIdentifiersSection({
               key={row.identifierId}
               row={row}
               linkJustSent={sentTo !== null && sentTo === row.value}
-              lastUsedAt={
-                lastUsed.data?.byIdentifier[row.identifierId] ?? null
-              }
+              lastUsedAt={lastUsed.data?.byIdentifier[row.identifierId] ?? null}
               isSending={resendAdded.isPending || resendOwnAddress.isPending}
               isRemoving={removeIdentifier.isPending}
               onResend={() => void resend(row)}
@@ -253,50 +252,83 @@ export function EmailIdentifiersSection({
           rather than as another member of it — and the edge they align to is
           the one the rows' own actions ("Send the link again") already sit
           on, so the card has one action column instead of two. */}
-      <HStack
-        width="full"
-        gap={3}
-        flexWrap="wrap"
-        align="center"
-        justify="flex-end"
-      >
-        <AddAddressControl onAdd={add} isSending={addAddress.isPending} />
-        {trailingActions ? (
-          <>
-            {/* Two families on one row: what this account is reached at, and
-                who vouches for it. The rule disappears where the row wraps —
-                a hairline dangling at a line break reads as a mistake. */}
-            <Box
-              display={{ base: "none", md: "block" }}
-              width="1px"
-              height="20px"
-              backgroundColor="border.muted"
-              flexShrink={0}
-              aria-hidden="true"
-            />
-            {trailingActions}
-          </>
+      {/* THE ROW DOES NOT MOVE. "Add email address" used to become the field
+          in place, and a field is far wider than the button it replaced, so
+          pressing it shoved every Connect button sideways — the reader's eye
+          was still on the button they had just pressed and the whole row had
+          walked off under it. The field opens BELOW instead: the offers keep
+          their places, and what appears is obviously a new thing rather than
+          the old thing rearranged. */}
+      <VStack width="full" align="stretch" gap={3}>
+        <HStack
+          width="full"
+          // The two clusters sit a step further apart than the buttons within
+          // each, which is what makes them read as two groups. The hairline
+          // then has a gap to live in rather than crowding the buttons on
+          // either side of it.
+          gap={4}
+          flexWrap="wrap"
+          align="center"
+          justify="flex-end"
+          data-testid="identifier-action-row"
+        >
+          <AddAddressButton
+            isOpen={draft.isOpen}
+            onOpen={draft.open}
+            onCancel={draft.close}
+          />
+          {trailingActions ? (
+            <>
+              {/* Two families on one row: what this account is reached at, and
+                  who vouches for it. Set on the emphasized border so it holds
+                  in the dark theme, where the muted one all but vanished and
+                  left the gap looking like a spacing mistake. The rule
+                  disappears where the row wraps — a hairline dangling at a
+                  line break reads as a mistake. */}
+              <Box
+                display={{ base: "none", md: "block" }}
+                width="1px"
+                // The height of the buttons it stands between, so it reads as
+                // a division of the row rather than as a tick floating in it.
+                height="8"
+                backgroundColor="border.emphasized"
+                flexShrink={0}
+                aria-hidden="true"
+              />
+              {trailingActions}
+            </>
+          ) : null}
+        </HStack>
+
+        {draft.isOpen ? (
+          <AddAddressForm
+            address={draft.address}
+            onAddressChange={draft.setAddress}
+            onSubmit={() => void draft.submit()}
+            onCancel={draft.close}
+            isSending={addAddress.isPending}
+          />
         ) : null}
-      </HStack>
+      </VStack>
     </VStack>
   );
 }
 
 /**
- * Adding one: a single button until it is pressed, then the field and the two
- * answers to it.
+ * The half-typed address, and whether anybody is typing one.
  *
- * It holds the half-typed address itself. The section around it re-renders on
- * every read that lands, and a draft living up there is a draft that can be
+ * A hook rather than a component because the two halves of this control are no
+ * longer next to each other: the button lives in the band's action row and the
+ * field opens on a row of its own underneath, and one piece of state has to
+ * drive both. The draft still lives BELOW the section — the section re-renders
+ * on every read that lands, and a draft held up there is a draft that can be
  * cleared by something the person did not do.
  */
-function AddAddressControl({
+function useAddAddressDraft({
   onAdd,
-  isSending,
 }: {
   /** Resolves true when the address was accepted and the field can close. */
   onAdd: (email: string) => Promise<boolean>;
-  isSending: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [address, setAddress] = useState("");
@@ -306,37 +338,94 @@ function AddAddressControl({
     setAddress("");
   };
 
-  const submit = async () => {
-    const accepted = await onAdd(address.trim());
-    if (accepted) close();
+  return {
+    isOpen,
+    address,
+    setAddress,
+    open: () => setIsOpen(true),
+    close,
+    submit: async () => {
+      const accepted = await onAdd(address.trim());
+      if (accepted) close();
+    },
   };
+}
 
-  if (!isOpen) {
-    return (
-      <Box>
-        <Button
-          size="sm"
-          variant="outline"
-          width={SETTINGS_ACTION_BUTTON_WIDTH}
-          justifyContent="center"
-          onClick={() => setIsOpen(true)}
-          data-testid="add-address"
-        >
-          <Plus size={14} />
-          Add email address
-        </Button>
-      </Box>
-    );
-  }
-
+/**
+ * The offer, in the band's action row, at the same width as every other offer
+ * on that row.
+ *
+ * It stays on screen while the field is open, and says what pressing it does
+ * NOW — a button that opened something and then went on reading "Add email
+ * address" is a button that has stopped describing itself.
+ */
+function AddAddressButton({
+  isOpen,
+  onOpen,
+  onCancel,
+}: {
+  isOpen: boolean;
+  onOpen: () => void;
+  onCancel: () => void;
+}) {
   return (
-    <HStack width="full" gap={2}>
+    <Button
+      size="sm"
+      variant="outline"
+      width={SETTINGS_ACTION_BUTTON_WIDTH}
+      justifyContent="center"
+      aria-expanded={isOpen}
+      onClick={isOpen ? onCancel : onOpen}
+      data-testid="add-address"
+    >
+      <Plus size={14} />
+      Add email address
+    </Button>
+  );
+}
+
+/**
+ * The field and the two answers to it, on their own row under the offers.
+ *
+ * Ranged right on the same edge as the row above, so the field starts where
+ * the offers start rather than spanning a width nothing else on the band uses.
+ * The field is capped rather than greedy: an address is a short thing, and a
+ * text box the width of the card promises a paragraph.
+ */
+function AddAddressForm({
+  address,
+  onAddressChange,
+  onSubmit,
+  onCancel,
+  isSending,
+}: {
+  address: string;
+  onAddressChange: (value: string) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+  isSending: boolean;
+}) {
+  return (
+    <HStack width="full" gap={2} justify="flex-end" align="center">
       <Input
         size="sm"
         type="email"
+        // eslint-disable-next-line jsx-a11y/no-autofocus
+        autoFocus
         placeholder="you@company.com"
+        maxWidth="320px"
         value={address}
-        onChange={(event) => setAddress(event.target.value)}
+        onChange={(event) => onAddressChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && address.trim()) {
+            event.preventDefault();
+            onSubmit();
+          }
+          // The key that closes anything that opened. Pressing Escape in a
+          // field that will not take it is the small thing that makes a
+          // surface feel unfinished.
+          if (event.key === "Escape") onCancel();
+        }}
         data-testid="new-address"
       />
       <Button
@@ -344,12 +433,12 @@ function AddAddressControl({
         colorPalette="orange"
         loading={isSending}
         disabled={!address.trim()}
-        onClick={() => void submit()}
+        onClick={onSubmit}
         data-testid="confirm-add-address"
       >
         Send confirmation
       </Button>
-      <Button size="sm" variant="ghost" onClick={close}>
+      <Button size="sm" variant="ghost" onClick={onCancel}>
         Cancel
       </Button>
     </HStack>

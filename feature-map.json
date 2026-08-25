@@ -1469,9 +1469,9 @@
           "consumes": []
         },
         {
-          "id": "settings.single-sign-on",
-          "name": "Single Sign-On",
-          "description": "Register an identity provider, prove a domain, test a sign-in through it, name someone who can still get in without it, and turn it on — without a support ticket",
+          "id": "settings.authentication",
+          "name": "Authentication",
+          "description": "Read how everyone in the organization signs in and how their accounts arrive: the live connection, its proved domains and a test sign-in beside the directory that provisions people; register an identity provider, prove a domain, name someone who can still get in without it, and turn it on — without a support ticket",
           "surfaces": {
             "code": {
               "sdk": {
@@ -1483,7 +1483,7 @@
               "docs": null
             },
             "platform": {
-              "ui": "/settings/single-sign-on",
+              "ui": "/settings/authentication",
               "mcp": null,
               "skill": null,
               "docs": null

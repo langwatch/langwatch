@@ -9,6 +9,7 @@ import {
 } from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
 import { Link } from "~/components/ui/link";
+import { domainProofChipFor } from "~/features/sso/logic/domainProofChip";
 import { api } from "~/utils/api";
 import { SectionErrorNotice } from "../settings/SectionErrorNotice";
 import { IdentityChip } from "./IdentityRow";
@@ -18,8 +19,8 @@ import { IdentityChip } from "./IdentityRow";
  *
  * An administrator setting who may join reads the words "verified address on
  * your domain" and quite reasonably goes looking for where they prove the
- * domain. Until now the answer lived only on the Single Sign-On page, under a
- * heading about identity providers, and nothing on this screen pointed at it.
+ * domain. The answer lives on the Authentication page, under a heading about
+ * identity providers, and nothing on this screen used to point at it.
  *
  * TWO MECHANISMS, AND THEY ARE NOT THE SAME ONE. This section says so out
  * loud, because collapsing them is the mistake this whole panel exists to
@@ -31,7 +32,7 @@ import { IdentityChip } from "./IdentityRow";
  *   - single sign-on is proved by a DNS TXT RECORD an administrator publishes
  *     and we look up. That is the ceremony below.
  *
- * The ceremony itself stays on the Single Sign-On page rather than being
+ * The ceremony itself stays on the Authentication page rather than being
  * built twice. This shows what state each domain is in and takes the reader
  * there — one place that issues records, one place that checks them.
  */
@@ -93,7 +94,7 @@ export function DomainVerificationSection({
           )}
 
           <HStack>
-            <Link href="/settings/single-sign-on">
+            <Link href="/settings/authentication">
               <Button size="sm" variant="outline">
                 <ExternalLink size={14} />
                 Prove a domain
@@ -158,7 +159,7 @@ function DomainStates({
   return (
     <VStack align="stretch" gap={2} data-testid="domain-states">
       {[...claims.map((claim) => claim.domain), ...provedOnly].map((domain) => {
-        const chip = chipFor({
+        const chip = domainProofChipFor({
           proved: verified.has(domain),
           proofState: proofByDomain.get(domain)?.proofState ?? "VERIFIED",
           graceEndsAtMs: proofByDomain.get(domain)?.graceEndsAtMs ?? null,
@@ -177,73 +178,4 @@ function DomainStates({
       })}
     </VStack>
   );
-}
-
-/** The one thing a reader has to publish, and nothing about who is busy. */
-const PUBLISH_IT = "Publish the DNS record and ask us to check for it.";
-
-/**
- * Which chip one domain gets, as a table rather than a ternary staircase.
- *
- * Ordered by what a reader most needs to know: whether the evidence behind a
- * proved domain has gone, then whether it is proved at all, then where an
- * unproved claim stands. A lapsed domain is read before a proved one on
- * purpose — it is still in `verifiedDomains`, because it still routes, and a
- * chip that said "Proved" would be technically true and completely wrong.
- */
-function chipFor({
-  proved,
-  proofState,
-  graceEndsAtMs,
-  claim,
-}: {
-  proved: boolean;
-  proofState: "VERIFIED" | "WAVERING" | "LAPSED";
-  graceEndsAtMs: number | null;
-  claim:
-    | { state: "WAITING" | "APPROVED" | "REJECTED"; waitsForReview: boolean }
-    | undefined;
-}): { label: string; tone: "good" | "warning" | "bad"; title: string } {
-  if (proved && proofState === "LAPSED") {
-    return {
-      label: "Record missing",
-      tone: "bad",
-      title:
-        "We haven't been able to find your record for two days, so this domain no longer lets new people in on its own. Everyone already here signs in as usual — publish the record again and it goes back to normal.",
-    };
-  }
-  if (proved && proofState === "WAVERING") {
-    return {
-      label: "Record not found",
-      tone: "warning",
-      title: graceEndsAtMs
-        ? `We can't find your record right now. Nothing has changed yet — republish it before ${new Date(graceEndsAtMs).toLocaleString()} and nothing will.`
-        : "We can't find your record right now. Nothing has changed yet — republish it and nothing will.",
-    };
-  }
-  if (proved) {
-    return {
-      label: "Proved",
-      tone: "good",
-      title:
-        "We found the record. This domain routes sign-ins to your identity provider.",
-    };
-  }
-  // The only claim a person is looking at is one on a domain somebody else
-  // already proved. Every other waiting claim is waiting for the READER.
-  if (claim?.state === "WAITING" && claim.waitsForReview) {
-    return {
-      label: "Waiting for review",
-      tone: "warning",
-      title: "We are checking this claim by hand.",
-    };
-  }
-  if (claim?.state === "REJECTED") {
-    return {
-      label: "Not approved",
-      tone: "bad",
-      title: "This claim was not approved. You can claim it again.",
-    };
-  }
-  return { label: "Not proved yet", tone: "warning", title: PUBLISH_IT };
 }

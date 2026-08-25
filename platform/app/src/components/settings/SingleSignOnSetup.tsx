@@ -18,7 +18,10 @@ import { BreakGlassSection } from "./singleSignOn/BreakGlassSection";
 import { DomainsSection } from "./singleSignOn/DomainsSection";
 import { GoLiveSection } from "./singleSignOn/GoLiveSection";
 import { RegisterConnection } from "./singleSignOn/RegisterConnection";
-import { LoadFailure } from "./singleSignOn/refusals";
+import {
+  AvailabilityRefusalNotice,
+  LoadFailure,
+} from "./singleSignOn/refusals";
 import { ServiceProviderDetails } from "./singleSignOn/ServiceProviderDetails";
 import { SetupStep } from "./singleSignOn/SetupStep";
 import { TestSignInSection } from "./singleSignOn/TestSignInSection";
@@ -56,22 +59,6 @@ import { TestSignInSection } from "./singleSignOn/TestSignInSection";
  * provider behind that identity provider.
  */
 
-/** What the reader is told when setup is not available to them. */
-const REFUSAL_COPY = {
-  license_required: {
-    title: "Single sign-on needs an active licence",
-    body: "Activate an enterprise licence on this installation, then restart it, and you can set single sign-on up here.",
-  },
-  license_restart_required: {
-    title: "Restart to finish activating single sign-on",
-    body: "The licence is active. This installation decides what it federates when it starts, so single sign-on becomes available after the next restart.",
-  },
-  not_opted_in: {
-    title: "Setting single sign-on up yourself isn't switched on yet",
-    body: "Talk to us and we'll set your connection up with you, or switch this on for your organization.",
-  },
-} as const;
-
 export function SingleSignOnSetup({
   organizationId,
 }: {
@@ -96,17 +83,11 @@ export function SingleSignOnSetup({
   const { availability, connection, claims, record, serviceProvider, goLive } =
     setup.data as SelfServeSetupView;
 
+  // The refusal itself is the Authentication page's to place, above the
+  // cards that explain what single sign-on would give this organization. A
+  // journey that cannot be started is not a screen.
   if (!availability.available) {
-    const copy = REFUSAL_COPY[availability.refusal];
-    return (
-      <Alert.Root status="info">
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title>{copy.title}</Alert.Title>
-          <Alert.Description>{copy.body}</Alert.Description>
-        </Alert.Content>
-      </Alert.Root>
-    );
+    return <AvailabilityRefusalNotice refusal={availability.refusal} />;
   }
 
   if (connection === null) {

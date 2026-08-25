@@ -21,7 +21,7 @@
  * tree in to prove neither.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -180,7 +180,12 @@ describe("the directory provisioning page", () => {
         "../../../components/settings/ScimReconciliationPanel"
       );
 
-      draw(<ScimReconciliationPanel organizationId="org_acme" />);
+      draw(
+        <ScimReconciliationPanel
+          organizationId="org_acme"
+          maySetUpSingleSignOn={true}
+        />,
+      );
 
       expect(screen.getByText("okta")).toBeTruthy();
       expect(
@@ -198,7 +203,12 @@ describe("the directory provisioning page", () => {
         "../../../components/settings/ScimReconciliationPanel"
       );
 
-      draw(<ScimReconciliationPanel organizationId="org_acme" />);
+      draw(
+        <ScimReconciliationPanel
+          organizationId="org_acme"
+          maySetUpSingleSignOn={true}
+        />,
+      );
 
       // One per connection: both are labelled, and only one has a date.
       expect(screen.getAllByText("Last push from the directory")).toHaveLength(
@@ -217,7 +227,12 @@ describe("the directory provisioning page", () => {
         "../../../components/settings/ScimReconciliationPanel"
       );
 
-      draw(<ScimReconciliationPanel organizationId="org_acme" />);
+      draw(
+        <ScimReconciliationPanel
+          organizationId="org_acme"
+          maySetUpSingleSignOn={true}
+        />,
+      );
 
       expect(screen.getByText("Not set up yet")).toBeTruthy();
       expect(screen.getByText("No push yet")).toBeTruthy();
@@ -234,7 +249,12 @@ describe("the directory provisioning page", () => {
         "../../../components/settings/ScimReconciliationPanel"
       );
 
-      draw(<ScimReconciliationPanel organizationId="org_acme" />);
+      draw(
+        <ScimReconciliationPanel
+          organizationId="org_acme"
+          maySetUpSingleSignOn={true}
+        />,
+      );
 
       expect(screen.getByText("Sam Patel lost access")).toBeTruthy();
       expect(screen.getByText("Removed")).toBeTruthy();
@@ -254,7 +274,10 @@ describe("the directory provisioning page", () => {
       );
 
       const { container } = draw(
-        <ScimReconciliationPanel organizationId="org_acme" />,
+        <ScimReconciliationPanel
+          organizationId="org_acme"
+          maySetUpSingleSignOn={true}
+        />,
       );
 
       expect(
@@ -275,7 +298,12 @@ describe("the directory provisioning page", () => {
         "../../../components/settings/ScimReconciliationPanel"
       );
 
-      draw(<ScimReconciliationPanel organizationId="org_acme" />);
+      draw(
+        <ScimReconciliationPanel
+          organizationId="org_acme"
+          maySetUpSingleSignOn={true}
+        />,
+      );
 
       // Not disabled — absent. There is no button on this panel at all.
       expect(screen.queryAllByRole("button")).toEqual([]);
@@ -284,6 +312,60 @@ describe("the directory provisioning page", () => {
           /next push re-asserts everything it still believes/i,
         ).length,
       ).toBeGreaterThan(0);
+    });
+  });
+
+  /**
+   * The state the page opens in for an organization that has not started.
+   * It used to be a paragraph saying a connection is the first step, with no
+   * way to take it — the reader was handed a fact and left holding it.
+   */
+  describe("given an organization with no connection at all", () => {
+    beforeEach(() => {
+      mockReconciliation.mockReturnValue({
+        data: { connections: [], recentChanges: [] },
+        isLoading: false,
+      });
+    });
+
+    /** @scenario "An organization with no connection is offered the way to set one up" */
+    it("offers the first step rather than only naming it", async () => {
+      const { ScimReconciliationPanel } = await import(
+        "../../../components/settings/ScimReconciliationPanel"
+      );
+
+      draw(
+        <ScimReconciliationPanel
+          organizationId="org_acme"
+          maySetUpSingleSignOn={true}
+        />,
+      );
+
+      const empty = screen.getByTestId("directory-no-connection");
+      expect(empty.textContent).toContain("No identity provider is connected");
+      const step = within(empty).getByRole("link", {
+        name: "Set up single sign-on",
+      });
+      expect(step.getAttribute("href")).toBe("/settings/authentication");
+    });
+
+    /** @scenario "The first step is not offered to somebody who would be refused it" */
+    it("offers nobody a step they would be refused for", async () => {
+      const { ScimReconciliationPanel } = await import(
+        "../../../components/settings/ScimReconciliationPanel"
+      );
+
+      draw(
+        <ScimReconciliationPanel
+          organizationId="org_acme"
+          maySetUpSingleSignOn={false}
+        />,
+      );
+
+      const empty = screen.getByTestId("directory-no-connection");
+      expect(within(empty).queryByRole("link")).toBeNull();
+      // Told who does it, rather than left wondering why there is no button.
+      expect(empty.textContent).toContain("An administrator who manages");
     });
   });
 
@@ -336,7 +418,10 @@ describe("the directory provisioning page", () => {
       );
 
       const { container } = draw(
-        <ScimReconciliationPanel organizationId="org_acme" />,
+        <ScimReconciliationPanel
+          organizationId="org_acme"
+          maySetUpSingleSignOn={true}
+        />,
       );
 
       // The page renders exactly what the organization-scoped query returned,

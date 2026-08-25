@@ -1,6 +1,7 @@
 import {
   Badge,
   Box,
+  Button,
   Card,
   Heading,
   HStack,
@@ -11,6 +12,7 @@ import {
 } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { api } from "../../utils/api";
+import RouterLink from "../../utils/compat/next-link";
 
 /**
  * What the directory has been doing, on the organization's own SCIM page
@@ -30,8 +32,14 @@ import { api } from "../../utils/api";
  */
 export function ScimReconciliationPanel({
   organizationId,
+  maySetUpSingleSignOn,
 }: {
   organizationId: string;
+  /** `sso:manage`. Whether the reader is the person who could act on an empty
+   *  directory, which decides whether the empty state carries the first step
+   *  or only says who does. A control somebody will be refused for is still an
+   *  invitation, and this page offers none of those. */
+  maySetUpSingleSignOn: boolean;
 }) {
   const reconciliation = api.scimReconciliation.getAll.useQuery({
     organizationId,
@@ -53,11 +61,7 @@ export function ScimReconciliationPanel({
       <VStack gap={3} width="full" align="stretch">
         <Heading size="md">Connections</Heading>
         {connections.length === 0 && (
-          <Text color="fg.muted" fontSize="sm">
-            No single sign-on connection has been set up for this organization
-            yet. Directory provisioning works against a connection, so that is
-            the first step.
-          </Text>
+          <NoConnectionYet maySetUp={maySetUpSingleSignOn} />
         )}
         {connections.map((connection) => (
           <ConnectionCard
@@ -69,6 +73,56 @@ export function ScimReconciliationPanel({
 
       <RecentDirectoryChanges changes={recentChanges} />
     </VStack>
+  );
+}
+
+/**
+ * A directory with nothing in it, said as the step that would fill it.
+ *
+ * It was a paragraph. The paragraph was true — provisioning runs against a
+ * connection, and there is no connection — and it left the reader holding a
+ * fact with nowhere to take it, on a page that had already told them twice
+ * that nothing was set up. An empty screen is an invitation to act, so the
+ * state that has no data is the one state that carries the door.
+ *
+ * The door is Authentication, because that is where a connection is
+ * registered; it is offered only to the reader who could walk through it.
+ */
+function NoConnectionYet({ maySetUp }: { maySetUp: boolean }) {
+  return (
+    <Box
+      width="full"
+      borderWidth="1px"
+      borderColor="border.muted"
+      borderRadius="10px"
+      paddingX={4}
+      paddingY={5}
+      data-testid="directory-no-connection"
+    >
+      <VStack align="start" gap={4}>
+        <VStack align="start" gap={1}>
+          <Text fontSize="sm" fontWeight={500}>
+            No identity provider is connected yet
+          </Text>
+          <Text fontSize="xs" color="fg.muted" lineHeight="1.6" maxWidth="60ch">
+            Provisioning runs against a single sign-on connection, so connecting
+            one is the first step. After that your identity provider creates,
+            updates and removes people here on its own.
+          </Text>
+        </VStack>
+        {maySetUp ? (
+          <Button asChild size="sm" colorPalette="orange">
+            <RouterLink href="/settings/authentication">
+              Set up single sign-on
+            </RouterLink>
+          </Button>
+        ) : (
+          <Text fontSize="xs" color="fg.muted">
+            An administrator who manages single sign-on sets this up.
+          </Text>
+        )}
+      </VStack>
+    </Box>
   );
 }
 

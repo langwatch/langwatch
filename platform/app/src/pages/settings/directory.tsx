@@ -16,6 +16,7 @@ import {
 import { Key, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useSearchParams } from "react-router";
+import { DirectoryMembersSection } from "../../components/access/DirectoryMembersSection";
 import { DirectorySummary } from "../../components/access/DirectorySummary";
 import { GroupsSection } from "../../components/access/GroupsSection";
 import { CopyInput } from "../../components/CopyInput";
@@ -194,7 +195,11 @@ function DirectorySettingsContent({
 
           {reach.maySeeSync && (
             <Tabs.Content value="overview">
-              <OverviewTab organizationId={organizationId} />
+              <OverviewTab
+                organizationId={organizationId}
+                mayReadMembership={reach.mayManageGroups}
+                maySetUpSingleSignOn={mayManageTokens}
+              />
             </Tabs.Content>
           )}
 
@@ -222,8 +227,29 @@ function DirectorySettingsContent({
   );
 }
 
-/** What the directory has been doing, and where it should send it. */
-function OverviewTab({ organizationId }: { organizationId: string }) {
+/**
+ * What the directory has been doing, who it did it to, and where it should
+ * send the next one.
+ *
+ *   connections ──► the people they manage ──► the address to point at
+ *
+ * The order is the reader's own question narrowing: is it working, is it
+ * working on the right people, and — only if they are still setting it up —
+ * what do I paste into the identity provider. The people sit in the middle
+ * because they are what the connections above them are FOR, and they are the
+ * one thing the status band can count but cannot show.
+ */
+function OverviewTab({
+  organizationId,
+  mayReadMembership,
+  maySetUpSingleSignOn,
+}: {
+  organizationId: string;
+  /** `organization:manage`: the roster and the provenance that names it. */
+  mayReadMembership: boolean;
+  /** `sso:manage`: whether the empty state carries the first step. */
+  maySetUpSingleSignOn: boolean;
+}) {
   const scimBaseUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/api/scim/v2`
@@ -231,7 +257,17 @@ function OverviewTab({ organizationId }: { organizationId: string }) {
 
   return (
     <VStack gap={6} width="full" align="start">
-      <ScimReconciliationPanel organizationId={organizationId} />
+      <ScimReconciliationPanel
+        organizationId={organizationId}
+        maySetUpSingleSignOn={maySetUpSingleSignOn}
+      />
+
+      {/* Absent rather than empty for a reader who may not have it: a roster
+          they cannot read is not a roster with nobody in it, and the band
+          above already says so in words where the counts would be. */}
+      {mayReadMembership && (
+        <DirectoryMembersSection organizationId={organizationId} />
+      )}
 
       <VStack gap={2} align="start" width="full">
         <Heading size="md">Where your identity provider sends it</Heading>
