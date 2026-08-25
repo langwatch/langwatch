@@ -25,14 +25,16 @@ func TestIDPLaneFollowsTheSelection(t *testing.T) {
 		return Child{}, false
 	}
 
-	t.Run("given the default selection", func(t *testing.T) {
-		if _, ok := find(plan(domain.DefaultSelection()), "idp"); ok {
-			t.Error("the IdP simulator lane was planned without being selected")
+	t.Run("given a selection that turned the idp lane off", func(t *testing.T) {
+		sel := domain.DefaultSelection()
+		sel.IDP = false
+		if _, ok := find(plan(sel), "idp"); ok {
+			t.Error("the IdP simulator lane was planned after being deselected")
 		}
 	})
 
-	t.Run("given a selection with the idp lane", func(t *testing.T) {
-		idp, ok := find(plan(domain.Selection{IDP: true}), "idp")
+	t.Run("given the default selection", func(t *testing.T) {
+		idp, ok := find(plan(domain.DefaultSelection()), "idp")
 		if !ok {
 			t.Fatal("no idp lane was planned for a selection that asked for one")
 		}

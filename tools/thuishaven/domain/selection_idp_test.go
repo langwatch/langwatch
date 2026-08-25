@@ -2,30 +2,30 @@ package domain
 
 import "testing"
 
-// @scenario "The idp lane is off by default and selectable per worktree"
-func TestIDPLaneIsOffByDefault(t *testing.T) {
-	if DefaultSelection().IDP {
-		t.Error("a fresh worktree must not run the IdP simulator")
+// @scenario "The idp lane runs by default and can be turned off per worktree"
+func TestIDPLaneRunsByDefault(t *testing.T) {
+	if !DefaultSelection().IDP {
+		t.Error("a fresh worktree must run the IdP simulator")
 	}
 
-	sel, err := ApplySelectionDeltas(DefaultSelection(), []string{"+idp"})
-	if err != nil {
-		t.Fatalf("+idp was rejected: %v", err)
-	}
-	if !sel.IDP {
-		t.Error("+idp did not turn the lane on")
-	}
-
-	sel, err = ApplySelectionDeltas(sel, []string{"-idp"})
+	sel, err := ApplySelectionDeltas(DefaultSelection(), []string{"-idp"})
 	if err != nil {
 		t.Fatalf("-idp was rejected: %v", err)
 	}
 	if sel.IDP {
 		t.Error("-idp did not turn the lane off")
 	}
+
+	sel, err = ApplySelectionDeltas(sel, []string{"+idp"})
+	if err != nil {
+		t.Fatalf("+idp was rejected: %v", err)
+	}
+	if !sel.IDP {
+		t.Error("+idp did not turn the lane back on")
+	}
 }
 
-// @scenario "The idp lane is off by default and selectable per worktree"
+// @scenario "The idp lane runs by default and can be turned off per worktree"
 func TestIDPSelectionDerivesFromStack(t *testing.T) {
 	st := Stack{Services: []Service{{Name: "idp", Port: 5565}}}
 	if !SelectionFromStack(st).IDP {

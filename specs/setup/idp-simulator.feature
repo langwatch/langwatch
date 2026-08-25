@@ -131,10 +131,17 @@ Feature: Local IdP simulator (idpsim)
   # --- haven integration -------------------------------------------------
 
   @unit
-  Scenario: The idp lane is off by default and selectable per worktree
+  Scenario: The idp lane runs by default and can be turned off per worktree
     Given a fresh worktree
-    Then haven's default selection does not run the idp lane
-    And `haven up +idp` turns the lane on for that worktree
+    Then haven's default selection runs the idp lane
+    And `haven up -idp` turns the lane off for that worktree
+
+  @unit
+  Scenario: The simulator runs alone without the app stack
+    Given no LangWatch stack is running
+    When the developer runs `haven idp`
+    Then only the simulator process starts — no app, API, workers or databases
+    And it is routed at the machine-wide idp hostname while the proxy is available
 
   @unit
   Scenario: A worktree running the idp lane routes it by hostname

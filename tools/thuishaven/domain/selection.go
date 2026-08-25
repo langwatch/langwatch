@@ -21,15 +21,17 @@ type Selection struct {
 	// cap that most worktrees never exercise. The worktrees that need it say
 	// `haven up +langy` once.
 	Langy bool `json:"langy"`
-	// IDP is off by default: the identity-provider simulator (OIDC + SAML +
-	// SCIM + domain verification) only matters when working on enterprise
-	// identity flows. Those worktrees say `haven up +idp` once.
+	// IDP is on by default: the identity-provider simulator (OIDC + SAML +
+	// SCIM + domain verification) is one small Go process, and having a
+	// login-capable IdP always routed makes identity flows testable without a
+	// setup step. Worktrees that don't want it say `haven up -idp` once.
+	// `haven idp` runs the simulator alone, with no stack at all.
 	IDP bool `json:"idp"`
 }
 
 // DefaultSelection is a fresh worktree's lean default: app (workers
-// in-process), gateway, and nlp — no langy.
-func DefaultSelection() Selection { return Selection{Gateway: true, NLP: true} }
+// in-process), gateway, nlp and the idp simulator — no langy.
+func DefaultSelection() Selection { return Selection{Gateway: true, NLP: true, IDP: true} }
 
 // SelectableServices are the names ±deltas accept, in display order.
 var SelectableServices = []string{"workers", "gateway", "nlp", "langy", "idp"}

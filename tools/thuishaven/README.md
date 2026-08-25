@@ -64,13 +64,15 @@ haven up         start or reconcile this worktree's stack — in a terminal it
                  switch between "all" and per-service logs, q detaches (the stack
                  keeps running; haven down stops it). +svc/-svc picks services and
                  sticks (+langy, -nlp, +workers, -gateway); a fresh worktree runs
-                 app + nlp + gateway, langy off. -w watches the Go services via
+                 app + nlp + gateway + idp, langy off. -w watches the Go services via
                  air; -d detaches without the view; --rebuild forces images
 haven down       stop this worktree's stack — data is always kept;
                  --all stops every stack, the shared servers, daemon, and proxy
 haven restart    bounce one supervised service (or all) in place; `restart obs`
                  bounces the observability stack; `restart langy --rebuild`
                  re-images first
+haven idp        run ONLY the IdP simulator — no app, API or databases — routed
+                 at idp.langwatch.localhost; --tenants <n> sizes the range
 haven logs       captured service logs from any terminal, attached or detached:
                  all interleaved, `haven logs nlp` filters, -t tails,
                  --since 10m windows, --level warn filters severity,
@@ -121,8 +123,9 @@ one replaces the stack in place. langy is off by default (it costs a container
 image and a hard memory cap); the worktrees that need it say `+langy` once.
 idp — the identity-provider simulator (`services/idpsim`: a range of OIDC +
 SAML + SCIM tenants with DNS/HTTP domain verification, routed at
-`idp.<slug>.langwatch.localhost`) — is likewise off by default; enterprise
-identity work says `haven up +idp` once.
+`idp.<slug>.langwatch.localhost`) — runs by default; a worktree that does not
+want it says `haven up -idp` once. `haven idp` runs the simulator alone —
+no app, API or databases — routed machine-wide at `idp.langwatch.localhost`.
 
 **Automatic preparation.** `up` owns the whole path from a fresh machine to a
 running stack: portless install + CA trust, `pnpm install` when the lockfile

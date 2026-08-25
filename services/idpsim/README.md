@@ -21,12 +21,16 @@ Everything is in-memory and reset at boot. Nothing here is production code.
 ## Running
 
 ```bash
+haven idp                        # ONLY the simulator — no app, API or databases —
+                                 #   routed at idp.langwatch.localhost
+haven idp --tenants 20           # same, with a wider range
 make service svc=idpsim          # run once (SERVER_ADDR :5565, DNS :15353)
 make service-watch svc=idpsim    # live reload via air
-haven up +idp                    # as a haven lane — sticky, routed at
-                                 #   idp.<slug>.langwatch.localhost
 IDPSIM_TENANTS=20 make service svc=idpsim   # a wider range
 ```
+
+Under haven the lane is **on by default** in every stack (`haven up -idp`
+turns it off for a worktree), routed at `idp.<slug>.langwatch.localhost`.
 
 Open `/` for the index page: every tenant with its issuer, SAML metadata, SCIM
 base + token, and seeded users. `GET /control/state` is the same as JSON.
