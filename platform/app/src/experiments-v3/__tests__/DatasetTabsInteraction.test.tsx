@@ -262,6 +262,57 @@ describe("DatasetTabs user interactions", () => {
     });
   });
 
+  describe("Feature: Switch Dataset from the active tab menu", () => {
+    /** @scenario Switching to another dataset from the active dataset's menu */
+    it("offers Switch Dataset on the active tab's dropdown", async () => {
+      const user = userEvent.setup();
+      renderDatasetTabs();
+
+      await user.click(
+        screen.getByTestId(`dataset-tab-${DEFAULT_TEST_DATA_ID}`),
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText("Switch Dataset")).toBeInTheDocument();
+      });
+    });
+
+    /** @scenario Switching to another dataset from the active dataset's menu */
+    it("opens the dataset picker when clicking Switch Dataset", async () => {
+      const user = userEvent.setup();
+      renderDatasetTabs();
+
+      await user.click(
+        screen.getByTestId(`dataset-tab-${DEFAULT_TEST_DATA_ID}`),
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText("Switch Dataset")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Switch Dataset"));
+
+      // The same picker the Add button's "Select existing dataset" opens.
+      expect(mockOnSelectExisting).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario Switching to another dataset from the active dataset's menu */
+    it("offers Switch Dataset for saved datasets too", async () => {
+      const user = userEvent.setup();
+      const store = useEvaluationsV3Store.getState();
+
+      store.addDataset(createSavedDataset("saved-ds", "Saved Dataset"));
+      store.setActiveDataset("saved-ds");
+
+      renderDatasetTabs();
+
+      await user.click(screen.getByTestId("dataset-tab-saved-ds"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Switch Dataset")).toBeInTheDocument();
+      });
+    });
+  });
+
   describe("Feature: Remove dataset from workbench", () => {
     it("removes dataset when clicking Remove from workbench", async () => {
       const user = userEvent.setup();
