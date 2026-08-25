@@ -8,11 +8,7 @@
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { getApp } from "~/server/app-layer/app";
-import {
-  GatewayBudgetService,
-  type GatewayBudgetWithSeats,
-} from "~/server/gateway/budget.service";
+import type { GatewayBudgetWithSeats } from "~/server/gateway/budget.service";
 import { effectiveBudgetPeriod } from "~/server/gateway/budgetPeriod";
 import {
   providerLabelFor,
@@ -60,12 +56,10 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .permission("gatewayBudgets:view")
     .query(async ({ ctx, input }) => {
       await requireOrgAccess(ctx, input.organizationId);
-      const service = GatewayBudgetService.create(
-        ctx.prisma,
-        getApp().gateway.budgets,
-      );
       const { budgets, spendAvailable, scopeReach } =
-        await service.listWithHealth(input.organizationId);
+        await ctx.app.gateway.budgetDecisions.listWithHealth(
+          input.organizationId,
+        );
       const scopeTargets = await resolveScopeTargetsBatch(
         ctx.prisma,
         budgets,
@@ -92,12 +86,10 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .permission("gatewayBudgets:view")
     .query(async ({ ctx, input }) => {
-      const service = GatewayBudgetService.create(
-        ctx.prisma,
-        getApp().gateway.budgets,
-      );
       const { budgets, spendAvailable, scopeReach } =
-        await service.listForProjectWithHealth(input.projectId);
+        await ctx.app.gateway.budgetDecisions.listForProjectWithHealth(
+          input.projectId,
+        );
       const project = await ctx.prisma.project.findUnique({
         where: { id: input.projectId },
         select: { team: { select: { organizationId: true } } },
@@ -129,11 +121,10 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .permission("gatewayBudgets:view")
     .query(async ({ ctx, input }) => {
       await requireOrgAccess(ctx, input.organizationId);
-      const service = GatewayBudgetService.create(
-        ctx.prisma,
-        getApp().gateway.budgets,
+      const detail = await ctx.app.gateway.budgetDecisions.getDetail(
+        input.id,
+        input.organizationId,
       );
-      const detail = await service.getDetail(input.id, input.organizationId);
       if (!detail) {
         throw new TRPCError({ code: "NOT_FOUND", message: "budget not found" });
       }
@@ -238,11 +229,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     )
     .permission("gatewayBudgets:create")
     .mutation(async ({ ctx, input }) => {
-      const service = GatewayBudgetService.create(
-        ctx.prisma,
-        getApp().gateway.budgets,
-      );
-      const row = await service.create({
+      const row = await ctx.app.gateway.budgetDecisions.create({
         organizationId: input.organizationId,
         scope: input.scope,
         name: input.name,
@@ -273,11 +260,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     )
     .permission("gatewayBudgets:update")
     .mutation(async ({ ctx, input }) => {
-      const service = GatewayBudgetService.create(
-        ctx.prisma,
-        getApp().gateway.budgets,
-      );
-      const row = await service.update({
+      const row = await ctx.app.gateway.budgetDecisions.update({
         ...input,
         actorUserId: ctx.session.user.id,
       });
@@ -288,11 +271,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .permission("gatewayBudgets:delete")
     .mutation(async ({ ctx, input }) => {
-      const service = GatewayBudgetService.create(
-        ctx.prisma,
-        getApp().gateway.budgets,
-      );
-      const row = await service.archive({
+      const row = await ctx.app.gateway.budgetDecisions.archive({
         ...input,
         actorUserId: ctx.session.user.id,
       });
@@ -310,11 +289,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     )
     .permission("gatewayBudgets:update")
     .mutation(async ({ ctx, input }) => {
-      const service = GatewayBudgetService.create(
-        ctx.prisma,
-        getApp().gateway.budgets,
-      );
-      const row = await service.reset({
+      const row = await ctx.app.gateway.budgetDecisions.reset({
         id: input.id,
         organizationId: input.organizationId,
         actorUserId: ctx.session.user.id,
