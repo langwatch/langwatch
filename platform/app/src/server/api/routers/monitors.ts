@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { ZodError, z } from "zod/v4";
+import { ZodError, z } from "zod";
 import { EvaluationExecutionMode } from "~/generated/prisma/client";
 import { checkDeclaredPermission } from "~/server/app-layer/authz/trpc-middleware";
 import { MonitorNotFoundError } from "@langwatch/monitor-contract";
@@ -61,7 +61,7 @@ export const monitorsRouter = createTRPCRouter({
         endDate: endMs,
         filters: {},
       });
-      return ctx.app.evaluations.performance.getPerformance({
+      return ctx.app.evaluations.getMonitorPerformance({
         tenantId: input.projectId,
         monitors: performanceMonitors,
         previousStartMs: previousPeriodStartDate.getTime(),

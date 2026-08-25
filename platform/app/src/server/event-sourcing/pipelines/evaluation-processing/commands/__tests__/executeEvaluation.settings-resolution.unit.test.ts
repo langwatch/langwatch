@@ -58,7 +58,7 @@ function buildDeps({
   return {
     ...(isSettingsRecoveryDisabled ? { isSettingsRecoveryDisabled } : {}),
     monitors: {
-      getMonitorById: vi.fn().mockResolvedValue(monitor),
+      tryGetMonitorById: vi.fn().mockResolvedValue(monitor),
     } as unknown as ExecuteEvaluationCommandDeps["monitors"],
     spanStorage: {
       getSpansByTraceId: vi.fn().mockResolvedValue([]),
@@ -66,13 +66,13 @@ function buildDeps({
     traceEvents: {
       getEventsByTraceId: vi.fn().mockResolvedValue([]),
     },
-    evaluationExecution: {
+    evaluations: {
       executeForTrace: vi.fn().mockResolvedValue({
         status: "processed",
         score: 1,
         passed: true,
       }),
-    } as unknown as ExecuteEvaluationCommandDeps["evaluationExecution"],
+    } as unknown as ExecuteEvaluationCommandDeps["evaluations"],
     costRecorder: {
       recordCost: vi.fn(),
     } as unknown as ExecuteEvaluationCommandDeps["costRecorder"],
@@ -100,7 +100,7 @@ async function executeWith(
   const deps = buildDeps({ monitor, isSettingsRecoveryDisabled });
   const command = new ExecuteEvaluationCommand(deps);
   await command.handle(buildCommand());
-  const executeForTrace = deps.evaluationExecution
+  const executeForTrace = deps.evaluations
     .executeForTrace as ReturnType<typeof vi.fn>;
   expect(executeForTrace).toHaveBeenCalledTimes(1);
   return executeForTrace.mock.calls[0]?.[0] as Record<string, unknown>;

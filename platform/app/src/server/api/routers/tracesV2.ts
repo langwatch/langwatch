@@ -2090,7 +2090,10 @@ export const tracesV2Router = createTRPCRouter({
     .permission("traces:view")
     .query(async ({ input }) => {
       const app = getApp();
-      return app.evaluations.runs.findByTraceId(input.projectId, input.traceId);
+      return app.evaluations.findRunsByTraceId({
+        tenantId: input.projectId,
+        traceId: input.traceId,
+      });
     }),
 
   /**

@@ -19,7 +19,7 @@ function buildDeps(
 ): ExecuteEvaluationCommandDeps {
   return {
     monitors: {
-      getMonitorById: vi.fn().mockResolvedValue({
+      tryGetMonitorById: vi.fn().mockResolvedValue({
         id: "monitor_1",
         checkType: "custom/thread-eval",
         level: "thread",
@@ -40,12 +40,12 @@ function buildDeps(
     traceEvents: {
       getEventsByTraceId: vi.fn().mockResolvedValue([]),
     },
-    evaluationExecution: {
+    evaluations: {
       executeForTrace: vi.fn().mockResolvedValue({
         status: "skipped",
         details: "Trace has no thread_id for thread-based evaluation",
       }),
-    } as unknown as ExecuteEvaluationCommandDeps["evaluationExecution"],
+    } as unknown as ExecuteEvaluationCommandDeps["evaluations"],
     costRecorder: {
       recordCost: vi.fn(),
     } as unknown as ExecuteEvaluationCommandDeps["costRecorder"],
@@ -80,9 +80,7 @@ describe("ExecuteEvaluationCommand", () => {
         // Pin the skip to the missing-thread-id branch: the command must reach
         // executeForTrace (which returns the skip) rather than bailing out at an
         // earlier guard, otherwise an empty event list would be a false positive.
-        expect(deps.evaluationExecution.executeForTrace).toHaveBeenCalledTimes(
-          1,
-        );
+        expect(deps.evaluations.executeForTrace).toHaveBeenCalledTimes(1);
         expect(events).toEqual([]);
         expect(deps.costRecorder.recordCost).not.toHaveBeenCalled();
       });

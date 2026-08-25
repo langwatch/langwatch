@@ -14,8 +14,8 @@ import type { Command } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EvaluationCostRecorder } from "../../../../app-layer/evaluations/evaluation-cost.recorder";
-import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
-import type { MonitorService } from "../../../../app-layer/monitors/monitor.service";
+import type { EvaluationService } from "@langwatch/evaluation-contract";
+import type { MonitorService } from "@langwatch/monitor-contract";
 import { ExecuteEvaluationCommand } from "../commands/executeEvaluation.command";
 import type { ExecuteEvaluationCommandData } from "../schemas/commands";
 
@@ -83,7 +83,7 @@ function buildCommandWithMocks({
   checkType: string;
 }) {
   const monitors = {
-    getMonitorById: vi.fn().mockResolvedValue(buildMonitor(checkType)),
+    tryGetMonitorById: vi.fn().mockResolvedValue(buildMonitor(checkType)),
   } as unknown as MonitorService;
 
   const spanStorage = {
@@ -94,13 +94,13 @@ function buildCommandWithMocks({
     getEventsByTraceId: vi.fn().mockResolvedValue([]),
   };
 
-  const evaluationExecution = {
+  const evaluations = {
     executeForTrace: vi.fn().mockResolvedValue({
       status: "processed",
       score: 0.1,
       passed: true,
     }),
-  } as unknown as EvaluationExecutionService;
+  } as unknown as EvaluationService;
 
   const costRecorder = {
     recordCost: vi.fn(),
@@ -120,7 +120,7 @@ function buildCommandWithMocks({
     monitors,
     spanStorage,
     traceEvents,
-    evaluationExecution,
+    evaluations,
     costRecorder,
     azureSafetyEnvResolver,
   });
@@ -128,7 +128,7 @@ function buildCommandWithMocks({
   return {
     command,
     monitors,
-    evaluationExecution,
+    evaluations,
     azureSafetyEnvResolver,
   };
 }
@@ -161,15 +161,15 @@ describe("Feature: ExecuteEvaluationCommand — Azure Safety BYOK gate", () => {
           expect(eventData.details).toMatch(/Model Providers/i);
         });
 
-        it("does not call evaluationExecution.executeForTrace", async () => {
-          const { command, evaluationExecution } = buildCommandWithMocks({
+        it("does not call evaluations.executeForTrace", async () => {
+          const { command, evaluations } = buildCommandWithMocks({
             azureConfigured: false,
             checkType: evaluatorType,
           });
 
           await command.handle(buildCommand(evaluatorType));
 
-          expect(evaluationExecution.executeForTrace).not.toHaveBeenCalled();
+          expect(evaluations.executeForTrace).not.toHaveBeenCalled();
         });
 
         it("resolves azure safety env only once", async () => {
@@ -188,15 +188,15 @@ describe("Feature: ExecuteEvaluationCommand — Azure Safety BYOK gate", () => {
 
     describe("and the project has azure_safety configured", () => {
       describe("when the command handles the evaluation", () => {
-        it("calls evaluationExecution.executeForTrace", async () => {
-          const { command, evaluationExecution } = buildCommandWithMocks({
+        it("calls evaluations.executeForTrace", async () => {
+          const { command, evaluations } = buildCommandWithMocks({
             azureConfigured: true,
             checkType: evaluatorType,
           });
 
           await command.handle(buildCommand(evaluatorType));
 
-          expect(evaluationExecution.executeForTrace).toHaveBeenCalledTimes(1);
+          expect(evaluations.executeForTrace).toHaveBeenCalledTimes(1);
         });
       });
     });

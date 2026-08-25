@@ -9,8 +9,7 @@
  *   PROJECT_ID=KAXYxPR8MUgTcP8CF193y TRACE_ID=c2481ff682fc54e912b7016a55db8153 \
  *     npx tsx scripts/seed-trace-evals.ts
  */
-import { EvaluationRunClickHouseRepository } from "../src/server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
-import { getClickHouseClientForTenant } from "../src/server/clickhouse/clickhouseClient";
+import { initializeWebApp } from "../src/server/app-layer/presets";
 
 async function main() {
   const projectId = process.env.PROJECT_ID;
@@ -19,16 +18,8 @@ async function main() {
     throw new Error("PROJECT_ID and TRACE_ID required");
   }
 
-  const repo = new EvaluationRunClickHouseRepository({
-    resolveClient: async (tenantId: string) => {
-      const client = await getClickHouseClientForTenant(tenantId);
-      if (!client)
-        throw new Error(`No ClickHouse client for project ${tenantId}`);
-      return client;
-    },
-  });
-
-  const now = new Date();
+  const app = initializeWebApp();
+  const now = Date.now();
   const samples: Array<{
     evaluatorId: string;
     evaluatorType: string;
@@ -112,42 +103,44 @@ async function main() {
     },
   ];
 
-  for (const s of samples) {
-    // Stable per-evaluator id so re-running the script replaces the row
-    // instead of stacking duplicates on the trace.
-    const evaluationId = `eval_seed_${s.evaluatorId.replace(/[^a-z0-9]/gi, "_")}_${traceId}`;
-    await repo.upsert(
-      {
-        evaluationId,
-        version: "1",
-        evaluatorId: s.evaluatorId,
-        evaluatorType: s.evaluatorType,
-        evaluatorName: s.evaluatorName,
-        traceId,
-        isGuardrail: false,
-        status: s.status,
-        score: s.score ?? null,
-        passed: s.passed,
-        label: s.label,
-        details: s.details,
-        inputs: null,
-        error: s.error,
-        errorDetails: null,
-        createdAt: now,
-        updatedAt: now,
-        archivedAt: null,
-        scheduledAt: now,
-        startedAt: now,
-        completedAt: now,
-        costId: null,
-        lastProcessedEventId: `manual:${evaluationId}`,
-        lastEventOccurredAt: now,
-      } as any,
-      projectId,
-    );
-    console.log(
-      `wrote ${s.evaluatorId} status=${s.status} score=${s.score} passed=${s.passed}`,
-    );
+  try {
+    for (const s of samples) {
+      // Stable per-evaluator id so re-running the script replaces the row
+      // instead of stacking duplicates on the trace.
+      const evaluationId = `eval_seed_${s.evaluatorId.replace(/[^a-z0-9]/gi, "_")}_${traceId}`;
+      await app.evaluations.upsertRun({
+        tenantId: projectId,
+        data: {
+          evaluationId,
+          evaluatorId: s.evaluatorId,
+          evaluatorType: s.evaluatorType,
+          evaluatorName: s.evaluatorName,
+          traceId,
+          isGuardrail: false,
+          status: s.status,
+          score: s.score,
+          passed: s.passed,
+          label: s.label,
+          details: s.details,
+          inputs: null,
+          error: s.error,
+          errorDetails: null,
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+          scheduledAt: now,
+          startedAt: now,
+          completedAt: now,
+          costId: null,
+          LastEventOccurredAt: now,
+        },
+      });
+      console.log(
+        `wrote ${s.evaluatorId} status=${s.status} score=${s.score} passed=${s.passed}`,
+      );
+    }
+  } finally {
+    await app.close();
   }
 }
 

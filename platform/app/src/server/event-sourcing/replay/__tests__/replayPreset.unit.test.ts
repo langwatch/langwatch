@@ -15,11 +15,6 @@ vi.mock("../../../app-layer/app", () => ({
 }));
 
 vi.mock(
-  "../../../app-layer/evaluations/repositories/evaluation-run.clickhouse.repository",
-  () => ({ EvaluationRunClickHouseRepository: class {} }),
-);
-
-vi.mock(
   "../../../app-layer/traces/repositories/trace-summary.clickhouse.repository",
   () => ({ TraceSummaryClickHouseRepository: class {} }),
 );
@@ -95,6 +90,7 @@ function stubApp(definitions: unknown[]) {
     eventSourcing: { definitions },
     retentionPolicyCache: {},
     clickhouse: { enabled: true, resolveClient: vi.fn() },
+    evaluations: {},
   } as unknown as ReturnType<typeof getApp>);
 }
 

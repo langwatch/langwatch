@@ -27,7 +27,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { createTenantId, EventUtils, eventToRecord } from "@langwatch/eventing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { TraceEvaluationsClickHouseRepository } from "~/server/app-layer/evaluations/repositories/trace-evaluations.clickhouse.repository";
+import { getApp } from "~/server/app-layer/app";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import { EvaluationService } from "~/server/evaluations/evaluation.service";
 import { EventRepositoryClickHouse } from "~/server/event-sourcing/adapters/clickhouse/eventRepositoryClickHouse";
@@ -56,7 +56,6 @@ import {
   resolveInputsMarker,
   STORED_OBJECT_MARKER_KEY,
 } from "../evaluation-inputs-offload";
-import { EvaluationRunClickHouseRepository } from "../repositories/evaluation-run.clickhouse.repository";
 import type { EvaluationRunData } from "../types";
 
 // Route the stored-objects repository (which resolves its client internally)
@@ -75,7 +74,6 @@ const tenantId = `test-eval-offload-${nanoid()}`;
 
 let ch: ClickHouseClient;
 let tmpDir: string;
-let evalRepo: EvaluationRunClickHouseRepository;
 let eventRepo: EventRepositoryClickHouse;
 
 function buildStoredObjects(): StoredObjectsService {
@@ -167,9 +165,6 @@ beforeAll(async () => {
     clickhouseClientModule.getClickHouseClientForTenant,
   ).mockResolvedValue(ch);
 
-  evalRepo = new EvaluationRunClickHouseRepository({
-    resolveClient: async () => ch,
-  });
   eventRepo = new EventRepositoryClickHouse(async () => ch);
 
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "eval-offload-int-"));
@@ -248,10 +243,10 @@ describe("evaluation inputs offload (integration)", () => {
       );
 
       // (b) evaluation_runs.Inputs row stays bounded (the marker only).
-      await evalRepo.upsert(
-        makeEvalData({ evaluationId, inputs: offloaded }),
+      await getApp().evaluations.upsertRun({
+        data: makeEvalData({ evaluationId, inputs: offloaded }),
         tenantId,
-      );
+      });
       const rowInputs = await selectInputsRaw(evaluationId);
       expect(rowInputs).toBeTruthy();
       expect(rowInputs!).toContain(STORED_OBJECT_MARKER_KEY);
@@ -315,10 +310,10 @@ describe("evaluation inputs offload (integration)", () => {
         evaluationId,
         storedObjects,
       });
-      await evalRepo.upsert(
-        makeEvalData({ evaluationId, inputs: offloaded }),
+      await getApp().evaluations.upsertRun({
+        data: makeEvalData({ evaluationId, inputs: offloaded }),
         tenantId,
-      );
+      });
 
       // The v1 read service resolves the marker at the read boundary. Inject
       // the same stored-objects service the write used (its client is the test
@@ -329,7 +324,7 @@ describe("evaluation inputs offload (integration)", () => {
       const service = new EvaluationService({
         resolveInputsMarker: ({ projectId, inputs }) =>
           resolveInputsMarker({ projectId, inputs, storedObjects }),
-        repository: new TraceEvaluationsClickHouseRepository(async () => ch),
+        service: getApp().evaluations,
       });
       const readInputs = await service.getEvaluationInputs({
         projectId: tenantId,
@@ -356,10 +351,10 @@ describe("evaluation inputs offload (integration)", () => {
       expect(offloaded).toBe(false);
       expect(maybeOffloaded).toBe(inputs);
 
-      await evalRepo.upsert(
-        makeEvalData({ evaluationId, inputs: maybeOffloaded }),
+      await getApp().evaluations.upsertRun({
+        data: makeEvalData({ evaluationId, inputs: maybeOffloaded }),
         tenantId,
-      );
+      });
       const rowInputs = await selectInputsRaw(evaluationId);
       expect(JSON.parse(rowInputs!)).toEqual(inputs);
       expect(rowInputs).not.toContain(STORED_OBJECT_MARKER_KEY);
@@ -389,10 +384,10 @@ describe("evaluation inputs offload (integration)", () => {
       expect(marker.ceilingExceeded).toBe(true);
       expect(marker.id).toBe("");
 
-      await evalRepo.upsert(
-        makeEvalData({ evaluationId, inputs: bounded }),
+      await getApp().evaluations.upsertRun({
+        data: makeEvalData({ evaluationId, inputs: bounded }),
         tenantId,
-      );
+      });
       const rowInputs = await selectInputsRaw(evaluationId);
       expect(Buffer.byteLength(rowInputs!, "utf8")).toBeLessThan(
         EVAL_INPUTS_INLINE_MAX_BYTES,
@@ -468,10 +463,10 @@ describe("evaluation inputs offload (integration)", () => {
       // 9 MiB of raw inputs, no offload - exercises the belt-and-braces cap.
       const fatInputs = inputsOfSize(9 * 1024 * 1024);
 
-      await evalRepo.upsert(
-        makeEvalData({ evaluationId, inputs: fatInputs }),
+      await getApp().evaluations.upsertRun({
+        data: makeEvalData({ evaluationId, inputs: fatInputs }),
         tenantId,
-      );
+      });
 
       const rowInputs = await selectInputsRaw(evaluationId);
       expect(rowInputs).toBeTruthy();

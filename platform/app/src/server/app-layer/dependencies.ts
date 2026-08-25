@@ -68,7 +68,7 @@ import type { ScenarioService } from "@langwatch/scenario-contract";
 import type { SuiteService } from "@langwatch/suite-contract";
 import type { SimulationService } from "@langwatch/simulation-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
-import type { EvaluationService as EvaluationCapability } from "@langwatch/evaluation-contract";
+import type { EvaluationService } from "@langwatch/evaluation-contract";
 import type { ScenarioRunExportService } from "../export/scenario-runs/scenario-run-export.service";
 import type { OpsExplainService } from "../ops/opsExplain.service";
 import type { TraceEditOverlayService } from "../traces/edit-overlay/traceEditOverlay.service";
@@ -83,10 +83,6 @@ import type { CodingAgentSessionsListService } from "./coding-agent/coding-agent
 import type { PullRequestUsageService } from "./coding-agent/pull-request-usage.service";
 import type { AppConfig } from "./config";
 import type { DspyStepService } from "./dspy-steps/dspy-step.service";
-import type { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
-import type { EvaluationRunService } from "./evaluations/evaluation-run.service";
-import type { MonitorPerformanceService } from "./evaluations/monitor-performance.service";
-import type { TraceEvaluationsRepository } from "./evaluations/repositories/trace-evaluations.clickhouse.repository";
 import type { GithubInstallationsService } from "./github/github-installations.service";
 import type { GithubPullRequestMappingService } from "./github/github-pull-request-mapping.service";
 import type { GithubPullRequestStatusService } from "./github/github-pull-request-status.service";
@@ -190,16 +186,8 @@ export interface AppDependencies {
     /** Reviewer corrections applied over a captured trace at read time. */
     editOverlay: TraceEditOverlayService;
   };
-  evaluations: {
-    /** One process-owned Evaluation capability shared by transports and workers. */
-    service: EvaluationCapability;
-    runs: EvaluationRunService;
-    execution: EvaluationExecutionService;
-    performance: MonitorPerformanceService;
-    /** Per-trace evaluation reads. Built over the composition root's
-     *  ClickHouse resolver, like every other repository here. */
-    traceEvaluations: TraceEvaluationsRepository;
-  };
+  /** One process-owned Evaluation capability shared by transports and workers. */
+  evaluations: EvaluationService;
   dspySteps: {
     steps: DspyStepService;
   };

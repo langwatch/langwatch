@@ -7,7 +7,6 @@ import type {
 import { ReplayService, RepositoryFoldStore } from "@langwatch/eventing";
 import { RedisConnectionService } from "@langwatch/redis-client";
 import { getApp } from "../../app-layer/app";
-import { EvaluationRunClickHouseRepository } from "../../app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
 import { TraceSummaryClickHouseRepository } from "../../app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import { EvaluationRunStore } from "../pipelines/evaluation-processing/projections/evaluationRun.store";
 import { createExperimentRunStateFoldStore } from "../pipelines/experiment-run-processing/projections/experimentRunState.store";
@@ -87,11 +86,7 @@ export function createReplayRuntime(config: {
     ],
     [
       "evaluation_processing",
-      new EvaluationRunStore(
-        new EvaluationRunClickHouseRepository({
-          resolveClient: clientResolver,
-        }),
-      ),
+      new EvaluationRunStore(getApp().evaluations),
     ],
     [
       "experiment_run_processing",

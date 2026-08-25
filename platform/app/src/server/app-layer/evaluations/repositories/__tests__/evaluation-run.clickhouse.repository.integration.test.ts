@@ -12,17 +12,53 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import {
+  EvaluationAdapter,
+  EvaluationExecutionPort,
+  EvaluationRetentionFloorPort,
+} from "@langwatch/evaluation-server";
+import type { EvaluationService } from "@langwatch/evaluation-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getTestClickHouseClient } from "../../../../event-sourcing/__tests__/integration/testContainers";
+import { createTestApp } from "~/server/app-layer/presets";
 import type { EvaluationRunData } from "../../types";
-import { EvaluationRunClickHouseRepository } from "../evaluation-run.clickhouse.repository";
 
 const tenantId = `test-eval-resolve-${nanoid()}`;
 const base = Date.now() - 60 * 60 * 1000;
 
 let ch: ClickHouseClient;
-let repo: EvaluationRunClickHouseRepository;
+let evaluations: EvaluationService;
+
+class NullEvaluationExecution extends EvaluationExecutionPort {
+  async execute(): Promise<{ status: "skipped" }> {
+    return { status: "skipped" };
+  }
+}
+
+class FixedEvaluationRetentionFloor extends EvaluationRetentionFloorPort {
+  async getFloorMs(): Promise<number> {
+    return 0;
+  }
+}
+
+function createEvaluations(client: ClickHouseClient): EvaluationService {
+  return EvaluationAdapter.create({
+    resolveClickHouse: async () => ({
+      insert: (input) => client.insert(input as never),
+      query: async (input) => {
+        const result = await client.query(input as never);
+        return {
+          json: async <Result>() =>
+            (await result.json<Result>()) as unknown as Result[],
+        };
+      },
+    }),
+    retentionFloor: new FixedEvaluationRetentionFloor(),
+    execution: new NullEvaluationExecution(),
+    workflows: createTestApp().workflows,
+  });
+}
 
 function makeEval(
   evaluationId: string,
@@ -59,9 +95,7 @@ beforeAll(async () => {
   const rawClient = getTestClickHouseClient();
   if (!rawClient) throw new Error("ClickHouse test container not available");
   ch = rawClient;
-  repo = new EvaluationRunClickHouseRepository({
-    resolveClient: async () => ch,
-  });
+  evaluations = createEvaluations(ch);
 
   // Two versions of the same evaluation: the dedup must return the latest
   // (v2), and the ScheduledAt resolve (argMax over UpdatedAt) must pick v2's
@@ -70,14 +104,17 @@ beforeAll(async () => {
   // bounded read would land on the wrong partition and miss the row, failing
   // the latest-version assertion below.
   const staleScheduledAt = base - 30 * 24 * 60 * 60 * 1000;
-  await repo.upsert(
-    makeEval("eval-resolve-1", { score: 1, scheduledAt: staleScheduledAt }),
+  await evaluations.upsertRun({
+    data: makeEval("eval-resolve-1", {
+      score: 1,
+      scheduledAt: staleScheduledAt,
+    }),
     tenantId,
-  );
-  await repo.upsert(
-    makeEval("eval-resolve-1", { score: 2, updatedAt: base + 1000 }),
+  });
+  await evaluations.upsertRun({
+    data: makeEval("eval-resolve-1", { score: 2, updatedAt: base + 1000 }),
     tenantId,
-  );
+  });
 }, 120_000);
 
 afterAll(async () => {
@@ -90,9 +127,9 @@ afterAll(async () => {
   }
 });
 
-describe("EvaluationRunClickHouseRepository.getByEvaluationId (integration)", () => {
+describe("EvaluationService.getRunByEvaluationId (integration)", () => {
   it("returns the latest version when no ScheduledAt hint is passed", async () => {
-    const result = await repo.getByEvaluationId({
+    const result = await evaluations.tryGetRunByEvaluationId({
       tenantId,
       evaluationId: "eval-resolve-1",
     });
@@ -116,11 +153,9 @@ describe("EvaluationRunClickHouseRepository.getByEvaluationId (integration)", ()
         return Reflect.get(target, prop, receiver);
       },
     }) as ClickHouseClient;
-    const recordingRepo = new EvaluationRunClickHouseRepository({
-      resolveClient: async () => recordingClient,
-    });
+    const recordingEvaluations = createEvaluations(recordingClient);
 
-    const result = await recordingRepo.getByEvaluationId({
+    const result = await recordingEvaluations.tryGetRunByEvaluationId({
       tenantId,
       evaluationId: "eval-resolve-1",
     });
@@ -151,11 +186,9 @@ describe("EvaluationRunClickHouseRepository.getByEvaluationId (integration)", ()
         return Reflect.get(target, prop, receiver);
       },
     }) as ClickHouseClient;
-    const recordingRepo = new EvaluationRunClickHouseRepository({
-      resolveClient: async () => recordingClient,
-    });
+    const recordingEvaluations = createEvaluations(recordingClient);
 
-    const result = await recordingRepo.getByEvaluationId({
+    const result = await recordingEvaluations.tryGetRunByEvaluationId({
       tenantId,
       evaluationId: `missing-${nanoid()}`,
     });

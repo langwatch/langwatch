@@ -81,10 +81,10 @@ as a directory rename.
 | `agent` | agent definitions and agent-specific HTTP node configuration | `agents`, `/api/agents`; agent portions of `httpProxy` and `setupSkills` | Agent feature package plus remaining `server/agents` and agent UI | package partial |
 | `workflow` | workflow definitions, versions, graph nodes and workflow execution-facing behaviour | `workflow`; `/api/workflows`, legacy workflow routes | `server/workflows`, `optimization_studio` workflow domain and workflow UI | contract/server and process App service landed; ordinary CRUD transports delegate to it, while version/copy propagation and execution composition still contain legacy persistence |
 | `evaluator` | evaluator definitions, evaluator providers and evaluator configuration | `evaluators`, evaluator portion of `optimization`; `/api/evaluators` | `server/evaluators`, evaluator components | contract/server/web packages landed and the duplicate app service is deleted; copy/cascade transport orchestration remains |
-| `evaluation` | evaluation definitions, execution, runs, results and DSPy evaluation steps | `evaluations`, `batchRecord`; legacy evaluation REST | `server/evaluations`, `app-layer/evaluations`, `app-layer/dspy-steps`, evaluation UI | contract/server scaffold landed but is not integrated: its ClickHouse repository must first absorb the hardened production retention, deduplication, projection-id and write-cap behavior, then execution/Eventing/UI residue must move |
-| `monitor` | online monitor definition and lifecycle | `monitors`; `/api/monitors` | `app-layer/monitors`, monitor router and online-evaluation UI | contract/server packages and process App service landed; remaining dataset-provider and UI seams still need draining |
-| `experiment` | experiment definition and run history | `experiments`; `/api/experiments`, experiment-v3 REST | `server/experiments*`, experiment event pipeline and UI | definition and ClickHouse history now use one canonical service; Eventing run commands are the active final drain |
-| `scenario` | scenario definition, events and cancellation | `scenarios`; `/api/scenarios`, `/api/scenario-events`, scenario generation route | `server/scenarios`, scenario components/hooks | definition persistence, run configuration and transports use one service; rebase the remaining legacy characterization tests, then remove the old duplicate service/repository; cancellation, failure handling and browser coordination remain execution seams |
+| `evaluation` | evaluation definitions, execution, runs, results and DSPy evaluation steps | `evaluations`, `batchRecord`; legacy evaluation REST | `server/evaluations`, `app-layer/evaluations`, `app-layer/dspy-steps`, evaluation UI | the process owns one canonical service for execution, run persistence, trace reads, deferred inputs and monitor performance; duplicate run/read/performance repositories are deleted, while the evaluator execution engine, stored-object resolution adapter, DSPy steps and UI still need relocation |
+| `monitor` | online monitor definition and lifecycle | `monitors`; `/api/monitors` | monitor router and online-evaluation UI | definition, replication and reads use the process App service; monitor performance is an Evaluation-service read, leaving dataset-provider compatibility and reusable UI to drain |
+| `experiment` | experiment definition and run history | `experiments`; `/api/experiments`, experiment-v3 REST | `server/experiments*`, experiment event pipeline and UI | definition, ClickHouse history and the four durable run commands use one canonical service; the duplicate run service is deleted; UI relocation and compatibility composition remain |
+| `scenario` | scenario definition, events and cancellation | `scenarios`; `/api/scenarios`, `/api/scenario-events`, scenario generation route | `server/scenarios`, scenario components/hooks | definition persistence, run configuration and transports use one service; the duplicate service and repository are deleted; cancellation, failure handling and browser coordination remain execution seams |
 | `simulation` | simulation execution, batches and simulation-run results | simulation procedures currently nested below `scenarios`; `/api/simulation-runs` | Simulation feature package, simulation event pipeline and UI | ClickHouse reads and actual Eventing commands use one process-owned service; the legacy app service/repository is deleted; global Langy/onboarding access and UI relocation remain |
 | `suite` | suite definition, run plan and suite-run history | `suites`; `/api/suites` | Suite feature package, suite event pipeline and UI | definition, references, archived names and run planning use one process-owned service; the duplicate legacy definition service/repository is deleted; durable execution stays behind its injected port |
 
@@ -366,17 +366,16 @@ The foundation, identity spine, Automation, Prompt, Dataset and the first
 execution package boundaries are landed. The queue now tracks only unfinished
 vertical drains:
 
-1. finish Experiment run history, Simulation ClickHouse reads and Suite run
-   orchestration, then remove their displaced app services;
-2. finish Scenario cancellation/failure/browser execution seams and the
-   remaining Workflow version/copy/execution paths;
-3. harden and integrate Evaluation's production ClickHouse semantics, then
-   finish Monitor and Evaluator cross-feature orchestration;
-4. finish Langy turn/relay and API Key grant/project-resolution seams;
-5. run the inventory-to-zero pass for Prompt, Dataset and execution-feature UI;
-6. begin Telemetry, Trace and Annotation only after the execution services are
+1. finish Scenario cancellation/failure/browser seams and Workflow
+   version/copy/history compatibility paths;
+2. move Evaluation's remaining execution engine and stored-object adapter,
+   finish Evaluator's compatibility reads, and drain Monitor/Evaluation UI;
+3. finish Langy turn/relay and API Key grant/project-resolution seams;
+4. run the inventory-to-zero pass for Prompt, Dataset, Agent and the remaining
+   execution-feature UI;
+5. begin Telemetry, Trace and Annotation only after the execution services are
    stable; and
-7. compress and relocate feature-owned ADRs, specs and developer docs as each
+6. compress and relocate feature-owned ADRs, specs and developer docs as each
    feature reaches zero legacy fragments.
 
 A package scaffold or compatibility facade does not complete an item. The

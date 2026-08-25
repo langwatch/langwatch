@@ -1,7 +1,7 @@
 import { getLangWatchTracer } from "langwatch";
+import type { EvaluationService as EvaluationCapability } from "@langwatch/evaluation-contract";
 import { getApp } from "~/server/app-layer/app";
 import { resolveInputsMarker } from "~/server/app-layer/evaluations/evaluation-inputs-offload";
-import type { TraceEvaluationsRepository } from "~/server/app-layer/evaluations/repositories/trace-evaluations.clickhouse.repository";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import type { Protections } from "~/server/traces/protections";
 import type { TraceEvaluation } from "./evaluation-run.types";
@@ -32,37 +32,35 @@ const defaultResolveInputsMarker: ResolveEvaluationInputsMarker = ({
  * Service for fetching per-trace evaluation runs from ClickHouse.
  * Queries `evaluation_runs` and collapses ReplacingMergeTree versions.
  *
- * The query, the dedup, and the memory-limit retry live in
- * `TraceEvaluationsClickHouseRepository`; this class keeps tracing and the
- * ADR-040 offloaded-inputs resolution.
+ * Querying, deduplication, and memory-limit fallback belong to the canonical
+ * Evaluation service. This compatibility class keeps only tracing and the
+ * ADR-040 offloaded-input resolution used by legacy Trace callers.
  */
 export class EvaluationService {
   private readonly tracer = getLangWatchTracer("langwatch.evaluations.service");
   private readonly resolveInputsMarker: ResolveEvaluationInputsMarker;
-  private readonly injectedRepository?: TraceEvaluationsRepository;
-  private cachedRepository?: TraceEvaluationsRepository;
+  private readonly injectedService?: EvaluationCapability;
+  private cachedService?: EvaluationCapability;
 
   constructor({
     resolveInputsMarker = defaultResolveInputsMarker,
-    repository,
+    service,
   }: {
     resolveInputsMarker?: ResolveEvaluationInputsMarker;
-    repository?: TraceEvaluationsRepository;
+    service?: EvaluationCapability;
   } = {}) {
     this.resolveInputsMarker = resolveInputsMarker;
-    this.injectedRepository = repository;
+    this.injectedService = service;
   }
 
   /**
-   * The evaluations repository, taken lazily from
-   * `getApp().evaluations.traceEvaluations` — the one the composition root
-   * built over its ClickHouse resolver. Lazy because this service is
-   * constructed inside `TraceService`, including on read paths and in unit
-   * tests that never reach an evaluations query and never boot an App.
+   * The canonical Evaluation service, taken lazily from the process App.
+   * Lazy because this compatibility wrapper is still constructed by legacy
+   * Trace callers that may never reach an evaluation read.
    */
-  private get repository(): TraceEvaluationsRepository {
-    if (this.injectedRepository) return this.injectedRepository;
-    return (this.cachedRepository ??= getApp().evaluations.traceEvaluations);
+  private get evaluations(): EvaluationCapability {
+    if (this.injectedService) return this.injectedService;
+    return (this.cachedService ??= getApp().evaluations);
   }
 
   static create(): EvaluationService {
@@ -106,7 +104,10 @@ export class EvaluationService {
         },
       },
       () =>
-        this.repository.findManyByTraceIds({ tenantId: projectId, traceIds }),
+        this.evaluations.findTraceEvaluations({
+          tenantId: projectId,
+          traceIds,
+        }),
     );
   }
 
@@ -137,7 +138,7 @@ export class EvaluationService {
         },
       },
       async () => {
-        const inputs = await this.repository.findInputsByEvaluationId({
+        const inputs = await this.evaluations.tryGetInputs({
           tenantId: projectId,
           evaluationId,
         });

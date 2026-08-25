@@ -75,13 +75,13 @@ async function execute({
 }) {
   const deps = {
     monitors: {
-      getMonitorById: vi
+      tryGetMonitorById: vi
         .fn()
         .mockResolvedValue(buildMonitor({ config, evaluatorRecordType })),
     },
     spanStorage: { getSpansByTraceId: vi.fn().mockResolvedValue([]) },
     traceEvents: { getEventsByTraceId: vi.fn().mockResolvedValue([]) },
-    evaluationExecution: {
+    evaluations: {
       executeForTrace: vi
         .fn()
         .mockResolvedValue({ status: "processed", score: 1, passed: true }),

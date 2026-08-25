@@ -8,6 +8,12 @@
  * on the headline, the previous period, and every daily bucket.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { EvaluationService } from "@langwatch/evaluation-contract";
+import {
+  EvaluationAdapter,
+  EvaluationExecutionPort,
+  EvaluationRetentionFloorPort,
+} from "@langwatch/evaluation-server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { deleteEvaluationRunsByTenant } from "~/server/analytics/clickhouse/__tests__/test-utils/clickhouse-cleanup";
@@ -17,11 +23,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import {
-  MonitorPerformanceService,
-  summarizeMonitorPerformance,
-} from "../monitor-performance.service";
-import { MonitorPerformanceClickHouseRepository } from "../repositories/monitor-performance.clickhouse.repository";
+import { createTestApp } from "~/server/app-layer/presets";
 import {
   buildSeedMatrix,
   readAnalyticsPageNumbers,
@@ -46,6 +48,36 @@ const previousStartMs = currentVsPreviousDates({
 let clickHouse: ClickHouseClient;
 let queryCount = 0;
 
+class NullEvaluationExecution extends EvaluationExecutionPort {
+  async execute(): Promise<{ status: "skipped" }> {
+    return { status: "skipped" };
+  }
+}
+
+class FixedEvaluationRetentionFloor extends EvaluationRetentionFloorPort {
+  async getFloorMs(): Promise<number> {
+    return 0;
+  }
+}
+
+function createEvaluations(client: ClickHouseClient): EvaluationService {
+  return EvaluationAdapter.create({
+    resolveClickHouse: async () => ({
+      insert: (input) => client.insert(input as never),
+      query: async (input) => {
+        const result = await client.query(input as never);
+        return {
+          json: async <Result>() =>
+            (await result.json<Result>()) as unknown as Result[],
+        };
+      },
+    }),
+    retentionFloor: new FixedEvaluationRetentionFloor(),
+    execution: new NullEvaluationExecution(),
+    workflows: createTestApp().workflows,
+  });
+}
+
 const countingClient = () =>
   new Proxy(clickHouse, {
     get(target, property, receiver) {
@@ -61,10 +93,7 @@ const countingClient = () =>
   });
 
 const readTablePerformance = async () => {
-  const service = new MonitorPerformanceService(
-    new MonitorPerformanceClickHouseRepository(async () => clickHouse),
-  );
-  return service.getPerformance({
+  return createEvaluations(clickHouse).getMonitorPerformance({
     tenantId,
     monitors: [
       { id: scoreEvaluatorId, isGuardrail: false },
@@ -125,11 +154,9 @@ describe("online evaluation monitor performance", () => {
   /** @scenario Performance for every monitor is read in one bounded query */
   it("loads current and previous performance with one real ClickHouse query", async () => {
     queryCount = 0;
-    const repository = new MonitorPerformanceClickHouseRepository(async () =>
+    const performance = await createEvaluations(
       countingClient(),
-    );
-    const service = new MonitorPerformanceService(repository);
-    const performance = await service.getPerformance({
+    ).getMonitorPerformance({
       tenantId,
       monitors: [
         { id: scoreEvaluatorId, isGuardrail: false },
@@ -161,32 +188,22 @@ describe("online evaluation monitor performance", () => {
   });
 
   it("returns an explicit no-data result for a monitor without runs", async () => {
-    const repository = new MonitorPerformanceClickHouseRepository(
-      async () => clickHouse,
-    );
-    const buckets = await repository.findBuckets({
+    const [empty] = await createEvaluations(clickHouse).getMonitorPerformance({
       tenantId,
-      evaluatorIds: [`${tenantId}-empty`],
+      monitors: [{ id: `${tenantId}-empty`, isGuardrail: false }],
       previousStartMs,
       currentStartMs,
       endMs,
       timeZone: "UTC",
     });
 
-    expect(
-      summarizeMonitorPerformance({
-        monitors: [{ id: `${tenantId}-empty`, isGuardrail: false }],
-        buckets,
-      }),
-    ).toEqual([
-      {
-        monitorId: `${tenantId}-empty`,
-        metric: "score",
-        points: [],
-        current: null,
-        previous: null,
-      },
-    ]);
+    expect(empty).toEqual({
+      monitorId: `${tenantId}-empty`,
+      metric: "score",
+      points: [],
+      current: null,
+      previous: null,
+    });
   });
 
   describe("when the analytics page reads the same period", () => {

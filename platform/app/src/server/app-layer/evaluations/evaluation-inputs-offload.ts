@@ -287,7 +287,7 @@ async function storeOversizedInputs({
  * re-inlining the raw inputs - `event_log.EventPayload` and the fold stay
  * bounded even under an S3 outage. Full input recovery is unavailable for
  * runs reported during the outage window; the belt-and-braces repository cap
- * (evaluation-run.clickhouse.repository.ts) remains the last line of defence
+ * (the canonical Evaluation ClickHouse repository) remains the last line of defence
  * for any writer that bypasses this path entirely.
  */
 export async function offloadInputsIfOversized({

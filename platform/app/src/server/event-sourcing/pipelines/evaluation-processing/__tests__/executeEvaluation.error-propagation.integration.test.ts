@@ -13,8 +13,8 @@ import type { Command } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EvaluationCostRecorder } from "../../../../app-layer/evaluations/evaluation-cost.recorder";
-import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
-import type { MonitorService } from "../../../../app-layer/monitors/monitor.service";
+import type { EvaluationService } from "@langwatch/evaluation-contract";
+import type { MonitorService } from "@langwatch/monitor-contract";
 import { ExecuteEvaluationCommand } from "../commands/executeEvaluation.command";
 import type { ExecuteEvaluationCommandData } from "../schemas/commands";
 
@@ -76,7 +76,7 @@ function buildCommandWithMocks({
   executionError?: Error;
 }) {
   const monitors = {
-    getMonitorById: vi
+    tryGetMonitorById: vi
       .fn()
       .mockResolvedValue(buildMonitor("azure/content_safety")),
   } as unknown as MonitorService;
@@ -93,9 +93,9 @@ function buildCommandWithMocks({
     ? vi.fn().mockRejectedValue(executionError)
     : vi.fn().mockResolvedValue(executionResult);
 
-  const evaluationExecution = {
+  const evaluations = {
     executeForTrace,
-  } as unknown as EvaluationExecutionService;
+  } as unknown as EvaluationService;
 
   const costRecorder = {
     recordCost: vi.fn(),
@@ -110,7 +110,7 @@ function buildCommandWithMocks({
     monitors,
     spanStorage,
     traceEvents,
-    evaluationExecution,
+    evaluations,
     costRecorder,
     azureSafetyEnvResolver,
   });

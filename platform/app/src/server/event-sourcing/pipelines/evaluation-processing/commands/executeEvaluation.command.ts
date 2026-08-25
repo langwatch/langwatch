@@ -13,8 +13,8 @@ import {
 } from "../../../../app-layer/evaluations/azure-safety-env";
 import { getAzureSafetyEnvFromProject } from "../../../../app-layer/evaluations/azure-safety-env.server";
 import type { EvaluationCostRecorder } from "../../../../app-layer/evaluations/evaluation-cost.recorder";
-import type { EvaluationExecutionService } from "../../../../app-layer/evaluations/evaluation-execution.service";
-import type { MonitorService } from "../../../../app-layer/monitors/monitor.service";
+import type { EvaluationService } from "@langwatch/evaluation-contract";
+import type { MonitorService } from "@langwatch/monitor-contract";
 import {
   buildPreconditionTraceDataFromCommand,
   checkEvaluatorRequiredFields,
@@ -85,7 +85,7 @@ export interface ExecuteEvaluationCommandDeps {
       traceId: string;
     }): Promise<ElasticSearchEvent[]>;
   };
-  evaluationExecution: EvaluationExecutionService;
+  evaluations: EvaluationService;
   costRecorder: EvaluationCostRecorder;
   /**
    * Resolves Azure Content Safety credentials from the per-project
@@ -331,9 +331,9 @@ export class ExecuteEvaluationCommand
     );
 
     // 1. Fetch monitor via service
-    const monitor = await this.deps.monitors.getMonitorById({
+    const monitor = await this.deps.monitors.tryGetMonitorById({
       projectId: tenantId,
-      monitorId: data.evaluatorId,
+      id: data.evaluatorId,
     });
     if (!monitor) {
       logger.warn(
@@ -479,7 +479,7 @@ export class ExecuteEvaluationCommand
       logger.info(
         {
           tenantId,
-          // The monitor id: `getMonitorById(data.evaluatorId)` above. Distinct
+          // The monitor id: `tryGetMonitorById(data.evaluatorId)` above. Distinct
           // values of this pair ARE the prevalence count.
           evaluatorId: data.evaluatorId,
           traceId: data.traceId,
@@ -496,7 +496,7 @@ export class ExecuteEvaluationCommand
         : undefined;
 
     try {
-      const result = await this.deps.evaluationExecution.executeForTrace({
+      const result = await this.deps.evaluations.executeForTrace({
         projectId: tenantId,
         traceId: data.traceId,
         evaluatorType: data.evaluatorType,

@@ -41,7 +41,7 @@ function buildDeps(
 ): ExecuteEvaluationCommandDeps {
   return {
     monitors: {
-      getMonitorById: vi.fn().mockResolvedValue({
+      tryGetMonitorById: vi.fn().mockResolvedValue({
         id: "monitor_1",
         checkType: "langevals/llm_score",
         level: "trace",
@@ -58,9 +58,9 @@ function buildDeps(
     } as unknown as ExecuteEvaluationCommandDeps["monitors"],
     spanStorage: { getSpansByTraceId: vi.fn().mockResolvedValue([]) },
     traceEvents: { getEventsByTraceId: vi.fn().mockResolvedValue([]) },
-    evaluationExecution: {
+    evaluations: {
       executeForTrace,
-    } as unknown as ExecuteEvaluationCommandDeps["evaluationExecution"],
+    } as unknown as ExecuteEvaluationCommandDeps["evaluations"],
     costRecorder: {
       recordCost: vi.fn(),
     } as unknown as ExecuteEvaluationCommandDeps["costRecorder"],

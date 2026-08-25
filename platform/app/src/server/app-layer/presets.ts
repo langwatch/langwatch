@@ -267,16 +267,10 @@ import { NullDspyStepRepository } from "./dspy-steps/repositories/dspy-step.repo
 import { PrismaEvaluationCostRecorder } from "./evaluations/evaluation-cost.recorder";
 import { createDefaultModelEnvResolver } from "./evaluations/evaluation-execution.factories";
 import { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
-import { EvaluationRunService } from "./evaluations/evaluation-run.service";
-import { MonitorPerformanceService } from "./evaluations/monitor-performance.service";
 import { EvaluationAnalyticsClickHouseRepository } from "./evaluations/repositories/evaluation-analytics.clickhouse.repository";
 import { NullEvaluationAnalyticsRepository } from "./evaluations/repositories/evaluation-analytics.repository";
 import { EvaluationAnalyticsRollupClickHouseRepository } from "./evaluations/repositories/evaluation-analytics-rollup.clickhouse.repository";
 import { NullEvaluationAnalyticsRollupRepository } from "./evaluations/repositories/evaluation-analytics-rollup.repository";
-import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluation-run.repository";
-import { MonitorPerformanceClickHouseRepository } from "./evaluations/repositories/monitor-performance.clickhouse.repository";
-import { NullMonitorPerformanceRepository } from "./evaluations/repositories/monitor-performance.repository";
-import { TraceEvaluationsClickHouseRepository } from "./evaluations/repositories/trace-evaluations.clickhouse.repository";
 import { FilterOptionsClickHouseRepository } from "./filters/repositories/filter-options.clickhouse.repository";
 import {
   runBranchRecheckPass,
@@ -768,16 +762,12 @@ export function initializeDefaultApp(options?: {
     }).build(),
     "EvaluationService",
   );
-  const evaluationRuns = traced(
-    EvaluationRunService.fromService(evaluationService),
-    "EvaluationRunService",
-  );
   const traceList = traced(
     new TraceListService(
       clickhouseEnabled
         ? new TraceListClickHouseRepository(resolveClickHouseClient)
         : new NullTraceListRepository(),
-      evaluationRuns,
+      evaluationService,
       topics,
     ),
     "TraceListService",
@@ -807,26 +797,6 @@ export function initializeDefaultApp(options?: {
     ),
   });
   // SuiteRunService is created after pipeline registration (needs startSuiteRun command)
-
-  const evaluations = {
-    service: evaluationService,
-    runs: evaluationRuns,
-    execution: evaluationExecution,
-    performance: traced(
-      new MonitorPerformanceService(
-        clickhouseEnabled
-          ? new MonitorPerformanceClickHouseRepository(resolveClickHouseClient)
-          : new NullMonitorPerformanceRepository(),
-      ),
-      "MonitorPerformanceService",
-    ),
-    // Unconditional on `clickhouseEnabled` for the same reason the analytics
-    // service is: the resolver throws at query time when ClickHouse isn't
-    // configured, and this repository already degrades that to an empty read.
-    traceEvaluations: new TraceEvaluationsClickHouseRepository(
-      resolveClickHouseClient,
-    ),
-  };
 
   const planResolver = (organizationId: string) =>
     getApp().planProvider.getActivePlan({ organizationId });
@@ -1355,7 +1325,7 @@ export function initializeDefaultApp(options?: {
     redis: redis ?? null,
     automation,
     projects,
-    evaluations: { runs: evaluations.runs },
+    evaluations: evaluationService,
     traces: { spans: spanStorage },
     traceSummaryRepository: repositories.traceSummaryFold,
     analytics: analyticsService,
@@ -1596,11 +1566,7 @@ export function initializeDefaultApp(options?: {
     prisma,
     organizations,
     traces: { summary: traceSummary, spans: spanStorage },
-    evaluations: {
-      service: evaluations.service,
-      runs: evaluations.runs,
-      execution: evaluations.execution,
-    },
+    evaluations: evaluationService,
     costRecorder: new PrismaEvaluationCostRecorder(prisma),
     billingCheckpoints: new PrismaBillingCheckpointService(prisma),
     usageReportingService,
@@ -2118,7 +2084,7 @@ export function initializeDefaultApp(options?: {
     broadcast,
     presence,
     traces,
-    evaluations,
+    evaluations: evaluationService,
     experiments,
     scenarios,
     suites,
@@ -2463,9 +2429,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     workflows: testWorkflows,
   });
   const testEvaluationService = AppEvaluationRuntime.create({
-    resolveClickHouse: async () => {
-      throw new Error("ClickHouse is not available in the test app");
-    },
+    resolveClickHouse: async () => ({
+      insert: async () => undefined,
+      query: async () => ({ json: async () => [] }),
+    }),
     retentionFloor: createRetentionFloorService(testRetentionPolicyCache),
     execution: AppEvaluationExecutionPort.create(async () => ({
       status: "skipped",
@@ -2529,7 +2496,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         list: traced(
           new TraceListService(
             new NullTraceListRepository(),
-            new EvaluationRunService(new NullEvaluationRunRepository()),
+            testEvaluationService,
             new TopicService(new NullTopicRepository()),
           ),
           "TraceListService",
@@ -2576,21 +2543,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         editOverlay: TraceEditOverlayService.create(testPrisma),
       };
     })(),
-    evaluations: {
-      service: testEvaluationService,
-      runs: traced(
-        new EvaluationRunService(new NullEvaluationRunRepository()),
-        "EvaluationRunService",
-      ),
-      execution:
-        void 0 as unknown as AppDependencies["evaluations"]["execution"],
-      performance: new MonitorPerformanceService(
-        new NullMonitorPerformanceRepository(),
-      ),
-      traceEvaluations: new TraceEvaluationsClickHouseRepository(async () => {
-        throw new Error("ClickHouse is not available in the test app");
-      }),
-    },
+    evaluations: testEvaluationService,
     dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
     analytics: {
       service: createAnalyticsService({

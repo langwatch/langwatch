@@ -62,9 +62,7 @@ import type { CodingAgentTraceSessionRepository } from "../../app-layer/coding-a
 import type { SessionMetricSeriesRepository } from "../../app-layer/coding-agent/repositories/session-metric-series.repository";
 import { getAzureSafetyEnvFromProject } from "../../app-layer/evaluations/azure-safety-env.server";
 import type { EvaluationCostRecorder } from "../../app-layer/evaluations/evaluation-cost.recorder";
-import type { EvaluationExecutionService } from "../../app-layer/evaluations/evaluation-execution.service";
 import { offloadInputsIfOversized } from "../../app-layer/evaluations/evaluation-inputs-offload";
-import type { EvaluationRunService } from "../../app-layer/evaluations/evaluation-run.service";
 import type { EvaluationAnalyticsRepository } from "../../app-layer/evaluations/repositories/evaluation-analytics.repository";
 import type { EvaluationAnalyticsRollupRepository } from "../../app-layer/evaluations/repositories/evaluation-analytics-rollup.repository";
 import type { LangyTitleGenerator } from "../../app-layer/langy/langy-title-generation.service";
@@ -380,11 +378,7 @@ export interface PipelineRegistryDeps {
     summary: TraceSummaryService;
     spans: SpanStorageService;
   };
-  evaluations: {
-    service: EvaluationService;
-    runs: EvaluationRunService;
-    execution: EvaluationExecutionService;
-  };
+  evaluations: EvaluationService;
   organizations: OrganizationService;
   costRecorder: EvaluationCostRecorder;
   billingCheckpoints: BillingCheckpointService;
@@ -1061,7 +1055,7 @@ export class PipelineRegistry {
       monitors: this.deps.monitors,
       spanStorage: this.deps.traces.spans,
       traceEvents: this.deps.traces.spans,
-      evaluationExecution: this.deps.evaluations.execution,
+      evaluations: this.deps.evaluations,
       costRecorder: this.deps.costRecorder,
       azureSafetyEnvResolver: getAzureSafetyEnvFromProject,
       // Emergency operator rollback for the langwatch#6397 settings recovery.
@@ -1125,9 +1119,7 @@ export class PipelineRegistry {
 
     return this.deps.eventSourcing.register(
       createEvaluationProcessingPipeline({
-        evalRunStore: new EvaluationRunStore(
-          this.deps.evaluations.service,
-        ),
+        evalRunStore: new EvaluationRunStore(this.deps.evaluations),
         // Redis cache is the eval slim fold's warm read path; a miss now falls
         // through to the store's own ClickHouse read-back (ADR-066, migration
         // 00056) rather than re-folding the event log. Same wiring as

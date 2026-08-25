@@ -1,12 +1,20 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { ClickHouseBillingAdapter } from "~/runtime/app/features/billing";
 import { AppGovernanceRuntime } from "~/runtime/app/features/governance";
-import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
-import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
-import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/services/governanceTraceActivity.clickhouse.repository";
-import { PersonalUsageClickHouseRepository } from "@ee/governance/services/personalUsage.clickhouse.repository";
+import { AppIngestionSourceAdapter } from "~/runtime/app/features/governance/ingestion-source.adapter";
+import { AppIngestionSourceActivityAdapter } from "~/runtime/app/features/governance/ingestion-source-activity.adapter";
+import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
+import { GovernanceKpisClickHouseRepository } from "~/runtime/app/features/governance/governance-kpis.clickhouse.repository";
+import { GovernanceOcsfEventsClickHouseRepository } from "~/runtime/app/features/governance/governance-ocsf-events.clickhouse.repository";
+import { GovernanceTraceActivityClickHouseRepository } from "~/runtime/app/features/governance/governance-trace-activity.clickhouse.repository";
+import { PersonalUsageClickHouseRepository } from "~/runtime/app/features/governance/personal-usage.clickhouse.repository";
 import { WebhookEventsClickHouseRepository } from "~/runtime/app/features/webhooks";
 import type { RedisConnection } from "@langwatch/redis-client";
+import {
+  AppEvaluationExecutionPort,
+  AppEvaluationRuntime,
+} from "~/runtime/app/features/evaluation";
+import { createRetentionFloorService } from "~/server/app-layer/clients/clickhouse/retention-floor";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
@@ -88,10 +96,47 @@ export function installClickHouseTestApp({
     new GovernanceTraceActivityClickHouseRepository(required);
   const governanceOcsfEvents =
     new GovernanceOcsfEventsClickHouseRepository(required);
+  const personalUsage = new PersonalUsageClickHouseRepository(required);
+  const baseApp = createTestApp();
   const governanceRuntime = AppGovernanceRuntime.create(prisma, {
+    organizations: baseApp.organizations,
+    projects: baseApp.projects,
+    gatewayBaseUrl: "http://localhost:5563",
     setupActivity: governanceTraceActivity,
     ocsfEvents: governanceOcsfEvents,
+    personalUsage,
   });
+  const ingestionSources = AppIngestionSourceAdapter.create({
+    database: prisma,
+    projects: governanceRuntime.projects,
+    plans: { getActivePlan: async () => FREE_PLAN },
+    lifecycle: { sync: async () => undefined },
+    secretPepper: "test-ingestion-secret-pepper",
+  }).build();
+  const activity = AppIngestionSourceActivityAdapter.create({
+    database: prisma,
+    resolveClient: requiredOrg,
+  }).build();
+  const evaluations = AppEvaluationRuntime.create({
+    resolveClickHouse: async (tenantId) => {
+      const client = await required(tenantId);
+      return {
+        insert: (input) => client.insert(input as never),
+        query: async (input) => {
+          const result = await client.query(input as never);
+          return {
+            json: async <Result>() =>
+              (await result.json<Result>()) as unknown as Result[],
+          };
+        },
+      };
+    },
+    retentionFloor: createRetentionFloorService(baseApp.retentionPolicyCache),
+    execution: AppEvaluationExecutionPort.create(async () => ({
+      status: "skipped",
+    })),
+    workflows: baseApp.workflows,
+  }).build();
 
   globalForApp.__langwatch_app = createTestApp({
     clickhouse: {
@@ -102,13 +147,17 @@ export function installClickHouseTestApp({
     },
     redis: redis ?? null,
     gateway: {
+      ...baseApp.gateway,
       budgets: new GatewayBudgetClickHouseRepository(required),
       virtualKeySpend: new GatewayVirtualKeySpendRepository(required),
       spendEvents: new GatewaySpendEventsRepository(required),
       webhookEvents: WebhookEventsClickHouseRepository.create(required),
     },
     governance: {
+      ...baseApp.governance,
+      activity,
       ingestionTemplates: governanceRuntime.ingestionTemplates,
+      ingestionSources,
       setupState: governanceRuntime.setupState,
       ocsfExport: governanceRuntime.ocsfExport,
       ottlGateway: governanceRuntime.ottlGateway,
@@ -116,12 +165,15 @@ export function installClickHouseTestApp({
       ocsfEvents: governanceOcsfEvents,
       traceActivity: governanceTraceActivity,
       kpis: new GovernanceKpisClickHouseRepository(required),
-      personalUsage: new PersonalUsageClickHouseRepository(required),
+      personalUsage: governanceRuntime.personalUsage,
     },
+    organizations: baseApp.organizations,
+    projects: baseApp.projects,
     billableEvents: ClickHouseBillingAdapter.create({
       resolveClient: required,
       resolveOrganizationClient: requiredOrg,
     }).build(),
+    evaluations,
   });
 }
 

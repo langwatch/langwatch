@@ -2,18 +2,19 @@ import type {
   FoldProjectionStore,
   ProjectionStoreContext,
 } from "@langwatch/eventing";
-import type { EvaluationRunRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.repository";
-import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
+import type { EvaluationService } from "@langwatch/evaluation-contract";
+import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 
 /**
  * Thin FoldProjectionStore adapter for evaluation runs.
- * Delegates directly to EvaluationRunRepository (no mapper needed — projection uses camelCase types).
+ * Delegates directly to the canonical Evaluation capability (no mapper needed
+ * — projection uses camelCase types).
  */
 export class EvaluationRunStore
   implements FoldProjectionStore<EvaluationRunData>
 {
-  constructor(private readonly repo: EvaluationRunRepository) {}
+  constructor(private readonly service: EvaluationService) {}
 
   async store(
     state: EvaluationRunData,
@@ -24,11 +25,11 @@ export class EvaluationRunStore
       : { ...state, evaluationId: String(context.aggregateId) };
     const retentionDays =
       context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
-    await this.repo.upsert(
-      stateWithId,
-      String(context.tenantId),
+    await this.service.upsertRun({
+      data: stateWithId,
+      tenantId: String(context.tenantId),
       retentionDays,
-    );
+    });
   }
 
   async storeBatch(
@@ -48,22 +49,14 @@ export class EvaluationRunStore
         context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
     }));
 
-    if (this.repo.upsertBatch) {
-      await this.repo.upsertBatch(batchEntries);
-    } else {
-      await Promise.all(
-        batchEntries.map(({ data, tenantId, retentionDays }) =>
-          this.repo.upsert(data, tenantId, retentionDays),
-        ),
-      );
-    }
+    await this.service.upsertRuns(batchEntries);
   }
 
   async get(
     aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<EvaluationRunData | null> {
-    return await this.repo.getByEvaluationId({
+    return await this.service.tryGetRunByEvaluationId({
       tenantId: String(context.tenantId),
       evaluationId: aggregateId,
     });

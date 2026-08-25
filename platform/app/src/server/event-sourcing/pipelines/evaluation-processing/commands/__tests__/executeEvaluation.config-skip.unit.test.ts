@@ -18,8 +18,8 @@ import {
   EvaluatorInputTooLargeError,
 } from "../../../../../app-layer/evaluations/errors";
 import type { EvaluationCostRecorder } from "../../../../../app-layer/evaluations/evaluation-cost.recorder";
-import type { EvaluationExecutionService } from "../../../../../app-layer/evaluations/evaluation-execution.service";
-import type { MonitorService } from "../../../../../app-layer/monitors/monitor.service";
+import type { EvaluationService } from "@langwatch/evaluation-contract";
+import type { MonitorService } from "@langwatch/monitor-contract";
 import type { ExecuteEvaluationCommandData } from "../../schemas/commands";
 import { ExecuteEvaluationCommand } from "../executeEvaluation.command";
 
@@ -68,7 +68,7 @@ function buildCommand(): Command<ExecuteEvaluationCommandData> {
 
 function buildCommandWithMocks({ thrown }: { thrown: Error }) {
   const monitors = {
-    getMonitorById: vi.fn().mockResolvedValue({
+    tryGetMonitorById: vi.fn().mockResolvedValue({
       id: "mon_cfg",
       projectId: "proj-cfg-1",
       checkType: "openai/moderation",
@@ -84,15 +84,15 @@ function buildCommandWithMocks({ thrown }: { thrown: Error }) {
     }),
   } as unknown as MonitorService;
 
-  const evaluationExecution = {
+  const evaluations = {
     executeForTrace: vi.fn().mockRejectedValue(thrown),
-  } as unknown as EvaluationExecutionService;
+  } as unknown as EvaluationService;
 
   const command = new ExecuteEvaluationCommand({
     monitors,
     spanStorage: { getSpansByTraceId: vi.fn().mockResolvedValue([]) },
     traceEvents: { getEventsByTraceId: vi.fn().mockResolvedValue([]) },
-    evaluationExecution,
+    evaluations,
     costRecorder: { recordCost: vi.fn() } as unknown as EvaluationCostRecorder,
     azureSafetyEnvResolver: vi.fn().mockResolvedValue(null),
   });

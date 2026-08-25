@@ -9,7 +9,7 @@ import {
  * Pure evaluation-processing commands defined from event data schemas.
  *
  * executeEvaluation is NOT here — it's a complex command with DI (monitors,
- * spans, evaluationExecution) and stays as a manual class.
+ * spans, canonical Evaluation service) and stays as a manual class.
  */
 
 export const StartEvaluationCommand = defineCommand({

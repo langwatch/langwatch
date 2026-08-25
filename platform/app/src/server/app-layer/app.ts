@@ -174,7 +174,10 @@ export class App {
     this.presence = deps.presence;
     this.secrets = deps.secrets;
     this.traces = { ...deps.traces, ...deps.commands.traces };
-    this.evaluations = { ...deps.evaluations, ...deps.commands.evaluations };
+    this.evaluations = Object.assign(
+      deps.evaluations,
+      deps.commands.evaluations,
+    );
     this.dspySteps = deps.dspySteps;
     this.analytics = deps.analytics;
     this.simulations = deps.simulations;
