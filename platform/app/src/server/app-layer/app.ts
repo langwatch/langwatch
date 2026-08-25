@@ -134,7 +134,6 @@ export class App {
    */
   readonly redis: AppDependencies["redis"];
   readonly billing: AppDependencies["billing"];
-  readonly usageStats: AppDependencies["usageStats"];
   readonly governance: AppDependencies["governance"];
   readonly billableEvents: AppDependencies["billableEvents"];
   readonly billingQueries: AppDependencies["billingQueries"];
@@ -237,7 +236,6 @@ export class App {
     this.clickhouse = deps.clickhouse;
     this.redis = deps.redis;
     this.billing = deps.billing;
-    this.usageStats = deps.usageStats;
     this.governance = deps.governance;
     this.billableEvents = deps.billableEvents;
     this.billingQueries = deps.billingQueries;

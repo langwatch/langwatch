@@ -1143,9 +1143,9 @@ secured.access(tracesCreateAuth).post(
 // POST /api/track_usage
 // =============================================
 // Self-hosted instances report anonymous daily usage counts here with no
-// credential to present (see usageStatsWorker.ts), so the route stays public.
+// credential to present, so the route stays public.
 // What it accepts is bounded instead:
-//   - `.strict()` schema matching exactly the one report `collectUsageStats`
+//   - `.strict()` schema matching exactly the Ops usage-stat report
 //     produces, so a spoofed event can't also smuggle arbitrary properties
 //     into PostHog even once it gets the event name right
 //   - a capped payload size
@@ -1159,8 +1159,8 @@ secured.access(tracesCreateAuth).post(
 const TRACK_USAGE_EVENT = "daily_usage_stats";
 // Every stat field is `.optional()`, not required: this receiver is a stable
 // contract that self-hosted instances at ANY historical version hit (see
-// usageStatsWorker.ts's docstring), so an older sender predating a field
-// collectUsageStats.ts later added (or a newer one with a field this receiver
+// the Ops worker contract), so an older sender predating a field
+// UsageStatsCollectionService later added (or a newer one with a field this receiver
 // doesn't know about yet) must still be accepted rather than 400'd — a
 // self-hosted operator gets zero feedback on a rejected send (the worker logs
 // success unconditionally once `fetch` resolves, without checking `.ok`), so
@@ -1192,7 +1192,7 @@ const trackUsageBodySchema = z
   .strict();
 
 // A self-hosted instance sends this once per organization per day
-// (usageStatsWorker.ts), so these ceilings stay generous for legitimate
+// (the Ops usage-stat worker), so these ceilings stay generous for legitimate
 // traffic while bounding abuse.
 const TRACK_USAGE_GLOBAL_PER_MINUTE = 500;
 const TRACK_USAGE_PER_IP_PER_MINUTE = 10;

@@ -19,7 +19,7 @@ Because a full scan fourteen times per 2 seconds would be ruinous, the per-pod s
 | Blocked / Parked / Pending tiles, chart | `SCARD` / `ZCARD` per queue, collector, 2s                  | exact            |
 | Top Errors                              | blocked-with-error groups **within the 200-per-end sample** | sample           |
 | Blocked card                            | full `SSCAN` of the blocked set, per viewer, on mount       | exhaustive       |
-| Anomalous tenants                       | `AnomalyStateStore`, the enqueue-rate breaker               | different signal |
+| Anomalous tenants                       | `RedisAnomalyStateRepository`, the enqueue-rate breaker     | different signal |
 | Parked                                  | nothing — counted, never enumerated                         | —                |
 
 Three concrete failures follow.
@@ -131,7 +131,7 @@ This is therefore a scoped exception to 052's direction, not a reversal of it: d
 ## References
 
 - Behavioural contract: [specs/ops/shared-ops-snapshot.feature](../../../specs/ops/shared-ops-snapshot.feature)
-- Prior art in-repo: trace facet discover cache leadership lease (`trace-list.service.ts`); `AnomalyStateStore` (persisted, shared, all-frontends-read — the model this generalises); blob-store ops honest-sampling convention (`OPS_BLOB_SORTS` doc comment)
+- Prior art in-repo: trace facet discover cache leadership lease (`trace-list.service.ts`); `RedisAnomalyStateRepository` (persisted, shared, all-frontends-read — the model this generalises); blob-store ops honest-sampling convention (`OPS_BLOB_SORTS` doc comment)
 - Counter-precedents addressed: scheduler no-leader design (`scheduler.service.ts`); [ADR-052](./052-automations-on-process-manager-substrate.md) §"Deletion and cutover", which deleted the Redis leader lock that [ADR-052](./052-automations-on-process-manager-substrate.md) introduced
 - Out of scope, and why: [specs/ops/pending-counter-reconcile.feature](../../../specs/ops/pending-counter-reconcile.feature) (single-flight marker, #4683)
 - Vocabulary: [packages/group-queue/specs/tenant-soft-cap.feature](../../../packages/group-queue/specs/tenant-soft-cap.feature) (parked = over cap) vs [packages/group-queue/specs/poison-group-park-guard.feature](../../../packages/group-queue/specs/poison-group-park-guard.feature) (parked = into the blocked set)

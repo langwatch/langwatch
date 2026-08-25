@@ -8,7 +8,6 @@ import {
 import Redis, { type Redis as RedisClient } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
-  NoopSchedulerAuditSink,
   NoopSchedulerWakeService,
   PostgresOpsAdapter,
   type SchedulerOpsRepository,
@@ -78,7 +77,6 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
       redis,
       scheduler: {
         repository: schedulerRepository,
-        audit: NoopSchedulerAuditSink.create(),
         wake: NoopSchedulerWakeService.create(),
         projects,
       },

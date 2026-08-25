@@ -23,5 +23,27 @@ export {
 export { AdminAuditSink } from "./services/impersonation.service";
 export * from "./ops.error-normalizer";
 export * from "./ops.redis-engine-cpu";
-export { PrismaSchedulerAuditRepository } from "./repositories/prisma/prisma-scheduler-audit.repository";
+export {
+  OpsWorkerAdapter,
+  type OpsWorkerAdapterOptions,
+} from "./adapters/ops-worker.adapter";
+export { AnomalyHardTierAlertPort } from "./ports/anomaly-hard-tier-alert.port";
+export type {
+  AnomalyFeatureFlagConfig,
+  AnomalyFeatureFlagsPort,
+} from "./ports/anomaly-feature-flags.port";
+export {
+  UsageStatsErrorReporter,
+  UsageStatsClickHouseClient,
+  UsageStatsClickHouseClientResolver,
+  UsageStatsTelemetryClient,
+  type UsageStatsClickHouseQuery,
+  type UsageStatsClickHouseQueryResult,
+  type UsageStatsWorkerDatabase,
+} from "./ports/usage-stats-worker.ports";
+export {
+  OpsWorkerPort,
+  type OpsWorkerHandle,
+  type UsageStatsWorkerConfig,
+} from "./ports/ops-worker.port";
 export * from "./services/scheduler-control.constants";

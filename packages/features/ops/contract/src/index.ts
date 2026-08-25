@@ -6,6 +6,7 @@ export * from "./blob-store";
 export * from "./ops.service";
 export * from "./ops-dashboard";
 export * from "./ops-latency";
+export * from "./ops-anomaly";
 export * from "./ops-scheduler";
 export * from "./ops-scheduler.errors";
 export * from "./ops-snapshot";

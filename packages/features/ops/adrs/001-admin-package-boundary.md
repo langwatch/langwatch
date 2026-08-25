@@ -12,14 +12,22 @@ The behaviour in this record moves to core `ops`; it is not Enterprise-licensed.
 
 ## Context
 
-Platform-admin access, impersonation policy, and operator capabilities were
-spread across app routes, app-layer services, and several UI locations.
+Platform-admin access, impersonation policy, operator capabilities, and the
+process-owned Ops worker loops were spread across app routes, app-layer
+services, observability, and several UI locations.
 
 ## Decision
 
 Own portable identities, commands, errors, and operator DTOs in the contract
 package. Own class-based services and storage adapters in the server package.
 Own browser-safe clients, formatters, and reusable controls in the web package.
+The server package also owns explicitly started worker contributions for tenant
+rate anomaly polling and daily self-hosted usage telemetry. Application worker
+composition supplies Redis, Prisma, a ClickHouse client resolver, feature
+flags, telemetry/error infrastructure, and validated runtime configuration.
+The package constructs its services and owns its Redis, Prisma, and ClickHouse
+repositories. Package code reads neither environment nor global application
+state.
 
 ## Public surfaces and transports
 
@@ -58,6 +66,15 @@ audit and Redis wake adapters. Project labels come from the complete Project
 service, not a Project repository owned by Ops. The application registers
 Hono/tRPC routes and owns the calendar scheduler loop; package imports do not
 register transports.
+
+Anomaly worker construction remains a thin application composition adapter
+because the central worker bootstrap is shared and currently composes the
+process. The adapter builds the anomaly detector from injected Redis and the
+feature-flag service, then starts the package contribution. The usage worker
+adapter supplies database and ClickHouse access plus PostHog/fetch
+infrastructure; Ops owns the collector and its repositories. Both package
+contributions preserve the existing initial scheduling, intervals,
+per-organization failure isolation, logs, and shutdown handles.
 
 Dashboard subscriptions yield the current readable snapshot before waiting for
 the next update. A missing snapshot remains `null`, preserving the loading

@@ -233,7 +233,6 @@
         "~/prompts/prompt-playground/llmParameterMap"
       ],
       "platform/app/src/server/traces/trace-blob-resolution.deps.ts": ["~/env.mjs"],
-      "platform/app/src/server/usageStatsWorker.ts": ["~/env.mjs"],
       "platform/app/src/server/websockets/trpc-ws.ts": ["~/env.mjs"],
       "platform/app/src/server/workflows/runWorkflow.ts": [
         "../../optimization_studio/server/addEnvs"

@@ -25,7 +25,6 @@ import {
   featureFlagRulesSchema,
   resolveEffectiveForListing,
 } from "~/server/featureFlag/rules";
-import { AnomalyStateStore } from "~/server/observability/anomalyState";
 import { grafanaConfigFromEnv } from "~/utils/grafanaLinks";
 
 const opsViewPermission = checkOpsPermission({ permission: "ops:view" });
@@ -1096,14 +1095,7 @@ export const opsRouter = createTRPCRouter({
    * fingerprint loops). Sorted with hard-tier first.
    */
   listAnomalies: protectedProcedure.use(opsViewPermission).query(async ({ ctx }) => {
-    const connection = ctx.app.redis ?? null;
-    if (!connection) return { anomalies: [] };
-    const store = new AnomalyStateStore(connection);
-    const anomalies = await store.list();
-    anomalies.sort((a, b) => {
-      if (a.tier !== b.tier) return a.tier === "hard" ? -1 : 1;
-      return b.triggeredAt - a.triggeredAt;
-    });
+    const anomalies = await ctx.app.ops.listAnomalies();
     return { anomalies };
   }),
 
@@ -1121,11 +1113,8 @@ export const opsRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const connection = ctx.app.redis ?? null;
-      if (!connection) return { dismissed: false };
-      const store = new AnomalyStateStore(connection);
-      await store.clear(input.tenantId, input.kind);
-      return { dismissed: true };
+      const dismissed = await ctx.app.ops.dismissAnomaly(input);
+      return { dismissed };
     }),
 
   /**

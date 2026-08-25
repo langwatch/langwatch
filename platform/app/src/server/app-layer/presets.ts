@@ -122,7 +122,6 @@ import { resolveLangyHarness } from "~/server/app-layer/langy/langyHarness";
 import { createLangyWorkerPort } from "~/server/app-layer/langy/langyWorker";
 import { renderLangyTurnContext } from "~/server/app-layer/langy/langyTurnContext.schema";
 import { OpsExplainClickHouseRepository } from "~/server/app-layer/ops/repositories/ops-explain.clickhouse.repository";
-import { InstanceUsageStatsClickHouseRepository } from "~/server/app-layer/usage-stats/repositories/instance-usage.clickhouse.repository";
 import {
   type ClickHouseClientResolver,
   clearCustomClientCache,
@@ -317,9 +316,7 @@ import { NullQueueRepository } from "./ops/repositories/queue.repository";
 import { ReplayRedisRepository } from "./ops/repositories/replay.redis.repository";
 import { NullReplayRepository } from "./ops/repositories/replay.repository";
 import {
-  NoopSchedulerAuditSink,
   NoopSchedulerWakeService,
-  PrismaSchedulerAuditRepository,
   RedisOpsSnapshotAdapter,
   RedisSchedulerWakeAdapter,
 } from "@langwatch/ops-server";
@@ -1946,7 +1943,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     users,
     scheduler: {
       repository: new PrismaScheduledJobStore(prisma),
-      audit: PrismaSchedulerAuditRepository.create(prisma),
       wake: redis
         ? RedisSchedulerWakeAdapter.create(redis)
         : NoopSchedulerWakeService.create(),
@@ -2044,11 +2040,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     redis,
     billing: {
       events: new BillableEventsMeterClickHouseRepository(
-        getClickHouseClientForOrganization,
-      ),
-    },
-    usageStats: {
-      instance: new InstanceUsageStatsClickHouseRepository(
         getClickHouseClientForOrganization,
       ),
     },
@@ -2397,7 +2388,6 @@ export function createTestApp(
     users: testUsers,
     scheduler: {
       repository: new NullScheduledJobStore(),
-      audit: NoopSchedulerAuditSink.create(),
       wake: NoopSchedulerWakeService.create(),
       projects: testProjects,
     },
@@ -2567,11 +2557,6 @@ export function createTestApp(
     redis: null,
     billing: {
       events: new BillableEventsMeterClickHouseRepository(async () => null),
-    },
-    usageStats: {
-      instance: new InstanceUsageStatsClickHouseRepository(async () => {
-        throw new Error("ClickHouse is not available in the test app");
-      }),
     },
     governance: {
       activity: testGovernanceActivity,

@@ -21,12 +21,15 @@ import {
   type ScheduleControlInput,
   type SchedulerAuditEntryView,
   type SetScheduleActiveInput,
+  type Anomaly,
+  type AnomalyKind,
 } from "@langwatch/ops-contract";
 import type { AdminAccess } from "./admin-access.service";
 import type { AdminBackofficeService } from "./admin-backoffice.service";
 import type { ImpersonationService } from "./impersonation.service";
 import type { BlobStoreService } from "./blob-store.service";
 import type { SchedulerOpsService } from "./scheduler-ops.service";
+import type { AnomalyStatePort } from "../ports/anomaly-state.port";
 
 export class OpsService extends OpsServiceContract {
   private constructor(
@@ -35,6 +38,7 @@ export class OpsService extends OpsServiceContract {
     private readonly adminBackoffice: AdminBackofficeService,
     private readonly blobStore: BlobStoreService,
     private readonly scheduler: SchedulerOpsService,
+    private readonly anomalyState: AnomalyStatePort | null,
   ) {
     super();
   }
@@ -45,6 +49,7 @@ export class OpsService extends OpsServiceContract {
     adminBackoffice: AdminBackofficeService;
     blobStore: BlobStoreService;
     scheduler: SchedulerOpsService;
+    anomalyState: AnomalyStatePort | null;
   }): OpsService {
     return new OpsService(
       options.access,
@@ -52,6 +57,7 @@ export class OpsService extends OpsServiceContract {
       options.adminBackoffice,
       options.blobStore,
       options.scheduler,
+      options.anomalyState,
     );
   }
 
@@ -96,6 +102,30 @@ export class OpsService extends OpsServiceContract {
 
   deleteBlob(input: DeleteBlobInput): Promise<DeleteBlobResult> {
     return this.blobStore.deleteBlob(input);
+  }
+
+  async listAnomalies(): Promise<Anomaly[]> {
+    if (!this.anomalyState) {
+      return [];
+    }
+
+    const anomalies = await this.anomalyState.list();
+    return anomalies.sort((left, right) => {
+      if (left.tier !== right.tier) {
+        return left.tier === "hard" ? -1 : 1;
+      }
+
+      return right.triggeredAt - left.triggeredAt;
+    });
+  }
+
+  async dismissAnomaly(input: { tenantId: string; kind: AnomalyKind }): Promise<boolean> {
+    if (!this.anomalyState) {
+      return false;
+    }
+
+    await this.anomalyState.clear(input.tenantId, input.kind);
+    return true;
   }
 
   listScheduledJobs(input: ListScheduledJobsInput): Promise<OpsScheduledJob[]> {

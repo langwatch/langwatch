@@ -24,6 +24,7 @@ import type {
   SchedulerAuditEntryView,
   SetScheduleActiveInput,
 } from "./ops-scheduler";
+import type { Anomaly, AnomalyKind } from "./ops-anomaly";
 
 /** The single portable capability for platform operations and backoffice work. */
 export abstract class OpsService {
@@ -37,6 +38,11 @@ export abstract class OpsService {
   abstract tryGetBlob(input: GetBlobInput): Promise<OpsBlobSummary | null>;
   abstract runBlobCleanup(input: RunBlobCleanupInput): Promise<BlobSweepReport>;
   abstract deleteBlob(input: DeleteBlobInput): Promise<DeleteBlobResult>;
+  abstract listAnomalies(): Promise<Anomaly[]>;
+  abstract dismissAnomaly(input: {
+    tenantId: string;
+    kind: AnomalyKind;
+  }): Promise<boolean>;
   abstract listScheduledJobs(input: ListScheduledJobsInput): Promise<OpsScheduledJob[]>;
   abstract listPausedSchedules(
     input: ListPausedSchedulesInput,

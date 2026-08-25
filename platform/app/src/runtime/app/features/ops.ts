@@ -3,7 +3,6 @@ import type { AdminAuditRequest, AuditLogRequestLike } from "@langwatch/ops-cont
 import {
   AdminAuditSink,
   PostgresOpsAdapter,
-  type SchedulerAuditSink,
   type SchedulerOpsRepository,
   type SchedulerWakeService,
 } from "@langwatch/ops-server";
@@ -49,7 +48,6 @@ export interface AppOpsRuntimeOptions {
   users: UserService;
   scheduler: {
     repository: SchedulerOpsRepository;
-    audit: SchedulerAuditSink;
     wake: SchedulerWakeService;
     projects: ProjectService;
   };

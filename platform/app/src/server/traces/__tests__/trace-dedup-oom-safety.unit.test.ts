@@ -52,23 +52,6 @@ describe("trace dedup OOM safety", () => {
   const traceServicePath = path.resolve(__dirname, "..", "clickhouse-trace.service.ts");
   const traceServiceSource = fs.readFileSync(traceServicePath, "utf-8");
 
-  // The org-wide counts moved into a repository so the CH client is reached
-  // through the App instead of resolved inline — see
-  // src/server/clickhouse/__tests__/clientAccessBoundary.unit.test.ts.
-  const instanceUsageStatsRepoPath = path.resolve(
-    __dirname,
-    "..",
-    "..",
-    "app-layer",
-    "usage-stats",
-    "repositories",
-    "instance-usage.clickhouse.repository.ts",
-  );
-  const instanceUsageStatsRepoSource = fs.readFileSync(
-    instanceUsageStatsRepoPath,
-    "utf-8",
-  );
-
   // ADR-051 moved the clustering domain into app-layer; the OOM-guarded
   // ClickHouse fetch lives in clustering.ts there now.
   const topicClusteringPath = path.resolve(
@@ -230,30 +213,6 @@ describe("trace dedup OOM safety", () => {
 
       it("delegates dedup to the IN-tuple helper", () => {
         expect(body).toContain("dedupInTuple");
-      });
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // instance-usage.clickhouse.repository.ts: findScenarioRunCount
-  // ---------------------------------------------------------------------------
-  describe("InstanceUsageStatsClickHouseRepository.findScenarioRunCount()", () => {
-    const body = extractMethodBody(instanceUsageStatsRepoSource, "findScenarioRunCount");
-
-    describe("when the scenario count query SQL is inspected", () => {
-      it("does not use LIMIT 1 BY for deduplication", () => {
-        expect(body).not.toContain("LIMIT 1 BY");
-      });
-
-      it("does not use SELECT * for counting", () => {
-        expect(body).not.toMatch(/SELECT\s+\*\s+FROM\s+simulation_runs/i);
-      });
-
-      it("uses max(UpdatedAt) GROUP BY for dedup", () => {
-        expect(body).toContain("max(UpdatedAt)");
-        expect(body).toMatch(
-          /GROUP BY\s+TenantId,\s*ScenarioSetId,\s*BatchRunId,\s*ScenarioRunId/,
-        );
       });
     });
   });

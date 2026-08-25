@@ -93,12 +93,42 @@ async function bootScenarioProcessor(
 
 // Per-tenant enqueue-rate anomaly detector (surfaces runaway tenants on
 // the Ops page).
-async function bootAnomalyWorker(shutdownHandles: ShutdownHandles): Promise<void> {
-  const { startAnomalyWorker } = await import("~/server/observability/anomalyWorker");
-  const anomalyWorker = startAnomalyWorker();
+async function bootOpsWorkers(
+  shutdownHandles: ShutdownHandles,
+  app: App,
+): Promise<void> {
+  const [opsWorker, { prisma }, flags, flagConfig] = await Promise.all([
+    import("~/runtime/worker/ops-workers.adapter"),
+    import("~/server/db"),
+    import("~/server/featureFlag"),
+    import("~/server/featureFlag/constants"),
+  ]);
+  const adapter = opsWorker.AppOpsWorkerAdapter.create({
+    anomaly: {
+      redis: app.redis ?? void 0,
+      featureFlags: flags.featureFlagService,
+      featureFlagConfig: {
+        killSwitchCacheTtlMs: flagConfig.KILL_SWITCH_CACHE_TTL_MS,
+      },
+    },
+    usageStats: {
+      database: prisma,
+      resolveClickHouseClient: app.clickhouse.resolveOrganizationClient,
+      config: opsWorker.resolveOpsWorkerConfig(process.env),
+      http: globalThis.fetch,
+    },
+  });
+
+  const anomalyWorker = adapter.startAnomalyWorker();
   if (anomalyWorker) {
     shutdownHandles.push(() => anomalyWorker.stop());
     logger.info("anomaly worker ready");
+  }
+
+  const usageStatsWorker = adapter.startUsageStatsWorker();
+  if (usageStatsWorker) {
+    shutdownHandles.push(() => usageStatsWorker.stop());
+    logger.info("usage stats worker ready");
   }
 }
 
@@ -146,17 +176,6 @@ async function bootRealtimeSessionPoller(
   });
   shutdownHandles.push(() => poller.stop());
   logger.info("realtime voice session poller ready");
-}
-
-// Self-hosted daily usage telemetry (no-op on SaaS or when
-// DISABLE_USAGE_STATS is set).
-async function bootUsageStatsWorker(shutdownHandles: ShutdownHandles): Promise<void> {
-  const { startUsageStatsWorker } = await import("~/server/usageStatsWorker");
-  const usageStatsWorker = startUsageStatsWorker();
-  if (usageStatsWorker) {
-    shutdownHandles.push(() => usageStatsWorker.stop());
-    logger.info("usage stats worker ready");
-  }
 }
 
 /**
@@ -518,9 +537,8 @@ export async function startWorkers(options: StartWorkersOptions): Promise<Worker
     // Langy turns self-drive: the process outbox dispatches to the Go manager,
     // which pushes signed frames to the relay. No in-process pool/executor to
     // boot; heartbeat recovery belongs to the direct liveness subscriber.
-    await bootAnomalyWorker(shutdownHandles);
+    await bootOpsWorkers(shutdownHandles, options.app);
     await bootSpendSpikeAnomalyWorker(shutdownHandles);
-    await bootUsageStatsWorker(shutdownHandles);
     await bootRealtimeSessionPoller(shutdownHandles);
     // One-time in-place data migrations (ADR-092 stage B and successors) are
     // NOT booted here: they are a worker-only background loop like the

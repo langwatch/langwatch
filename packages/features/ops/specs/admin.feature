@@ -51,3 +51,17 @@ Feature: Platform administration package boundary
     When an operator requests a conflicting control
     Then the service refuses with its stable scheduler error
     And no audit entry is written for the refused control
+
+  @unit
+  Scenario: The anomaly worker preserves its settling delay and retry interval
+    Given a composed tenant-rate anomaly detector
+    When the Ops worker contribution starts
+    Then its first tick runs after five seconds
+    And a failed tick retries after sixty seconds without stopping the worker
+
+  @unit
+  Scenario: Self-hosted usage telemetry is composed without package environment access
+    Given enabled self-hosted telemetry configuration and an organization list
+    When the Ops worker contribution reaches noon UTC
+    Then it sends one daily_usage_stats report per organization
+    And a failed organization report is captured without skipping later organizations
