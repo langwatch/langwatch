@@ -2,7 +2,7 @@ import { Button, Center, EmptyState, Spacer, Spinner } from "@chakra-ui/react";
 import { Database } from "lucide-react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { OpsDashboardContent } from "~/components/ops/dashboard";
-import { ConnectionStatusIndicator } from "~/components/ops/shared/ConnectionStatusIndicator";
+import { ConnectionStatusIndicator } from "@langwatch/ops-web";
 import { OpsPageShell } from "~/components/ops/shared/OpsPageShell";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDrawer } from "~/hooks/useDrawer";

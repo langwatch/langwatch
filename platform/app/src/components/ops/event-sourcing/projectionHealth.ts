@@ -1,4 +1,4 @@
-import type { PipelineNode } from "~/server/app-layer/ops/types";
+import type { PipelineNode } from "@langwatch/ops-contract";
 
 export interface ProjectionMeta {
   projectionName: string;

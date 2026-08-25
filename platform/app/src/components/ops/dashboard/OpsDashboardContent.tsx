@@ -1,11 +1,11 @@
 import { Card, Text, VStack } from "@chakra-ui/react";
+import type { DashboardData } from "@langwatch/ops-contract";
 import { useMemo } from "react";
 import { AnomaliesCard } from "~/components/ops/queues/AnomaliesCard";
 import { BlockedCard } from "~/components/ops/queues/BlockedCard";
 import { DlqCard } from "~/components/ops/queues/DlqCard";
 import { GroupsCard } from "~/components/ops/queues/GroupsCard";
 import { PipelineTreeCard } from "~/components/ops/queues/PipelineTreeCard";
-import type { DashboardData } from "~/server/app-layer/ops/types";
 import { api } from "~/utils/api";
 import { ActiveOperationsSection } from "./ActiveOperationsSection";
 import { HealthLine } from "./HealthLine";

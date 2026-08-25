@@ -1,5 +1,6 @@
 export * from "./admin-client";
 export * from "./backoffice";
+export * from "./backoffice.table";
 export * from "./blob-formatters";
 export * from "./blob-filters";
 export * from "./blob-toolbar";
@@ -24,6 +25,9 @@ export * from "./queue.pipeline-utils";
 export * from "./queue.presentation";
 export * from "./queue.types";
 export * from "./ops.connection-status-indicator";
+export * from "./ops.dashboard-axis-ticks";
+export * from "./ops.dashboard-health-line";
+export * from "./ops.dashboard-linked-stat";
 export * from "./ops.phase-timeline";
 export * from "./ops.replay-state-badge";
 export * from "./ops.snapshot-staleness";

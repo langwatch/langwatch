@@ -1,5 +1,5 @@
 import { Card, HStack, Table, Text } from "@chakra-ui/react";
-import type { DashboardData } from "~/server/app-layer/ops/types";
+import type { DashboardData } from "@langwatch/ops-contract";
 
 /**
  * Blocked-group error clusters.

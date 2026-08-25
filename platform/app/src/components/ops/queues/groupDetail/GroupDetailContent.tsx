@@ -9,8 +9,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { formatTimeAgo } from "@langwatch/ops-web";
+import type { GroupInfo } from "@langwatch/ops-contract";
 import type { JobEntry } from "~/server/app-layer/ops/repositories/queue.repository";
-import type { GroupInfo } from "~/server/app-layer/ops/types";
 import type { GrafanaDeepLinkConfig } from "~/utils/grafanaLinks";
 import { GroupStateBadge } from "../GroupStateBadge";
 import {

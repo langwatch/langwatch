@@ -1,60 +1,17 @@
-import { HStack, Stat, Text } from "@chakra-ui/react";
-import { ArrowUpRight } from "lucide-react";
+import { LinkedStat as OpsLinkedStat } from "@langwatch/ops-web";
+import type { LinkedStatProps } from "@langwatch/ops-web";
 import NextLink from "~/utils/compat/next-link";
 
-export function LinkedStat({
-  label,
-  value,
-  sublabel,
-  href,
-  color,
-  testId,
-  warning,
-  hint,
-}: {
-  label: string;
-  value: string;
-  sublabel?: string;
-  href?: string;
-  color?: string;
-  testId?: string;
-  warning?: boolean;
-  /** Hover explanation of what the figure is measured over. */
-  hint?: string;
-}) {
-  const content = (
-    <Stat.Root
-      cursor={href ? "pointer" : undefined}
-      _hover={href ? { bg: "bg.subtle" } : undefined}
-      borderRadius="md"
-      padding={2}
-      transition="background 0.1s"
-      data-testid={testId}
-      title={hint}
-      data-warning={warning === undefined ? undefined : warning ? "true" : "false"}
-    >
-      <Stat.Label whiteSpace="nowrap">
-        <HStack gap={1}>
-          <Text>{label}</Text>
-          {href && <ArrowUpRight size={10} />}
-        </HStack>
-      </Stat.Label>
-      <Stat.ValueText color={color} whiteSpace="nowrap">
-        {value}
-      </Stat.ValueText>
-      {sublabel && (
-        <Text textStyle="xs" color="fg.muted" fontWeight="normal" whiteSpace="nowrap">
-          {sublabel}
-        </Text>
-      )}
-    </Stat.Root>
-  );
-
-  if (!href) return content;
-
+/** App router adapter for the reusable Ops stat tile. */
+export function LinkedStat(props: LinkedStatProps) {
   return (
-    <NextLink href={href} style={{ textDecoration: "none" }}>
-      {content}
-    </NextLink>
+    <OpsLinkedStat
+      {...props}
+      link={(content, href) => (
+        <NextLink href={href} style={{ textDecoration: "none" }}>
+          {content}
+        </NextLink>
+      )}
+    />
   );
 }

@@ -1,9 +1,9 @@
 import { Box, Button, Card, HStack, Spacer, Text } from "@chakra-ui/react";
+import type { PipelineNode } from "@langwatch/ops-contract";
 import { useMemo, useState } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
-import type { PipelineNode } from "~/server/app-layer/ops/types";
 import { api } from "~/utils/api";
 import { filterTree, PipelineTreeFilter, PipelineTreeNode } from "@langwatch/ops-web";
 

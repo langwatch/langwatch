@@ -1,4 +1,5 @@
 import { Box, Button, Center, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import type { DashboardData } from "@langwatch/ops-contract";
 import { useMemo, useRef, useState } from "react";
 import {
   Area,
@@ -10,7 +11,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { DashboardData } from "~/server/app-layer/ops/types";
 
 const COLORS = {
   staged: { stroke: "#06b6d4", fill: "#06b6d4" },

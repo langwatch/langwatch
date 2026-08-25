@@ -1,6 +1,6 @@
 import { Badge, Card, HStack, Spacer, Status, Text, VStack } from "@chakra-ui/react";
+import type { DashboardData } from "@langwatch/ops-contract";
 import { useReplayStatus } from "~/hooks/useReplayStatus";
-import type { DashboardData } from "~/server/app-layer/ops/types";
 import NextLink from "~/utils/compat/next-link";
 
 export function ActiveOperationsSection({ data }: { data: DashboardData }) {

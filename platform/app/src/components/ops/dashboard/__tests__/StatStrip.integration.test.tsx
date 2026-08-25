@@ -8,9 +8,9 @@
  * direction depending on throughput.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { DashboardData, PhaseMetrics } from "@langwatch/ops-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { DashboardData, PhaseMetrics } from "~/server/app-layer/ops/types";
 import { StatStrip } from "../StatStrip";
 
 // The dead-letters tile reads the process-outbox side through the same query

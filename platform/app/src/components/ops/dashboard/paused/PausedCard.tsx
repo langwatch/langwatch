@@ -1,5 +1,5 @@
 import { Card, HStack, Separator, Text, VStack } from "@chakra-ui/react";
-import type { DashboardData } from "~/server/app-layer/ops/types";
+import type { DashboardData } from "@langwatch/ops-contract";
 import { ParkedTenantsSection } from "./ParkedTenantsSection";
 import { PausedSchedulesSection } from "./PausedSchedulesSection";
 import { PausedSubscribersSection } from "./PausedSubscribersSection";
