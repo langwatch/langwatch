@@ -14,13 +14,48 @@ vi.mock("../epoch", () => ({
 }));
 
 import { bumpAuthzEpoch } from "../epoch";
-import { ACTOR, harness, ORG_ID } from "./ledger-write-fork.harness";
+import { ACTOR, binding, harness, ORG_ID } from "./ledger-write-fork.harness";
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 describe("given an organization past the genesis import", () => {
+  describe("when the attached binding carries a date its access ends", () => {
+    it("puts the term on the command, alongside the rest of the fact", async () => {
+      const { writer, sent } = harness({ onLedger: true });
+
+      await writer.attachBindings({
+        organizationId: ORG_ID,
+        bindings: [{ ...binding, expiresAtMs: 1_800_000_000_000 }],
+        actor: ACTOR,
+        onDuplicate: "reject",
+      });
+
+      const attach = sent.find((entry) => entry.verb === "attachGrant");
+      expect(attach?.data).toMatchObject({
+        grant: { expiresAtMs: 1_800_000_000_000 },
+      });
+    });
+
+    it("leaves the key off the command entirely when there is no end date", async () => {
+      const { writer, sent } = harness({ onLedger: true });
+
+      await writer.attachBindings({
+        organizationId: ORG_ID,
+        bindings: [binding],
+        actor: ACTOR,
+        onDuplicate: "reject",
+      });
+
+      const attach = sent.find((entry) => entry.verb === "attachGrant");
+      const grant = (attach?.data as { grant: Record<string, unknown> }).grant;
+      // Absent, not undefined: every command sent before end dates existed
+      // carries no such key, and the two have to serialize the same way.
+      expect("expiresAtMs" in grant).toBe(false);
+    });
+  });
+
   describe("when a filtered revoke names a principal with Grant-head rows the compat head does not carry", () => {
     /** @scenario "A filtered revoke reaches Grant-head rows with no compat binding" */
     it("revokes the union of the compat ids and the translated Grant ids", async () => {

@@ -76,6 +76,11 @@ function toRow(binding: DecoratedRoleBinding): AccessListingBindingRow {
     scopeType: binding.scopeType,
     scopeId: binding.scopeId,
     createdAt: binding.createdAt,
+    // `RoleBinding` has no expiry column. An organization on this head
+    // cannot hold an expiring binding either - the ledger writer refuses to
+    // create one where it could not be stored - so null is the whole truth
+    // here, not a gap.
+    expiresAt: null,
     user: binding.user,
     group: binding.group,
     apiKey: binding.apiKey,

@@ -60,6 +60,10 @@ export const attachGrantEntrySchema = z
     /** Imported bindings only — the legacy `role` column a `custom:<id>`
      *  roleKey cannot carry (see the schema in events.ts). */
     legacyRole: legacyBindingRoleSchema.optional(),
+    /** The binding tiers' time box, carried straight onto the event (see the
+     *  schema in events.ts). Refused at RESOURCE scope by the shape
+     *  refinement below - a share link's expiry lives in its terms. */
+    expiresAtMs: z.number().int().positive().optional(),
     source: grantEventSourceSchema,
     actor: grantsLedgerActorSchema,
     /** Business time of the fact — a backfilled grant carries the legacy

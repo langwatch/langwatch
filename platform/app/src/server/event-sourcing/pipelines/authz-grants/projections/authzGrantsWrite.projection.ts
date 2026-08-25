@@ -132,9 +132,12 @@ export class AuthzGrantsWriteProjection
           : null,
         projectId: data.resource?.projectId ?? null,
         createdByUserId: data.resource?.createdByUserId ?? null,
-        expiresAt: data.resource?.expiresAtMs
-          ? new Date(data.resource.expiresAtMs)
-          : null,
+        // One column, two tiers, and they are mutually exclusive by the
+        // event's own shape refinement: a RESOURCE grant states its expiry
+        // inside its terms, every other tier states it on the grant. An
+        // event carrying neither - which is every event appended before
+        // expiring bindings existed - lands null, exactly as it always did.
+        expiresAt: expiryFrom(data.resource?.expiresAtMs ?? data.expiresAtMs),
         maxViews: data.resource?.maxViews ?? null,
         occurredAt: new Date(event.occurredAt),
       },
@@ -205,6 +208,11 @@ export class AuthzGrantsWriteProjection
       occurredAt: new Date(event.occurredAt),
     };
   }
+}
+
+/** A ledger expiry as the projection column holds it. */
+function expiryFrom(expiresAtMs: number | undefined): Date | null {
+  return expiresAtMs != null ? new Date(expiresAtMs) : null;
 }
 
 export const AUTHZ_GRANTS_WRITE_EVENT_TYPES = [

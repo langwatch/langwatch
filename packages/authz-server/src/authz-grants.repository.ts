@@ -33,6 +33,17 @@ export type RoleBindingWrite = {
   role: TeamUserRole;
   customRoleId: string | null;
   principal: BindingPrincipalWhere;
+  /**
+   * When the binding stops granting (ADR-092's expiring bindings). Optional,
+   * and absent on every existing call site: a binding without one grants
+   * until it is revoked, exactly as before.
+   *
+   * It is NOT part of the binding's identity - the partial unique indexes
+   * key on (principal, scope, role) and nothing else - so re-declaring the
+   * same binding with a different expiry is still a duplicate, and answers
+   * 409 rather than quietly re-dating a grant somebody else made.
+   */
+  expiresAtMs?: number;
 };
 
 /**

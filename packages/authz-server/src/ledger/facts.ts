@@ -109,6 +109,22 @@ export interface GrantFact {
    * deterministic.
    */
   legacyRole?: LegacyBindingRole;
+  /**
+   * When the grant stops granting, for the tiers that are not RESOURCE
+   * (a share link's expiry rides in `resource` alongside the rest of its
+   * terms, and always has).
+   *
+   * ADDITIVE and OPTIONAL, which is the whole contract: every event ever
+   * appended lacks this field, and a fact folded without it produces exactly
+   * the row it produced before - `Grant.expiresAt` null, granting until
+   * revoked. Nothing reads it at fold time either, so a replay of the old
+   * stream is byte-identical.
+   *
+   * Expiry is a READ-side fact. Nothing is written when the moment passes:
+   * `revokedAt` stays null, the epoch is not bumped, and the row remains for
+   * audit. The collector treats an elapsed row as absent (ADR-092 §2).
+   */
+  expiresAtMs?: number;
   source: GrantEventSource;
   /** Business time (backfilled facts carry the legacy row's createdAt). */
   occurredAtMs: number;

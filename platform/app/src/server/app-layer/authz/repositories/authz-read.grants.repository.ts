@@ -87,7 +87,12 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
         principalId: userId,
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
       },
-      select: { roleKey: true, scopeType: true, scopeId: true },
+      select: {
+        roleKey: true,
+        scopeType: true,
+        scopeId: true,
+        expiresAt: true,
+      },
     });
     return collectBindings({ rows, viaGroupId: () => null });
   }
@@ -123,6 +128,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
         scopeType: true,
         scopeId: true,
         principalId: true,
+        expiresAt: true,
       },
     });
     return collectBindings({ rows, viaGroupId: (row) => row.principalId });
@@ -145,7 +151,12 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
         principalId: apiKeyId,
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
       },
-      select: { roleKey: true, scopeType: true, scopeId: true },
+      select: {
+        roleKey: true,
+        scopeType: true,
+        scopeId: true,
+        expiresAt: true,
+      },
     });
     return collectBindings({ rows, viaGroupId: () => null });
   }
@@ -483,7 +494,12 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
  * a binding here would change a decision the cutover promised not to change.
  */
 function collectBindings<
-  TRow extends { roleKey: string | null; scopeType: string; scopeId: string },
+  TRow extends {
+    roleKey: string | null;
+    scopeType: string;
+    scopeId: string;
+    expiresAt: Date | null;
+  },
 >({
   rows,
   viaGroupId,
@@ -502,6 +518,11 @@ function collectBindings<
       scopeType: row.scopeType,
       scopeId: row.scopeId,
       viaGroupId: viaGroupId(row),
+      // Reported, never filtered. Whether an elapsed expiry means the
+      // binding is gone is POLICY, and it lives in the collector - which is
+      // also what makes the compat head, whose table has no such column,
+      // behave identically for every row that has none.
+      expiresAt: row.expiresAt,
     });
   }
   return bindings;

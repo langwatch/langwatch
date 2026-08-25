@@ -108,6 +108,51 @@ describe("grant row mapping", () => {
       expect(grantRowToFact(row).principal.type).toBe("apiKey");
     });
   });
+
+  // ADR-092's expiring bindings. The column is shared with the resource
+  // tier, which has always stated its own expiry inside its terms, so the
+  // mapping has to keep the two apart in both directions.
+  describe("when a fact carries the date its access ends", () => {
+    /** @scenario "A grant's end date survives a round trip through the projection" */
+    it("stores it on the row and reads back the same fact", () => {
+      const expiring = fact({ expiresAtMs: 1_756_000_000_000 });
+      const row = grantFactToRow({ grant: expiring, organizationId: ORG });
+
+      expect(row.expiresAt).toEqual(new Date(1_756_000_000_000));
+      expect(grantRowToFact(row)).toEqual(expiring);
+    });
+
+    it("keeps a resource fact's expiry inside its terms, not on the fact", () => {
+      const row = grantFactToRow({
+        grant: resourceFact(),
+        organizationId: ORG,
+      });
+
+      // One column, and it belongs to whichever tier the row is: a resource
+      // row that also reported a top-level expiry would round-trip into a
+      // fact the wire refuses.
+      expect(row.expiresAt).toEqual(new Date(1_756_000_000_000));
+      const back = grantRowToFact(row);
+      expect(back.expiresAtMs).toBeUndefined();
+      expect(back.resource?.expiresAtMs).toBe(1_756_000_000_000);
+    });
+  });
+
+  describe("when a fact predates end dates entirely", () => {
+    /** @scenario "A grant recorded before end dates existed still grants" */
+    it("writes no end date and folds exactly as it always did", () => {
+      const older = fact();
+      expect("expiresAtMs" in older).toBe(false);
+
+      const row = grantFactToRow({ grant: older, organizationId: ORG });
+
+      expect(row.expiresAt).toBeNull();
+      // Byte-for-byte the fact that went in: an additive field cannot show
+      // up in a replay of a stream that never carried it.
+      expect(grantRowToFact(row)).toEqual(older);
+      expect("expiresAtMs" in grantRowToFact(row)).toBe(false);
+    });
+  });
 });
 
 describe("role row mapping", () => {

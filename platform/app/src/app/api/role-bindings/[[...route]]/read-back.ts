@@ -39,6 +39,8 @@ export type BindingWire = {
   scopeId: string;
   scopeName: string | null;
   createdAt: Date;
+  /** When the binding stops granting, or null when it does not. */
+  expiresAt: Date | null;
 };
 
 /** The principal a create names — exactly one of the three id fields. */
@@ -64,6 +66,7 @@ export function optimisticBindingWire({
   customRoleId,
   scopeType,
   scopeId,
+  expiresAt,
   now = () => new Date(),
 }: {
   id: string;
@@ -72,6 +75,7 @@ export function optimisticBindingWire({
   customRoleId?: string | undefined;
   scopeType: RoleBindingScopeType;
   scopeId: string;
+  expiresAt?: Date | undefined;
   now?: () => Date;
 }): BindingWire {
   return {
@@ -84,6 +88,10 @@ export function optimisticBindingWire({
     scopeId,
     scopeName: null,
     createdAt: now(),
+    // The request's own term, echoed back. Unlike the names, this is
+    // something the caller stated rather than something the listing joins
+    // in, so the optimistic answer can state it exactly.
+    expiresAt: expiresAt ?? null,
   };
 }
 

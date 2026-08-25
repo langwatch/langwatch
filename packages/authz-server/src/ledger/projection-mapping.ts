@@ -140,17 +140,30 @@ export function grantFactToRow({
       grant.resource != null ? RESOURCE_KIND_TO_DB[grant.resource.kind] : null,
     projectId: grant.resource?.projectId ?? null,
     createdByUserId: grant.resource?.createdByUserId ?? null,
-    expiresAt:
-      grant.resource?.expiresAtMs != null
-        ? new Date(grant.resource.expiresAtMs)
-        : null,
+    // ONE column, two tiers. A resource fact states its expiry inside its
+    // terms (it always did); every other tier states it on the fact itself.
+    // The two are mutually exclusive by the shape refinement - a fact
+    // carrying terms is a RESOURCE fact - so `??` picks whichever is there
+    // rather than choosing between two live candidates.
+    expiresAt: expiryDate(grant.resource?.expiresAtMs ?? grant.expiresAtMs),
     maxViews: grant.resource?.maxViews ?? null,
     occurredAt: new Date(grant.occurredAtMs),
   };
 }
 
+/** A stored expiry as the column holds it. Written once so the two
+ *  directions of the mapping cannot disagree about what "no expiry" is. */
+function expiryDate(expiresAtMs: number | undefined): Date | null {
+  return expiresAtMs != null ? new Date(expiresAtMs) : null;
+}
+
 export function grantRowToFact(row: GrantRowShape): GrantFact {
   const resourceKind = resourceKindFromDb(row.resourceKind);
+  const isResourceRow =
+    row.token != null &&
+    row.permission != null &&
+    resourceKind !== undefined &&
+    row.projectId != null;
   return {
     grantId: row.id,
     principal: { type: PRINCIPAL_FROM_DB[row.principalType], id: row.principalId },
@@ -159,20 +172,23 @@ export function grantRowToFact(row: GrantRowShape): GrantFact {
     ...(row.legacyRole != null
       ? { legacyRole: row.legacyRole as LegacyBindingRole }
       : {}),
+    // The stored expiry belongs to whichever tier the row is. On a resource
+    // row it is part of the terms below and is NOT restated here, so a fact
+    // read back out of the projection is the fact that went in.
+    ...(!isResourceRow && row.expiresAt != null
+      ? { expiresAtMs: row.expiresAt.getTime() }
+      : {}),
     // All four identity columns or none, and the kind has to PARSE as one of
     // the two the tier has: a row missing one of them cannot describe a
     // resource grant, and inventing a default would put a fact in front of
     // the engine that names the wrong thing.
-    ...(row.token != null &&
-    row.permission != null &&
-    resourceKind !== undefined &&
-    row.projectId != null
+    ...(isResourceRow
       ? {
           resource: {
-            kind: resourceKind,
-            projectId: row.projectId,
-            token: row.token,
-            permission: row.permission,
+            kind: resourceKind as ResourceGrantTerms["kind"],
+            projectId: row.projectId as string,
+            token: row.token as string,
+            permission: row.permission as string,
             ...(row.createdByUserId != null
               ? { createdByUserId: row.createdByUserId }
               : {}),
