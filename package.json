@@ -8,11 +8,6 @@
     "type": "git",
     "url": "https://github.com/langwatch/langwatch.git"
   },
-  "engines": {
-    "node": ">=20",
-    "pnpm": ">=10"
-  },
-  "packageManager": "pnpm@10.24.0",
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter @langwatch/web dev",
@@ -38,7 +33,8 @@
     "lint:architecture:declarations": "pnpm --filter @langwatch/architecture-lint lint:declarations",
     "lint:architecture:migration": "pnpm --filter @langwatch/architecture-lint lint:migration",
     "lint:fix": "pnpm --filter @langwatch/web lint:fix",
-    "format": "pnpm --filter @langwatch/web format",
+    "format": "oxfmt --write --disable-nested-config .",
+    "format:check": "oxfmt --check --disable-nested-config .",
     "prepare:files": "pnpm --filter @langwatch/web start:prepare:files",
     "prisma:migrate": "pnpm --filter @langwatch/web prisma:migrate",
     "prisma:seed": "pnpm --filter @langwatch/web prisma:seed",
@@ -49,7 +45,13 @@
   "devDependencies": {
     "@0xdeafcafe/tslsp-cli": "0.6.0",
     "@typescript/native-preview": "7.0.0-dev.20260506.1",
+    "oxfmt": "0.63.0",
     "oxlint": "^1.78.0",
     "typescript": "^7.0.2"
-  }
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=10"
+  },
+  "packageManager": "pnpm@10.24.0"
 }

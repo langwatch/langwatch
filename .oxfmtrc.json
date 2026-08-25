@@ -1,0 +1,28 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 90,
+  "tabWidth": 2,
+  "useTabs": false,
+  "semi": true,
+  "singleQuote": false,
+  "trailingComma": "all",
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/coverage/**",
+    "**/.next/**",
+    "**/generated/**",
+    "**/*.min.*",
+    "**/testdata/**",
+    "**/fixtures/**",
+    "**/__fixtures__/**",
+    "charts/**/templates/**",
+    "specs/langy/langy-keys-plan.md",
+    "specs/langy/langy-pr4-plan.md",
+    "**/vendor/**",
+    "pnpm-lock.yaml",
+    "package-lock.json",
+    "yarn.lock"
+  ]
+}
