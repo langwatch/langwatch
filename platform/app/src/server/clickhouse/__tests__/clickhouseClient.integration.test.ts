@@ -330,6 +330,24 @@ describe("ClickHouse routing via env vars", () => {
 
       expect(client1).toBe(client2);
     });
+
+    it("shares one pool when organizations use the same private endpoint", async () => {
+      const {
+        clearCustomClientCache,
+        getClickHouseClientForOrganization,
+        getCustomClientCacheSize,
+      } = await import("../clickhouseClient");
+
+      await clearCustomClientCache();
+
+      const first = await getClickHouseClientForOrganization(PRIVATE_ORG_ID);
+      const second = await getClickHouseClientForOrganization(
+        PRIVATE_ORG_ID_WITHOUT_PROJECTS,
+      );
+
+      expect(second).toBe(first);
+      expect(getCustomClientCacheSize()).toBe(1);
+    });
   });
 
   describe("when getClickHouseClientForOrganization is called", () => {

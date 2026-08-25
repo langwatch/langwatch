@@ -69,8 +69,13 @@ function parsePrivateEnvVars(
   return map;
 }
 
-/** Cache of custom ClickHouse clients keyed by organizationId. */
-const customClientCache = new Map<string, ClickHouseClient>();
+type CachedPrivateClient = {
+  client: ClickHouseClient;
+  limiterInstance: string;
+};
+
+/** One pool per physical private endpoint, even when several orgs share it. */
+const customClientCache = new Map<string, CachedPrivateClient>();
 
 /** Cache of tenantId → organizationId to avoid repeated DB lookups. */
 const tenantOrgCache = new Map<string, string>();
@@ -196,16 +201,16 @@ export function isClickHouseEnabled(): boolean {
 }
 
 /**
- * Returns a cached ClickHouse client for the given org and URL,
+ * Returns a cached ClickHouse client for the given physical endpoint,
  * creating one if it doesn't exist yet.
  */
 function getOrCreateCustomClient(
   organizationId: string,
   route: PrivateRoute & { url: string },
 ): ClickHouseClient {
-  const cached = customClientCache.get(organizationId);
+  const cached = customClientCache.get(route.url);
   if (cached) {
-    return cached;
+    return cached.client;
   }
 
   // Built the same way as the shared client, which it previously was not: it
@@ -218,7 +223,10 @@ function getOrCreateCustomClient(
     instance: organizationId,
     cluster: route.cluster,
   });
-  customClientCache.set(organizationId, client);
+  customClientCache.set(route.url, {
+    client,
+    limiterInstance: organizationId,
+  });
   return client;
 }
 
@@ -228,11 +236,9 @@ function getOrCreateCustomClient(
  */
 export async function clearCustomClientCache(): Promise<void> {
   const closePromises: Promise<void>[] = [];
-  for (const [organizationId, client] of customClientCache) {
+  for (const { client, limiterInstance } of customClientCache.values()) {
     closePromises.push(client.close());
-    // Each private instance registered its limiter under its own org id; drop
-    // the probe with the client so the gauges describe only live limiters.
-    unregisterClickHouseLimiter(organizationId);
+    unregisterClickHouseLimiter(limiterInstance);
   }
   await Promise.all(closePromises);
   customClientCache.clear();
