@@ -1,6 +1,6 @@
 import {
   Alert,
-  Badge,
+  Box,
   Card,
   Heading,
   HStack,
@@ -12,8 +12,13 @@ import type {
   SelfServeGoLiveView,
   SelfServeSetupView,
 } from "@langwatch/identity-server";
+import {
+  connectionProtocolName,
+  connectionStatusChipFor,
+} from "~/features/sso/logic/connectionStatus";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
+import { IdentityChip } from "../access/IdentityRow";
 import { BreakGlassSection } from "./singleSignOn/BreakGlassSection";
 import { DomainsSection } from "./singleSignOn/DomainsSection";
 import { GoLiveSection } from "./singleSignOn/GoLiveSection";
@@ -193,19 +198,66 @@ function ConnectionSummary({
   connection: NonNullable<SelfServeSetupView["connection"]>;
   goLive: SelfServeGoLiveView | null;
 }) {
+  const chip = connectionStatusChipFor({
+    state: connection.state,
+    routingSwitchedOn: goLive?.routingSwitchedOn ?? false,
+  });
   return (
-    <Card.Root>
+    <Card.Root borderRadius="xl">
       <Card.Body>
         <VStack align="stretch" gap={3}>
-          <HStack width="full">
-            <Heading size="sm">Identity provider</Heading>
+          <HStack width="full" gap={2}>
+            <Box
+              width="8px"
+              height="8px"
+              borderRadius="full"
+              flexShrink={0}
+              backgroundColor={
+                chip.tone === "good"
+                  ? "green.solid"
+                  : chip.tone === "warning"
+                    ? "orange.solid"
+                    : chip.tone === "bad"
+                      ? "red.solid"
+                      : "border.emphasized"
+              }
+            />
+            <Heading size="sm">
+              {connectionProtocolName(connection.type)}
+            </Heading>
             <Spacer />
-            <Badge>{connection.state}</Badge>
+            <IdentityChip
+              label={chip.label}
+              tone={chip.tone}
+              title={chip.title}
+            />
           </HStack>
-          <Text>{connection.providerId}</Text>
-          {connection.issuer && (
-            <Text color="fg.muted">{connection.issuer}</Text>
-          )}
+          <HStack
+            gap={6}
+            paddingTop={2}
+            borderTopWidth="1px"
+            borderColor="border.muted"
+            justify="space-between"
+          >
+            <Text fontSize="sm" fontWeight="medium">
+              Identity provider
+            </Text>
+            <VStack align="end" gap={0} minWidth={0}>
+              <Text fontSize="sm">{connection.providerId}</Text>
+              {connection.issuer && (
+                <Text
+                  fontFamily="mono"
+                  fontSize="xs"
+                  color="fg.muted"
+                  truncate
+                  maxWidth="full"
+                  title={connection.issuer}
+                >
+                  {connection.issuer}
+                </Text>
+              )}
+            </VStack>
+          </HStack>
           {goLive?.activated &&
             (goLive.routingSwitchedOn ? (
               <Alert.Root status="success">

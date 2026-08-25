@@ -9,8 +9,8 @@ import Link from "~/utils/compat/next-link";
 import { useSearchParams } from "~/utils/compat/next-navigation";
 import { hardRedirect } from "~/utils/hardRedirect";
 import {
-  usePublishAuthStep,
   useAuthAnalytics,
+  usePublishAuthStep,
 } from "../hooks/useAuthAnalytics";
 import { useSignInRouting } from "../hooks/useSignInRouting";
 import { AUTH_SURFACE, SIGN_UP_STEP } from "../logic/authAnalytics";
@@ -23,21 +23,21 @@ import {
 } from "../logic/lastUsedMethod";
 import { usePasskeyCeremony } from "../logic/passkeyCeremony";
 import { useTwoStepChallenge } from "../logic/twoStepChallenge";
+import { AuthFinePrint } from "./AuthFinePrint";
 import { CheckYourEmail } from "./CheckYourEmail";
 import { CredentialSignInForm } from "./CredentialSignInForm";
-import { AuthFinePrint } from "./AuthFinePrint";
-import { IdentifierStepForm } from "./IdentifierStepForm";
 import { RoutedToConnection } from "./IdentifierFirstSignIn";
+import { IdentifierStepForm } from "./IdentifierStepForm";
 import {
   PasskeyCeremonyPanel,
   passkeyCeremonyTitle,
 } from "./PasskeyCeremonyPanel";
+import { SecondaryActionLink } from "./SecondaryActionLink";
 import {
   AlternativeMethods,
   hasAlternativeMethods,
   SignInMethodPicker,
 } from "./SignInMethodPicker";
-import { SecondaryActionLink } from "./SecondaryActionLink";
 import { SignUpCredentialForm } from "./SignUpCredentialForm";
 import { SuccessPulse } from "./SuccessPulse";
 import {
@@ -332,7 +332,9 @@ export function VerificationFirstSignUp() {
         onContinue={dialFederated}
         callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH}
         title="Create your LangWatch account"
-        footer={<LogInLink callbackUrl={callbackUrl} label="Log in instead" />}
+        footer={
+          <LogInLink callbackUrl={callbackUrl} label="Or log in instead" />
+        }
       />
     );
   }
@@ -411,7 +413,9 @@ export function VerificationFirstSignUp() {
           }
           setSigningUpEmail(email);
         }}
-        footer={<LogInLink callbackUrl={callbackUrl} label="Log in instead" />}
+        footer={
+          <LogInLink callbackUrl={callbackUrl} label="Or log in instead" />
+        }
         alternatives={
           hasAlternativeMethods(instanceMethods) ? (
             <AlternativeMethods
@@ -580,7 +584,9 @@ function LinkNoLongerWorks({
         // often a link somebody already used on another device, so the person
         // reading this may well have an account already — and burning a fresh
         // one to find that out is the round trip this saves.
-        footer={<LogInLink callbackUrl={callbackUrl} label="Log in instead" />}
+        footer={
+          <LogInLink callbackUrl={callbackUrl} label="Or log in instead" />
+        }
       />
     </AuthCard>
   );

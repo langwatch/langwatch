@@ -14,9 +14,10 @@ import { SHAPE } from "../authTheme";
  * left-aligned caption.
  *
  * Not a `MethodButton`: a method is a way to finish THIS screen; this is a
- * way to leave it for another. It says the action outright — "Create an
- * account", "Log in instead" — because its words have to work without the
- * sentence that used to lead into them.
+ * way to leave it for another. It says the action outright — "Or create an
+ * account instead", "Or log in instead" — the leading "Or" hanging it off
+ * the primary action above, so the pair reads as one sentence with a main
+ * clause and a quiet alternative.
  *
  * An anchor, not a button that navigates: it goes somewhere, so it is
  * something to open in a new tab, copy, and see the destination of on hover.

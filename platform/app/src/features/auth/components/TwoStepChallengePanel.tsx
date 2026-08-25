@@ -11,7 +11,7 @@ import {
   showTwoStepFactor,
   type TwoStepFactor,
 } from "../logic/twoStepChallenge";
-import { FIELD_FOCUS, FIELD_SURFACE, AuthField } from "./AuthField";
+import { AuthField, FIELD_FOCUS, FIELD_SURFACE } from "./AuthField";
 import { AuthPrimaryButton } from "./AuthPrimaryButton";
 
 /** How long an authenticator code is, everywhere it is asked for. */

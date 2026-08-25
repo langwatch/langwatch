@@ -1,14 +1,6 @@
-import {
-  Box,
-  Heading,
-  HStack,
-  IconButton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Heading, Text, VStack } from "@chakra-ui/react";
 import type { SelfServeSetupView } from "@langwatch/identity-server";
-import { Copy } from "lucide-react";
-import { toaster } from "../../ui/toaster";
+import { CopyValueRows } from "./CopyValueRow";
 
 /**
  * What LangWatch is, to somebody about to configure their identity provider
@@ -79,97 +71,7 @@ export function ServiceProviderDetails({
           )}
         </Text>
       </VStack>
-      <Box
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="lg"
-        overflow="hidden"
-      >
-        {rows.map((row, index) => (
-          <ServiceProviderValueRow
-            key={row.label}
-            label={row.label}
-            hint={row.hint}
-            value={row.value}
-            first={index === 0}
-          />
-        ))}
-      </Box>
+      <CopyValueRows rows={rows} />
     </VStack>
-  );
-}
-
-function ServiceProviderValueRow({
-  label,
-  hint,
-  value,
-  first,
-}: {
-  label: string;
-  hint: string;
-  value: string;
-  first: boolean;
-}) {
-  const copy = () => {
-    if (!navigator.clipboard) {
-      toaster.create({
-        title: `Your browser does not support clipboard access, please copy the ${label} manually`,
-        type: "error",
-        duration: 2000,
-      });
-      return;
-    }
-    void navigator.clipboard.writeText(value).then(() => {
-      toaster.create({
-        title: `${label} copied to your clipboard`,
-        type: "success",
-        duration: 2000,
-      });
-    });
-  };
-
-  return (
-    <HStack
-      gap={3}
-      paddingX={3.5}
-      paddingY={2.5}
-      borderTopWidth={first ? 0 : "1px"}
-      borderColor="border.muted"
-      cursor="pointer"
-      _hover={{ backgroundColor: "bg.subtle" }}
-      onClick={copy}
-    >
-      <VStack align="stretch" gap={0.5} minWidth={0} flex="1">
-        <HStack gap={2}>
-          <Text fontSize="sm" fontWeight="medium">
-            {label}
-          </Text>
-          <Text fontSize="xs" color="fg.muted">
-            {hint}
-          </Text>
-        </HStack>
-        <Text
-          fontFamily="mono"
-          fontSize="xs"
-          color="fg.muted"
-          truncate
-          title={value}
-        >
-          {value}
-        </Text>
-      </VStack>
-      <IconButton
-        aria-label={`Copy ${label}`}
-        size="xs"
-        variant="ghost"
-        flexShrink={0}
-        onClick={(event) => {
-          event.stopPropagation();
-          copy();
-        }}
-      >
-        <Copy size={14} />
-      </IconButton>
-    </HStack>
   );
 }

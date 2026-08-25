@@ -43,7 +43,7 @@ export function GoLiveSection({
 
   if (goLive.activated) {
     return (
-      <Text color="fg.muted">
+      <Text color="fg.muted" fontSize="sm">
         This connection is on. The banner at the top of the page says whether
         sign-in is being decided by it yet.
       </Text>
@@ -114,9 +114,9 @@ function Precondition({
         tone={met ? "good" : "warning"}
       />
       <VStack align="start" gap={0}>
-        <Text>{met ? metText : unmetText}</Text>
+        <Text fontSize="sm">{met ? metText : unmetText}</Text>
         {!met && (
-          <Text fontSize="sm" color="fg.muted">
+          <Text fontSize="xs" color="fg.muted">
             {next}
           </Text>
         )}

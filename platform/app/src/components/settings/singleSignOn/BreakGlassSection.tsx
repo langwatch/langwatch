@@ -55,7 +55,7 @@ export function BreakGlassSection({
 
   return (
     <VStack align="stretch" gap={3}>
-      <Text color="fg.muted">
+      <Text color="fg.muted" fontSize="sm">
         Once single sign-on decides who gets in, everyone goes through your
         identity provider. Name one person who can still sign in with a password
         if it ever stops working, so nobody has to wait for us to let them back
@@ -67,7 +67,7 @@ export function BreakGlassSection({
       ) : bindings.isLoading ? (
         <Text color="fg.muted">Loading…</Text>
       ) : live.length === 0 ? (
-        <Text color="fg.muted">
+        <Text color="fg.muted" fontSize="sm">
           Nobody can get in without your identity provider yet.
         </Text>
       ) : (
