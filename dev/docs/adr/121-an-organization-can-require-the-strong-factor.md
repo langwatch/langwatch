@@ -2,7 +2,12 @@
 
 **Date:** 2026-08-25
 
-**Status:** Proposed — Wave 3, not built here
+**Status:** Accepted — Wave 3 (pulled in 2026-08-25, Alex): builds after D05
+lands the permission registry entries and D06 lands the condition machinery,
+last in the wave. The adoption precondition is met in kind — ADR-120's nudge
+and the settings surface shipped with the front door — and the pre-flight
+lockout count below is the remaining safety, so it ships **with** the setting,
+not after it.
 
 **Program:** Identity platform redesign — epic `../identity-platform-redesign.md`,
 plan `../identity-platform/delivery-plan.md`, deliverables `D06-mfa-and-session-shape.md`
