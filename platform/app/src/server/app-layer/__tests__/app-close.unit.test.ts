@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { SHUTDOWN_BUDGET } from "~/server/shutdown/budget";
-import { App } from "../app";
+import { App, AppShutdownResources, type AppShutdownPhase } from "../app";
 import type { AppDependencies } from "../dependencies";
 
 /**
@@ -16,13 +16,50 @@ function appWith({
   closeables,
 }: {
   eventSourcingClose?: () => Promise<void>;
-  closeables: Array<{ name: string; close: () => Promise<void> }>;
+  closeables: Array<{
+    phase?: AppShutdownPhase;
+    name: string;
+    close: () => Promise<void>;
+  }>;
 }): App {
+  const shutdownResources = new AppShutdownResources();
+  for (const closeable of closeables) {
+    shutdownResources.register(
+      closeable.phase ?? "database",
+      closeable.name,
+      closeable.close,
+    );
+  }
+
   return new App({
     commands: emptyCommands,
-    _eventSourcing: eventSourcingClose ? { close: eventSourcingClose } : undefined,
-    _gracefulCloseables: closeables,
+    evaluations: {},
+    _eventSourcing: eventSourcingClose ? { close: eventSourcingClose } : void 0,
+    _shutdownResources: shutdownResources,
   } as unknown as AppDependencies);
+}
+
+function deferred(): {
+  started: Promise<void>;
+  start: () => void;
+  promise: Promise<void>;
+  resolve: () => void;
+} {
+  let start: (() => void) | undefined;
+  const started = new Promise<void>((next) => {
+    start = next;
+  });
+  let resolve: (() => void) | undefined;
+  const promise = new Promise<void>((next) => {
+    resolve = next;
+  });
+
+  return {
+    started,
+    start: () => start?.(),
+    promise,
+    resolve: () => resolve?.(),
+  };
 }
 
 describe("App.close", () => {
@@ -114,6 +151,156 @@ describe("App.close", () => {
 
         await expect(app.close()).resolves.toBeUndefined();
         expect(closed).toEqual(["redis"]);
+      });
+    });
+  });
+
+  describe("given resources which depend on different roots", () => {
+    describe("when the App is closed", () => {
+      it("settles each shutdown phase before starting the next", async () => {
+        const order: string[] = [];
+        const subscriber = deferred();
+        const redis = deferred();
+        const clickhouse = deferred();
+        const database = deferred();
+
+        const app = appWith({
+          closeables: [
+            {
+              phase: "subscriber",
+              name: "subscriber",
+              close: async () => {
+                order.push("subscriber:start");
+                subscriber.start();
+                await subscriber.promise;
+                order.push("subscriber:end");
+              },
+            },
+            {
+              phase: "redis",
+              name: "redis",
+              close: async () => {
+                order.push("redis:start");
+                redis.start();
+                await redis.promise;
+                order.push("redis:end");
+              },
+            },
+            {
+              phase: "clickhouse",
+              name: "clickhouse",
+              close: async () => {
+                order.push("clickhouse:start");
+                clickhouse.start();
+                await clickhouse.promise;
+                order.push("clickhouse:end");
+              },
+            },
+            {
+              phase: "database",
+              name: "prisma",
+              close: async () => {
+                order.push("database:start");
+                database.start();
+                await database.promise;
+                order.push("database:end");
+              },
+            },
+          ],
+        });
+
+        const closing = app.close();
+        expect(order).toEqual(["subscriber:start"]);
+
+        subscriber.resolve();
+        await redis.started;
+        expect(order).toEqual(["subscriber:start", "subscriber:end", "redis:start"]);
+
+        redis.resolve();
+        await clickhouse.started;
+        expect(order).toEqual([
+          "subscriber:start",
+          "subscriber:end",
+          "redis:start",
+          "redis:end",
+          "clickhouse:start",
+        ]);
+
+        clickhouse.resolve();
+        await database.started;
+        expect(order).toEqual([
+          "subscriber:start",
+          "subscriber:end",
+          "redis:start",
+          "redis:end",
+          "clickhouse:start",
+          "clickhouse:end",
+          "database:start",
+        ]);
+
+        database.resolve();
+        await closing;
+        expect(order).toEqual([
+          "subscriber:start",
+          "subscriber:end",
+          "redis:start",
+          "redis:end",
+          "clickhouse:start",
+          "clickhouse:end",
+          "database:start",
+          "database:end",
+        ]);
+      });
+
+      it("continues with later phases when an earlier resource fails", async () => {
+        const closed: string[] = [];
+        const app = appWith({
+          closeables: [
+            {
+              phase: "subscriber",
+              name: "subscriber",
+              close: async () => {
+                throw new Error("subscriber close failed");
+              },
+            },
+            {
+              phase: "redis",
+              name: "redis",
+              close: async () => {
+                closed.push("redis");
+              },
+            },
+            {
+              phase: "clickhouse",
+              name: "clickhouse",
+              close: async () => {
+                closed.push("clickhouse");
+              },
+            },
+            {
+              phase: "database",
+              name: "prisma",
+              close: async () => {
+                closed.push("prisma");
+              },
+            },
+          ],
+        });
+
+        await expect(app.close()).resolves.toBeUndefined();
+        expect(closed).toEqual(["redis", "clickhouse", "prisma"]);
+      });
+
+      it("closes each resource once when close is called repeatedly", async () => {
+        const close = vi.fn(async () => void 0);
+        const app = appWith({
+          closeables: [{ phase: "database", name: "prisma", close }],
+        });
+
+        await Promise.all([app.close(), app.close()]);
+        await app.close();
+
+        expect(close).toHaveBeenCalledOnce();
       });
     });
   });

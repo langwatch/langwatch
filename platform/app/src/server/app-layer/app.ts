@@ -16,6 +16,54 @@ type SettleOutcome =
   | { status: "failed"; error: unknown }
   | { status: "timeout" };
 
+export const APP_SHUTDOWN_PHASES = [
+  "subscriber",
+  "redis",
+  "clickhouse",
+  "database",
+] as const;
+
+export type AppShutdownPhase = (typeof APP_SHUTDOWN_PHASES)[number];
+
+type AppShutdownResource = {
+  name: string;
+  close: () => Promise<void>;
+};
+
+/**
+ * Owns resources which outlive a request and the order in which their
+ * connections can safely disappear. A subscriber may use Redis while it
+ * settles; query services may use ClickHouse; only then can their roots go.
+ */
+export class AppShutdownResources {
+  private readonly resources = new Map<AppShutdownPhase, AppShutdownResource[]>();
+
+  register(phase: AppShutdownPhase, name: string, close: () => Promise<void>): void {
+    const phaseResources = this.resources.get(phase) ?? [];
+    phaseResources.push({ name, close });
+    this.resources.set(phase, phaseResources);
+  }
+
+  async close(): Promise<void> {
+    for (const phase of APP_SHUTDOWN_PHASES) {
+      await this.closePhase(phase);
+    }
+  }
+
+  private async closePhase(phase: AppShutdownPhase): Promise<void> {
+    for (const resource of this.resources.get(phase) ?? []) {
+      try {
+        await resource.close();
+      } catch (error) {
+        logger.error(
+          { phase, name: resource.name, error },
+          "Failed to close application resource",
+        );
+      }
+    }
+  }
+}
+
 /**
  * Runs `run` under a deadline, reporting WHICH way it ended.
  *
@@ -133,10 +181,8 @@ export class App {
   get authzMigration(): AppDependencies["_authzMigration"] {
     return this._authzMigration;
   }
-  private readonly _gracefulCloseables: Array<{
-    name: string;
-    close: () => Promise<void>;
-  }>;
+  private readonly _shutdownResources: AppShutdownResources;
+  private closePromise: Promise<void> | undefined;
 
   constructor(deps: AppDependencies) {
     this.config = deps.config;
@@ -207,15 +253,15 @@ export class App {
     this.sharedTraceCache = deps.sharedTraceCache;
     this._eventSourcing = deps._eventSourcing;
     this._authzMigration = deps._authzMigration;
-    this._gracefulCloseables = deps._gracefulCloseables ?? [];
+    this._shutdownResources = deps._shutdownResources ?? new AppShutdownResources();
   }
 
   /**
-   * Shut down in two ordered phases: drain the work, then drop the transports
-   * it was using.
+   * Shut down in order: drain the work, then close dependent resources before
+   * the roots they use.
    *
-   * These MUST NOT overlap. The graceful closeables are ClickHouse, Redis and
-   * Prisma — the very connections the event-sourcing consumer is still issuing
+   * These MUST NOT overlap. The resources include ClickHouse, Redis and Prisma
+   * — the very connections the event-sourcing consumer is still issuing
    * statements over while it drains. Closing them concurrently destroys the
    * ClickHouse HTTP client mid-request, which the server reports as
    * `Broken pipe, while writing to socket ... ParallelFormattingOutputFormat`
@@ -244,6 +290,11 @@ export class App {
   }: {
     terminating?: boolean;
   } = {}): Promise<void> {
+    this.closePromise ??= this.closeOnce({ terminating });
+    return this.closePromise;
+  }
+
+  private async closeOnce({ terminating }: { terminating: boolean }): Promise<void> {
     if (this._eventSourcing) {
       const eventSourcing = this._eventSourcing;
       const outcome = await settleWithTimeout({
@@ -280,15 +331,7 @@ export class App {
       }
     }
 
-    await Promise.allSettled(
-      this._gracefulCloseables.map(async (c) => {
-        try {
-          await c.close();
-        } catch (error) {
-          logger.error({ name: c.name, error }, "Failed to close");
-        }
-      }),
-    );
+    await this._shutdownResources.close();
   }
 }
 
@@ -341,7 +384,7 @@ export function tryGetApp(): App | null {
 
 export async function resetApp(): Promise<void> {
   // Close the previous App before dropping the singleton so its EventSourcing
-  // and graceful-closeable handles (Redis, queue workers, etc.) don't leak
+  // and shutdown resources (Redis, queue workers, etc.) don't leak
   // into the next test. Without this the prior App is orphaned and its open
   // handles keep vitest's single fork worker from exiting between files.
   const existing = globalForApp.__langwatch_app;

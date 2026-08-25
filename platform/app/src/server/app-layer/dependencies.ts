@@ -3,6 +3,7 @@ import type { AgentService } from "@langwatch/agent-contract";
 import type { WebhookEventsClickHouseRepository } from "~/runtime/app/features/webhooks";
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import type { EventSourcing } from "@langwatch/eventing";
+import type { AppShutdownResources } from "./app";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { PresenceService } from "@langwatch/presence-contract";
 import type { SecretService } from "@langwatch/secret-contract";
@@ -396,6 +397,6 @@ export interface AppDependencies {
   /** Internal — the package-owned AuthZ migration installed by the runtime. */
   _authzMigration?: SystemMigration;
 
-  /** Internal — resources to gracefully close on shutdown. */
-  _gracefulCloseables?: Array<{ name: string; close: () => Promise<void> }>;
+  /** Internal — process resources owned and closed by App. */
+  _shutdownResources?: AppShutdownResources;
 }

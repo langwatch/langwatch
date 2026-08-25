@@ -241,7 +241,7 @@ import {
 import { stripUnsupportedLLMParamsFromWorkflow } from "../workflows/stripUnsupportedLLMParams";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { nlpgoFetch } from "../nlpgo/nlpgoFetch";
-import { App, getApp, globalForApp, initializeApp } from "./app";
+import { App, AppShutdownResources, getApp, globalForApp, initializeApp } from "./app";
 import { demoProjectId } from "./authz/demo-project";
 import { testFireTrigger } from "./automations/trigger-template.service";
 import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.service";
@@ -1884,22 +1884,14 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     editOverlay: TraceEditOverlayService.create(prisma),
   };
 
-  // Collect closeables for graceful shutdown
-  const gracefulCloseables: Array<{
-    name: string;
-    close: () => Promise<void>;
-  }> = [];
-  gracefulCloseables.push({
-    name: "langwatchql",
-    close: () => langWatchQL.close(),
-  });
+  // Subscribers must settle before their transports disappear. The App owns
+  // this sequence so every process role follows the same connection order.
+  const shutdownResources = new AppShutdownResources();
+  shutdownResources.register("clickhouse", "langwatchql", () => langWatchQL.close());
   if (clickhouseEnabled) {
-    gracefulCloseables.push({
-      name: "clickhouse",
-      close: async () => {
-        await clearCustomClientCache();
-        await closeClickHouseClient();
-      },
+    shutdownResources.register("clickhouse", "clickhouse", async () => {
+      await clearCustomClientCache();
+      await closeClickHouseClient();
     });
   }
   // BEFORE the Redis closeable, deliberately: stopping the writer hands the
@@ -1907,43 +1899,27 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   // fleet electing a new writer immediately and going without one for the
   // remainder of the lease window — the rolling-deploy case. Once Redis is
   // disconnected the release can no longer be issued at all.
-  gracefulCloseables.push({
-    name: "ops-snapshot",
-    close: async () => {
-      await ops.metricsCollector?.stop();
-      ops.snapshotReader?.stop();
-    },
+  shutdownResources.register("subscriber", "ops-snapshot", async () => {
+    await ops.metricsCollector?.stop();
+    ops.snapshotReader?.stop();
   });
   if (redis) {
-    gracefulCloseables.push({
-      name: "redis",
-      close: () => redisShutdown.shutdown(redis),
-    });
+    shutdownResources.register("redis", "redis", () => redisShutdown.shutdown(redis));
   }
-  gracefulCloseables.push({
-    name: "broadcast",
-    close: async () => {
-      await broadcast.close();
-    },
+  shutdownResources.register("subscriber", "broadcast", async () => {
+    await broadcast.close();
   });
   if (scheduler) {
-    gracefulCloseables.push({
-      name: "scheduler",
-      close: () => scheduler.stop(),
-    });
+    shutdownResources.register("subscriber", "scheduler", () => scheduler.stop());
   }
   if (systemMigrations) {
     // Aborts the pass between tenants; a truncated pass is harmless because
     // every migration is idempotent and the next boot resumes the sweep.
-    gracefulCloseables.push({
-      name: "system-migrations",
-      close: () => systemMigrations.stop(),
-    });
+    shutdownResources.register("subscriber", "system-migrations", () =>
+      systemMigrations.stop(),
+    );
   }
-  gracefulCloseables.push({
-    name: "prisma",
-    close: () => prisma.$disconnect(),
-  });
+  shutdownResources.register("database", "prisma", () => prisma.$disconnect());
 
   const notifications = NotificationService.create({
     config: {
@@ -2158,7 +2134,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     ops,
     _eventSourcing: es,
     _authzMigration: authzFeature.migration,
-    _gracefulCloseables: gracefulCloseables,
+    _shutdownResources: shutdownResources,
   });
   processApp = app;
   return app;
