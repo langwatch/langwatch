@@ -178,14 +178,20 @@ describe("redactAttributeNative", () => {
     // these names would trade one hole for a worse one, so only the shape-only
     // rules are skipped and a real credential parked under a reserved name is
     // still replaced by the rule that names its vendor.
+    //
+    // The tokens are assembled at run time. A complete credential-shaped
+    // literal in the source reads as a committed secret to every scanner that
+    // walks the repository, the CI gitleaks step included.
     /** @scenario "A credential under a reserved identifier attribute is still redacted" */
     it.each([
-      ["a provider key", "sk-ant-" + "A".repeat(40)],
-      ["a GitHub token", "ghp_" + "b".repeat(38)],
-      ["an AWS access key id", "AKIA" + "C".repeat(16)],
+      ["a provider key", `sk-ant-${"A".repeat(40)}`],
+      ["a GitHub token", `ghp_${"b".repeat(38)}`],
+      ["an AWS access key id", `AKIA${"C".repeat(16)}`],
       [
         "a JWT",
-        "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dBjftJeZ4CVPmB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+        ["eyJhbGciOiJIUzI1NiJ9", "eyJzdWIiOiJhY21lIn0", "c2lnbmF0dXJl"].join(
+          ".",
+        ),
       ],
       ["a connection URL password", "postgres://user:hunter2abc@db.internal/x"],
     ])("still redacts %s under every reserved name", (_label, value) => {
