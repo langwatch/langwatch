@@ -1,7 +1,10 @@
 import type { PresenceSession } from "@langwatch/presence-contract";
 import { ProjectService } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
-import { PresenceBroadcastPort } from "../src/ports/presence.port";
+import {
+  PresenceBroadcastPort,
+  PresenceDiagnosticsPort,
+} from "../src/ports/presence.port";
 import { PresenceRepository } from "../src/repositories/presence.repository";
 import { PresenceService } from "../src/services/presence.service";
 
@@ -23,6 +26,10 @@ class StubRepository extends PresenceRepository {
 
 class RecordingBroadcast extends PresenceBroadcastPort {
   publish = vi.fn(async () => undefined);
+}
+
+class RecordingDiagnostics extends PresenceDiagnosticsPort {
+  warn = vi.fn();
 }
 
 type StubProjects = ProjectService & { enabled: boolean };
@@ -74,7 +81,49 @@ describe("PresenceService", () => {
       30,
     );
     expect(broadcast.publish).toHaveBeenCalledWith(
-      expect.objectContaining({ channel: "presence_updated" }),
+      expect.objectContaining({
+        projectId: "project-1",
+        channel: "presence_updated",
+        rateLimited: false,
+        event: JSON.stringify({
+          kind: "join",
+          session: {
+            ...session,
+            updatedAt: 42,
+          },
+        }),
+      }),
+    );
+  });
+
+  it("publishes an update only when the location changes", async () => {
+    const { service, repository, broadcast } = createService();
+    repository.current = session;
+
+    await service.update({
+      projectId: session.projectId,
+      sessionId: session.sessionId,
+      user: session.user,
+      location: {
+        ...session.location,
+        route: { conversationId: "conversation-1" },
+      },
+    });
+
+    expect(broadcast.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: JSON.stringify({
+          kind: "update",
+          session: {
+            ...session,
+            location: {
+              ...session.location,
+              route: { conversationId: "conversation-1" },
+            },
+            updatedAt: 42,
+          },
+        }),
+      }),
     );
   });
 
@@ -108,8 +157,49 @@ describe("PresenceService", () => {
     });
     expect(broadcast.publish).toHaveBeenCalledWith(
       expect.objectContaining({
+        projectId: "project-1",
         channel: "presence_cursor",
         rateLimited: true,
+        event: JSON.stringify({
+          projectId: "project-1",
+          sessionId: "tab-1",
+          user: session.user,
+          anchor: "trace:trace-1",
+          x: 0.25,
+          y: 0.75,
+          emittedAt: 42,
+        }),
+      }),
+    );
+  });
+
+  it("keeps broadcast failures off the persistence path", async () => {
+    const broadcast = new RecordingBroadcast();
+    broadcast.publish.mockRejectedValue(new Error("broadcast unavailable"));
+    const diagnostics = new RecordingDiagnostics();
+    const repository = new StubRepository();
+    const service = PresenceService.create({
+      repository,
+      broadcast,
+      projects: createProjects(),
+      diagnostics,
+      now: () => 42,
+    });
+
+    await expect(
+      service.update({
+        projectId: session.projectId,
+        sessionId: session.sessionId,
+        user: session.user,
+        location: session.location,
+      }),
+    ).resolves.toMatchObject({ updatedAt: 42 });
+    expect(repository.upsert).toHaveBeenCalledOnce();
+    expect(diagnostics.warn).toHaveBeenCalledWith(
+      "Failed to broadcast presence event",
+      expect.objectContaining({
+        projectId: "project-1",
+        channel: "presence_updated",
       }),
     );
   });
