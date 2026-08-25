@@ -42,6 +42,7 @@ import { graphsRouter } from "./routers/graphs";
 import { groupRouter } from "./routers/group";
 import { homeRouter } from "./routers/home";
 import { httpProxyRouter } from "./routers/httpProxy";
+import { identityRouter } from "./routers/identity";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
 import { langyRouter } from "./routers/langy";
 import { langyEgressRouter } from "./routers/langyEgress";
@@ -118,6 +119,7 @@ const coreRouters = {
   limits: limitsRouter,
   automation: automationRouter,
   authz: authzRouter,
+  identity: identityRouter,
   experiments: experimentsRouter,
   featureFlag: featureFlagRouter,
   annotation: annotationRouter,

@@ -230,6 +230,25 @@ export const FEATURE_FLAGS = [
     description:
       "Externalizes inline media (audio, images, files) from span content into the content-addressed stored-objects store at the ingestion edge, replacing base64 payloads with /api/files references. Off = media stays inline through the pipeline as before. Note: stored media is not yet covered by retention deletion; enable knowingly.",
   },
+  // ADR-116 §3. The allowlist for the born-finalized entrance: a sign-up on
+  // a flag-listed organization is created ON the identity branch — its
+  // identifier history goes into the event log and its migration state is
+  // finalized before sign-up returns — instead of being created on the
+  // legacy branch and migrated off it later.
+  //
+  // Default OFF, and it must stay off until the entrance is hardened: a
+  // flagged sign-up is deliberately COUPLED to engine availability and fails
+  // loudly (`identity_engine_unavailable`) when the event stack is down,
+  // rather than falling back. That coupling is acceptable only while the
+  // population is an operator-chosen allowlist. Target it with a store
+  // targeting rule per organization; the env override is the dev-loop lever.
+  {
+    key: "release_identity_born_finalized_signup",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Creates new users directly on the identity branch: their sign-in history is recorded as identity events and their migration state is finalized as part of sign-up, instead of being backfilled afterwards. Off = new users are created exactly as before. Sign-up on a targeted organization fails rather than falling back when the event-sourcing stack is unavailable, so enable it per organization, knowingly.",
+  },
   {
     key: "release_ui_ai_governance_enabled",
     scope: "PRODUCT",

@@ -22,8 +22,10 @@ The properties the contract guarantees:
   per pass; everyone else stands down. Losing the lease mid-pass just ends
   the pass early — migrations are idempotent by contract.
 - **Self-hosted migrates silently.** The cohort predicate is composition:
-  self-hosted answers true for every tenant; cloud reads a rollout cohort
-  from the environment and widens it deliberately.
+  self-hosted answers true for every tenant; cloud answers from the
+  migration's own `enrolledAutomatically` declaration, and for a migration
+  still mid-rollout, from the per-migration enrollment rows an operator
+  writes.
 - **Finalization is proved, not assumed.** A migration returns `finalized`
   only when it verified the tenant behaves identically without its legacy
   path; disagreements hold the tenant (`migrated`) with a report, and later
