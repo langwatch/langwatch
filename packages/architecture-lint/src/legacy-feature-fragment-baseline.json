@@ -673,26 +673,6 @@
     },
     {
       "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/graph-trigger-evaluation.service.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/graph-trigger-heartbeat.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/graph-trigger-sent.repository.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/matchEverything.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
       "file": "platform/app/src/server/app-layer/automations/providers/annotationQueue/server.ts",
       "kind": "legacy-implementation"
     },
@@ -729,16 +709,6 @@
     {
       "feature": "automation",
       "file": "platform/app/src/server/app-layer/automations/report.builder.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/runaway-containment.deps.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "automation",
-      "file": "platform/app/src/server/app-layer/automations/runaway-containment.service.ts",
       "kind": "legacy-implementation"
     },
     {
@@ -3248,16 +3218,6 @@
     },
     {
       "feature": "ops",
-      "file": "platform/app/src/components/ops/blobs/BlobFilters.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "ops",
-      "file": "platform/app/src/components/ops/blobs/blobFormatters.ts",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "ops",
       "file": "platform/app/src/components/ops/blobs/BlobRow.tsx",
       "kind": "page-shell"
     },
@@ -3274,11 +3234,6 @@
     {
       "feature": "ops",
       "file": "platform/app/src/components/ops/blobs/BlobTable.tsx",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "ops",
-      "file": "platform/app/src/components/ops/blobs/BlobToolbar.tsx",
       "kind": "page-shell"
     },
     {
@@ -3943,11 +3898,6 @@
     },
     {
       "feature": "ops",
-      "file": "platform/app/src/components/ops/shared/formatters.ts",
-      "kind": "page-shell"
-    },
-    {
-      "feature": "ops",
       "file": "platform/app/src/components/ops/shared/Kbd.tsx",
       "kind": "page-shell"
     },
@@ -4143,18 +4093,8 @@
     },
     {
       "feature": "ops",
-      "file": "platform/app/src/runtime/app/features/admin.ts",
-      "kind": "composition"
-    },
-    {
-      "feature": "ops",
       "file": "platform/app/src/server/api/routers/ops.ts",
       "kind": "transport"
-    },
-    {
-      "feature": "ops",
-      "file": "platform/app/src/server/app-layer/ops/blob-store.service.ts",
-      "kind": "legacy-implementation"
     },
     {
       "feature": "ops",
@@ -4199,16 +4139,6 @@
     {
       "feature": "ops",
       "file": "platform/app/src/server/app-layer/ops/replay.service.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "ops",
-      "file": "platform/app/src/server/app-layer/ops/repositories/blob-store.redis.repository.ts",
-      "kind": "legacy-implementation"
-    },
-    {
-      "feature": "ops",
-      "file": "platform/app/src/server/app-layer/ops/repositories/blob-store.repository.ts",
       "kind": "legacy-implementation"
     },
     {
