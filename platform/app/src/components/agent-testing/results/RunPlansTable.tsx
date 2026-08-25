@@ -3,7 +3,8 @@
  * cases it holds and how its last run went.
  *
  * The list is a grid inside one card, the way the Test cases table is drawn,
- * so both tabs read as one surface.
+ * so both tabs read as one surface. Its section header carries New run plan
+ * and the period picker, the way the cases panel header carries its actions.
  *
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/suites/one-off-runs-surface.feature
@@ -26,6 +27,7 @@ import {
   Folder,
   FolderCode,
   MoreVertical,
+  Plus,
   Zap,
 } from "lucide-react";
 import type {
@@ -45,6 +47,7 @@ import {
   TABLE_HEADER_BG,
 } from "../shared/design";
 import { AgentTestingPeriodPicker, periodDays } from "../shared/PeriodPicker";
+import { SmallButton } from "../shared/SmallButton";
 import { planScopeNote, type RunPlan, toRunGroupSummary } from "./run-plans";
 
 /**
@@ -65,6 +68,8 @@ export type RunPlansTableProps = {
   setRelativePeriod: (key: RelativePresetKey) => void;
   onSelectPlan: (planSlug: string) => void;
   onEditPlan: (suiteId: string) => void;
+  /** Opens the run plan editor on an empty plan. */
+  onNewRunPlan: () => void;
 };
 
 function PlanIcon({ kind }: { kind: RunPlan["kind"] }) {
@@ -240,6 +245,7 @@ export function RunPlansTable({
   setRelativePeriod,
   onSelectPlan,
   onEditPlan,
+  onNewRunPlan,
 }: RunPlansTableProps) {
   const days = periodDays(period);
 
@@ -253,6 +259,10 @@ export function RunPlansTable({
           {plans.length === 1 ? "1 run plan" : `${plans.length} run plans`}
         </Text>
         <Box flex={1} />
+        <SmallButton onClick={onNewRunPlan}>
+          <Plus size={13} />
+          New run plan
+        </SmallButton>
         <AgentTestingPeriodPicker
           period={period}
           setRelativePeriod={setRelativePeriod}

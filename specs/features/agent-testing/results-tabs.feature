@@ -25,6 +25,14 @@ Feature: The Results tab
     And "One-off runs" is the last row
 
   @integration
+  Scenario: New run plan sits in the header of the Test Runs list
+    Given the Results tab is open on the list of run plans
+    When the header of the list is read
+    Then it offers "New run plan" beside the period picker
+    And the button reads as a small outlined action, like "New test case"
+    And choosing it opens the run plan editor
+
+  @integration
   Scenario: A run plan row shows its last result
     Given a run plan whose last run passed three of three
     When the Test Runs list is read

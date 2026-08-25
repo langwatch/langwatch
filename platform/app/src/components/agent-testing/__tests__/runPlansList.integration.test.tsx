@@ -78,6 +78,7 @@ function renderPlans(
     setRelativePeriod: vi.fn(),
     onSelectPlan: vi.fn(),
     onEditPlan: vi.fn(),
+    onNewRunPlan: vi.fn(),
     ...overrides,
   };
   render(<RunPlansTable {...props} />, { wrapper: Wrapper });
@@ -352,6 +353,29 @@ describe("the Test Runs list", () => {
     const row = screen.getByTestId("run-plan-row-external:nightly-ci");
     expect(within(row).getByText("nightly-ci")).toBeInTheDocument();
     expect(within(row).getByText("from code")).toBeInTheDocument();
+  });
+
+  /** @scenario "New run plan sits in the header of the Test Runs list" */
+  it("offers New run plan in its section header, before the period picker", async () => {
+    const user = userEvent.setup();
+    const plans = buildRunPlans({
+      projectId: PROJECT_ID,
+      suites: [makeSuite()],
+      suiteSummaries: {},
+      externalSets: [],
+      oneOffLastRun: null,
+    });
+
+    const props = renderPlans(plans);
+
+    const action = screen.getByRole("button", { name: /New run plan/i });
+    const picker = screen.getByTestId("results-period-picker");
+    expect(
+      action.compareDocumentPosition(picker) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    await user.click(action);
+    expect(props.onNewRunPlan).toHaveBeenCalledOnce();
   });
 
   it("says a project with no run has none", () => {

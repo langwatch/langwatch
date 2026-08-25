@@ -15,6 +15,7 @@ import { usePeriodSelector } from "~/components/PeriodSelector";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { PLAN_EDITOR_DRAWER } from "../plan/usePlanEditor";
+import { useNewRunPlanFlow } from "../useAgentTestingPageFlows";
 import { useAgentTestingRouting } from "../useAgentTestingRouting";
 import { RunPlanDetail } from "./RunPlanDetail";
 import { RunPlansTable } from "./RunPlansTable";
@@ -34,6 +35,7 @@ export function ResultsTab({ isSseConnected }: ResultsTabProps) {
     useAgentTestingRouting();
   const { period, mode, setPeriod, setRelativePeriod } = usePeriodSelector(30);
   const { plans, isLoading, hasAnyPlans } = useRunPlans({ period });
+  const handleNewRunPlan = useNewRunPlanFlow(selectPlan);
 
   const selectedPlan = planSlug
     ? resolveRunPlan({ plans, planSlug, projectId: project?.id ?? "" })
@@ -95,6 +97,7 @@ export function ResultsTab({ isSseConnected }: ResultsTabProps) {
           setRelativePeriod={setRelativePeriod}
           onSelectPlan={selectPlan}
           onEditPlan={handleEditPlan}
+          onNewRunPlan={handleNewRunPlan}
         />
       )}
     </Box>

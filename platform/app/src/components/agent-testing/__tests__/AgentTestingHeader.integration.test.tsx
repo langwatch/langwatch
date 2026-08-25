@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The Agent Testing header is one line: the page title, then the tabs, then
- * the action of the tab that is open.
+ * The Agent Testing header is one line: the page title, then the tabs. The
+ * actions of each tab sit in the section header above their own table.
  *
  * @see specs/features/agent-testing/page-structure.feature
  */
@@ -20,15 +20,9 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 const renderHeader = (
   props: Partial<React.ComponentProps<typeof AgentTestingHeader>> = {},
 ) =>
-  render(
-    <AgentTestingHeader
-      tab="cases"
-      onTabChange={vi.fn()}
-      onNewRunPlan={vi.fn()}
-      {...props}
-    />,
-    { wrapper: Wrapper },
-  );
+  render(<AgentTestingHeader tab="cases" onTabChange={vi.fn()} {...props} />, {
+    wrapper: Wrapper,
+  });
 
 /** True when `first` stands before `second` in the page. */
 const comesBefore = (first: Element, second: Element) =>
@@ -40,31 +34,29 @@ describe("<AgentTestingHeader/>", () => {
   afterEach(cleanup);
 
   describe("given the page is open", () => {
-    /** @scenario "The header holds the title, the tabs and the actions on one line" */
-    it("holds the title, then the tabs, then the action", () => {
+    /** @scenario "The header holds the title and the tabs on one line" */
+    it("holds the title, then the tabs", () => {
       renderHeader({ tab: "results" });
 
       const title = screen.getByRole("heading", { name: "Agent Testing" });
       const tabs = screen.getByRole("tablist");
-      const action = screen.getByRole("button", { name: /New Run Plan/ });
 
       expect(comesBefore(title, tabs)).toBe(true);
-      expect(comesBefore(tabs, action)).toBe(true);
     });
 
-    /** @scenario "The header holds the title, the tabs and the actions on one line" */
+    /** @scenario "The header holds the title and the tabs on one line" */
     it("counts the cases and the run plans beside the tab names", () => {
       renderHeader({ casesCount: 12, plansCount: 3 });
 
-      expect(
-        screen.getByRole("tab", { name: /Test cases/ }),
-      ).toHaveTextContent("12");
+      expect(screen.getByRole("tab", { name: /Test cases/ })).toHaveTextContent(
+        "12",
+      );
       expect(screen.getByRole("tab", { name: /Results/ })).toHaveTextContent(
         "3",
       );
     });
 
-    /** @scenario "The header holds the title, the tabs and the actions on one line" */
+    /** @scenario "The header holds the title and the tabs on one line" */
     it("offers the Test cases tab and the Results tab", () => {
       renderHeader();
 
@@ -93,39 +85,31 @@ describe("<AgentTestingHeader/>", () => {
   });
 
   describe("given the Test cases tab is open", () => {
-    /** @scenario "The header action changes with the selected tab" */
+    /** @scenario "The header carries no action on either tab" */
     it("offers no action of its own", () => {
       renderHeader({ tab: "cases" });
 
-      expect(
-        screen.queryByRole("button", { name: /New Run Plan/ }),
-      ).not.toBeInTheDocument();
       // New test case belongs to the panel header, beside the set it files
       // into, so the page header carries nothing here.
       expect(
         screen.queryByRole("button", { name: /New test case/ }),
       ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /New run plan/i }),
+      ).not.toBeInTheDocument();
     });
   });
 
   describe("given the Results tab is open", () => {
-    /** @scenario "The header action changes with the selected tab" */
-    it("offers New Run Plan", () => {
+    /** @scenario "The header carries no action on either tab" */
+    it("offers no action of its own", () => {
       renderHeader({ tab: "results" });
 
+      // New run plan belongs to the Test Runs section header, beside the list
+      // it adds to.
       expect(
-        screen.getByRole("button", { name: /New Run Plan/ }),
-      ).toBeInTheDocument();
-    });
-
-    it("reports a new run plan", async () => {
-      const user = userEvent.setup();
-      const onNewRunPlan = vi.fn();
-      renderHeader({ tab: "results", onNewRunPlan });
-
-      await user.click(screen.getByRole("button", { name: /New Run Plan/ }));
-
-      expect(onNewRunPlan).toHaveBeenCalledOnce();
+        screen.queryByRole("button", { name: /New run plan/i }),
+      ).not.toBeInTheDocument();
     });
   });
 });

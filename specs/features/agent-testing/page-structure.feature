@@ -5,9 +5,11 @@ Feature: The Agent Testing page
 
   Background: the shape of the page.
     Agent Testing is one page behind a release flag. Its header holds the page
-    title on the left, the tabs in the middle, and the actions on the right,
-    all on one line. The content of the selected tab starts directly under that
-    line.
+    title on the left and the tabs in the middle, on one line. The content of
+    the selected tab starts directly under that line.
+
+    The header carries no action. Every action sits in the section header above
+    the table it acts on, so the entry point is beside what it writes into.
 
     With the flag off, nothing changes. The main menu keeps the current
     Simulations group and the current pages work exactly as they do today.
@@ -52,21 +54,19 @@ Feature: The Agent Testing page
   # --- The header ---
 
   @integration
-  Scenario: The header holds the title, the tabs and the actions on one line
+  Scenario: The header holds the title and the tabs on one line
     Given the Agent Testing page is open
     When the header is read
     Then "Agent Testing" is on the far left
     And the tabs "Test cases" and "Results" are in the middle
-    And the actions are on the far right
     And the header spans the full width of the page
 
   @integration
-  Scenario: The header action changes with the selected tab
+  Scenario: The header carries no action on either tab
     Given the Agent Testing page is open on the Test cases tab
-    Then the header offers "New test case"
+    Then the header offers no action
     When the Results tab is chosen
-    Then the header offers "New run plan"
-    And it no longer offers "New test case"
+    Then the header still offers no action
 
   # --- The content column ---
 

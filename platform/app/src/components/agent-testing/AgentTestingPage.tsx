@@ -19,10 +19,7 @@ import { AgentTestingCaseEditor } from "./cases/AgentTestingCaseEditor";
 import { TestCasesTab } from "./cases/TestCasesTab";
 import { ResultsTab } from "./results/ResultsTab";
 import { useAgentTestingLiveUpdates } from "./useAgentTestingLiveUpdates";
-import {
-  useHydrateViewFromUrl,
-  useNewRunPlanFlow,
-} from "./useAgentTestingPageFlows";
+import { useHydrateViewFromUrl } from "./useAgentTestingPageFlows";
 import { useAgentTestingRouting } from "./useAgentTestingRouting";
 
 /** How many test cases and how many run plans the tabs count. */
@@ -41,14 +38,13 @@ function useTabCounts(projectId: string) {
 
 export function AgentTestingPage() {
   const { project } = useOrganizationTeamProject();
-  // The rows open a run's detail and the header opens the run plan editor,
-  // two separate downloads. Fetch them while the person reads the page.
+  // The rows open a run's detail and the Test Runs list opens the run plan
+  // editor, two separate downloads. Fetch them while the person reads the page.
   usePreloadDrawer("scenarioRunDetail", "agentTestingPlanEditor");
 
   const routing = useAgentTestingRouting();
   useHydrateViewFromUrl();
   const { isSseConnected } = useAgentTestingLiveUpdates(project?.id ?? "");
-  const handleNewRunPlan = useNewRunPlanFlow(routing.selectPlan);
   const { casesCount, plansCount } = useTabCounts(project?.id ?? "");
 
   return (
@@ -58,7 +54,6 @@ export function AgentTestingPage() {
           <AgentTestingHeader
             tab={routing.tab}
             onTabChange={routing.setTab}
-            onNewRunPlan={handleNewRunPlan}
             casesCount={casesCount}
             plansCount={plansCount}
           />

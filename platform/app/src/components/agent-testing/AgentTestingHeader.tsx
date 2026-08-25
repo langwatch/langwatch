@@ -1,14 +1,14 @@
 /**
- * The one header line of the Agent Testing page: the page title on the left,
- * the tabs in the middle, and the action of the open tab on the right.
+ * The one header line of the Agent Testing page: the page title on the left
+ * and the tabs in the middle.
  *
- * The Test cases tab carries no action here. Its New test case button sits in
- * the panel header above the table, where the set it files into is named.
+ * Neither tab carries an action here. Every write entry sits in the section
+ * header above the table it writes into: New test case beside the set it files
+ * into, New run plan beside the Test Runs list it adds to.
  *
  * @see specs/features/agent-testing/page-structure.feature
  */
 import { Box, Grid, GridItem, Tabs } from "@chakra-ui/react";
-import { Plus } from "lucide-react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { FG_FAINT } from "./shared/design";
 import type { AgentTestingTab } from "./useAgentTestingRouting";
@@ -16,8 +16,6 @@ import type { AgentTestingTab } from "./useAgentTestingRouting";
 export type AgentTestingHeaderProps = {
   tab: AgentTestingTab;
   onTabChange: (tab: AgentTestingTab) => void;
-  /** The action of the Results tab. */
-  onNewRunPlan: () => void;
   /** How many test cases the project holds, beside the Test cases tab. */
   casesCount?: number;
   /** How many run plans the project holds, beside the Results tab. */
@@ -45,19 +43,14 @@ function TabCount({ value }: { value?: number }) {
 export function AgentTestingHeader({
   tab,
   onTabChange,
-  onNewRunPlan,
   casesCount,
   plansCount,
 }: AgentTestingHeaderProps) {
   return (
-    <PageLayout.Header
-      height="auto"
-      paddingX={5}
-      alignItems="flex-end"
-      gap={4}
-    >
+    <PageLayout.Header height="auto" paddingX={5} alignItems="flex-end" gap={4}>
       {/* The middle column takes the width of the tabs, so the tabs sit in the
-          centre of the page and not in the centre of what is left of it. */}
+          centre of the page and not in the centre of what is left of it. The
+          right column stays empty and balances the title on the left. */}
       <Grid
         width="full"
         templateColumns="1fr auto 1fr"
@@ -92,13 +85,7 @@ export function AgentTestingHeader({
           </Tabs.Root>
         </GridItem>
 
-        <GridItem justifySelf="end" paddingBottom={1.5}>
-          {tab === "results" && (
-            <PageLayout.HeaderButton onClick={onNewRunPlan}>
-              <Plus size={15} /> New Run Plan
-            </PageLayout.HeaderButton>
-          )}
-        </GridItem>
+        <GridItem />
       </Grid>
     </PageLayout.Header>
   );
