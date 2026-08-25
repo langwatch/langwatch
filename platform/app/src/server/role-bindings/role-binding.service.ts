@@ -29,7 +29,6 @@ import {
 // both paths answer the customer with the same `scim_managed_group` code.
 import { ScimManagedGroupError } from "~/server/app-layer/groups/errors";
 import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
-import { ScimManagedGroupError } from "~/server/app-layer/groups/errors";
 import { LiteMemberViewerOnlyError } from "~/server/app-layer/teams/team.service";
 import type { RoleService } from "~/server/role/role.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
