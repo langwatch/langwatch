@@ -419,6 +419,44 @@ Feature: Unified authorization engine
     Then every read is granted through trace "t1"'s single grant
     And a span belonging to a different trace in "chatbot" is not readable
 
+  # The tier stopped being a design and became the live path: opening a shared
+  # trace resolves its token HERE. What the share domain kept is what the
+  # engine does not decide - the sharing kill switch (a project setting, not a
+  # grant), the view accounting, and which words a refused viewer reads.
+
+  @unit
+  Scenario: A share link decides through the engine's resource tier
+    Given trace "t1" in project "chatbot" is shared with anyone via a share link
+    When a visitor presents the link to open t1
+    Then the read is granted through the resource tier
+    And no other step of the walk is what granted it
+
+  @unit
+  Scenario: A member's own access never redeems a dead share link
+    Given trace "t1" in project "chatbot" has a share link that expired
+    And a member of "chatbot" holds "traces:view" there through their team
+    When that member presents the expired link
+    Then the request is denied
+    # The walk reaches the resource tier last, so an ordinary binding on the
+    # trace's lineage would otherwise answer a resource check before the token
+    # is ever read - handing a member a link its own expiry had killed, and
+    # spending a view against a token that granted nothing. Reading the trace
+    # in-app is a different question, asked at the project scope.
+
+  @unit
+  Scenario: A share link grants only what it says it grants
+    Given trace "t1" in project "chatbot" has a share link conferring "datasets:view"
+    When a visitor presents that link to read the trace
+    Then the request is denied
+    But a link conferring "annotations:create" reads the trace, because it carries "traces:view" too
+
+  @unit
+  Scenario: A share link covers the trace it names and no other
+    Given trace "t1" in project "chatbot" is shared with anyone via a share link
+    And trace "t2" lives in the same project
+    When a visitor presents t1's link to read "t2"
+    Then the request is denied
+
   @unit
   Scenario: A share link that is not presented grants nothing
     Given trace "t1" in project "chatbot" is shared with anyone via a share link

@@ -1,3 +1,4 @@
+import type { AuthzPrincipalRef } from "@langwatch/authz";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PinnedTraceService } from "~/server/data-retention/pinning/pinnedTrace.service";
 import {
@@ -17,9 +18,26 @@ import {
   type ShareServiceDeps,
   type ShareViewer,
 } from "../share.service";
+import type { ShareAccessDecider, ShareAccessOutcome } from "../share-access";
 
 const ORG_ID = "org_1";
 const PROJECT_ID = "project_1";
+const ANONYMOUS: AuthzPrincipalRef = { type: "anonymous" };
+
+/**
+ * The engine's answer, stated per scenario. The engine's own reasoning is
+ * exercised against the real walk in `share-access.unit.test.ts`; what this
+ * suite pins is the other half — that ShareService ASKS, obeys the answer, and
+ * turns a refusal into the right words without disclosing which refusal it is.
+ */
+function buildDecider(
+  outcome: ShareAccessOutcome = { allowed: true, via: "resource-grant" },
+): ShareAccessDecider {
+  return { decide: vi.fn().mockResolvedValue(outcome) };
+}
+
+/** The engine refused. Which refusal is the link's business, not the engine's. */
+const REFUSED: ShareAccessOutcome = { allowed: false };
 
 function buildShare(
   overrides: Partial<ShareWithProject> = {},
@@ -82,6 +100,7 @@ describe("ShareService", () => {
     };
     deps = {
       isTraceSharingEnabled: vi.fn().mockResolvedValue(true),
+      shareAccess: buildDecider(),
     };
     service = new ShareService(repo, pinnedTraces as PinnedTraceService, deps);
   });
@@ -102,6 +121,7 @@ describe("ShareService", () => {
         deps.viewDedupe = { isNewViewing: vi.fn().mockResolvedValue(false) };
 
         await service.resolveForViewer({
+          principal: ANONYMOUS,
           token: "tok_abc",
           viewer: buildViewer(),
           viewerKey: "viewer_1",
@@ -110,15 +130,23 @@ describe("ShareService", () => {
         expect(repo.consumeView).not.toHaveBeenCalled();
       });
 
+      /**
+       * The engine cannot express this one: its collector drops a spent link
+       * (`isLiveShareLink`) before the walk sees it, and it has no notion of
+       * who is re-reading. So the window is honoured where the viewing was
+       * recorded — behind the engine's refusal, never instead of it.
+       */
       /** @scenario A viewer refreshing a single-view link keeps access */
       it("still resolves a link their own earlier view already spent", async () => {
         deps.viewDedupe = { isNewViewing: vi.fn().mockResolvedValue(false) };
+        deps.shareAccess = buildDecider(REFUSED);
         vi.mocked(repo.findByToken).mockResolvedValue(
           buildShare({ maxViews: 1, viewCount: 1 }),
         );
 
         await expect(
           service.resolveForViewer({
+            principal: ANONYMOUS,
             token: "tok_abc",
             viewer: buildViewer(),
             viewerKey: "viewer_1",
@@ -134,6 +162,7 @@ describe("ShareService", () => {
         deps.viewDedupe = { isNewViewing: vi.fn().mockResolvedValue(true) };
 
         await service.resolveForViewer({
+          principal: ANONYMOUS,
           token: "tok_abc",
           viewer: buildViewer(),
           viewerKey: "viewer_1",
@@ -149,6 +178,7 @@ describe("ShareService", () => {
         deps.viewDedupe = { isNewViewing: vi.fn().mockResolvedValue(false) };
 
         await service.resolveForViewer({
+          principal: ANONYMOUS,
           token: "tok_abc",
           viewer: buildViewer(),
         });
@@ -166,6 +196,7 @@ describe("ShareService", () => {
 
         await expect(
           service.resolveForViewer({
+            principal: ANONYMOUS,
             token: "tok_nope",
             viewer: buildViewer(),
           }),
@@ -195,7 +226,11 @@ describe("ShareService", () => {
         );
 
         await expect(
-          service.resolveForViewer({ token: "tok_abc", viewer: buildViewer() }),
+          service.resolveForViewer({
+            principal: ANONYMOUS,
+            token: "tok_abc",
+            viewer: buildViewer(),
+          }),
         ).rejects.toThrow(ShareLinkNotFoundError);
       });
 
@@ -213,7 +248,11 @@ describe("ShareService", () => {
         );
 
         await expect(
-          service.resolveForViewer({ token: "tok_abc", viewer: buildViewer() }),
+          service.resolveForViewer({
+            principal: ANONYMOUS,
+            token: "tok_abc",
+            viewer: buildViewer(),
+          }),
         ).rejects.toThrow(ShareLinkNotFoundError);
       });
 
@@ -221,6 +260,7 @@ describe("ShareService", () => {
         vi.mocked(repo.findByToken).mockResolvedValue(buildShare());
 
         const share = await service.resolveForViewer({
+          principal: ANONYMOUS,
           token: "tok_abc",
           viewer: buildViewer(),
         });
@@ -232,12 +272,17 @@ describe("ShareService", () => {
     describe("given the link expired in the past", () => {
       /** @scenario A timed link stops resolving after its expiry */
       it("throws expired and does not consume a view", async () => {
+        deps.shareAccess = buildDecider(REFUSED);
         vi.mocked(repo.findByToken).mockResolvedValue(
           buildShare({ expiresAt: new Date(Date.now() - 1000) }),
         );
 
         await expect(
-          service.resolveForViewer({ token: "tok_abc", viewer: buildViewer() }),
+          service.resolveForViewer({
+            principal: ANONYMOUS,
+            token: "tok_abc",
+            viewer: buildViewer(),
+          }),
         ).rejects.toThrow(ShareLinkExpiredError);
         expect(repo.consumeView).not.toHaveBeenCalled();
       });
@@ -250,6 +295,7 @@ describe("ShareService", () => {
         vi.mocked(repo.findByToken).mockResolvedValue(buildShare());
 
         const share = await service.resolveForViewer({
+          principal: ANONYMOUS,
           token: "tok_abc",
           viewer: buildViewer(),
         });
@@ -265,12 +311,14 @@ describe("ShareService", () => {
 
     describe("given an organization-scoped link", () => {
       it("denies a non-member", async () => {
+        deps.shareAccess = buildDecider(REFUSED);
         vi.mocked(repo.findByToken).mockResolvedValue(
           buildShare({ visibility: "ORGANIZATION" }),
         );
 
         await expect(
           service.resolveForViewer({
+            principal: ANONYMOUS,
             token: "tok_abc",
             viewer: buildViewer({
               isOrgMember: vi.fn().mockResolvedValue(false),
@@ -280,47 +328,70 @@ describe("ShareService", () => {
         expect(repo.consumeView).not.toHaveBeenCalled();
       });
 
+      /**
+       * The audience is the engine's to match now — `audienceMatches` against
+       * the caller's collected grants, not a probe this service makes. The
+       * viewer probes survive for one job only: choosing between "sign in" and
+       * "this link is dead" once the engine has already refused.
+       */
       /** @scenario An organization link requires a member of the same organization */
-      it("grants a member of that organization", async () => {
+      it("grants a member without probing membership itself", async () => {
         vi.mocked(repo.findByToken).mockResolvedValue(
           buildShare({ visibility: "ORGANIZATION" }),
         );
         const isOrgMember = vi.fn().mockResolvedValue(true);
 
         const share = await service.resolveForViewer({
+          principal: { type: "user", id: "user_1" },
           token: "tok_abc",
           viewer: buildViewer({ isOrgMember }),
         });
 
         expect(share.id).toBe("share_1");
-        expect(isOrgMember).toHaveBeenCalledWith(ORG_ID);
+        expect(isOrgMember).not.toHaveBeenCalled();
+        expect(deps.shareAccess.decide).toHaveBeenCalledWith({
+          principal: { type: "user", id: "user_1" },
+          permission: "traces:view",
+          projectId: PROJECT_ID,
+          resourceType: "TRACE",
+          resourceId: "trace_a",
+          token: "tok_abc",
+        });
       });
     });
 
     describe("given a project-scoped link", () => {
       /** @scenario A project link requires a member of the same project */
       it("grants a member of that project", async () => {
+        deps.shareAccess = buildDecider({
+          allowed: true,
+          via: "project-audience",
+        });
         vi.mocked(repo.findByToken).mockResolvedValue(
           buildShare({ visibility: "PROJECT" }),
         );
-        const isProjectMember = vi.fn().mockResolvedValue(true);
 
         const share = await service.resolveForViewer({
+          principal: { type: "user", id: "user_1" },
           token: "tok_abc",
-          viewer: buildViewer({ isProjectMember }),
+          viewer: buildViewer({ isProjectMember: vi.fn() }),
         });
 
         expect(share.id).toBe("share_1");
-        expect(isProjectMember).toHaveBeenCalledWith(PROJECT_ID);
       });
 
       it("denies a non-member", async () => {
+        deps.shareAccess = buildDecider(REFUSED);
         vi.mocked(repo.findByToken).mockResolvedValue(
           buildShare({ visibility: "PROJECT" }),
         );
 
         await expect(
-          service.resolveForViewer({ token: "tok_abc", viewer: buildViewer() }),
+          service.resolveForViewer({
+            principal: ANONYMOUS,
+            token: "tok_abc",
+            viewer: buildViewer(),
+          }),
         ).rejects.toThrow(ShareLinkForbiddenError);
       });
     });
@@ -333,6 +404,7 @@ describe("ShareService", () => {
         );
 
         const share = await service.resolveForViewer({
+          principal: ANONYMOUS,
           token: "tok_abc",
           viewer: buildViewer(),
         });
@@ -346,12 +418,17 @@ describe("ShareService", () => {
       });
 
       it("throws exhausted once the view was already spent, without a write attempt", async () => {
+        deps.shareAccess = buildDecider(REFUSED);
         vi.mocked(repo.findByToken).mockResolvedValue(
           buildShare({ maxViews: 1, viewCount: 1 }),
         );
 
         await expect(
-          service.resolveForViewer({ token: "tok_abc", viewer: buildViewer() }),
+          service.resolveForViewer({
+            principal: ANONYMOUS,
+            token: "tok_abc",
+            viewer: buildViewer(),
+          }),
         ).rejects.toThrow(ShareLinkExhaustedError);
         expect(repo.consumeView).not.toHaveBeenCalled();
       });
@@ -372,12 +449,136 @@ describe("ShareService", () => {
 
           await expect(
             service.resolveForViewer({
+              principal: ANONYMOUS,
               token: "tok_abc",
               viewer: buildViewer(),
             }),
           ).rejects.toThrow(ShareLinkExhaustedError);
         });
       });
+    });
+
+    describe("given the engine refuses a link nothing else objects to", () => {
+      /**
+       * Live, in audience, budget to spare — and still refused, because the
+       * engine read something no hand-rolled check ever did (the link's own
+       * permission). This is the assertion that fails if the decision ever
+       * drifts back into this service: with the engine merely imported, every
+       * predicate here passes and the read succeeds.
+       */
+      /** @scenario A share link grants only what it says it grants */
+      it("refuses, spends no view, and says no more than a bad token would", async () => {
+        deps.shareAccess = buildDecider(REFUSED);
+        vi.mocked(repo.findByToken).mockResolvedValue(buildShare());
+
+        await expect(
+          service.resolveForViewer({
+            principal: ANONYMOUS,
+            token: "tok_abc",
+            viewer: buildViewer(),
+          }),
+        ).rejects.toMatchObject({
+          code: "share_link_not_found",
+          message: "This share link is not available.",
+        });
+        expect(repo.consumeView).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("given the kill switch is off", () => {
+      /**
+       * The kill switch is a project setting, and the resource tier reads
+       * share rows. It gates the resolve BEFORE the engine is consulted, so a
+       * killed link costs one read and discloses nothing.
+       */
+      /** @scenario A link is resolvable only while both org and project allow sharing */
+      it("refuses without asking the engine at all", async () => {
+        vi.mocked(repo.findByToken).mockResolvedValue(
+          buildShare({
+            project: {
+              traceSharingEnabled: false,
+              team: {
+                organizationId: ORG_ID,
+                organization: { traceSharingEnabled: true },
+              },
+            },
+          }),
+        );
+
+        await expect(
+          service.resolveForViewer({
+            principal: ANONYMOUS,
+            token: "tok_abc",
+            viewer: buildViewer(),
+          }),
+        ).rejects.toThrow(ShareLinkNotFoundError);
+        expect(deps.shareAccess.decide).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("given three different reasons a token resolves to nothing", () => {
+      /**
+       * ADR-057's disclosure rule: an unknown token, a link behind the kill
+       * switch and a link the engine refuses on its own terms must be the same
+       * answer, to the character. A caller probing tokens learns only that
+       * none of them worked.
+       */
+      /** @scenario A refused share link never says which refusal it was */
+      it("answers all three with the identical refusal", async () => {
+        const refusals: unknown[] = [];
+
+        vi.mocked(repo.findByToken).mockResolvedValue(null);
+        refusals.push(await refusalOf());
+
+        vi.mocked(repo.findByToken).mockResolvedValue(
+          buildShare({
+            project: {
+              traceSharingEnabled: false,
+              team: {
+                organizationId: ORG_ID,
+                organization: { traceSharingEnabled: true },
+              },
+            },
+          }),
+        );
+        refusals.push(await refusalOf());
+
+        deps.shareAccess = buildDecider(REFUSED);
+        vi.mocked(repo.findByToken).mockResolvedValue(buildShare());
+        refusals.push(await refusalOf());
+
+        expect(refusals).toHaveLength(3);
+        for (const refusal of refusals) {
+          expect(refusal).toEqual(refusals[0]);
+        }
+      });
+
+      /** The observable shape of a refusal: what a caller can actually read. */
+      async function refusalOf(): Promise<{
+        code: unknown;
+        message: string;
+        httpStatus: unknown;
+      }> {
+        try {
+          await service.resolveForViewer({
+            principal: ANONYMOUS,
+            token: "tok_abc",
+            viewer: buildViewer(),
+          });
+        } catch (error) {
+          const handled = error as {
+            code: unknown;
+            message: string;
+            httpStatus: unknown;
+          };
+          return {
+            code: handled.code,
+            message: handled.message,
+            httpStatus: handled.httpStatus,
+          };
+        }
+        throw new Error("expected the resolve to be refused");
+      }
     });
   });
 
