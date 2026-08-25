@@ -13,12 +13,9 @@ import {
   enforceApiKeyCeiling,
   extractCredentials,
 } from "../api-key/auth-middleware";
-import { TokenResolver } from "../api-key/token-resolver";
-import { getApp } from "../app-layer/app";
 import { SPAN_MAX_PAST_MS } from "../app-layer/traces/trace-request-collection.service";
 import { PlanLimitExceededError } from "../app-layer/usage/errors";
 import type { UsageLimitResult } from "../app-layer/usage/usage.service";
-import { prisma } from "../db";
 import { evaluationNameAutoslug } from "../tracer/collector/evaluationNameAutoslug";
 import { maybeAddIdsToContextList } from "../tracer/collector/rag";
 import type {
@@ -39,8 +36,6 @@ import { CollectorSpanUtils } from "../traces/collectorSpan.utils";
 import { bodyLimit } from "./_lib/body-limit";
 
 const logger = createLogger("langwatch.collector");
-const tokenResolver = TokenResolver.create(prisma);
-
 const secured = createServiceApp({ basePath: "/api" });
 
 // POST /api/collector
@@ -103,7 +98,9 @@ secured
         return c.json({ message: "Invalid body, expecting json" }, 400);
       }
 
-      const resolved = await tokenResolver.resolve({
+      const app = c.app;
+      const apiKeys = app.apiKeys;
+      const resolved = await apiKeys.tryResolveToken({
         token: credentials.token,
         projectId: credentials.projectId,
       });
@@ -154,7 +151,7 @@ secured
       // a lookup failure.
       let limitResult: UsageLimitResult;
       try {
-        limitResult = await getApp().usage.checkLimit({
+        limitResult = await app.usage.checkLimit({
           teamId: project.teamId,
         });
       } catch (error) {
@@ -170,10 +167,10 @@ secured
 
       if (limitResult.exceeded) {
         try {
-          const activePlan = await getApp().planProvider.getActivePlan({
+          const activePlan = await app.planProvider.getActivePlan({
             organizationId: project.team.organizationId,
           });
-          await getApp().usageLimits.notifyPlanLimitReached({
+          await app.usageLimits.notifyPlanLimitReached({
             organizationId: project.team.organizationId,
             planName: activePlan.name ?? "free",
             usageUnit: limitResult.usageUnit,
@@ -309,7 +306,7 @@ secured
       // Body successfully validated — mark the API key as used if this request was
       // authenticated via API key
       if (resolved.type === "apiKey") {
-        tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
+        apiKeys.markUsed({ id: resolved.apiKeyId });
       }
 
       const { trace_id: nullableTraceId, expected_output: expectedOutput } =
@@ -614,7 +611,7 @@ secured
             // REST collector shares the (tenant, trace, span) dedup gate + ADR-022
             // spool hook with the OTLP path — a retry storm here must not bypass
             // dedup. occurredAt is stamped inside ingestNormalizedSpan.
-            getApp().traces.collection.ingestNormalizedSpan({
+            app.traces.collection.ingestNormalizedSpan({
               tenantId: project.id,
               span: CollectorSpanUtils.convertSpanToOtlp(span),
               resource,
@@ -693,7 +690,6 @@ secured
       let rejectedEvaluations = 0;
       const evaluationErrors: string[] = [];
       if (params.evaluations && params.evaluations.length > 0 && traceId) {
-        const app = getApp();
         const occurredAt = Date.now();
 
         for (const evaluation of params.evaluations) {
