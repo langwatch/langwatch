@@ -37,7 +37,6 @@
  */
 import { timingSafeEqual } from "node:crypto";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
-import { getApp } from "~/server/app-layer/app";
 import {
   buildExplainQuery,
   explainBodySchema,
@@ -101,7 +100,7 @@ secured
       return c.json({ message: built.reason }, 400);
     }
 
-    const outcome = await getApp().opsExplain.service.explain({
+    const outcome = await c.app.opsExplain.service.explain({
       wrappedQuery: built.wrapped!,
       type: built.type!,
       isProduction: process.env.NODE_ENV === "production",
