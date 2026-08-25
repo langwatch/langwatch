@@ -1,5 +1,4 @@
 import {
-  Badge,
   Box,
   Card,
   Heading,
@@ -9,6 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { AlertTriangle, Lock } from "lucide-react";
+import { EnterprisePlanBadge } from "~/components/enterprise/EnterprisePlanBadge";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useActivePlan } from "~/hooks/useActivePlan";
@@ -121,14 +121,7 @@ export function TwoStepRequirementCard({
                   Require two-step verification
                 </Heading>
                 {locked && (
-                  <Badge
-                    colorPalette="orange"
-                    size="sm"
-                    variant="surface"
-                    data-testid="two-step-requirement-plan-badge"
-                  >
-                    Enterprise plan
-                  </Badge>
+                  <EnterprisePlanBadge data-testid="two-step-requirement-plan-badge" />
                 )}
               </HStack>
               <Text color="fg.muted" fontSize="sm">

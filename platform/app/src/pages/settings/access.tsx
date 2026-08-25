@@ -1,10 +1,12 @@
-import { SimpleGrid, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { HStack, SimpleGrid, Skeleton, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { DomainVerificationSection } from "~/components/access/DomainVerificationSection";
 import { JoinPolicyCard } from "~/components/access/JoinPolicyCard";
+import { EnterprisePlanBadge } from "~/components/enterprise/EnterprisePlanBadge";
 import SettingsLayout from "~/components/SettingsLayout";
 import { SettingsPageHeader } from "~/components/settings/SettingsPageHeader";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { useActivePlan } from "~/hooks/useActivePlan";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { TwoStepRequirementCard } from "../../components/members/TwoStepRequirementCard";
@@ -62,6 +64,13 @@ function AccessContent({
     redirectToProjectOnboarding: false,
   });
   const canViewSso = hasPermission("sso:view");
+  // Whether the two plan-gated controls on this page are gated for THIS
+  // organization. Read here rather than taken from either card, because the
+  // tiles above them answer both questions and must agree with both. Held to
+  // "we know for certain" — a badge that appears and then vanishes as the
+  // plan resolves tells somebody their plan changed while they watched.
+  const { isEnterprise, isLoading: planIsLoading } = useActivePlan();
+  const planLocked = !isEnterprise && !planIsLoading;
 
   const joinRequests = useJoinRequests({ organizationId, canManage });
   const twoStep = useTwoStepRequirement({ organizationId, canManage });
@@ -82,15 +91,29 @@ function AccessContent({
 
       {/* Where things stand, before any control: the four answers an
           administrator opens this page to check, each settled in detail by
-          a card below. */}
+          a card below.
+
+          TWO OF THEM ARE PLAN-GATED, AND THE TILES NOW SAY SO. The cards
+          below have carried an "Enterprise plan" badge all along; the tiles
+          answering the same two questions carried nothing, so somebody
+          scanning the row read "Joining: Nobody joins" with no hint that
+          opening it is a plan away, and found out by reading to the bottom of
+          the page. Marked, not disabled — the plan gates turning a control
+          ON, never reading where it stands. */}
       <SimpleGrid columns={{ base: 2, lg: 4 }} gap={3} width="full">
-        <AccessFact label="Joining">
+        <AccessFact
+          label="Joining"
+          badge={planLocked ? <EnterprisePlanBadge size="xs" /> : null}
+        >
           {JOINING_LABEL[joinRequests.joining.domainJoin]}
         </AccessFact>
         <AccessFact label="Waiting to join">
           {waitingLabel(joinRequests.requests.length)}
         </AccessFact>
-        <AccessFact label="Two-step verification">
+        <AccessFact
+          label="Two-step verification"
+          badge={planLocked ? <EnterprisePlanBadge size="xs" /> : null}
+        >
           {twoStep.show && twoStep.mfaRequired ? "Required" : "Optional"}
         </AccessFact>
         <AccessFact label="Domains verified">
@@ -164,9 +187,13 @@ function domainsValue({
  *  established: tracked eyebrow, plain value, hairline card. */
 function AccessFact({
   label,
+  badge,
   children,
 }: {
   label: string;
+  /** A mark on the question rather than on the answer — the plan gates the
+   *  control this tile reports, not the reading of it. */
+  badge?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -179,15 +206,18 @@ function AccessFact({
       padding={3}
       background="bg.panel"
     >
-      <Text
-        fontSize="10px"
-        fontWeight="medium"
-        color="fg.subtle"
-        textTransform="uppercase"
-        letterSpacing="0.08em"
-      >
-        {label}
-      </Text>
+      <HStack gap={1.5} align="center">
+        <Text
+          fontSize="10px"
+          fontWeight="medium"
+          color="fg.subtle"
+          textTransform="uppercase"
+          letterSpacing="0.08em"
+        >
+          {label}
+        </Text>
+        {badge}
+      </HStack>
       <Text fontSize="sm" fontWeight="medium">
         {children}
       </Text>

@@ -11,6 +11,7 @@ import {
 } from "@chakra-ui/react";
 import type {
   SelfServeDomainClaimView,
+  SelfServeIssuedDnsRecord,
   SelfServeSetupView,
 } from "@langwatch/identity-server";
 import { RefreshCw } from "lucide-react";
@@ -62,11 +63,14 @@ export function DomainsSection({
    *
    * Kept in state rather than pushed anywhere: it is a secret whose whole
    * lifetime is this screen, and a reload is meant to lose it.
+   *
+   * The WHOLE record, not only the value. The panel that publishes it was
+   * drawn from the read alone, and on the first prove the read has no record
+   * to give — so the press minted a value, stored it, and rendered nothing at
+   * all. It looked like the button did nothing, and pressing it again would
+   * have minted a second value and quietly retired the first.
    */
-  const [minted, setMinted] = useState<{
-    domain: string;
-    value: string;
-  } | null>(null);
+  const [minted, setMinted] = useState<SelfServeIssuedDnsRecord | null>(null);
   const claim = api.ssoSetup.claimDomain.useMutation();
   const utils = api.useUtils();
 
@@ -83,6 +87,11 @@ export function DomainsSection({
       (entry) => !claims.some((candidate) => candidate.domain === entry),
     ),
   ];
+  // The read is authoritative once it has one; before then, the record this
+  // screen just minted IS the record, and drawing it is the whole visible
+  // result of pressing prove. A freshly minted one cannot be expired.
+  const shownRecord: SelfServeSetupView["record"] =
+    record ?? (minted ? { ...minted, expired: false } : null);
 
   return (
     <VStack align="stretch" gap={3}>
@@ -91,9 +100,15 @@ export function DomainsSection({
       {domains.length === 0 ? (
         <Text color="fg.muted" fontSize="sm">
           No domain has been claimed yet. Add the domain your team&apos;s email
-          addresses end in — <Text as="span" fontFamily="mono">acme.com</Text>{" "}
+          addresses end in —{" "}
+          <Text as="span" fontFamily="mono">
+            acme.com
+          </Text>{" "}
           for somebody signing in as{" "}
-          <Text as="span" fontFamily="mono">jane@acme.com</Text>.
+          <Text as="span" fontFamily="mono">
+            jane@acme.com
+          </Text>
+          .
         </Text>
       ) : (
         <Table.Root size="sm">
@@ -116,7 +131,13 @@ export function DomainsSection({
                 organizationId={organizationId}
                 connectionId={connectionId}
                 provesWithLicense={provesWithLicense}
-                recordIssued={record?.domain === entry}
+                // Either source. A value minted a moment ago is issued
+                // whether or not the read has caught up — and this is what
+                // moves the row off "Prove this domain", so pressing it twice
+                // cannot mint a second value that retires the first.
+                recordIssued={
+                  record?.domain === entry || minted?.domain === entry
+                }
                 onMinted={setMinted}
               />
             ))}
@@ -155,13 +176,13 @@ export function DomainsSection({
         </VStack>
       )}
 
-      {record !== null && (
+      {shownRecord !== null && (
         <PublishedRecord
-          record={record}
+          record={shownRecord}
           canManage={canManage}
           organizationId={organizationId}
           connectionId={connectionId}
-          minted={minted?.domain === record.domain ? minted.value : null}
+          minted={minted?.domain === shownRecord.domain ? minted.value : null}
           onMinted={setMinted}
         />
       )}
@@ -193,14 +214,16 @@ function DomainRow({
   /** Whether a value is already out for this domain, waiting to be
    *  published. Asking to prove again would replace it. */
   recordIssued: boolean;
-  /** Where a freshly minted value goes. Returned once and never again, so
+  /** Where a freshly minted record goes. Returned once and never again, so
    *  a caller that ignores it has thrown the ceremony's answer away. */
-  onMinted: (minted: { domain: string; value: string }) => void;
+  onMinted: (minted: SelfServeIssuedDnsRecord) => void;
 }) {
   const keepMintedValue = (
-    result: { proved: true } | { proved: false; record: { value: string } },
+    result:
+      | { proved: true }
+      | { proved: false; record: SelfServeIssuedDnsRecord },
   ) => {
-    if (!result.proved) onMinted({ domain, value: result.record.value });
+    if (!result.proved) onMinted(result.record);
   };
   const claim = api.ssoSetup.claimDomain.useMutation();
   const prove = api.ssoSetup.proveDomain.useMutation();
@@ -338,9 +361,12 @@ function WhyADomainIsProved({
       </Text>
       <Disclosure summary="What is a DNS record, and who can add one?">
         <Text>
-          Anybody could type <Text as="span" fontFamily="mono">acme.com</Text>{" "}
-          into this box, so proving it means showing us something only its
-          owner could put there.
+          Anybody could type{" "}
+          <Text as="span" fontFamily="mono">
+            acme.com
+          </Text>{" "}
+          into this box, so proving it means showing us something only its owner
+          could put there.
         </Text>
         <Text>
           DNS is the public address book for a domain — the same place its
@@ -348,12 +374,12 @@ function WhyADomainIsProved({
           with whoever administers the domain, usually a registrar or DNS host
           such as Cloudflare, Route 53 or GoDaddy, and often another team. The
           record we ask for is a plain public one. It grants nothing, it is
-          visible to anyone who looks, and it can be deleted once the
-          connection is retired.
+          visible to anyone who looks, and it can be deleted once the connection
+          is retired.
         </Text>
         <Text>
-          If DNS is a ticket away, you can serve the same value as a file on
-          the website instead. Either one proves the domain.
+          If DNS is a ticket away, you can serve the same value as a file on the
+          website instead. Either one proves the domain.
         </Text>
       </Disclosure>
     </VStack>
@@ -402,7 +428,7 @@ function PublishedRecord({
   /** The value as this screen last saw it minted, which is the ONLY place it
    *  exists — a refetched record carries a hash and a null value. */
   minted: string | null;
-  onMinted: (minted: { domain: string; value: string }) => void;
+  onMinted: (minted: SelfServeIssuedDnsRecord) => void;
   record: NonNullable<SelfServeSetupView["record"]>;
   canManage: boolean;
   organizationId: string;
@@ -484,9 +510,9 @@ function PublishedRecord({
           above was the old bug read back as copy. */}
       {shownValue === null && (
         <Text color="fg.muted" fontSize="sm">
-          The value was shown once, when the record was issued, and we keep
-          only a hash of it. If you no longer have it, ask for a fresh one
-          below and publish that instead.
+          The value was shown once, when the record was issued, and we keep only
+          a hash of it. If you no longer have it, ask for a fresh one below and
+          publish that instead.
         </Text>
       )}
       {record.expired && (
@@ -534,12 +560,7 @@ function PublishedRecord({
                     prove.mutate(target, {
                       ...settle,
                       onSuccess: (result) => {
-                        if (!result.proved) {
-                          onMinted({
-                            domain: record.domain,
-                            value: result.record.value,
-                          });
-                        }
+                        if (!result.proved) onMinted(result.record);
                         settle.onSuccess();
                       },
                     });
@@ -565,8 +586,8 @@ function PublishedRecord({
             <Text fontSize="sm" color="fg.muted" maxWidth="72ch">
               A fresh value replaces the one above, and anything you have
               already published stops counting — you would need to publish the
-              new value in its place. Only do this if the current value has
-              been lost or has expired.
+              new value in its place. Only do this if the current value has been
+              lost or has expired.
             </Text>
           )}
           {/* The check's verdict, where the reader is looking. A check that

@@ -113,6 +113,22 @@ Feature: Which organization takes my address - matching rules and what they reve
     And nobody joins it without that member approving
     And it cannot admit anybody automatically, whatever its setting says
 
+  # BELONGING TO ONE ORGANIZATION IS NOT A REASON TO BE OFFERED NOTHING. A
+  # contractor whose address matches two teams, or somebody whose company runs
+  # a second organization, has a real reason to ask for the second one — and
+  # the offer is the only way they will ever learn it is there. What is never
+  # offered is the organization they are standing in: an "ask to join" beside
+  # a workspace somebody is already using reads as the product not knowing who
+  # they are, and asking could only ever be refused.
+  @unit
+  Scenario: An organization I am already in is not offered, and the others still are
+    Given "sam" is a member of "acme" and not of "acme labs"
+    And both hold verified "acme.com" addresses and allow joining
+    When the organizations open to "sam@acme.com" are looked up
+    Then "acme labs" is offered
+    And "acme" is not offered
+    And being in one organization never silences the offer of another
+
   @unit
   Scenario: An organization whose identity provider already admits people is not offered
     Given "acme" has an ACTIVE SSO connection for "acme.com"

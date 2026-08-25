@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
+import { JoinYourTeamNotice } from "~/components/JoinYourTeamNotice";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { showErrorToast } from "~/features/errors";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
@@ -180,6 +181,17 @@ export const WelcomeScreen: React.FC = () => {
         showBackButton={false}
       >
         <VStack gap={5} align="stretch" w="full" minW="0">
+          {/* ASK TO JOIN, WHERE THE PERSON WHO NEEDS IT ACTUALLY IS.
+              This offer already existed and was mounted in
+              `DashboardPageBody` — which is a page you can only reach once
+              you belong to an organization. So the one person it was written
+              for, somebody signed in with no organization at all, was bounced
+              straight here and shown a form for creating one, with no way to
+              ask for the one their colleagues are already in. It renders
+              nothing when nothing is open to their address, which is most
+              people, and nothing at all once it has been waved away — so it
+              costs the ordinary sign-up nothing. */}
+          <JoinYourTeamNotice />
           <Box
             position="relative"
             overflow="hidden"

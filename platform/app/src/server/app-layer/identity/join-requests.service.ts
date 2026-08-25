@@ -227,9 +227,30 @@ export class JoinRequestsService {
 
     await this.assertNotLooking({ userId });
 
-    const organizations = await this.deps.candidates.findCandidateOrganizations(
-      { domain },
-    );
+    const matched = await this.deps.candidates.findCandidateOrganizations({
+      domain,
+    });
+    // NEVER THE ONES THEY ARE ALREADY IN. Belonging to an organization does
+    // not stop somebody being offered ANOTHER — a contractor on two teams'
+    // domains, or somebody whose company runs two organizations, has a real
+    // reason to ask for the second. What it does stop is being offered the
+    // one they are standing in, which reads as the product not knowing who
+    // they are, and whose "ask to join" could only ever be refused.
+    //
+    // Asked per candidate rather than in the query, because the candidate
+    // list is a handful of organizations and the membership question already
+    // has a port. The request path re-derives the offer and refuses a member
+    // on its own, so this is the screen agreeing with the service rather than
+    // the only thing standing between them.
+    const organizations = [];
+    for (const organization of matched) {
+      const already = await this.deps.membership.isMember({
+        userId,
+        organizationId: organization.organizationId,
+      });
+      if (!already) organizations.push(organization);
+    }
+
     const decision = resolveJoinLookup({
       email: verifiedEmail,
       verified: true,

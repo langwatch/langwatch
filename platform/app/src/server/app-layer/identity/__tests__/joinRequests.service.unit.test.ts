@@ -69,6 +69,7 @@ function harness({
   policyEntitled = true,
   enabled = true,
   isMember = false,
+  memberOf,
   dismissedDomains = [],
   setting = { domainJoin: "request" as DomainJoinSetting, joinDomains: [] },
 }: {
@@ -81,6 +82,9 @@ function harness({
   policyEntitled?: boolean;
   enabled?: boolean;
   isMember?: boolean;
+  /** Membership per organization, for the cases where "already in one" and
+   *  "not in the other" is the whole point. Overrides `isMember`. */
+  memberOf?: string[];
   dismissedDomains?: string[];
   setting?: { domainJoin: DomainJoinSetting; joinDomains: string[] };
 } = {}) {
@@ -96,7 +100,9 @@ function harness({
   };
   const membership: JoinMembershipPort = {
     attachDefaultMembership: vi.fn(async () => undefined),
-    isMember: vi.fn(async () => isMember),
+    isMember: vi.fn(async ({ organizationId }) =>
+      memberOf ? memberOf.includes(organizationId) : isMember,
+    ),
   };
   const notifier = {
     requestArrived: vi.fn(async () => undefined),
@@ -189,6 +195,57 @@ describe("given the join-requests flag is off", () => {
         }),
       ).rejects.toMatchObject({ code: "join_not_available" });
       expect(requests.requestJoin).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given somebody who already belongs to one of the matches", () => {
+  const acmeLabs: JoinCandidateOrganization = {
+    ...acme,
+    organizationId: "org_acme_labs",
+    name: "Acme Labs",
+  };
+
+  describe("when the organizations open to their address are looked up", () => {
+    /** @scenario An organization I am already in is not offered, and the others still are */
+    it("offers the one they are not in and never the one they are", async () => {
+      const { service } = harness({
+        candidates: [acme, acmeLabs],
+        memberOf: ["org_acme"],
+      });
+
+      const decision = await service.lookup({
+        userId: "user_sam",
+        verifiedEmail: "sam@acme.com",
+      });
+
+      // Belonging somewhere is not a reason to be told nothing: the second
+      // organization is a real thing to ask for, and the offer is the only
+      // way they would learn it exists.
+      expect(decision.outcome).toBe("ask");
+      const offered =
+        decision.outcome === "ask"
+          ? decision.organizations.map((entry) => entry.organizationId)
+          : [];
+      expect(offered).toEqual(["org_acme_labs"]);
+    });
+
+    /** @scenario An organization I am already in is not offered, and the others still are */
+    it("answers the universal nothing when the only match is one they are in", async () => {
+      const { service } = harness({
+        candidates: [acme],
+        memberOf: ["org_acme"],
+      });
+
+      const decision = await service.lookup({
+        userId: "user_sam",
+        verifiedEmail: "sam@acme.com",
+      });
+
+      // The same nothing every other closed door gives. An "ask to join"
+      // beside the workspace somebody is already using reads as the product
+      // not knowing who they are, and asking could only ever be refused.
+      expect(decision).toEqual({ outcome: "none" });
     });
   });
 });

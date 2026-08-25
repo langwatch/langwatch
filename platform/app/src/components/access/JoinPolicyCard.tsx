@@ -1,5 +1,4 @@
 import {
-  Badge,
   Box,
   Button,
   Card,
@@ -14,6 +13,7 @@ import {
 import type { DomainJoinSetting } from "@langwatch/identity";
 import { Lock } from "lucide-react";
 import { useState } from "react";
+import { EnterprisePlanBadge } from "~/components/enterprise/EnterprisePlanBadge";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useEnterpriseLock } from "./useEnterpriseLock";
 
@@ -105,14 +105,7 @@ export function JoinPolicyCard({
                 Who can join your organization
               </Heading>
               {lock.locked && (
-                <Badge
-                  colorPalette="orange"
-                  size="sm"
-                  variant="surface"
-                  data-testid="join-policy-plan-badge"
-                >
-                  Enterprise plan
-                </Badge>
+                <EnterprisePlanBadge data-testid="join-policy-plan-badge" />
               )}
             </HStack>
             <Text color="fg.muted" fontSize="sm">
@@ -191,8 +184,8 @@ export function JoinPolicyCard({
                   of who happens to receive mail on the domain. */}
               <Text color="fg.muted" fontSize="sm">
                 Company domains only, and each one must be verified as yours —
-                the record or file from the Authentication page — before
-                anybody walks in through it.
+                the record or file from the Authentication page — before anybody
+                walks in through it.
               </Text>
             </VStack>
           )}
