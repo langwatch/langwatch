@@ -330,7 +330,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     return new GrantValidationError("Role binding not found", meta);
   }
 
-  private portErrorCode(error: unknown): string | undefined {
+  private tryPortErrorCode(error: unknown): string | undefined {
     if (
       typeof error === "object" &&
       error !== null &&
@@ -346,7 +346,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     error: unknown,
     { bindingId, ...meta }: { bindingId?: string } & Record<string, unknown>,
   ): never {
-    const code = this.portErrorCode(error);
+    const code = this.tryPortErrorCode(error);
     const errorMeta = { ...meta };
     if (bindingId) errorMeta.bindingId = bindingId;
     if (code === "role_binding_already_exists") {
@@ -367,7 +367,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     bindingId: string;
     organizationId: string;
   }): Promise<void> {
-    const binding = await repository.findBinding({ bindingId });
+    const binding = await repository.tryFindBinding({ bindingId });
     if (!binding || binding.organizationId !== organizationId) {
       throw this.bindingNotFound({ bindingId });
     }
@@ -384,7 +384,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
   }): Promise<void> {
     if (where.type === "organization") return;
     if (where.type === "team") {
-      const team = await repository.findTeamOrganization({ teamId: where.id });
+      const team = await repository.tryFindTeamOrganization({ teamId: where.id });
       if (team?.organizationId !== organizationId) {
         throw new GrantValidationError("Team is not in this organization", {
           teamId: where.id,
@@ -392,7 +392,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
       }
       return;
     }
-    const lineage = await repository.findProjectLineage({
+    const lineage = await repository.tryFindProjectLineage({
       projectId: where.id,
     });
     if (
@@ -416,7 +416,7 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
   }): Promise<void> {
     if (!("customRoleId" in role)) return;
     const { customRoleId } = role;
-    const customRole = await repository.findCustomRole({ customRoleId });
+    const customRole = await repository.tryFindCustomRole({ customRoleId });
     if (!customRole || customRole.organizationId !== organizationId) {
       throw new GrantValidationError(
         "Custom role does not belong to this organization",

@@ -478,7 +478,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     });
     const listed: AuthzAccessBinding[] = [];
     for (const grant of grants) {
-      const row = this.toListedRow({
+      const row = this.tryToListedRow({
         grant,
         decoration,
         shouldDropUndecoratedPrincipals,
@@ -574,7 +574,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
   }
 
   /** roleKey → the compat pair the fold writes onto the legacy head. */
-  private compatRole(row: {
+  private tryCompatRole(row: {
     roleKey: string | null;
     legacyRole: string | null;
   }): { role: TeamUserRole; customRoleId: string | null } | null {
@@ -587,14 +587,14 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     }
     if (row.roleKey?.startsWith("custom:")) {
       return {
-        role: this.teamUserRoleFrom(row.legacyRole) ?? "CUSTOM",
+        role: this.tryTeamUserRoleFrom(row.legacyRole) ?? "CUSTOM",
         customRoleId: row.roleKey.slice("custom:".length),
       };
     }
     return null;
   }
 
-  private teamUserRoleFrom(value: string | null): TeamUserRole | null {
+  private tryTeamUserRoleFrom(value: string | null): TeamUserRole | null {
     return value === "ADMIN" ||
       value === "MEMBER" ||
       value === "VIEWER" ||
@@ -618,7 +618,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     for (const row of rows) {
       if (!this.isBindingScope(row.scopeType)) continue;
       if (!this.isBindingPrincipal(row.principalType)) continue;
-      const translated = this.compatRole(row);
+      const translated = this.tryCompatRole(row);
       if (!translated) continue;
       listable.push({
         row,
@@ -678,7 +678,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     };
   }
 
-  private toListedRow({
+  private tryToListedRow({
     grant,
     decoration,
     shouldDropUndecoratedPrincipals,

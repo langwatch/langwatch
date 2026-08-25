@@ -1,0 +1,22 @@
+{
+  "name": "@langwatch/role-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical server-side custom role service.",
+  "license": "MIT",
+  "type": "module",
+  "exports": { ".": { "types": "./src/index.ts", "default": "./src/index.ts" } },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": ["src"],
+  "scripts": { "typecheck": "tsc --noEmit", "test": "vitest run" },
+  "dependencies": {
+    "@langwatch/actor": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/ksuid": "^2.0.2",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/role-contract": "workspace:*",
+    "nanoid": "^5.1.5"
+  },
+  "devDependencies": { "typescript": "^7.0.2", "vitest": "^4.1.9" }
+}

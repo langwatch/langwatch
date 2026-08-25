@@ -17,6 +17,7 @@ import {
   type LangyConversationCommands,
   type LangyConversationEventsReader,
   type LangyConversationRuntime,
+  type LangyRelayCompositionOptions,
 } from "../services/langy.service";
 import { LangyConversationService } from "../services/langy-conversation.service";
 import { LangyMessageService } from "../services/langy-message.service";
@@ -106,6 +107,7 @@ export interface LangyServiceCompositionOptions
   commands: LangyConversationCommands;
   events?: LangyConversationEventsReader | null;
   runtime?: LangyConversationRuntime;
+  relay?: LangyRelayCompositionOptions;
 }
 
 export interface PostgresLangyAdapterOptions {
@@ -203,7 +205,7 @@ export class PostgresLangyAdapter {
       credentials,
       feedbackPrompt: options.feedbackPrompt,
     };
-    this.service = LangyService.compose(capabilities);
+    this.service = LangyService.compose(capabilities, options.relay);
     return this.service;
   }
 }

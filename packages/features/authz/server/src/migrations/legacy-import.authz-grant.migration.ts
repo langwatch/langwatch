@@ -259,7 +259,7 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
       credentials,
       groupMemberships,
     ] = await Promise.all([
-      this.deps.store.findOrganizationCreatedAtMs({ organizationId }),
+      this.deps.store.tryFindOrganizationCreatedAtMs({ organizationId }),
       this.deps.store.findLegacyRoleRows({ organizationId }),
       this.deps.store.findLegacyBindingRows({ organizationId }),
       this.deps.store.findOrganizationMembers({ organizationId }),

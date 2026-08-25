@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { InitiateToolCallCommand } from "@langwatch/langy-server/eventing/langy-conversation-processing";
-import { langyRelayFrameSchema } from "../langyRelayFrame";
+import { langyRelayFrameSchema } from "../src/streaming/langy-relay-frame";
 
 /**
  * The real shape: an 8-character tool id with a provider's round-trip blob

@@ -1,4 +1,4 @@
-# Stored Objects persistence and accounting: ../../packages/features/stored-objects/adrs/001-package-boundary.md
+# Stored Objects persistence and accounting: ../../packages/features/stored-object/adrs/001-package-boundary.md
 Feature: Trace media blob extraction at the ingestion edge
   As the LangWatch trace ingestion pipeline receiving spans whose message
   content embeds inline media bytes (base64 audio turns, data-URI images,

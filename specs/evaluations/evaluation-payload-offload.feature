@@ -1,4 +1,4 @@
-# Stored Objects persistence and accounting: ../../packages/features/stored-objects/adrs/001-package-boundary.md
+# Stored Objects persistence and accounting: ../../packages/features/stored-object/adrs/001-package-boundary.md
 Feature: Evaluation payload offload
   As the LangWatch evaluations pipeline persisting evaluator inputs
   I want oversized evaluation inputs offloaded to object storage with a

@@ -12,12 +12,12 @@
  * @see specs/langy/langy-dual-stream.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LANGY_STREAMING } from "../langy.streaming.constants";
+import { LANGY_STREAMING } from "../src/streaming/langy-streaming.constants";
 import {
   LANGY_EMPTY_TURN_FALLBACK,
   type LangyStreamRedis,
   LangyTokenBuffer,
-} from "../langyTokenBuffer";
+} from "../src/streaming/langy-token-buffer";
 
 interface RecordedEntry {
   type: string;
@@ -70,7 +70,7 @@ describe("LangyTokenBuffer hybrid flush", () => {
     describe("when the first delta arrives", () => {
       it("flushes it to the stream immediately, without waiting for a batch", async () => {
         const { redis, entries } = makeRedis();
-        const buffer = new LangyTokenBuffer({ redis });
+        const buffer = LangyTokenBuffer.create({ redis });
 
         await buffer.appendChunk({ ...ids, text: "Hello" });
 
@@ -81,7 +81,7 @@ describe("LangyTokenBuffer hybrid flush", () => {
     describe("when later tokens trickle in below the batch size", () => {
       it("flushes the pending text on the clock instead of holding it for the batch", async () => {
         const { redis, entries } = makeRedis();
-        const buffer = new LangyTokenBuffer({ redis });
+        const buffer = LangyTokenBuffer.create({ redis });
 
         await buffer.appendChunk({ ...ids, text: "Hello" }); // first flush
         await buffer.appendChunk({ ...ids, text: " there" });
@@ -101,7 +101,7 @@ describe("LangyTokenBuffer hybrid flush", () => {
 
       it("arms the clock once per pending batch, keeping stream write volume bounded", async () => {
         const { redis, entries } = makeRedis();
-        const buffer = new LangyTokenBuffer({ redis });
+        const buffer = LangyTokenBuffer.create({ redis });
 
         await buffer.appendChunk({ ...ids, text: "first" }); // immediate
         // A steady trickle across one FLUSH_AFTER_MS window.
@@ -128,7 +128,7 @@ describe("LangyTokenBuffer hybrid flush", () => {
     describe("when a fast stream fills the batch before the clock fires", () => {
       it("flushes on size and does not double-flush when the clock later fires", async () => {
         const { redis, entries } = makeRedis();
-        const buffer = new LangyTokenBuffer({ redis });
+        const buffer = LangyTokenBuffer.create({ redis });
 
         await buffer.appendChunk({ ...ids, text: "go" }); // immediate first flush
         const words = Array.from(
@@ -149,7 +149,7 @@ describe("LangyTokenBuffer hybrid flush", () => {
     describe("when the turn ends with tokens still pending", () => {
       it("drains the tail on the terminal marker, in order, before the end entry", async () => {
         const { redis, entries } = makeRedis();
-        const buffer = new LangyTokenBuffer({ redis });
+        const buffer = LangyTokenBuffer.create({ redis });
 
         await buffer.appendChunk({ ...ids, text: "first" });
         await buffer.appendChunk({ ...ids, text: " tail" });
@@ -168,7 +168,7 @@ describe("LangyTokenBuffer hybrid flush", () => {
   describe("given a provider streams reasoning token by token", () => {
     it("coalesces the live-only reasoning tail, then drains it before the terminal marker", async () => {
       const { redis, entries } = makeRedis();
-      const buffer = new LangyTokenBuffer({ redis });
+      const buffer = LangyTokenBuffer.create({ redis });
 
       await buffer.appendReasoning({ ...ids, text: "I will " });
       await buffer.appendReasoning({ ...ids, text: "inspect this." });
@@ -188,7 +188,7 @@ describe("LangyTokenBuffer hybrid flush", () => {
       /** @scenario A turn never ends silently */
       it("emits a visible fallback line before the terminal marker", async () => {
         const { redis, entries } = makeRedis();
-        const buffer = new LangyTokenBuffer({ redis });
+        const buffer = LangyTokenBuffer.create({ redis });
 
         // Tool cards but no prose: the exact shape of the blank replies seen in
         // production, where the turn succeeds and the panel shows nothing.
@@ -209,7 +209,7 @@ describe("LangyTokenBuffer hybrid flush", () => {
       /** @scenario A turn never ends silently */
       it("counts a whitespace-only delta as no text at all", async () => {
         const { redis, entries } = makeRedis();
-        const buffer = new LangyTokenBuffer({ redis });
+        const buffer = LangyTokenBuffer.create({ redis });
 
         // Whitespace is truthy, so this used to satisfy the has-written check
         // while the panel still rendered nothing the user could read.
@@ -228,7 +228,7 @@ describe("LangyTokenBuffer hybrid flush", () => {
       /** @scenario A stream that ends without the turn finishing says nothing */
       it("stays silent on a user stop, which lands on a partial answer", async () => {
         const { redis, entries } = makeRedis();
-        const buffer = new LangyTokenBuffer({ redis });
+        const buffer = LangyTokenBuffer.create({ redis });
 
         // stopTurn ends the stream on its own buffer instance, one that never
         // saw a chunk. Reading that as "the turn wrote no reply" put the
@@ -250,8 +250,8 @@ describe("LangyTokenBuffer hybrid flush", () => {
         // One redis, two buffers: a buffer is built per relay request, so the
         // instance that ends the stream is not always the one that filled it.
         const { redis, entries } = makeRedis();
-        const streamed = new LangyTokenBuffer({ redis });
-        const ending = new LangyTokenBuffer({ redis });
+        const streamed = LangyTokenBuffer.create({ redis });
+        const ending = LangyTokenBuffer.create({ redis });
 
         await streamed.appendChunk({ ...ids, text: "Found 3 failing traces." });
         await streamed.flush(ids);
@@ -272,7 +272,7 @@ describe("LangyTokenBuffer hybrid flush", () => {
     describe("when the turn reaches its terminal marker", () => {
       it("stays out of the way", async () => {
         const { redis, entries } = makeRedis();
-        const buffer = new LangyTokenBuffer({ redis });
+        const buffer = LangyTokenBuffer.create({ redis });
 
         await buffer.appendChunk({ ...ids, text: "Found 3 failing traces." });
         await buffer.markEnd(ids);
@@ -284,7 +284,7 @@ describe("LangyTokenBuffer hybrid flush", () => {
 
       it("keeps the whitespace that separates two words", async () => {
         const { redis, entries } = makeRedis();
-        const buffer = new LangyTokenBuffer({ redis });
+        const buffer = LangyTokenBuffer.create({ redis });
 
         await buffer.appendChunk({ ...ids, text: "Found" });
         await buffer.appendChunk({ ...ids, text: " " });
@@ -304,7 +304,7 @@ describe("LangyTokenBuffer hybrid flush", () => {
     describe("when a later turn ends silently", () => {
       it("emits the fallback again", async () => {
         const { redis, entries } = makeRedis();
-        const buffer = new LangyTokenBuffer({ redis });
+        const buffer = LangyTokenBuffer.create({ redis });
 
         await buffer.appendChunk({ ...ids, text: "First answer." });
         await buffer.markEnd({ ...ids, backstopSilentTurn: true });

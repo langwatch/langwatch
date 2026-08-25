@@ -70,7 +70,7 @@ export abstract class AuthzGrantRepository extends ScopeLineageRepository {
     organizationId: string;
     actor: LedgerActor;
   }): Promise<void>;
-  abstract findBinding(args: {
+  abstract tryFindBinding(args: {
     bindingId: string;
   }): Promise<{ id: string; organizationId: string } | null>;
   /**
@@ -78,7 +78,7 @@ export abstract class AuthzGrantRepository extends ScopeLineageRepository {
    * the tenancy check and the vocabulary check read the same row, so they
    * take one query.
    */
-  abstract findCustomRole(args: {
+  abstract tryFindCustomRole(args: {
     customRoleId: string;
   }): Promise<{ organizationId: string; permissions: unknown } | null>;
   /**

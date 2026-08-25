@@ -101,7 +101,7 @@ export type ResourceGrantUsageSeed = {
 
 /** Storage contract for the one ADR-110 AuthZ import. */
 export abstract class AuthzMigrationRepository {
-  abstract findOrganizationCreatedAtMs(args: {
+  abstract tryFindOrganizationCreatedAtMs(args: {
     organizationId: string;
   }): Promise<number | null>;
 

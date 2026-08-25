@@ -160,4 +160,47 @@ export class PrismaAnnotationRepository extends AnnotationRepository {
       }),
     );
   }
+
+  async findProjectOrganizationId(input: {
+    projectId: string;
+  }): Promise<string | null> {
+    const project = await this.database.project.findUnique({
+      where: { id: input.projectId },
+      select: { team: { select: { organizationId: true } } },
+    });
+    return project?.team.organizationId ?? null;
+  }
+
+  async countOrganizationUsers(input: {
+    organizationId: string;
+    userIds: string[];
+  }): Promise<number> {
+    if (input.userIds.length === 0) return 0;
+    return this.database.organizationUser.count({
+      where: {
+        organizationId: input.organizationId,
+        userId: { in: input.userIds },
+      },
+    });
+  }
+
+  async countAnnotationScores(input: {
+    projectId: string;
+    scoreTypeIds: string[];
+  }): Promise<number> {
+    if (input.scoreTypeIds.length === 0) return 0;
+    return this.database.annotationScore.count({
+      where: { projectId: input.projectId, id: { in: input.scoreTypeIds } },
+    });
+  }
+
+  async countAnnotationQueues(input: {
+    projectId: string;
+    queueIds: string[];
+  }): Promise<number> {
+    if (input.queueIds.length === 0) return 0;
+    return this.database.annotationQueue.count({
+      where: { projectId: input.projectId, id: { in: input.queueIds } },
+    });
+  }
 }

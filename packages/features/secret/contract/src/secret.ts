@@ -1,4 +1,4 @@
-import { z } from "zod/v4";
+import { z } from "zod";
 
 export const SECRET_FEATURE_ID = "secret" as const;
 export const MAX_SECRETS_PER_PROJECT = 50;

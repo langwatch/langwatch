@@ -22,7 +22,7 @@ import {
   LANGY_LIVENESS,
   LANGY_STREAM,
   LANGY_STREAMING,
-} from "./langy.streaming.constants";
+} from "./langy-streaming.constants";
 
 /**
  * A decoded stream entry. `delta` carries buffered tokens; `status`/`progress`
@@ -172,8 +172,19 @@ export class LangyTokenBuffer {
     ReturnType<typeof setTimeout>
   >();
 
-  constructor(deps: { redis: LangyStreamRedis }) {
+  private constructor(deps: { redis: LangyStreamRedis }) {
     this.redis = deps.redis;
+  }
+
+  static create(deps: {
+    redis: unknown;
+    blockingRedis?: unknown;
+  }): LangyTokenBuffer {
+    const redis = deps.redis as LangyStreamRedis;
+    if (deps.blockingRedis) {
+      redis.blocking = deps.blockingRedis as LangyStreamRedis["blocking"];
+    }
+    return new LangyTokenBuffer({ redis });
   }
 
   private streamKey(conversationId: string, turnId: string): string {
@@ -694,13 +705,3 @@ export class LangyTokenBuffer {
  * `LangyStreamRedis` shape. The blocking connection is optional; when omitted,
  * `follow` uses the primary (fine for tests, not for a busy shared client).
  */
-export function createLangyTokenBuffer(deps: {
-  redis: unknown;
-  blockingRedis?: unknown;
-}): LangyTokenBuffer {
-  const redis = deps.redis as LangyStreamRedis;
-  if (deps.blockingRedis) {
-    redis.blocking = deps.blockingRedis as LangyStreamRedis["blocking"];
-  }
-  return new LangyTokenBuffer({ redis });
-}

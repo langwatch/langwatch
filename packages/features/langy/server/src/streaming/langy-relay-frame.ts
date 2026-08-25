@@ -16,7 +16,7 @@ import {
   handledErrorFromHerr,
 } from "@langwatch/handled-error";
 import { cliToolResultSchema } from "@langwatch/langy-contract";
-import * as z from "zod";
+import { z } from "zod";
 
 /**
  * The signed envelope — mirrors frameauth's construction. `payload` is the exact

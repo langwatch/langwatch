@@ -1,0 +1,27 @@
+{
+  "name": "@langwatch/github-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical GitHub installation, webhook and pull-request linkage services.",
+  "type": "module",
+  "exports": {
+    ".": { "types": "./src/index.ts", "default": "./src/index.ts" }
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": ["src"],
+  "scripts": { "typecheck": "tsc --noEmit", "test": "vitest run", "test:unit": "vitest run" },
+  "dependencies": {
+    "@langwatch/coding-agent-contract": "workspace:*",
+    "@langwatch/github-contract": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "jsonwebtoken": "^9.0.2",
+    "nanoid": "^5.1.5",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": { "@types/jsonwebtoken": "^9.0.10", "@types/node": "^26.0.1", "typescript": "^7.0.2", "vitest": "^4.1.9" }
+}

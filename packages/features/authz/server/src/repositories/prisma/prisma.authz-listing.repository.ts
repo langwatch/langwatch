@@ -285,7 +285,9 @@ export class PrismaAuthzListingRepository extends AuthzListingRepository {
 
   /** The relation predicate the whole-table and scope listings carry: a row
    * is listed only while its principal is still of this organization. */
-  private principalInOrganizationWhere(organizationId: string) {
+  private principalInOrganizationWhere(
+    organizationId: string,
+  ): Record<string, unknown> {
     return {
       OR: [
         {

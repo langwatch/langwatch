@@ -15,6 +15,7 @@ export type {
   LangyConversationCommands,
   LangyConversationEventsReader,
   LangyConversationRuntime,
+  LangyRelayCompositionOptions,
 } from "./services/langy.service";
 export type {
   LangyTurnAdmissionCapability,
@@ -100,3 +101,5 @@ export type {
   LangyHandoffRedis,
   LangyTurnHandoff,
 } from "./streaming/langy-turn-handoff";
+export { LangyTokenBuffer } from "./streaming/langy-token-buffer";
+export type { LangyStreamEntry } from "./streaming/langy-token-buffer";

@@ -1,0 +1,14 @@
+{
+  "name": "@langwatch/model-provider-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Model Provider service, private persistence ports, and infrastructure adapters.",
+  "type": "module",
+  "exports": { ".": { "types": "./src/index.ts", "default": "./src/index.ts" } },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": ["src"],
+  "scripts": { "typecheck": "tsc --noEmit", "test": "vitest run", "test:unit": "vitest run" },
+  "dependencies": { "@langwatch/model-provider-contract": "workspace:*", "@langwatch/prisma-client": "workspace:*" },
+  "devDependencies": { "typescript": "^7.0.2", "vitest": "^4.1.9" }
+}

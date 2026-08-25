@@ -146,6 +146,28 @@ export type LangyTurnAdmissionClaim =
   | { kind: "busy" }
   | { kind: "mismatch" };
 
+export type LangyRelayRejection =
+  | "malformed-envelope"
+  | "no-run-token"
+  | "bad-signature"
+  | "wrong-turn"
+  | "invalid-payload";
+
+export type LangyRelayOutcome =
+  | { status: "applied" }
+  | { status: "terminal" }
+  | { status: "duplicate" }
+  | { status: "rejected"; reason: LangyRelayRejection };
+
+export type LangyRelayConnection = {
+  readonly pinnedTurn: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+  } | null;
+  handle(raw: unknown): Promise<LangyRelayOutcome>;
+};
+
 export type LangyTurnAdmissionCapability = {
   claim(input: {
     projectId: string;
@@ -221,6 +243,9 @@ export abstract class LangyService {
   ): Promise<LangyEgressAllowlist | null>;
 
   abstract relay(frame: LangyRelayFrame): Promise<void>;
+
+  /** Opens one per-worker-connection relay session over this process-owned service. */
+  abstract openRelayConnection(): LangyRelayConnection;
 
   abstract getPage(input: {
     projectId: string;

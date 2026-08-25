@@ -2,9 +2,9 @@
 
 **Status:** Implemented, 2026-08-23
 **Architecture:**
-[`packages/features/stored-objects/adrs/001-package-boundary.md`](../../../packages/features/stored-objects/adrs/001-package-boundary.md)
+[`packages/features/stored-object/adrs/001-package-boundary.md`](../../../packages/features/stored-object/adrs/001-package-boundary.md)
 **Behaviour:**
-[`packages/features/stored-objects/specs/stored-objects.feature`](../../../packages/features/stored-objects/specs/stored-objects.feature)
+[`packages/features/stored-object/specs/stored-objects.feature`](../../../packages/features/stored-object/specs/stored-objects.feature)
 **Migration substrate:**
 [`@langwatch/system-migrations`](../../../packages/system-migrations/README.md)
 
@@ -13,10 +13,10 @@
 Feature packages have one initial enforced format, `layoutVersion: 0`, described
 in `packages/features/README.md` and checked by architecture lint. Agents,
 Entitlements and Stored Objects use that format and their contract schemas use
-Zod 4. `@langwatch/api` consumes schemas through Standard Schema so legacy app
-routes can remain on Zod 3 while they migrate.
+Zod 4. `@langwatch/api` consumes schemas through Standard Schema so application
+and feature routes share validation without coupling contracts to Hono.
 
-Stored Objects lives entirely under `packages/features/stored-objects` and has:
+Stored Objects lives entirely under `packages/features/stored-object` and has:
 
 - one portable contract package;
 - one server package;
@@ -48,7 +48,7 @@ in place; composing and cutting over the reduced feature is a later rollout.
 ## Package shape
 
 ```text
-packages/features/stored-objects/
+packages/features/stored-object/
 ├── contract/
 │   └── src/
 │       ├── stored-object.service.ts

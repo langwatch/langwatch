@@ -10,6 +10,7 @@ export const AUTHZ_PROBLEM_CODES = [
   "role_binding_already_exists",
   "role_binding_not_found",
   "offboard_incomplete",
+  "authz_ledger_unavailable",
 ] as const;
 export const authzProblemCodeSchema = z.enum(AUTHZ_PROBLEM_CODES);
 export type AuthzProblemCode = z.infer<typeof authzProblemCodeSchema>;
@@ -153,5 +154,18 @@ export class OffboardIncompleteError extends HandledError {
       { httpStatus: 500, fault: "platform", meta },
     );
     this.name = "OffboardIncompleteError";
+  }
+}
+
+export class AuthzLedgerUnavailableError extends HandledError {
+  declare readonly code: "authz_ledger_unavailable";
+
+  constructor() {
+    super(
+      "authz_ledger_unavailable",
+      "Access changes are temporarily unavailable. Try again in a moment.",
+      { httpStatus: 503, fault: "platform" },
+    );
+    this.name = "AuthzLedgerUnavailableError";
   }
 }

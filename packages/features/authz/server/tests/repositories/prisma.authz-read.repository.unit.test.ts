@@ -12,7 +12,7 @@ import { PrismaAuthzReadRepository } from "../../src/repositories/prisma/prisma.
  * key it was minted for.
  */
 describe("PrismaAuthzReadRepository", () => {
-  describe("findOrganizationRole", () => {
+  describe("tryFindOrganizationRole", () => {
     describe("when the user is a member of the organization", () => {
       it("reads the membership row for this user in this organization", async () => {
         const findFirst = vi.fn().mockResolvedValue({ role: "ADMIN" });
@@ -22,7 +22,7 @@ describe("PrismaAuthzReadRepository", () => {
 
         const role = await PrismaAuthzReadRepository.create(
           prisma,
-        ).findOrganizationRole({ userId: "alice", organizationId: "org-1" });
+        ).tryFindOrganizationRole({ userId: "alice", organizationId: "org-1" });
 
         expect(findFirst).toHaveBeenCalledWith({
           where: { userId: "alice", organizationId: "org-1" },
@@ -39,7 +39,7 @@ describe("PrismaAuthzReadRepository", () => {
         } as unknown as AuthzDatabase;
 
         expect(
-          await PrismaAuthzReadRepository.create(prisma).findOrganizationRole({
+          await PrismaAuthzReadRepository.create(prisma).tryFindOrganizationRole({
             userId: "alice",
             organizationId: "org-1",
           }),
@@ -175,7 +175,7 @@ describe("PrismaAuthzReadRepository", () => {
     });
   });
 
-  describe("findApiKeyOwner", () => {
+  describe("tryFindApiKeyOwner", () => {
     describe("when the key belongs to a user", () => {
       it("returns the owning user id for a personal key", async () => {
         const findUnique = vi.fn().mockResolvedValue({ userId: "alice" });
@@ -184,7 +184,7 @@ describe("PrismaAuthzReadRepository", () => {
         } as unknown as AuthzDatabase;
 
         const owner =
-          await PrismaAuthzReadRepository.create(prisma).findApiKeyOwner(
+          await PrismaAuthzReadRepository.create(prisma).tryFindApiKeyOwner(
             "key-1",
           );
 
@@ -208,10 +208,10 @@ describe("PrismaAuthzReadRepository", () => {
         const repository = PrismaAuthzReadRepository.create(prisma);
 
         // { userId: null } carries no ceiling; null is an unknown key.
-        expect(await repository.findApiKeyOwner("service-key")).toEqual({
+        expect(await repository.tryFindApiKeyOwner("service-key")).toEqual({
           userId: null,
         });
-        expect(await repository.findApiKeyOwner("ghost")).toBeNull();
+        expect(await repository.tryFindApiKeyOwner("ghost")).toBeNull();
       });
     });
   });
@@ -400,7 +400,7 @@ describe("PrismaAuthzReadRepository", () => {
     });
   });
 
-  describe("findProjectLineage", () => {
+  describe("tryFindProjectLineage", () => {
     it("returns the owning team and organization, null for an unknown project", async () => {
       const findUnique = vi
         .fn()
@@ -414,10 +414,10 @@ describe("PrismaAuthzReadRepository", () => {
       const repository = PrismaAuthzReadRepository.create(prisma);
 
       expect(
-        await repository.findProjectLineage({ projectId: "proj-1" }),
+        await repository.tryFindProjectLineage({ projectId: "proj-1" }),
       ).toEqual({ teamId: "team-1", organizationId: "org-1" });
       expect(
-        await repository.findProjectLineage({ projectId: "proj-ghost" }),
+        await repository.tryFindProjectLineage({ projectId: "proj-ghost" }),
       ).toBeNull();
     });
   });

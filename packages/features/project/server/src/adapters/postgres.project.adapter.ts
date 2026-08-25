@@ -25,7 +25,6 @@ class FunctionProjectCredentials extends ProjectCredentialsPort {
   generateApiKey(): string {
     return this.apiKey();
   }
-
 }
 
 export interface PostgresProjectAdapterOptions {

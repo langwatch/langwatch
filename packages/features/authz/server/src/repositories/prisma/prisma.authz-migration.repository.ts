@@ -56,7 +56,7 @@ export class PrismaAuthzMigrationRepository extends AuthzMigrationRepository {
     super();
   }
 
-  async findOrganizationCreatedAtMs({
+  async tryFindOrganizationCreatedAtMs({
     organizationId,
   }: {
     organizationId: string;

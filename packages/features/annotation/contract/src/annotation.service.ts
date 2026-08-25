@@ -21,4 +21,20 @@ export abstract class AnnotationService {
     traceIds: string[];
     anchor?: "trace" | "all";
   }): Promise<ProjectionAnnotation[]>;
+
+  abstract getProjectOrganizationId(input: {
+    projectId: string;
+  }): Promise<string>;
+
+  abstract assertQueueConfigurationReferences(input: {
+    projectId: string;
+    userIds: string[];
+    scoreTypeIds: string[];
+  }): Promise<void>;
+
+  abstract assertAnnotatorReferences(input: {
+    projectId: string;
+    queueIds: string[];
+    userIds: string[];
+  }): Promise<void>;
 }

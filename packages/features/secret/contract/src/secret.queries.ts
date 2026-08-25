@@ -1,5 +1,5 @@
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { z, type ZodType } from "zod/v4";
+import { z, type ZodType } from "zod";
 import {
   secretIdSchema,
   secretNameSchema,

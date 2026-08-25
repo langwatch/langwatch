@@ -22,35 +22,50 @@ import {
   type CliResultDigest,
   type CliToolResult,
   cliToolResultPayload,
+  extractPlatformUrl,
+  isPreciseResourceHref,
   isSoleLangwatchInvocation,
   type LangwatchCommand,
   parseAllLangwatchCommands,
   parseLangwatchCommand,
-} from "@langwatch/langy-contract";
-import { env } from "~/env.mjs";
-import { resolveCapabilityProgress } from "~/features/langy/components/capabilities/capabilityRegistry";
-import {
-  extractPlatformUrl,
-  isPreciseResourceHref,
   toRelativeSameOriginHref,
-} from "~/utils/platformHref";
+} from "@langwatch/langy-contract";
 import {
   LangyCliEnvelopeService,
   type LangyToolFrame,
-} from "@langwatch/langy-server";
+} from "../services/langy-cli-envelope.service";
 import {
   langyAgentErrorFromErrorFrame,
   serializeLangyTurnError,
-} from "@langwatch/langy-server";
-import { verifyFrame } from "@langwatch/langy-server";
+} from "../adapters/langy.turn-errors.adapter";
+import { verifyFrame } from "../ports/langy-frame-auth.port";
 import {
   type LangyFrameEnvelope,
   type LangyRelayFrame,
   langyFrameEnvelopeSchema,
   langyRelayFrameSchema,
-} from "./langyRelayFrame";
-import type { LangyResourceLinkStore } from "@langwatch/langy-server";
-import { LANGY_EMPTY_TURN_FALLBACK } from "./langyTokenBuffer";
+} from "./langy-relay-frame";
+import type {
+  LangyLinkRedis,
+  LangyResourceLinkStore,
+} from "./langy-resource-links";
+import { LangyFrameDedupStore } from "./langy-frame-dedup";
+import type { LangyFrameDedupRedis } from "./langy-frame-dedup";
+import { LangyResourceLinksStore } from "./langy-resource-links";
+import { LangyTurnHandoffStore } from "./langy-turn-handoff";
+import type { LangyHandoffRedis } from "./langy-turn-handoff";
+import {
+  LANGY_EMPTY_TURN_FALLBACK,
+  LangyTokenBuffer,
+  type LangyStreamRedis,
+} from "./langy-token-buffer";
+
+type PlatformProgress = { headline: string };
+
+export type LangyRelayRedis = LangyStreamRedis &
+  LangyFrameDedupRedis &
+  LangyLinkRedis &
+  LangyHandoffRedis;
 
 /** The CLI grammar the agent uses to say WHICH resource to open — never an
  * address. `langwatch navigate open <resourceId>`; the platform resolves
@@ -313,6 +328,10 @@ export interface LangyTurnRelayDeps {
     warn(o: unknown, m: string): void;
     debug?(o: unknown, m: string): void;
   };
+  /** The deployment origin used to turn platform URLs into safe app hrefs. */
+  baseHost: string;
+  /** Optional app-owned capability label registry. */
+  resolveCapabilityProgress?: (name: string) => PlatformProgress | null;
 }
 
 export type LangyRelayRejection =
@@ -367,7 +386,71 @@ export class LangyTurnRelay {
   // Redis store, NOT an instance field. The relay is per-turn; a navigate in a
   // later turn must still resolve a link a lookup surfaced in an earlier one.
 
-  constructor(private readonly deps: LangyTurnRelayDeps) {}
+  private constructor(private readonly deps: LangyTurnRelayDeps) {}
+
+  static create(options: {
+    redis?: LangyRelayRedis;
+    conversations: LangyRelayConversations;
+    baseHost: string;
+    buffer?: LangyRelayBuffer;
+    reserveFrameNonce?: LangyTurnRelayDeps["reserveFrameNonce"];
+    readHandoffRunToken?: LangyTurnRelayDeps["readHandoffRunToken"];
+    resourceLinks?: LangyResourceLinkStore;
+    resolveResourceUrl?: LangyTurnRelayDeps["resolveResourceUrl"];
+    resolveCapabilityProgress?: (name: string) => PlatformProgress | null;
+    logger?: LangyTurnRelayDeps["logger"];
+  }): LangyTurnRelay {
+    const redis = options.redis;
+    const buffer =
+      options.buffer ??
+      (redis ? LangyTokenBuffer.create({ redis }) : undefined);
+    if (!buffer) {
+      throw new Error("Langy relay requires Redis or a buffer");
+    }
+    const frameDedup = redis ? LangyFrameDedupStore.create({ redis }) : null;
+    const handoff = redis ? LangyTurnHandoffStore.create({ redis }) : null;
+    const resourceLinks =
+      options.resourceLinks ??
+      (redis ? LangyResourceLinksStore.create({ redis }) : undefined);
+    if (!resourceLinks) {
+      throw new Error("Langy relay requires Redis or resource links");
+    }
+    const reserveFrameNonce =
+      options.reserveFrameNonce ??
+      (frameDedup?.reserveFrameNonce.bind(frameDedup));
+    if (!reserveFrameNonce) {
+      throw new Error("Langy relay requires frame nonce deduplication");
+    }
+    return new LangyTurnRelay({
+      conversations: options.conversations,
+      buffer,
+      reserveFrameNonce,
+      ...(options.readHandoffRunToken
+        ? { readHandoffRunToken: options.readHandoffRunToken }
+        : handoff
+          ? {
+              readHandoffRunToken: async ({
+                projectId,
+                conversationId,
+                turnId,
+              }) => {
+                const row = await handoff.read({ conversationId, turnId });
+                if (!row || row.projectId !== projectId) return null;
+                return row.runToken || null;
+              },
+            }
+          : {}),
+      resourceLinks,
+      ...(options.resolveResourceUrl
+        ? { resolveResourceUrl: options.resolveResourceUrl }
+        : {}),
+      ...(options.logger ? { logger: options.logger } : {}),
+      baseHost: options.baseHost,
+      ...(options.resolveCapabilityProgress
+        ? { resolveCapabilityProgress: options.resolveCapabilityProgress }
+        : {}),
+    });
+  }
 
   async handle(raw: unknown): Promise<LangyRelayOutcome> {
     const envelopeParse = langyFrameEnvelopeSchema.safeParse(raw);
@@ -721,7 +804,7 @@ export class LangyTurnRelay {
     // fires on the tool entry, once per turn) cannot wipe it, and cleared with an
     // empty status when the call settles, so it shows only between the step's
     // start and its output. Non-capability calls (a raw bash) carry no label.
-    const progress = resolveCapabilityProgress(call.name);
+    const progress = this.deps.resolveCapabilityProgress?.(call.name);
     if (progress) {
       await this.deps.buffer.appendStatus({
         ...at,
@@ -878,7 +961,7 @@ export class LangyTurnRelay {
 
     const href = toRelativeSameOriginHref({
       url: platformUrl,
-      origin: env.BASE_HOST ?? "",
+      origin: this.deps.baseHost,
     });
     if (!href) return { status: "applied" }; // resolves outside the app — drop
 

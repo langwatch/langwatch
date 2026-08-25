@@ -70,7 +70,7 @@ function harness(data: Data = {}) {
   const seeded: ResourceGrantUsageSeed[][] = [];
   const reads = { grantHeads: 0, roleHeads: 0, resourceRows: 0 };
   const store: AuthzMigrationRepository = {
-    findOrganizationCreatedAtMs: async () =>
+    tryFindOrganizationCreatedAtMs: async () =>
       data.organizationCreatedAtMs === undefined
         ? CREATED
         : data.organizationCreatedAtMs,

@@ -1,6 +1,6 @@
 # Historical characterization while product- and platform-owned scenarios are
 # split to their long-term owners. Generic Stored Objects architecture is owned
-# by packages/features/stored-objects and this file is not a competing authority.
+# by packages/features/stored-object and this file is not a competing authority.
 @deprecated
 Feature: Externalize event byte content to stored_objects
   As a platform operator and SDK consumer

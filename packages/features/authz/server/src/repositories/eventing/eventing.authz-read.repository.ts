@@ -67,7 +67,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
   }
 
   /** Membership is not a grant: the same query the legacy repository runs. */
-  async findOrganizationRole({
+  async tryFindOrganizationRole({
     userId,
     organizationId,
   }: {
@@ -273,7 +273,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
   }
 
   /** Membership again, not a grant: the legacy query, unchanged. */
-  async findApiKeyOwner(
+  async tryFindApiKeyOwner(
     apiKeyId: string,
   ): Promise<{ userId: string | null } | null> {
     return (await this.database.apiKey.findUnique({
@@ -320,7 +320,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     if (tokens.length === 0 || links.length === 0) return [];
     const resolvedOrganizationId =
       organizationId ??
-      (await this.findProjectLineage({ projectId }))?.organizationId;
+      (await this.tryFindProjectLineage({ projectId }))?.organizationId;
     if (!resolvedOrganizationId) return [];
 
     const rows = await this.findResourceGrantCandidates({
@@ -393,7 +393,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
   }
 
   /** Lineage is not a grant: the legacy query, unchanged. */
-  async findProjectLineage({
+  async tryFindProjectLineage({
     projectId,
   }: {
     projectId: string;
@@ -410,7 +410,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
   }
 
   /** Lineage is not a grant: the legacy query, unchanged. */
-  async findTeamOrganization({
+  async tryFindTeamOrganization({
     teamId,
   }: {
     teamId: string;
@@ -465,7 +465,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     }>;
     const held = new Map<string, { isMine: boolean; isForeign: boolean }>();
     for (const holder of holders) {
-      const role = this.bindingRole(holder.roleKey);
+      const role = this.tryBindingRole(holder.roleKey);
       if (role?.customRoleId == null) continue;
       const entry = held.get(role.customRoleId) ?? {
         isMine: false,
@@ -509,7 +509,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     const bindings: CollectedBinding[] = [];
     for (const row of rows) {
       if (!this.isBindingScope(row.scopeType)) continue;
-      const role = this.bindingRole(row.roleKey);
+      const role = this.tryBindingRole(row.roleKey);
       if (!role) continue;
       bindings.push({
         role: role.role,
@@ -522,7 +522,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     return bindings;
   }
 
-  private bindingRole(
+  private tryBindingRole(
     roleKey: string | null,
   ): { role: CollectedBinding["role"]; customRoleId: string | null } | null {
     if (roleKey === "admin") return { role: "ADMIN", customRoleId: null };

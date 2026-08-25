@@ -8,7 +8,7 @@ import { PrismaAuthzGrantRepository } from "../../src/repositories/prisma/prisma
  */
 
 describe("PrismaAuthzGrantRepository", () => {
-  describe("findCustomRole", () => {
+  describe("tryFindCustomRole", () => {
     it("reads the tenancy and the vocabulary in one query", async () => {
       const findUnique = vi
         .fn()
@@ -19,7 +19,7 @@ describe("PrismaAuthzGrantRepository", () => {
 
       const role = await PrismaAuthzGrantRepository.create(
         prisma,
-      ).findCustomRole({ customRoleId: "role-1" });
+      ).tryFindCustomRole({ customRoleId: "role-1" });
 
       expect(findUnique).toHaveBeenCalledWith({
         where: { id: "role-1" },
@@ -29,14 +29,14 @@ describe("PrismaAuthzGrantRepository", () => {
     });
   });
 
-  describe("findTeamOrganization", () => {
+  describe("tryFindTeamOrganization", () => {
     it("reads the owning organization for a team", async () => {
       const findUnique = vi.fn().mockResolvedValue({ organizationId: "org-1" });
       const prisma = { team: { findUnique } } as never;
 
       const result = await PrismaAuthzGrantRepository.create(
         prisma,
-      ).findTeamOrganization({ teamId: "team-1" });
+      ).tryFindTeamOrganization({ teamId: "team-1" });
 
       expect(findUnique).toHaveBeenCalledWith({
         where: { id: "team-1" },
@@ -46,7 +46,7 @@ describe("PrismaAuthzGrantRepository", () => {
     });
   });
 
-  describe("findProjectLineage", () => {
+  describe("tryFindProjectLineage", () => {
     describe("when the project has no team", () => {
       it("returns null rather than a half-filled lineage", async () => {
         const findUnique = vi.fn().mockResolvedValue({ team: null });
@@ -54,7 +54,7 @@ describe("PrismaAuthzGrantRepository", () => {
 
         const result = await PrismaAuthzGrantRepository.create(
           prisma,
-        ).findProjectLineage({ projectId: "project-1" });
+        ).tryFindProjectLineage({ projectId: "project-1" });
 
         expect(result).toBeNull();
       });
@@ -69,7 +69,7 @@ describe("PrismaAuthzGrantRepository", () => {
 
         const result = await PrismaAuthzGrantRepository.create(
           prisma,
-        ).findProjectLineage({ projectId: "project-1" });
+        ).tryFindProjectLineage({ projectId: "project-1" });
 
         expect(result).toEqual({ teamId: "team-1", organizationId: "org-1" });
       });

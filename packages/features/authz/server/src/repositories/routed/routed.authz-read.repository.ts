@@ -101,11 +101,11 @@ export class RoutedAuthzReadRepository extends AuthzReadRepository {
     return new RoutedAuthzReadRepository(this.selectHead, this.repositories);
   }
 
-  async findOrganizationRole(args: {
+  async tryFindOrganizationRole(args: {
     userId: string;
     organizationId: string;
   }): Promise<OrganizationRole | null> {
-    return this.repositories.legacy.findOrganizationRole(args);
+    return this.repositories.legacy.tryFindOrganizationRole(args);
   }
 
   async findUserBindings(args: {
@@ -129,10 +129,10 @@ export class RoutedAuthzReadRepository extends AuthzReadRepository {
     return (await this.readerFor(args.organizationId)).findApiKeyBindings(args);
   }
 
-  async findApiKeyOwner(
+  async tryFindApiKeyOwner(
     apiKeyId: string,
   ): Promise<{ userId: string | null } | null> {
-    return this.repositories.legacy.findApiKeyOwner(apiKeyId);
+    return this.repositories.legacy.tryFindApiKeyOwner(apiKeyId);
   }
 
   async findLegacyTeamMemberships(args: {
@@ -159,7 +159,7 @@ export class RoutedAuthzReadRepository extends AuthzReadRepository {
     tokens: readonly string[];
     links: ReadonlyArray<{ kind: ShareableResourceKind; id: string }>;
   }): Promise<ShareLinkRow[]> {
-    const lineage = await this.repositories.legacy.findProjectLineage({
+    const lineage = await this.repositories.legacy.tryFindProjectLineage({
       projectId: args.projectId,
     });
     if (!lineage) return this.repositories.legacy.findShareLinks(args);
@@ -175,16 +175,16 @@ export class RoutedAuthzReadRepository extends AuthzReadRepository {
     });
   }
 
-  async findProjectLineage(args: {
+  async tryFindProjectLineage(args: {
     projectId: string;
   }): Promise<{ teamId: string; organizationId: string } | null> {
-    return this.repositories.legacy.findProjectLineage(args);
+    return this.repositories.legacy.tryFindProjectLineage(args);
   }
 
-  async findTeamOrganization(args: {
+  async tryFindTeamOrganization(args: {
     teamId: string;
   }): Promise<{ organizationId: string } | null> {
-    return this.repositories.legacy.findTeamOrganization(args);
+    return this.repositories.legacy.tryFindTeamOrganization(args);
   }
 
   private async readerFor(

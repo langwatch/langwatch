@@ -25,7 +25,7 @@ export class RedisAuthzEpochAdapter extends AuthzEpochPort {
     super();
   }
 
-  async read({
+  async tryRead({
     organizationId,
   }: {
     organizationId: string;

@@ -7,20 +7,12 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-// A navigate instruction resolves its address by comparing a resource's
-// remembered platformUrl against BASE_HOST (the server-side notion of "this
-// instance") — fixed here so those tests have a stable origin to assert
-// against, same pattern as platform-url.unit.test.ts.
-vi.mock("~/env.mjs", () => ({
-  env: { BASE_HOST: "https://app.langwatch.ai" },
-}));
-
 import { mintRunToken, signFrame } from "@langwatch/langy-server/streaming/langy-frame-auth";
 import {
   type LangyRelayBuffer,
   type LangyRelayConversations,
   LangyTurnRelay,
-} from "../langyTurnRelay";
+} from "../src/streaming/langy-turn-relay";
 
 const RUN_TOKEN = mintRunToken();
 const IDENTITY = {
@@ -102,7 +94,7 @@ const navigateFrames = (
 
 function fakeConversations(runToken: string | null = RUN_TOKEN) {
   return {
-    getRunToken: vi.fn(async () => runToken),
+    tryGetRunToken: vi.fn(async () => runToken),
     recordToolCallStarted: vi.fn(async () => {}),
     recordToolCallCompleted: vi.fn(async () => {}),
     ingestAgentTurnResult: vi.fn(async () => {}),
@@ -158,7 +150,7 @@ function makeRelay(
   const conversations = over.conversations ?? fakeConversations();
   const resourceLinks = over.resourceLinks ?? fakeResourceLinks();
   const reserveFrameNonce = vi.fn(async () => over.fresh ?? true);
-  const relay = new LangyTurnRelay({
+  const relay = LangyTurnRelay.create({
     buffer,
     conversations,
     reserveFrameNonce,
@@ -169,6 +161,11 @@ function makeRelay(
     ...(over.resolveResourceUrl
       ? { resolveResourceUrl: over.resolveResourceUrl }
       : {}),
+    baseHost: "https://app.langwatch.ai",
+    resolveCapabilityProgress: (name) =>
+      name === "langwatch.trace.search"
+        ? { headline: "Searching traces" }
+        : null,
   });
   return { relay, buffer, conversations, reserveFrameNonce, resourceLinks };
 }
@@ -1075,7 +1072,7 @@ describe("LangyTurnRelay", () => {
       await relay.handle(frame({ type: "delta", text: "a" }));
       await relay.handle(frame({ type: "delta", text: "b" }));
       await relay.handle(frame({ type: "final", text: "done" }));
-      expect(conversations.getRunToken).toHaveBeenCalledTimes(1);
+      expect(conversations.tryGetRunToken).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -1104,7 +1101,7 @@ describe("LangyTurnRelay", () => {
           turnId: "turn-1",
         });
         // The lagging projection is never consulted once the handoff has it.
-        expect(conversations.getRunToken).not.toHaveBeenCalled();
+        expect(conversations.tryGetRunToken).not.toHaveBeenCalled();
       });
     });
 
@@ -1125,7 +1122,7 @@ describe("LangyTurnRelay", () => {
         // falling through to the projection is the point of the two-stage lookup.
         expect(out).toEqual({ status: "applied" });
         expect(buffer.appendChunk).toHaveBeenCalledTimes(1);
-        expect(conversations.getRunToken).toHaveBeenCalledTimes(1);
+        expect(conversations.tryGetRunToken).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -1133,7 +1130,7 @@ describe("LangyTurnRelay", () => {
       it("re-reads the token instead of reusing the cached miss", async () => {
         // No handoff wired; the projection is null on the first read, then lands.
         const conversations = fakeConversations();
-        conversations.getRunToken.mockResolvedValueOnce(null);
+        conversations.tryGetRunToken.mockResolvedValueOnce(null);
         const { relay, buffer } = makeRelay({ conversations });
 
         const first = await relay.handle(frame({ type: "delta", text: "one" }));
@@ -1145,7 +1142,7 @@ describe("LangyTurnRelay", () => {
         expect(second).toEqual({ status: "applied" });
         expect(buffer.appendChunk).toHaveBeenCalledTimes(1);
         // Re-queried because the first null was NOT cached (the bug this fixes).
-        expect(conversations.getRunToken).toHaveBeenCalledTimes(2);
+        expect(conversations.tryGetRunToken).toHaveBeenCalledTimes(2);
       });
     });
   });

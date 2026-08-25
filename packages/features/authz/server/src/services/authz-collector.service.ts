@@ -45,7 +45,7 @@ export class AuthzCollectorService {
    * the resource, never from the caller — same posture as the legacy
    * project path). Returns null when the id does not exist.
    */
-  async resolveScopeRef({
+  async tryResolveScopeRef({
     projectId,
     teamId,
     organizationId,
@@ -55,7 +55,7 @@ export class AuthzCollectorService {
     organizationId?: string;
   }): Promise<AuthzScopeRef | null> {
     if (projectId) {
-      const lineage = await this.reader.findProjectLineage({ projectId });
+      const lineage = await this.reader.tryFindProjectLineage({ projectId });
       if (!lineage) return null;
       return {
         type: "project",
@@ -65,7 +65,7 @@ export class AuthzCollectorService {
       };
     }
     if (teamId) {
-      const team = await this.reader.findTeamOrganization({ teamId });
+      const team = await this.reader.tryFindTeamOrganization({ teamId });
       if (!team) return null;
       return { type: "team", id: teamId, organizationId: team.organizationId };
     }
@@ -88,7 +88,7 @@ export class AuthzCollectorService {
    * forged-parent hole: one shared thread would unlock unrelated traces
    * through the parent link. Returns null when the project does not exist.
    */
-  async resolveResourceScopeRef({
+  async tryResolveResourceScopeRef({
     projectId,
     kind,
     id,
@@ -101,7 +101,7 @@ export class AuthzCollectorService {
     parentThreadId?: string;
     shareTokens?: readonly string[];
   }): Promise<AuthzScopeRef | null> {
-    const lineage = await this.reader.findProjectLineage({ projectId });
+    const lineage = await this.reader.tryFindProjectLineage({ projectId });
     if (!lineage) return null;
     return {
       type: "resource",
@@ -123,12 +123,12 @@ export class AuthzCollectorService {
    * AuthzService asks through here rather than holding its own reader: the
    * collector is the one seam in front of storage.
    */
-  async findApiKeyOwner({
+  async tryFindApiKeyOwner({
     apiKeyId,
   }: {
     apiKeyId: string;
   }): Promise<{ userId: string | null } | null> {
-    return this.reader.findApiKeyOwner(apiKeyId);
+    return this.reader.tryFindApiKeyOwner(apiKeyId);
   }
 
   async collectGrants({
@@ -297,7 +297,7 @@ export class AuthzCollectorService {
   }): Promise<CollectedGrants> {
     const [organizationRole, directBindings, groupBindings, legacyRows] =
       await Promise.all([
-        reader.findOrganizationRole({
+        reader.tryFindOrganizationRole({
           userId: principal.id,
           organizationId,
         }),

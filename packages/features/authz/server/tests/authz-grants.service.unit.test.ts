@@ -55,12 +55,12 @@ function makeRepository(
     createBinding: vi.fn().mockResolvedValue(undefined),
     updateBindingRole: vi.fn().mockResolvedValue(undefined),
     deleteBinding: vi.fn().mockResolvedValue(undefined),
-    findBinding: vi.fn().mockResolvedValue({ id: "rb-1", organizationId: ORG }),
-    findCustomRole: vi
+    tryFindBinding: vi.fn().mockResolvedValue({ id: "rb-1", organizationId: ORG }),
+    tryFindCustomRole: vi
       .fn()
       .mockResolvedValue({ organizationId: ORG, permissions: ["traces:view"] }),
-    findTeamOrganization: vi.fn().mockResolvedValue({ organizationId: ORG }),
-    findProjectLineage: vi.fn().mockResolvedValue(null),
+    tryFindTeamOrganization: vi.fn().mockResolvedValue({ organizationId: ORG }),
+    tryFindProjectLineage: vi.fn().mockResolvedValue(null),
     replaceBinding: vi.fn().mockResolvedValue(undefined),
     // The real adapter runs the deletes in a transaction and calls prove()
     // with a transaction-bound reader; the stub mirrors that contract - a
@@ -146,7 +146,7 @@ describe("AuthzGrantsService.attach", () => {
   describe("when the custom role belongs to another organization", () => {
     it("rejects the attach", async () => {
       const repository = makeRepository({
-        findCustomRole: vi
+        tryFindCustomRole: vi
           .fn()
           .mockResolvedValue({ organizationId: OTHER_ORG, permissions: [] }),
       });
@@ -167,7 +167,7 @@ describe("AuthzGrantsService.attach", () => {
   describe("when the custom role lists a permission the registry never heard of", () => {
     it("rejects the attach and names the offending strings", async () => {
       const repository = makeRepository({
-        findCustomRole: vi.fn().mockResolvedValue({
+        tryFindCustomRole: vi.fn().mockResolvedValue({
           organizationId: ORG,
           permissions: ["traces:view", "traces:teleport"],
         }),
@@ -192,7 +192,7 @@ describe("AuthzGrantsService.attach", () => {
   describe("when the custom role's payload is not a list at all", () => {
     it("attaches, because a malformed payload grants nothing to validate", async () => {
       const repository = makeRepository({
-        findCustomRole: vi
+        tryFindCustomRole: vi
           .fn()
           .mockResolvedValue({ organizationId: ORG, permissions: null }),
       });
@@ -212,7 +212,7 @@ describe("AuthzGrantsService.attach", () => {
   describe("when the team is not in the target organization", () => {
     it("rejects the attach", async () => {
       const repository = makeRepository({
-        findTeamOrganization: vi
+        tryFindTeamOrganization: vi
           .fn()
           .mockResolvedValue({ organizationId: OTHER_ORG }),
       });
@@ -296,7 +296,7 @@ describe("AuthzGrantsService.revoke", () => {
   describe("when the binding belongs to another organization", () => {
     it("answers not-found rather than confirming it exists", async () => {
       const repository = makeRepository({
-        findBinding: vi
+        tryFindBinding: vi
           .fn()
           .mockResolvedValue({ id: "rb-1", organizationId: OTHER_ORG }),
       });
@@ -358,7 +358,7 @@ describe("AuthzGrantsService.update", () => {
     /** @scenario "A role binding can never reference another organization's custom role" */
     it("rejects with the same tenancy rule as attach", async () => {
       const repository = makeRepository({
-        findCustomRole: vi
+        tryFindCustomRole: vi
           .fn()
           .mockResolvedValue({ organizationId: OTHER_ORG, permissions: [] }),
       });
@@ -378,7 +378,7 @@ describe("AuthzGrantsService.update", () => {
   describe("when re-pointing at a custom role with an unknown permission", () => {
     it("rejects with the same vocabulary rule as attach", async () => {
       const repository = makeRepository({
-        findCustomRole: vi.fn().mockResolvedValue({
+        tryFindCustomRole: vi.fn().mockResolvedValue({
           organizationId: ORG,
           permissions: ["definitely:notreal"],
         }),
@@ -402,7 +402,7 @@ describe("AuthzGrantsService.update", () => {
   describe("when the binding belongs to another organization", () => {
     it("answers not-found rather than confirming it exists", async () => {
       const repository = makeRepository({
-        findBinding: vi
+        tryFindBinding: vi
           .fn()
           .mockResolvedValue({ id: "rb-1", organizationId: OTHER_ORG }),
       });
@@ -538,7 +538,7 @@ describe("AuthzGrantsService.offboard", () => {
       const authz = AuthzService.create({
         listing: new StubAuthzListingRepository(),
         repository: makeReader({
-          findApiKeyOwner: vi.fn().mockResolvedValue({ userId: "dave" }),
+          tryFindApiKeyOwner: vi.fn().mockResolvedValue({ userId: "dave" }),
           findApiKeyBindings: vi.fn().mockResolvedValue([
             {
               role: "ADMIN",

@@ -149,28 +149,28 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
     this.reads = PrismaAuthzGrantRepository.create(options.database);
   }
 
-  findBinding(
-    ...args: Parameters<PrismaAuthzGrantRepository["findBinding"]>
-  ): ReturnType<PrismaAuthzGrantRepository["findBinding"]> {
-    return this.reads.findBinding(...args);
+  tryFindBinding(
+    ...args: Parameters<PrismaAuthzGrantRepository["tryFindBinding"]>
+  ): ReturnType<PrismaAuthzGrantRepository["tryFindBinding"]> {
+    return this.reads.tryFindBinding(...args);
   }
 
-  findCustomRole(
-    ...args: Parameters<PrismaAuthzGrantRepository["findCustomRole"]>
-  ): ReturnType<PrismaAuthzGrantRepository["findCustomRole"]> {
-    return this.reads.findCustomRole(...args);
+  tryFindCustomRole(
+    ...args: Parameters<PrismaAuthzGrantRepository["tryFindCustomRole"]>
+  ): ReturnType<PrismaAuthzGrantRepository["tryFindCustomRole"]> {
+    return this.reads.tryFindCustomRole(...args);
   }
 
-  findTeamOrganization(
-    ...args: Parameters<PrismaAuthzGrantRepository["findTeamOrganization"]>
-  ): ReturnType<PrismaAuthzGrantRepository["findTeamOrganization"]> {
-    return this.reads.findTeamOrganization(...args);
+  tryFindTeamOrganization(
+    ...args: Parameters<PrismaAuthzGrantRepository["tryFindTeamOrganization"]>
+  ): ReturnType<PrismaAuthzGrantRepository["tryFindTeamOrganization"]> {
+    return this.reads.tryFindTeamOrganization(...args);
   }
 
-  findProjectLineage(
-    ...args: Parameters<PrismaAuthzGrantRepository["findProjectLineage"]>
-  ): ReturnType<PrismaAuthzGrantRepository["findProjectLineage"]> {
-    return this.reads.findProjectLineage(...args);
+  tryFindProjectLineage(
+    ...args: Parameters<PrismaAuthzGrantRepository["tryFindProjectLineage"]>
+  ): ReturnType<PrismaAuthzGrantRepository["tryFindProjectLineage"]> {
+    return this.reads.tryFindProjectLineage(...args);
   }
 
   findOwnedApiKeys(

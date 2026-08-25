@@ -12,7 +12,7 @@ describe("RedisAuthzEpochAdapter", () => {
     };
     const epoch = RedisAuthzEpochAdapter.create({ redis });
 
-    await expect(epoch.read({ organizationId: ORGANIZATION_ID })).resolves.toBe(
+    await expect(epoch.tryRead({ organizationId: ORGANIZATION_ID })).resolves.toBe(
       42,
     );
     await expect(
@@ -33,7 +33,7 @@ describe("RedisAuthzEpochAdapter", () => {
       });
 
       await expect(
-        epoch.read({ organizationId: ORGANIZATION_ID }),
+        epoch.tryRead({ organizationId: ORGANIZATION_ID }),
       ).resolves.toBeNull();
     },
   );
@@ -47,7 +47,7 @@ describe("RedisAuthzEpochAdapter", () => {
     const epoch = RedisAuthzEpochAdapter.create({ redis });
 
     await expect(
-      epoch.read({ organizationId: ORGANIZATION_ID }),
+      epoch.tryRead({ organizationId: ORGANIZATION_ID }),
     ).resolves.toBeNull();
     await expect(
       epoch.bump({ organizationId: ORGANIZATION_ID }),
@@ -58,7 +58,7 @@ describe("RedisAuthzEpochAdapter", () => {
     const epoch = RedisAuthzEpochAdapter.create({ redis: null });
 
     await expect(
-      epoch.read({ organizationId: ORGANIZATION_ID }),
+      epoch.tryRead({ organizationId: ORGANIZATION_ID }),
     ).resolves.toBeNull();
     await expect(
       epoch.bump({ organizationId: ORGANIZATION_ID }),

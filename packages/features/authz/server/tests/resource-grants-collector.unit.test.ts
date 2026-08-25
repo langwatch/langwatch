@@ -32,7 +32,7 @@ describe("collector at the resource tier", () => {
       expect(grants.bindings).toEqual([]);
       expect(grants.isOrgMember).toBe(false);
       expect(grants.legacyTeamMemberships).toEqual([]);
-      expect(reader.findOrganizationRole).not.toHaveBeenCalled();
+      expect(reader.tryFindOrganizationRole).not.toHaveBeenCalled();
       expect(reader.findUserBindings).not.toHaveBeenCalled();
     });
   });
@@ -56,7 +56,7 @@ describe("collector at the resource tier", () => {
       expect(grants.organizationRole).toBeNull();
       expect(grants.isOrgMember).toBe(false);
       expect(grants.legacyTeamMemberships).toEqual([]);
-      expect(reader.findOrganizationRole).not.toHaveBeenCalled();
+      expect(reader.tryFindOrganizationRole).not.toHaveBeenCalled();
       expect(reader.findLegacyTeamMemberships).not.toHaveBeenCalled();
       expect(reader.findCustomRolePermissions).toHaveBeenCalledWith({
         organizationId: ORG,
@@ -69,7 +69,7 @@ describe("collector at the resource tier", () => {
   describe("when a custom role's stored payload is malformed", () => {
     const collectWith = async (permissions: unknown) => {
       const reader = makeReader({
-        findOrganizationRole: vi.fn().mockResolvedValue("MEMBER"),
+        tryFindOrganizationRole: vi.fn().mockResolvedValue("MEMBER"),
         findUserBindings: vi.fn().mockResolvedValue(customRoleBinding),
         findCustomRolePermissions: vi
           .fn()
@@ -280,16 +280,16 @@ describe("collector at the resource tier", () => {
   });
 });
 
-describe("resolveResourceScopeRef", () => {
+describe("tryResolveResourceScopeRef", () => {
   it("derives the project lineage from storage, never the caller", async () => {
     const reader = makeReader({
-      findProjectLineage: vi
+      tryFindProjectLineage: vi
         .fn()
         .mockResolvedValue({ teamId: TEAM, organizationId: ORG }),
     });
     const scope = await AuthzCollectorService.create({
       reader,
-    }).resolveResourceScopeRef({
+    }).tryResolveResourceScopeRef({
       projectId: PROJECT,
       kind: "trace",
       id: "trace-1",
@@ -306,7 +306,7 @@ describe("resolveResourceScopeRef", () => {
       teamId: TEAM,
       organizationId: ORG,
     });
-    expect(reader.findProjectLineage).toHaveBeenCalledWith({
+    expect(reader.tryFindProjectLineage).toHaveBeenCalledWith({
       projectId: PROJECT,
     });
   });
@@ -314,7 +314,7 @@ describe("resolveResourceScopeRef", () => {
   it("returns null for an unknown project", async () => {
     const reader = makeReader();
     expect(
-      await AuthzCollectorService.create({ reader }).resolveResourceScopeRef({
+      await AuthzCollectorService.create({ reader }).tryResolveResourceScopeRef({
         projectId: "proj-ghost",
         kind: "trace",
         id: "trace-1",
@@ -324,13 +324,13 @@ describe("resolveResourceScopeRef", () => {
 
   it("gives a thread no parents — threads are the top of the shareable tree", async () => {
     const reader = makeReader({
-      findProjectLineage: vi
+      tryFindProjectLineage: vi
         .fn()
         .mockResolvedValue({ teamId: TEAM, organizationId: ORG }),
     });
     const scope = await AuthzCollectorService.create({
       reader,
-    }).resolveResourceScopeRef({
+    }).tryResolveResourceScopeRef({
       projectId: PROJECT,
       kind: "thread",
       id: "thread-1",

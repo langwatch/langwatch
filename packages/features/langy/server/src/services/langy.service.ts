@@ -29,6 +29,7 @@ import {
   type LangyMessageRow as ContractMessageRow,
   type LangyStartConversationTurnInput,
   type LangyTurnResultInput,
+  type LangyRelayConnection,
 } from "@langwatch/langy-contract";
 import {
   ConversationRepository,
@@ -55,6 +56,24 @@ import {
   LangyCredentialService,
   type LangyCredentialServiceOptions,
 } from "./langy-credential.service";
+import {
+  LangyTurnRelay,
+  type LangyRelayRedis,
+} from "../streaming/langy-turn-relay";
+
+export type LangyRelayCompositionOptions = {
+  redis: LangyRelayRedis;
+  baseHost: string;
+  resolveResourceUrl?: (input: {
+    projectId: string;
+    resourceId: string;
+  }) => Promise<string | null>;
+  resolveCapabilityProgress?: (name: string) => { headline: string } | null;
+  logger?: {
+    warn(o: unknown, message: string): void;
+    debug?(o: unknown, message: string): void;
+  };
+};
 
 export type LangyConversationCapability = LangyConversationService;
 export type LangyMessageCapability = LangyMessageService;
@@ -220,6 +239,7 @@ export class LangyService<Capabilities = never> extends LangyServiceContract {
   private constructor(
     private readonly repositories: Repositories | null,
     capabilities?: Capabilities,
+    private readonly relayOptions: LangyRelayCompositionOptions | null = null,
   ) {
     super();
     if (capabilities !== undefined) {
@@ -233,8 +253,33 @@ export class LangyService<Capabilities = never> extends LangyServiceContract {
 
   static compose<Capabilities extends LangyLegacyCapabilities>(
     capabilities: Capabilities,
+    relayOptions?: LangyRelayCompositionOptions,
   ): LangyService<Capabilities> {
-    return new LangyService<Capabilities>(null, capabilities);
+    return new LangyService<Capabilities>(
+      null,
+      capabilities,
+      relayOptions ?? null,
+    );
+  }
+
+  openRelayConnection(): LangyRelayConnection {
+    if (!this.relayOptions) {
+      throw new Error("Langy relay is not configured");
+    }
+    return LangyTurnRelay.create({
+      conversations: this,
+      redis: this.relayOptions.redis,
+      baseHost: this.relayOptions.baseHost,
+      ...(this.relayOptions.resolveResourceUrl
+        ? {
+            resolveResourceUrl: this.relayOptions.resolveResourceUrl,
+          }
+        : {}),
+      ...(this.relayOptions.resolveCapabilityProgress
+        ? { resolveCapabilityProgress: this.relayOptions.resolveCapabilityProgress }
+        : {}),
+      ...(this.relayOptions.logger ? { logger: this.relayOptions.logger } : {}),
+    });
   }
 
   /** Composition-only factories keep concrete capability classes private. */

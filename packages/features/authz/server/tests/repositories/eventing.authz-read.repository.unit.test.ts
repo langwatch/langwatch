@@ -19,7 +19,7 @@ const member = () =>
   vi.fn().mockResolvedValue({ userId: "alice" }) as ReturnType<typeof vi.fn>;
 
 describe("EventingAuthzReadRepository", () => {
-  describe("when findOrganizationRole reads the membership row", () => {
+  describe("when tryFindOrganizationRole reads the membership row", () => {
     it("reads the membership row, which the ledger never projected", async () => {
       const findFirst = vi.fn().mockResolvedValue({ role: "ADMIN" });
       const repository = EventingAuthzReadRepository.create(
@@ -27,7 +27,7 @@ describe("EventingAuthzReadRepository", () => {
       );
 
       expect(
-        await repository.findOrganizationRole({
+        await repository.tryFindOrganizationRole({
           userId: "alice",
           organizationId: "org-1",
         }),
@@ -836,7 +836,7 @@ describe("EventingAuthzReadRepository", () => {
     });
   });
 
-  describe("when findApiKeyOwner reads a key's owner", () => {
+  describe("when tryFindApiKeyOwner reads a key's owner", () => {
     it("distinguishes a service key from a key that is not there", async () => {
       const findUnique = vi
         .fn()
@@ -846,14 +846,14 @@ describe("EventingAuthzReadRepository", () => {
         clientFor({ apiKey: { findUnique } }),
       );
 
-      expect(await repository.findApiKeyOwner("service-key")).toEqual({
+      expect(await repository.tryFindApiKeyOwner("service-key")).toEqual({
         userId: null,
       });
-      expect(await repository.findApiKeyOwner("ghost")).toBeNull();
+      expect(await repository.tryFindApiKeyOwner("ghost")).toBeNull();
     });
   });
 
-  describe("when findProjectLineage reads a project's lineage", () => {
+  describe("when tryFindProjectLineage reads a project's lineage", () => {
     it("returns the owning team and organization, null for an unknown project", async () => {
       const findUnique = vi
         .fn()
@@ -866,15 +866,15 @@ describe("EventingAuthzReadRepository", () => {
       );
 
       expect(
-        await repository.findProjectLineage({ projectId: "proj-1" }),
+        await repository.tryFindProjectLineage({ projectId: "proj-1" }),
       ).toEqual({ teamId: "team-1", organizationId: "org-1" });
       expect(
-        await repository.findProjectLineage({ projectId: "proj-ghost" }),
+        await repository.tryFindProjectLineage({ projectId: "proj-ghost" }),
       ).toBeNull();
     });
   });
 
-  describe("when findTeamOrganization reads a team's organization", () => {
+  describe("when tryFindTeamOrganization reads a team's organization", () => {
     it("returns the team's organization, null for an unknown team", async () => {
       const findUnique = vi
         .fn()
@@ -885,10 +885,10 @@ describe("EventingAuthzReadRepository", () => {
       );
 
       expect(
-        await repository.findTeamOrganization({ teamId: "team-1" }),
+        await repository.tryFindTeamOrganization({ teamId: "team-1" }),
       ).toEqual({ organizationId: "org-1" });
       expect(
-        await repository.findTeamOrganization({ teamId: "team-ghost" }),
+        await repository.tryFindTeamOrganization({ teamId: "team-ghost" }),
       ).toBeNull();
     });
   });

@@ -29,7 +29,7 @@ describe("AuthzService portable facade", () => {
   it("routes declared and imperative checks through the same decision engine", async () => {
     const { service } = makeService({
       reader: makeReader({
-        findOrganizationRole: vi.fn().mockResolvedValue("ADMIN"),
+        tryFindOrganizationRole: vi.fn().mockResolvedValue("ADMIN"),
       }),
     });
 
@@ -41,7 +41,7 @@ describe("AuthzService portable facade", () => {
       }),
     ).resolves.toEqual({ permitted: true, organizationRole: "ADMIN" });
 
-    const witness = await service.requirePermission({
+    const witness = await service.authorizePermission({
       userId: "admin-1",
       permission: "organization:view",
       organizationId: ORG,
@@ -67,11 +67,11 @@ describe("AuthzService portable facade", () => {
   it("fences project API-key checks to the resolved organization", async () => {
     const { service } = makeService({
       reader: makeReader({
-        findProjectLineage: vi.fn().mockResolvedValue({
+        tryFindProjectLineage: vi.fn().mockResolvedValue({
           teamId: TEAM,
           organizationId: ORG,
         }),
-        findApiKeyOwner: vi.fn().mockResolvedValue({ userId: null }),
+        tryFindApiKeyOwner: vi.fn().mockResolvedValue({ userId: null }),
         findApiKeyBindings: vi.fn().mockResolvedValue([
           {
             role: "ADMIN",

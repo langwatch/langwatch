@@ -2,8 +2,8 @@
 #
 # Implementation:
 #   packages/prisma-client/prisma/schema.prisma                                                                    (Project.lastCodingAgentSessionAt / lastCodingAgentPullRequestAt)
-#   platform/app/src/server/app-layer/projects/project.service.ts                                                  (the throttled touch methods)
-#   platform/app/src/server/app-layer/projects/repositories/project.prisma.repository.ts                           (the staleness-guarded write)
+#   packages/features/project/server/src/services/project.service.ts                                               (the throttled touch methods)
+#   packages/features/project/server/src/repositories/prisma/prisma.project.repository.ts                         (the staleness-guarded write)
 #   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSessionSeen.touch.ts (the fold-commit stamp)
 #   platform/app/src/server/app-layer/github/github-pull-request-mapping.service.ts                                (the pull-request trigger)
 #   platform/app/src/components/sidebar/codingAgentActivity.ts                                                     (the recency rule)

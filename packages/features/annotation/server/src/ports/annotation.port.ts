@@ -22,4 +22,19 @@ export abstract class AnnotationRepository {
     traceIds: string[];
     anchor: "trace" | "all";
   }): Promise<ProjectionAnnotation[]>;
+  abstract findProjectOrganizationId(input: {
+    projectId: string;
+  }): Promise<string | null>;
+  abstract countOrganizationUsers(input: {
+    organizationId: string;
+    userIds: string[];
+  }): Promise<number>;
+  abstract countAnnotationScores(input: {
+    projectId: string;
+    scoreTypeIds: string[];
+  }): Promise<number>;
+  abstract countAnnotationQueues(input: {
+    projectId: string;
+    queueIds: string[];
+  }): Promise<number>;
 }

@@ -8,18 +8,18 @@ import { RoutedAuthzReadRepository } from "../../src/repositories/routed/routed.
 const spyRepository = (name: string): AuthzReadRepository =>
   ({
     beginPass: vi.fn(),
-    findOrganizationRole: vi.fn().mockResolvedValue(name),
+    tryFindOrganizationRole: vi.fn().mockResolvedValue(name),
     findUserBindings: vi.fn().mockResolvedValue([]),
     findGroupBindings: vi.fn().mockResolvedValue([]),
     findApiKeyBindings: vi.fn().mockResolvedValue([]),
-    findApiKeyOwner: vi.fn().mockResolvedValue({ userId: name }),
+    tryFindApiKeyOwner: vi.fn().mockResolvedValue({ userId: name }),
     findLegacyTeamMemberships: vi.fn().mockResolvedValue([]),
     findCustomRolePermissions: vi.fn().mockResolvedValue([]),
     findShareLinks: vi.fn().mockResolvedValue([]),
-    findProjectLineage: vi
+    tryFindProjectLineage: vi
       .fn()
       .mockResolvedValue({ teamId: "team-1", organizationId: "org-1" }),
-    findTeamOrganization: vi
+    tryFindTeamOrganization: vi
       .fn()
       .mockResolvedValue({ organizationId: "org-1" }),
   }) as unknown as AuthzReadRepository;
@@ -83,20 +83,20 @@ describe("RoutedAuthzReadRepository", () => {
     const { legacy, eventing, repository } = repositoryFor(selectHead);
 
     expect(
-      await repository.findOrganizationRole({
+      await repository.tryFindOrganizationRole({
         userId: "alice",
         organizationId: "org-1",
       }),
     ).toBe("legacy");
-    expect(await repository.findApiKeyOwner("key-1")).toEqual({
+    expect(await repository.tryFindApiKeyOwner("key-1")).toEqual({
       userId: "legacy",
     });
-    await repository.findProjectLineage({ projectId: "project-1" });
-    await repository.findTeamOrganization({ teamId: "team-1" });
+    await repository.tryFindProjectLineage({ projectId: "project-1" });
+    await repository.tryFindTeamOrganization({ teamId: "team-1" });
 
     expect(selectHead).not.toHaveBeenCalled();
-    expect(eventing.findOrganizationRole).not.toHaveBeenCalled();
-    expect(legacy.findTeamOrganization).toHaveBeenCalledWith({
+    expect(eventing.tryFindOrganizationRole).not.toHaveBeenCalled();
+    expect(legacy.tryFindTeamOrganization).toHaveBeenCalledWith({
       teamId: "team-1",
     });
   });
@@ -122,7 +122,7 @@ describe("RoutedAuthzReadRepository", () => {
 
   it("uses the legacy share-link reader when project lineage is unknown", async () => {
     const { legacy, eventing, repository } = repositoryFor(async () => true);
-    vi.mocked(legacy.findProjectLineage).mockResolvedValue(null);
+    vi.mocked(legacy.tryFindProjectLineage).mockResolvedValue(null);
 
     await repository.findShareLinks({
       projectId: "missing",
