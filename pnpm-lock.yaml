@@ -1315,9 +1315,15 @@ importers:
 
   packages/features/automation/server:
     dependencies:
+      '@langwatch/analytics-contract':
+        specifier: workspace:*
+        version: link:../../analytics/contract
       '@langwatch/automation-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       croner:
         specifier: ^10.0.1
         version: 10.0.1
