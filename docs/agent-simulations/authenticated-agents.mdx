@@ -57,7 +57,7 @@ langwatch secret create AUTH0_AUDIENCE --value "https://api.your-company.interna
 langwatch secret create AUTH0_API_URL --value "https://api.your-company.internal/chat"
 ```
 
-Secret names must be `UPPER_SNAKE_CASE` (`^[A-Z][A-Z0-9_]*$`). Values are encrypted at rest. Every route that lists or gets a secret answers with metadata only. One route returns a value, and it needs a key that can manage secrets: see [reusing one login across the rows of a run](#reusing-one-login-across-the-rows-of-a-run).
+Secret names must be `UPPER_SNAKE_CASE` (`^[A-Z][A-Z0-9_]*$`). Values are encrypted at rest, and the UI never shows one. `GET /api/secrets/by-name/{name}/value` is the only route that returns a value, and it needs an API key that can manage secrets; every other secrets route answers with names and timestamps. See [reusing one login across the rows of a run](#reusing-one-login-across-the-rows-of-a-run).
 
 <Warning>
   Never paste the client secret into the agent's Python. The stored code is readable by anyone with project access; the `secrets` namespace exists so the credential is stored encrypted at rest and never persisted in the agent's source. At run time it is injected into the execution's memory and sent only to your token endpoint.
@@ -308,9 +308,9 @@ follow:
   prevents this. Keep the login idempotent on the target system, or lower the
   run's parallelism when the target rate-limits the login.
 - A failed write does not fail the row. The row already holds a working session,
-  and the only cost is that the next row logs in again. The agent reports the
-  failure by its type, never by its message, because an error message can quote
-  the credential that caused it.
+  and the only cost is that the next row logs in again. The agent says on stderr
+  what the store did, in its own fixed words, and nothing from the exception
+  reaches the output: an error message can quote the credential that caused it.
 
 The source of this file is
 [`shared_session_code_agent.py`](https://github.com/langwatch/langwatch/blob/main/services/nlpgo/app/engine/blocks/codeblock/examples/shared_session_code_agent.py).
@@ -326,4 +326,4 @@ The source of this file is
 | Timeout | Token fetch + downstream call exceeded the 60s runner budget. Check both endpoints' latency. |
 | Every row logs in again | The session was not written back. Check the run output for the store failure, and check that `LANGWATCH_API_KEY` and `LANGWATCH_ENDPOINT` are project secrets. |
 | Rows that start together each log in, later rows do not | Expected. Each of them read an empty store, so each one logs in. The rows after them reuse the stored session. |
-| `ACME_SESSION is not stored yet, or could not be read, this row logs in` | Expected on the first row of a project, because nothing is stored yet. On every later row it means the read failed: check that `LANGWATCH_API_KEY` can manage secrets and that `LANGWATCH_ENDPOINT` is right. |
+| `ACME_SESSION is not stored yet, or could not be read, this row logs in` | The line does not tell the two causes apart, so check both. Nothing is stored yet, which is expected on the first row and after a failed write, or the read did not get through: `LANGWATCH_API_KEY` must be able to manage secrets and `LANGWATCH_ENDPOINT` must point at your instance. |

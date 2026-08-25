@@ -95,13 +95,13 @@ Feature: A code agent shares one login session across the rows of a run
     When the committed example runs one row
     Then the row returns the answer
     And the run reports that the session was not stored
-    And the report names the failure by its type and not by its message
+    And the report is the agent's own fixed words, carrying nothing from the exception
 
   @integration
   Scenario: A store failure never prints the LangWatch API key
     Given a LangWatch API key the HTTP client refuses to put in a header
     When the committed example runs one row
-    Then the run reports the failure by its type
+    Then the run reports what the store did, in the agent's own fixed words
     And no output stream contains the key
 
   @integration
