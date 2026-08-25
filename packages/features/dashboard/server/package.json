@@ -1,0 +1,29 @@
+{
+  "name": "@langwatch/dashboard-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical server-side dashboard, graph, and saved workbench chart service.",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "files": ["src"],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/dashboard-contract": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.9"
+  }
+}
