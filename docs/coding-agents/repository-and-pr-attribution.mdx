@@ -10,13 +10,13 @@ keywords:
   - coding agent worktree
 ---
 
-Attribution is the join between a session and the code it changed: the session reports a repository and branch, and LangWatch maps that branch to its pull requests. Everything on the [pull requests view](/coding-agents/pull-requests) rests on this join, so this page states exactly how the report happens, what moves it, and what its limits are.
+Attribution is the join between a session and the code it changed: the session reports a repository and branch, and LangWatch maps that branch to its pull requests. The [pull requests view](/coding-agents/pull-requests) prices each change through this join. This page covers how the report happens, what moves it, and what its limits are.
 
 ## Two channels report the working context
 
 Together they cover every way a session moves between checkouts.
 
-**Automatic.** The session reports the directory it is working in, read at the start of the session and again after every turn. When the agent switches checkouts natively, for example Claude Code's EnterWorktree tool, the report follows. A `cd` inside a shell tool does not move it, because the session's own directory stays where it was launched.
+**Automatic.** The session reports the directory it is working in, read at the start of the session and again after every turn. When the agent switches checkouts natively, for example Claude Code's EnterWorktree tool, the next report uses the new directory. A `cd` inside a shell tool does not move it, because the session's own directory stays where it was launched.
 
 **Declared by the agent.** The agent runs one command from inside a checkout:
 
@@ -28,13 +28,13 @@ LangWatch attributes the session to that repository and branch from that point o
 
 A standing agent that runs from a scratch directory and works on one checkout after another attributes each piece of work correctly by declaring as it goes.
 
-You do not have to teach your agent to do this. The setup installs an always-loaded instruction that tells every session to declare when it switches repository, branch or worktree: through the LangWatch plugin on Claude Code, and through an `AGENTS.md` block on Codex. You can also just tell a session "declare your working context" at any time.
+You do not have to teach your agent to do this. The setup installs an always-loaded instruction that tells every session to declare when it switches repository, branch or worktree: through the LangWatch plugin on Claude Code, and through an `AGENTS.md` block on Codex. You can also tell a session "declare your working context" at any time.
 
 The command resolves which session is asking on its own. For Claude Code, the session id is in the command's environment. For Codex, the command finds the codex process among its own ancestors and reads the session from it; with several Codex sessions active and no way to tell them apart, it refuses rather than guess, and `--agent codex --session-id <id>` names one exactly.
 
 ## From branch to pull request
 
-With GitHub connected under **Settings → Integrations**, LangWatch maps every branch a session reported to the pull requests whose head is that branch. The mapping keeps working in both directions in time: a pull request opened after the session already went quiet is still found, and connecting GitHub backfills recent branches.
+With GitHub connected under **Settings → Integrations**, LangWatch maps every branch a session reported to the pull requests whose head is that branch. The mapping works in both time directions: a pull request opened after the session went quiet is still found, and connecting GitHub backfills recent branches.
 
 LangWatch reads pull request status (open, merged, closed) live from GitHub whenever you look, and never stores it.
 

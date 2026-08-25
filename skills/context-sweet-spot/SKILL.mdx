@@ -61,7 +61,7 @@ Write a single self-contained `context-sweet-spot-report.html` in the project ro
 - **The number**: the context share where this user's sessions start degrading, stated in the first line ("your sessions stay economical up to about 55% of the window; past that, cost per turn doubles")
 - The bucket comparison table with cost per call, rebuild rate and compaction rate per bucket
 - The three most expensive sessions dissected: where the context grew, where it rebuilt, what one rebuild cost
-- **Concrete habits**, each tied to the evidence: when to start a fresh session instead of pushing through, what to offload to sub-agents (their context does not ride the main session), whether the user's compactions arrive too late
+- **Concrete habits**, each tied to the evidence: when to start a fresh session instead of pushing through, what to offload to sub-agents (the sub-agent keeps its context out of the main session), whether the user's compactions happen late, after the context already crossed the sweet spot
 - Links to example sessions in LangWatch for every claim
 
 Also state the top finding directly in the conversation, leading with the number. The LangWatch session detail shows the same cache-health stats per session (`/me/sessions`), so name it as the place to watch the habit change.

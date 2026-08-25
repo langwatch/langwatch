@@ -10,7 +10,7 @@ keywords:
   - compare model prices
 ---
 
-"Provider X is 80% cheaper" compares price cards, not workloads. A coding agent's input is mostly cache reads billed at a fraction of fresh input, so a provider with a lower sticker price and no cache discount can cost more on your actual traffic. A real comparison prices your own month of usage under each candidate, and that is what this investigation does.
+A price-card comparison can mislead on a coding workload. A coding agent's input is mostly cache reads billed at a fraction of fresh input, so a provider with a lower sticker price and no cache discount can cost more on your actual traffic. This investigation prices your own month of usage under each candidate instead.
 
 ## Run the investigation
 
@@ -126,7 +126,7 @@ Candidates come from the user; when they name none, take the current obvious one
 For each candidate, reprice the same mix:
 
 1. **Direct repricing**: the same tokens at the candidate's rates, cache split preserved where the candidate has caching. A candidate that bills cache residency by time needs a storage line as well, because tokens alone do not price it: estimate the residency of each session from its own call timestamps, from the first call that writes the cache to the last call that reads it, cap each stretch at the candidate's cache lifetime, and multiply the cached token count by the elapsed time and the storage rate. State the residency assumption next to the number. When the exported rows carry no usable timestamps, do not publish a direct row that silently omits a real charge: fall back to the no-cache row for that candidate and label it as an upper bound.
-2. **No-cache degradation**: for a candidate without caching, cache reads and cache writes both rebill as fresh input, because the candidate is sent the same context in full on every call. Add the two together, do not price the writes at a write rate the candidate does not have, and state this row separately; it is where most "80% cheaper" claims die.
+2. **No-cache degradation**: for a candidate without caching, cache reads and cache writes both rebill as fresh input, because the candidate is sent the same context in full on every call. Add the two together, do not price the writes at a write rate the candidate does not have, and state this row separately; it is the row a sticker-price comparison leaves out.
 3. **Sensitivity**: recompute at the observed cache-hit share, at half of it, and at zero, so the conclusion survives a workload change.
 4. **The non-price caveats, named not judged**: a different model is a different model. State window differences and any capability constraint the user's workload obviously depends on (tool calling, long context), and leave the quality judgment to the user; this is a cost analysis.
 
@@ -173,13 +173,13 @@ State the headline numbers directly in the conversation too.
 The skill exports your real token mix per model: input, output, cache reads and cache writes, from your own LangWatch data. It fetches the candidates' current price pages at analysis time, and reprices the same mix under each one, three ways:
 
 - **Direct**: your tokens at their rates, cache split preserved where the candidate offers caching.
-- **No cache**: for candidates without caching, your cache reads rebill as fresh input. This row is where most cheap-provider claims die.
+- **No cache**: for candidates without caching, your cache reads rebill as fresh input. This row is what a sticker-price comparison leaves out.
 - **Sensitivity**: the same comparison at your observed cache-hit share, at half of it, and at zero, so the conclusion survives a change in how you work.
 
 The report leads with the answer ("your last 30 days cost $X; the same usage prices at $Y under the candidate"), names the cache assumption in the same sentence, and links the price pages it used with their fetch date.
 
 ## What it does not claim
 
-Repricing prices the same usage; a different model changes the usage. The report states window differences and obvious capability constraints and leaves the quality judgment to you. It is a cost analysis, not a migration verdict.
+Repricing prices the same usage; a different model changes the usage. The report states window differences and obvious capability constraints and leaves the quality judgment to you.
 
 **Also check:** [Usage analytics](/coding-agents/usage-analytics) for the data this investigation reads, and [Find your context sweet spot](/coding-agents/find-your-context-sweet-spot) for lowering the bill without switching anything.

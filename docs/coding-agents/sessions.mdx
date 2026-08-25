@@ -11,7 +11,7 @@ keywords:
   - terminal replay
 ---
 
-A session is one run of a coding agent: everything between starting Claude Code, Codex or another assistant and closing it, folded into one row. Open **Sessions** on your personal page at [/me/sessions](https://app.langwatch.ai/me/sessions), or in the sidebar of any project that receives coding-agent telemetry.
+A session is one run of a coding agent: everything between starting Claude Code, Codex or another assistant and closing it, shown as one row. Open **Sessions** on your personal page at [/me/sessions](https://app.langwatch.ai/me/sessions), or in the sidebar of any project that receives coding-agent telemetry.
 
 <Frame caption="The sessions list. The Context and Compactions columns show which sessions ran heavy; the Pull requests column shows what each session shipped, and a dash means the branch has no pull request yet.">
   ![Sessions list](/images/coding-agents/sessions-list.png)
@@ -53,9 +53,9 @@ The detail also shows the biggest single rebuild: how many tokens one model call
   ![Session detail](/images/coding-agents/session-detail.png)
 </Frame>
 
-Below Cache health, **Where the tokens went** plots one bar per model call, split into the part served from cache and the part paid fresh. A session that caches well shows a thin dark band on each bar after the first. A tall dark band part way through the run is the call that threw the cache away, and the bar number tells you which call to look at in the replay.
+Below Cache health, **Where the tokens went** plots one bar per model call, split into the part served from cache and the part paid fresh. A session that caches well shows a thin dark band on each bar after the first. A tall dark band part way through the run marks the call where the cache was rebuilt, and the bar number tells you which call to look at in the replay.
 
-The same tab also reports what the session reached for, what it did as an ordered chain of tools, where the time went between thinking, running tools and waiting on you, and what came out of it in lines changed and edits kept.
+The same tab also lists the tools the session used, in order, the time split between thinking, running tools and waiting for you, and the result in lines changed and edits accepted.
 
 <Frame caption="The token composition of one session. Call 1 pays for the whole context; every call after it reads most of the context back from cache.">
   ![Session token usage](/images/coding-agents/session-usage.png)

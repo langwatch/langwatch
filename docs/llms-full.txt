@@ -19523,9 +19523,7 @@ keywords:
   - claude code analytics
 ---
 
-The Anthropic Console gives you one number a month. It does not say which session spent it, which model took each turn, how much of your context you paid for twice instead of reading back from cache, or what the agent did to earn the bill.
-
-One command changes that, and your plan keeps billing exactly as it does today.
+The Anthropic Console shows a monthly total, with no split by session, model or cache use, and no record of what the agent did. This page connects Claude Code to LangWatch, where each session carries that split and a replay of the conversation.
 
 ## Start
 
@@ -19541,11 +19539,11 @@ How should `langwatch claude` run?
   Using an API key              route calls through LangWatch with a virtual key
 ```
 
-On a Max or Pro plan, take the first answer. Claude Code keeps talking to Anthropic the way it always has, and LangWatch reads only the OpenTelemetry that Claude Code already emits. The answer is remembered, so every run after this one starts the agent and asks nothing.
+On a Max or Pro plan, take the first answer: Claude Code keeps your plan and your login, and LangWatch receives only the OpenTelemetry that Claude Code already emits. The answer is remembered, so later runs start the agent without asking.
 
-Now use Claude Code the way you always do. Same prompt, same keybinds, same agent loop.
+Use Claude Code as usual from here.
 
-If you already read your local usage with `ccusage`, this is the same accounting with the conversation attached, kept across every machine you work on, and reported the same way for Codex, Copilot, Gemini CLI and opencode.
+If you read local usage with `ccusage`, this is the same accounting with the conversation attached, stored across your machines. Codex, Copilot, Gemini CLI and opencode report the same way.
 
 ## Read your sessions
 
@@ -19557,7 +19555,7 @@ Open **Sessions** at [/me/sessions](https://app.langwatch.ai/me/sessions). One r
 
 ## Find where the money went
 
-Open a session and the **Usage** tab prices it. The **Cache health** block is the part worth reading first, because a coding agent's bill is mostly cache economics:
+Open a session and the **Usage** tab prices it. Read the **Cache health** block first: cache reads and cache writes decide a large share of a coding agent's bill.
 
 | Stat | Why it costs you |
 | --- | --- |
@@ -19570,7 +19568,7 @@ Open a session and the **Usage** tab prices it. The **Cache health** block is th
   ![Claude Code session cost detail](/images/coding-agents/session-detail.png)
 </Frame>
 
-Below it, **Where the tokens went** plots one bar per model call, split into the part served from cache and the part paid fresh. The first call pays for the whole context. A tall fresh band later in the run is the call that threw the cache away, and the bar number tells you which call to open in the replay.
+Below it, **Where the tokens went** plots one bar per model call, split into the part served from cache and the part paid fresh. The first call pays for the whole context. A tall fresh band part way through the run marks the call where the cache was rebuilt, and the bar number tells you which call to open in the replay.
 
 To turn this into a decision, run the [context sweet spot investigation](/coding-agents/find-your-context-sweet-spot) over your own sessions.
 
@@ -19582,9 +19580,9 @@ The **Terminal** tab replays the session the way it looked in your terminal: you
   ![Claude Code terminal replay](/images/coding-agents/terminal-replay.png)
 </Frame>
 
-A tool call the agent was denied stays in the replay, marked as denied, so a session that went nowhere still shows why.
+A tool call the agent was denied stays in the replay, marked as denied, so a session that produced nothing still shows where it stopped.
 
-## Price a change, not a session
+## Cost per pull request
 
 **Pull requests** at [/me/pull-requests](https://app.langwatch.ai/me/pull-requests) sums every session that drove a branch, over the pull request's whole life and across everyone who worked on it. That is the number to compare against what the change was worth.
 
@@ -19608,7 +19606,7 @@ To wire one repository instead of the whole machine, to send the telemetry to a 
 
 ## Ask your own agent where the tokens went
 
-The same command-line tool that captured your sessions reads them back, authenticated by the login you already did. Paste one prompt into Claude Code and it answers which sessions cost the most, which ran above 150k of context, and which subagents burned it. See [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
+The same command-line tool that captured your sessions reads them back, authenticated by the login you already did. Paste one prompt into Claude Code and it answers which sessions cost the most, which ran above 150k of context, and which subagents used the most. See [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
 
 You can point it at its own history too, through the [skills directory](https://langwatch.ai/docs/skills/directory) or the [MCP server](https://langwatch.ai/docs/integration/mcp), so the agent finds where it wasted tokens and changes how it works.
 
@@ -19616,7 +19614,7 @@ You can point it at its own history too, through the [skills directory](https://
 
 Answer **Using an API key** at the first-run question instead. Paste your `sk-ant-` key at **Settings → Model providers**, and `langwatch claude` routes every call through the LangWatch AI Gateway with a virtual key.
 
-This path costs nothing extra and adds two things the subscription path cannot give you. Cost comes from Anthropic's own response rather than from Claude Code's estimate, and a personal budget at **/me → Settings** is enforced rather than advisory: requests fail with `budget_exceeded` once you cross it. On a subscription you get alerts at 80% and 100%, because Anthropic does not let the receiver gate the calls.
+This path costs nothing extra and adds two things the subscription path cannot give you. Cost comes from Anthropic's own response rather than from Claude Code's estimate, and a personal budget at **/me → Settings** is enforced rather than advisory: requests fail with `budget_exceeded` once you cross it. On a subscription you get alerts at 80% and 100%, because a proxy cannot gate subscription calls.
 
 Everything above this section looks the same on either path.
 
@@ -19961,7 +19959,7 @@ keywords:
   - compare model prices
 ---
 
-"Provider X is 80% cheaper" compares price cards, not workloads. A coding agent's input is mostly cache reads billed at a fraction of fresh input, so a provider with a lower sticker price and no cache discount can cost more on your actual traffic. A real comparison prices your own month of usage under each candidate, and that is what this investigation does.
+A price-card comparison can mislead on a coding workload. A coding agent's input is mostly cache reads billed at a fraction of fresh input, so a provider with a lower sticker price and no cache discount can cost more on your actual traffic. This investigation prices your own month of usage under each candidate instead.
 
 ## Run the investigation
 
@@ -20077,7 +20075,7 @@ Candidates come from the user; when they name none, take the current obvious one
 For each candidate, reprice the same mix:
 
 1. **Direct repricing**: the same tokens at the candidate's rates, cache split preserved where the candidate has caching. A candidate that bills cache residency by time needs a storage line as well, because tokens alone do not price it: estimate the residency of each session from its own call timestamps, from the first call that writes the cache to the last call that reads it, cap each stretch at the candidate's cache lifetime, and multiply the cached token count by the elapsed time and the storage rate. State the residency assumption next to the number. When the exported rows carry no usable timestamps, do not publish a direct row that silently omits a real charge: fall back to the no-cache row for that candidate and label it as an upper bound.
-2. **No-cache degradation**: for a candidate without caching, cache reads and cache writes both rebill as fresh input, because the candidate is sent the same context in full on every call. Add the two together, do not price the writes at a write rate the candidate does not have, and state this row separately; it is where most "80% cheaper" claims die.
+2. **No-cache degradation**: for a candidate without caching, cache reads and cache writes both rebill as fresh input, because the candidate is sent the same context in full on every call. Add the two together, do not price the writes at a write rate the candidate does not have, and state this row separately; it is the row a sticker-price comparison leaves out.
 3. **Sensitivity**: recompute at the observed cache-hit share, at half of it, and at zero, so the conclusion survives a workload change.
 4. **The non-price caveats, named not judged**: a different model is a different model. State window differences and any capability constraint the user's workload obviously depends on (tool calling, long context), and leave the quality judgment to the user; this is a cost analysis.
 
@@ -20124,14 +20122,14 @@ State the headline numbers directly in the conversation too.
 The skill exports your real token mix per model: input, output, cache reads and cache writes, from your own LangWatch data. It fetches the candidates' current price pages at analysis time, and reprices the same mix under each one, three ways:
 
 - **Direct**: your tokens at their rates, cache split preserved where the candidate offers caching.
-- **No cache**: for candidates without caching, your cache reads rebill as fresh input. This row is where most cheap-provider claims die.
+- **No cache**: for candidates without caching, your cache reads rebill as fresh input. This row is what a sticker-price comparison leaves out.
 - **Sensitivity**: the same comparison at your observed cache-hit share, at half of it, and at zero, so the conclusion survives a change in how you work.
 
 The report leads with the answer ("your last 30 days cost $X; the same usage prices at $Y under the candidate"), names the cache assumption in the same sentence, and links the price pages it used with their fetch date.
 
 ## What it does not claim
 
-Repricing prices the same usage; a different model changes the usage. The report states window differences and obvious capability constraints and leaves the quality judgment to you. It is a cost analysis, not a migration verdict.
+Repricing prices the same usage; a different model changes the usage. The report states window differences and obvious capability constraints and leaves the quality judgment to you.
 
 **Also check:** [Usage analytics](/coding-agents/usage-analytics) for the data this investigation reads, and [Find your context sweet spot](/coding-agents/find-your-context-sweet-spot) for lowering the bill without switching anything.
 
@@ -20150,7 +20148,7 @@ keywords:
   - analyze claude code usage
 ---
 
-Once your sessions land on LangWatch (see [Track your Claude Code usage](/coding-agents/claude-code-usage)), the same CLI that captured them can read them back. That means your own coding agent can answer questions about your usage: no API key to paste, no dashboard clicking, just the `langwatch` CLI it already has.
+Once your sessions land on LangWatch (see [Track your Claude Code usage](/coding-agents/claude-code-usage)), the same CLI that captured them can read them back. Your own coding agent can then answer questions about your usage by running the `langwatch` CLI with your device login, so it needs no API key.
 
 ## One-time setup
 
@@ -20211,11 +20209,9 @@ keywords:
   - claude code limits
 ---
 
-Long context is not free even when it fits the window. Every cache rebuild re-bills the whole context at write rates, compactions burn turns, and cost per turn climbs as a session swells.
+A session pays for the context it carries: every cache rebuild re-bills the whole context at write rates, compactions cost turns, and cost per turn climbs as the context grows. Past some size, those costs stop being worth carrying. That size is different per team, per model and per working style, so measure your own sessions to find it.
 
-Between "fresh session" and "the window is full" there is a size your sessions should stay under. It is different per team, per model and per working style, so measure your own sessions to find it.
-
-This investigation runs as a skill for your coding agent. It reads your sessions from LangWatch, computes the economics, and writes a report with your number.
+This investigation runs as a skill for your coding agent. It reads your sessions from LangWatch, computes cost per model call, cache rebuild rate and compaction rate, and writes a report with the context size to stay under.
 
 ## Run the investigation
 
@@ -20329,7 +20325,7 @@ Write a single self-contained `context-sweet-spot-report.html` in the project ro
 - **The number**: the context share where this user's sessions start degrading, stated in the first line ("your sessions stay economical up to about 55% of the window; past that, cost per turn doubles")
 - The bucket comparison table with cost per call, rebuild rate and compaction rate per bucket
 - The three most expensive sessions dissected: where the context grew, where it rebuilt, what one rebuild cost
-- **Concrete habits**, each tied to the evidence: when to start a fresh session instead of pushing through, what to offload to sub-agents (their context does not ride the main session), whether the user's compactions arrive too late
+- **Concrete habits**, each tied to the evidence: when to start a fresh session instead of pushing through, what to offload to sub-agents (the sub-agent keeps its context out of the main session), whether the user's compactions happen late, after the context already crossed the sweet spot
 - Links to example sessions in LangWatch for every claim
 
 Also state the top finding directly in the conversation, leading with the number. The LangWatch session detail shows the same cache-health stats per session (`/me/sessions`), so name it as the place to watch the habit change.
@@ -20366,13 +20362,13 @@ The skill exports your coding-agent sessions and their per-call rows, then bucke
 
 - **Cost per model call**, split by session lifetime: does the last third of a session cost more per call than the first third?
 - **Cache rebuild rate**: model calls that re-created the context instead of reading it from cache. Each one pays write rates for tokens that were already paid for.
-- **Compaction rate**: how often the agent had to compress its conversation to keep going.
+- **Compaction rate**: how often the agent compressed its conversation to stay under the context window.
 
 The sweet spot is the highest context share where all three stay flat. The report states it in one line, shows the bucket comparison behind it, and dissects your three most expensive sessions: where the context grew, where it rebuilt, what one rebuild cost.
 
 ## What to do with the number
 
-The report ties each recommendation to your own evidence: start a fresh session instead of pushing a long one further; offload research to sub-agents, whose context stays out of the main session; watch whether compactions arrive too late to save the session that needed them.
+The report ties each recommendation to your own evidence: when to start a fresh session instead of pushing a long one further, what to offload to sub-agents so their context does not enter the main session, and whether compactions happen late, after the context already crossed your threshold.
 
 The [session detail](/coding-agents/sessions#session-detail) shows the same cache-health stats live, per session, so you can watch the habit change after you act on the report.
 
@@ -20426,7 +20422,7 @@ LangWatch remembers the answer, so later runs do not ask again. Everything else 
 You do not always see the question. When your organization allows only one of the two paths, LangWatch takes that path without asking. A run with no terminal attached, in CI for example, keeps your own plan and sends telemetry only. `--tool-mode` settles it explicitly on any run, and overrides a remembered answer.
 
 <Note>
-  For the gateway path, `~/.gemini/settings.json` must have `security.auth.selectedType` set to `"gemini-api-key"`. With `"gemini-oauth"` selected, Gemini CLI uses its cached login and ignores the key, so the calls bypass the gateway; the wrapper warns when it sees that. The telemetry path works with either.
+  For the gateway path, `~/.gemini/settings.json` must have `security.auth.selectedType` set to `"gemini-api-key"`. With `"gemini-oauth"` selected, Gemini CLI uses its cached login and ignores the key, so the calls bypass the gateway; the wrapper prints a warning in that case. The telemetry path works with either.
 </Note>
 
 ## Set up a machine without starting Gemini CLI
@@ -20584,7 +20580,7 @@ LangWatch remembers the answer, so later runs do not ask again. Everything else 
 You do not always see the question. When your organization allows only one of the two paths, LangWatch takes that path without asking. A run with no terminal attached, in CI for example, keeps your own plan and sends telemetry only. `--tool-mode` settles it explicitly on any run, and overrides a remembered answer.
 
 <Warning>
-  The gateway answer moves the model spend off your Copilot seat and onto your organization's gateway budget. Pick it only when that is what you want. The command-line tool names the change every time it takes that route.
+  The gateway answer moves the model spend off your Copilot seat and onto your organization's gateway budget. Pick it only when that is what you want. The command-line tool prints a note about the change every time it takes that route.
 </Warning>
 
 For Copilot Chat inside Visual Studio Code, start the editor the same way:
@@ -20947,13 +20943,13 @@ Your agent can read all of this back. See [Explore your usage with your own agen
 
 The general model, both reporting channels and their limits, is covered on [Repository and PR attribution](/coding-agents/repository-and-pr-attribution). The Codex specifics live here, because Codex records its directory once, when the session starts: a `cd` inside the session does not change it, so the declared channel carries more weight than on other agents.
 
-The agent moves the attribution itself. `langwatch ingest context`, run from inside a checkout, declares that repository and branch for the running session, and the session's pull requests reflect every branch it declares. This is what makes a long-lived session work: a standing review agent that lives in a scratch directory and reviews one checkout after another runs the command inside each checkout, and each review lands on its pull request. `langwatch instrument codex` installs a short instruction in `$CODEX_HOME/AGENTS.md`, which is `~/.codex/AGENTS.md` unless you set `CODEX_HOME` yourself. It tells every session to do this when it switches repository, branch or worktree, so the agent does not need to be taught per machine. `langwatch logout` removes the instruction, and your own content in that file is never touched.
+The agent moves the attribution itself. `langwatch ingest context`, run from inside a checkout, declares that repository and branch for the running session, and the session's pull requests reflect every branch it declares. This is what makes a long-lived session work: a standing review agent that runs from a scratch directory and reviews one checkout after another executes the command inside each checkout, and each review lands on its pull request. `langwatch instrument codex` installs a short instruction in `$CODEX_HOME/AGENTS.md`, which is `~/.codex/AGENTS.md` unless you set `CODEX_HOME` yourself. It tells every session to do this when it switches repository, branch or worktree, so the agent does not need to be taught per machine. `langwatch logout` removes the instruction, and your own content in that file is never touched.
 
-The command finds the session itself. Codex keeps the transcript of a session open for as long as the session runs, and it starts the shell that runs the command, so the command looks up its own chain of parent processes and takes the session from the codex process it is running under. This is exact. Several codex sessions can work at the same time on one machine and each one declares for itself.
+The command finds the session itself. Codex keeps the transcript of a session open for as long as the session runs, and it starts the shell that runs the command, so the command looks up its own chain of parent processes and takes the session from the codex process it is running under. The lookup is exact: several codex sessions can work at the same time on one machine, and each one declares for itself.
 
 If the process chain cannot be read, a restrictive sandbox being the usual reason, the command falls back to reading which session wrote to its transcript most recently. That reading cannot tell two sessions apart when both are working at the same moment, so in that case it declares nothing and prints one line asking you to name the session. `--agent codex --session-id <id>` names one exactly, and always wins over both.
 
-Codex's default sandbox blocks both the reading of the process chain and network access, so under it the command falls back to the transcript reading and cannot send the record itself. It queues the declaration instead and says so in one line. The next turn delivers it: Codex runs the LangWatch session report from its own process, outside the sandbox, so the report goes out even when the agent's shell has no network. A queued declaration is sent after the report's own directory, which makes the declared checkout the session's current one. It is dropped unsent if it waits more than an hour, since by then the agent has moved on.
+Codex's default sandbox blocks both the reading of the process chain and network access, so under it the command falls back to the transcript reading and cannot send the record itself. It queues the declaration instead and says so in one line. The next turn delivers it: Codex runs the LangWatch session report from its own process, outside the sandbox, so the report goes out even when the agent's shell has no network. A queued declaration is sent after the report's own directory, which makes the declared checkout the session's current one. It is dropped unsent if it waits more than an hour, because the agent has by then usually switched to other work.
 
 For the full per-turn traces of a review to land on the pull request too, a fresh `codex` session inside a worktree of the pull request's branch is still the most complete setup:
 
@@ -20973,7 +20969,7 @@ Everything above is telemetry: Codex keeps your own plan and your own login. Cho
 
 Content reaches LangWatch on one path only, and you can turn that path off. Codex's own OpenTelemetry export carries no conversation content; the `notify` program LangWatch installs does send it. Read both parts below before you decide.
 
-The OpenTelemetry export carries two signals. The trace exporter reports each turn with the model, the tokens and the timing. The event exporter reports the facts of the session: each tool run with its name, duration and result, each prompt as a length without its text, tool approvals and denials, and the time to the first token. LangWatch enables both, and the session view is built from them. The prompt text, the tool output and the answer never ride either signal, and no Codex setting turns that content on. So the `[otel]` block alone gives you usage numbers and nothing that was said.
+The OpenTelemetry export carries two signals. The trace exporter reports each turn with the model, the tokens and the timing. The event exporter reports the facts of the session: each tool run with its name, duration and result, each prompt as a length without its text, tool approvals and denials, and the time to the first token. LangWatch enables both, and the session view is built from them. Neither signal includes the prompt text, the tool output or the answer, and no Codex setting turns that content on. So the `[otel]` block alone gives you usage numbers and nothing that was said.
 
 Codex does write the whole conversation to a transcript on your machine, and each turn there records the trace that Codex reported it under. `langwatch codex` and `langwatch instrument codex` register a small program on the Codex `notify` setting, which Codex runs after each completed turn. That program reads the turn from the transcript and records it against the same trace, so a session you started with a plain `codex` still shows what was said. It also reports the repository and branch the session worked in, read from the same transcript, which is what connects the session to its pull request. This is the path that carries content, and LangWatch installs it unless you say otherwise. A `notify` program of your own keeps running: LangWatch calls it after its own.
 
@@ -21269,11 +21265,13 @@ keywords:
   - opentelemetry coding agents
 ---
 
-One command connects an agent. After that, LangWatch records every session with its cost, its context economics, its conversation, and the pull requests it drove. An organization that drops or restricts content in its [data privacy policy](/coding-agents/privacy) keeps the numbers and loses the conversation.
+One command per tool connects an agent, for example:
 
 ```bash
 npx langwatch claude
 ```
+
+LangWatch then records each session with its token cost, its context use, the conversation, and the pull requests it drove. When the [data privacy policy](/coding-agents/privacy) drops content, the session keeps its cost and token counts, and the conversation text is not stored.
 
 ## Start here
 
@@ -21364,11 +21362,11 @@ keywords:
   - track claude code without spying
 ---
 
-The question behind coding-agent telemetry is "can my boss read what I typed". The short answer: your sessions land in a project only you own, an administrator reads them only through an audited path that shows a banner for the whole visit, and an organization can drop the content before it is ever stored. The rest of this page states each boundary exactly.
+The first question to settle: can your manager read what you typed? The short answer: your sessions land in a project only you own, an administrator reads them only through an audited path that shows a banner for the whole visit, and an organization can drop the content before it is ever stored.
 
 ## Where your data lands
 
-By default, your sessions land in your **personal project**: one project, one owner, you. It is not a filter on a shared table; it is a separate project that other members' queries never touch. A session lands in a shared project only when you, or an administrator setting up a machine, pinned the tool to one with `--project`. See [Team projects](/coding-agents/team-projects).
+By default, your sessions land in your **personal project**: one project, one owner, you. Other members' queries never touch it, because it is a separate project rather than a filter on a shared table. A session lands in a shared project only when you, or an administrator setting up a machine, pinned the tool to one with `--project`. See [Team projects](/coding-agents/team-projects).
 
 ## What a teammate can see
 
@@ -21376,12 +21374,12 @@ Nothing from your personal project. Teammates see your sessions only in a team p
 
 ## What an administrator can see
 
-Spend and usage always aggregate: the governance dashboard shows cost per user, per team and per department, because cost accounting is the point of the product. Those are numbers, not conversations.
+Spend and usage always aggregate: the governance dashboard shows cost per user, per team and per department, because cost accounting is the point of the product. The aggregation holds numbers only; conversation content is not in it.
 
 Reading your actual sessions is possible for an organization administrator, and it is deliberately never silent:
 
 - The only path is the drill-in from the governance dashboard, which shows a persistent **"Viewing as admin"** banner for the whole time. The banner is enforced on the server, not painted by the browser.
-- Every such read writes an audit-log row. You can read the log yourself at **Settings → Audit log**, so "has anyone looked at my sessions" is a question you can answer, not one you have to trust.
+- Every such read writes an audit-log row. You can read the log yourself at **Settings → Audit log** and see every administrator read of your sessions.
 - There is no bypass flag and no service-token side door around the audit hook.
 
 Permissions gate what any viewer sees even inside an allowed project: a viewer without content permission gets session rows with the generated titles blanked, and a viewer without the cost permission sees no cost at all rather than a zero.
@@ -21426,7 +21424,7 @@ keywords:
   - ai spend per change
 ---
 
-Use this view to price a change instead of a session. Open **Pull requests** at [/me/pull-requests](https://app.langwatch.ai/me/pull-requests), or in the sidebar of a project that receives coding-agent telemetry.
+Open **Pull requests** at [/me/pull-requests](https://app.langwatch.ai/me/pull-requests), or in the sidebar of a project that receives coding-agent telemetry.
 
 <Frame caption="The pull requests list. Status is read live from GitHub, and Token cost sums every session that drove the branch. A branch with no pull request yet keeps its row so the work still has a price.">
   ![Pull requests list](/images/coding-agents/pull-requests-list.png)
@@ -21487,7 +21485,7 @@ keywords:
   - langwatch cli
 ---
 
-Run your agent through the LangWatch wrapper. The first run opens a browser sign-in, asks one question about billing, and starts the agent; every run after that just starts the agent.
+Run your agent through the LangWatch wrapper: the agent starts as usual, and its sessions report to LangWatch. The first run opens a browser sign-in and asks one question before the agent starts.
 
 
   ### Claude Code
@@ -21526,19 +21524,19 @@ Run your agent through the LangWatch wrapper. The first run opens a browser sign
 
 
 
-The billing question is "How should `langwatch claude` run?", and it offers two answers. The first names the tool's own plan, for example "Using a Claude subscription" or "Using a ChatGPT subscription": it keeps your own plan and login, and LangWatch receives telemetry only. The second is "Using an API key": the model calls route through the LangWatch AI Gateway under your organization's budgets and policies. LangWatch remembers your answer per tool.
+The question asks how to connect. **Using a subscription**, the first answer, keeps your own plan and your own login, and LangWatch receives telemetry only. **Using an API key** routes the model calls through the LangWatch AI Gateway under your organization's budgets and policies. On a subscription plan, take the first answer. LangWatch remembers the answer per tool, and each agent's page covers the question in full, for example [Claude Code](/coding-agents/claude-code#run-claude-code-through-the-wrapper).
 
-You do not always see it. When your organization allows only one of the two paths, LangWatch takes that path without asking, and a run with no terminal attached keeps your own plan and sends telemetry only. `--tool-mode` settles it explicitly on any run.
-
-This is the wrapper's own question, and it is separate from `langwatch login`, which asks where to sign in and which credential to mint. See [the CLI reference](/integration/cli) for that flow.
-
-The wrapper changes nothing else: same flags, same subcommands, same exit code as the bare tool.
+You may not see the question at all: when your organization allows one path only, LangWatch takes that path without asking, and a run with no terminal attached keeps your own plan. `--tool-mode` sets it explicitly on any run.
 
 ## What you see now
 
 Work with the agent for a minute, then open [/me](https://app.langwatch.ai/me):
 
-- Your session is on the [sessions list](/coding-agents/sessions), with its cost, the context it carried, and a terminal replay of the conversation. The replay shows what your organization's [data privacy policy](/coding-agents/privacy) lets it store: with content dropped, the session keeps its numbers and shows no conversation.
+<Frame caption="The sessions list on /me. Each row is one session, with its cost, the context it carried, and the pull requests it drove.">
+  ![Sessions list](/images/coding-agents/sessions-list.png)
+</Frame>
+
+- Your session is on the [sessions list](/coding-agents/sessions), with its cost, the context it carried, and a terminal replay of the conversation. The [data privacy policy](/coding-agents/privacy) can drop content; the session then shows its numbers without the conversation.
 - Your spend for the month is on the usage cards. See [Usage analytics](/coding-agents/usage-analytics).
 - Once the session works on a branch with a pull request, it shows under [Pull requests](/coding-agents/pull-requests).
 
@@ -21565,13 +21563,13 @@ keywords:
   - coding agent worktree
 ---
 
-Attribution is the join between a session and the code it changed: the session reports a repository and branch, and LangWatch maps that branch to its pull requests. Everything on the [pull requests view](/coding-agents/pull-requests) rests on this join, so this page states exactly how the report happens, what moves it, and what its limits are.
+Attribution is the join between a session and the code it changed: the session reports a repository and branch, and LangWatch maps that branch to its pull requests. The [pull requests view](/coding-agents/pull-requests) prices each change through this join. This page covers how the report happens, what moves it, and what its limits are.
 
 ## Two channels report the working context
 
 Together they cover every way a session moves between checkouts.
 
-**Automatic.** The session reports the directory it is working in, read at the start of the session and again after every turn. When the agent switches checkouts natively, for example Claude Code's EnterWorktree tool, the report follows. A `cd` inside a shell tool does not move it, because the session's own directory stays where it was launched.
+**Automatic.** The session reports the directory it is working in, read at the start of the session and again after every turn. When the agent switches checkouts natively, for example Claude Code's EnterWorktree tool, the next report uses the new directory. A `cd` inside a shell tool does not move it, because the session's own directory stays where it was launched.
 
 **Declared by the agent.** The agent runs one command from inside a checkout:
 
@@ -21583,13 +21581,13 @@ LangWatch attributes the session to that repository and branch from that point o
 
 A standing agent that runs from a scratch directory and works on one checkout after another attributes each piece of work correctly by declaring as it goes.
 
-You do not have to teach your agent to do this. The setup installs an always-loaded instruction that tells every session to declare when it switches repository, branch or worktree: through the LangWatch plugin on Claude Code, and through an `AGENTS.md` block on Codex. You can also just tell a session "declare your working context" at any time.
+You do not have to teach your agent to do this. The setup installs an always-loaded instruction that tells every session to declare when it switches repository, branch or worktree: through the LangWatch plugin on Claude Code, and through an `AGENTS.md` block on Codex. You can also tell a session "declare your working context" at any time.
 
 The command resolves which session is asking on its own. For Claude Code, the session id is in the command's environment. For Codex, the command finds the codex process among its own ancestors and reads the session from it; with several Codex sessions active and no way to tell them apart, it refuses rather than guess, and `--agent codex --session-id <id>` names one exactly.
 
 ## From branch to pull request
 
-With GitHub connected under **Settings → Integrations**, LangWatch maps every branch a session reported to the pull requests whose head is that branch. The mapping keeps working in both directions in time: a pull request opened after the session already went quiet is still found, and connecting GitHub backfills recent branches.
+With GitHub connected under **Settings → Integrations**, LangWatch maps every branch a session reported to the pull requests whose head is that branch. The mapping works in both time directions: a pull request opened after the session went quiet is still found, and connecting GitHub backfills recent branches.
 
 LangWatch reads pull request status (open, merged, closed) live from GitHub whenever you look, and never stores it.
 
@@ -21628,21 +21626,21 @@ keywords:
   - redact secrets from llm traces
 ---
 
-Coding-agent traces are full of live credentials: a key pasted into a prompt, an `.env` file a tool read, a connection string in a stack trace. Secrets redaction scrubs them in the ingestion pipeline, so the stored trace shows a `[SECRET]` marker where the credential was, and the surrounding text stays intact.
+Coding-agent traces carry live credentials: a key pasted into a prompt, an `.env` file a tool read, a connection string in a stack trace. Redaction runs in the ingestion pipeline, before storage, and replaces each credential it recognizes with a `[SECRET]` marker. The text around the marker stays intact, and detection uses three layers, from exact vendor rules to context.
 
-Nothing to set up: it is on for every project unless a [data privacy rule](/ai-governance/data-privacy#secrets-redaction) turns it off.
+There is nothing to set up. A [data privacy rule](/ai-governance/data-privacy#secrets-redaction) can turn redaction off for its scope.
 
 ## How detection works
 
 Three layers, from exact to contextual:
 
 1. **Known vendors.** Keys with a recognized prefix: AWS, GitHub, OpenAI, Anthropic, Slack, Google, Stripe, plus JWTs, private key blocks, database connection-string passwords and bearer tokens.
-2. **Shape.** A vendor-style prefix followed by a high-entropy body is redacted even when the vendor has no built-in rule, so a key from a niche provider does not slip through on obscurity.
+2. **Shape.** A vendor-style prefix followed by a high-entropy body is redacted even when the vendor has no built-in rule, so a key from a provider with no rule of its own is still caught.
 3. **Context.** A credential named in prose and then given a value, for example "the admin password is ...", is redacted from the naming alone. Values under obviously sensitive attribute names such as `authorization` are covered the same way.
 
 Layers 2 and 3 only fire when the value's entropy and character mix look like a real credential, because over-redaction is treated as a bug of the same severity as a leak: ordinary identifiers, commit hashes and UUIDs stay readable, and a placeholder such as `YOUR_API_KEY` is left alone.
 
-One credential produces one marker, so a leak reads as one event, not a spray. LangWatch scans large payloads in slices within the ingestion budget, and still catches a credential that straddles a slice boundary.
+One credential produces one marker. LangWatch scans large payloads in slices within the ingestion budget, and still catches a credential that straddles a slice boundary.
 
 ## The marker
 
@@ -21650,7 +21648,7 @@ The replacement is typed: `[SECRET]`, not a generic blank. In the trace view you
 
 ## Custom patterns
 
-Add company-specific token shapes, for example `acme_live_...`, as regular expressions on a data privacy rule under **Settings → Data privacy**. LangWatch rejects a pattern that risks catastrophic backtracking when you save the rule. Patterns accumulate down the scope cascade, so a team's patterns apply on top of the organization's.
+Add company-specific token shapes, for example `acme_live_...`, as regular expressions on a data privacy rule under **Settings → Data privacy**. LangWatch rejects a pattern that risks catastrophic backtracking when you save the rule. Patterns add up across scopes: a team's patterns apply on top of the organization's.
 
 ## Turning it off
 
@@ -21683,7 +21681,7 @@ keywords:
   - terminal replay
 ---
 
-A session is one run of a coding agent: everything between starting Claude Code, Codex or another assistant and closing it, folded into one row. Open **Sessions** on your personal page at [/me/sessions](https://app.langwatch.ai/me/sessions), or in the sidebar of any project that receives coding-agent telemetry.
+A session is one run of a coding agent: everything between starting Claude Code, Codex or another assistant and closing it, shown as one row. Open **Sessions** on your personal page at [/me/sessions](https://app.langwatch.ai/me/sessions), or in the sidebar of any project that receives coding-agent telemetry.
 
 <Frame caption="The sessions list. The Context and Compactions columns show which sessions ran heavy; the Pull requests column shows what each session shipped, and a dash means the branch has no pull request yet.">
   ![Sessions list](/images/coding-agents/sessions-list.png)
@@ -21725,9 +21723,9 @@ The detail also shows the biggest single rebuild: how many tokens one model call
   ![Session detail](/images/coding-agents/session-detail.png)
 </Frame>
 
-Below Cache health, **Where the tokens went** plots one bar per model call, split into the part served from cache and the part paid fresh. A session that caches well shows a thin dark band on each bar after the first. A tall dark band part way through the run is the call that threw the cache away, and the bar number tells you which call to look at in the replay.
+Below Cache health, **Where the tokens went** plots one bar per model call, split into the part served from cache and the part paid fresh. A session that caches well shows a thin dark band on each bar after the first. A tall dark band part way through the run marks the call where the cache was rebuilt, and the bar number tells you which call to look at in the replay.
 
-The same tab also reports what the session reached for, what it did as an ordered chain of tools, where the time went between thinking, running tools and waiting on you, and what came out of it in lines changed and edits kept.
+The same tab also lists the tools the session used, in order, the time split between thinking, running tools and waiting for you, and the result in lines changed and edits accepted.
 
 <Frame caption="The token composition of one session. Call 1 pays for the whole context; every call after it reads most of the context back from cache.">
   ![Session token usage](/images/coding-agents/session-usage.png)
@@ -21830,7 +21828,7 @@ keywords:
   - usage api
 ---
 
-Usage rolls up everything your sessions spent. Read your own numbers at [/me](https://app.langwatch.ai/me), a project's numbers on the project, and an organization's numbers on the governance dashboard.
+Usage rolls up everything your sessions spent. Read your own numbers at [/me](https://app.langwatch.ai/me), a project's numbers on the project page, and an organization's numbers on the governance dashboard.
 
 ## Your usage at /me
 
@@ -21848,7 +21846,7 @@ langwatch trace search --period 7d                                   # recent tr
 langwatch trace export -f jsonl                                      # bulk export for your own analysis
 ```
 
-The fastest way to use these is to not type them yourself: [give your agent the prompt](/coding-agents/explore-your-usage-with-your-own-agent) and ask it questions in plain language.
+You do not have to type these yourself: [give your agent the prompt](/coding-agents/explore-your-usage-with-your-own-agent) and ask your questions in plain language.
 
 ## Query it over the API
 
@@ -53268,7 +53266,7 @@ Write a single self-contained `context-sweet-spot-report.html` in the project ro
 - **The number**: the context share where this user's sessions start degrading, stated in the first line ("your sessions stay economical up to about 55% of the window; past that, cost per turn doubles")
 - The bucket comparison table with cost per call, rebuild rate and compaction rate per bucket
 - The three most expensive sessions dissected: where the context grew, where it rebuilt, what one rebuild cost
-- **Concrete habits**, each tied to the evidence: when to start a fresh session instead of pushing through, what to offload to sub-agents (their context does not ride the main session), whether the user's compactions arrive too late
+- **Concrete habits**, each tied to the evidence: when to start a fresh session instead of pushing through, what to offload to sub-agents (the sub-agent keeps its context out of the main session), whether the user's compactions happen late, after the context already crossed the sweet spot
 - Links to example sessions in LangWatch for every claim
 
 Also state the top finding directly in the conversation, leading with the number. The LangWatch session detail shows the same cache-health stats per session (`/me/sessions`), so name it as the place to watch the habit change.
@@ -53407,7 +53405,7 @@ Candidates come from the user; when they name none, take the current obvious one
 For each candidate, reprice the same mix:
 
 1. **Direct repricing**: the same tokens at the candidate's rates, cache split preserved where the candidate has caching. A candidate that bills cache residency by time needs a storage line as well, because tokens alone do not price it: estimate the residency of each session from its own call timestamps, from the first call that writes the cache to the last call that reads it, cap each stretch at the candidate's cache lifetime, and multiply the cached token count by the elapsed time and the storage rate. State the residency assumption next to the number. When the exported rows carry no usable timestamps, do not publish a direct row that silently omits a real charge: fall back to the no-cache row for that candidate and label it as an upper bound.
-2. **No-cache degradation**: for a candidate without caching, cache reads and cache writes both rebill as fresh input, because the candidate is sent the same context in full on every call. Add the two together, do not price the writes at a write rate the candidate does not have, and state this row separately; it is where most "80% cheaper" claims die.
+2. **No-cache degradation**: for a candidate without caching, cache reads and cache writes both rebill as fresh input, because the candidate is sent the same context in full on every call. Add the two together, do not price the writes at a write rate the candidate does not have, and state this row separately; it is the row a sticker-price comparison leaves out.
 3. **Sensitivity**: recompute at the observed cache-hit share, at half of it, and at zero, so the conclusion survives a workload change.
 4. **The non-price caveats, named not judged**: a different model is a different model. State window differences and any capability constraint the user's workload obviously depends on (tool calling, long context), and leave the quality judgment to the user; this is a cost analysis.
 

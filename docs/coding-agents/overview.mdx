@@ -12,11 +12,13 @@ keywords:
   - opentelemetry coding agents
 ---
 
-One command connects an agent. After that, LangWatch records every session with its cost, its context economics, its conversation, and the pull requests it drove. An organization that drops or restricts content in its [data privacy policy](/coding-agents/privacy) keeps the numbers and loses the conversation.
+One command per tool connects an agent, for example:
 
 ```bash
 npx langwatch claude
 ```
+
+LangWatch then records each session with its token cost, its context use, the conversation, and the pull requests it drove. When the [data privacy policy](/coding-agents/privacy) drops content, the session keeps its cost and token counts, and the conversation text is not stored.
 
 ## Start here
 

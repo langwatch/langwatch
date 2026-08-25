@@ -12,9 +12,7 @@ keywords:
   - claude code analytics
 ---
 
-The Anthropic Console gives you one number a month. It does not say which session spent it, which model took each turn, how much of your context you paid for twice instead of reading back from cache, or what the agent did to earn the bill.
-
-One command changes that, and your plan keeps billing exactly as it does today.
+The Anthropic Console shows a monthly total, with no split by session, model or cache use, and no record of what the agent did. This page connects Claude Code to LangWatch, where each session carries that split and a replay of the conversation.
 
 ## Start
 
@@ -30,11 +28,11 @@ How should `langwatch claude` run?
   Using an API key              route calls through LangWatch with a virtual key
 ```
 
-On a Max or Pro plan, take the first answer. Claude Code keeps talking to Anthropic the way it always has, and LangWatch reads only the OpenTelemetry that Claude Code already emits. The answer is remembered, so every run after this one starts the agent and asks nothing.
+On a Max or Pro plan, take the first answer: Claude Code keeps your plan and your login, and LangWatch receives only the OpenTelemetry that Claude Code already emits. The answer is remembered, so later runs start the agent without asking.
 
-Now use Claude Code the way you always do. Same prompt, same keybinds, same agent loop.
+Use Claude Code as usual from here.
 
-If you already read your local usage with `ccusage`, this is the same accounting with the conversation attached, kept across every machine you work on, and reported the same way for Codex, Copilot, Gemini CLI and opencode.
+If you read local usage with `ccusage`, this is the same accounting with the conversation attached, stored across your machines. Codex, Copilot, Gemini CLI and opencode report the same way.
 
 ## Read your sessions
 
@@ -46,7 +44,7 @@ Open **Sessions** at [/me/sessions](https://app.langwatch.ai/me/sessions). One r
 
 ## Find where the money went
 
-Open a session and the **Usage** tab prices it. The **Cache health** block is the part worth reading first, because a coding agent's bill is mostly cache economics:
+Open a session and the **Usage** tab prices it. Read the **Cache health** block first: cache reads and cache writes decide a large share of a coding agent's bill.
 
 | Stat | Why it costs you |
 | --- | --- |
@@ -59,7 +57,7 @@ Open a session and the **Usage** tab prices it. The **Cache health** block is th
   ![Claude Code session cost detail](/images/coding-agents/session-detail.png)
 </Frame>
 
-Below it, **Where the tokens went** plots one bar per model call, split into the part served from cache and the part paid fresh. The first call pays for the whole context. A tall fresh band later in the run is the call that threw the cache away, and the bar number tells you which call to open in the replay.
+Below it, **Where the tokens went** plots one bar per model call, split into the part served from cache and the part paid fresh. The first call pays for the whole context. A tall fresh band part way through the run marks the call where the cache was rebuilt, and the bar number tells you which call to open in the replay.
 
 To turn this into a decision, run the [context sweet spot investigation](/coding-agents/find-your-context-sweet-spot) over your own sessions.
 
@@ -71,9 +69,9 @@ The **Terminal** tab replays the session the way it looked in your terminal: you
   ![Claude Code terminal replay](/images/coding-agents/terminal-replay.png)
 </Frame>
 
-A tool call the agent was denied stays in the replay, marked as denied, so a session that went nowhere still shows why.
+A tool call the agent was denied stays in the replay, marked as denied, so a session that produced nothing still shows where it stopped.
 
-## Price a change, not a session
+## Cost per pull request
 
 **Pull requests** at [/me/pull-requests](https://app.langwatch.ai/me/pull-requests) sums every session that drove a branch, over the pull request's whole life and across everyone who worked on it. That is the number to compare against what the change was worth.
 
@@ -97,7 +95,7 @@ To wire one repository instead of the whole machine, to send the telemetry to a 
 
 ## Ask your own agent where the tokens went
 
-The same command-line tool that captured your sessions reads them back, authenticated by the login you already did. Paste one prompt into Claude Code and it answers which sessions cost the most, which ran above 150k of context, and which subagents burned it. See [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
+The same command-line tool that captured your sessions reads them back, authenticated by the login you already did. Paste one prompt into Claude Code and it answers which sessions cost the most, which ran above 150k of context, and which subagents used the most. See [Explore your usage with your own agent](/coding-agents/explore-your-usage-with-your-own-agent).
 
 You can point it at its own history too, through the [skills directory](https://langwatch.ai/docs/skills/directory) or the [MCP server](https://langwatch.ai/docs/integration/mcp), so the agent finds where it wasted tokens and changes how it works.
 
@@ -105,7 +103,7 @@ You can point it at its own history too, through the [skills directory](https://
 
 Answer **Using an API key** at the first-run question instead. Paste your `sk-ant-` key at **Settings → Model providers**, and `langwatch claude` routes every call through the LangWatch AI Gateway with a virtual key.
 
-This path costs nothing extra and adds two things the subscription path cannot give you. Cost comes from Anthropic's own response rather than from Claude Code's estimate, and a personal budget at **/me → Settings** is enforced rather than advisory: requests fail with `budget_exceeded` once you cross it. On a subscription you get alerts at 80% and 100%, because Anthropic does not let the receiver gate the calls.
+This path costs nothing extra and adds two things the subscription path cannot give you. Cost comes from Anthropic's own response rather than from Claude Code's estimate, and a personal budget at **/me → Settings** is enforced rather than advisory: requests fail with `budget_exceeded` once you cross it. On a subscription you get alerts at 80% and 100%, because a proxy cannot gate subscription calls.
 
 Everything above this section looks the same on either path.
 

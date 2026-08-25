@@ -11,11 +11,11 @@ keywords:
   - track claude code without spying
 ---
 
-The question behind coding-agent telemetry is "can my boss read what I typed". The short answer: your sessions land in a project only you own, an administrator reads them only through an audited path that shows a banner for the whole visit, and an organization can drop the content before it is ever stored. The rest of this page states each boundary exactly.
+The first question to settle: can your manager read what you typed? The short answer: your sessions land in a project only you own, an administrator reads them only through an audited path that shows a banner for the whole visit, and an organization can drop the content before it is ever stored.
 
 ## Where your data lands
 
-By default, your sessions land in your **personal project**: one project, one owner, you. It is not a filter on a shared table; it is a separate project that other members' queries never touch. A session lands in a shared project only when you, or an administrator setting up a machine, pinned the tool to one with `--project`. See [Team projects](/coding-agents/team-projects).
+By default, your sessions land in your **personal project**: one project, one owner, you. Other members' queries never touch it, because it is a separate project rather than a filter on a shared table. A session lands in a shared project only when you, or an administrator setting up a machine, pinned the tool to one with `--project`. See [Team projects](/coding-agents/team-projects).
 
 ## What a teammate can see
 
@@ -23,12 +23,12 @@ Nothing from your personal project. Teammates see your sessions only in a team p
 
 ## What an administrator can see
 
-Spend and usage always aggregate: the governance dashboard shows cost per user, per team and per department, because cost accounting is the point of the product. Those are numbers, not conversations.
+Spend and usage always aggregate: the governance dashboard shows cost per user, per team and per department, because cost accounting is the point of the product. The aggregation holds numbers only; conversation content is not in it.
 
 Reading your actual sessions is possible for an organization administrator, and it is deliberately never silent:
 
 - The only path is the drill-in from the governance dashboard, which shows a persistent **"Viewing as admin"** banner for the whole time. The banner is enforced on the server, not painted by the browser.
-- Every such read writes an audit-log row. You can read the log yourself at **Settings → Audit log**, so "has anyone looked at my sessions" is a question you can answer, not one you have to trust.
+- Every such read writes an audit-log row. You can read the log yourself at **Settings → Audit log** and see every administrator read of your sessions.
 - There is no bypass flag and no service-token side door around the audit hook.
 
 Permissions gate what any viewer sees even inside an allowed project: a viewer without content permission gets session rows with the generated titles blanked, and a viewer without the cost permission sees no cost at all rather than a zero.

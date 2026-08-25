@@ -10,11 +10,9 @@ keywords:
   - claude code limits
 ---
 
-Long context is not free even when it fits the window. Every cache rebuild re-bills the whole context at write rates, compactions burn turns, and cost per turn climbs as a session swells.
+A session pays for the context it carries: every cache rebuild re-bills the whole context at write rates, compactions cost turns, and cost per turn climbs as the context grows. Past some size, those costs stop being worth carrying. That size is different per team, per model and per working style, so measure your own sessions to find it.
 
-Between "fresh session" and "the window is full" there is a size your sessions should stay under. It is different per team, per model and per working style, so measure your own sessions to find it.
-
-This investigation runs as a skill for your coding agent. It reads your sessions from LangWatch, computes the economics, and writes a report with your number.
+This investigation runs as a skill for your coding agent. It reads your sessions from LangWatch, computes cost per model call, cache rebuild rate and compaction rate, and writes a report with the context size to stay under.
 
 ## Run the investigation
 
@@ -128,7 +126,7 @@ Write a single self-contained `context-sweet-spot-report.html` in the project ro
 - **The number**: the context share where this user's sessions start degrading, stated in the first line ("your sessions stay economical up to about 55% of the window; past that, cost per turn doubles")
 - The bucket comparison table with cost per call, rebuild rate and compaction rate per bucket
 - The three most expensive sessions dissected: where the context grew, where it rebuilt, what one rebuild cost
-- **Concrete habits**, each tied to the evidence: when to start a fresh session instead of pushing through, what to offload to sub-agents (their context does not ride the main session), whether the user's compactions arrive too late
+- **Concrete habits**, each tied to the evidence: when to start a fresh session instead of pushing through, what to offload to sub-agents (the sub-agent keeps its context out of the main session), whether the user's compactions happen late, after the context already crossed the sweet spot
 - Links to example sessions in LangWatch for every claim
 
 Also state the top finding directly in the conversation, leading with the number. The LangWatch session detail shows the same cache-health stats per session (`/me/sessions`), so name it as the place to watch the habit change.
@@ -165,13 +163,13 @@ The skill exports your coding-agent sessions and their per-call rows, then bucke
 
 - **Cost per model call**, split by session lifetime: does the last third of a session cost more per call than the first third?
 - **Cache rebuild rate**: model calls that re-created the context instead of reading it from cache. Each one pays write rates for tokens that were already paid for.
-- **Compaction rate**: how often the agent had to compress its conversation to keep going.
+- **Compaction rate**: how often the agent compressed its conversation to stay under the context window.
 
 The sweet spot is the highest context share where all three stay flat. The report states it in one line, shows the bucket comparison behind it, and dissects your three most expensive sessions: where the context grew, where it rebuilt, what one rebuild cost.
 
 ## What to do with the number
 
-The report ties each recommendation to your own evidence: start a fresh session instead of pushing a long one further; offload research to sub-agents, whose context stays out of the main session; watch whether compactions arrive too late to save the session that needed them.
+The report ties each recommendation to your own evidence: when to start a fresh session instead of pushing a long one further, what to offload to sub-agents so their context does not enter the main session, and whether compactions happen late, after the context already crossed your threshold.
 
 The [session detail](/coding-agents/sessions#session-detail) shows the same cache-health stats live, per session, so you can watch the habit change after you act on the report.
 
