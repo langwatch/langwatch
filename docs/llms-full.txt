@@ -67726,6 +67726,15 @@ openapi: "GET /api/scenarios/{id}"
 
 ---
 
+# FILE: ./api-reference/scenarios/list-a-scenario-s-versions.mdx
+
+---
+title: "List a scenario's versions"
+openapi: "GET /api/scenarios/{id}/versions"
+---
+
+---
+
 # FILE: ./api-reference/scenarios/list-scenarios.mdx
 
 ---
@@ -67745,6 +67754,15 @@ description: "Manage test scenarios for agent simulations. Create, update, and o
 ## Intro
 
 Manage test scenarios for agent simulations. Create, update, and organize scenarios that define test cases for your AI agents.
+
+---
+
+# FILE: ./api-reference/scenarios/read-one-scenario-version.mdx
+
+---
+title: "Read one scenario version"
+openapi: "GET /api/scenarios/{id}/versions/{version}"
+---
 
 ---
 

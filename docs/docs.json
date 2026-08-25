@@ -1149,6 +1149,8 @@
               "api-reference/scenarios/list-scenarios",
               "api-reference/scenarios/create-scenarios",
               "api-reference/scenarios/get-scenarios",
+              "api-reference/scenarios/list-a-scenario-s-versions",
+              "api-reference/scenarios/read-one-scenario-version",
               "api-reference/scenarios/update-scenarios",
               "api-reference/scenarios/delete-scenarios"
             ]
