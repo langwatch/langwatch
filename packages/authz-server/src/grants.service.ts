@@ -291,6 +291,15 @@ export class GrantsService {
     if (from.type === "resource" || to.type === "resource") {
       throw new GrantValidationError(RESOURCE_SCOPE_REJECTION);
     }
+    // Same refusal `attach` makes, and for the same reason: a date already
+    // behind us cannot become valid further down. Without it a "successful"
+    // narrowing would revoke the source binding and write a replacement that
+    // is expired on arrival -- an access removal wearing the shape of an edit.
+    assertExpiryInFuture({
+      expiresAtMs,
+      now: this.now(),
+      meta: { scopeType: to.type, scopeId: to.id },
+    });
     const organizationId = scopeOrganizationId(from);
     if (scopeOrganizationId(to) !== organizationId) {
       throw new GrantValidationError(
