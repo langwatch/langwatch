@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { HttpComponentConfig } from "~/optimization_studio/types/dsl";
+import type { HttpComponentConfig } from "@langwatch/workflow-contract";
 import {
   buildHttpAgentTarget,
   buildInputsFromBodyTemplate,

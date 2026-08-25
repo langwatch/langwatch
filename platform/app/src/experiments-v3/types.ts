@@ -5,13 +5,13 @@ import type {
   CellPosition,
   RowHeightMode,
 } from "~/components/datasets/editor/DatasetTableContext";
-import type { Field } from "~/optimization_studio/types/dsl";
+import type { Field } from "@langwatch/workflow-contract";
 import {
   fieldSchema,
   HTTP_METHODS,
   httpAuthSchema,
   httpHeaderSchema,
-} from "~/optimization_studio/types/dsl";
+} from "@langwatch/workflow-contract";
 import type { DatasetColumnType } from "~/server/datasets/types";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";
 
@@ -97,7 +97,7 @@ export type DatasetReference = {
   savedRecords?: SavedRecord[];
 };
 
-// fieldSchema is imported from optimization_studio/types/dsl
+// fieldSchema is owned by the Workflow contract.
 
 /**
  * Zod schema for local prompt config validation.

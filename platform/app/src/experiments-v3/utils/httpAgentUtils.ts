@@ -6,10 +6,7 @@
  * - Building target configs from HTTP agent data
  */
 
-import type {
-  Field,
-  HttpComponentConfig,
-} from "~/optimization_studio/types/dsl";
+import type { Field, HttpComponentConfig } from "@langwatch/workflow-contract";
 import type { HttpConfig, TargetConfig } from "../types";
 
 // ============================================================================

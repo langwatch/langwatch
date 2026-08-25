@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { Field } from "~/optimization_studio/types/dsl";
+import type { Field } from "@langwatch/workflow-contract";
 import type {
   DatasetColumn,
   DatasetReference,

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   type HttpComponentConfig,
   LATEST_SPEC_VERSION,
-} from "~/optimization_studio/types/dsl";
+} from "@langwatch/workflow-contract";
 import {
   createInitialState,
   DEFAULT_TEST_DATA_ID,

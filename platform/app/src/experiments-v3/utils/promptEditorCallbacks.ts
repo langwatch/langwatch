@@ -7,16 +7,10 @@
  */
 
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
-import type { Field } from "~/optimization_studio/types/dsl";
-import type {
-  LocalPromptConfig,
-  FieldMapping as StoreFieldMapping,
-} from "../types";
+import type { Field } from "@langwatch/workflow-contract";
+import type { LocalPromptConfig, FieldMapping as StoreFieldMapping } from "../types";
 import { convertFromUIMapping } from "./fieldMappingConverters";
-import {
-  type PromptOutputField,
-  toTargetOutputFields,
-} from "./targetOutputFields";
+import { type PromptOutputField, toTargetOutputFields } from "./targetOutputFields";
 
 /**
  * Parameters required to create prompt editor callbacks.

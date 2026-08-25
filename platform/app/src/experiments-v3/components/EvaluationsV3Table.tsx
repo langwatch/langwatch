@@ -31,10 +31,7 @@ import {
   useDrawerParams,
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type {
-  Field,
-  HttpComponentConfig,
-} from "~/optimization_studio/types/dsl";
+import type { Field, HttpComponentConfig } from "@langwatch/workflow-contract";
 import type { AgentWithFields } from "~/server/agents/agent-fields";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators";

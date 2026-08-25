@@ -22,7 +22,7 @@ import {
   LATEST_SPEC_VERSION,
   type Signature,
   type Workflow,
-} from "~/optimization_studio/types/dsl";
+} from "@langwatch/workflow-contract";
 import type {
   DatasetColumn,
   DatasetReference,

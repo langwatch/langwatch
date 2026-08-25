@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { Field } from "~/optimization_studio/types/dsl";
+import type { Field } from "@langwatch/workflow-contract";
 import { api } from "~/utils/api";
 import type { TargetConfig } from "../types";
 import { useEvaluationsV3Store } from "./useEvaluationsV3Store";

@@ -8,7 +8,7 @@ import {
   type FieldMapping as VariableFieldMapping,
   VariablesSection,
 } from "~/components/variables";
-import type { Field } from "~/optimization_studio/types/dsl";
+import type { Field } from "@langwatch/workflow-contract";
 import { useResolveTargetName } from "../../hooks/useResolveTargetName";
 import type { DatasetReference, FieldMapping, TargetConfig } from "../../types";
 import { getUsedFields } from "../../utils/mappingValidation";

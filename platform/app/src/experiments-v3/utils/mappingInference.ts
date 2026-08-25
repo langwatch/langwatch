@@ -10,7 +10,7 @@
  * 3. Cross-dataset propagation from existing mappings
  */
 
-import type { Field } from "~/optimization_studio/types/dsl";
+import type { Field } from "@langwatch/workflow-contract";
 import type {
   ComparisonEvaluatorConfig,
   DatasetColumn,
