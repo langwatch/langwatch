@@ -1,4 +1,5 @@
 import {
+  type AuthzPrincipalRef,
   DEFAULT_SHARE_LINK_PERMISSION,
   isShareLinkPermission,
   SHARE_LINK_PERMISSIONS,
@@ -21,6 +22,7 @@ import type {
   ShareWithProject,
 } from "./repositories/share.repository";
 import { generateShareToken } from "./share.token";
+import type { ShareAccessDecider } from "./share-access";
 import type { ShareViewDedupeService } from "./share-view-dedupe.service";
 
 const logger = createLogger("langwatch:share-service");
@@ -70,6 +72,13 @@ export interface ShareViewer {
 export interface ShareServiceDeps {
   isTraceSharingEnabled: (projectId: string) => Promise<boolean>;
   /**
+   * ADR-092 §8 — the engine, as the ONE authority on whether a presented
+   * token authorizes a read. Required, not optional: a share resolve that
+   * could fall back to a second implementation of the same rules is exactly
+   * what routing this path through the engine removes.
+   */
+  shareAccess: ShareAccessDecider;
+  /**
    * Collapses one viewer's repeat opens of a link into a single viewing, so
    * `maxViews` counts viewings rather than HTTP requests. Absent (tests, no
    * Redis) means every open counts, which is the stricter behaviour.
@@ -95,6 +104,20 @@ export class ShareService {
   /**
    * Resolve a share token for a viewer. This is the single authorization point
    * for anonymous reads: the token — not the resource id — is the capability.
+   *
+   * The DECISION is the engine's (ADR-092 §8). `deps.shareAccess` presents the
+   * token at a resource scope and the engine's resource tier answers, which is
+   * what makes possession, expiry, the view budget, the audience, the project
+   * anchor and the link's own permission ONE implementation rather than two.
+   * What is left here is what the engine does not decide:
+   *
+   *   - the sharing KILL SWITCH, a project/organization setting the resource
+   *     tier reads nothing of (see below);
+   *   - view ACCOUNTING, which has its own writer and its own atomicity;
+   *   - which REFUSAL a denied caller is told, derived from the link this
+   *     service already holds. Those predicates explain a denial; they no
+   *     longer make one.
+   *
    * Failures throw typed share HandledErrors (mapped to wire codes by
    * `handledErrorMiddleware`); a token that doesn't resolve and one behind the
    * sharing kill switch are indistinguishable by design. Every successful
@@ -108,10 +131,13 @@ export class ShareService {
    */
   async resolveForViewer({
     token,
+    principal,
     viewer,
     viewerKey,
   }: {
     token: string;
+    /** Who is asking, as the engine names it. No session is `anonymous`. */
+    principal: AuthzPrincipalRef;
     viewer: ShareViewer;
     /** Opaque per-viewer key; omit to count every request as a viewing. */
     viewerKey?: string;
@@ -122,6 +148,12 @@ export class ShareService {
     // Sharing kill switch: effective sharing = org AND project. Off at either
     // level makes every trace link stop resolving — indistinguishable from a
     // bad token by design. See ADR-057.
+    //
+    // Deliberately still decided here. The switch is a flag on the PROJECT and
+    // its ORGANIZATION, and the resource tier reads share rows, not project
+    // settings: `ShareLinkRow` carries no such column, so asking the engine
+    // would mean inventing a fact for it to collect. It gates the resolve
+    // before the engine is consulted, so a killed link costs one read.
     if (
       share.resourceType === "TRACE" &&
       !(
@@ -132,18 +164,25 @@ export class ShareService {
       throw new ShareLinkNotFoundError();
     }
 
-    // Audience before expiry: an out-of-audience viewer (including an
-    // anonymous prober holding a leaked ORGANIZATION/PROJECT token) learns
-    // nothing beyond "sign in" — not even that the link expired.
-    const audienceOk = await this.checkAudience(share, viewer);
-    if (!audienceOk) throw new ShareLinkForbiddenError();
+    const access = await this.deps.shareAccess.decide({
+      principal,
+      // What the read surface asks for. A link minted to confer more (the
+      // `annotations:create` option) still satisfies it; one whose stored
+      // permission confers less — or names something outside the allowlist —
+      // does not, and the reader is refused. That refusal exists only because
+      // the engine decides: no hand-rolled check ever read the column.
+      permission: DEFAULT_SHARE_LINK_PERMISSION,
+      projectId: share.projectId,
+      resourceType: share.resourceType,
+      resourceId: share.resourceId,
+      token,
+    });
+    if (!access.allowed) {
+      return await this.refuse({ share, viewer, viewerKey });
+    }
 
-    if (isShareExpired(share)) throw new ShareLinkExpiredError();
-
-    // Before the exhaustion check, not after: a viewer re-reading inside the
-    // window must not be locked out by the view THEY already consumed. That
-    // is the whole point — a single-view link should survive its recipient
-    // pressing refresh.
+    // The link is live, so a repeat viewing inside the window is a viewing
+    // already counted — it must not consume another.
     if (viewerKey && this.deps.viewDedupe) {
       const isNewViewing = await this.deps.viewDedupe.isNewViewing({
         shareId: share.id,
@@ -151,10 +190,6 @@ export class ShareService {
       });
       if (!isNewViewing) return share;
     }
-
-    // Fast path: an already-spent link answers without attempting a write. The
-    // atomic conditional consume below remains the authority under races.
-    if (isShareViewExhausted(share)) throw new ShareLinkExhaustedError();
 
     const consumed = await this.repo.consumeView({
       id: share.id,
@@ -166,6 +201,57 @@ export class ShareService {
     return share;
   }
 
+  /**
+   * The engine refused. Say WHICH refusal, in the order ADR-057 fixed — and
+   * nothing more: these predicates read the link the caller already presented,
+   * so none of them tells them anything a possessed token did not.
+   *
+   * Audience before expiry: an out-of-audience viewer (including an anonymous
+   * prober holding a leaked ORGANIZATION/PROJECT token) learns nothing beyond
+   * "sign in" — not even that the link expired. Anything the engine refused
+   * that these predicates all pass is a link that confers nothing here, and
+   * answers with the same generic not-found as an unknown token.
+   */
+  private async refuse({
+    share,
+    viewer,
+    viewerKey,
+  }: {
+    share: ShareWithProject;
+    viewer: ShareViewer;
+    viewerKey?: string;
+  }): Promise<ShareWithProject> {
+    if (!(await this.checkAudience(share, viewer))) {
+      throw new ShareLinkForbiddenError();
+    }
+    if (isShareExpired(share)) throw new ShareLinkExpiredError();
+    if (isShareViewExhausted(share)) {
+      // The one refusal that is not final. A viewer re-reading inside the
+      // dedupe window must not be locked out by the view THEY consumed — a
+      // single-view link has to survive its recipient pressing refresh. The
+      // engine cannot express it: the collector filters a spent link out
+      // (`isLiveShareLink`) before the walk ever sees the row, and it has no
+      // notion of who is re-reading. So the window is honoured here, where the
+      // viewing was recorded.
+      if (viewerKey && this.deps.viewDedupe) {
+        const isNewViewing = await this.deps.viewDedupe.isNewViewing({
+          shareId: share.id,
+          viewerKey,
+        });
+        if (!isNewViewing) return share;
+      }
+      throw new ShareLinkExhaustedError();
+    }
+    throw new ShareLinkNotFoundError();
+  }
+
+  /**
+   * Which refusal an out-of-audience viewer gets — NOT whether they are in the
+   * audience, which the engine decided above. Kept on the viewer probes the
+   * router supplies rather than re-deriving from the decision: the engine
+   * hands back one boolean, and a refusal has to pick between "sign in" (401)
+   * and "this link is dead" (403) without disclosing which.
+   */
   private async checkAudience(
     share: ShareWithProject,
     viewer: ShareViewer,

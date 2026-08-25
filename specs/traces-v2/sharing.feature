@@ -177,6 +177,18 @@ Feature: Share a trace behind a secret, scoped, expiring link
       When the sharer revokes the link
       Then opening the link afterwards is denied
 
+    # The decision itself is the authorization engine's (see
+    # specs/rbac/unified-authorization-engine.feature, the resource tier). What
+    # this pins is the half a customer can see: a refusal the engine hands back
+    # is one boolean, and turning it into words must not turn it into a probe.
+    @unit
+    Scenario: A refused share link never says which refusal it was
+      Given a token that matches no link
+      And a link behind a project whose sharing was switched off
+      And a live link the engine refuses on its own terms
+      When each is opened
+      Then all three answer with the identical refusal, to the character
+
   Rule: The plan visibility window and content redaction still apply to shared views
 
     @integration
