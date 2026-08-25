@@ -16,7 +16,10 @@ import type {
   PrismaClient,
 } from "~/generated/prisma/client";
 import { Prisma } from "~/generated/prisma/client";
-import { liveGroups } from "~/server/app-layer/authz/repositories/live-rows";
+import {
+  LIVE_MEMBERSHIP,
+  liveGroups,
+} from "~/server/app-layer/authz/repositories/live-rows";
 import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
 import type {
@@ -267,6 +270,32 @@ export class GatewayBudgetService {
       new GatewayAuditAdapter(prisma),
       chRepo,
     );
+  }
+
+  /**
+   * The groups a budget can be aimed at, with the size of each.
+   *
+   * LIVE members, for the reason the settings page counts them that way: a
+   * budget sized per member must not be divided by people who have left the
+   * group.
+   */
+  async groupTargets(
+    organizationId: string,
+  ): Promise<Array<{ id: string; name: string; memberCount: number }>> {
+    const groups = await liveGroups(this.prisma).findMany({
+      where: { organizationId },
+      select: {
+        id: true,
+        name: true,
+        _count: { select: { members: { where: LIVE_MEMBERSHIP } } },
+      },
+      orderBy: { name: "asc" },
+    });
+    return groups.map((group) => ({
+      id: group.id,
+      name: group.name,
+      memberCount: group._count.members,
+    }));
   }
 
   async list(organizationId: string): Promise<GatewayBudgetWithSeats[]> {

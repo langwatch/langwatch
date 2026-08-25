@@ -10,10 +10,6 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
 import {
-  LIVE_MEMBERSHIP,
-  liveGroups,
-} from "~/server/app-layer/authz/repositories/live-rows";
-import {
   GatewayBudgetService,
   type GatewayBudgetWithSeats,
 } from "~/server/gateway/budget.service";
@@ -177,23 +173,9 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("gatewayBudgets:create")
     .query(async ({ ctx, input }) => {
-      const groups = await liveGroups(ctx.prisma).findMany({
-        where: { organizationId: input.organizationId },
-        select: {
-          id: true,
-          name: true,
-          // LIVE members, for the reason the settings page counts them that
-          // way: a budget sized per member must not be divided by people who
-          // have left the group.
-          _count: { select: { members: { where: LIVE_MEMBERSHIP } } },
-        },
-        orderBy: { name: "asc" },
-      });
-      return groups.map((g) => ({
-        id: g.id,
-        name: g.name,
-        memberCount: g._count.members,
-      }));
+      return await GatewayBudgetService.create(ctx.prisma).groupTargets(
+        input.organizationId,
+      );
     }),
 
   create: protectedProcedure

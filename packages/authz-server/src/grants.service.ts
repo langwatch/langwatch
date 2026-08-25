@@ -265,6 +265,13 @@ export class GrantsService {
    * The REDUCE verb (ADR-092 §3): atomically replace a broad grant with a
    * narrower one — never a second binding fighting the first. The
    * repository runs the delete and the create as one transaction.
+   *
+   * `expiresAtMs` is NOT inferred from the binding being replaced, and the
+   * omission is the dangerous direction: narrowing a grant that ends on
+   * Friday must not hand back one that never ends. The caller states the
+   * replacement's own end date, exactly as `attach` does, and a reduction of
+   * a time-boxed grant has to pass the date through or it is a widening in
+   * the one dimension nobody was looking at.
    */
   async replace({
     actor,
@@ -272,12 +279,14 @@ export class GrantsService {
     from,
     to,
     role,
+    expiresAtMs,
   }: {
     actor: GrantActor;
     who: GrantPrincipal;
     from: AuthzScopeRef;
     to: AuthzScopeRef;
     role: GrantRole;
+    expiresAtMs?: number;
   }): Promise<{ bindingId: string }> {
     if (from.type === "resource" || to.type === "resource") {
       throw new GrantValidationError(RESOURCE_SCOPE_REJECTION);
@@ -295,7 +304,13 @@ export class GrantsService {
       organizationId,
     });
     await assertRoleUsable({ repository, role, organizationId });
-    const row = this.bindingRow({ who, role, where: to, organizationId });
+    const row = this.bindingRow({
+      who,
+      role,
+      where: to,
+      organizationId,
+      ...(expiresAtMs !== undefined ? { expiresAtMs } : {}),
+    });
     try {
       await repository.replaceBinding({
         deleteWhere: {

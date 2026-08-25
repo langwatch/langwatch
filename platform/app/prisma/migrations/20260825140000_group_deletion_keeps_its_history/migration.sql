@@ -7,7 +7,8 @@
 -- every one of those marked rows. The ledger kept the facts; the projection
 -- lost exactly the history the change existed to preserve. This closes it.
 --
--- Four changes, in the order they have to happen:
+-- Three changes here, in the order they have to happen -- and a fourth that
+-- deliberately is not here, explained under the list:
 --
 --   1. `deletedAt` / `deletedReason` - the mark, the same pair `Grant`,
 --      `Role` and now `GroupMembership` carry. NULL is live, which is what

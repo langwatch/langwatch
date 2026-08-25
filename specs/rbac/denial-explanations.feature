@@ -1,3 +1,4 @@
+@authz @rbac @explanations
 Feature: Denial explanations
   As a member who has just been refused something
   I want the refusal to tell me which of my roles fell short and which role
