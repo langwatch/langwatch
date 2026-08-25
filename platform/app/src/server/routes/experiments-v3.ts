@@ -1231,7 +1231,7 @@ secured.access(apiKeyAuthExperimentsView).get(
   describeRoute({
     summary: "List an experiment's versions",
     description:
-      "Every saved version of the experiment's setup, newest first. Page through them with `limit` and `cursor`.",
+      "Every saved version of the experiment's setup, newest first. A commit, an agent write and a restore each add a numbered version. Ordinary typing rewrites one autosave row, which is the entry with `autoSaved` true. Page through them with `limit` and `cursor`.",
     tags: ["Experiments"],
     parameters: [
       {
@@ -1300,6 +1300,7 @@ secured.access(apiKeyAuthExperimentsView).get(
     return c.json({
       versions: versions.map((version) => ({
         version: version.version,
+        counterVersion: version.counterVersion,
         autoSaved: version.autoSaved,
         commitMessage: version.commitMessage,
         authorLabel: version.authorLabel,

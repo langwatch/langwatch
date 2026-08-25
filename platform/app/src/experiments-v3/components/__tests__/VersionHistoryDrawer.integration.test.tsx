@@ -37,6 +37,8 @@ vi.mock("~/hooks/useCan", () => ({
 const mockLoadState = vi.fn();
 const mockSetWorkbenchVersion = vi.fn();
 const mockSetStaleWorkbench = vi.fn();
+/** What the open workbench holds, which is what the current badge follows. */
+let storeWorkbenchVersion: number | undefined = 12;
 vi.mock("~/experiments-v3/hooks/useEvaluationsV3Store", () => ({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   useEvaluationsV3Store: (selector: (state: any) => unknown) =>
@@ -44,6 +46,7 @@ vi.mock("~/experiments-v3/hooks/useEvaluationsV3Store", () => ({
       loadState: mockLoadState,
       setWorkbenchVersion: mockSetWorkbenchVersion,
       setStaleWorkbench: mockSetStaleWorkbench,
+      workbenchVersion: storeWorkbenchVersion,
     }),
 }));
 
@@ -89,9 +92,16 @@ vi.mock("~/utils/api", () => ({
 
 import { VersionHistoryDrawer } from "../VersionHistoryDrawer";
 
+/**
+ * A history as the seam writes one: two deliberate versions numbered without
+ * gaps, and one autosave row that a long session of typing left behind. The
+ * autosave carries a number of its own, but it is a handle for a restore and
+ * not a place in the list, which is why the rows below run 2, autosave, 1.
+ */
 const versions = [
   {
-    version: 12,
+    version: 2,
+    counterVersion: 12,
     autoSaved: false,
     commitMessage: "Added a target",
     authorLabel: "langy",
@@ -101,12 +111,23 @@ const versions = [
   },
   {
     version: 11,
+    counterVersion: 11,
     autoSaved: true,
     commitMessage: null,
     authorLabel: "user",
     authorId: "user_1",
     authorName: "Ada Lovelace",
     createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    version: 1,
+    counterVersion: 1,
+    autoSaved: false,
+    commitMessage: "First setup",
+    authorLabel: "user",
+    authorId: "user_1",
+    authorName: "Ada Lovelace",
+    createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
   },
 ];
 
@@ -121,6 +142,7 @@ describe("VersionHistoryDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     canRestore = true;
+    storeWorkbenchVersion = 12;
     versionsQuery = {
       data: { versions, nextCursor: null },
       isLoading: false,
@@ -141,10 +163,31 @@ describe("VersionHistoryDrawer", () => {
     it("renders a row per version naming its author", async () => {
       renderDrawer();
 
-      expect(await screen.findByText("v12")).toBeDefined();
+      expect(await screen.findByText("v2")).toBeDefined();
+      expect(screen.getByText("v1")).toBeDefined();
       expect(screen.getByText("· Langy")).toBeDefined();
-      expect(screen.getByText("· Ada Lovelace")).toBeDefined();
+      expect(screen.getAllByText("· Ada Lovelace")).toHaveLength(2);
       expect(screen.getByText(/Added a target/)).toBeDefined();
+    });
+
+    /** @scenario "The version history shows the autosave as an autosave" */
+    it("names the autosave row rather than numbering it", async () => {
+      renderDrawer();
+
+      expect(await screen.findByText("Autosave")).toBeDefined();
+      // The autosave row carries version 11 as a restore handle. Showing it
+      // would put a number in the list that its neighbours do not follow.
+      expect(screen.queryByText("v11")).toBeNull();
+    });
+
+    /** @scenario "The current badge marks the version the workbench holds" */
+    it("badges the version the workbench holds and offers no restore on it", async () => {
+      renderDrawer();
+
+      expect(await screen.findByText("Current")).toBeDefined();
+      // Two rows are older than the open workbench, and each of those can be
+      // brought back. The one it already holds cannot.
+      expect(screen.getAllByText("Restore")).toHaveLength(2);
     });
 
     describe("when the caller confirms a restore", () => {
@@ -153,7 +196,8 @@ describe("VersionHistoryDrawer", () => {
         const user = userEvent.setup();
         renderDrawer();
 
-        await user.click(await screen.findByText("Restore"));
+        const [firstRestore] = await screen.findAllByText("Restore");
+        await user.click(firstRestore!);
         await user.click(await screen.findByText("Confirm restore"));
 
         await waitFor(() => {
@@ -180,11 +224,22 @@ describe("VersionHistoryDrawer", () => {
         const user = userEvent.setup();
         renderDrawer();
 
-        await user.click(await screen.findByText("Restore"));
+        const [firstRestore] = await screen.findAllByText("Restore");
+        await user.click(firstRestore!);
 
         expect(screen.getByText("Confirm restore")).toBeDefined();
         expect(mockRestore).not.toHaveBeenCalled();
       });
+    });
+  });
+
+  describe("given the workbench is behind the newest saved version", () => {
+    it("badges the newest row, because that is the one the reader is shown", async () => {
+      storeWorkbenchVersion = 3;
+      renderDrawer();
+
+      expect(await screen.findByText("Current")).toBeDefined();
+      expect(screen.getAllByText("Restore")).toHaveLength(2);
     });
   });
 
@@ -194,7 +249,7 @@ describe("VersionHistoryDrawer", () => {
       canRestore = false;
       renderDrawer();
 
-      expect(await screen.findByText("v12")).toBeDefined();
+      expect(await screen.findByText("v2")).toBeDefined();
       expect(screen.queryByText("Restore")).toBeNull();
     });
   });
