@@ -329,13 +329,6 @@ const IDENTIFIER_PREFIXES = new Set([
  * of these prefixes. `toolu_` is here for the same reason, having previously
  * survived only by being two characters under the length floor, which is not a
  * margin anyone should rely on.
- *
- * These are the prefixes of OTHER systems, so the body that follows has no one
- * format: `chatcmpl-` and `toolu_` are OpenAI's and Anthropic's, `cus_` and
- * `evt_` are Stripe's, and each vendor picks its own length and alphabet. The
- * prefix is all there is to go on, so the prefix alone is what exempts. The
- * prefixes this product mints are in {@link PRODUCT_RECORD_ID_PREFIXES}, where
- * the format IS known and is checked.
  */
 const RECORD_ID_PREFIXES = new Set([
   "project",
@@ -376,98 +369,6 @@ const RECORD_ID_PREFIXES = new Set([
 ]);
 
 /**
- * Prefixes that name a record THIS product mints.
- *
- * They are kept apart from {@link RECORD_ID_PREFIXES} because the format is
- * known here, and a prefix on its own is too weak a signal to exempt on. Words
- * like `agent`, `prompt`, `record`, `dataset` and `event` are exactly the ones
- * an unlisted vendor mints a token under, so `agent_<41 random characters>`
- * would have walked past the shape rule everywhere in a trace, not only under
- * the attributes ingestion reads. The prefix opens the door; the body still has
- * to look like an id this product minted, which a vendor token does not.
- *
- * The prefix a rule sees ends at the FIRST separator, which is what a
- * near-match cannot cover. The list held `scenario`, and the product mints
- * `scenariorun_…`; the rule read `scenariorun`, found nothing, and blanked
- * every simulation run id at ingestion, which cost the platform the link
- * between a trace and its run. So the prefixes are listed whole and one by one,
- * mirroring `KSUID_RESOURCES` in `platform/app/src/utils/constants.ts` plus the
- * ids minted from a template literal. A test in the app walks that registry and
- * fails when a new resource is missing here.
- *
- * Key material never goes in this list. LangWatch mints its credentials with a
- * dash (`sk-lw-`, `ik-lw-`, `pat-lw-`, `vk-lw-`), and the shape rule accepts a
- * dash as the separator too, so a prefix listed for its underscore form would
- * exempt the dash form with it.
- */
-const PRODUCT_RECORD_ID_PREFIXES = new Set([
-  // KSUID resources, in the order they are declared in the app registry.
-  "batchresult",
-  "cost",
-  "event",
-  "experiment",
-  "exprunresult",
-  "mdcfg",
-  "mdcs",
-  "mpscope",
-  "organization",
-  "scenariobatch",
-  "scenariorun",
-  "trigger",
-  "logrecord",
-  "tracesummary",
-  "trackedevent",
-  "promptthread",
-  "dsrecord",
-  "group",
-  "rolebinding",
-  "apikeyrole",
-  "bugreport",
-  "langymsg",
-  "topicrun",
-  "topicrunhist",
-  "topicmodel",
-  "pminstance",
-  "pminbox",
-  "pmoutbox",
-  "webhookendpoint",
-  "export",
-  "traceedit",
-  // KSUID resources minted by the identity and authorization packages.
-  "idf",
-  "idcmd",
-  "verif",
-  "grant",
-  // KSUID resources minted by the Go services.
-  "gtwyreq",
-  "gtwytrace",
-  "aicomptrace",
-  "budgetdebit",
-  "authcache",
-  // Records minted from a template literal rather than through the registry.
-  "prompt",
-  "agent",
-  "suite",
-  "workflow",
-  "evaluator",
-  "customeval",
-  "record",
-  "dataset",
-  "doc",
-  "ptag",
-  "vtag",
-  "llmcost",
-  "langyturn",
-  "mcp",
-  "svc",
-  // Prefixes the app no longer mints and still reads off stored rows.
-  "check",
-  "evaluation",
-  "scen",
-  "mp",
-]);
-
-/**
  * Keys that are published on purpose. PostHog's `phc_` is a client-side project
  * key that ships inside web bundles by design, so blanking it hides legitimate
  * telemetry configuration and protects nothing. The vendor-list comment has
@@ -476,64 +377,14 @@ const PRODUCT_RECORD_ID_PREFIXES = new Set([
  */
 const PUBLIC_KEY_PREFIXES = new Set(["phc"]);
 
-/**
- * The body of an id this product mints, as the shape rule sees it.
- *
- * A KSUID is the only one of the product's id formats that reaches the shape
- * rule at all: `pkg/ksuid` writes 21 bytes as exactly 29 base62 characters, and
- * `<prefix>_<29 base62>` clears the rule's 26-character floor. The rest fall
- * short of it or fail its character mix. A nanoid body is 21 characters, a
- * `randomUUID()` body and a digest body are all lowercase hex, and the rule
- * wants two characters of each case plus two digits.
- *
- * One product id nests another: the gateway and governance routes name a
- * service caller `svc_<project id>`, whose body is a project id, so a nested id
- * is accepted with the same prefix list in front of a 21-character nanoid.
- */
-const KSUID_BODY_REGEX = /^[0-9A-Za-z]{29}$/;
-const NESTED_ID_BODY_REGEX = /^([A-Za-z][A-Za-z0-9]{1,19})_([A-Za-z0-9_-]{21})$/;
-
-function isProductRecordId({
-  prefix,
-  body,
-}: {
-  prefix: string;
-  body: string;
-}): boolean {
-  if (!PRODUCT_RECORD_ID_PREFIXES.has(prefix.toLowerCase())) return false;
-  if (KSUID_BODY_REGEX.test(body)) return true;
-  const nested = NESTED_ID_BODY_REGEX.exec(body);
-  if (!nested) return false;
-  const nestedPrefix = (nested[1] ?? "").toLowerCase();
-  return (
-    PRODUCT_RECORD_ID_PREFIXES.has(nestedPrefix) ||
-    RECORD_ID_PREFIXES.has(nestedPrefix)
-  );
-}
-
-/**
- * Does this token announce something other than a credential?
- *
- * A digest, an identifier, a published key and another system's record are
- * decided by the prefix, because their bodies have no one format to check. This
- * product's own records are decided by the WHOLE token: the prefix names the
- * record and the body has to look like an id this product minted. See
- * {@link PRODUCT_RECORD_ID_PREFIXES}.
- */
-function isNonCredentialToken({
-  prefix,
-  body,
-}: {
-  prefix: string;
-  body: string;
-}): boolean {
+/** Every prefix that announces something other than a credential. */
+function isNonCredentialPrefix(prefix: string): boolean {
   const lower = prefix.toLowerCase();
   return (
     DIGEST_PREFIXES.has(lower) ||
     IDENTIFIER_PREFIXES.has(lower) ||
     RECORD_ID_PREFIXES.has(lower) ||
-    PUBLIC_KEY_PREFIXES.has(lower) ||
-    isProductRecordId({ prefix: lower, body })
+    PUBLIC_KEY_PREFIXES.has(lower)
   );
 }
 
@@ -846,10 +697,8 @@ const VALUE_RULES: ValueRule[] = [
       "g",
     ),
     accept: (groups) =>
-      !isNonCredentialToken({
-        prefix: groups[1] ?? "",
-        body: groups[2] ?? "",
-      }) && isKeyShapedBody(groups[2] ?? ""),
+      !isNonCredentialPrefix(groups[1] ?? "") &&
+      isKeyShapedBody(groups[2] ?? ""),
     precondition: (text) => text.includes("_") || text.includes("-"),
   },
   {

@@ -401,93 +401,94 @@ Feature: Redacting secrets from traces
     When the log record is redacted
     Then the key id is still readable
 
-  # The shape rule reads the prefix up to the FIRST separator, and the record
-  # id list held `scenario` while the product mints `scenariorun_…`. The rule
-  # saw `scenariorun`, matched nothing on the list, and blanked every
-  # simulation run id at ingestion; `prompt_…`, `scenarioset_…`, `check_…`,
-  # `dataset_…` and `trigger_…` went the same way, and `scenariobatch_…`
-  # survived only by being one character over the prefix cap. A customer report
-  # showed the cost of it: with the run id gone, a trace could not be attached
-  # to its run, and the pipeline attributed the cost to a run that did not
-  # exist. Redaction is irreversible at ingestion, so the ids are not
-  # recoverable for the spans already stored.
+  # Two value rules decide on shape alone: they ask only whether a token looks
+  # random. A record id is minted as `prefix_<random body>` and looks exactly
+  # that random, so a rule tuned for keys takes ids too. That is what happened:
+  # the rule read the prefix up to the FIRST separator, the record-id list held
+  # `scenario`, and the product mints `scenariorun_…`, so every simulation run
+  # id was replaced with a marker at ingestion. A customer report showed the
+  # cost: with the run id gone, a trace could not be attached to its run, and
+  # the pipeline attributed the cost to a run that did not exist. Redaction is
+  # irreversible at ingestion, so the ids on the spans already stored are gone.
   #
-  # The prefixes the app mints are listed one by one now, and the test walks
-  # the app's own resource registry, so a resource added later cannot be
-  # forgotten here.
-  #
-  # A prefix on its own is too weak a signal to exempt a token on, because the
-  # words the product mints ids under - `agent`, `prompt`, `record`, `dataset`,
-  # `event` - are the words an unlisted vendor mints a token under too. So the
-  # whole token has to look like an id the product minted: the prefix names the
-  # record and the body carries the format the product writes, a fixed-length
-  # base62 string. A vendor token that borrows the prefix has a body of the
-  # wrong length and is still replaced.
-
-  @unit
-  Scenario: Every id prefix the product mints survives redaction
-    Given an id for every resource the application mints ids for
-    When each id is redacted
-    Then every id is left exactly as written
-
-  @unit
-  Scenario: A credential that borrows a product id prefix is still redacted
-    Given a credential-shaped token whose prefix names a product record
-    And the token body is not the format the product mints
-    When the token is redacted in text that names no credential
-    Then the token is replaced
-
-  # Second line for the same failure. Two rules decide on shape alone: they ask
-  # only whether a token looks random, and a minted id looks as random as a
-  # minted key, so a rule tuned for keys will take ids again. For the small set
-  # of attribute names the ingestion pipeline READS - the run id it attaches a
-  # trace by, the prompt id, the conversation, user and customer it groups by,
-  # the gateway and ingestion provenance - the value is an address rather than
-  # content, so those two rules are left out by name.
+  # The fix reads the attribute NAME. A name that is `id`, or that ends in
+  # `_id` or `.id`, says the value is an identifier, and an identifier is an
+  # address rather than content: the pipeline compares it to the same value on
+  # another record to attach a trace to its run, its prompt, its conversation
+  # and its customer. So the two shape rules do not run on those values.
   #
   # Only those two. An exemption that turned the secrets pass off would trade
   # one hole for a worse one, because a real key parked under a run id would
-  # then be stored in the clear. Every rule that reads a vendor prefix, armour,
-  # a URL password, an authorization scheme or a credential keyword still runs,
-  # so does the sensitive-name rule, so do the customer's own patterns, and so
-  # does the personal-data pass. None of them can match a minted record id,
-  # which carries no vendor prefix and no keyword in front of it.
+  # then be stored in the clear. Every rule that reads a vendor namespace,
+  # armour, a URL password, an authorization scheme or a credential keyword
+  # still runs, so do the customer's own patterns, and so does the personal-data
+  # pass.
+  #
+  # The name rule reads the name and nothing else, so it does not widen to a
+  # namespace. `langwatch.input` and `langwatch.output` carry the chat content
+  # itself and keep every rule.
+  #
+  # KNOWN LIMIT. An id in FREE TEXT, in a message body or an error string, is
+  # still replaced when its body carries 26 or more high-entropy characters.
+  # That is cosmetic: nothing in the pipeline reads an id out of free text, so
+  # trace linking is unaffected.
 
   @unit
-  Scenario: A reserved identifier attribute keeps its value
-    Given a span attribute the pipeline reads to link a trace, holding an id
+  Scenario: An identifier attribute keeps the id it holds
+    Given a span attribute whose name ends in "_id" or ".id"
+    And the value is an id the product minted
     When the attribute is redacted with secrets redaction on
     Then the stored attribute still holds the id
 
   @unit
-  Scenario: A credential under a reserved identifier attribute is still redacted
-    Given a reserved attribute holding a real vendor credential
+  Scenario: The shape rules still run on an attribute that is not an identifier
+    Given a span attribute holding the chat content
+    And the value is a token only the shape rules can match
+    When the attribute is redacted
+    Then the value is replaced
+
+  @unit
+  Scenario: A credential under an identifier attribute is still redacted
+    Given an identifier attribute holding a real vendor credential
     When the attribute is redacted
     Then the credential is replaced
 
   @unit
-  Scenario: A custom secret pattern still runs on a reserved identifier attribute
+  Scenario: A custom secret pattern still runs on an identifier attribute
     Given a rule that adds a custom secret pattern
-    When a reserved attribute holds a value that pattern matches
+    When an identifier attribute holds a value that pattern matches
     Then the value is replaced
 
   @unit
-  Scenario: The sensitive name rule still runs on a reserved identifier attribute
-    Given a reserved attribute whose name the deny-list matches
+  Scenario: The identifier of a credential keeps its value while the credential does not
+    Given an attribute named for the identifier of a credential
     When the attribute is redacted
-    Then the value is replaced by name
+    Then the row id is still readable
+    And an attribute named for the credential itself is replaced by name
 
   @unit
-  Scenario: A name that only resembles a reserved one is still redacted
-    Given an attribute whose name adds a prefix or a suffix to a reserved name
+  Scenario: A name that only resembles an identifier name keeps the shape rules
+    Given an attribute whose name adds a segment after the identifier ending
     When the attribute is redacted
     Then the value is treated as ordinary content
 
   @unit
-  Scenario: A reserved identifier attribute still runs the personal data pass
-    Given a reserved attribute whose value is an email address
+  Scenario: An identifier attribute still runs the personal data pass
+    Given an identifier attribute whose value is an email address
     When the attribute is redacted
     Then the email address is replaced
+
+  # A handle and a version number are not identifier names, and they do not need
+  # to be. A handle accepts lowercase letters, digits, hyphens, underscores and
+  # one slash, and the shape rule needs two uppercase characters before it
+  # fires. The legacy handle form carries a body under the rule's length floor,
+  # and a version number is digits.
+
+  @unit
+  Scenario: A prompt handle and a version number survive redaction
+    Given a prompt attribute holding a handle or a version number
+    When the attribute is redacted
+    Then the value is left exactly as written
 
   @integration
   Scenario: A simulation trace keeps the run id that links it to its run

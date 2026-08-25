@@ -439,33 +439,6 @@ describe("redactSecretsInText, beyond the known-vendor list", () => {
     });
   });
 
-  describe("given a token whose prefix names a record this product mints", () => {
-    // The product mints ids under ordinary words, and an unlisted vendor is
-    // free to mint a token under the same ones. So the prefix opens the door
-    // and the body decides: the product writes a fixed-length base62 body, and
-    // a token that borrows the prefix without the format is still key material.
-    const KSUID_BODY = "0005FFcHZ7IBvPE1OSWymml0ikKqB";
-
-    describe("when the body carries the format the product mints", () => {
-      it("leaves the id exactly as written", () => {
-        for (const prefix of ["agent", "prompt", "record", "dataset"]) {
-          const id = `${prefix}_${KSUID_BODY}`;
-          expect(redact(`the run reported ${id} back`).text).toContain(id);
-        }
-      });
-    });
-
-    describe("when the body is a length the product never mints", () => {
-      it("redacts it even in text that names no credential", () => {
-        for (const prefix of ["agent", "prompt", "record", "dataset"]) {
-          expect(
-            redact(`the run reported ${prefix}_${BODY.slice(0, 41)} back`).text,
-          ).toBe("the run reported [SECRET] back");
-        }
-      });
-    });
-  });
-
   describe("given a credential named in prose and then given a value", () => {
     /** @scenario "A credential introduced by name in free text is redacted" */
     it("redacts the value and leaves the words that introduce it", () => {
