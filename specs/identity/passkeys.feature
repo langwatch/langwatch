@@ -68,6 +68,16 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     Then the passkey appears in "sam"'s list of sign-in methods
     And "sam" can sign in with it from then on
 
+  # The nudge (ADR-120) offers a way IN, and only the identifier-first
+  # screens accept one — so a deployment still signing everybody in the old
+  # way must not mint credentials its own front door cannot take.
+  @unit
+  Scenario: The nudge stays silent while the old sign-in screens are the way in
+    Given the deployment mints passkeys behind their flag
+    But the identifier-first sign-in screens are not enforced
+    When the signed-in shell asks whether to offer "sam" a passkey
+    Then no passkey is offered
+
   @unit @unimplemented
   Scenario: A registered passkey becomes an identifier like every other method
     When "sam" completes a passkey registration ceremony

@@ -12,7 +12,7 @@ import { TRPCError } from "@trpc/server";
 import { compare, hash } from "bcrypt";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
-import { deploymentOffersPasskeys } from "~/server/app-layer/identity/signin-method-policy";
+import { deploymentSignsInWithPasskeys } from "~/server/app-layer/identity/signin-method-policy";
 import { NoAdminConfiguredError } from "~/server/app-layer/organizations/errors";
 import {
   Auth0ApiError,
@@ -301,6 +301,11 @@ export const userRouter = createTRPCRouter({
    *
    * The interval lives on the account rather than in browser storage, so a new
    * device does not restart the count and the 30 days actually mean 30 days.
+   *
+   * Gated on the sign-in screens actually TAKING a passkey, not just on the
+   * plugin being mounted: a deployment still on the legacy front door would
+   * otherwise nudge people into minting a credential no screen has a button
+   * for.
    */
   passkeyNudge: protectedProcedure
     .input(z.object({}))
@@ -308,7 +313,7 @@ export const userRouter = createTRPCRouter({
       reason: "operates on the session user's own account, no tenant scope",
     })
     .query(async ({ ctx }) => {
-      if (!deploymentOffersPasskeys()) return { offer: false };
+      if (!deploymentSignsInWithPasskeys()) return { offer: false };
 
       const [passkeys, user] = await Promise.all([
         ctx.prisma.passkey.count({ where: { userId: ctx.session.user.id } }),

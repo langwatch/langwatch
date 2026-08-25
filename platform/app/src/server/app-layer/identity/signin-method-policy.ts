@@ -61,6 +61,32 @@ export function deploymentOffersPasskeys(): boolean {
 }
 
 /**
+ * Whether a passkey minted today is a way IN today. The plugin can be mounted
+ * (`deploymentOffersPasskeys`) while the legacy sign-in screens are still the
+ * front door — and those screens accept no passkey, only the identifier-first
+ * ones do (D13, `IDENTITY_ROUTER_V2=enforce`). Anything that OFFERS to mint a
+ * credential — the nudge above all — gates on this, so nobody is walked into
+ * creating one the sign-in screen then has no button for.
+ */
+export function deploymentSignsInWithPasskeys(): boolean {
+  return deploymentOffersPasskeys() && env.IDENTITY_ROUTER_V2 === "enforce";
+}
+
+/**
+ * Whether this deployment offers two-step verification at all (D06). The
+ * same derived read `deploymentOffersPasskeys` is, for the same reason: the
+ * two-factor plugin's server half is registered off this value, so a screen
+ * that offers a setup can never call an endpoint nobody mounted.
+ *
+ * It is NOT part of any method set. Two-step verification is a second factor
+ * answered after a first one, never a way in on its own, so nothing about it
+ * belongs in `defaultMethods` or `localMethods`.
+ */
+export function deploymentOffersTwoStepVerification(): boolean {
+  return env.MFA_ENROLLMENT_OPEN === "on";
+}
+
+/**
  * Whether this deployment names a federated method AT ALL — a pure env read,
  * synchronous on purpose.
  *
