@@ -194,10 +194,11 @@ export function createEnvConfig() {
       /**
        * Nameservers the single sign-on domain proof asks, in node's
        * `setServers` shape (`127.0.0.1:15353`, `[::1]:15353`), comma or
-       * whitespace separated. Unset — every deployed installation — the
-       * machine's own resolver answers. Set locally so a reserved name like
-       * `acme.test`, which no public resolver will ever answer for, can be
-       * proved against the identity provider simulator's nameserver.
+       * whitespace separated. LOCAL ONLY — ignored under
+       * `NODE_ENV=production`, where domain ownership must rest on real DNS.
+       * Set it in development so a reserved name like `acme.test`, which no
+       * public resolver will ever answer for, can be proved against the
+       * identity provider simulator's own nameserver.
        */
       SSO_DOMAIN_PROOF_DNS_SERVERS: z.string().optional(),
       /**

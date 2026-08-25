@@ -194,19 +194,22 @@ const LOOKUP_TRIES = 2;
  *
  * `SSO_DOMAIN_PROOF_DNS_SERVERS` names that nameserver, as node's
  * `setServers` shape: `127.0.0.1:15353`, or `[::1]:15353` for IPv6, comma
- * separated. Unset — which is every deployed installation — the resolver is
- * the machine's, exactly as before.
+ * separated.
  *
- * It is deliberately NOT gated on `NODE_ENV`. An operator running an
- * air-gapped installation against an internal nameserver has the same need
- * and no other way to express it, and a variable nobody sets in production
- * is not made safer by refusing to read it there.
+ * LOCAL ONLY, because local is the only place it is needed. A deployed
+ * installation proves real domains against real DNS, and the one thing this
+ * variable could do there is quietly point domain ownership — the evidence
+ * the whole ceremony rests on — at a nameserver somebody chose. There is no
+ * case for that we have been asked for, so it is read outside production and
+ * ignored inside it.
  */
 function nameserverBackedResolver(): TxtRecordResolver {
   const resolver = new Resolver({
     timeout: LOOKUP_TIMEOUT_MS,
     tries: LOOKUP_TRIES,
   });
+  if (env.NODE_ENV === "production") return resolver;
+
   const configured: string = env.SSO_DOMAIN_PROOF_DNS_SERVERS ?? "";
   const servers = configured
     .split(/[\s,]+/)
