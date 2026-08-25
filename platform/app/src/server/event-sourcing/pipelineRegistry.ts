@@ -198,6 +198,7 @@ import { createSimulationProcessingPipeline } from "./pipelines/simulation-proce
 import type { SimulationRunExecutionCommands } from "./pipelines/simulation-processing/process-manager";
 import type { SimulationRunMetricsProjectionRecord } from "./pipelines/simulation-processing/projections/simulationRunMetrics.mapProjection";
 import type { SimulationRunStateData } from "./pipelines/simulation-processing/projections/simulationRunState.foldProjection";
+import { SimulationRunStateFoldStore } from "./pipelines/simulation-processing/projections/simulationRunState.store";
 import type { SimulationRunStateRepository } from "./pipelines/simulation-processing/repositories/simulationRunState.repository";
 import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
@@ -1566,10 +1567,10 @@ export class PipelineRegistry {
     >;
   }) {
     const simulationRunStore = this.cached<SimulationRunStateData>(
-      new RepositoryFoldStore<SimulationRunStateData>(
-        this.deps.repositories.simulationRunState,
-        SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
-      ),
+      new SimulationRunStateFoldStore({
+        repository: this.deps.repositories.simulationRunState,
+        version: SIMULATION_PROJECTION_VERSIONS.RUN_STATE,
+      }),
       "simulation_runs",
     );
 
