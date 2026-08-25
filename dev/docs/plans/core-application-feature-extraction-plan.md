@@ -52,7 +52,9 @@ as a directory rename.
    They do not construct a service per request or recover dependencies from a
    global Prisma client.
 7. Existing tRPC names and REST paths remain compatibility transports. Moving a
-   feature does not rename an endpoint.
+   feature does not rename an endpoint or narrow its response. Query rewrites
+   need full-shape characterization for every existing field, nullability,
+   enrichment, cursor and redaction rule before a transport switches over.
 8. Contracts, services, repositories, API adapters, projections, subscribers,
    processes, tests, web UI, and runtime wiring move together when they belong
    to the same feature slice.
