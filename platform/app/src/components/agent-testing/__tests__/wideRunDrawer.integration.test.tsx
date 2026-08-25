@@ -34,6 +34,7 @@ const mockGetScenario = vi.hoisted(() => vi.fn());
 const mockGetBatchRunData = vi.hoisted(() => vi.fn());
 const mockOpenDrawer = vi.hoisted(() => vi.fn());
 const mockCancelJob = vi.hoisted(() => vi.fn());
+const mockInvalidateRunState = vi.hoisted(() => vi.fn());
 const mockParams = vi.hoisted(() => ({
   value: {} as Record<string, string | undefined>,
 }));
@@ -47,7 +48,7 @@ vi.mock("~/utils/api", () => ({
   api: {
     useUtils: () => ({
       scenarios: {
-        getRunState: { invalidate: vi.fn() },
+        getRunState: { invalidate: mockInvalidateRunState },
         getAll: { invalidate: vi.fn() },
         getById: { invalidate: vi.fn() },
         getByIdIncludingArchived: { invalidate: vi.fn() },
@@ -374,6 +375,47 @@ describe("the wide run detail drawer", () => {
 
     expect(screen.getByText("Let me check the order")).toBeInTheDocument();
     expect(screen.getByTestId("judge-pending")).toBeInTheDocument();
+  });
+
+  /** @scenario "A run that is still going shows the conversation growing beside empty results" */
+  it("reads no score at all on a run whose stored results are empty", () => {
+    setRunState(
+      makeRunState({
+        status: ScenarioRunStatus.IN_PROGRESS,
+        // The live stream leaves an empty result object behind; the judge has
+        // still said nothing, so the drawer must not read it as 0 of 0.
+        results: { verdict: null, metCriteria: [], unmetCriteria: [] },
+      }),
+    );
+    renderWide();
+
+    expect(screen.getByTestId("judge-pending")).toBeInTheDocument();
+    expect(screen.queryByText("0/0")).not.toBeInTheDocument();
+  });
+
+  /** @scenario "The criteria appear the moment the run settles" */
+  it("reads the stored run again when the run settles without criteria", () => {
+    vi.useFakeTimers();
+    try {
+      setRunState(
+        makeRunState({
+          // The event stamped the terminal status before the results landed.
+          status: ScenarioRunStatus.SUCCESS,
+          results: { verdict: null, metCriteria: [], unmetCriteria: [] },
+        }),
+      );
+      renderWide();
+
+      act(() => {
+        vi.advanceTimersByTime(600);
+      });
+
+      expect(mockInvalidateRunState).toHaveBeenCalledWith({
+        scenarioRunId: "run_1",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   // --- The version the run used ---

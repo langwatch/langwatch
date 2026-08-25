@@ -46,6 +46,9 @@ import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
 import type { AgentTestingSelection } from "../useAgentTestingRouting";
 import type { ExternalSetEntry, TestSuiteEntry } from "./test-cases";
 
+/** How wide the rail is when it is open. */
+export const SUITE_RAIL_WIDTH = 260;
+
 /** What the archive dialog of a test suite says. */
 export const SUITE_ARCHIVE_TITLE = "Archive test suite?";
 export const SUITE_ARCHIVE_DESCRIPTION =
@@ -55,8 +58,6 @@ export type SuiteRailProps = {
   selection: AgentTestingSelection;
   suites: TestSuiteEntry[];
   externalSets: ExternalSetEntry[];
-  /** How many test cases the project holds, archived ones aside. */
-  allCasesCount: number;
   isLoading?: boolean;
   /** False for a person who may read the project but not change it. */
   canManage: boolean;
@@ -82,7 +83,6 @@ export function SuiteRail({
   selection,
   suites,
   externalSets,
-  allCasesCount,
   isLoading = false,
   canManage,
   suiteIdsWithRuns,
@@ -118,8 +118,8 @@ export function SuiteRail({
       align="stretch"
       gap={0}
       height="full"
-      width={collapsed ? "56px" : "260px"}
-      minWidth={collapsed ? "56px" : "260px"}
+      width={collapsed ? "56px" : `${SUITE_RAIL_WIDTH}px`}
+      minWidth={collapsed ? "56px" : `${SUITE_RAIL_WIDTH}px`}
       borderRightWidth="1px"
       borderColor="border"
       data-testid="agent-testing-suite-rail"
@@ -127,7 +127,6 @@ export function SuiteRail({
       <VStack align="stretch" gap={1} flex={1} overflowY="auto" padding={2}>
         <RailItem
           label="All test cases"
-          count={allCasesCount}
           icon={<LayoutList size={14} color="var(--chakra-colors-fg-muted)" />}
           selected={selection.kind === "all"}
           collapsed={collapsed}
@@ -161,7 +160,6 @@ export function SuiteRail({
             <RailItem
               key={suite.id}
               label={suite.name}
-              count={suite.caseCount}
               icon={<Folder size={14} color="var(--chakra-colors-fg-muted)" />}
               selected={
                 selection.kind === "suite" && selection.slug === suite.slug
@@ -301,9 +299,13 @@ function RailSectionHeading({
   );
 }
 
+/**
+ * One row of the rail. The row itself is not a `button` element: it carries
+ * the row menu, and a button inside a button is not valid markup. It answers
+ * to a click, to Enter and to Space, the way a button does.
+ */
 function RailItem({
   label,
-  count,
   caption,
   icon,
   selected,
@@ -312,7 +314,6 @@ function RailItem({
   actions,
 }: {
   label: string;
-  count?: number;
   caption?: string;
   icon: React.ReactNode;
   selected: boolean;
@@ -322,10 +323,16 @@ function RailItem({
 }) {
   return (
     <HStack
-      as="button"
       role="button"
+      tabIndex={0}
       aria-current={selected ? "true" : undefined}
       onClick={onClick}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        // The row is not a button element, so Space would scroll the rail.
+        event.preventDefault();
+        onClick();
+      }}
       gap={2}
       width="full"
       paddingX={2}
@@ -346,11 +353,6 @@ function RailItem({
           {caption && (
             <Text fontSize="xs" color="fg.muted" whiteSpace="nowrap">
               {caption}
-            </Text>
-          )}
-          {typeof count === "number" && (
-            <Text fontSize="xs" color="fg.muted">
-              {count}
             </Text>
           )}
           {actions}

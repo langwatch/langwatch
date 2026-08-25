@@ -80,7 +80,6 @@ function renderRail(
     selection: { kind: "all" },
     suites: [makeSuite()],
     externalSets: [],
-    allCasesCount: 5,
     canManage: true,
     suiteIdsWithRuns: new Set<string>(["suite_1"]),
     collapsed: false,
@@ -138,6 +137,28 @@ describe("the test suites rail", () => {
       "suite-rail-item-Checkout",
       "suite-rail-item-nightly-ci",
     ]);
+
+    // No row carries a count: the case count reads beside the panel title.
+    // The external row is the one that carries a number, its last run time.
+    for (const entry of entries.slice(0, 3)) {
+      expect(screen.getByTestId(entry).textContent).not.toMatch(/\d/);
+    }
+  });
+
+  /** @scenario "The rail lists All test cases, then the test suites, then the external sets" */
+  it("nests no button inside a rail row", () => {
+    renderRail({
+      suites: [makeSuite({ id: "suite_1", name: "Refunds", slug: "refunds" })],
+      externalSets: [],
+    });
+
+    const row = screen.getByTestId("suite-rail-item-Refunds");
+    expect(row.tagName).not.toBe("BUTTON");
+    expect(row).toHaveAttribute("role", "button");
+    // The row menu lives inside the row, so the row itself must not be one.
+    expect(within(row).getByLabelText("Actions for Refunds").tagName).toBe(
+      "BUTTON",
+    );
   });
 
   /** @scenario "An external set carries the code icon and no counts" */
@@ -426,8 +447,9 @@ function casesPanelProps(
     onNewTestCase: vi.fn(),
     onSelectSuite: vi.fn(),
     onRowClick: vi.fn(),
-    onRun: vi.fn(),
+    onRunCase: vi.fn(),
     onEdit: vi.fn(),
+    onHistory: vi.fn(),
     onDuplicate: vi.fn(),
     onMoveToSuite: vi.fn(),
     onOpenLastRun: vi.fn(),

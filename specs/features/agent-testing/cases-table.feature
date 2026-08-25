@@ -126,6 +126,23 @@ Feature: The test cases table
     When its row is clicked
     Then the case editor opens for that case
 
+  # --- The case editor ---
+
+  @integration
+  Scenario: The case editor footer holds Cancel, Save and Run, with no dropdown
+    Given a test case that ran against an agent before
+    When its editor is opened
+    Then the footer holds "Cancel", "Save" and "Run"
+    And Run carries no dropdown
+    And it is titled "Edit test case"
+
+  @integration
+  Scenario: Run is off on a test case that never ran
+    Given a test case that never ran
+    When its editor is opened
+    Then the Run button is off
+    And it says to run the case from the table first
+
   @integration
   Scenario: Clicking the Run button does not open the row
     Given a test case row with a last run
@@ -149,7 +166,8 @@ Feature: The test cases table
     Given a test suite with a finished run
     When that suite is opened
     Then a line under the table reads when it last ran
-    And the result of the whole set reads on the far right of that line
+    And the date sits directly left of the result of the whole set
+    And the two of them read at the right edge of the line
 
   @integration
   Scenario: All test cases reads Last full run at

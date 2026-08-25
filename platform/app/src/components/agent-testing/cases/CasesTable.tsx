@@ -409,6 +409,17 @@ function CaseRowActionsMenu({
             Duplicate
           </Menu.Item>
         )}
+        {hasLastRun && (
+          <Menu.Item
+            value="open-last-run"
+            onClick={(event) => {
+              stop(event);
+              onOpenLastRun(testCase);
+            }}
+          >
+            Open last run
+          </Menu.Item>
+        )}
         {canManage && (
           <Menu.Root positioning={{ placement: "right-start", gutter: 2 }}>
             <Menu.TriggerItem value="move-to-suite">
@@ -438,17 +449,6 @@ function CaseRowActionsMenu({
               </Menu.Item>
             </Menu.Content>
           </Menu.Root>
-        )}
-        {hasLastRun && (
-          <Menu.Item
-            value="open-last-run"
-            onClick={(event) => {
-              stop(event);
-              onOpenLastRun(testCase);
-            }}
-          >
-            Open last run
-          </Menu.Item>
         )}
         <Menu.Item
           value="history"

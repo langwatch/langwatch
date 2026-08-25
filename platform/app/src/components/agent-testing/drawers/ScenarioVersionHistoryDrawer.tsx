@@ -48,12 +48,19 @@ function authorOf(entry: VersionEntry): string | null {
   return null;
 }
 
-/** What one entry says changed: the field list, or the description it holds. */
+/**
+ * What one entry says changed.
+ *
+ * A version that carries its own description says that: a restore writes the
+ * old content forward, so its field list reads like an ordinary edit and
+ * would not say where the content came from.
+ */
 function changeLineOf(entry: VersionEntry): string {
+  if (entry.changeDescription) return entry.changeDescription;
   if (entry.changedFields.length > 0) {
     return `changed ${entry.changedFields.join(", ")}`;
   }
-  return entry.changeDescription ?? "Created";
+  return "Created";
 }
 
 export function ScenarioVersionHistoryDrawer({ open }: { open?: boolean }) {

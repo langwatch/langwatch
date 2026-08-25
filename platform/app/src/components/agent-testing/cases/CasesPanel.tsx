@@ -17,12 +17,12 @@ import {
   HStack,
   Spacer,
   Text,
-  VStack,
 } from "@chakra-ui/react";
 import { format } from "date-fns";
 import { FlaskConical, FolderCode, Play, Plus } from "lucide-react";
 import { LabelFilterDropdown } from "~/components/scenarios/LabelFilterDropdown";
 import { RunMetricsSummary } from "~/components/suites/RunMetricsSummary";
+import { ContentColumn } from "../shared/ContentColumn";
 import type { AgentTestingSelection } from "../useAgentTestingRouting";
 import {
   type CaseLastResult,
@@ -30,6 +30,7 @@ import {
   CasesTableSkeleton,
   ExternalCasesTable,
 } from "./CasesTable";
+import { SUITE_RAIL_WIDTH } from "./SuiteRail";
 import {
   type CaseGroup,
   lastRunAtOf,
@@ -107,13 +108,8 @@ export function CasesPanel(props: CasesPanelProps) {
     : groups.reduce((total, group) => total + group.cases.length, 0);
 
   return (
-    <VStack
-      align="stretch"
-      gap={3}
-      width="full"
-      height="full"
-      overflow="auto"
-      padding={6}
+    <ContentColumn
+      railWidth={SUITE_RAIL_WIDTH}
       data-testid="agent-testing-cases-panel"
     >
       <HStack gap={2}>
@@ -147,7 +143,7 @@ export function CasesPanel(props: CasesPanelProps) {
             </Button>
             <Button
               size="sm"
-              colorPalette="blue"
+              variant="outline"
               loading={isRunningSet}
               onClick={onRunSet}
             >
@@ -209,7 +205,7 @@ export function CasesPanel(props: CasesPanelProps) {
           />
         </>
       )}
-    </VStack>
+    </ContentColumn>
   );
 }
 
@@ -238,11 +234,15 @@ function LastRunLine({
     selection.kind === "all" ? ALL_CASES_LAST_RUN_LABEL : SUITE_LAST_RUN_LABEL;
 
   return (
-    <HStack gap={2} paddingX={1} data-testid="cases-last-run-line">
+    <HStack
+      gap={3}
+      justify="flex-end"
+      paddingX={1}
+      data-testid="cases-last-run-line"
+    >
       <Text fontSize="xs" color="fg.muted">
         {label} {lastRunAt ? format(lastRunAt, "MMM d, HH:mm") : "-"}
       </Text>
-      <Spacer />
       <RunMetricsSummary summary={summaryFromLastResults(results)} />
     </HStack>
   );

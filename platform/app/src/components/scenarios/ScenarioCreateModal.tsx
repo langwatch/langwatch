@@ -36,9 +36,14 @@ export interface ScenarioCreateModalProps {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MODAL_TITLE = "Create new scenario";
+/** What Agent Testing calls the same modal. */
+const AGENT_TESTING_MODAL_TITLE = "New test case";
 const MODAL_PLACEHOLDER =
   "Explain your agent, its goals and what behavior you want to test.";
 const GENERATING_TEXT = "Drafting your scenario…";
+const AGENT_TESTING_GENERATING_TEXT = "Drafting your test case…";
+const PROMPT_LABEL = "What should this simulation prove?";
+const AGENT_TESTING_PROMPT_LABEL = "What should this test case prove?";
 
 const EXAMPLE_TEMPLATES: ExampleTemplate[] = [
   {
@@ -149,22 +154,28 @@ export function ScenarioCreateModal({
     );
   }
 
+  const isAgentTesting = variant === "agent-testing";
+
   return (
     <AICreateModal
       open={open}
       onClose={onClose}
-      title={MODAL_TITLE}
+      title={isAgentTesting ? AGENT_TESTING_MODAL_TITLE : MODAL_TITLE}
       placeholder={MODAL_PLACEHOLDER}
       exampleTemplates={EXAMPLE_TEMPLATES}
       onGenerate={(desc) => handleGenerate(desc)}
       onSkip={handleSkip}
-      generatingText={GENERATING_TEXT}
+      generatingText={
+        isAgentTesting ? AGENT_TESTING_GENERATING_TEXT : GENERATING_TEXT
+      }
       footerHint={<ResolvedModelCaption model={resolvedDefault.data?.model} />}
       assistant={{
         name: "AI",
         description:
           "Describe the behavior you care about. AI will turn it into an editable situation and success criteria.",
-        promptLabel: "What should this simulation prove?",
+        promptLabel: isAgentTesting
+          ? AGENT_TESTING_PROMPT_LABEL
+          : PROMPT_LABEL,
         generateLabel: "Draft with AI",
         reviewHint:
           "AI is shaping the situation and criteria. You will review everything before it is saved.",

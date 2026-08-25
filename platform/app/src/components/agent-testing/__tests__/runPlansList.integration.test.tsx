@@ -233,6 +233,31 @@ describe("the Test Runs list", () => {
     expect(within(row).getByText("2h ago")).toBeInTheDocument();
   });
 
+  /** @scenario "A run plan row shows its last result" */
+  it("draws no empty pill on a plan whose summary holds no verdict", () => {
+    const plans = buildRunPlans({
+      projectId: PROJECT_ID,
+      suites: [],
+      suiteSummaries: {},
+      externalSets: [
+        {
+          ...makeExternalSet(),
+          passedCount: 0,
+          failedCount: 0,
+          totalCount: 0,
+        },
+      ],
+      oneOffLastRun: null,
+    });
+
+    renderPlans(plans);
+
+    const row = screen.getByTestId("run-plan-row-external:nightly-ci");
+    expect(
+      within(row).queryByTestId("run-metrics-summary"),
+    ).not.toBeInTheDocument();
+  });
+
   /** @scenario "Choosing a run plan opens its runs" */
   it("opens the plan when its row is chosen", async () => {
     const user = userEvent.setup();

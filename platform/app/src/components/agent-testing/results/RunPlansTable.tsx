@@ -36,6 +36,7 @@ import { ListTable } from "~/components/ui/ListTable";
 import { Menu } from "~/components/ui/menu";
 import { useNow } from "~/hooks/useNow";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
+import { ContentColumn } from "../shared/ContentColumn";
 import { type RunPlan, toRunGroupSummary } from "./run-plans";
 
 export type RunPlansTableProps = {
@@ -76,6 +77,13 @@ function PlanBadge({ kind }: { kind: RunPlan["kind"] }) {
   return null;
 }
 
+/**
+ * How the last run of a plan went.
+ *
+ * A plan that never ran inside the window says so. A plan whose summary holds
+ * no verdict yet says nothing at all: the metrics pill would be an empty grey
+ * pill, which reads as a broken row rather than as an absent number.
+ */
 function LastResultCell({ plan }: { plan: RunPlan }) {
   if (!plan.lastRun || plan.lastRun.lastRunTimestamp === null) {
     return (
@@ -84,6 +92,8 @@ function LastResultCell({ plan }: { plan: RunPlan }) {
       </Text>
     );
   }
+
+  if (plan.lastRun.settledCount === 0) return null;
 
   const summary = toRunGroupSummary(plan.lastRun);
   return (
@@ -155,15 +165,7 @@ export function RunPlansTable({
   const now = useNow();
 
   return (
-    <VStack
-      align="stretch"
-      gap={3}
-      width="full"
-      height="full"
-      overflow="auto"
-      padding={6}
-      data-testid="agent-testing-run-plans"
-    >
+    <ContentColumn data-testid="agent-testing-run-plans">
       <HStack gap={2}>
         <Text fontSize="sm" fontWeight="semibold">
           Test Runs
@@ -255,6 +257,6 @@ export function RunPlansTable({
           </Table.Body>
         </ListTable>
       )}
-    </VStack>
+    </ContentColumn>
   );
 }

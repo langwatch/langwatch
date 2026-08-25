@@ -9,7 +9,7 @@
  */
 
 import { Box, VStack } from "@chakra-ui/react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { ScenarioCreateModal } from "~/components/scenarios/ScenarioCreateModal";
 import { NowProvider } from "~/components/suites/NowProvider";
@@ -17,7 +17,9 @@ import type { SimulationSuite } from "~/generated/prisma/client";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePreloadDrawer } from "~/hooks/usePreloadDrawer";
+import { useScenarioTabFollow } from "~/hooks/useScenarioTabFollow";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
+import type { ScenarioTabNavigatePayload } from "~/server/scenarios/browser-tab/scenario-tab-events";
 import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
@@ -25,6 +27,7 @@ import { AgentTestingHeader } from "./AgentTestingHeader";
 import { TestCasesTab } from "./cases/TestCasesTab";
 import { useOpenLiveRun } from "./cases/useOpenLiveRun";
 import { ResultsTab } from "./results/ResultsTab";
+import { toAgentTestingRunPath } from "./results/run-plans";
 import { useAgentTestingRouting } from "./useAgentTestingRouting";
 import { useAgentTestingStore } from "./useAgentTestingStore";
 
@@ -65,6 +68,28 @@ export function AgentTestingPage() {
     hydrateFromUrl(router.query);
   }, [router.isReady, viewParam, hydrateFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // When the SDK opened this tab, a later run from the same machine is steered
+  // here instead of opening yet another browser tab. The address the handoff
+  // carries names the v1 page, so it is read as the Agent Testing run it means.
+  const scenarioTab = useScenarioTabFollow();
+  const lastFollowedRef = useRef<string | null>(null);
+  const followRun = useCallback(
+    (payload: ScenarioTabNavigatePayload) => {
+      const target = new URL(payload.url);
+      if (target.origin !== window.location.origin) return;
+      const path =
+        toAgentTestingRunPath(target.pathname) ??
+        target.pathname + target.search;
+      if (path === window.location.pathname) return;
+      // A handoff is parked as well as broadcast, so a tab that took the live
+      // one and then re-subscribed is offered the same run again.
+      if (lastFollowedRef.current === payload.url) return;
+      lastFollowedRef.current = payload.url;
+      void router.push(path);
+    },
+    [router],
+  );
+
   // The same query keys the v1 page refreshes, so a person moving between the
   // two interfaces never reads a stale list. The connection state travels to
   // the results, where it decides whether the fallback polling runs at all.
@@ -73,9 +98,16 @@ export function AgentTestingPage() {
     refetch: () => {
       void utils.suites.getSummaries.invalidate();
       void utils.scenarios.getExternalSetSummaries.invalidate();
+      // The run number of a plan counts the runs of the window. A run that
+      // just finished makes that count one higher, and a stale count names
+      // the new run after the one before it.
+      void utils.scenarios.getScenarioSetBatchRunCount.invalidate();
     },
     enabled: !!project?.id,
     debounceMs: 500,
+    tabKey: scenarioTab.tabKey,
+    tabId: scenarioTab.tabId,
+    onTabNavigate: followRun,
   });
 
   const { selectPlan } = routing;

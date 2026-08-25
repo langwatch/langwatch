@@ -47,11 +47,12 @@ import { isSuiteSetId } from "~/server/suites/suite-set-id";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
+import { ContentColumn } from "../shared/ContentColumn";
 import { useAgentTestingStore } from "../useAgentTestingStore";
 import { RunPlanDetailHeader } from "./RunPlanDetailHeader";
 import { RunResultsTable } from "./RunResultsTable";
 import { RunSummaryLine } from "./RunSummaryLine";
-import { RunsSidebar } from "./RunsSidebar";
+import { RUNS_SIDEBAR_WIDTH, RunsSidebar } from "./RunsSidebar";
 import {
   batchNote,
   oneOffRunTitle,
@@ -264,6 +265,18 @@ export function RunPlanDetail({
     [openDrawer, plan.scenarioSetId],
   );
 
+  const handleEditCase = useCallback(
+    (scenarioRun: ScenarioRunData) => {
+      openDrawer("scenarioEditor", {
+        urlParams: {
+          variant: "agent-testing",
+          scenarioId: scenarioRun.scenarioId,
+        },
+      });
+    },
+    [openDrawer],
+  );
+
   const handleViewModeChange = useCallback(
     (next: typeof viewMode) => {
       setViewMode(next);
@@ -321,15 +334,7 @@ export function RunPlanDetail({
         setRelativePeriod={setRelativePeriod}
       />
 
-      <VStack
-        align="stretch"
-        gap={3}
-        flex={1}
-        minWidth={0}
-        height="full"
-        overflow="auto"
-        padding={6}
-      >
+      <ContentColumn railWidth={RUNS_SIDEBAR_WIDTH}>
         <RunPlanDetailHeader
           plan={plan}
           viewMode={viewMode}
@@ -412,11 +417,12 @@ export function RunPlanDetail({
                 onScenarioRunClick={handleScenarioRunClick}
                 onCancelRun={canStop ? handleCancelRun : undefined}
                 cancellingJobId={cancellingJobId}
+                onEditCase={can("scenarios:manage") ? handleEditCase : undefined}
               />
             )}
           </>
         )}
-      </VStack>
+      </ContentColumn>
 
       <ScenarioRunExportDialog
         isOpen={isExportDialogOpen}

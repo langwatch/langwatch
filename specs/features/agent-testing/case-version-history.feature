@@ -82,6 +82,13 @@ Feature: Test case history in the interface
     And version 5 is still listed
 
   @integration
+  Scenario: The version a restore wrote says that it is a restore
+    Given a version written by restoring version 1
+    When the history drawer is read
+    Then that entry reads "Restored from v1"
+    And it does not read as an ordinary field change
+
+  @integration
   Scenario: Restore asks for confirmation before it writes
     Given the history drawer with an older version chosen
     When Restore is chosen

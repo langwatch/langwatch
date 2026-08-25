@@ -28,6 +28,9 @@ import {
   runOrdinal,
 } from "./run-plans";
 
+/** How wide the runs rail is. */
+export const RUNS_SIDEBAR_WIDTH = 240;
+
 export type RunsSidebarProps = {
   plan: RunPlan;
   batchRuns: BatchRun[];
@@ -156,7 +159,7 @@ export function RunsSidebar({
     <VStack
       align="stretch"
       gap={1}
-      width="240px"
+      width={`${RUNS_SIDEBAR_WIDTH}px`}
       flexShrink={0}
       height="full"
       paddingX={3}

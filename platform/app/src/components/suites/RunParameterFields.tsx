@@ -24,11 +24,14 @@ export function RunParameterFields({
   values,
   onChange,
   disabled,
+  title = "Parameters",
 }: {
   parameters: ScenarioParameterDefinition[];
   values: Record<string, string>;
   onChange?: (name: string, value: string) => void;
   disabled: boolean;
+  /** What the block is headed by. */
+  title?: string;
 }) {
   return (
     <VStack
@@ -46,7 +49,7 @@ export function RunParameterFields({
         color="fg.muted"
         letterSpacing="0.5px"
       >
-        Parameters
+        {title}
       </Text>
       {parameters.map((parameter) => (
         <RunParameterField

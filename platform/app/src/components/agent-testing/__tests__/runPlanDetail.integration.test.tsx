@@ -222,6 +222,21 @@ describe("<RunPlanDetail/>", () => {
     expect(entries[0]).toHaveAttribute("data-selected", "true");
   });
 
+  /** @scenario "Two runs never carry the same number" */
+  it("numbers every run apart when the run count is behind the list", () => {
+    // The run that has just finished is in the list before the count query
+    // has read it again.
+    mockGetBatchRunCount.mockReturnValue({ data: { count: 2 } });
+    renderDetail();
+
+    const sidebar = screen.getByTestId("agent-testing-runs-sidebar");
+    const entries = within(sidebar).getAllByTestId(/^runs-sidebar-item-\w+$/);
+
+    expect(within(entries[0]!).getByText("Run #3")).toBeInTheDocument();
+    expect(within(entries[1]!).getByText("Run #2")).toBeInTheDocument();
+    expect(within(entries[2]!).getByText("Run #1")).toBeInTheDocument();
+  });
+
   /** @scenario "A sidebar entry shows the number, the note, the age and the pass rate" */
   it("shows the number, the note, the age and the pass rate on an entry", () => {
     renderDetail();
@@ -352,6 +367,66 @@ describe("<RunPlanDetail/>", () => {
     expect(within(table).getByText("Passed (3/3)")).toBeInTheDocument();
     expect(within(table).getByText("Angry refund request")).toBeInTheDocument();
     expect(within(table).getByText("6.3s · $0.004200")).toBeInTheDocument();
+  });
+
+  /** @scenario "A row that has not settled shows no time and no cost" */
+  it("shows no time and no cost while a case is still running", () => {
+    setRuns([
+      makeRun({
+        scenarioRunId: "run_live",
+        status: ScenarioRunStatus.IN_PROGRESS,
+        results: null,
+        // The stored row already carries the millisecond it started on.
+        durationInMs: 1,
+        totalCost: undefined,
+      }),
+    ]);
+    const { view } = renderDetail();
+
+    const table = screen.getByTestId("run-results-table");
+    expect(within(table).queryByText(/1ms/)).not.toBeInTheDocument();
+
+    setRuns([makeRun({ scenarioRunId: "run_live" })]);
+    view.rerender(
+      <Wrapper>
+        <RunPlanDetail
+          plan={suitePlan}
+          batchRunId={null}
+          onSelectRun={vi.fn()}
+          onBack={vi.fn()}
+          onEditPlan={vi.fn()}
+          period={period}
+          periodMode="relative"
+          setPeriod={vi.fn()}
+          setRelativePeriod={vi.fn()}
+          sseConnected
+        />
+      </Wrapper>,
+    );
+
+    expect(
+      within(screen.getByTestId("run-results-table")).getByText(
+        "6.3s · $0.004200",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  /** @scenario "The row menu of a result opens the editor of the test case" */
+  it("opens the editor of the test case from the row menu", async () => {
+    const user = userEvent.setup();
+    setRuns([makeRun({ scenarioRunId: "run_a", scenarioId: "scen_7" })]);
+    renderDetail();
+
+    await user.click(
+      screen.getByRole("button", { name: /^Actions for / }),
+    );
+    await user.click(
+      await screen.findByRole("menuitem", { name: "Edit test case" }),
+    );
+
+    expect(mockOpenDrawer).toHaveBeenCalledWith("scenarioEditor", {
+      urlParams: { variant: "agent-testing", scenarioId: "scen_7" },
+    });
   });
 
   /** @scenario "Only the selected run is shown, not every previous run" */

@@ -179,6 +179,26 @@ describe("<ScenarioCreateModal/>", () => {
       ).toBeInTheDocument();
     });
 
+    it("calls the same thing a test case in the Agent Testing interface", () => {
+      render(
+        <ScenarioCreateModal
+          open={true}
+          onClose={vi.fn()}
+          variant="agent-testing"
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const dialog = getDialogContent();
+      expect(within(dialog).getByText("New test case")).toBeInTheDocument();
+      expect(
+        within(dialog).getByText("What should this test case prove?"),
+      ).toBeInTheDocument();
+      expect(
+        within(dialog).queryByText("Create new scenario"),
+      ).not.toBeInTheDocument();
+    });
+
     it("presents AI drafting as an editable step while keeping manual setup", () => {
       render(<ScenarioCreateModal open={true} onClose={vi.fn()} />, {
         wrapper: Wrapper,

@@ -326,7 +326,39 @@ describe("<RunDialog/>", () => {
   });
 
   /** @scenario "The override parameters chip adds one input line for the values" */
-  it("adds the parameter lines prefilled with the declared values", async () => {
+  it("adds exactly one input line, prefilled with the declared values", async () => {
+    const user = userEvent.setup();
+    mockScenariosGetAll.mockReturnValue({
+      data: [
+        {
+          id: "case_1",
+          name: "Double charge",
+          labels: [],
+          folderId: "suite_refunds",
+          parameters: [
+            { name: "model", defaultValue: "gpt-5-mini" },
+            { name: "locale", defaultValue: "de" },
+          ],
+          createdAt: new Date("2026-07-06T12:00:00.000Z"),
+          lastUpdatedById: null,
+          version: 1,
+        },
+      ],
+      isLoading: false,
+    });
+    renderDialog(suiteSubject());
+
+    await user.click(screen.getByTestId("customize-chip-params"));
+
+    const block = screen.getByTestId("run-dialog-parameters");
+    expect(block.querySelectorAll("input")).toHaveLength(1);
+
+    const line = screen.getByTestId("run-dialog-parameter-line");
+    expect(line).toHaveValue("model=gpt-5-mini, locale=de");
+  });
+
+  /** @scenario "The override parameters chip adds one input line for the values" */
+  it("sends what the line holds as the run parameters", async () => {
     const user = userEvent.setup();
     mockScenariosGetAll.mockReturnValue({
       data: [
@@ -346,9 +378,57 @@ describe("<RunDialog/>", () => {
     renderDialog(suiteSubject());
 
     await user.click(screen.getByTestId("customize-chip-params"));
+    const line = screen.getByTestId("run-dialog-parameter-line");
+    await user.clear(line);
+    await user.type(line, "model=gpt-5, locale=de");
 
-    const field = screen.getByTestId("suite-run-parameter-model");
-    expect(field).toHaveValue("gpt-5-mini");
+    await user.click(screen.getByTestId("run-dialog-run"));
+    await waitFor(() => expect(mockSuitesRun).toHaveBeenCalled());
+    expect(mockSuitesRun.mock.calls[0]![0]).toMatchObject({
+      parameters: { model: "gpt-5", locale: "de" },
+    });
+  });
+
+  /** @scenario "A secret parameter keeps a masked field of its own" */
+  it("keeps a secret off the line and waits for its masked field", async () => {
+    const user = userEvent.setup();
+    mockScenariosGetAll.mockReturnValue({
+      data: [
+        {
+          id: "case_1",
+          name: "Double charge",
+          labels: [],
+          folderId: "suite_refunds",
+          parameters: [
+            { name: "model", defaultValue: "gpt-5-mini" },
+            { name: "api_key", secret: true },
+          ],
+          createdAt: new Date("2026-07-06T12:00:00.000Z"),
+          lastUpdatedById: null,
+          version: 1,
+        },
+      ],
+      isLoading: false,
+    });
+    renderDialog(suiteSubject());
+
+    await user.click(screen.getByTestId("customize-chip-params"));
+
+    expect(screen.getByTestId("run-dialog-parameter-line")).toHaveValue(
+      "model=gpt-5-mini",
+    );
+    const secret = screen.getByTestId("suite-run-parameter-api_key");
+    expect(secret).toHaveAttribute("type", "password");
+    expect(screen.getByTestId("run-dialog-run")).toBeDisabled();
+
+    await user.type(secret, "sk-live-1");
+    expect(screen.getByTestId("run-dialog-run")).toBeEnabled();
+
+    await user.click(screen.getByTestId("run-dialog-run"));
+    await waitFor(() => expect(mockSuitesRun).toHaveBeenCalled());
+    expect(mockSuitesRun.mock.calls[0]![0]).toMatchObject({
+      parameters: { model: "gpt-5-mini", api_key: "sk-live-1" },
+    });
   });
 
   /** @scenario "The prompt chip replaces the agent area" */

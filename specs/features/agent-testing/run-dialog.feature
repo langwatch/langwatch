@@ -71,6 +71,15 @@ Feature: The run dialog
     When "Override parameters" is chosen
     Then one input line is added for the parameter values
     And the values declared on the cases are already filled in
+    And a name written on that line is sent as the run parameter of that name
+
+  @integration
+  Scenario: A secret parameter keeps a masked field of its own
+    Given a test suite whose cases declare a secret parameter
+    When "Override parameters" is chosen
+    Then the secret is not on the input line, which would show what it holds
+    And it has a masked field under the line
+    And the run waits until the secret holds a value
 
   @integration
   Scenario: The prompt chip replaces the agent area

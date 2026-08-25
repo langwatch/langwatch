@@ -68,6 +68,16 @@ Feature: The Agent Testing page
     Then the header offers "New run plan"
     And it no longer offers "New test case"
 
+  # --- The content column ---
+
+  @integration
+  Scenario: The content is held to a column and centred on the page
+    Given the Agent Testing page is open on a wide window
+    When the test cases and the results are read one after the other
+    Then the content of each is held to one readable column
+    And the column is centred on the whole page, not on the space beside the rail
+    And the column does not move when the tab changes
+
   # --- Addresses ---
 
   @integration

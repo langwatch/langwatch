@@ -15,17 +15,14 @@
  * @see specs/suites/folder-run-plan-reuse.feature
  */
 
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { generate } from "@langwatch/ksuid";
 import { Play, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import { useFilteredAgents } from "~/components/scenarios/useFilteredScenarioTargets";
 import { RunParameterFields } from "~/components/suites/RunParameterFields";
-import {
-  toRunParameters,
-  unionParameterDefinitions,
-} from "~/components/suites/useRunSuite";
+import { unionParameterDefinitions } from "~/components/suites/useRunSuite";
 import { Dialog } from "~/components/ui/dialog";
 import {
   HandledErrorAlert,
@@ -43,9 +40,9 @@ import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { api } from "~/utils/api";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { displayOptionalValue } from "~/utils/jsonValueText";
 import { useAgentTestingStore } from "../useAgentTestingStore";
 import { type CustomizeRunChip, CustomizeRunChips } from "./CustomizeRunChips";
+import { formatParameterLine, toLineRunParameters } from "./parameter-line";
 import { isNoteTooLong, RunNoteField } from "./RunNoteField";
 import {
   AgentBlocks,
@@ -53,6 +50,9 @@ import {
   type RunDialogAgent,
   SetupAgentBox,
 } from "./RunTargetPicker";
+
+/** What the one parameter line reads when it is empty. */
+export const PARAMETER_LINE_PLACEHOLDER = "plan=free, locale=de";
 
 /** What the dialog is about to run. */
 export type RunDialogSubject =
@@ -140,9 +140,8 @@ export function RunDialog({
   const [showNote, setShowNote] = useState(false);
   const [note, setNote] = useState("");
   const [showParams, setShowParams] = useState(false);
-  const [parameterOverrides, setParameterOverrides] = useState<
-    Record<string, string>
-  >({});
+  const [parameterLine, setParameterLine] = useState("");
+  const [secretValues, setSecretValues] = useState<Record<string, string>>({});
   const [inlineError, setInlineError] = useState<unknown>(null);
   const [missingProvider, setMissingProvider] = useState(false);
   const agentTargetBeforePrompt = useRef<TargetValue>(null);
@@ -155,7 +154,8 @@ export function RunDialog({
     setShowNote(false);
     setNote("");
     setShowParams(false);
-    setParameterOverrides({});
+    setParameterLine("");
+    setSecretValues({});
     setInlineError(null);
     setMissingProvider(false);
     agentTargetBeforePrompt.current = null;
@@ -181,29 +181,27 @@ export function RunDialog({
     [scenarioIdsInRun, allScenarios],
   );
 
-  const parameterValues = useMemo(() => {
-    const values: Record<string, string> = {};
-    for (const definition of parameterDefinitions) {
-      values[definition.name] =
-        parameterOverrides[definition.name] ??
-        displayOptionalValue(definition.defaultValue);
-    }
-    return values;
-  }, [parameterDefinitions, parameterOverrides]);
+  // The line a single input can carry, and the secrets that cannot ride on it.
+  const secretDefinitions = useMemo(
+    () =>
+      parameterDefinitions.filter((definition) => definition.secret === true),
+    [parameterDefinitions],
+  );
+
+  /** Opens the overrides on the values the cases declare. */
+  const showParameters = useCallback(() => {
+    setParameterLine(formatParameterLine(parameterDefinitions));
+    setShowParams(true);
+  }, [parameterDefinitions]);
 
   const runParameters = showParams
-    ? toRunParameters({
-        definitions: parameterDefinitions,
-        values: parameterValues,
-      })
+    ? toLineRunParameters({ line: parameterLine, secretValues })
     : undefined;
 
   const missingSecrets =
     showParams &&
-    parameterDefinitions.some(
-      (definition) =>
-        definition.secret === true &&
-        (parameterValues[definition.name] ?? "") === "",
+    secretDefinitions.some(
+      (definition) => (secretValues[definition.name] ?? "") === "",
     );
 
   // --- Target choices -------------------------------------------------------
@@ -244,7 +242,7 @@ export function RunDialog({
     chips.push({
       key: "params",
       label: "Override parameters",
-      onAdd: () => setShowParams(true),
+      onAdd: showParameters,
     });
   }
   if (mode === "agents" && publishedPrompts.length > 0) {
@@ -324,10 +322,13 @@ export function RunDialog({
             {showParams && (
               <VStack
                 align="stretch"
-                gap={0}
+                gap={1}
                 data-testid="run-dialog-parameters"
               >
-                <HStack justify="flex-end">
+                <HStack gap={1}>
+                  <Text fontSize="xs" fontWeight="medium" color="fg.muted">
+                    Parameters
+                  </Text>
                   <Button
                     size="2xs"
                     variant="ghost"
@@ -335,23 +336,38 @@ export function RunDialog({
                     aria-label="Remove the parameter overrides"
                     onClick={() => {
                       setShowParams(false);
-                      setParameterOverrides({});
+                      setParameterLine("");
+                      setSecretValues({});
                     }}
                   >
                     <X size={12} />
                   </Button>
                 </HStack>
-                <RunParameterFields
-                  parameters={parameterDefinitions}
-                  values={parameterValues}
-                  onChange={(name, value) =>
-                    setParameterOverrides((previous) => ({
-                      ...previous,
-                      [name]: value,
-                    }))
-                  }
+                <Input
+                  size="sm"
+                  fontFamily="mono"
+                  fontSize="13px"
+                  aria-label="Parameter overrides"
+                  placeholder={PARAMETER_LINE_PLACEHOLDER}
+                  value={parameterLine}
+                  onChange={(event) => setParameterLine(event.target.value)}
                   disabled={controller.isBusy}
+                  data-testid="run-dialog-parameter-line"
                 />
+                {secretDefinitions.length > 0 && (
+                  <RunParameterFields
+                    title="Secret parameters"
+                    parameters={secretDefinitions}
+                    values={secretValues}
+                    onChange={(name, value) =>
+                      setSecretValues((previous) => ({
+                        ...previous,
+                        [name]: value,
+                      }))
+                    }
+                    disabled={controller.isBusy}
+                  />
+                )}
               </VStack>
             )}
 
@@ -504,7 +520,7 @@ function useRunDialogSubmit({
   subject: RunDialogSubject | null;
   target: TargetValue;
   note: string;
-  runParameters: ReturnType<typeof toRunParameters>;
+  runParameters: ReturnType<typeof toLineRunParameters>;
   onRunStarted: (info: RunStartedInfo) => void;
   onCaseRunSettled?: (scenarioId: string) => void;
   onClose: () => void;

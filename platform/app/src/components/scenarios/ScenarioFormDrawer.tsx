@@ -11,7 +11,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { generate } from "@langwatch/ksuid";
-import { History, Lock } from "lucide-react";
+import { History, Lock, Play } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   type FieldErrors,
@@ -87,6 +87,10 @@ export type ScenarioEditorVariant = "agent-testing";
 /** What the Agent Testing editor says a test case is for. */
 export const AGENT_TESTING_EDITOR_DESCRIPTION =
   "Test your agent on a critical path or edge case";
+
+/** Why Run is off on a test case that has never run. */
+export const NO_REMEMBERED_TARGET_HINT =
+  "Run this test case from the table first, to choose the agent it runs against.";
 
 /**
  * Model overrides chosen in the run dialog. Omitted on a plain save so the
@@ -462,7 +466,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
               toaster.create({
                 title: "Configure scenario mappings",
                 description:
-                  'Map at least one scenario input — "input" or "messages" — to an agent input before running this workflow agent.',
+                  'Map at least one scenario input, "input" or "messages", to an agent input before running this workflow agent.',
                 type: "warning",
                 action: {
                   label: "Open agent editor",
@@ -579,7 +583,13 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         const saved = await handleSave({ data, skipTransition: true });
         if (saved) {
           toaster.create({
-            title: scenario ? "Scenario updated" : "Scenario created",
+            title: isAgentTesting
+              ? scenario
+                ? "Test case updated"
+                : "Test case created"
+              : scenario
+                ? "Scenario updated"
+                : "Scenario created",
             type: "success",
           });
           onClose();
@@ -588,7 +598,14 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         // Error already handled by mutation onError callback
       }
     }, openParametersOnInvalid)();
-  }, [handleSave, scenario, formInstance, onClose, openParametersOnInvalid]);
+  }, [
+    handleSave,
+    scenario,
+    formInstance,
+    onClose,
+    openParametersOnInvalid,
+    isAgentTesting,
+  ]);
   const setFormRef = useCallback(
     (form: UseFormReturn<ScenarioFormData> | null) => {
       setFormInstance(form);
@@ -634,7 +651,9 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
             {isAgentTesting ? (
               <HStack gap={2}>
                 <Heading size="md">
-                  {scenarioId || scenario ? "Edit Scenario" : "Create Scenario"}
+                  {scenarioId || scenario
+                    ? "Edit test case"
+                    : "New test case"}
                 </Heading>
                 <CaseVersionChip version={scenario?.version} />
               </HStack>
@@ -699,7 +718,10 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
             </GridItem>
             {/* Right: Help Sidebar */}
             <GridItem overflowY="auto" padding={4} bg="bg.muted">
-              <ScenarioEditorSidebar form={formInstance} />
+              <ScenarioEditorSidebar
+                form={formInstance}
+                variant={props.variant}
+              />
             </GridItem>
           </Grid>
         </Drawer.Body>
@@ -737,17 +759,34 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
                 and nothing to save at all once the read has failed: the body
                 is an error state, not a form. `handleSave` refuses either way,
                 so this is what says so rather than what enforces it. */}
+            {/* Agent Testing reads three plain buttons: Cancel, Save, Run.
+                The Run button uses the agent this test case last ran against,
+                which the run dialog on the table remembers. */}
             {!hasReadFailed && isAgentTesting && (
-              <Button
-                variant="outline"
-                size="sm"
-                loading={isSubmitting}
-                onClick={() => void handleSaveWithoutRunning()}
-              >
-                Save
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  loading={isSubmitting}
+                  onClick={() => void handleSaveWithoutRunning()}
+                >
+                  Save
+                </Button>
+                <Button
+                  colorPalette="blue"
+                  size="sm"
+                  loading={isSubmitting}
+                  disabled={!selectedTarget || isHydrating}
+                  title={selectedTarget ? undefined : NO_REMEMBERED_TARGET_HINT}
+                  onClick={() => void handleSaveAndRun(selectedTarget)}
+                  data-testid="editor-run"
+                >
+                  <Play size={14} />
+                  Run
+                </Button>
+              </>
             )}
-            {!hasReadFailed && (
+            {!hasReadFailed && !isAgentTesting && (
               <SaveAndRunMenu
                 selectedTarget={selectedTarget}
                 onTargetChange={handleTargetChange}

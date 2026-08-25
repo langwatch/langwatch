@@ -18,14 +18,20 @@ import {
   EXTERNAL_SET_PREFIX,
   isExternalSetSelection,
 } from "~/components/suites/useSuiteRouting";
-import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
+import {
+  getOnPlatformSetId,
+  isOnPlatformSet,
+} from "~/server/scenarios/internal-set-id";
 import type {
   ExternalSetSummary,
   ScenarioRunData,
   SuiteRunSummary,
 } from "~/server/scenarios/scenario-event.types";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
-import { ONE_OFF_RUNS_PLAN_SLUG } from "../useAgentTestingRouting";
+import {
+  ONE_OFF_RUNS_PLAN_SLUG,
+  RESULTS_SEGMENT,
+} from "../useAgentTestingRouting";
 
 /** What the one-off run plan reads as in the v2 interface. */
 export const ONE_OFF_RUNS_DISPLAY_NAME = "One-off runs";
@@ -73,6 +79,33 @@ export type RunPlanSuite = {
 /** The address segment an external set is opened by. */
 export function toExternalPlanSlug(scenarioSetId: string): string {
   return `${EXTERNAL_SET_PREFIX}${scenarioSetId}`;
+}
+
+/**
+ * The Agent Testing address that shows the run a v1 handoff names.
+ *
+ * The SDK hands a tab a `/simulations/:scenarioSetId/:batchRunId` address,
+ * built on the server from ids. A reader of the v2 interface belongs on the
+ * run of the plan that set is read as, not on the v1 page.
+ *
+ * Returns null for anything that is not a v1 run address, so the caller can
+ * follow it as it stands.
+ *
+ * @see specs/features/agent-testing/page-structure.feature
+ */
+export function toAgentTestingRunPath(pathname: string): string | null {
+  const match = pathname.match(/^\/([^/]+)\/simulations\/([^/]+)\/([^/]+)\/?$/);
+  if (!match) return null;
+
+  const [, projectSlug, rawSetId, batchRunId] = match;
+  if (!projectSlug || !rawSetId || !batchRunId) return null;
+
+  const scenarioSetId = decodeURIComponent(rawSetId);
+  const planSlug = isOnPlatformSet(scenarioSetId)
+    ? ONE_OFF_RUNS_PLAN_SLUG
+    : toExternalPlanSlug(scenarioSetId);
+
+  return `/${projectSlug}/agent-testing/${RESULTS_SEGMENT}/${planSlug}/${batchRunId}`;
 }
 
 function toLastRun(
@@ -235,6 +268,10 @@ export function toRunGroupSummary(lastRun: RunPlanLastRun): RunGroupSummary {
  * The newest run of the window is the last one that happened in it, so the
  * count of runs in the window names it. Older runs count down from there.
  * When the total is not known yet, the loaded runs are the best answer.
+ *
+ * The loaded runs are also the floor of the count. A run that has just
+ * finished is in the list before the count query has read it again, and a
+ * count lower than the list would name two runs the same.
  */
 export function runOrdinal({
   index,
@@ -248,7 +285,7 @@ export function runOrdinal({
   /** Runs fetched so far. */
   loadedCount: number;
 }): number {
-  const highest = totalCount ?? loadedCount;
+  const highest = Math.max(totalCount ?? 0, loadedCount);
   return Math.max(highest - index, 1);
 }
 

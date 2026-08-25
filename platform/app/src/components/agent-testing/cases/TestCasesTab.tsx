@@ -341,7 +341,6 @@ export function TestCasesTab({ onNewTestCase }: TestCasesTabProps) {
         selection={selection}
         suites={suites}
         externalSets={externalSets}
-        allCasesCount={cases.length}
         isLoading={isLoading}
         canManage={canManage}
         suiteIdsWithRuns={suiteIdsWithRuns}

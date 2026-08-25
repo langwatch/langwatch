@@ -24,7 +24,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { History, Square } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CopyButton } from "~/components/CopyButton";
 import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
 import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
@@ -47,6 +47,10 @@ import {
   isCancellableStatus,
   useCancelScenarioRun,
 } from "~/components/suites/useCancelScenarioRun";
+import {
+  isTerminalStatus,
+  type ScenarioRunStatus,
+} from "~/server/scenarios/scenario-event.enums";
 import { Drawer } from "~/components/ui/drawer";
 import { Tooltip } from "~/components/ui/tooltip";
 import { HandledErrorAlert } from "~/features/errors";
@@ -61,6 +65,9 @@ import { CaseVersionChip } from "../shared/CaseVersionChip";
 
 /** How wide the window must be before the results sit beside the conversation. */
 export const SIDE_BY_SIDE_MIN_WIDTH = 1100;
+
+/** What the console title bar reads in Agent Testing. */
+export const AGENT_TESTING_CONSOLE_FILE_NAME = "test-results.log";
 
 /** True when the window gives the side-by-side layout enough room. */
 export function useSideBySideLayout(): boolean {
@@ -78,6 +85,55 @@ export function useSideBySideLayout(): boolean {
   }, []);
 
   return sideBySide;
+}
+
+/** True once the judge has said something about this run. */
+function hasCriteria(scenarioState: {
+  results?: {
+    metCriteria?: string[] | null;
+    unmetCriteria?: string[] | null;
+  } | null;
+}): boolean {
+  const results = scenarioState.results;
+  if (!results) return false;
+  return (
+    (results.metCriteria?.length ?? 0) + (results.unmetCriteria?.length ?? 0) > 0
+  );
+}
+
+/**
+ * Reads the stored run once more the moment the run settles.
+ *
+ * The event that carries the terminal status can beat the write of the
+ * results, and a settled run stops polling, so without this the drawer keeps
+ * the state it held while the run was still going: no criteria, and no
+ * success rate.
+ */
+function useRereadOnSettled({
+  scenarioRunId,
+  scenarioState,
+  open,
+}: {
+  scenarioRunId: string | undefined;
+  scenarioState: { status: ScenarioRunStatus; results?: unknown } | undefined;
+  open: boolean;
+}): void {
+  const utils = api.useUtils();
+  const utilsRef = useRef(utils);
+  utilsRef.current = utils;
+
+  const settledWithoutResults =
+    !!scenarioState &&
+    isTerminalStatus(scenarioState.status) &&
+    !hasCriteria(scenarioState as Parameters<typeof hasCriteria>[0]);
+
+  useEffect(() => {
+    if (!open || !scenarioRunId || !settledWithoutResults) return;
+    const timer = setTimeout(() => {
+      void utilsRef.current.scenarios.getRunState.invalidate({ scenarioRunId });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [open, scenarioRunId, settledWithoutResults]);
 }
 
 /**
@@ -131,6 +187,8 @@ export function AgentTestingRunDrawer({ open }: { open?: boolean }) {
 
   const detail = useScenarioRunDetail({ scenarioRunId, open: !!open });
   const { scenarioState } = detail;
+
+  useRereadOnSettled({ scenarioRunId, scenarioState, open: !!open });
 
   const sideBySide = useSideBySideLayout();
 
@@ -557,8 +615,11 @@ function ResultsSection({
   const { scenarioState } = detail;
   if (!scenarioState) return null;
 
+  // A run that has not settled has no verdict, whatever its stored results
+  // hold. Drawing the console then reads "0/0", which says the judge failed
+  // every criterion rather than that it has not spoken yet.
   const judgePending =
-    !scenarioState.results && isCancellableStatus(scenarioState.status);
+    !isTerminalStatus(scenarioState.status) && !hasCriteria(scenarioState);
 
   return (
     <RunDetailSection
@@ -587,6 +648,7 @@ function ResultsSection({
           boxShadow="sm"
         >
           <SimulationConsole
+            fileName={AGENT_TESTING_CONSOLE_FILE_NAME}
             results={scenarioState.results}
             scenarioName={scenarioState.name ?? undefined}
             status={scenarioState.status}

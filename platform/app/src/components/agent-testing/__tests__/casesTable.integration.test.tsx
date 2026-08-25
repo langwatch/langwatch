@@ -356,7 +356,7 @@ describe("the test cases table", () => {
   });
 
   /** @scenario "The row menu offers Edit, Duplicate, Open last run and Archive in order" */
-  it("offers Edit, Duplicate, Move to suite, Open last run and Archive in order", async () => {
+  it("offers Edit, Duplicate, Open last run, Move to suite and Archive in order", async () => {
     renderPanel({
       groups: groupCasesByFolder({ cases: [makeCase()], suites: [REFUNDS] }),
       lastResults: new Map([["case_1", makeResult()]]),
@@ -369,8 +369,8 @@ describe("the test cases table", () => {
     expect(items).toEqual([
       "Edit",
       "Duplicate",
-      "Move to suite",
       "Open last run",
+      "Move to suite",
       "History",
       "Archive",
     ]);
@@ -589,6 +589,14 @@ describe("the test cases table", () => {
     const line = screen.getByTestId("cases-last-run-line");
     expect(line).toHaveTextContent("Last run on Jul 8");
     expect(within(line).getByText("100%")).toBeInTheDocument();
+    // The date sits directly left of the result, with nothing pushing them
+    // apart, so the pair reads at the right edge of the line.
+    expect(line.children).toHaveLength(2);
+    expect(line.children[0]).toHaveTextContent("Last run on");
+    expect(line.children[1]).toHaveAttribute(
+      "data-testid",
+      "run-metrics-summary",
+    );
   });
 
   /** @scenario "All test cases reads Last full run at" */

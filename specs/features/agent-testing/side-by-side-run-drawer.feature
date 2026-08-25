@@ -64,6 +64,15 @@ Feature: The wide run detail drawer
     When messages arrive
     Then the conversation grows on the left
     And the results side reads that the judge has not run yet
+    And it never reads a score of 0 out of 0
+
+  @integration
+  Scenario: The criteria appear the moment the run settles
+    Given a running run open in the wide drawer
+    When the run reaches its verdict
+    Then the stored run is read again
+    And the criteria and the success rate read in the results
+    And the drawer does not have to be closed and opened again
 
   # --- v1 is unchanged ---
 

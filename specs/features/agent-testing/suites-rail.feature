@@ -11,6 +11,9 @@ Feature: The test suites rail
     An external set is read-only in the platform. It has no Run and no Edit,
     and choosing it opens its results.
 
+    No row of the rail carries a count. How many test cases a set holds reads
+    beside the title of the panel, once, and not on every row.
+
   # --- What is listed ---
 
   @integration
@@ -20,6 +23,7 @@ Feature: The test suites rail
     Then "All test cases" is the first entry
     And the two test suites follow it under a "Test Suites" heading
     And the external set follows them under an "External Sets" heading
+    And no entry carries a count
 
   @integration
   Scenario: An external set carries the code icon and no counts

@@ -19,7 +19,10 @@ import {
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
+import {
+  NO_REMEMBERED_TARGET_HINT,
+  ScenarioFormDrawer,
+} from "~/components/scenarios/ScenarioFormDrawer";
 import { ScenarioVersionHistoryDrawer } from "../drawers/ScenarioVersionHistoryDrawer";
 
 const mocks = vi.hoisted(() => ({
@@ -35,6 +38,8 @@ const mocks = vi.hoisted(() => ({
   mockCloseDrawer: vi.fn(),
   mockParams: {} as Record<string, string | undefined>,
   canManage: true,
+  /** The agent this case last ran against, as the editor remembers it. */
+  persistedTarget: null as { type: string; id: string } | null,
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -170,10 +175,10 @@ vi.mock("~/hooks/useRunScenario", () => ({
 
 vi.mock("~/hooks/useScenarioTarget", () => ({
   useScenarioTarget: () => ({
-    target: null,
+    target: mocks.persistedTarget,
     setTarget: vi.fn(),
     clearTarget: vi.fn(),
-    hasPersistedTarget: false,
+    hasPersistedTarget: !!mocks.persistedTarget,
   }),
 }));
 
@@ -341,6 +346,62 @@ describe("the version chip in the case editor", () => {
   });
 });
 
+/** @see specs/features/agent-testing/cases-table.feature */
+describe("the case editor footer", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.mockParams = {};
+    mocks.canManage = true;
+    mocks.persistedTarget = null;
+    mocks.mockGetById.mockReturnValue({
+      data: scenarioAt(4),
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: mocks.mockGetByIdRefetch,
+    });
+  });
+
+  afterEach(cleanup);
+
+  const renderEditor = () =>
+    render(
+      <ScenarioFormDrawer
+        open
+        scenarioId="case_1"
+        variant="agent-testing"
+        onClose={vi.fn()}
+      />,
+      { wrapper: Wrapper },
+    );
+
+  /** @scenario "The case editor footer holds Cancel, Save and Run, with no dropdown" */
+  it("holds Cancel, Save and Run, and no Save-and-Run dropdown", async () => {
+    mocks.persistedTarget = { type: "http", id: "agent_1" };
+    renderEditor();
+    await screen.findByTestId("case-version-4");
+
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+    const run = screen.getByTestId("editor-run");
+    expect(run).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: /Save and Run/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Edit test case")).toBeInTheDocument();
+  });
+
+  /** @scenario "Run is off on a test case that never ran" */
+  it("turns Run off, and says why, on a case with no remembered agent", async () => {
+    renderEditor();
+    await screen.findByTestId("case-version-4");
+
+    const run = screen.getByTestId("editor-run");
+    expect(run).toBeDisabled();
+    expect(run).toHaveAttribute("title", NO_REMEMBERED_TARGET_HINT);
+  });
+});
+
 describe("the History drawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -413,6 +474,30 @@ describe("the History drawer", () => {
     expect(
       within(row).getByText(/changed situation, criteria · .+/),
     ).toBeInTheDocument();
+  });
+
+  /** @scenario "The version a restore wrote says that it is a restore" */
+  it("reads a restored version as a restore, not as a field change", () => {
+    mocks.mockListVersions.mockReturnValue({
+      data: {
+        versions: [
+          versionEntry({
+            version: 4,
+            changedFields: ["name", "criteria"],
+            changeDescription: "Restored from v1",
+          }),
+          versionEntry({ version: 1, changedFields: [] }),
+        ],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: mocks.mockListVersionsRefetch,
+    });
+    renderHistory();
+
+    const row = screen.getByTestId("version-row-4");
+    expect(within(row).getByText(/Restored from v1 · .+/)).toBeInTheDocument();
+    expect(within(row).queryByText(/changed name/)).not.toBeInTheDocument();
   });
 
   /** @scenario "Choosing a version shows what it held" */

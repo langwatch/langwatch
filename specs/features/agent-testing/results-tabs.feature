@@ -57,6 +57,13 @@ Feature: The Results tab
     And the result circle under the name still reads the outcome
 
   @integration
+  Scenario: Two runs never carry the same number
+    Given a run plan whose newest run has just finished
+    When the runs sidebar is read before the run count is read again
+    Then the newest run carries a number of its own
+    And no two runs in the sidebar read the same number
+
+  @integration
   Scenario: The runs sidebar loads more runs on request
     Given a run plan with more runs than one page holds
     When the end of the runs sidebar is reached
@@ -71,6 +78,20 @@ Feature: The Results tab
     When the run is selected
     Then a table lists one row per case and target pair
     And each row shows the verdict, the duration and the cost
+
+  @integration
+  Scenario: A row that has not settled shows no time and no cost
+    Given a run whose first case is still running
+    When the results table is read
+    Then the time and cost cell of that row is empty
+    And the cell fills in once the case reaches its verdict
+
+  @integration
+  Scenario: The row menu of a result opens the editor of the test case
+    Given a finished run of one case
+    When the row menu of the result is opened
+    Then it offers "Edit test case"
+    And choosing it opens the editor of that test case
 
   @integration
   Scenario: The classic grid can be switched on and stays on
