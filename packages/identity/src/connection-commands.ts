@@ -343,6 +343,10 @@ export type SsoConnectionCommand =
   | { type: typeof ATTEST_DOMAIN_COMMAND_TYPE; data: AttestDomainCommandData }
   | { type: typeof VERIFY_DOMAIN_COMMAND_TYPE; data: VerifyDomainCommandData }
   | {
+      type: typeof WITHDRAW_DOMAIN_COMMAND_TYPE;
+      data: WithdrawDomainCommandData;
+    }
+  | {
       type: typeof RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE;
       data: RecordDomainProofAbsentCommandData;
     }
