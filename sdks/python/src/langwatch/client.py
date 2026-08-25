@@ -3,6 +3,7 @@ import os
 import logging
 import threading
 from typing import List, Optional, Sequence, ClassVar
+from urllib.parse import urlsplit
 
 from langwatch.__version__ import __version__
 from langwatch.attributes import AttributeKey
@@ -719,8 +720,11 @@ class Client(LangWatchClientProtocol):
         }
 
         if Client._debug:
+            # A configured URL can carry credentials in its userinfo, so the
+            # line names the host the exporter will send to and nothing else.
+            host = urlsplit(Client._endpoint_url or "").hostname
             logger.info(
-                f"Configuring OTLP exporter with endpoint: {Client._endpoint_url}/api/otel/v1/traces"
+                "Configuring OTLP exporter for %s", host or "the configured endpoint"
             )
 
         otlp_exporter = OTLPSpanExporter(
