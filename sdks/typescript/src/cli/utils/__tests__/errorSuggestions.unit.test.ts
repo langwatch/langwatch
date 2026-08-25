@@ -16,6 +16,7 @@ const domain = (overrides: Partial<CliHandledError> = {}): CliHandledError => ({
   meta: {},
   isHandled: true,
   ...overrides,
+  retryable: overrides.retryable ?? false,
 });
 
 describe("fallbackSuggestionsFor", () => {

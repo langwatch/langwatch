@@ -87,6 +87,8 @@ export interface GovernanceSetupState {
 export class GovernanceCliError extends Error {
   /** Brands this for `handledErrorFromThrown` — see the SDK's LangWatchHandledError. */
   readonly isLangWatchHandledError = true as const;
+  /** Local precondition failures are never retried unchanged. */
+  readonly retryable = false;
   /** ADR-045 handled-error status; equals {@link status}, read by the render pipeline. */
   readonly httpStatus: number;
   /** Domain context, if any. Empty for the CLI's own client-side failures. */

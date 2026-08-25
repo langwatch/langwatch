@@ -230,6 +230,7 @@ export const commandValidationError = (
   httpStatus: 0,
   meta,
   isHandled: true,
+  retryable: false,
 });
 
 /**

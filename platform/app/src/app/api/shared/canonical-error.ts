@@ -69,6 +69,7 @@ const VALIDATION_ERROR_STATUS = 400;
 export interface ApiErrorReason {
   code: string;
   message: string;
+  retryable: boolean;
   meta?: Record<string, unknown>;
 }
 
@@ -77,6 +78,7 @@ function reasonsOf(error: unknown): ApiErrorReason[] {
   return error.serialize().reasons.map((reason) => ({
     code: reason.code,
     message: typeof reason.meta?.message === "string" ? reason.meta.message : reason.code,
+    retryable: reason.retryable,
     ...(reason.meta && Object.keys(reason.meta).length > 0 ? { meta: reason.meta } : {}),
   }));
 }

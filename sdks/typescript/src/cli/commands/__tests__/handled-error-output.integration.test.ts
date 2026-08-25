@@ -59,6 +59,7 @@ const notFound = () =>
       httpStatus: 404,
       meta: { id: "trace-abc" },
       isHandled: true,
+      retryable: false,
       traceId: "4bf92f3577b34da6a3ce929d0e0e4736",
     },
     body: { error: "trace_not_found", message: "Trace not found: trace-abc" },

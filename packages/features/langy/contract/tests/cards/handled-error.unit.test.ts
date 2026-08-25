@@ -37,6 +37,7 @@ describe("parseHandledError, given dialect 1 (the flattened Hono handler body)",
       message: "Dataset not found: sales-q3",
       httpStatus: 404,
       isHandled: true,
+      retryable: false,
     });
   });
 
@@ -83,10 +84,13 @@ describe("parseHandledError, given dialect 2 (serialize() under `domainError`)",
         domainError: {
           code: "rate_limited",
           kind: "rate_limited",
+          retryable: true,
           meta: { retryAfterSeconds: 30 },
           traceId: TRACE_ID,
           traceUrl: "https://grafana.example.com/explore?traceId=4bf",
-          reasons: [{ code: "upstream_saturated", kind: "upstream_saturated" }],
+          reasons: [
+            { code: "upstream_saturated", kind: "upstream_saturated", retryable: true },
+          ],
           suggestions: ["Back off and retry"],
           docUrl: "https://langwatch.ai/docs/ai-gateway/rate-limits",
         },
@@ -99,7 +103,8 @@ describe("parseHandledError, given dialect 2 (serialize() under `domainError`)",
       meta: { retryAfterSeconds: 30 },
       traceId: TRACE_ID,
       traceUrl: "https://grafana.example.com/explore?traceId=4bf",
-      reasons: [{ kind: "upstream_saturated" }],
+      reasons: [{ kind: "upstream_saturated", retryable: true }],
+      retryable: true,
       suggestions: ["Back off and retry"],
       docUrl: "https://langwatch.ai/docs/ai-gateway/rate-limits",
       isHandled: true,
@@ -472,6 +477,7 @@ describe("handledErrorFromThrown", () => {
       suggestions: ["Raise the budget"],
       docUrl: "https://langwatch.ai/docs/ai-gateway/budgets",
       isHandled: true,
+      retryable: false,
     });
   });
 
@@ -485,6 +491,7 @@ describe("handledErrorFromThrown", () => {
     });
 
     expect(parsed.code).toBe("dataset_not_found");
+    expect(parsed.retryable).toBe(false);
   });
 
   it("unwraps a service wrapper to the wire body underneath", () => {
@@ -504,6 +511,7 @@ describe("handledErrorFromThrown", () => {
       message: "Dataset not found: sales-q3",
       meta: { id: "sales-q3" },
       isHandled: true,
+      retryable: false,
     });
   });
 

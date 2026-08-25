@@ -226,6 +226,7 @@ function reportProjectScopeError(error: ProjectScopeError): never {
         httpStatus: 0,
         meta: { project: error.project },
         isHandled: true,
+        retryable: false,
       }),
     );
     console.error(chalk.red(`Error: ${error.message}`));
@@ -416,6 +417,7 @@ function reportMissingCredentials(endpoint: string): never {
         httpStatus: 0,
         meta: { authUrl },
         isHandled: true,
+        retryable: false,
       }),
     );
     console.error(
@@ -456,6 +458,7 @@ export const checkOrgApiKey = (): string => {
         httpStatus: 0,
         meta: { settingsUrl },
         isHandled: true,
+        retryable: false,
       }),
     );
     console.error(chalk.red("Error: LANGWATCH_API_KEY not found."));

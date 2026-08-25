@@ -116,5 +116,17 @@ describe("canonicalErrorFor", () => {
 
       expect(body.error.retryable).toBe(true);
     });
+
+    it("preserves retryability for each exposed reason", () => {
+      const { body } = canonicalErrorFor(
+        new ValidationError("The request could not be completed", {
+          reasons: [new ValidationError("The provider is busy", { retryable: true })],
+        }),
+      );
+
+      expect(body.error.meta).toMatchObject({
+        reasons: [{ code: "validation_error", retryable: true }],
+      });
+    });
   });
 });

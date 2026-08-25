@@ -37,6 +37,8 @@
  */
 export interface CliHandledErrorReason {
   kind: string;
+  /** Whether retrying this underlying failure unchanged may succeed. */
+  retryable: boolean;
   meta?: Record<string, unknown>;
   reasons?: CliHandledErrorReason[];
 }
@@ -65,6 +67,8 @@ export interface CliHandledError {
    * fault.
    */
   isHandled: boolean;
+  /** Whether the platform explicitly permits retrying the same request. */
+  retryable: boolean;
   /**
    * The OTel trace the failure happened on, when the route sent it.
    *
@@ -140,6 +144,7 @@ const asReasons = (value: unknown): CliHandledErrorReason[] | undefined => {
     )
     .map((r) => ({
       kind: (typeof r.code === "string" ? r.code : r.kind) as string,
+      retryable: r.retryable === true,
       ...(asRecord(r.meta) ? { meta: asRecord(r.meta)! } : {}),
       ...(asReasons(r.reasons) ? { reasons: asReasons(r.reasons) } : {}),
     }));
@@ -189,6 +194,7 @@ interface ErrorBody {
   code: string;
   message?: string;
   meta: Record<string, unknown>;
+  retryable: boolean;
   traceId?: string;
   traceUrl?: string;
   logsUrl?: string;
@@ -259,6 +265,7 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
             ? record.message
             : undefined,
       meta: asRecord(serialized.meta) ?? {},
+      retryable: serialized.retryable === true,
       traceId:
         typeof serialized.traceId === "string"
           ? serialized.traceId
@@ -342,6 +349,7 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
     // `fault` is the envelope's own ("customer" vs "platform"), not something
     // the platform attached to this failure.
     fault,
+    retryable,
     ...rest
   } = record;
 
@@ -372,6 +380,7 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
     message: sentence,
     // Dialect 3 carries meta as its own key; dialect 1 spreads it flat.
     meta: nestedMeta ?? rest,
+    retryable: retryable === true,
     traceId:
       typeof traceRecord?.traceId === "string"
         ? traceRecord.traceId
@@ -474,6 +483,7 @@ export const parseHandledError = ({
       httpStatus: status,
       meta: {},
       isHandled: false,
+      retryable: false,
     };
   }
 
@@ -484,6 +494,7 @@ export const parseHandledError = ({
     message: parsed.message ?? parsed.code,
     httpStatus: status,
     meta: parsed.meta,
+    retryable: parsed.retryable,
     ...(parsed.traceId ? { traceId: parsed.traceId } : {}),
     ...(parsed.traceUrl ? { traceUrl: parsed.traceUrl } : {}),
     ...(parsed.logsUrl ? { logsUrl: parsed.logsUrl } : {}),
@@ -567,6 +578,7 @@ export const readCliErrorDocument = (output: unknown): CliHandledError | null =>
     httpStatus: typeof error.httpStatus === "number" ? error.httpStatus : 0,
     meta: asRecord(error.meta) ?? {},
     isHandled: error.isHandled === true,
+    retryable: error.retryable === true,
     ...(typeof error.traceId === "string" ? { traceId: error.traceId } : {}),
     ...(typeof error.traceUrl === "string" ? { traceUrl: error.traceUrl } : {}),
     ...(typeof error.logsUrl === "string" ? { logsUrl: error.logsUrl } : {}),
@@ -613,6 +625,7 @@ const asAlreadyReadHandledError = (
     httpStatus: typeof outer.httpStatus === "number" ? outer.httpStatus : 0,
     meta: asRecord(outer.meta) ?? {},
     isHandled: true,
+    retryable: outer.retryable === true,
     ...(typeof outer.traceId === "string" ? { traceId: outer.traceId } : {}),
     ...(typeof outer.traceUrl === "string" ? { traceUrl: outer.traceUrl } : {}),
     ...(typeof outer.logsUrl === "string" ? { logsUrl: outer.logsUrl } : {}),

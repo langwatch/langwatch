@@ -27,9 +27,12 @@ const handledError = ({
   meta = { id: "sales-q3" } as Record<string, unknown>,
   traceId = "4bf92f3577b34da6a3ce929d0e0e4736" as string | undefined,
   traceUrl = undefined as string | undefined,
-  reasons = undefined as { kind: string; meta?: Record<string, unknown> }[] | undefined,
+  reasons = undefined as
+    | { kind: string; retryable?: boolean; meta?: Record<string, unknown> }[]
+    | undefined,
   suggestions = undefined as string[] | undefined,
   docUrl = undefined as string | undefined,
+  retryable = false,
 } = {}) =>
   new LangWatchHandledError({
     handled: {
@@ -39,9 +42,13 @@ const handledError = ({
       httpStatus,
       meta,
       isHandled: true,
+      retryable,
       traceId,
       traceUrl,
-      reasons,
+      reasons: reasons?.map((reason) => ({
+        ...reason,
+        retryable: reason.retryable ?? false,
+      })),
       suggestions,
       docUrl,
     },

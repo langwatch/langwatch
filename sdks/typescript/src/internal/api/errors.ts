@@ -65,6 +65,8 @@ export class LangWatchHandledError extends Error {
   readonly logsUrl: string | undefined;
   /** The failure behind the failure, when the route sent the chain. */
   readonly reasons: CliHandledErrorReason[] | undefined;
+  /** Whether the platform explicitly marked this failure safe to retry. */
+  readonly retryable: boolean;
   /** What the user can DO about it, when the platform sent next steps. */
   readonly suggestions: string[] | undefined;
   /** The docs page that explains the failure, when the platform sent one. */
@@ -107,6 +109,7 @@ export class LangWatchHandledError extends Error {
     this.traceUrl = handled.traceUrl;
     this.logsUrl = handled.logsUrl;
     this.reasons = handled.reasons;
+    this.retryable = handled.retryable;
     this.suggestions = handled.suggestions;
     this.docUrl = handled.docUrl;
     this.body = body;
